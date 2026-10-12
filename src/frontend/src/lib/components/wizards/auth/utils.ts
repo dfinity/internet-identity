@@ -16,6 +16,10 @@ export const ssoErrorMessage = (e: unknown, domainInput: string): string => {
       // The org gated this dapp off, so no client can serve this origin.
       return t`Your organization hasn't granted this app access via ${domainInput}.`;
     }
+    if (e.reason === "failed" && e.detail !== undefined) {
+      const detail = e.detail;
+      return t`${domainInput} can't be used for SSO: ${detail}`;
+    }
     // `timeout`: discovery never resolved — a wrong domain, or an unreachable
     // or failed discovery fetch (the canister keeps reporting `Pending` until
     // we time out) — so point the SSO admin at the discovery endpoint.

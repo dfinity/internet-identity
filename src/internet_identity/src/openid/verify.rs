@@ -9,6 +9,7 @@
 //! — this module is "the implementation up to the JWK read", and one step past
 //! it.
 
+use super::domain::Domain;
 use super::{
     get_all_claims, get_issuer_placeholders, replace_issuer_placeholders, AudClaim,
     OpenIDJWTVerificationError, OpenIdCredential,
@@ -115,7 +116,7 @@ pub(super) struct Descriptor {
 /// written onto the built credential, plus the claim (if any) carrying its
 /// cross-client-stable identifier.
 pub(super) struct SsoProvider {
-    pub domain: String,
+    pub domain: Domain,
     pub name: Option<String>,
     /// Claim holding the cross-client-stable id (e.g. Entra `oid`). `None` for a
     /// `sub` org, which keys identity on the token `sub` and needs no bridge.
@@ -523,14 +524,17 @@ mod tests {
             issuer: "https://accounts.google.com".to_string(),
             client_id: TEST_AUD.to_string(),
             sso: Some(SsoProvider {
-                domain: "example.org".to_string(),
+                domain: Domain::try_from("example.org").unwrap(),
                 name: Some("Example".to_string()),
                 stable_identifier_claim: None,
             }),
         };
         let credential = verify_and_build(VALID_JWT, &descriptor, &test_certs(), &test_salt())
             .expect("expected verification to succeed");
-        assert_eq!(credential.sso_domain, Some("example.org".to_string()));
+        assert_eq!(
+            credential.sso_domain,
+            Some(Domain::try_from("example.org").unwrap())
+        );
         assert_eq!(credential.sso_name, Some("Example".to_string()));
     }
 

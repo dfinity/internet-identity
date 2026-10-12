@@ -21,7 +21,7 @@
 //! (e.g. Google) would let an attacker's domain relabel a victim's sign-in onto
 //! the victim's anchor. A foreign domain matches nothing and fails safe.
 
-use super::{sso, verify, Cached, OpenIDJWTVerificationError, OpenIdCredential};
+use super::{sso, verify, Cached, Domain, OpenIDJWTVerificationError, OpenIdCredential};
 use crate::state;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegFinishError};
@@ -55,11 +55,9 @@ impl VerifiedSsoLogin {
 pub fn verify_sso_jwt(
     jwt: &str,
     salt: &[u8; 32],
-    discovery_domain: &str,
+    discovery_domain: &Domain,
     origin: &str,
 ) -> Result<Cached<VerifiedSsoLogin>, OpenIDJWTVerificationError> {
-    sso::validate_discovery_domain(discovery_domain)
-        .map_err(OpenIDJWTVerificationError::GenericError)?;
     let discovery_config = match sso::peek_discovery(discovery_domain) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(discovery_config) => discovery_config,
@@ -82,7 +80,7 @@ pub fn verify_sso_jwt(
         issuer: discovery_config.issuer.clone(),
         client_id: expected_client.clone(),
         sso: Some(verify::SsoProvider {
-            domain: discovery_domain.to_string(),
+            domain: discovery_domain.clone(),
             name: discovery_config.name.clone(),
             stable_identifier_claim: sso::non_default_stable_claim(
                 &discovery_config.stable_identifier_claim,
@@ -165,7 +163,7 @@ fn resolve_gated_ii_client_sub(
     verification: &VerifiedSsoLogin,
     stable_id: Option<&str>,
 ) -> Option<String> {
-    let sso_domain = verification.credential.sso_domain.as_deref()?;
+    let sso_domain = verification.credential.sso_domain.as_ref()?.as_str();
     let iss = &verification.credential.iss;
     let ii_client_id = &verification.ii_client_id;
     match stable_id {
@@ -208,7 +206,7 @@ fn ii_client_sub_on_anchor(
             .find(|cred| {
                 cred.iss == iss
                     && cred.aud == ii_client_id
-                    && cred.sso_domain.as_deref() == Some(sso_domain)
+                    && cred.sso_domain.as_ref().map(Domain::as_str) == Some(sso_domain)
                     && cred.stable_id.as_deref() == Some(stable_id)
             })
             .map(|cred| cred.sub.clone())
@@ -240,7 +238,7 @@ fn anchor_established_through_domain(
 pub fn verify_sso_for_registration(
     jwt: &str,
     salt: &[u8; 32],
-    discovery_domain: &str,
+    discovery_domain: &Domain,
     origin: &str,
 ) -> Result<Cached<OpenIdCredential>, IdRegFinishError> {
     let verification_outcome = match verify_sso_jwt(jwt, salt, discovery_domain, origin) {
@@ -291,10 +289,18 @@ mod tests {
     #[test]
     fn sso_gate_ungated_login_mints() {
         sso::test_setup_discovery(SSO_DOMAIN, sso_gate_config(vec![], false), test_certs());
-        match verify_sso_jwt(VALID_JWT, &test_salt(), SSO_DOMAIN, "https://public.app") {
+        match verify_sso_jwt(
+            VALID_JWT,
+            &test_salt(),
+            &Domain::try_from(SSO_DOMAIN).unwrap(),
+            "https://public.app",
+        ) {
             Ok(Cached::Ready(v)) => {
                 assert_eq!(v.credential.aud, TEST_AUD);
-                assert_eq!(v.credential.sso_domain, Some(SSO_DOMAIN.to_string()));
+                assert_eq!(
+                    v.credential.sso_domain,
+                    Some(Domain::try_from(SSO_DOMAIN).unwrap())
+                );
                 assert!(!v.is_gated());
             }
             other => panic!("expected Ready verification, got {other:?}"),
@@ -312,15 +318,25 @@ mod tests {
             sso_gate_config(app_clients, false),
             test_certs(),
         );
-        assert!(verify_sso_jwt(VALID_JWT, &test_salt(), SSO_DOMAIN, GATED_ORIGIN).is_err());
+        assert!(verify_sso_jwt(
+            VALID_JWT,
+            &test_salt(),
+            &Domain::try_from(SSO_DOMAIN).unwrap(),
+            GATED_ORIGIN
+        )
+        .is_err());
     }
 
     #[test]
     fn sso_gate_all_apps_denies_unlisted_origin() {
         sso::test_setup_discovery(SSO_DOMAIN, sso_gate_config(vec![], true), test_certs());
-        assert!(
-            verify_sso_jwt(VALID_JWT, &test_salt(), SSO_DOMAIN, "https://unlisted.app").is_err()
-        );
+        assert!(verify_sso_jwt(
+            VALID_JWT,
+            &test_salt(),
+            &Domain::try_from(SSO_DOMAIN).unwrap(),
+            "https://unlisted.app"
+        )
+        .is_err());
     }
 
     fn sso_verification(
@@ -350,7 +366,7 @@ mod tests {
                 },
                 last_usage_timestamp: None,
                 metadata: HashMap::new(),
-                sso_domain: Some(SSO_DOMAIN.to_string()),
+                sso_domain: Some(Domain::try_from(SSO_DOMAIN).unwrap()),
                 sso_name: None,
                 stable_id: None,
             },
@@ -528,7 +544,8 @@ mod tests {
         // identity: the domain is part of the lookup key, so a login through a
         // foreign domain fails safe rather than resolving onto it.
         let mut gated_other_domain = sso_verification(true, "oid", "pairwise", Some("oid-9"));
-        gated_other_domain.credential.sso_domain = Some("attacker.example".to_string());
+        gated_other_domain.credential.sso_domain =
+            Some(Domain::try_from("attacker.example").unwrap());
         assert!(matches!(
             resolve_ii_client_identity(&gated_other_domain),
             Err(OpenIdDelegationError::NoSuchAnchor)

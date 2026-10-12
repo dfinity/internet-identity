@@ -104,7 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
-use crate::openid::OpenIdCredentialKey;
+use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
@@ -1122,7 +1122,7 @@ impl<M: Memory + Clone> Storage<M> {
                 &cred.iss == iss
                     && &cred.sub == sub
                     && &cred.aud == aud
-                    && cred.sso_domain.as_deref() == discovery_domain
+                    && cred.sso_domain.as_ref().map(Domain::as_str) == discovery_domain
             })
             .then_some(anchor_number)
     }
@@ -1151,7 +1151,7 @@ impl<M: Memory + Clone> Storage<M> {
             .openid_credentials()
             .iter()
             .find(|cred| &cred.iss == iss && &cred.sub == sub && &cred.aud == aud)
-            .map(|cred| cred.sso_domain.clone())
+            .map(|cred| cred.sso_domain.clone().map(String::from))
     }
 
     /// The `(iss, sub, aud)` index read behind both lookups above.
