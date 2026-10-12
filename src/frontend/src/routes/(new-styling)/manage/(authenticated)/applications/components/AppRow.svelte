@@ -10,8 +10,9 @@
     /** The origin the app's identity is derived for: what its metadata is published
      *  on and its consent is keyed by. */
     origin: string;
-    /** The latest sign-in at the app, in milliseconds. */
-    lastUsedMillis: number;
+    /** The latest sign-in at the app, in milliseconds, or `undefined` where none was
+     *  used. */
+    lastUsedMillis: number | undefined;
     /** Whether the app may notify. None may while this Internet Identity does not
      *  notify. */
     allowed: boolean;
@@ -69,7 +70,11 @@
         {$t`Last visited`}
       </span>
       <span class="text-text-primary text-xs">
-        {$formatRelative(new Date(lastUsedMillis), { style: "long" })}
+        {#if lastUsedMillis !== undefined}
+          {$formatRelative(new Date(lastUsedMillis), { style: "long" })}
+        {:else}
+          {$t`Never`}
+        {/if}
       </span>
     </span>
     {#if showNotifications}

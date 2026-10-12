@@ -594,6 +594,15 @@ fn list_applications(
     Ok(account_management::list_applications(request.anchor_number))
 }
 
+/// Origins are taken as `list_applications` spells them; one the identity holds nothing
+/// at is already forgotten.
+#[update]
+fn forget_applications(request: ForgetApplicationsRequest) -> Result<(), ForgetApplicationsError> {
+    check_authz_and_record_activity(request.anchor_number)
+        .map_err(|_| ForgetApplicationsError::Unauthorized(caller()))?;
+    account_management::forget_applications(request.anchor_number, request.origins)
+}
+
 #[query]
 fn get_accounts(
     anchor_number: AnchorNumber,

@@ -138,9 +138,8 @@ export type AppSsoDomainStatus = { 'Available' : { 'name' : [] | [string] } } |
   } |
   { 'Pending' : null };
 /**
- * An app the identity has signed in to, for the user's own list of their apps. Only
- * apps some account was used at: consent, a named account or a chosen default can each
- * be stored at an app the identity never signed in to.
+ * An app the identity decided a permission for, allowed or denied, for the user's own
+ * list of their apps.
  */
 export interface ApplicationInfo {
   /**
@@ -159,9 +158,10 @@ export interface ApplicationInfo {
    */
   'last_notified' : [] | [Timestamp],
   /**
-   * The latest sign-in to any of the identity's accounts at the app.
+   * The latest sign-in to any of the identity's accounts at the app, or null where
+   * none was used.
    */
-  'last_used' : Timestamp,
+  'last_used' : [] | [Timestamp],
 }
 /**
  * Configuration parameters related to the archive.
@@ -821,6 +821,15 @@ export interface EmailRecoveryGetDelegationArgs {
   'session_key' : SessionKey,
   'expiration' : Timestamp,
   'nonce' : string,
+}
+export type ForgetApplicationsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export interface ForgetApplicationsRequest {
+  /**
+   * As list_applications spells them.
+   */
+  'origins' : Array<FrontendHostname>,
+  'anchor_number' : UserNumber,
 }
 /**
  * Reported where the client can state it and inferred where it cannot, so unknown is a
@@ -2580,6 +2589,17 @@ export interface _SERVICE {
    * Only callable by this IIs archive canister.
    */
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
+  /**
+   * Undoes every permission decision for the apps, drops what they queued for the
+   * identity's browsers and signs out every session at them, as one write. Accounts and
+   * the default account stay. An origin the identity holds nothing at is already
+   * forgotten.
+   */
+  'forget_applications' : ActorMethod<
+    [ForgetApplicationsRequest],
+    { 'Ok' : null } |
+      { 'Err' : ForgetApplicationsError }
+  >,
   'get_account_delegation' : ActorMethod<
     [
       UserNumber,
@@ -2729,8 +2749,8 @@ export interface _SERVICE {
    */
   'init_salt' : ActorMethod<[], undefined>,
   /**
-   * Every app the identity holds accounts at, so the user can see where they have
-   * signed in. Authorized by the identity's own access methods.
+   * Every app the identity decided a permission for, so the user can change or forget
+   * what they decided. Authorized by the identity's own access methods.
    */
   'list_applications' : ActorMethod<
     [ListApplicationsRequest],

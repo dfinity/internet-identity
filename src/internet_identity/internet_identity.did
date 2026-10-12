@@ -1525,15 +1525,15 @@ type AccountUpdate = record {
     name : opt text;
 };
 
-// An app the identity has signed in to, for the user's own list of their apps. Only
-// apps some account was used at: consent, a named account or a chosen default can each
-// be stored at an app the identity never signed in to.
+// An app the identity decided a permission for, allowed or denied, for the user's own
+// list of their apps.
 type ApplicationInfo = record {
     // The origin the app's identity is derived for: what its accounts and its
     // notification consent are stored under.
     origin : FrontendHostname;
-    // The latest sign-in to any of the identity's accounts at the app.
-    last_used : Timestamp;
+    // The latest sign-in to any of the identity's accounts at the app, or null where
+    // none was used.
+    last_used : opt Timestamp;
     // Whether the app may notify the identity: it holds consent, and this deployment
     // notifies for it, as notification_consent_granted answers.
     notifications_allowed : bool;
@@ -1547,6 +1547,17 @@ type ListApplicationsRequest = record {
 };
 
 type ListApplicationsError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type ForgetApplicationsRequest = record {
+    anchor_number : UserNumber;
+    // As list_applications spells them.
+    origins : vec FrontendHostname;
+};
+
+type ForgetApplicationsError = variant {
     Unauthorized : principal;
     InternalCanisterError : text;
 };
@@ -2273,9 +2284,14 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
     ) -> (variant { Ok : vec AccountInfo; Err: GetAccountsError }) query;
 
-    // Every app the identity holds accounts at, so the user can see where they have
-    // signed in. Authorized by the identity's own access methods.
+    // Every app the identity decided a permission for, so the user can change or forget
+    // what they decided. Authorized by the identity's own access methods.
     list_applications : (ListApplicationsRequest) -> (variant { Ok : vec ApplicationInfo; Err : ListApplicationsError }) query;
+    // Undoes every permission decision for the apps, drops what they queued for the
+    // identity's browsers and signs out every session at them, as one write. Accounts and
+    // the default account stay. An origin the identity holds nothing at is already
+    // forgotten.
+    forget_applications : (ForgetApplicationsRequest) -> (variant { Ok; Err : ForgetApplicationsError });
 
     create_account : (
         anchor_number : UserNumber,
