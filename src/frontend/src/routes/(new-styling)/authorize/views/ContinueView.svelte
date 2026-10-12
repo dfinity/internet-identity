@@ -558,7 +558,6 @@
   <div
     class={[
       "border-border-tertiary flex h-13 flex-row items-center gap-3 border-b ps-4 pe-1.5",
-      "has-focus-visible:ring-focus-ring has-focus-visible:ring-2 has-focus-visible:ring-inset",
       isSelected ? "bg-bg-quaternary" : "hover:bg-bg-tertiary",
     ]}
   >
@@ -607,7 +606,10 @@
           {$t`Account`}
         </span>
         <div
-          class="border-border-secondary bg-bg-primary mb-5 flex flex-col overflow-hidden rounded-xl border"
+          class={[
+            "border-border-secondary bg-bg-primary mb-5 flex flex-col overflow-hidden rounded-xl border",
+            "has-[input:focus-visible]:outline-focus-ring has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2",
+          ]}
         >
           <!-- Native radios: arrow keys, a single tab stop and the radio
                announcement come from the browser. -->
@@ -631,7 +633,10 @@
             hidden={!isAccountLimitReached}
           >
             <button
-              class="text-fg-primary hover:not-disabled:bg-bg-tertiary disabled:text-fg-disabled flex h-13 w-full cursor-pointer flex-row items-center gap-3 px-4 text-start text-sm font-semibold disabled:cursor-default"
+              class={[
+                "text-fg-primary hover:not-disabled:bg-bg-tertiary disabled:text-fg-disabled flex h-13 w-full cursor-pointer flex-row items-center gap-3 px-4 text-start text-sm font-semibold disabled:cursor-default",
+                "focus-visible:outline-focus-ring rounded-b-[calc(var(--radius-xl)-1px)] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2",
+              ]}
               onclick={() => (isCreateAccountDialogVisible = true)}
               disabled={isAccountLimitReached}
             >
