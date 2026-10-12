@@ -40,9 +40,7 @@ test.describe("session delegation — multiple accounts without re-auth", () => 
       authPage.getByRole("switch", { name: "Show all options" }),
     ).toBeChecked();
 
-    await expect(
-      authPage.getByRole("button", { name: /Continue with/ }),
-    ).toBeVisible();
+    await expect(authPage.getByRole("radio").first()).toBeVisible();
 
     const credentialDialog = await Promise.race([
       credentialPromise,

@@ -1,7 +1,12 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
+  import {
+    CheckIcon,
+    HelpCircleIcon,
+    PlusIcon,
+    PencilIcon,
+  } from "@lucide/svelte";
   import { handleError } from "$lib/components/utils/error";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
@@ -31,7 +36,7 @@
     AccountNumber,
   } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
-  import { slide, fade, scale } from "svelte/transition";
+  import { slide, fade } from "svelte/transition";
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import { accessLevelStore } from "$lib/stores/access-level.store";
@@ -169,8 +174,20 @@
   $effect(() => {
     if (!isMultipleAccountsEnabled) {
       accounts = undefined;
+      selectedAccountNumber = null;
     }
   });
+
+  // The account picked in the list, or `null` until the user picks one, in
+  // which case the default account is the one Continue signs in with.
+  let selectedAccountNumber = $state<
+    AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
+  >(null);
+  const chosenAccountNumber = $derived(
+    selectedAccountNumber !== null
+      ? selectedAccountNumber
+      : (defaultAccountNumber ?? undefined),
+  );
 
   let isCreateAccountDialogVisible = $state(false);
   let isEditAccountDialogVisibleForNumber = $state<
@@ -235,6 +252,7 @@
       selectedIdentityNumber,
     );
     defaultAccountNumber = null;
+    selectedAccountNumber = null;
     if (hydrated) {
       void handleEnableMultipleAccounts();
     }
@@ -532,66 +550,56 @@
   });
 </script>
 
-{#snippet accountListItem(account: AccountInfo)}
+{#snippet accountRow(account: AccountInfo)}
   {@const name = account.name[0] ?? primaryAccountName}
-  <div in:slide={{ duration: 300, delay: 300, axis: "y" }}>
-    <div
-      in:scale={{ duration: 300, delay: 450, start: 0.95 }}
-      class={[
-        // Layout
-        "relative flex flex-row items-stretch gap-3",
-        // Styling
-        "border-border-secondary bg-bg-primary rounded-sm border shadow-xs",
-        // Animate scale and shadow
-        "transition-all duration-100 ease-out",
-        // While an access level still needs choosing, the card can't authorize
-        // yet: drop the interactive affordances and dim it.
-        mustChooseAccess
-          ? "opacity-60"
-          : [
-              // Apply scale effect on hover
-              "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
-              // Also apply scale effect on keyboard focus besides hover
-              "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
-              // When cursor is between two items, we still want an item
-              // to be scaled and the cursor to be a pointer nonetheless.
-              "cursor-pointer after:absolute after:-inset-2 after:-z-1",
-            ],
-      ]}
+  {@const isSelected = account.account_number[0] === chosenAccountNumber}
+  <div
+    class={[
+      "border-border-tertiary flex h-13 flex-row items-center gap-3 border-b ps-4 pe-1.5",
+      isSelected ? "bg-bg-quaternary" : "hover:bg-bg-tertiary",
+    ]}
+  >
+    <button
+      role="radio"
+      aria-checked={isSelected}
+      onclick={() => (selectedAccountNumber = account.account_number[0])}
+      disabled={isAuthenticatingDefault}
+      class="flex min-w-0 flex-1 cursor-pointer flex-row items-center gap-3 self-stretch text-start outline-0"
     >
-      <button
-        onclick={() => handleContinueAs(account.account_number[0])}
-        disabled={mustChooseAccess}
-        class="flex flex-1 flex-row items-center text-start outline-0"
-        aria-label={$t`Continue with ${name}`}
-      >
-        <span class="text-text-primary flex-1 py-3 ps-5 text-sm font-semibold">
-          {name}
-        </span>
-        {#if account.account_number[0] === defaultAccountNumber}
-          <Badge size="sm">{$t`Default`}</Badge>
-        {/if}
-      </button>
-      <button
-        class="btn btn-tertiary btn-sm btn-icon my-3 me-3 shrink-0"
-        onclick={() => openEditAccountDialog(account.account_number[0])}
-        aria-label={$t`Edit ${name}`}
-      >
-        <PencilIcon class="size-5" />
-      </button>
-    </div>
+      <CheckIcon
+        class={["size-4.5 shrink-0", isSelected ? "opacity-100" : "opacity-0"]}
+      />
+      <span class="text-text-primary flex-1 truncate text-sm font-semibold">
+        {name}
+      </span>
+      {#if account.account_number[0] === defaultAccountNumber}
+        <Badge size="sm">{$t`Default`}</Badge>
+      {/if}
+    </button>
+    <button
+      class="btn btn-tertiary btn-sm btn-icon hover:!bg-bg-tertiary shrink-0"
+      onclick={() => openEditAccountDialog(account.account_number[0])}
+      aria-label={$t`Edit ${name}`}
+    >
+      <PencilIcon class="size-5" />
+    </button>
   </div>
 {/snippet}
 
-{#snippet accountList(accounts: AccountInfo[])}
+{#snippet allOptions(accounts: AccountInfo[])}
   <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
-    <div class="!min-h-18" out:slide={{ axis: "y", duration: 300 }}>
-      <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
-        <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
-          <ul class="contents" aria-label={$t`Choose an account`}>
+    <div in:slide={{ axis: "y", duration: 300 }}>
+      <div class="flex flex-col" in:fade={{ duration: 300 }}>
+        <span class="text-text-tertiary mb-2 text-sm font-medium">
+          {$t`Account`}
+        </span>
+        <div
+          class="border-border-secondary bg-bg-primary mb-5 flex flex-col overflow-hidden rounded-xl border"
+        >
+          <ul class="contents" role="radiogroup" aria-label={$t`Account`}>
             {#each accounts as account (account.account_number[0])}
               <li class="contents">
-                {@render accountListItem(account)}
+                {@render accountRow(account)}
               </li>
             {/each}
           </ul>
@@ -605,17 +613,47 @@
             align="center"
             hidden={!isAccountLimitReached}
           >
-            <div class="mt-3 shrink-0">
-              <button
-                class="btn btn-tertiary w-full"
-                onclick={() => (isCreateAccountDialogVisible = true)}
-                disabled={isAccountLimitReached}
-              >
-                <PlusIcon class="size-5" />
-                {$t`Add another account`}
-              </button>
-            </div>
+            <button
+              class="text-fg-primary hover:not-disabled:bg-bg-tertiary disabled:text-fg-disabled flex h-13 w-full cursor-pointer flex-row items-center gap-3 px-4 text-start text-sm font-semibold disabled:cursor-default"
+              onclick={() => (isCreateAccountDialogVisible = true)}
+              disabled={isAccountLimitReached}
+            >
+              <PlusIcon class="size-4.5 shrink-0" />
+              {$t`Add another account`}
+            </button>
           </Tooltip>
+        </div>
+        <span class="text-text-tertiary mb-2 text-sm font-medium">
+          {$t`Session`}
+        </span>
+        <!-- How long the sign-in lasts before the user must sign in again,
+             capped at the duration the app requested (see `ceilingSeconds`). -->
+        <div
+          class="border-border-secondary bg-bg-primary flex h-13 flex-row items-center gap-3 rounded-xl border ps-4 pe-1.5"
+        >
+          <span class="text-text-secondary flex-1 text-sm">
+            {$t`Stay signed in for`}
+          </span>
+          <SessionDurationSelect
+            maxSeconds={ceilingSeconds}
+            bind:value={selectedTtlSeconds}
+            disabled={isAuthenticatingDefault}
+            variant="tertiary"
+          />
+        </div>
+        <div class="my-6">
+          <button
+            class="btn btn-primary btn-xl w-full"
+            onclick={() => handleContinueAs(chosenAccountNumber)}
+            disabled={isAuthenticatingDefault || mustChooseAccess}
+          >
+            {#if isAuthenticatingDefault}
+              <ProgressRing />
+              <span>{$t`Authenticating...`}</span>
+            {:else}
+              <span>{continueLabel ?? $t`Continue`}</span>
+            {/if}
+          </button>
         </div>
       </div>
     </div>
@@ -654,33 +692,10 @@
       {$t`with your Internet Identity`}
     </p>
   {/if}
-  {#if isMultipleAccountsEnabled}
-    <!-- Session: how long the sign-in lasts before the user must sign in
-         again, capped at the duration the app requested (see `ceilingSeconds`).
-         Revealed alongside the account choices when "all options" is on. -->
-    <div class="border-border-tertiary mb-6 flex flex-col border-t pt-4">
-      <span class="text-text-primary mb-0.5 text-base font-medium">
-        {$t`Session duration`}
-      </span>
-      <div class="flex flex-row items-center justify-between gap-2">
-        <span class="text-text-tertiary text-base">
-          {$t`until you have to sign in again`}
-        </span>
-        <SessionDurationSelect
-          maxSeconds={ceilingSeconds}
-          bind:value={selectedTtlSeconds}
-          disabled={isAuthenticatingDefault}
-        />
-      </div>
-    </div>
-    <span class="text-text-primary mb-3 self-start text-base font-medium">
-      {$t`Available accounts`}
-    </span>
-  {/if}
   <div class="grid">
     <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
     {#if isMultipleAccountsEnabled && accounts !== undefined}
-      {@render accountList(accounts)}
+      {@render allOptions(accounts)}
     {:else if isMultipleAccountsEnabled}
       <div
         class="col-start-1 row-start-1 flex min-h-18 items-center justify-center pb-6"

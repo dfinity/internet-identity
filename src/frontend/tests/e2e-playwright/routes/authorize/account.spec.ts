@@ -22,8 +22,9 @@ test("Create another account and authorize with primary", async ({
     await authPage.getByRole("button", { name: "Add another account" }).click();
     await authPage.getByLabel("Account name").fill("Work account");
     await authPage.getByRole("button", { name: "Create account" }).click();
+    await authPage.getByRole("radio", { name: "My Test Dapp account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with My Test Dapp account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
   expect(principal).toEqual(primaryPrincipal);
@@ -49,8 +50,9 @@ test("Create another account and authorize with it", async ({
     await authPage.getByRole("button", { name: "Add another account" }).click();
     await authPage.getByLabel("Account name").fill("Social account");
     await authPage.getByRole("button", { name: "Create account" }).click();
+    await authPage.getByRole("radio", { name: "Social account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with Social account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
   expect(principal).not.toEqual(primaryPrincipal);
@@ -79,8 +81,9 @@ test("Create another account, make it default and authorize with it", async ({
       .getByRole("checkbox", { name: "Set as default sign-in" })
       .setChecked(true);
     await authPage.getByRole("button", { name: "Create account" }).click();
+    await authPage.getByRole("radio", { name: "My Test Dapp account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with My Test Dapp account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
   const secondaryPrincipal = await authorize(page, async (authPage) => {
@@ -89,8 +92,9 @@ test("Create another account, make it default and authorize with it", async ({
     // the previous step, so the multi-accounts list is shown on return
     // visits. Click the new default ("Test account") explicitly — same
     // outcome as the plain "Continue" path under toggle-off.
+    await authPage.getByRole("radio", { name: "Test account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with Test account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
   expect(principal).toEqual(primaryPrincipal);
@@ -119,8 +123,9 @@ test("Rename primary account and authorize with it", async ({
       .click();
     await authPage.getByLabel("Account name").fill("Renamed account");
     await authPage.getByRole("button", { name: "Save changes" }).click();
+    await authPage.getByRole("radio", { name: "Renamed account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with Renamed account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
   expect(principal).toEqual(primaryPrincipal);
@@ -146,8 +151,9 @@ test("Rename secondary account and authorize with it", async ({
     await authPage.getByRole("button", { name: "Add another account" }).click();
     await authPage.getByLabel("Account name").fill("Test account");
     await authPage.getByRole("button", { name: "Create account" }).click();
+    await authPage.getByRole("radio", { name: "My Test Dapp account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with My Test Dapp account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
   const secondaryPrincipal = await authorize(page, async (authPage) => {
@@ -158,8 +164,9 @@ test("Rename secondary account and authorize with it", async ({
     await authPage.getByRole("button", { name: "Edit Test account" }).click();
     await authPage.getByLabel("Account name").fill("Renamed account");
     await authPage.getByRole("button", { name: "Save changes" }).click();
+    await authPage.getByRole("radio", { name: "Renamed account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with Renamed account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
   expect(principal).toEqual(primaryPrincipal);
@@ -187,8 +194,9 @@ test("Can't create more than 5 accounts", async ({
       authPage.getByRole("button", { name: "Add another account" }),
     ).toBeDisabled();
     // Authentication needs to complete in `authorize()` to pass the test
+    await authPage.getByRole("radio", { name: "My Test Dapp account" }).click();
     await authPage
-      .getByRole("button", { name: "Continue with My Test Dapp account" })
+      .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
 });
