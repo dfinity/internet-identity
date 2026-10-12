@@ -562,7 +562,7 @@
     ]}
   >
     <label
-      class="relative flex min-w-0 flex-1 cursor-pointer flex-row items-center gap-3 self-stretch ps-4 pe-3"
+      class="relative flex min-w-0 flex-1 flex-row items-center gap-3 self-stretch ps-4 pe-3 not-has-disabled:cursor-pointer"
     >
       <input
         type="radio"
