@@ -579,7 +579,7 @@
         {name}
       </span>
       {#if account.account_number[0] === defaultAccountNumber}
-        <Badge size="sm" class="!bg-transparent">{$t`Default`}</Badge>
+        <Badge size="sm" class="shrink-0 !bg-transparent">{$t`Default`}</Badge>
       {/if}
     </label>
     <button
@@ -714,7 +714,7 @@
       {$t`with your Internet Identity`}
     </p>
   {/if}
-  <div class="grid">
+  <div class="grid grid-cols-1">
     <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
     {#if isMultipleAccountsEnabled && accounts !== undefined}
       {@render allOptions(accounts)}
