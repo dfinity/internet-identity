@@ -90,6 +90,8 @@
     continueLabel,
   }: Props = $props();
 
+  const id = $props.id();
+
   type PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
 
@@ -556,18 +558,23 @@
   <div
     class={[
       "border-border-tertiary flex h-13 flex-row items-center gap-3 border-b ps-4 pe-1.5",
+      "has-focus-visible:ring-focus-ring has-focus-visible:ring-2 has-focus-visible:ring-inset",
       isSelected ? "bg-bg-quaternary" : "hover:bg-bg-tertiary",
     ]}
   >
-    <button
-      role="radio"
-      aria-checked={isSelected}
-      onclick={() => (selectedAccountNumber = account.account_number[0])}
-      disabled={isAuthenticatingDefault}
-      class="flex min-w-0 flex-1 cursor-pointer flex-row items-center gap-3 self-stretch text-start outline-0"
+    <label
+      class="flex min-w-0 flex-1 cursor-pointer flex-row items-center gap-3 self-stretch"
     >
+      <input
+        type="radio"
+        name="{id}-account"
+        checked={isSelected}
+        onchange={() => (selectedAccountNumber = account.account_number[0])}
+        class="sr-only"
+      />
       <CheckIcon
         class={["size-4.5 shrink-0", isSelected ? "opacity-100" : "opacity-0"]}
+        aria-hidden="true"
       />
       <span class="text-text-primary flex-1 truncate text-sm font-semibold">
         {name}
@@ -575,7 +582,7 @@
       {#if account.account_number[0] === defaultAccountNumber}
         <Badge size="sm" class="!bg-transparent">{$t`Default`}</Badge>
       {/if}
-    </button>
+    </label>
     <button
       class="btn btn-tertiary btn-sm btn-icon hover:!bg-bg-tertiary shrink-0"
       onclick={() => openEditAccountDialog(account.account_number[0])}
@@ -590,19 +597,26 @@
   <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
     <div in:slide={{ axis: "y", duration: 300 }}>
       <div class="flex flex-col" in:fade={{ duration: 300 }}>
-        <span class="text-text-tertiary mb-2 text-sm font-medium">
+        <span
+          id="{id}-account-label"
+          class="text-text-tertiary mb-2 text-sm font-medium"
+        >
           {$t`Account`}
         </span>
         <div
           class="border-border-secondary bg-bg-primary mb-5 flex flex-col overflow-hidden rounded-xl border"
         >
-          <ul class="contents" role="radiogroup" aria-label={$t`Account`}>
+          <!-- Native radios: arrow keys, a single tab stop and the radio
+               announcement come from the browser. -->
+          <fieldset
+            class="flex min-w-0 flex-col"
+            aria-labelledby="{id}-account-label"
+            disabled={isAuthenticatingDefault}
+          >
             {#each accounts as account (account.account_number[0])}
-              <li class="contents">
-                {@render accountRow(account)}
-              </li>
+              {@render accountRow(account)}
             {/each}
-          </ul>
+          </fieldset>
           <Tooltip
             label={$t`Limit reached`}
             description={$plural(MAX_ACCOUNTS, {
