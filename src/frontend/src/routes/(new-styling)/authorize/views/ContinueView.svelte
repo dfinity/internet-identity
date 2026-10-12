@@ -557,12 +557,12 @@
   {@const isSelected = account.account_number[0] === chosenAccountNumber}
   <div
     class={[
-      "border-border-tertiary flex h-13 flex-row items-center gap-3 border-b ps-4 pe-1.5",
+      "border-border-tertiary flex h-13 flex-row items-center border-b pe-1.5",
       isSelected ? "bg-bg-quaternary" : "hover:bg-bg-tertiary",
     ]}
   >
     <label
-      class="relative flex min-w-0 flex-1 flex-row items-center gap-3 self-stretch"
+      class="relative flex min-w-0 flex-1 cursor-pointer flex-row items-center gap-3 self-stretch ps-4 pe-3"
     >
       <input
         type="radio"
