@@ -54,6 +54,22 @@ test.describe("Applications page", () => {
     return page;
   };
 
+  /**
+   * The page as the canister holds it, in a window of its own: the manage pages keep their
+   * sign-in in memory only, so a reload lands on the sign-in screen instead.
+   */
+  let reopen: (page: Page) => Promise<Page>;
+  test.beforeEach(({ context, identities, signInWithIdentity }) => {
+    reopen = async (page: Page) => {
+      await page.close();
+      return openApplications(
+        context,
+        identities[0].identityNumber,
+        signInWithIdentity,
+      );
+    };
+  });
+
   /** One card per listed app, each with its settings behind this button. */
   const manageButtons = (page: Page) =>
     page.getByRole("button", { name: /^Manage / });
@@ -118,17 +134,20 @@ test.describe("Applications page", () => {
     await expect(applications.getByText("Not allowed")).toBeVisible();
 
     // What the canister holds, not what the page wrote ahead of the call.
-    await applications.reload();
-    await expect(manageButtons(applications)).toHaveCount(1);
-    await expect(applications.getByText("Not allowed")).toBeVisible();
+    const reopened = await reopen(applications);
+    await expect(manageButtons(reopened)).toHaveCount(1);
+    await expect(reopened.getByText("Not allowed")).toBeVisible();
 
-    await manageButtons(applications).click();
-    await notifications.click();
-    await expect(notifications).toBeChecked();
-    await applications.keyboard.press("Escape");
+    await manageButtons(reopened).click();
+    const switchAgain = reopened
+      .getByRole("dialog")
+      .getByRole("switch", { name: "Notifications" });
+    await switchAgain.click();
+    await expect(switchAgain).toBeChecked();
+    await reopened.keyboard.press("Escape");
 
-    await applications.reload();
-    await expect(applications.getByText("None yet")).toBeVisible();
+    const reopenedAgain = await reopen(reopened);
+    await expect(reopenedAgain.getByText("None yet")).toBeVisible();
   });
 
   test("forgetting an app takes it off the list and signs it out", async ({
@@ -162,8 +181,7 @@ test.describe("Applications page", () => {
 
     await expect(applications.getByText(/has been forgotten\.$/)).toBeVisible();
     await expect(emptyList(applications)).toBeVisible();
-    await applications.reload();
-    await expect(emptyList(applications)).toBeVisible();
+    await expect(emptyList(await reopen(applications))).toBeVisible();
 
     // Ended for the app too, at its next refresh.
     await testApp.focus();
