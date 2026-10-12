@@ -1,4 +1,4 @@
-use crate::openid::{Aud, Iss, OpenIdCredential, Sub};
+use crate::openid::{Aud, Domain, Iss, OpenIdCredential, Sub};
 use crate::storage::storable::metadata_v2::StorableMetadataEntryV2;
 use crate::storage::storable::openid_credential_key::StorableOpenIdCredentialKey;
 use ic_stable_structures::storable::Bound;
@@ -82,7 +82,7 @@ impl From<StorableOpenIdCredential> for OpenIdCredential {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
-            sso_domain: value.sso_domain,
+            sso_domain: value.sso_domain.map(Domain::from_stored),
             sso_name: value.sso_name,
             stable_id: value.stable_id,
         }
@@ -101,7 +101,7 @@ impl From<OpenIdCredential> for StorableOpenIdCredential {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
-            sso_domain: value.sso_domain,
+            sso_domain: value.sso_domain.map(String::from),
             sso_name: value.sso_name,
             stable_id: value.stable_id,
         }

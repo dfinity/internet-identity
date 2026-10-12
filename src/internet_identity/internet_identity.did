@@ -497,21 +497,22 @@ type SsoDiscovery = record {
 
 // Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
 // `Failed.retry_after` is when II fetches the domain again (a retry before then
-// fails the same way), and is absent when no retry can help, such as a domain
-// that is not a bare authority.
+// fails the same way), and is absent when no retry can help, such as a value
+// that is not a domain. `reason` explains the failure, to show as is, when II
+// has one.
 type SsoDiscoveryStatus = variant {
     Resolved : SsoDiscovery;
     Pending;
-    Failed : record { retry_after : opt Timestamp };
+    Failed : record { retry_after : opt Timestamp; reason : opt text };
 };
 
 // Whether an organization domain can be used for SSO sign-in, read by
 // `app_sso_domain_status`. `name` is the organization's display name;
-// `retry_after` is as for `SsoDiscoveryStatus.Failed`.
+// `retry_after` and `reason` are as for `SsoDiscoveryStatus.Failed`.
 type AppSsoDomainStatus = variant {
     Available : record { name : opt text };
     Pending;
-    Unavailable : record { retry_after : opt Timestamp };
+    Unavailable : record { retry_after : opt Timestamp; reason : opt text };
 };
 
 // Request for `get_sso_discovery_status`.

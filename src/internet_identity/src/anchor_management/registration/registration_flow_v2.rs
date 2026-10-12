@@ -213,13 +213,10 @@ pub fn identity_registration_finish(
 /// inside.
 pub fn verify_openid_for_registration(
     arg: &OpenIDRegFinishArg,
+    discovery_domain: Option<&openid::Domain>,
 ) -> Result<openid::Cached<openid::OpenIdCredential>, IdRegFinishError> {
-    openid::prefetch_sso(arg.discovery_domain.as_deref());
-    Ok(openid::verify_jwt(
-        &arg.jwt,
-        &arg.salt,
-        arg.discovery_domain.as_deref(),
-    )?)
+    openid::prefetch_sso(discovery_domain);
+    Ok(openid::verify_jwt(&arg.jwt, &arg.salt, discovery_domain)?)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -9,7 +9,7 @@
 //! u64-BE len || session_expiry_ns  session deadline, ns since epoch
 //! ```
 
-use super::{calculate_delegation_seed, SSO_ATTR_BUNDLE_TTL_NS};
+use super::{calculate_delegation_seed, Domain, SSO_ATTR_BUNDLE_TTL_NS};
 use crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN;
 use crate::{state, update_root_hash};
 use candid::Principal;
@@ -201,12 +201,13 @@ pub fn prepare_sso_attr_bundle(
     sub: &str,
     aud: &str,
     anchor_number: AnchorNumber,
-    sso_domain: &str,
+    sso_domain: &Domain,
     origin: &str,
     session_expiry_ns: Timestamp,
 ) -> (Vec<u8>, Timestamp) {
     let expiration = time().saturating_add(SSO_ATTR_BUNDLE_TTL_NS);
-    let message = encode_sso_attr_bundle(sso_domain, origin, expiration, session_expiry_ns);
+    let message =
+        encode_sso_attr_bundle(sso_domain.as_str(), origin, expiration, session_expiry_ns);
     let seed = calculate_delegation_seed(
         &(iss.to_string(), sub.to_string(), aud.to_string()),
         anchor_number,

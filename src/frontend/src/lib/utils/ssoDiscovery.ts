@@ -52,15 +52,21 @@ export class DomainNotConfiguredError extends Error {
    * then fails the same way. Absent when no retry can help.
    */
   readonly retryAfter?: Date;
+  /**
+   * For `failed`: the canister's explanation, to show as is, when it gives one.
+   */
+  readonly detail?: string;
 
   constructor(
     reason: "timeout" | "origin-denied" | "failed",
     retryAfter?: Date,
+    detail?: string,
   ) {
     super(`SSO discovery failed (${reason})`);
     this.name = "DomainNotConfiguredError";
     this.reason = reason;
     this.retryAfter = retryAfter;
+    this.detail = detail;
   }
 }
 
@@ -195,6 +201,7 @@ export const discoverSsoConfig = async (
         retryAfterNs !== undefined
           ? new Date(Number(retryAfterNs / BigInt(1_000_000)))
           : undefined,
+        status.Failed.reason[0],
       );
     }
     // Pending. The sleep is abortable so a mid-delay abort skips straight to

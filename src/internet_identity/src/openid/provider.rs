@@ -3,6 +3,7 @@
 //! against the data-only `CONFIG_REGISTRY`; an SSO provider is a discovery-cache
 //! lookup by the frontend-supplied domain.
 
+use super::domain::Domain;
 use super::jwks::JwkSource;
 use super::verify::Descriptor;
 use super::{configured, sso, AudClaim, OpenIDJWTVerificationError};
@@ -23,7 +24,7 @@ pub(super) fn resolve(
     iss: &str,
     aud: &AudClaim,
     claims_bytes: &[u8],
-    discovery_domain: Option<&str>,
+    discovery_domain: Option<&Domain>,
 ) -> Result<Cached<Resolved>, OpenIDJWTVerificationError> {
     match discovery_domain {
         Some(domain) => Ok(match sso::resolve(domain, iss, aud)? {

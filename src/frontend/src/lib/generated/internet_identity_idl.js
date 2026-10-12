@@ -206,7 +206,10 @@ export const idlFactory = ({ IDL }) => {
   });
   const AppSsoDomainStatus = IDL.Variant({
     'Available' : IDL.Record({ 'name' : IDL.Opt(IDL.Text) }),
-    'Unavailable' : IDL.Record({ 'retry_after' : IDL.Opt(Timestamp) }),
+    'Unavailable' : IDL.Record({
+      'retry_after' : IDL.Opt(Timestamp),
+      'reason' : IDL.Opt(IDL.Text),
+    }),
     'Pending' : IDL.Null,
   });
   const IdentityNumber = IDL.Nat64;
@@ -647,7 +650,10 @@ export const idlFactory = ({ IDL }) => {
     'session_max_age_ns' : IDL.Nat64,
   });
   const SsoDiscoveryStatus = IDL.Variant({
-    'Failed' : IDL.Record({ 'retry_after' : IDL.Opt(Timestamp) }),
+    'Failed' : IDL.Record({
+      'retry_after' : IDL.Opt(Timestamp),
+      'reason' : IDL.Opt(IDL.Text),
+    }),
     'Resolved' : SsoDiscovery,
     'Pending' : IDL.Null,
   });

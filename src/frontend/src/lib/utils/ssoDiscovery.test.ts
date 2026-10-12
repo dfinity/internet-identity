@@ -226,7 +226,10 @@ describe("ssoDiscovery", () => {
     it("stops at once when the canister reports a failure, with its retry time", async () => {
       const retryAfterMs = Date.UTC(2026, 9, 7, 12, 0, 0);
       vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
-        Failed: { retry_after: [BigInt(retryAfterMs) * BigInt(1_000_000)] },
+        Failed: {
+          retry_after: [BigInt(retryAfterMs) * BigInt(1_000_000)],
+          reason: [],
+        },
       });
 
       const error = await discoverSsoConfig("dfinity.org").catch(
@@ -241,9 +244,9 @@ describe("ssoDiscovery", () => {
       expect(anonymousActor.get_sso_discovery_status).toHaveBeenCalledTimes(1);
     });
 
-    it("reports no retry time when no retry can help", async () => {
+    it("reports no retry time when no retry can help, with the canister's reason", async () => {
       vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
-        Failed: { retry_after: [] },
+        Failed: { retry_after: [], reason: ['domain "a/b" has a path'] },
       });
 
       const error = await discoverSsoConfig("dfinity.org").catch(
@@ -254,6 +257,7 @@ describe("ssoDiscovery", () => {
       if (error instanceof DomainNotConfiguredError) {
         expect(error.reason).toBe("failed");
         expect(error.retryAfter).toBeUndefined();
+        expect(error.detail).toBe('domain "a/b" has a path');
       }
     });
 

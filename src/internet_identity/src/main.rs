@@ -1704,11 +1704,13 @@ mod openid_api {
 
     #[update]
     fn openid_identity_registration_finish(
-        mut arg: OpenIDRegFinishArg,
+        arg: OpenIDRegFinishArg,
     ) -> OpenIdResult<IdRegFinishResult, IdRegFinishError> {
-        // Canonicalize the untrusted discovery domain at the boundary so both
-        // verification and the credential stored from `arg` see the same value.
-        arg.discovery_domain = openid::canonical_discovery_domain_opt(arg.discovery_domain);
+        let discovery_domain = match openid::parse_discovery_domain(arg.discovery_domain.as_deref())
+        {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
         // Verify the JWT up front (driving any SSO discovery/JWKS fetches): a
         // cold or evicted cache surfaces as the `Pending` retry arm instead of a
         // terminal error, and the verified credential is then handed to the
@@ -1716,7 +1718,7 @@ mod openid_api {
         // domain + origin) goes through the SSO gate; everything else (a direct
         // provider or an ungated SSO login) through the plain OpenID verify —
         // mirroring the `sso_`/`openid_prepare_delegation` split on the auth side.
-        let credential = match (arg.discovery_domain.as_deref(), arg.origin.as_deref()) {
+        let credential = match (discovery_domain.as_ref(), arg.origin.as_deref()) {
             (Some(domain), Some(origin)) => {
                 openid::prefetch_sso(Some(domain));
                 match openid::verify_sso_for_registration(&arg.jwt, &arg.salt, domain, origin) {
@@ -1725,7 +1727,10 @@ mod openid_api {
                     Err(err) => return OpenIdResult::Err(err),
                 }
             }
-            _ => match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+            _ => match registration::registration_flow_v2::verify_openid_for_registration(
+                &arg,
+                discovery_domain.as_ref(),
+            ) {
                 Ok(openid::Cached::Ready(credential)) => credential,
                 Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
                 Err(err) => return OpenIdResult::Err(err),
@@ -1753,9 +1758,12 @@ mod openid_api {
         salt: [u8; 32],
         discovery_domain: Option<String>,
     ) -> OpenIdResult<(), OpenIdCredentialAddError> {
-        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
-        openid::prefetch_sso(discovery_domain.as_deref());
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+        let discovery_domain = match openid::parse_discovery_domain(discovery_domain.as_deref()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        openid::prefetch_sso(discovery_domain.as_ref());
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
             // SSO discovery/JWKS isn't cached yet; the fetch is in flight. The
             // frontend retries the call.
@@ -1807,9 +1815,12 @@ mod openid_api {
         // read the result. A cold cache reads `Pending`; the frontend polls
         // `openid_get_delegation` and re-calls this until the delegation is
         // ready.
-        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
-        openid::prefetch_sso(discovery_domain.as_deref());
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+        let discovery_domain = match openid::parse_discovery_domain(discovery_domain.as_deref()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        openid::prefetch_sso(discovery_domain.as_ref());
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
@@ -1819,7 +1830,7 @@ mod openid_api {
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
             let anchor_number = openid::resolve_anchor_with_openid_credential(
                 &openid_credential.key(),
-                discovery_domain.as_deref(),
+                discovery_domain.as_ref(),
             )?;
 
             // Update anchor with latest OpenID credential from JWT so latest information is stored,
@@ -1836,7 +1847,7 @@ mod openid_api {
             // Checking again because the association could've changed during the .await
             let still_anchor_number = openid::resolve_anchor_with_openid_credential(
                 &openid_credential.key(),
-                discovery_domain.as_deref(),
+                discovery_domain.as_ref(),
             )?;
 
             if anchor_number != still_anchor_number {
@@ -1869,8 +1880,11 @@ mod openid_api {
         // caches. A `Pending` means discovery/JWKS isn't cached yet — the
         // frontend re-calls `openid_prepare_delegation` (an update, which drives
         // the fetch) and polls this again.
-        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+        let discovery_domain = match openid::parse_discovery_domain(discovery_domain.as_deref()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
@@ -1878,7 +1892,7 @@ mod openid_api {
 
         let delegation = openid::resolve_anchor_with_openid_credential(
             &openid_credential.key(),
-            discovery_domain.as_deref(),
+            discovery_domain.as_ref(),
         )
         .and_then(|anchor_number| {
             openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
@@ -1895,14 +1909,22 @@ mod openid_api {
     /// `get_sso_discovery_status`.
     #[update]
     fn discover_sso(domain: String) {
-        openid::discover_sso(&openid::canonical_discovery_domain(&domain))
+        // A value that is not a domain has nothing to fetch;
+        // `get_sso_discovery_status` reports why.
+        if let Ok(domain) = openid::Domain::try_from(domain.as_str()) {
+            openid::discover_sso(&domain)
+        }
     }
 
     /// Start the fetches behind `app_sso_domain_status` for `domain`, or
     /// refresh a stale result.
     #[update]
     fn app_sso_domain_check(domain: String) {
-        openid::discover_sso(&openid::canonical_discovery_domain(&domain))
+        // A value that is not a domain has nothing to fetch;
+        // `app_sso_domain_status` reports why.
+        if let Ok(domain) = openid::Domain::try_from(domain.as_str()) {
+            openid::discover_sso(&domain)
+        }
     }
 
     /// Whether `domain` can be used for SSO sign-in.
@@ -1910,7 +1932,15 @@ mod openid_api {
     fn app_sso_domain_status(
         domain: String,
     ) -> internet_identity_interface::internet_identity::types::AppSsoDomainStatus {
-        openid::app_sso_domain_status(&openid::canonical_discovery_domain(&domain))
+        match openid::Domain::try_from(domain.as_str()) {
+            Ok(domain) => openid::app_sso_domain_status(&domain),
+            Err(reason) => {
+                internet_identity_interface::internet_identity::types::AppSsoDomainStatus::Unavailable {
+                    retry_after: None,
+                    reason: Some(reason),
+                }
+            }
+        }
     }
 
     /// Read the status of `org_domain`'s SSO discovery: `Resolved` with the
@@ -1922,10 +1952,17 @@ mod openid_api {
     fn get_sso_discovery_status(
         request: internet_identity_interface::internet_identity::types::GetSsoDiscoveryStatusRequest,
     ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryStatus {
-        openid::get_sso_discovery_status(
-            &openid::canonical_discovery_domain(&request.org_domain),
-            request.target_app_origin.as_deref(),
-        )
+        match openid::Domain::try_from(request.org_domain.as_str()) {
+            Ok(domain) => {
+                openid::get_sso_discovery_status(&domain, request.target_app_origin.as_deref())
+            }
+            Err(reason) => {
+                internet_identity_interface::internet_identity::types::SsoDiscoveryStatus::Failed {
+                    retry_after: None,
+                    reason: Some(reason),
+                }
+            }
+        }
     }
 
     /// SSO sign-in: verify the JWT, enforce the per-app gate, resolve the II-client
@@ -1941,7 +1978,14 @@ mod openid_api {
             org_domain,
             target_app_origin: origin,
         } = request;
-        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        let discovery_domain = match openid::Domain::try_from(org_domain.as_str()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(reason) => {
+                return OpenIdResult::Err(
+                    openid::OpenIDJWTVerificationError::GenericError(reason).into(),
+                )
+            }
+        };
         openid::prefetch_sso(Some(&discovery_domain));
 
         let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
@@ -2026,7 +2070,14 @@ mod openid_api {
             target_app_origin: origin,
             sso_attr_bundle,
         } = request;
-        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        let discovery_domain = match openid::Domain::try_from(org_domain.as_str()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(reason) => {
+                return OpenIdResult::Err(
+                    openid::OpenIDJWTVerificationError::GenericError(reason).into(),
+                )
+            }
+        };
         let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
             Ok(openid::Cached::Ready(v)) => v,
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,

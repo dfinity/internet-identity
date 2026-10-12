@@ -2429,7 +2429,7 @@ mod tests {
                 metadata,
                 // Stamped SSO credential — `discovery_domain()` /
                 // `matched_attribute_scope()` read this directly.
-                sso_domain: Some(SSO_DOMAIN.to_string()),
+                sso_domain: Some(crate::openid::Domain::try_from(SSO_DOMAIN).unwrap()),
                 sso_name: None,
                 stable_id: None,
             }
@@ -2470,7 +2470,10 @@ mod tests {
         #[test]
         fn credential_reports_discovery_domain() {
             let credential = sso_credential_with(email_and_name_metadata());
-            pretty_assert_eq!(credential.discovery_domain(), Some(SSO_DOMAIN.to_string()),);
+            pretty_assert_eq!(
+                credential.discovery_domain(),
+                Some(&crate::openid::Domain::try_from(SSO_DOMAIN).unwrap())
+            );
         }
 
         // `matched_attribute_scope()` returns `Sso { .. }` for an

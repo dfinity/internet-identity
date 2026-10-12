@@ -595,8 +595,12 @@ pub enum SsoDiscoveryStatus {
     Pending,
     /// Discovery failed. `retry_after` is when II fetches the domain again; a
     /// retry before then fails the same way. `None` when no retry can help,
-    /// such as a domain that is not a bare authority.
-    Failed { retry_after: Option<Timestamp> },
+    /// such as a value that is not a domain. `reason` explains the failure,
+    /// to show as is, when II has one.
+    Failed {
+        retry_after: Option<Timestamp>,
+        reason: Option<String>,
+    },
 }
 
 /// Whether an organization domain can be used for SSO sign-in, read by
@@ -611,8 +615,12 @@ pub enum AppSsoDomainStatus {
     /// again.
     Pending,
     /// The domain cannot be used. `retry_after` is when II fetches it again;
-    /// `None` when no retry can help.
-    Unavailable { retry_after: Option<Timestamp> },
+    /// `None` when no retry can help. `reason` explains why, to show as is,
+    /// when II has one.
+    Unavailable {
+        retry_after: Option<Timestamp>,
+        reason: Option<String>,
+    },
 }
 
 /// Request for `get_sso_discovery_status`.

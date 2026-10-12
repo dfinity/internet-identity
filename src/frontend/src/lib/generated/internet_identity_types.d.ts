@@ -127,10 +127,15 @@ export type AppSessionError = {
 /**
  * Whether an organization domain can be used for SSO sign-in, read by
  * `app_sso_domain_status`. `name` is the organization's display name;
- * `retry_after` is as for `SsoDiscoveryStatus.Failed`.
+ * `retry_after` and `reason` are as for `SsoDiscoveryStatus.Failed`.
  */
 export type AppSsoDomainStatus = { 'Available' : { 'name' : [] | [string] } } |
-  { 'Unavailable' : { 'retry_after' : [] | [Timestamp] } } |
+  {
+    'Unavailable' : {
+      'retry_after' : [] | [Timestamp],
+      'reason' : [] | [string],
+    }
+  } |
   { 'Pending' : null };
 /**
  * An app the identity has signed in to, for the user's own list of their apps. Only
@@ -2124,11 +2129,12 @@ export interface SsoDiscovery {
 /**
  * Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
  * `Failed.retry_after` is when II fetches the domain again (a retry before then
- * fails the same way), and is absent when no retry can help, such as a domain
- * that is not a bare authority.
+ * fails the same way), and is absent when no retry can help, such as a value
+ * that is not a domain. `reason` explains the failure, to show as is, when II
+ * has one.
  */
 export type SsoDiscoveryStatus = {
-    'Failed' : { 'retry_after' : [] | [Timestamp] }
+    'Failed' : { 'retry_after' : [] | [Timestamp], 'reason' : [] | [string] }
   } |
   { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
