@@ -562,14 +562,14 @@
     ]}
   >
     <label
-      class="flex min-w-0 flex-1 cursor-pointer flex-row items-center gap-3 self-stretch"
+      class="relative flex min-w-0 flex-1 flex-row items-center gap-3 self-stretch"
     >
       <input
         type="radio"
         name="{id}-account"
         checked={isSelected}
         onchange={() => (selectedAccountNumber = account.account_number[0])}
-        class="sr-only"
+        class="absolute inset-0 cursor-pointer appearance-none opacity-0"
       />
       <CheckIcon
         class={["size-4.5 shrink-0", isSelected ? "opacity-100" : "opacity-0"]}
