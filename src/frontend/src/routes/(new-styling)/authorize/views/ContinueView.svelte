@@ -569,7 +569,7 @@
         name="{id}-account"
         checked={isSelected}
         onchange={() => (selectedAccountNumber = account.account_number[0])}
-        class="absolute inset-0 cursor-pointer appearance-none opacity-0"
+        class="absolute inset-0 appearance-none opacity-0"
       />
       <CheckIcon
         class={["size-4.5 shrink-0", isSelected ? "opacity-100" : "opacity-0"]}
