@@ -573,7 +573,7 @@
         {name}
       </span>
       {#if account.account_number[0] === defaultAccountNumber}
-        <Badge size="sm">{$t`Default`}</Badge>
+        <Badge size="sm" class="!bg-transparent">{$t`Default`}</Badge>
       {/if}
     </button>
     <button
