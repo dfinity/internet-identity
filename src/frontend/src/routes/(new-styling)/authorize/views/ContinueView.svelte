@@ -584,7 +584,10 @@
       {/if}
     </label>
     <button
-      class="btn btn-tertiary btn-sm btn-icon hover:!bg-bg-tertiary shrink-0"
+      class={[
+        "btn btn-tertiary btn-sm btn-icon shrink-0",
+        isSelected ? "hover:!bg-bg-tertiary" : "hover:!bg-bg-quaternary",
+      ]}
       onclick={() => openEditAccountDialog(account.account_number[0])}
       aria-label={$t`Edit ${name}`}
     >
