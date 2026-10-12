@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { LayoutGridIcon } from "@lucide/svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import { plural, t } from "$lib/stores/locale.store";
@@ -163,11 +164,12 @@
       </ul>
     </div>
   {:else}
-    <p
-      class="border-border-secondary text-text-tertiary rounded-xl border border-dashed p-6 text-center text-sm"
+    <div
+      class="border-border-tertiary bg-bg-primary flex flex-col items-center justify-center gap-2 rounded-sm border border-dashed px-6 py-10 text-center"
     >
-      {$t`Apps you allow to notify you will show up here.`}
-    </p>
+      <LayoutGridIcon class="text-fg-secondary size-7" aria-hidden="true" />
+      <p class="text-text-tertiary text-sm">{$t`No apps yet`}</p>
+    </div>
   {/if}
 </div>
 

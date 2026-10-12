@@ -75,7 +75,7 @@ test.describe("Applications page", () => {
     page.getByRole("button", { name: /^Manage / });
 
   const emptyList = (page: Page) =>
-    page.getByText("Apps you allow to notify you will show up here.");
+    page.getByText("No apps yet", { exact: true });
 
   test("an app the user only signed in to is not listed", async ({
     context,
