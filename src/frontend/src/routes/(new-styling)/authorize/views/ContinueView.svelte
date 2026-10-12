@@ -635,7 +635,7 @@
             <button
               class={[
                 "text-fg-primary hover:not-disabled:bg-bg-tertiary disabled:text-fg-disabled flex h-13 w-full cursor-pointer flex-row items-center gap-3 px-4 text-start text-sm font-semibold disabled:cursor-default",
-                "focus-visible:outline-focus-ring rounded-b-[calc(var(--radius-xl)-1px)] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2",
+                "focus-visible:outline-focus-ring rounded-b-[calc(var(--radius-xl)-1px)] focus-visible:outline-2 focus-visible:-outline-offset-2",
               ]}
               onclick={() => (isCreateAccountDialogVisible = true)}
               disabled={isAccountLimitReached}
