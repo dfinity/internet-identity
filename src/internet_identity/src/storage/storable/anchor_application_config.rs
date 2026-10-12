@@ -18,9 +18,9 @@ pub struct AnchorApplicationConfig {
     pub notifications: Option<PermissionDecision>, // None if the identity never decided
 }
 
-/// The identity's answer to an app asking for a permission. Once given, it is only ever
-/// changed, never taken back, so a permission that was allowed and then denied is
-/// remembered as denied.
+/// The identity's answer to an app asking for a permission. Switching the permission keeps
+/// the decision, so a permission that was allowed and then denied is remembered as denied.
+/// Only forgetting the app clears it.
 #[derive(Encode, Decode, Clone, Copy, Ord, Eq, PartialEq, PartialOrd, Debug)]
 #[cbor(map)]
 pub struct PermissionDecision {
