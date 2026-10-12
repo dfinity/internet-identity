@@ -1,6 +1,13 @@
-import type { ApplicationInfo } from "$lib/generated/internet_identity_types";
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import { derived, get, type Readable } from "svelte/store";
+import type {
+  _SERVICE,
+  ApplicationInfo,
+} from "$lib/generated/internet_identity_types";
+import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
 import { nanosToMillis } from "$lib/utils/time";
-import { GATEWAY_ORIGIN_REGEX } from "$lib/utils/urlUtils";
+import { GATEWAY_ORIGIN_REGEX, originLabel } from "$lib/utils/urlUtils";
+import { throwCanisterError } from "$lib/utils/utils";
 
 export interface App {
   /** The origin the app's identity is derived for. Its metadata and its
@@ -40,3 +47,30 @@ export const appsFrom = (applications: ApplicationInfo[]): App[] =>
       const byTime = (b.lastUsedMillis ?? -1) - (a.lastUsedMillis ?? -1);
       return byTime !== 0 ? byTime : a.origin.localeCompare(b.origin);
     });
+
+/** The app's published name, or where it is shown when it publishes none. Follows the
+ *  metadata as it resolves. */
+export const appNameStore = (origin: string): Readable<string> =>
+  derived(
+    getAppMetadataStore(origin),
+    (metadata) => metadata.name ?? originLabel(appUrl(origin)),
+  );
+
+/** {@link appNameStore} as it reads now. */
+export const appName = (origin: string): string => get(appNameStore(origin));
+
+/** Undoes every permission the identity decided for the apps and signs it out of them,
+ *  in one call. */
+export const forgetApps = ({
+  identityNumber,
+  origins,
+  actor,
+}: {
+  identityNumber: bigint;
+  origins: string[];
+  actor: ActorSubclass<_SERVICE>;
+}): Promise<void> =>
+  actor
+    .forget_applications({ anchor_number: identityNumber, origins })
+    .then(throwCanisterError)
+    .then(() => undefined);
