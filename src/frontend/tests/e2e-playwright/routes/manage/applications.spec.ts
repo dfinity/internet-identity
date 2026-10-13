@@ -9,7 +9,7 @@ import { continueAs } from "../authorize/app-sessions/helpers";
 /**
  * The Applications page lists the apps the identity decided a permission for, today
  * whether they may notify, and nothing else. From it the user switches that permission
- * or forgets the app, which signs it out.
+ * or removes the app, which signs it out.
  *
  * Every scenario signs in to the test app and answers its notification request first,
  * through the real consent screen, so what the page shows is what the canister holds.
@@ -150,7 +150,7 @@ test.describe("Applications page", () => {
     await expect(reopenedAgain.getByText("None yet")).toBeVisible();
   });
 
-  test("forgetting an app takes it off the list and signs it out", async ({
+  test("removing an app takes it off the list and signs it out", async ({
     context,
     testApp,
     identities,
@@ -172,14 +172,14 @@ test.describe("Applications page", () => {
     await manageButtons(applications).click();
     await applications
       .getByRole("dialog")
-      .getByRole("button", { name: "Forget", exact: true })
+      .getByRole("button", { name: "Remove", exact: true })
       .click();
     await applications
       .getByRole("dialog")
-      .getByRole("button", { name: "Forget app", exact: true })
+      .getByRole("button", { name: "Remove app", exact: true })
       .click();
 
-    await expect(applications.getByText(/has been forgotten\.$/)).toBeVisible();
+    await expect(applications.getByText(/has been removed\.$/)).toBeVisible();
     await expect(emptyList(applications)).toBeVisible();
     await expect(emptyList(await reopen(applications))).toBeVisible();
 
@@ -190,7 +190,7 @@ test.describe("Applications page", () => {
     await testApp.expectSessionEnded();
   });
 
-  test("apps selected on the list are forgotten together", async ({
+  test("apps selected on the list are removed together", async ({
     context,
     testApp,
     identities,
@@ -210,20 +210,20 @@ test.describe("Applications page", () => {
       signInWithIdentity,
     );
     await applications
-      .getByRole("button", { name: "Forget apps", exact: true })
+      .getByRole("button", { name: "Remove apps", exact: true })
       .click();
-    const toolbar = applications.getByRole("toolbar", { name: "Forget apps" });
-    await expect(toolbar.getByText("No apps selected")).toBeVisible();
+    const toolbar = applications.getByRole("toolbar", { name: "Remove apps" });
+    await expect(toolbar.getByText("Select apps to remove")).toBeVisible();
     await expect(
-      toolbar.getByRole("button", { name: "Forget", exact: true }),
+      toolbar.getByRole("button", { name: "Remove", exact: true }),
     ).toBeDisabled();
 
     await applications.getByRole("checkbox", { name: /^Select / }).click();
     await expect(toolbar.getByText("1 app selected")).toBeVisible();
-    await toolbar.getByRole("button", { name: "Forget", exact: true }).click();
+    await toolbar.getByRole("button", { name: "Remove", exact: true }).click();
     await applications
       .getByRole("dialog")
-      .getByRole("button", { name: "Forget app", exact: true })
+      .getByRole("button", { name: "Remove app", exact: true })
       .click();
 
     await expect(emptyList(applications)).toBeVisible();

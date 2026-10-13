@@ -46,7 +46,7 @@
     class="bg-bg-primary border-border-tertiary flex min-h-13 items-center gap-3 border-t py-2 ps-4 pe-3"
   >
     <span class="text-text-tertiary text-[13px] leading-[18px]">
-      {selected ? $t`Will be forgotten` : $t`Tap to select`}
+      {selected ? $t`Will be removed` : $t`Tap to select`}
     </span>
   </span>
 </button>

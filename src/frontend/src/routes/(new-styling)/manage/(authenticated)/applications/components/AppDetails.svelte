@@ -94,7 +94,7 @@
     <div class="flex flex-row flex-wrap items-center gap-x-4 gap-y-3">
       <div class="flex min-w-50 flex-1 flex-col gap-0.5">
         <span class="text-text-primary text-sm font-semibold">
-          {$t`Forget this app`}
+          {$t`Remove this app`}
         </span>
         <span class="text-text-tertiary text-sm text-pretty">
           {$t`Signs you out and clears its settings.`}
@@ -105,7 +105,7 @@
         disabled={saving}
         class="btn btn-secondary btn-sm btn-danger shrink-0"
       >
-        {$t`Forget`}
+        {$t`Remove`}
       </button>
     </div>
   </div>

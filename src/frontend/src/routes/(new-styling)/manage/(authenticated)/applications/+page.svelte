@@ -94,10 +94,10 @@
     toaster.success({
       title:
         origins.length === 1
-          ? $t`${name} has been forgotten.`
+          ? $t`${name} has been removed.`
           : $plural(origins.length, {
-              one: "1 app has been forgotten.",
-              other: "# apps have been forgotten.",
+              one: "1 app has been removed.",
+              other: "# apps have been removed.",
             }),
       description:
         origins.length === 1
@@ -109,28 +109,27 @@
   const dialogTitleId = $props.id();
 </script>
 
-<header
-  class="grid max-w-3xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3"
->
+<header class="flex max-w-3xl flex-col gap-3">
   <h1 class="text-text-primary text-3xl font-medium">{$t`Applications`}</h1>
-  <p class="text-text-tertiary col-span-full row-start-2 text-base">
-    {selecting
-      ? $t`Select the ones to forget.`
-      : $t`Jump back in or change what they can do.`}
+  <p class="text-text-tertiary text-base">
+    {$t`Open or manage apps you've granted permissions.`}
   </p>
-  {#if apps.length > 0}
-    <button
-      onclick={() => (selecting ? stopSelecting() : (selecting = true))}
-      aria-pressed={selecting}
-      class="btn btn-secondary btn-sm col-start-2 row-start-1"
-    >
-      {selecting ? $t`Cancel` : $t`Forget apps`}
-    </button>
-  {/if}
 </header>
 
-<div class="mt-10 flex max-w-3xl flex-col gap-4">
+<div class="mt-10 flex max-w-3xl flex-col">
   {#if apps.length > 0}
+    <ForgetBar
+      {selecting}
+      count={selected.length}
+      onStart={() => (selecting = true)}
+      onCancel={stopSelecting}
+      onForget={() => {
+        const [first, ...rest] = selected;
+        if (first !== undefined) {
+          forgetting = [first, ...rest];
+        }
+      }}
+    />
     <!-- Two columns once the list, not the page, is wide enough: the sidebar can narrow it. -->
     <div class="@container/apps">
       <ul class="-m-px grid list-none gap-3 p-px @min-[560px]/apps:grid-cols-2">
@@ -172,21 +171,6 @@
     </div>
   {/if}
 </div>
-
-{#if selecting && apps.length > 0}
-  <!-- Keeps the last cards clear of the bar. -->
-  <div class="h-32"></div>
-  <ForgetBar
-    count={selected.length}
-    onCancel={stopSelecting}
-    onForget={() => {
-      const [first, ...rest] = selected;
-      if (first !== undefined) {
-        forgetting = [first, ...rest];
-      }
-    }}
-  />
-{/if}
 
 {#if forgetting !== undefined}
   {@const origins = forgetting}

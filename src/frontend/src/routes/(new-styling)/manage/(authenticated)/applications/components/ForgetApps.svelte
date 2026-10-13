@@ -37,10 +37,10 @@
     </FeaturedIcon>
     <h1 id={titleId} class="text-text-primary mb-3 text-2xl font-medium">
       {single
-        ? $t`Forget ${name}?`
+        ? $t`Remove ${name}?`
         : $plural(origins.length, {
-            one: "Forget 1 app?",
-            other: "Forget # apps?",
+            one: "Remove 1 app?",
+            other: "Remove # apps?",
           })}
     </h1>
     <div
@@ -69,9 +69,9 @@
     >
       {#if isForgetting}
         <ProgressRing />
-        <span>{$t`Forgetting...`}</span>
+        <span>{$t`Removing...`}</span>
       {:else}
-        <span>{single ? $t`Forget app` : $t`Forget apps`}</span>
+        <span>{single ? $t`Remove app` : $t`Remove apps`}</span>
       {/if}
     </button>
     <button
