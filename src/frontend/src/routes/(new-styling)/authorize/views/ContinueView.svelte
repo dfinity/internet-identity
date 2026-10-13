@@ -721,22 +721,8 @@
     </p>
   {/if}
   <div class="grid grid-cols-1">
-    <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
     {#if isMultipleAccountsEnabled && accounts !== undefined}
       {@render allOptions(accounts)}
-    {:else if isMultipleAccountsEnabled}
-      <div
-        class="col-start-1 row-start-1"
-        transition:slide={{ axis: "y", duration: 300 }}
-      >
-        <div
-          class="flex min-h-18 items-center justify-center pb-6"
-          in:fade={{ duration: 100, delay: 300 }}
-          out:fade={{ duration: 100 }}
-        >
-          <ProgressRing class="text-fg-tertiary size-8" />
-        </div>
-      </div>
     {/if}
   </div>
   <div class="pb-6">
