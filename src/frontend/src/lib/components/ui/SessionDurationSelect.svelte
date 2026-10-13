@@ -3,6 +3,7 @@
   import { ChevronDownIcon } from "@lucide/svelte";
   import { formatDuration, t } from "$lib/stores/locale.store";
   import {
+    SESSION_DURATION_PRESETS,
     cappedSessionDurations,
     sessionDurationBreakdown,
   } from "$lib/utils/sessionDuration";
@@ -61,14 +62,13 @@
   // Every preset up to the cap, plus the cap itself when it isn't a preset, each
   // with its label and a flag for the current selection.
   const options = $derived(
-    cappedSessionDurations(
-      maxSeconds,
-      presets.map((preset) => preset.value),
-    ).map((optionValue) => ({
-      value: optionValue,
-      label: labelFor(optionValue),
-      selected: optionValue === value,
-    })),
+    cappedSessionDurations(maxSeconds, SESSION_DURATION_PRESETS).map(
+      (optionValue) => ({
+        value: optionValue,
+        label: labelFor(optionValue),
+        selected: optionValue === value,
+      }),
+    ),
   );
 
   // The trigger shows the selected duration's label.

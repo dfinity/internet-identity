@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import {
     CheckIcon,
@@ -46,6 +46,8 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
   import {
+    SESSION_DURATION_PRESETS,
+    cappedSessionDurations,
     sessionDurationCeilingSeconds,
     sessionDurationToNanos,
   } from "$lib/utils/sessionDuration";
@@ -97,9 +99,8 @@
 
   // The largest duration the picker offers: the app's requested value, capped
   // at the 30-day maximum, or the maximum itself when the app didn't request
-  // one. Defaulting the selection to it means a plain "Continue" grants exactly
-  // what the app asked for (as before this picker existed); the user can shorten
-  // it first.
+  // one. A plain "Continue" grants exactly this; with all options shown the
+  // picker starts on the duration last chosen for this app on this browser.
   const ceilingSeconds = sessionDurationCeilingSeconds(requestedMaxTimeToLive);
   let selectedTtlSeconds = $state(ceilingSeconds);
   const selectedMaxTimeToLive = $derived(
@@ -180,16 +181,42 @@
     }
   });
 
+  // The account and duration last chosen for this app with all options shown,
+  // on this browser.
+  const rememberedOptions = $derived(
+    $lastUsedIdentitiesStore.selected?.authorizeOptions?.[effectiveOrigin],
+  );
+  const rememberedTtlSeconds = (): number => {
+    const remembered = rememberedOptions?.sessionDurationSeconds;
+    return remembered !== undefined &&
+      cappedSessionDurations(ceilingSeconds, SESSION_DURATION_PRESETS).includes(
+        remembered,
+      )
+      ? remembered
+      : ceilingSeconds;
+  };
+
   // The account picked in the list, or `null` until the user picks one, in
-  // which case the default account is the one Continue signs in with.
+  // which case Continue signs in with the remembered account if it still
+  // exists, or else the default account.
   let selectedAccountNumber = $state<
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
-  const chosenAccountNumber = $derived(
-    selectedAccountNumber !== null
-      ? selectedAccountNumber
-      : (defaultAccountNumber ?? undefined),
-  );
+  const chosenAccountNumber = $derived.by(() => {
+    if (selectedAccountNumber !== null) {
+      return selectedAccountNumber;
+    }
+    if (
+      rememberedOptions !== undefined &&
+      accounts?.some(
+        (account) =>
+          account.account_number[0] === rememberedOptions.accountNumber,
+      ) === true
+    ) {
+      return rememberedOptions.accountNumber;
+    }
+    return defaultAccountNumber ?? undefined;
+  });
 
   let isCreateAccountDialogVisible = $state(false);
   let isEditAccountDialogVisibleForNumber = $state<
@@ -307,7 +334,7 @@
       onAuthorize(
         accountNumberPromise,
         effectiveAccessLevel,
-        selectedMaxTimeToLive,
+        sessionDurationToNanos(ceilingSeconds),
       );
     } catch (error) {
       // Left busy on the way out: this view stays up while a request that still owes
@@ -329,6 +356,11 @@
           effectiveOrigin,
         );
       }
+      lastUsedIdentitiesStore.setAuthorizeOptions(
+        selectedIdentityNumber,
+        effectiveOrigin,
+        { accountNumber, sessionDurationSeconds: selectedTtlSeconds },
+      );
       onAuthorize(
         Promise.resolve(accountNumber),
         effectiveAccessLevel,
@@ -361,6 +393,9 @@
   };
 
   const handleEnableMultipleAccounts = async () => {
+    // Untracked: this runs inside the identity effect, which must not rerun
+    // when Continue saves the options.
+    selectedTtlSeconds = untrack(rememberedTtlSeconds);
     try {
       const sessionActor = await actorForIdentity(selectedIdentityNumber);
       if (sessionActor !== undefined) {
