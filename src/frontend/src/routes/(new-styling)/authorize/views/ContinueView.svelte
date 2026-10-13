@@ -631,73 +631,78 @@
 {/snippet}
 
 {#snippet allOptions(accounts: AccountInfo[])}
-  <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
-    <div in:slide={{ axis: "y", duration: 300 }}>
-      <div class="flex flex-col pb-6" in:fade={{ duration: 300 }}>
-        <span
-          id="{id}-account-label"
-          class="text-text-tertiary mb-2 text-sm font-medium"
-        >
-          {$t`Account`}
-        </span>
-        <div
-          class={[
-            "border-border-secondary bg-bg-primary mb-5 flex flex-col overflow-hidden rounded-xl border",
-            "has-[input:focus-visible]:outline-focus-ring has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2",
-          ]}
-        >
-          <!-- Native radios: arrow keys, a single tab stop and the radio
+  <div
+    class="col-start-1 row-start-1"
+    transition:slide={{ axis: "y", duration: 300 }}
+  >
+    <div
+      class="flex flex-col pb-6"
+      in:fade={{ duration: 300 }}
+      out:fade={{ duration: 100 }}
+    >
+      <span
+        id="{id}-account-label"
+        class="text-text-tertiary mb-2 text-sm font-medium"
+      >
+        {$t`Account`}
+      </span>
+      <div
+        class={[
+          "border-border-secondary bg-bg-primary mb-5 flex flex-col overflow-hidden rounded-xl border",
+          "has-[input:focus-visible]:outline-focus-ring has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2",
+        ]}
+      >
+        <!-- Native radios: arrow keys, a single tab stop and the radio
                announcement come from the browser. -->
-          <fieldset
-            class="flex min-w-0 flex-col"
-            aria-labelledby="{id}-account-label"
-            disabled={isAuthenticatingDefault}
-          >
-            {#each accounts as account (account.account_number[0])}
-              {@render accountRow(account)}
-            {/each}
-          </fieldset>
-          <Tooltip
-            label={$t`Limit reached`}
-            description={$plural(MAX_ACCOUNTS, {
-              one: `You have reached the maximum of # account for a single app.`,
-              other: `You have reached the maximum of # accounts for a single app.`,
-            })}
-            direction="up"
-            align="center"
-            hidden={!isAccountLimitReached}
-          >
-            <button
-              class={[
-                "text-fg-primary hover:not-disabled:bg-bg-tertiary disabled:text-fg-disabled flex h-13 w-full cursor-pointer flex-row items-center gap-3 px-4 text-start text-sm font-semibold disabled:cursor-default",
-                "focus-visible:outline-focus-ring rounded-b-[calc(var(--radius-xl)-1px)] focus-visible:outline-2 focus-visible:-outline-offset-2",
-              ]}
-              onclick={() => (isCreateAccountDialogVisible = true)}
-              disabled={isAccountLimitReached}
-            >
-              <PlusIcon class="size-4.5 shrink-0" />
-              {$t`Add another account`}
-            </button>
-          </Tooltip>
-        </div>
-        <span class="text-text-tertiary mb-2 text-sm font-medium">
-          {$t`Session`}
-        </span>
-        <!-- How long the sign-in lasts before the user must sign in again,
-             capped at the duration the app requested (see `ceilingSeconds`). -->
-        <div
-          class="border-border-secondary bg-bg-primary flex h-13 flex-row items-center gap-3 rounded-xl border ps-4 pe-1.5"
+        <fieldset
+          class="flex min-w-0 flex-col"
+          aria-labelledby="{id}-account-label"
+          disabled={isAuthenticatingDefault}
         >
-          <span class="text-text-secondary flex-1 text-sm">
-            {$t`Stay signed in for`}
-          </span>
-          <SessionDurationSelect
-            maxSeconds={ceilingSeconds}
-            bind:value={selectedTtlSeconds}
-            disabled={isAuthenticatingDefault}
-            variant="tertiary"
-          />
-        </div>
+          {#each accounts as account (account.account_number[0])}
+            {@render accountRow(account)}
+          {/each}
+        </fieldset>
+        <Tooltip
+          label={$t`Limit reached`}
+          description={$plural(MAX_ACCOUNTS, {
+            one: `You have reached the maximum of # account for a single app.`,
+            other: `You have reached the maximum of # accounts for a single app.`,
+          })}
+          direction="up"
+          align="center"
+          hidden={!isAccountLimitReached}
+        >
+          <button
+            class={[
+              "text-fg-primary hover:not-disabled:bg-bg-tertiary disabled:text-fg-disabled flex h-13 w-full cursor-pointer flex-row items-center gap-3 px-4 text-start text-sm font-semibold disabled:cursor-default",
+              "focus-visible:outline-focus-ring rounded-b-[calc(var(--radius-xl)-1px)] focus-visible:outline-2 focus-visible:-outline-offset-2",
+            ]}
+            onclick={() => (isCreateAccountDialogVisible = true)}
+            disabled={isAccountLimitReached}
+          >
+            <PlusIcon class="size-4.5 shrink-0" />
+            {$t`Add another account`}
+          </button>
+        </Tooltip>
+      </div>
+      <span class="text-text-tertiary mb-2 text-sm font-medium">
+        {$t`Session`}
+      </span>
+      <!-- How long the sign-in lasts before the user must sign in again,
+             capped at the duration the app requested (see `ceilingSeconds`). -->
+      <div
+        class="border-border-secondary bg-bg-primary flex h-13 flex-row items-center gap-3 rounded-xl border ps-4 pe-1.5"
+      >
+        <span class="text-text-secondary flex-1 text-sm">
+          {$t`Stay signed in for`}
+        </span>
+        <SessionDurationSelect
+          maxSeconds={ceilingSeconds}
+          bind:value={selectedTtlSeconds}
+          disabled={isAuthenticatingDefault}
+          variant="tertiary"
+        />
       </div>
     </div>
   </div>
@@ -721,11 +726,16 @@
       {@render allOptions(accounts)}
     {:else if isMultipleAccountsEnabled}
       <div
-        class="col-start-1 row-start-1 flex min-h-18 items-center justify-center pb-6"
-        in:fade={{ duration: 100, delay: 300 }}
-        out:fade={{ duration: 100 }}
+        class="col-start-1 row-start-1"
+        transition:slide={{ axis: "y", duration: 300 }}
       >
-        <ProgressRing class="text-fg-tertiary size-8" />
+        <div
+          class="flex min-h-18 items-center justify-center pb-6"
+          in:fade={{ duration: 100, delay: 300 }}
+          out:fade={{ duration: 100 }}
+        >
+          <ProgressRing class="text-fg-tertiary size-8" />
+        </div>
       </div>
     {/if}
   </div>
