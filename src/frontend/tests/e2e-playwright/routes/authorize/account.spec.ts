@@ -88,12 +88,11 @@ test("Create another account, make it default and authorize with it", async ({
   });
   const secondaryPrincipal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
-    // The multi-accounts toggle persists per-anchor in localStorage from
-    // the previous step, so the multi-accounts list is shown on return
-    // visits, with the new default ("Test account") already selected.
-    await expect(
-      authPage.getByRole("radio", { name: "Test account" }),
-    ).toBeChecked();
+    // With all options off, Continue signs in with the default account,
+    // which is now "Test account".
+    await authPage
+      .getByRole("switch", { name: "Show all options" })
+      .setChecked(false);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
