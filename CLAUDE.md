@@ -4,11 +4,19 @@ Guidance for AI coding agents (e.g. Claude Code) working in this repository.
 For the human-facing docs, see [CONTRIBUTING.md](CONTRIBUTING.md) and
 [HACKING.md](HACKING.md).
 
-## Pull request reviews
+## Rules
 
-- After pushing changes that address a reviewer's feedback on a pull request,
-  re-request a review from that reviewer — use GitHub's "Re-request review"
-  control (the circular-arrow button next to the reviewer in the "Reviewers"
-  sidebar) or the equivalent API. GitHub does not re-request automatically
-  after a reviewer has left comments or requested changes, so without this the
-  reviewer has to notice the update on their own and the PR can stall.
+Conventions live in `.claude/rules/`, one file per topic. Most are scoped to the
+paths they apply to via `paths:` frontmatter, so they load only when the files
+they govern are in play:
+
+| File | Applies to |
+| --- | --- |
+| `workflow.md` | all files — formatting, PR titles and descriptions, stacked PRs, CI and reviews |
+| `handle-all-type-variants.md` | all files — exhaustive handling of candid variants, Rust enums, TS unions |
+| `backend.md` | `src/internet_identity*/**`, `src/asset_util/**` — no-trap rule, clippy flags, PocketIC tests |
+| `frontend.md` | `src/frontend/**` — design tokens, buttons, i18n, Svelte and TypeScript style |
+| `e2e-testing.md` | `src/frontend/tests/**`, `scripts/dev-e2e*`, `playwright.config.ts` — the dev-e2e stack |
+
+Add a new convention as a file in `.claude/rules/` rather than expanding this
+one, and give it `paths:` frontmatter unless it genuinely applies everywhere.
