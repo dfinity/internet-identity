@@ -201,3 +201,52 @@ test("Can't create more than 5 accounts", async ({
       .click();
   });
 });
+
+test("All options start from the account and duration last chosen on this browser", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
+}) => {
+  const primaryPrincipal = await authorize(page, async (authPage) => {
+    await signInWithIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
+  const workPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("switch", { name: "Show all options" })
+      .setChecked(true);
+    await authPage.getByRole("button", { name: "Add another account" }).click();
+    await authPage.getByLabel("Account name").fill("Work");
+    await authPage.getByRole("button", { name: "Create account" }).click();
+    await authPage.getByRole("radio", { name: "Work" }).click();
+    await authPage.getByRole("button", { name: "30 days" }).click();
+    await authPage.getByRole("menuitem", { name: "1 day" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
+  const rememberedPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await expect(authPage.getByRole("radio", { name: "Work" })).toBeChecked();
+    await expect(authPage.getByRole("button", { name: "1 day" })).toBeVisible();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
+  const optionsOffPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("switch", { name: "Show all options" })
+      .setChecked(false);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
+  expect(workPrincipal).not.toEqual(primaryPrincipal);
+  expect(rememberedPrincipal).toEqual(workPrincipal);
+  expect(optionsOffPrincipal).toEqual(primaryPrincipal);
+});
