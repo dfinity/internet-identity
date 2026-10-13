@@ -465,6 +465,14 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
+  const ForgetApplicationsRequest = IDL.Record({
+    'origins' : IDL.Vec(FrontendHostname),
+    'anchor_number' : UserNumber,
+  });
+  const ForgetApplicationsError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const Permissions = IDL.Variant({ 'all' : IDL.Null, 'queries' : IDL.Null });
   const AccountDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
@@ -795,7 +803,7 @@ export const idlFactory = ({ IDL }) => {
     'origin' : FrontendHostname,
     'notifications_allowed' : IDL.Bool,
     'last_notified' : IDL.Opt(Timestamp),
-    'last_used' : Timestamp,
+    'last_used' : IDL.Opt(Timestamp),
   });
   const ListApplicationsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -1338,6 +1346,11 @@ export const idlFactory = ({ IDL }) => {
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
+    'forget_applications' : IDL.Func(
+        [ForgetApplicationsRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ForgetApplicationsError })],
+        [],
+      ),
     'get_account_delegation' : IDL.Func(
         [
           UserNumber,

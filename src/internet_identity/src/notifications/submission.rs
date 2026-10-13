@@ -126,8 +126,7 @@ fn resolve_recipient(
         }
         let consented = storage
             .read_anchor_application_config(account.anchor_number, origin)
-            .and_then(|config| config.notifications_consented_at_ns)
-            .is_some();
+            .is_some_and(|config| config.notifications_allowed());
         if !consented
             || !anchor
                 .browsers()
@@ -148,7 +147,7 @@ fn resolve_recipient(
 mod tests {
     use super::*;
     use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
-    use crate::notifications::{write_consent, ValidatedSendNotificationArg};
+    use crate::notifications::{write_notifications_decision, ValidatedSendNotificationArg};
     use crate::state::storage_borrow_mut;
     use internet_identity_interface::internet_identity::types::SendNotificationArg;
     use pretty_assertions::assert_eq;
@@ -192,13 +191,8 @@ mod tests {
     }
 
     fn allow(recipient: &Recipient) {
-        write_consent(
-            recipient.anchor_number,
-            &APP.to_string(),
-            Some(NOW_NS),
-            NOW_NS,
-        )
-        .expect("writing consent");
+        write_notifications_decision(recipient.anchor_number, &APP.to_string(), true, NOW_NS)
+            .expect("writing consent");
     }
 
     fn notification(recipient: &Recipient, id: u64) -> Notification {
