@@ -633,7 +633,7 @@
 {#snippet allOptions(accounts: AccountInfo[])}
   <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
     <div in:slide={{ axis: "y", duration: 300 }}>
-      <div class="flex flex-col" in:fade={{ duration: 300 }}>
+      <div class="flex flex-col pb-6" in:fade={{ duration: 300 }}>
         <span
           id="{id}-account-label"
           class="text-text-tertiary mb-2 text-sm font-medium"
@@ -698,42 +698,8 @@
             variant="tertiary"
           />
         </div>
-        <div class="my-6">
-          <button
-            class="btn btn-primary btn-xl w-full"
-            onclick={() => handleContinueAs(chosenAccountNumber)}
-            disabled={isAuthenticatingDefault || mustChooseAccess}
-          >
-            {#if isAuthenticatingDefault}
-              <ProgressRing />
-              <span>{$t`Authenticating...`}</span>
-            {:else}
-              <span>{continueLabel ?? $t`Continue`}</span>
-            {/if}
-          </button>
-        </div>
       </div>
     </div>
-  </div>
-{/snippet}
-
-{#snippet continueDefault()}
-  <div
-    class="col-start-1 row-start-1 pb-6"
-    in:fade={{ duration: 200, delay: 100 }}
-  >
-    <button
-      class="btn btn-primary btn-xl w-full"
-      onclick={handleContinueDefault}
-      disabled={isAuthenticatingDefault || mustChooseAccess}
-    >
-      {#if isAuthenticatingDefault}
-        <ProgressRing />
-        <span>{$t`Authenticating...`}</span>
-      {:else}
-        <span>{continueLabel ?? $t`Continue`}</span>
-      {/if}
-    </button>
   </div>
 {/snippet}
 
@@ -761,9 +727,25 @@
       >
         <ProgressRing class="text-fg-tertiary size-8" />
       </div>
-    {:else}
-      {@render continueDefault()}
     {/if}
+  </div>
+  <div class="pb-6">
+    <button
+      class="btn btn-primary btn-xl w-full"
+      onclick={isMultipleAccountsEnabled
+        ? () => handleContinueAs(chosenAccountNumber)
+        : handleContinueDefault}
+      disabled={isAuthenticatingDefault ||
+        mustChooseAccess ||
+        (isMultipleAccountsEnabled && accounts === undefined)}
+    >
+      {#if isAuthenticatingDefault}
+        <ProgressRing />
+        <span>{$t`Authenticating...`}</span>
+      {:else}
+        <span>{continueLabel ?? $t`Continue`}</span>
+      {/if}
+    </button>
   </div>
   <div class="flex flex-row items-center">
     <!-- Intentionally we use onclick here instead of onchange to make sure it's a user gesture-->
