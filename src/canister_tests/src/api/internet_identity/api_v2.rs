@@ -388,6 +388,27 @@ pub fn list_applications(
     .map(|(x,)| x)
 }
 
+pub fn forget_applications(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    origins: Vec<FrontendHostname>,
+) -> Result<Result<(), ForgetApplicationsError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "forget_applications",
+        (ForgetApplicationsRequest {
+            anchor_number,
+            origins,
+        },),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn get_default_account(
     env: &PocketIc,
     canister_id: CanisterId,

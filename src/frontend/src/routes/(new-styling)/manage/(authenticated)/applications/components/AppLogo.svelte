@@ -4,7 +4,7 @@
   interface Props {
     /** A ready `<img src>`, or `undefined` for an app that publishes none. */
     logo?: string;
-    size: "md" | "lg";
+    size: "card" | "lg";
   }
 
   const { logo, size }: Props = $props();
@@ -23,7 +23,7 @@
     // Only the globe needs a frame; a logo brings its own.
     shown === undefined &&
       "border-border-secondary bg-bg-primary text-fg-tertiary border",
-    { md: "size-10 rounded-lg", lg: "size-12 rounded-xl" }[size],
+    { card: "size-11 rounded-lg", lg: "size-12 rounded-xl" }[size],
   ]}
 >
   {#if shown !== undefined}
@@ -34,6 +34,6 @@
       onerror={() => (failedLogo = shown)}
     />
   {:else}
-    <GlobeIcon class={{ md: "size-5", lg: "size-6" }[size]} />
+    <GlobeIcon class={{ card: "size-5", lg: "size-6" }[size]} />
   {/if}
 </span>
