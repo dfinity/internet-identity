@@ -234,6 +234,11 @@
         account.account_number[0] === isEditAccountDialogVisibleForNumber,
     ),
   );
+  // Continue looks unchanged while the account list loads, but does nothing
+  // until it has.
+  const isLoadingAccounts = $derived(
+    isMultipleAccountsEnabled && accounts === undefined,
+  );
   const isAccountLimitReached = $derived(
     accounts !== undefined && accounts.length >= 5,
   );
@@ -728,12 +733,18 @@
   <div class="pb-6">
     <button
       class="btn btn-primary btn-xl w-full"
-      onclick={isMultipleAccountsEnabled
-        ? () => handleContinueAs(chosenAccountNumber)
-        : handleContinueDefault}
-      disabled={isAuthenticatingDefault ||
-        mustChooseAccess ||
-        (isMultipleAccountsEnabled && accounts === undefined)}
+      onclick={() => {
+        if (!isMultipleAccountsEnabled) {
+          void handleContinueDefault();
+          return;
+        }
+        if (isLoadingAccounts) {
+          return;
+        }
+        void handleContinueAs(chosenAccountNumber);
+      }}
+      disabled={isAuthenticatingDefault || mustChooseAccess}
+      aria-disabled={isLoadingAccounts}
     >
       {#if isAuthenticatingDefault}
         <ProgressRing />
