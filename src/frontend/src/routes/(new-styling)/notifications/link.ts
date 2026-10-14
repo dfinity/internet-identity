@@ -9,7 +9,7 @@ import {
   ensureAppKey,
   rememberLinked,
 } from "$lib/utils/notifications/notificationAppKey";
-import { appKeyActor } from "$lib/utils/notifications/notificationAppActor";
+import { appKeyActor } from "./appKeyActor";
 import type { LinkNotificationAppError } from "$lib/generated/internet_identity_types";
 import type { LinkToken } from "./linkToken";
 

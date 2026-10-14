@@ -17,8 +17,10 @@ import {
   browserKeyIdentity,
   registeredIdentityNumbers,
 } from "$lib/stores/browser-key.store";
-import { readAppKey } from "./notificationAppKey";
-import { appKeyActor } from "./notificationAppActor";
+import { readAppKey, type AppKeyRecord } from "./notificationAppKey";
+import { appKeyActorWith } from "./notificationAppActor";
+import { config } from "./workerConfig";
+import { Principal } from "@icp-sdk/core/principal";
 
 export interface SigningIdentity {
   identityNumber: bigint;
@@ -38,6 +40,16 @@ const fromBrowserKeys = async (): Promise<SigningIdentity[]> => {
   return entries.flat();
 };
 
+/** The identities a browser claimed this app for, which only the canister can name.
+ *  Answers nothing where the worker was told nothing, as a document with no config is. */
+const claimedAnchors = async (record: AppKeyRecord): Promise<bigint[]> => {
+  const actor = await appKeyActorWith(record, {
+    agentOptions: config.agentOptions,
+    canisterId: Principal.fromText(config.canisterId),
+  });
+  return actor.notification_app_anchors();
+};
+
 const fromAppKey = async (): Promise<SigningIdentity[]> => {
   const record = await readAppKey();
   if (record?.identityNumber === undefined) {
@@ -48,9 +60,7 @@ const fromAppKey = async (): Promise<SigningIdentity[]> => {
   // claimed by browsers on this device, and the canister is the only thing that can say
   // so — a browser cannot reach this app's storage, and the app cannot find its own
   // entries without being told which identities hold them.
-  const claimed = await appKeyActor(record)
-    .then((actor) => actor.notification_app_anchors())
-    .catch(() => []);
+  const claimed = await claimedAnchors(record).catch(() => []);
   return [...new Set([record.identityNumber, ...claimed])].map(
     (identityNumber) => ({ identityNumber, identity }),
   );

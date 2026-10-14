@@ -22,6 +22,17 @@ vi.mock("$lib/stores/browser-key.store", () => ({
 vi.mock("$lib/utils/notifications/notificationAppKey", () => ({
   readAppKey: () => readAppKey(),
 }));
+vi.mock("$lib/utils/notifications/workerConfig", () => ({
+  config: {
+    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: { host: "http://127.0.0.1:4943" },
+  },
+}));
+const anchorsAnswer = vi.fn<() => Promise<bigint[]>>(() => Promise.resolve([]));
+vi.mock("$lib/utils/notifications/notificationAppActor", () => ({
+  appKeyActorWith: () =>
+    Promise.resolve({ notification_app_anchors: () => anchorsAnswer() }),
+}));
 vi.mock("@icp-sdk/core/identity", () => ({
   ECDSAKeyIdentity: { fromKeyPair: (pair: CryptoKeyPair) => fromKeyPair(pair) },
 }));
@@ -93,6 +104,20 @@ describe("signingIdentities", () => {
     browserKeyIdentity.mockResolvedValue(undefined);
 
     expect(await signingIdentities()).toEqual([]);
+  });
+
+  /// The anchors another identity claimed this app for are the canister's to name, and
+  /// a wake-up that cannot reach it still owes the user the identity the app linked.
+  it("still answers its own identity where the claimed anchors cannot be read", async () => {
+    readAppKey.mockResolvedValue({
+      keyPair: APP_KEY_PAIR,
+      identityNumber: APP,
+    });
+    anchorsAnswer.mockRejectedValueOnce(new Error("offline"));
+
+    expect(await signingIdentities()).toEqual([
+      { identityNumber: APP, identity: { keyPair: APP_KEY_PAIR } },
+    ]);
   });
 
   it("answers what it can where one source throws", async () => {

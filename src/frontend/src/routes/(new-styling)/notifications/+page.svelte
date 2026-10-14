@@ -17,7 +17,7 @@
   import { linkAndRegister, type LinkOutcome } from "./link";
   import { readAppKey } from "$lib/utils/notifications/notificationAppKey";
   import { ensureRegisteredDevice } from "$lib/utils/notifications/subscribeDevice";
-  import { appKeyActor } from "$lib/utils/notifications/notificationAppActor";
+  import { appKeyActor } from "./appKeyActor";
   import InstallSteps from "./installSteps/InstallSteps.svelte";
   import IosAppSteps from "./blockedSteps/IosAppSteps.svelte";
   import { NOTIFICATION_APP_NAME } from "./appName";
@@ -221,8 +221,8 @@
           </h1>
           <p class="text-text-tertiary mb-5 text-base">
             <Trans>
-              Already have the {NOTIFICATION_APP_NAME} app on this device? Open
-              it, that is all it needs. Otherwise follow these steps:
+              Already have the {NOTIFICATION_APP_NAME} app on this device? Open it,
+              that is all it needs. Otherwise follow these steps:
             </Trans>
           </p>
           <InstallSteps {host} />
