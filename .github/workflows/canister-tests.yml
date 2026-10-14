@@ -203,7 +203,8 @@ jobs:
         run: |
           run=true
           if [[ "$GITHUB_REF" == refs/tags/release-* ]]; then
-            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .status)
+            # If the lookup fails, run the tests rather than skip them
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .status || echo unknown)
             echo "$GITHUB_SHA compared to main: $status"
             if [[ "$status" == "identical" || "$status" == "behind" ]]; then
               run=false
