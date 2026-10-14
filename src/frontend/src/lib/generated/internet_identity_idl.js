@@ -31,6 +31,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIdEmailVerification = IDL.Variant({
     'Google' : IDL.Null,
     'Unknown' : IDL.Null,
+    'Apple' : IDL.Null,
     'Microsoft' : IDL.Null,
   });
   const OpenIdConfig = IDL.Record({
@@ -1870,6 +1871,7 @@ export const init = ({ IDL }) => {
   const OpenIdEmailVerification = IDL.Variant({
     'Google' : IDL.Null,
     'Unknown' : IDL.Null,
+    'Apple' : IDL.Null,
     'Microsoft' : IDL.Null,
   });
   const OpenIdConfig = IDL.Record({

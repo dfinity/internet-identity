@@ -1601,6 +1601,14 @@ export type OpenIdDelegationError = {
   { 'JwtVerificationFailed' : null };
 export type OpenIdEmailVerification = { 'Google' : null } |
   { 'Unknown' : null } |
+  {
+    /**
+     * Trusts email_verified like Google, except for Apple's private relay
+     * addresses, which only senders registered with II's Apple developer team
+     * can deliver mail to.
+     */
+    'Apple' : null
+  } |
   { 'Microsoft' : null };
 export interface OpenIdPrepareDelegationResponse {
   'user_key' : UserKey,

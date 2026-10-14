@@ -23,8 +23,8 @@
         client_id = "ai.id.beta.auth";
         jwks_uri = "https://appleid.apple.com/auth/keys";
         auth_uri = "https://appleid.apple.com/auth/authorize";
-        auth_scope = vec { "openid" };
-        email_verification = opt variant { Unknown };
+        auth_scope = vec { "openid"; "email" };
+        email_verification = opt variant { Apple };
       };
       record {
         name = "Microsoft";

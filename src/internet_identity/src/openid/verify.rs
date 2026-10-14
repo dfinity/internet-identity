@@ -60,25 +60,37 @@ const MAX_SUB_LENGTH: usize = 255;
 
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum EmailVerifiedClaim {
+enum BoolClaim {
     Bool(bool),
     String(String),
 }
 
-// Depending on the OpenID provider, this claim can either be a boolean or string,
-// so we need to support both formats when parsing the claims, but we will convert
-// both to a string for storing it in the OpenIdCredential metadata.
-impl EmailVerifiedClaim {
+// Depending on the OpenID provider, a boolean claim like `email_verified` can either
+// be a boolean or string (Apple sends either), so we need to support both formats
+// when parsing the claims, but we will convert both to a string for storing it in
+// the OpenIdCredential metadata.
+impl BoolClaim {
     fn into_string(self) -> String {
         match self {
-            EmailVerifiedClaim::Bool(value) => {
+            BoolClaim::Bool(value) => {
                 if value {
                     "true".into()
                 } else {
                     "false".into()
                 }
             }
-            EmailVerifiedClaim::String(value) => value,
+            BoolClaim::String(value) => value,
+        }
+    }
+
+    /// Apple's `is_private_email`, as `"true"` unless it plainly says `false`:
+    /// an unexpected value must not let a private relay address count as a
+    /// verified email, and must not fail the sign-in either.
+    fn into_private_email_string(self) -> String {
+        match self {
+            BoolClaim::Bool(false) => "false".into(),
+            BoolClaim::String(value) if value.eq_ignore_ascii_case("false") => "false".into(),
+            _ => "true".into(),
         }
     }
 }
@@ -94,7 +106,9 @@ struct Claims {
     // Optional metadata claims
     email: Option<String>,
     name: Option<String>,
-    email_verified: Option<EmailVerifiedClaim>,
+    email_verified: Option<BoolClaim>,
+    // Apple only: whether `email` is a private relay address.
+    is_private_email: Option<BoolClaim>,
 }
 
 /// What the resolver determined about a provider, independent of the JWK
@@ -205,6 +219,7 @@ pub(super) fn verify_and_build(
         email,
         name,
         email_verified,
+        is_private_email,
         aud: _,
         nonce: _,
         exp: _,
@@ -213,13 +228,21 @@ pub(super) fn verify_and_build(
 
     // Assemble metadata
     let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
-    if let Some(email) = email {
+    // An empty email (Apple sends one for some Work & School accounts) is no
+    // address at all.
+    if let Some(email) = email.filter(|email| !email.is_empty()) {
         metadata.insert("email".into(), MetadataEntryV2::String(email));
     }
     if let Some(email_verified) = email_verified {
         metadata.insert(
             "email_verified".into(),
             MetadataEntryV2::String(email_verified.into_string()),
+        );
+    }
+    if let Some(is_private_email) = is_private_email {
+        metadata.insert(
+            "is_private_email".into(),
+            MetadataEntryV2::String(is_private_email.into_private_email_string()),
         );
     }
     if let Some(name) = name {
@@ -404,7 +427,7 @@ fn verify_claims(
             "Name too long".into(),
         ));
     }
-    if let Some(EmailVerifiedClaim::String(ref s)) = claims.email_verified {
+    if let Some(BoolClaim::String(ref s)) = claims.email_verified {
         if s != "true" && s != "false" {
             return Err(OpenIDJWTVerificationError::GenericError(format!(
                 "email_verified must be 'true' or 'false', got: {}",
@@ -701,6 +724,7 @@ mod tests {
                 email: None,
                 name: None,
                 email_verified: None,
+                is_private_email: None,
             },
             &test_salt(),
         );
@@ -735,6 +759,7 @@ mod tests {
                 email: None,
                 name: None,
                 email_verified: None,
+                is_private_email: None,
             },
             &test_salt(),
         );
@@ -744,6 +769,37 @@ mod tests {
                 "Subject too long".to_string()
             ))
         );
+    }
+
+    #[test]
+    fn should_parse_apple_bool_claims_as_bool_or_string() {
+        // Apple sends `email_verified` and `is_private_email` as either a
+        // boolean or a string.
+        for (email_verified, is_private_email) in [("true", "true"), ("\"true\"", "\"true\"")] {
+            let claims: Claims = serde_json::from_str(&format!(
+                r#"{{"iss":"https://appleid.apple.com","sub":"sub","aud":"aud","nonce":"n","exp":1,"iat":1,"email":"x@privaterelay.appleid.com","email_verified":{email_verified},"is_private_email":{is_private_email}}}"#
+            ))
+            .expect("claims should parse");
+            assert_eq!(claims.email_verified.unwrap().into_string(), "true");
+            assert_eq!(
+                claims.is_private_email.unwrap().into_private_email_string(),
+                "true"
+            );
+        }
+    }
+
+    #[test]
+    fn should_store_is_private_email_as_true_unless_plainly_false() {
+        for (claim, expected) in [
+            (BoolClaim::Bool(false), "false"),
+            (BoolClaim::String("false".to_string()), "false"),
+            (BoolClaim::String("FALSE".to_string()), "false"),
+            (BoolClaim::Bool(true), "true"),
+            (BoolClaim::String("true".to_string()), "true"),
+            (BoolClaim::String("unexpected".to_string()), "true"),
+        ] {
+            assert_eq!(claim.into_private_email_string(), expected);
+        }
     }
 
     #[test]
@@ -763,6 +819,7 @@ mod tests {
                 email: None,
                 name: None,
                 email_verified: None,
+                is_private_email: None,
             },
             &test_salt(),
         );

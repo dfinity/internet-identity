@@ -236,6 +236,37 @@ impl OpenIdCredential {
         self.get_email()
     }
 
+    fn get_apple_verified_email(&self) -> Option<String> {
+        // Apple marks private relay addresses as verified too, but only senders
+        // registered with II's Apple developer team can deliver mail to them,
+        // so they are of no use to the apps a verified email is shared with.
+        // Apple flags them with `is_private_email`, which may be missing, so
+        // the relay domains are checked as well. (A relay address can also end
+        // in `@icloud.com`; only the flag tells that one apart.)
+        //
+        // See https://developer.apple.com/documentation/signinwithapple/communicating-using-the-private-email-relay-service
+        const APPLE_RELAY_DOMAINS: [&str; 2] = ["privaterelay.appleid.com", "private.icloud.com"];
+
+        if self
+            .read_metadata_string("is_private_email")
+            .is_some_and(|value| !value.eq_ignore_ascii_case("false"))
+        {
+            return None;
+        }
+
+        // Same `email_verified` check as Google.
+        let email = self.get_google_verified_email()?;
+        let (_, domain) = email.rsplit_once('@')?;
+        if APPLE_RELAY_DOMAINS
+            .iter()
+            .any(|relay| domain.eq_ignore_ascii_case(relay))
+        {
+            return None;
+        }
+
+        Some(email)
+    }
+
     fn get_microsoft_verified_email(&self) -> Option<String> {
         // For Microsoft, check if tid matches the personal account tenant ID
         // (services like Xbox, Teams for Life, or Outlook.com)
@@ -264,6 +295,7 @@ impl OpenIdCredential {
             Unknown => None,
             Google => self.get_google_verified_email(),
             Microsoft => self.get_microsoft_verified_email(),
+            Apple => self.get_apple_verified_email(),
         }
     }
 }

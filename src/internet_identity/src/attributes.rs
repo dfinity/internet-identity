@@ -1233,6 +1233,7 @@ mod tests {
         const MICROSOFT_PERSONAL_TID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
         const MICROSOFT_RESOLVED_ISSUER: &str =
             "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0";
+        const APPLE_ISSUER: &str = "https://appleid.apple.com";
 
         fn setup_providers() {
             crate::openid::setup(vec![
@@ -1258,6 +1259,18 @@ mod tests {
                     auth_scope: vec![],
                     fedcm_uri: None,
                     email_verification: Some(OpenIdEmailVerificationScheme::Microsoft),
+                    seed_jwks: None,
+                },
+                OpenIdConfig {
+                    name: "Apple".to_string(),
+                    logo: String::new(),
+                    issuer: APPLE_ISSUER.to_string(),
+                    client_id: "test-client-id".to_string(),
+                    jwks_uri: String::new(),
+                    auth_uri: String::new(),
+                    auth_scope: vec![],
+                    fedcm_uri: None,
+                    email_verification: Some(OpenIdEmailVerificationScheme::Apple),
                     seed_jwks: None,
                 },
             ]);
@@ -1797,6 +1810,184 @@ mod tests {
                 )),
                 "should contain name"
             );
+        }
+
+        // ── Apple verified email tests ───────────────────────────────────
+
+        /// The `openid:<apple>:verified_email` value for an Apple credential
+        /// carrying `metadata`, if any.
+        fn apple_verified_email(metadata: &[(&str, &str)]) -> Option<String> {
+            setup_providers();
+
+            let credential = OpenIdCredential {
+                iss: APPLE_ISSUER.to_string(),
+                sub: "001234.apple-user.0789".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: metadata
+                    .iter()
+                    .map(|(key, value)| {
+                        (key.to_string(), MetadataEntryV2::String(value.to_string()))
+                    })
+                    .collect(),
+                sso_domain: None,
+                sso_name: None,
+                stable_id: None,
+            };
+            let anchor = anchor_with_openid_credentials(vec![credential]);
+            let mut requested = request_verified_email_for(Some(AttributeScope::OpenId {
+                issuer: APPLE_ISSUER.to_string(),
+            }));
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(
+                    APPLE_ISSUER.to_string(),
+                    "001234.apple-user.0789".to_string(),
+                    "test-client-id".to_string(),
+                ))
+                .expect("credential key should be present");
+            let pairs = attribute_pairs(attrs);
+            assert!(pairs.len() <= 1);
+            pairs.into_iter().next().map(|(key, value)| {
+                pretty_assert_eq!(key, format!("openid:{APPLE_ISSUER}:verified_email"));
+                value
+            })
+        }
+
+        #[test]
+        fn test_apple_returns_verified_email_when_email_verified_is_true() {
+            pretty_assert_eq!(
+                apple_verified_email(&[
+                    ("email", "user@icloud.com"),
+                    ("email_verified", "true"),
+                    ("is_private_email", "false"),
+                ]),
+                Some("user@icloud.com".to_string())
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_verified_email_when_is_private_email_is_missing() {
+            // Apple may leave the flag out for a real address.
+            pretty_assert_eq!(
+                apple_verified_email(&[("email", "user@example.com"), ("email_verified", "true")]),
+                Some("user@example.com".to_string())
+            );
+        }
+
+        #[test]
+        fn test_apple_email_verified_check_is_case_insensitive() {
+            pretty_assert_eq!(
+                apple_verified_email(&[
+                    ("email", "user@example.com"),
+                    ("email_verified", "TRUE"),
+                    ("is_private_email", "FALSE"),
+                ]),
+                Some("user@example.com".to_string())
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_for_private_relay_address() {
+            pretty_assert_eq!(
+                apple_verified_email(&[
+                    ("email", "ep9ks2tnph@privaterelay.appleid.com"),
+                    ("email_verified", "true"),
+                    ("is_private_email", "true"),
+                ]),
+                None
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_is_private_email_is_true_on_any_domain() {
+            // A relay address can also end in `@icloud.com`; only the flag
+            // tells it apart.
+            pretty_assert_eq!(
+                apple_verified_email(&[
+                    ("email", "relay-alias@icloud.com"),
+                    ("email_verified", "true"),
+                    ("is_private_email", "true"),
+                ]),
+                None
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_for_relay_domains_without_the_flag() {
+            for email in [
+                "ep9ks2tnph@privaterelay.appleid.com",
+                "ep9ks2tnph@PrivateRelay.AppleID.com",
+                "ep9ks2tnph@private.icloud.com",
+            ] {
+                pretty_assert_eq!(
+                    apple_verified_email(&[("email", email), ("email_verified", "true")]),
+                    None,
+                    "{email} is a relay address"
+                );
+            }
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_verified_is_false() {
+            // Sign in with Apple at Work & School accounts may not be verified.
+            pretty_assert_eq!(
+                apple_verified_email(&[
+                    ("email", "student@school.example"),
+                    ("email_verified", "false"),
+                ]),
+                None
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_verified_is_missing() {
+            pretty_assert_eq!(apple_verified_email(&[("email", "user@example.com")]), None);
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_is_missing_or_empty() {
+            pretty_assert_eq!(apple_verified_email(&[("email_verified", "true")]), None);
+            pretty_assert_eq!(
+                apple_verified_email(&[("email", ""), ("email_verified", "true")]),
+                None
+            );
+        }
+
+        #[test]
+        fn test_google_scheme_keeps_addresses_the_apple_scheme_rejects() {
+            // The relay rule is Apple's alone: Google's scheme only reads
+            // `email_verified`.
+            setup_providers();
+
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("someone@privaterelay.appleid.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::String("true".to_string()),
+                ),
+                (
+                    "is_private_email".to_string(),
+                    MetadataEntryV2::String("true".to_string()),
+                ),
+            ]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(google_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+
+            let attrs = result
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
+                .expect("credential key should be present");
+            pretty_assert_eq!(attrs.len(), 1);
         }
 
         #[test]
