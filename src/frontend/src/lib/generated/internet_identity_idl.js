@@ -1654,6 +1654,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
+    'notification_app_anchors' : IDL.Func([], [IDL.Vec(UserNumber)], ['query']),
     'notification_app_link' : IDL.Func(
         [GetNotificationAppLinkRequest],
         [IDL.Opt(NotificationAppLink)],

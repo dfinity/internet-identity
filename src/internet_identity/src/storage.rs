@@ -121,6 +121,7 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -215,6 +216,7 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
+const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -241,6 +243,8 @@ const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
 const LOOKUP_ANCHOR_WITH_PASSKEY_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX);
 
+const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX);
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX);
 
@@ -475,6 +479,15 @@ pub struct Storage<M: Memory> {
     pub(crate) lookup_anchor_with_passkey_pubkey_hash_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 
+    lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Where a notification app's key is an entry, which is the one lookup a linked app
+    /// cannot do for itself: a browser is found inside the anchor that holds it, so
+    /// without this the app would have to be told which identities it serves, and the
+    /// browsers that claimed it have no way to tell it. One key, several anchors, so the
+    /// value is a list rather than the single anchor the other indexes hold.
+    pub(crate) lookup_anchors_with_notification_app_memory:
+        StableBTreeMap<Principal, StorableAnchorNumberList, ManagedMemory<M>>,
+
     lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Reverse index for the email-recovery flow: maps
     /// `SHA-256(lowercase(address))` to the anchor that bound it. The
@@ -601,6 +614,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID);
         let lookup_anchor_with_passkey_pubkey_hash_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
+        let lookup_anchors_with_notification_app_memory =
+            memory_manager.get(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID);
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
         let mcp_grant_memory = memory_manager.get(MCP_GRANT_MEMORY_ID);
@@ -722,6 +737,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_passkey_pubkey_hash_memory: StableBTreeMap::init(
                 lookup_anchor_with_passkey_pubkey_hash_memory,
+            ),
+            lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper::new(
+                lookup_anchors_with_notification_app_memory.clone(),
+            ),
+            lookup_anchors_with_notification_app_memory: StableBTreeMap::init(
+                lookup_anchors_with_notification_app_memory,
             ),
             lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_email_recovery_memory.clone(),
@@ -915,6 +936,7 @@ impl<M: Memory + Clone> Storage<M> {
             previous_passkey_credentials,
             previous_recovery_keys,
             previous_email_recovery,
+            previous_browsers,
         ) = if let Some(StorableAnchor {
             // The following fields need to be compared with the previous anchor
             openid_credentials,
@@ -923,10 +945,11 @@ impl<M: Memory + Clone> Storage<M> {
             email_recovery,
 
             // The following fields do not require merging.
+            browsers,
+
             created_at_ns: _,
             name: _,
             verified_emails: _,
-            browsers: _,
             next_browser_id: _,
             session_count: _,
         }) = previous_anchor_maybe
@@ -936,10 +959,11 @@ impl<M: Memory + Clone> Storage<M> {
                 passkey_credentials.unwrap_or_default(),
                 recovery_keys.unwrap_or_default(),
                 email_recovery.unwrap_or_default(),
+                browsers.unwrap_or_default(),
             )
         } else {
             // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
-            (vec![], vec![], vec![], vec![])
+            (vec![], vec![], vec![], vec![], vec![])
         };
         // `storable_anchor.verified_emails` is not synced through any
         // reverse-lookup index — verified emails are addressable only
@@ -975,6 +999,11 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             &previous_passkey_credentials,
             &current_passkey_credentials,
+        );
+        self.sync_anchor_with_notification_app_index(
+            anchor_number,
+            &previous_browsers,
+            storable_anchor.browsers.as_deref().unwrap_or_default(),
         );
 
         // The reverse address index for email recovery: map
@@ -1431,6 +1460,70 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert(hash, anchor_number);
         }
         Ok(())
+    }
+
+    /// Keeps [`Storage::lookup_anchors_with_notification_app`] in step with the linked
+    /// apps this anchor holds.
+    ///
+    /// One key may be an entry on several anchors, which is the whole point: a browser
+    /// signed in to two identities gives the same app to both. So the value is a list,
+    /// and an anchor adds and removes only itself.
+    fn sync_anchor_with_notification_app_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous_browsers: &[StorableBrowser],
+        current_browsers: &[StorableBrowser],
+    ) {
+        let principals = |browsers: &[StorableBrowser]| {
+            browsers
+                .iter()
+                .filter(|browser| browser.linked_from_browser.is_some())
+                .map(|browser| Principal::self_authenticating(&browser.next_browser_key))
+                .collect::<BTreeSet<_>>()
+        };
+        let previous = principals(previous_browsers);
+        let current = principals(current_browsers);
+
+        for principal in previous.difference(&current) {
+            let mut anchors: Vec<AnchorNumber> = self
+                .lookup_anchors_with_notification_app_memory
+                .get(principal)
+                .map(Vec::from)
+                .unwrap_or_default();
+            anchors.retain(|held| *held != anchor_number);
+            if anchors.is_empty() {
+                self.lookup_anchors_with_notification_app_memory
+                    .remove(principal);
+            } else {
+                self.lookup_anchors_with_notification_app_memory
+                    .insert(*principal, anchors.into());
+            }
+        }
+
+        for principal in current.difference(&previous) {
+            let mut anchors: Vec<AnchorNumber> = self
+                .lookup_anchors_with_notification_app_memory
+                .get(principal)
+                .map(Vec::from)
+                .unwrap_or_default();
+            if !anchors.contains(&anchor_number) {
+                anchors.push(anchor_number);
+            }
+            self.lookup_anchors_with_notification_app_memory
+                .insert(*principal, anchors.into());
+        }
+    }
+
+    /// The anchors a notification app's key is an entry on.
+    ///
+    /// Answered for the app itself, which knows its key and nothing else: a browser is
+    /// found inside the anchor that holds it, so an app claimed by another identity has
+    /// no other way to learn whose queue it now has to read.
+    pub fn lookup_anchors_with_notification_app(&self, principal: Principal) -> Vec<AnchorNumber> {
+        self.lookup_anchors_with_notification_app_memory
+            .get(&principal)
+            .map(Vec::from)
+            .unwrap_or_default()
     }
 
     fn sync_anchor_with_passkey_pubkey_index(

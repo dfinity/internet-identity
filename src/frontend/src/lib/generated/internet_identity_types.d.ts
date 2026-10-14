@@ -2995,6 +2995,12 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : string }
   >,
+  /**
+   * The identities this notification app carries notifications for, answered to the
+   * app by its own key: a browser is found inside the anchor that holds it, so an app
+   * another identity claimed cannot otherwise learn whose queue to read.
+   */
+  'notification_app_anchors' : ActorMethod<[], BigUint64Array | bigint[]>,
   'notification_app_link' : ActorMethod<
     [GetNotificationAppLinkRequest],
     [] | [NotificationAppLink]

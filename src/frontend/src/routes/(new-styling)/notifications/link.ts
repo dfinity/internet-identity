@@ -9,10 +9,9 @@ import {
   ensureAppKey,
   rememberLinked,
 } from "$lib/utils/notifications/notificationAppKey";
-import { appKeyActor } from "./appKeyActor";
+import { appKeyActor } from "$lib/utils/notifications/notificationAppActor";
 import type { LinkNotificationAppError } from "$lib/generated/internet_identity_types";
 import type { LinkToken } from "./linkToken";
-import { publishAppRecord } from "./publishRecord";
 
 export type LinkOutcome =
   | { status: "linked"; identityNumber: bigint }
@@ -62,9 +61,6 @@ export const linkAndRegister = async (
     }
 
     await ensureRegisteredDevice(token.identityNumber, actor);
-    // Left where the browsers on this device can read it, which is how an identity
-    // that never installed anything is delivered to.
-    await publishAppRecord({ ...record, identityNumber: token.identityNumber });
     return { status: "linked", identityNumber: token.identityNumber };
   } catch (error) {
     const reason = describe(error);

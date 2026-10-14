@@ -11,7 +11,6 @@ import { throwCanisterError } from "$lib/utils/utils";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { browserKeyActor } from "./browserActor";
-import { recordClaimedIdentity } from "./deviceRecord";
 import { findDeviceApp } from "./deviceApp";
 
 /**
@@ -46,8 +45,8 @@ export const claimDeviceApp = async ({
     })
     .then(throwCanisterError);
 
-  // The app is not running and cannot be told. It reads this on its next wake-up,
-  // which is how it learns there is another queue to ask about.
-  await recordClaimedIdentity(identityNumber);
+  // The app is not running and is not told. It asks the canister which identities it
+  // serves on its next wake-up, which is the only channel there is: a browser cannot
+  // reach the app's storage.
   return true;
 };

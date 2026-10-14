@@ -453,6 +453,18 @@ fn link_notification_app(
     })
 }
 
+/// The identities this notification app carries notifications for.
+///
+/// Answered to the app itself, by its own key, because nothing else can tell it: a
+/// browser is found inside the anchor that holds it, so an app another identity claimed
+/// has no way to learn whose queue it now has to read. Empty for any caller that is no
+/// linked app, so nothing can be probed with it.
+#[query]
+fn notification_app_anchors() -> Vec<AnchorNumber> {
+    let caller = caller();
+    state::storage_borrow(|storage| storage.lookup_anchors_with_notification_app(caller))
+}
+
 /// What this browser's notification app is, for a browser that wants to give the same
 /// app to another identity signed in here.
 ///

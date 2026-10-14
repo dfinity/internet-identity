@@ -2596,6 +2596,10 @@ service : (opt InternetIdentityInit) -> {
     link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
     claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
     notification_app_link : (GetNotificationAppLinkRequest) -> (opt NotificationAppLink);
+    // The identities this notification app carries notifications for, answered to the
+    // app by its own key: a browser is found inside the anchor that holds it, so an app
+    // another identity claimed cannot otherwise learn whose queue to read.
+    notification_app_anchors : () -> (vec UserNumber) query;
     // Called by the browser that installed the app, signed with its own browser key.
     get_notification_app_status : (GetNotificationAppStatusRequest) -> (opt NotificationAppStatus) query;
 

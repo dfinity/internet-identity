@@ -4,15 +4,8 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import type { DeviceApp } from "$lib/utils/notifications/deviceApp";
 
 const findDeviceApp = vi.fn<() => Promise<DeviceApp | undefined>>();
-const recordClaimedIdentity = vi.fn((_identityNumber?: bigint) =>
-  Promise.resolve(),
-);
 const browserKeyActor = vi.fn();
 
-vi.mock("$lib/utils/notifications/deviceRecord", () => ({
-  recordClaimedIdentity: (identityNumber: bigint) =>
-    recordClaimedIdentity(identityNumber),
-}));
 vi.mock("$lib/utils/notifications/deviceApp", () => ({
   findDeviceApp: () => findDeviceApp(),
 }));
@@ -64,16 +57,6 @@ describe("claimDeviceApp", () => {
     });
   });
 
-  // The app is not running when this happens, so the list it reads on its next
-  // wake-up is the only way it hears that another queue is now its to ask about.
-  it("records the identity so the app knows to ask for its queue", async () => {
-    const { actor } = actorAnswering({ Ok: null });
-
-    await claimDeviceApp({ identityNumber: IDENTITY, caller: actor });
-
-    expect(recordClaimedIdentity).toHaveBeenCalledWith(IDENTITY);
-  });
-
   it("answers no where this device has no app", async () => {
     findDeviceApp.mockResolvedValue(undefined);
     const { actor, claim } = actorAnswering({ Ok: null });
@@ -91,6 +74,5 @@ describe("claimDeviceApp", () => {
     await expect(
       claimDeviceApp({ identityNumber: IDENTITY, caller: actor }),
     ).rejects.toThrow();
-    expect(recordClaimedIdentity).not.toHaveBeenCalled();
   });
 });

@@ -17,8 +17,7 @@
   import { linkAndRegister, type LinkOutcome } from "./link";
   import { readAppKey } from "$lib/utils/notifications/notificationAppKey";
   import { ensureRegisteredDevice } from "$lib/utils/notifications/subscribeDevice";
-  import { appKeyActor } from "./appKeyActor";
-  import { publishAppRecord } from "./publishRecord";
+  import { appKeyActor } from "$lib/utils/notifications/notificationAppActor";
   import InstallSteps from "./installSteps/InstallSteps.svelte";
   import IosAppSteps from "./blockedSteps/IosAppSteps.svelte";
   import { NOTIFICATION_APP_NAME } from "./appName";
@@ -88,14 +87,12 @@
       }
       // Registered on every launch, not only at the one that linked: a browser signed
       // out remotely takes this app's subscription with it, and the app is the only
-      // holder of the key that can write it back. Opening it is the whole of the cure.
+      // holder of the key that can write it back. Opening it is the whole of the cure,
+      // and it is refused while that browser has no session.
       await ensureRegisteredDevice(
         record.identityNumber,
         await appKeyActor(record),
       );
-      // Published for the same reason: the pool it carries is spent by elapsed time,
-      // and a browser claiming weeks later needs a newer one.
-      await publishAppRecord(record);
       return { kind: "ready", identityNumber: record.identityNumber };
     }
 
