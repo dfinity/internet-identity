@@ -5,11 +5,11 @@
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import { ensureRegisteredDevice } from "$lib/utils/notifications/subscribeDevice";
 import {
-  appKeyActor,
   appPublicKey,
   ensureAppKey,
   rememberLinked,
 } from "$lib/utils/notifications/notificationAppKey";
+import { appKeyActor } from "./appKeyActor";
 import type { LinkNotificationAppError } from "$lib/generated/internet_identity_types";
 import type { LinkToken } from "./linkToken";
 import { publishAppRecord } from "./publishRecord";

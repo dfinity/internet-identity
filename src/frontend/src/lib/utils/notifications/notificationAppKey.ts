@@ -6,13 +6,12 @@
  * in and never rotates, because the only thing it can do is set and read one push
  * subscription. A Home Screen app also has its own storage partition, so it could not
  * reach the other store even if the semantics matched.
+ *
+ * Storage only. The service worker reads this to know who it can sign for, and a worker
+ * that reached `$lib/globals` from here would pull the page's DOM-bound modules into a
+ * context that has no `document`.
  */
 import { createStore, get as idbGet, set as idbSet } from "idb-keyval";
-import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import { Actor, HttpAgent, type ActorSubclass } from "@icp-sdk/core/agent";
-import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { agentOptions, canisterId } from "$lib/globals";
 
 const APP_KEY_STORE = createStore("ii-notification-app", "key");
 const RECORD_KEY = "key";
@@ -66,14 +65,3 @@ export const appPublicKey = (record: AppKeyRecord): Promise<Uint8Array> =>
   crypto.subtle
     .exportKey("spki", record.keyPair.publicKey)
     .then((spki) => new Uint8Array(spki));
-
-/** An actor signing as this app, which is how the canister knows whose rows these are. */
-export const appKeyActor = async (
-  record: AppKeyRecord,
-): Promise<ActorSubclass<_SERVICE>> => {
-  const identity = await ECDSAKeyIdentity.fromKeyPair(record.keyPair);
-  return Actor.createActor<_SERVICE>(internetIdentityIDL, {
-    agent: HttpAgent.createSync({ ...agentOptions, identity }),
-    canisterId,
-  });
-};
