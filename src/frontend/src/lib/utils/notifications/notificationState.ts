@@ -8,12 +8,17 @@
 // the registration and the app's consent are read once an identity is chosen.
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type {
+  _SERVICE,
+  NotificationAppStatus,
+} from "$lib/generated/internet_identity_types";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { recordPermission } from "./notificationDiagnostics";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+import { saidAlreadyInstalled } from "./alreadyInstalled";
+import { findDeviceApp } from "./deviceApp";
 
 /** What this browser can do, and what it is subscribed with. */
 export interface BrowserPushState {
@@ -121,11 +126,68 @@ const isRegisteredHere = async (
 const deliversHere = (state: DeviceNotificationState): boolean =>
   state.permission === "granted" && state.registered;
 
+/**
+ * Whether a Home Screen app this browser installed can be delivered to.
+ *
+ * The app has an entry of its own, so `get_webpush_subscription_status` cannot see it:
+ * that answers for the caller, and the caller here is the browser. This is the read that
+ * tells an install that finished from one that was never done.
+ *
+ * `false` where the canister could not be asked, which is the same answer a browser that
+ * has linked nothing gets: either way there is an install to offer.
+ */
+export const notificationAppStatus = async (
+  identityNumber: bigint,
+): Promise<NotificationAppStatus | undefined> => {
+  try {
+    const actor = await browserKeyActor(identityNumber);
+    const [status] = await actor.get_notification_app_status({
+      anchor_number: identityNumber,
+    });
+    return status;
+  } catch (error) {
+    if (!(error instanceof UnregisteredBrowserError)) {
+      console.error(error);
+    }
+    return undefined;
+  }
+};
+
+export const notificationAppDelivers = async (
+  identityNumber: bigint,
+): Promise<boolean> =>
+  (await notificationAppStatus(identityNumber))?.subscribed === true;
+
 /** iOS has no notifications yet: Safari delivers them only to a Home Screen app, and
  *  that is not built. Nothing is offered there and no app is told otherwise. */
 export const notificationsUnavailableHere = (): boolean => {
   const { os } = browserAndSystem();
   return "Ios" in os || "Ipados" in os;
+};
+
+/**
+ * Whether notifications here have to go through a Home Screen app first.
+ *
+ * iOS delivers web push only to an installed app, so Safari cannot subscribe and
+ * answering here means sending the user through the install instead of raising a
+ * prompt. The Home Screen app itself runs standalone and is served the same page, so
+ * it is excluded: inside it, notifications are ordinary.
+ */
+export const notificationsNeedInstallHere = (): boolean => {
+  if (!notificationsUnavailableHere()) {
+    return false;
+  }
+  const legacy = (navigator as { standalone?: boolean }).standalone;
+  if (legacy === true) {
+    return false;
+  }
+  // Asked of the document, which not every context this module loads in has: the
+  // service worker imports from here and has no `window` at all.
+  const display =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(display-mode: standalone)").matches
+      : false;
+  return !display;
 };
 
 export type OptInScreen = "enable" | "skip";
@@ -138,6 +200,10 @@ export type OptInResolution =
       screen: "enable";
       state: DeviceNotificationState;
       consented: boolean;
+      /** Allow sends the user through the Home Screen install rather than raising a
+       *  prompt, because this browser has no way to subscribe. The screen is the same
+       *  one either way; only what answering it does differs. */
+      installFirst: boolean;
     };
 
 /**
@@ -177,10 +243,45 @@ export const resolveOptIn = async ({
         }
       : await readDeviceState(identityNumber, browserState);
   recordPermission(state.permission);
+  // Where the answer is a Home Screen app, delivery is the app's and not this
+  // browser's, so it is read from the entry this browser linked. Both halves still
+  // have to hold: the identity allowed the app, and an app exists that can be
+  // delivered to. Consent alone would tell an app yes while nothing reached the user,
+  // and would never offer the install to an identity that allowed notifications before
+  // any of this existed.
+  if (notificationsNeedInstallHere()) {
+    // Two ways this browser can know the user is covered, and it needs both. Its own
+    // linked app it can see. An app installed from another browser on the same device
+    // it cannot: the canister records which browser installed one, and asking
+    // anchor-wide instead would stop the same user's second device being offered the
+    // install at all. So the user's own word counts, given on the install steps.
+    const [delivers, saidSo, deviceApp] = await Promise.all([
+      notificationAppDelivers(identityNumber),
+      saidAlreadyInstalled(identityNumber),
+      findDeviceApp(identityNumber),
+    ]);
+    if (consented && (delivers || saidSo)) {
+      return { screen: "skip", granted: true };
+    }
+    // An app another identity installed in this browser is one this identity can be
+    // given without installing anything: answering claims it. Nothing found means
+    // nothing installed here, as far as this browser can tell, and the answer is the
+    // install.
+    // An app that already delivers for this identity leaves only the consent to
+    // record: there is nothing to install and nothing to claim. A record in the
+    // shared storage is the other way an answer costs the user nothing.
+    return {
+      screen: "enable",
+      state,
+      consented,
+      installFirst: !delivers && deviceApp === undefined,
+    };
+  }
+
   const screen = resolveOptInScreen(state, consented);
   return screen === "skip"
     ? { screen, granted: consented && deliversHere(state) }
-    : { screen, state, consented };
+    : { screen, state, consented, installFirst: false };
 };
 
 /**

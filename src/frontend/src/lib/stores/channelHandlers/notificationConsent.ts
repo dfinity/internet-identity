@@ -16,7 +16,6 @@ import {
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
 import {
-  notificationsUnavailableHere,
   readBrowserPushState,
   readGranted,
   resolveOptIn,
@@ -188,18 +187,6 @@ const answerConsent = async (
       params.icrc95DerivationOrigin ?? channel.origin,
     );
 
-    // No notifications on iOS yet, so nothing is offered and the app is told
-    // plainly that it may not notify here rather than being refused outright:
-    // the method exists, this browser just has no answer but no.
-    if (notificationsUnavailableHere()) {
-      await channel.send({
-        jsonrpc: "2.0",
-        id: requestId,
-        result: { granted: false },
-      });
-      return "answered";
-    }
-
     const granted = await runConsentCeremony(
       effectiveOrigin,
       browser,
@@ -303,34 +290,47 @@ const askUntilSettled = async (
       actor: authenticated.actor,
       device: resolution.state,
       consented: resolution.consented,
+      installFirst: resolution.installFirst,
     });
 
     // The header keeps the identity switcher up for this screen, and switching
     // leaves it holding the identity it opened for, so a grant would land on one
     // identity while the answer was read for another. Start it again instead.
+    // Tagged, not bare: one arm resolves to a store's value and the other to a
+    // sentinel, and telling those apart by identity would rest on what the store
+    // happens to hold.
     const outcome = await Promise.race([
-      waitForStore(notificationConsentSettledStore).then(
-        () => "settled" as const,
-      ),
+      waitForStore(notificationConsentSettledStore).then((settled) => ({
+        settled,
+      })),
       waitForStore(authenticationStore, (current) =>
         current?.identityNumber !== authenticated.identityNumber
-          ? ("switched" as const)
+          ? ({ switched: true } as const)
           : undefined,
       ),
       // A sign-in that arrives while the screen waits still registers this browser
       // for the allowing to land on, so the screen steps aside until it has.
       waitForStore(signInWaitingStore, (waiting) =>
-        waiting ? ("yielded" as const) : undefined,
+        waiting ? ({ yielded: true } as const) : undefined,
       ),
     ]);
-    if (outcome === "switched") {
+    if ("switched" in outcome) {
       continue;
     }
-    if (outcome === "yielded") {
+    if ("yielded" in outcome) {
       notificationConsentStore.clear();
       return "yielded";
     }
     releaseScreen();
+
+    // A browser that answers by installing an app has nothing to read back: the app
+    // holds an entry of its own and has not been opened yet, so this browser cannot
+    // see a subscription for it however long it waits. The app is told yes on the
+    // strength of the user having asked for it, which is the answer that leaves them
+    // able to finish, and the install is the only thing left to do.
+    if (outcome.settled.installStarted) {
+      return true;
+    }
 
     // What the app is told is read back rather than reported from the screen, and it
     // is both halves: the consent this identity holds, and a browser that delivers.

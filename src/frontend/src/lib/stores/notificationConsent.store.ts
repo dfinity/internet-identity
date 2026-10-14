@@ -14,10 +14,21 @@ export interface NotificationConsentContext {
   device: DeviceNotificationState;
   /** Whether this app already holds consent from this identity. */
   consented: boolean;
+  /** Answering sends the user to install the app that carries notifications, because
+   *  this browser has no prompt to raise. */
+  installFirst: boolean;
+}
+
+/** What the screen did, where the answer cannot be read back from the canister. */
+export interface NotificationConsentOutcome {
+  /** The user pressed Allow on a browser that answers by installing an app. Nothing is
+   *  recorded yet, and this browser cannot see the app's entry, so what the app is told
+   *  rests on this. */
+  installStarted: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();
-const settledInternal = writable<true | undefined>();
+const settledInternal = writable<NotificationConsentOutcome | undefined>();
 
 export const notificationConsentStore = {
   /** Clears any previous outcome first, so a stale settle from an earlier
@@ -26,10 +37,16 @@ export const notificationConsentStore = {
     settledInternal.set(undefined);
     contextInternal.set(context);
   },
-  /** The screen is done — granted or not. What was actually recorded is read
-   *  back from the canister rather than reported from here. */
-  settle: (): void => {
-    settledInternal.set(true);
+  /**
+   * The screen is done, granted or not. What was recorded is read back from the
+   * canister rather than reported from here, with one exception: a browser that
+   * answers by installing an app has nothing to read back yet, because the app has
+   * its own entry and has not been opened. That case says so.
+   */
+  settle: (
+    outcome: NotificationConsentOutcome = { installStarted: false },
+  ): void => {
+    settledInternal.set(outcome);
   },
   clear: (): void => {
     contextInternal.set(undefined);
@@ -38,6 +55,8 @@ export const notificationConsentStore = {
   subscribe: contextInternal.subscribe,
 };
 
-export const notificationConsentSettledStore: Readable<true | undefined> = {
+export const notificationConsentSettledStore: Readable<
+  NotificationConsentOutcome | undefined
+> = {
   subscribe: settledInternal.subscribe,
 };
