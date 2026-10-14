@@ -33,6 +33,27 @@ import {
   tagOf,
   type NotificationRef,
 } from "./shownNotification";
+import { recordShown, shownRecently } from "./shownRecord";
+
+/**
+ * How long a wake-up waits for the delegation that reads the app's own text before it
+ * shows the placeholder instead.
+ *
+ * One update call and the query that follows it, which is seconds on a good network.
+ * The budget this sits inside is the browser's: a push handler that shows nothing is
+ * answered for by the engine.
+ */
+const MINT_DEADLINE_MS = 2_500;
+
+/** Rejects where `work` has not answered within `deadlineMs`; the work carries on, and
+ *  what it earns is a wake-up that finds the delegation already there. */
+const withDeadline = <T>(work: Promise<T>, deadlineMs: number): Promise<T> =>
+  Promise.race([
+    work,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("deadline")), deadlineMs),
+    ),
+  ]);
 
 /** Shown until the delegation that reads the app's own text has been minted. */
 const PLACEHOLDER_TITLE = "Internet Identity";
@@ -51,6 +72,7 @@ export const showPlaceholder = async (
     body: PLACEHOLDER_BODY,
     tag: PLACEHOLDER_TAG,
   });
+  await recordShown();
 };
 
 export interface WakeUpContext {
@@ -92,10 +114,10 @@ const refFor = (
 /**
  * What is on screen under `tag`, matched here rather than by the browser.
  *
- * WebKit does not coalesce by tag, so a same-tag notification arrives beside the one it
- * was meant to replace, and asking it to filter by tag answers nothing: on iOS the
- * placeholder stayed on the lock screen beside the app's own text. Reading them all and
- * comparing the tag ourselves is what every engine agrees on.
+ * iOS ignores `tag` entirely — a same-tag notification arrives beside the one it was
+ * meant to replace rather than updating it — so replacing means closing by hand. The
+ * filtered form of the query is the one engines disagree about, so the tag is compared
+ * here instead.
  */
 const shownUnder = async (
   registration: ServiceWorkerRegistration,
@@ -120,6 +142,7 @@ const show = async (
     tag,
     data: dataOf(ref, shown.url),
   });
+  await recordShown();
 };
 
 const closeShown = async (
@@ -215,30 +238,31 @@ const showQueued = async (
     nowMillis: Date.now(),
   });
 
-  if (held === undefined) {
-    // Nothing to read the content with yet. Say that something arrived, then ask for a
-    // delegation — which is what wakes this worker again to replace this with the
-    // app's own text.
+  // Minting is an update call, so it is raced against a deadline rather than waited
+  // for: a worker that shows nothing is one the browser answers for, with its own
+  // "site updated in the background" or, on iOS, by holding the silence against the
+  // subscription. Inside the deadline the user sees the app's own text once; outside
+  // it they see the placeholder, and the wake-up the mint earns replaces it.
+  const minted =
+    held ??
+    (await withDeadline(
+      mintPullIdentity({ actor, identityNumber, target }),
+      MINT_DEADLINE_MS,
+    ).catch(() => undefined));
+
+  if (minted === undefined) {
     await show(context, ref, {
       title: PLACEHOLDER_TITLE,
       body: PLACEHOLDER_BODY,
       url: notification.origin,
     });
-    sendAndForget(
-      pending,
-      mintPullIdentity({
-        actor,
-        identityNumber,
-        target,
-      }),
-    );
     return true;
   }
 
   const content = await fetchNotificationContent({
     appCanisterId: notification.canister_id,
     id: notification.id,
-    identity: held,
+    identity: minted,
   });
   if (content === undefined) {
     // The app dismissed it, or it expired: there is nothing to show and nothing left
@@ -277,7 +301,7 @@ const showQueued = async (
     reportNotificationReceived({
       appCanisterId: notification.canister_id,
       id: notification.id,
-      identity: held,
+      identity: minted,
     }),
   );
   sendAndForget(
@@ -387,7 +411,13 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     // Whether this wake-up still owes the user something depends on what is on
     // screen, and an app may have dismissed what is on screen.
     await closeDismissed(context).catch(() => undefined);
-    if ((await context.registration.getNotifications()).length === 0) {
+    // The browser is asked first, since it knows the live screen. Our own stamp covers
+    // what it cannot: it answered an empty array on iOS before 17.0, and a wake-up that
+    // believed the screen empty put a placeholder beside what was already there.
+    const onScreen =
+      (await context.registration.getNotifications()).length > 0 ||
+      (await shownRecently());
+    if (!onScreen) {
       // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
       // nothing on screen owes the user something.
       await showPlaceholder(context.registration);

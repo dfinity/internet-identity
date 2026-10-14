@@ -206,10 +206,37 @@ describe("onWakeUp", () => {
     );
   });
 
-  it("shows a placeholder and mints a delegation when it holds none", async () => {
+  /// The delegation is minted inside this wake-up where it can be, so the user sees the
+  /// app's own text once rather than a placeholder that something has to replace — on
+  /// iOS nothing can, since the worker cannot see what is on screen.
+  it("mints a delegation it holds none of and shows the app's text", async () => {
     const shown = registration();
     const ii = internetIdentity([notification]);
     loadPullIdentity.mockResolvedValue(undefined);
+    fetchAppMetadata.mockResolvedValue({ name: "Example App" });
+
+    await onWakeUp({
+      registration: shown,
+      internetIdentity: ii.factory,
+    });
+
+    expect(mintPullIdentity).toHaveBeenCalledOnce();
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Example App · New message",
+    ]);
+    expect(ii.removed).toHaveLength(1);
+  });
+
+  /// A mint that outruns the browser's patience is the case the placeholder exists for:
+  /// a handler that shows nothing is answered for by the engine, and on iOS counted
+  /// against the subscription.
+  it("shows the placeholder where the delegation does not arrive in time", async () => {
+    const shown = registration();
+    const ii = internetIdentity([notification]);
+    loadPullIdentity.mockResolvedValue(undefined);
+    mintPullIdentity.mockImplementation(
+      () => new Promise(() => undefined) as Promise<Identity>,
+    );
 
     await onWakeUp({
       registration: shown,
@@ -217,10 +244,9 @@ describe("onWakeUp", () => {
     });
 
     expect(shown.shown[0].title).toBe("Internet Identity");
-    expect(mintPullIdentity).toHaveBeenCalledOnce();
     expect(fetchNotificationContent).not.toHaveBeenCalled();
     expect(ii.removed).toHaveLength(0);
-  });
+  }, 10_000);
 
   it("takes content the app no longer serves as a dismissal", async () => {
     const shown = registration();
