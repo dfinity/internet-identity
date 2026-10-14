@@ -868,6 +868,16 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
+  const GetNotificationAppLinkRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationAppLink = IDL.Record({
+    'endpoint' : IDL.Text,
+    'app_key' : PublicKey,
+    'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
+    'jwt_issued_at_ns' : IDL.Nat64,
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+  });
   const NotificationConsentGrantedRequest = IDL.Record({
     'origin' : IDL.Text,
     'anchor_number' : UserNumber,
@@ -1641,6 +1651,11 @@ export const idlFactory = ({ IDL }) => {
     'mcp_set_config' : IDL.Func(
         [UserNumber, McpConfig],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'notification_app_link' : IDL.Func(
+        [GetNotificationAppLinkRequest],
+        [IDL.Opt(NotificationAppLink)],
         [],
       ),
     'notification_consent_granted' : IDL.Func(

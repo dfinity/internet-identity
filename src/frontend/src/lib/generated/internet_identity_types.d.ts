@@ -1016,6 +1016,14 @@ export interface GetNextNotificationResponse {
   'notification' : [] | [NotificationToShow],
 }
 /**
+ * What the app a browser installed carries notifications with, read by that browser so
+ * another identity signed in to the same browser can be given the same app. A browser
+ * cannot read this from its own storage: the app keeps its key in a partition of its own.
+ * An update rather than a query although it writes nothing: its answer decides which key
+ * is linked to another identity, and a query is one replica's word for it.
+ */
+export interface GetNotificationAppLinkRequest { 'anchor_number' : UserNumber }
+/**
  * Whether this browser has a notification app, and whether it can be delivered to. A
  * Home Screen app has an entry of its own, so the browser that installed it cannot see
  * it through get_webpush_subscription_status, which answers for the caller.
@@ -1543,6 +1551,13 @@ export interface Notification {
    * Null means II's default retention, which is also the ceiling.
    */
   'expires_at' : [] | [Timestamp],
+}
+export interface NotificationAppLink {
+  'endpoint' : string,
+  'app_key' : PublicKey,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'vapid_public_key' : Uint8Array | number[],
 }
 export interface NotificationAppStatus {
   'browser_id' : number,
@@ -2972,6 +2987,10 @@ export interface _SERVICE {
     [UserNumber, McpConfig],
     { 'Ok' : null } |
       { 'Err' : string }
+  >,
+  'notification_app_link' : ActorMethod<
+    [GetNotificationAppLinkRequest],
+    [] | [NotificationAppLink]
   >,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],

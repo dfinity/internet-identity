@@ -15,7 +15,7 @@ import { recordPermission } from "./notificationDiagnostics";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
-import { readDeviceRecord } from "./deviceRecord";
+import { findDeviceApp } from "./deviceApp";
 
 /** What this browser can do, and what it is subscribed with. */
 export interface BrowserPushState {
@@ -248,18 +248,18 @@ export const resolveOptIn = async ({
     // it cannot: the canister records which browser installed one, and asking
     // anchor-wide instead would stop the same user's second device being offered the
     // install at all. So the user's own word counts, given on the install steps.
-    const [delivers, saidSo, record] = await Promise.all([
+    const [delivers, saidSo, deviceApp] = await Promise.all([
       notificationAppDelivers(identityNumber),
       saidAlreadyInstalled(identityNumber),
-      readDeviceRecord(),
+      findDeviceApp(identityNumber),
     ]);
     if (consented && (delivers || saidSo)) {
       return { screen: "skip", granted: true };
     }
-    // An app that has published to the storage this origin shares is one this browser
-    // can be delivered by without installing anything: answering claims it. Nothing
-    // published means nothing installed here, as far as this browser can tell, and the
-    // answer is the install.
+    // An app another identity installed in this browser is one this identity can be
+    // given without installing anything: answering claims it. Nothing found means
+    // nothing installed here, as far as this browser can tell, and the answer is the
+    // install.
     // An app that already delivers for this identity leaves only the consent to
     // record: there is nothing to install and nothing to claim. A record in the
     // shared storage is the other way an answer costs the user nothing.
@@ -267,7 +267,7 @@ export const resolveOptIn = async ({
       screen: "enable",
       state,
       consented,
-      installFirst: !delivers && record === undefined,
+      installFirst: !delivers && deviceApp === undefined,
     };
   }
 

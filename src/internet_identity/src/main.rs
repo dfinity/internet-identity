@@ -453,6 +453,38 @@ fn link_notification_app(
     })
 }
 
+/// What this browser's notification app is, for a browser that wants to give the same
+/// app to another identity signed in here.
+///
+/// Authorized by the browser key the caller signs with, and answers only about the app
+/// that browser installed, so one browser cannot read what another has. `None` for a
+/// browser with no app, for an app that has not registered yet, and for a caller that is
+/// no browser of this identity, so none of the three can be probed with it.
+///
+/// An update rather than a query, although it writes nothing: what it answers decides
+/// which key the caller then links to another identity, and a query is one replica's
+/// word. A forged key would be given that identity's wake-ups, and with them the
+/// delegation that reads its notifications.
+#[update]
+fn notification_app_link(request: GetNotificationAppLinkRequest) -> Option<NotificationAppLink> {
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return None;
+    };
+    let app = anchor.linked_notification_app(browser_id)?;
+    let subscription = app.webpush_subscription.as_ref()?;
+    Some(NotificationAppLink {
+        app_key: app.next_browser_key.clone(),
+        endpoint: subscription.endpoint.clone(),
+        vapid_public_key: ByteBuf::from(subscription.vapid_public_key.clone()),
+        jwt_signatures: subscription
+            .jwt_signatures
+            .iter()
+            .map(|signature| ByteBuf::from(signature.clone()))
+            .collect(),
+        jwt_issued_at_ns: subscription.jwt_issued_at_ns,
+    })
+}
+
 /// Authorized by the browser key the caller signs with: a browser says that the app
 /// this device has installed delivers for it too.
 ///

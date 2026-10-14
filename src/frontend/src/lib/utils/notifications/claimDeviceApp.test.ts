@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import type { DeviceRecord } from "$lib/utils/notifications/deviceRecord";
+import type { DeviceApp } from "$lib/utils/notifications/deviceApp";
 
-const readDeviceRecord = vi.fn<() => Promise<DeviceRecord | undefined>>();
+const findDeviceApp = vi.fn<() => Promise<DeviceApp | undefined>>();
 const recordClaimedIdentity = vi.fn((_identityNumber?: bigint) =>
   Promise.resolve(),
 );
 const browserKeyActor = vi.fn();
 
 vi.mock("$lib/utils/notifications/deviceRecord", () => ({
-  readDeviceRecord: () => readDeviceRecord(),
   recordClaimedIdentity: (identityNumber: bigint) =>
     recordClaimedIdentity(identityNumber),
+}));
+vi.mock("$lib/utils/notifications/deviceApp", () => ({
+  findDeviceApp: () => findDeviceApp(),
 }));
 vi.mock("$lib/utils/notifications/browserActor", () => ({
   browserKeyActor: () => browserKeyActor(),
@@ -23,13 +25,12 @@ const { claimDeviceApp } =
 
 const IDENTITY = BigInt(10_000);
 
-const RECORD: DeviceRecord = {
+const APP: DeviceApp = {
   appKey: Uint8Array.from([1, 2, 3]),
   endpoint: "https://web.push.apple.com/abc",
   vapidPublicKey: Uint8Array.from([4, 5, 6]),
   jwtSignatures: [Uint8Array.from([7])],
   jwtIssuedAtNs: BigInt("1700000000000000000"),
-  identityNumbers: [BigInt(10_001)],
 };
 
 const actorAnswering = (reply: unknown) => {
@@ -42,7 +43,7 @@ const actorAnswering = (reply: unknown) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  readDeviceRecord.mockResolvedValue(RECORD);
+  findDeviceApp.mockResolvedValue(APP);
 });
 
 describe("claimDeviceApp", () => {
@@ -55,11 +56,11 @@ describe("claimDeviceApp", () => {
 
     expect(claim).toHaveBeenCalledWith({
       anchor_number: IDENTITY,
-      app_key: RECORD.appKey,
-      endpoint: RECORD.endpoint,
-      vapid_public_key: RECORD.vapidPublicKey,
-      jwt_signatures: RECORD.jwtSignatures,
-      jwt_issued_at_ns: RECORD.jwtIssuedAtNs,
+      app_key: APP.appKey,
+      endpoint: APP.endpoint,
+      vapid_public_key: APP.vapidPublicKey,
+      jwt_signatures: APP.jwtSignatures,
+      jwt_issued_at_ns: APP.jwtIssuedAtNs,
     });
   });
 
@@ -73,8 +74,8 @@ describe("claimDeviceApp", () => {
     expect(recordClaimedIdentity).toHaveBeenCalledWith(IDENTITY);
   });
 
-  it("answers no where this device has published no app", async () => {
-    readDeviceRecord.mockResolvedValue(undefined);
+  it("answers no where this device has no app", async () => {
+    findDeviceApp.mockResolvedValue(undefined);
     const { actor, claim } = actorAnswering({ Ok: null });
 
     expect(

@@ -1898,6 +1898,23 @@ type LinkNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
+// What the app a browser installed carries notifications with, read by that browser so
+// another identity signed in to the same browser can be given the same app. A browser
+// cannot read this from its own storage: the app keeps its key in a partition of its own.
+// An update rather than a query although it writes nothing: its answer decides which key
+// is linked to another identity, and a query is one replica's word for it.
+type GetNotificationAppLinkRequest = record {
+    anchor_number : UserNumber;
+};
+
+type NotificationAppLink = record {
+    app_key : PublicKey;
+    endpoint : text;
+    vapid_public_key : blob;
+    jwt_signatures : vec blob;
+    jwt_issued_at_ns : nat64;
+};
+
 // What a browser hands over to have the app this device already has deliver for it
 // too. Authorized by the caller being a browser of this identity: the app is not in the
 // conversation, and published its key and its subscription to storage this origin
@@ -2575,6 +2592,7 @@ service : (opt InternetIdentityInit) -> {
     // spending a token the browser that installed it signed.
     link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
     claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+    notification_app_link : (GetNotificationAppLinkRequest) -> (opt NotificationAppLink);
     // Called by the browser that installed the app, signed with its own browser key.
     get_notification_app_status : (GetNotificationAppStatusRequest) -> (opt NotificationAppStatus) query;
 

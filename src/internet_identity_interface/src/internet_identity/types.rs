@@ -1124,6 +1124,27 @@ pub struct NotificationAppStatus {
     pub subscribed: bool,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppLinkRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What the app a browser installed carries notifications with, as that browser is
+/// entitled to read it: the key is the app's name to the canister, and the subscription
+/// is what the app registered under the entry.
+///
+/// Answered so that another identity signed in to the same browser can be given the
+/// same app, which a browser cannot do from its own storage: the app keeps its key where
+/// no browser can reach it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppLink {
+    pub app_key: PublicKey,
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
 /// Claims the entry a Home Screen app carries notifications under.
 ///
 /// Authorized by the token rather than by the caller being a browser this identity

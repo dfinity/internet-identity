@@ -2,16 +2,17 @@
  * Turning notifications on for an identity through the app this device already has.
  *
  * A browser that cannot hold a subscription of its own, which on iOS is every browser,
- * has the installed app deliver instead. What the app published is enough to do that
- * without the app running: its key says which entry to create, and its subscription is
- * what makes the entry reachable, since only the app holds the key a pool is signed
- * with.
+ * has the installed app deliver instead. The app is not running and does not have to be:
+ * its key says which entry to create and its subscription is what makes that entry
+ * reachable, and both are read from the canister through an identity already signed in
+ * to this browser.
  */
 import { throwCanisterError } from "$lib/utils/utils";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { browserKeyActor } from "./browserActor";
-import { readDeviceRecord, recordClaimedIdentity } from "./deviceRecord";
+import { recordClaimedIdentity } from "./deviceRecord";
+import { findDeviceApp } from "./deviceApp";
 
 /**
  * Claims this device's app for `identityNumber`, answering whether it was claimed.
@@ -28,8 +29,8 @@ export const claimDeviceApp = async ({
   /** Who to call as. Defaults to this browser's key, which is what authorizes it. */
   caller?: ActorSubclass<_SERVICE>;
 }): Promise<boolean> => {
-  const record = await readDeviceRecord();
-  if (record === undefined) {
+  const app = await findDeviceApp(identityNumber);
+  if (app === undefined) {
     return false;
   }
 
@@ -37,11 +38,11 @@ export const claimDeviceApp = async ({
   await actor
     .claim_notification_app({
       anchor_number: identityNumber,
-      app_key: record.appKey,
-      endpoint: record.endpoint,
-      vapid_public_key: record.vapidPublicKey,
-      jwt_signatures: record.jwtSignatures,
-      jwt_issued_at_ns: record.jwtIssuedAtNs,
+      app_key: app.appKey,
+      endpoint: app.endpoint,
+      vapid_public_key: app.vapidPublicKey,
+      jwt_signatures: app.jwtSignatures,
+      jwt_issued_at_ns: app.jwtIssuedAtNs,
     })
     .then(throwCanisterError);
 
