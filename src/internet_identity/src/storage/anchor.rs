@@ -882,6 +882,19 @@ impl Anchor {
             .find(|entry| entry.linked_from_browser == Some(browser))
     }
 
+    /// The browser that installed `browser_id`, where that entry is a notification app.
+    ///
+    /// `None` for a browser of the identity's own, which is what every caller but a
+    /// linked app is, and for an app whose installing browser is gone.
+    pub fn installing_browser(&self, browser_id: BrowserId) -> Option<&Browser> {
+        let parent = self
+            .browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)?
+            .linked_from_browser?;
+        self.browsers.iter().find(|browser| browser.id == parent)
+    }
+
     /// The browser a caller signing as `principal` is, if the identity is signed in
     /// from it.
     ///

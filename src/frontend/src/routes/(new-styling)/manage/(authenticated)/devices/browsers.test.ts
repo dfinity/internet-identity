@@ -110,7 +110,7 @@ describe("fromCanisterBrowsers", () => {
    * its own it reads as a second copy of that browser, with no sessions and therefore
    * signed out, offering to sign out something that has nothing to sign out of.
    */
-  it("keeps a notification app out of the list and hangs it off its browser", () => {
+  it("leaves a notification app out of the list", () => {
     const listed = fromCanisterBrowsers([
       [
         browser(1, at(now)),
@@ -122,30 +122,7 @@ describe("fromCanisterBrowsers", () => {
       ],
     ]);
 
-    expect(listed).toHaveLength(1);
-    expect(listed[0].id).toBe(1);
-    expect(listed[0].app).toEqual({
-      id: 2,
-      lastUsedMillis: now - 1_000,
-      delivers: true,
-    });
-  });
-
-  it("says an app that is registered with nothing does not deliver", () => {
-    const listed = fromCanisterBrowsers([
-      [
-        browser(1, at(now)),
-        { ...browser(2, at(now)), linked_from_browser: [1] as [number] },
-      ],
-    ]);
-
-    expect(listed[0].app?.delivers).toBe(false);
-  });
-
-  it("leaves a browser without an app with none", () => {
-    const listed = fromCanisterBrowsers([[browser(1, at(now))]]);
-
-    expect(listed[0].app).toBeUndefined();
+    expect(listed.map((entry) => entry.id)).toEqual([1]);
   });
 });
 

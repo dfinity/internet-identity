@@ -19,7 +19,6 @@
     brandNameOf,
     nameOf,
     signOutBrowser,
-    silenceNotificationApp,
     type Browser,
   } from "./browsers";
   import type { PageProps } from "./$types";
@@ -94,10 +93,6 @@
 
   let signedOut = $state<number[]>([]);
   let signingOut = $state<number | undefined>(undefined);
-  let silencing = $state<number | undefined>(undefined);
-  /** Apps turned off here, so the line answers the press before `identity_info` is
-   *  read again, the way a signed-out browser's row does. */
-  let silenced = $state<number[]>([]);
   let confirming = $state<Browser | undefined>(undefined);
 
   // Nothing to offer on the browser being read from: signing it out here would end the
@@ -129,49 +124,6 @@
       month: "short",
       day: "numeric",
     });
-
-  /**
-   * Stops the app a browser installed from being delivered to.
-   *
-   * No confirmation: nothing is lost that opening the app does not restore, unlike
-   * signing out, which ends sessions the user would have to create again.
-   */
-  const silenceApp = async (browser: Browser) => {
-    const app = browser.app;
-    if (app === undefined) {
-      return;
-    }
-    silencing = app.id;
-    try {
-      await silenceNotificationApp(
-        $authenticatedStore.actor,
-        $authenticatedStore.identityNumber,
-        app.id,
-      );
-      silenced = [...silenced, app.id];
-      toaster.success({
-        title: $t`Notifications turned off`,
-        description: $t`${browser.name} no longer sends notifications to this device's Home Screen app.`,
-      });
-    } catch (error) {
-      toaster.error({
-        title: $t`Couldn't turn these notifications off`,
-        description: error instanceof Error ? error.message : undefined,
-      });
-    } finally {
-      silencing = undefined;
-    }
-  };
-
-  /** The app as the page shows it: one turned off here reads as turned off before the
-   *  canister has been asked again. */
-  const appOf = (browser: Browser) =>
-    browser.app === undefined
-      ? undefined
-      : {
-          ...browser.app,
-          delivers: browser.app.delivers && !silenced.includes(browser.app.id),
-        };
 
   const confirmSignOut = async () => {
     const browser = confirming;
@@ -255,12 +207,6 @@
                   isCurrent={browser.isCurrent}
                   action={actionFor(browser)}
                   onSignOut={() => (confirming = browser)}
-                  app={appOf(browser)}
-                  appLastUsed={browser.app === undefined
-                    ? undefined
-                    : lastUsedOf({ ...browser, ...browser.app })}
-                  onSilenceApp={() => void silenceApp(browser)}
-                  silencing={silencing === browser.app?.id}
                 />
               </li>
             {/each}

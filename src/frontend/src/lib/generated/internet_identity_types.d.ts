@@ -2107,6 +2107,13 @@ export type SetWebPushSubscriptionError = {
      * The pool offered is not newer than the one this endpoint already holds.
      */
     'StaleJwtPool' : null
+  } |
+  {
+    /**
+     * A notification app whose installing browser holds no session: delivery is on that
+     * browser's authority, so signing it out stops the app registering again.
+     */
+    'SignedOut' : null
   };
 /**
  * What a browser uploads when it registers for Web Push, and how it replaces a pool

@@ -530,6 +530,11 @@ fn claim_notification_app(
             SetWebPushSubscriptionError::InvalidBrowserKey => {
                 ClaimNotificationAppError::InvalidBrowserKey
             }
+            // A browser claiming for itself is signed in, which is what authorized this
+            // call, so the app it claims registers under a browser that holds a session.
+            SetWebPushSubscriptionError::SignedOut => {
+                ClaimNotificationAppError::InternalCanisterError("signed out".to_string())
+            }
             SetWebPushSubscriptionError::StaleJwtPool => {
                 ClaimNotificationAppError::InternalCanisterError("stale JWT pool".to_string())
             }

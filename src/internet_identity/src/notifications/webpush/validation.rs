@@ -78,6 +78,11 @@ impl TryFrom<ClaimNotificationAppRequest> for ValidatedClaimNotificationAppReque
                 SetWebPushSubscriptionError::InvalidBrowserKey => {
                     ClaimNotificationAppError::InvalidBrowserKey
                 }
+                // Validation runs before any entry is read, so nothing here can know
+                // yet whether a browser is signed out; the write itself answers that.
+                SetWebPushSubscriptionError::SignedOut => {
+                    ClaimNotificationAppError::InternalCanisterError("signed out".to_string())
+                }
                 // The entry this call creates holds no pool yet, so nothing can be stale.
                 SetWebPushSubscriptionError::StaleJwtPool => {
                     ClaimNotificationAppError::InternalCanisterError("stale JWT pool".to_string())

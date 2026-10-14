@@ -223,7 +223,10 @@
             {$t`Add to Home Screen`}
           </h1>
           <p class="text-text-tertiary mb-5 text-base">
-            <Trans>Follow these steps to get notifications:</Trans>
+            <Trans>
+              Already have the {NOTIFICATION_APP_NAME} app on this device? Open
+              it, that is all it needs. Otherwise follow these steps:
+            </Trans>
           </p>
           <InstallSteps {host} />
 
