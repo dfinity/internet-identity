@@ -41,8 +41,8 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
 use notifications::webpush::{
-    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
-    ValidatedSetWebPushSubscriptionRequest,
+    ValidatedClaimNotificationAppRequest, ValidatedGetWebPushSubscriptionStatusRequest,
+    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
     ValidatedGetNextNotificationRequest, ValidatedGetNotificationDelegationRequest,
@@ -451,6 +451,50 @@ fn link_notification_app(
             .write(anchor)
             .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
     })
+}
+
+/// Authorized by the browser key the caller signs with: a browser says that the app
+/// this device has installed delivers for it too.
+///
+/// The app is not in this conversation. It published its key and its subscription to
+/// storage this origin shares with it, which no other origin can write, so a caller
+/// that read them is running in the same browser the app was installed in. What the
+/// browser can do here it could do anyway: it is already authorized for this identity.
+///
+/// The subscription is written in the same call because the entry is useless without
+/// one, and only the app can sign a pool for it.
+#[update]
+fn claim_notification_app(
+    request: ClaimNotificationAppRequest,
+) -> Result<(), ClaimNotificationAppError> {
+    let validated: ValidatedClaimNotificationAppRequest = request.try_into()?;
+    let (mut anchor, browser_id) =
+        check_browser_authorization(validated.subscription.anchor_number)
+            .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
+    let now = ic_cdk::api::time();
+
+    let app = anchor
+        .claim_notification_app(browser_id, validated.app_key, now)
+        .map_err(|err| match err {
+            storage::anchor::BrowserError::SuccessorAlreadyInUse => {
+                ClaimNotificationAppError::KeyAlreadyInUse
+            }
+            other => ClaimNotificationAppError::InternalCanisterError(format!("{other:?}")),
+        })?;
+
+    notifications::webpush::set_subscription(anchor, app, validated.subscription, now).map_err(
+        |err| match err {
+            SetWebPushSubscriptionError::InvalidBrowserKey => {
+                ClaimNotificationAppError::InvalidBrowserKey
+            }
+            SetWebPushSubscriptionError::StaleJwtPool => {
+                ClaimNotificationAppError::InternalCanisterError("stale JWT pool".to_string())
+            }
+            SetWebPushSubscriptionError::InternalCanisterError(problem) => {
+                ClaimNotificationAppError::InternalCanisterError(problem)
+            }
+        },
+    )
 }
 
 /// Authorized by the browser key the caller signs with.

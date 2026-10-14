@@ -1898,6 +1898,28 @@ type LinkNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
+// What a browser hands over to have the app this device already has deliver for it
+// too. Authorized by the caller being a browser of this identity: the app is not in the
+// conversation, and published its key and its subscription to storage this origin
+// shares with it. The subscription travels along because only the app holds the VAPID
+// private key a pool is signed with.
+type ClaimNotificationAppRequest = record {
+    anchor_number : UserNumber;
+    app_key : PublicKey;               // the installed app's key, read from shared storage
+    endpoint : text;
+    vapid_public_key : blob;
+    jwt_signatures : vec blob;
+    jwt_issued_at_ns : nat64;
+};
+
+type ClaimNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // The key is one some browser of this identity already holds as its own.
+    KeyAlreadyInUse;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2552,6 +2574,7 @@ service : (opt InternetIdentityInit) -> {
     // Called by a Home Screen app on first launch, signed with the key it just generated,
     // spending a token the browser that installed it signed.
     link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
+    claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
     // Called by the browser that installed the app, signed with its own browser key.
     get_notification_app_status : (GetNotificationAppStatusRequest) -> (opt NotificationAppStatus) query;
 

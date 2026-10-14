@@ -1143,6 +1143,32 @@ pub struct LinkNotificationAppRequest {
     pub signature: ByteBuf,
 }
 
+/// What a browser hands over to have the device's notification app deliver for it.
+///
+/// The subscription travels with the key because the entry is useless without it: only
+/// the app holds the VAPID private key the pool is signed with, so a browser cannot
+/// register one for it afterwards.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ClaimNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// The app's public key, DER-encoded, read from the storage this origin shares
+    /// with the installed app.
+    pub app_key: PublicKey,
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ClaimNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// The key is one some browser of this identity already holds as its own.
+    KeyAlreadyInUse,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum LinkNotificationAppError {
     /// No browser of this identity signed this token, or the one that did has rotated

@@ -1496,6 +1496,49 @@ mod browser_tests {
         );
     }
 
+    /// Claiming is what a browser does for an app it did not install, and it says the
+    /// same thing every time the user turns notifications on, so it has to be free to
+    /// repeat.
+    #[test]
+    fn claiming_the_key_a_browser_already_linked_keeps_the_entry() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(browser_key(1), successor_key(1), description("one"), 1_000)
+            .unwrap();
+        let first = anchor
+            .claim_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        let again = anchor
+            .claim_notification_app(parent, browser_key(9), 3_000)
+            .unwrap();
+
+        assert_eq!(again, first);
+        assert_eq!(anchor.browsers().len(), 2);
+    }
+
+    #[test]
+    fn claiming_a_different_key_replaces_the_app_a_browser_had() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(browser_key(1), successor_key(1), description("one"), 1_000)
+            .unwrap();
+        let first = anchor
+            .claim_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        let second = anchor
+            .claim_notification_app(parent, browser_key(8), 3_000)
+            .unwrap();
+
+        assert_ne!(second, first);
+        assert!(anchor.browsers().iter().all(|entry| entry.id != first));
+        assert_eq!(
+            anchor.linked_notification_app(parent).map(|entry| entry.id),
+            Some(second)
+        );
+    }
+
     /// A key another entry already holds is refused, as it is for a successor: otherwise
     /// linking could be used to take over a browser's entry.
     #[test]

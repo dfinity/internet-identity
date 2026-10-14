@@ -531,6 +531,34 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
+export type ClaimNotificationAppError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The key is one some browser of this identity already holds as its own.
+     */
+    'KeyAlreadyInUse' : null
+  };
+/**
+ * What a browser hands over to have the app this device already has deliver for it
+ * too. Authorized by the caller being a browser of this identity: the app is not in the
+ * conversation, and published its key and its subscription to storage this origin
+ * shares with it. The subscription travels along because only the app holds the VAPID
+ * private key a pool is signed with.
+ */
+export interface ClaimNotificationAppRequest {
+  'endpoint' : string,
+  'app_key' : PublicKey,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'anchor_number' : UserNumber,
+  'vapid_public_key' : Uint8Array | number[],
+}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -2508,6 +2536,11 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
+  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],

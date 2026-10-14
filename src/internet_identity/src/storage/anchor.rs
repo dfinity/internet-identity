@@ -899,6 +899,25 @@ impl Anchor {
     /// The description is the installing browser's own. What the app runs in is that
     /// browser's engine on that browser's device, and the app cannot describe itself in
     /// terms the devices page would recognise.
+    /// The entry this browser's notification app has, linking one for `app_key` unless
+    /// that is the key the entry already holds.
+    ///
+    /// Reusing it is what lets a browser say the same thing twice without cost: a fresh
+    /// entry would start with an empty queue and drop whatever was waiting on the one
+    /// it replaced. Any other key is a different app, and replaces it as an install
+    /// does.
+    pub fn claim_notification_app(
+        &mut self,
+        parent: BrowserId,
+        app_key: PublicKey,
+        now: Timestamp,
+    ) -> Result<BrowserId, BrowserError> {
+        match self.linked_notification_app(parent) {
+            Some(linked) if linked.next_browser_key == app_key => Ok(linked.id),
+            _ => self.link_notification_app(parent, app_key, now),
+        }
+    }
+
     pub fn link_notification_app(
         &mut self,
         parent: BrowserId,
