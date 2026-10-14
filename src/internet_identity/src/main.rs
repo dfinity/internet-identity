@@ -482,6 +482,20 @@ fn claim_notification_app(
             other => ClaimNotificationAppError::InternalCanisterError(format!("{other:?}")),
         })?;
 
+    // The record a browser reads is published by the app and may be one another browser
+    // has already spent. Saying the same thing twice is not an error: the entry is
+    // already reachable through exactly this subscription, and a pool that is not newer
+    // is the one it holds.
+    if anchor
+        .webpush_subscription(app)
+        .is_some_and(|registered| {
+            registered.endpoint == validated.subscription.endpoint
+                && registered.jwt_issued_at_ns >= validated.subscription.jwt_issued_at_ns
+        })
+    {
+        return Ok(());
+    }
+
     notifications::webpush::set_subscription(anchor, app, validated.subscription, now).map_err(
         |err| match err {
             SetWebPushSubscriptionError::InvalidBrowserKey => {
