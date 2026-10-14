@@ -60,38 +60,46 @@ const MAX_SUB_LENGTH: usize = 255;
 
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum BoolClaim {
+enum EmailVerifiedClaim {
     Bool(bool),
     String(String),
 }
 
-// Depending on the OpenID provider, a boolean claim like `email_verified` can either
-// be a boolean or string (Apple sends either), so we need to support both formats
-// when parsing the claims, but we will convert both to a string for storing it in
-// the OpenIdCredential metadata.
-impl BoolClaim {
+// Depending on the OpenID provider, this claim can either be a boolean or string,
+// so we need to support both formats when parsing the claims, but we will convert
+// both to a string for storing it in the OpenIdCredential metadata.
+impl EmailVerifiedClaim {
     fn into_string(self) -> String {
         match self {
-            BoolClaim::Bool(value) => {
+            EmailVerifiedClaim::Bool(value) => {
                 if value {
                     "true".into()
                 } else {
                     "false".into()
                 }
             }
-            BoolClaim::String(value) => value,
+            EmailVerifiedClaim::String(value) => value,
         }
     }
+}
 
-    /// Apple's `is_private_email`, as `"true"` unless it plainly says `false`:
-    /// an unexpected value must not let a private relay address count as a
-    /// verified email, and must not fail the sign-in either.
-    fn into_private_email_string(self) -> String {
-        match self {
-            BoolClaim::Bool(false) => "false".into(),
-            BoolClaim::String(value) if value.eq_ignore_ascii_case("false") => "false".into(),
-            _ => "true".into(),
-        }
+/// Reads a claim that is present, even as `null`, as `Some`; an absent one
+/// falls back to `None` through `#[serde(default)]`.
+fn present_claim<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<serde_json::Value>, D::Error> {
+    serde_json::Value::deserialize(deserializer).map(Some)
+}
+
+/// Apple's `is_private_email` (a boolean or a string) as stored in the
+/// metadata: `"true"` unless it plainly says false, so that an unexpected value
+/// neither lets a private relay address count as a verified email nor fails
+/// the sign-in.
+fn private_email_flag(claim: &serde_json::Value) -> &'static str {
+    match claim {
+        serde_json::Value::Bool(false) => "false",
+        serde_json::Value::String(value) if value.eq_ignore_ascii_case("false") => "false",
+        _ => "true",
     }
 }
 
@@ -106,9 +114,10 @@ struct Claims {
     // Optional metadata claims
     email: Option<String>,
     name: Option<String>,
-    email_verified: Option<BoolClaim>,
+    email_verified: Option<EmailVerifiedClaim>,
     // Apple only: whether `email` is a private relay address.
-    is_private_email: Option<BoolClaim>,
+    #[serde(default, deserialize_with = "present_claim")]
+    is_private_email: Option<serde_json::Value>,
 }
 
 /// What the resolver determined about a provider, independent of the JWK
@@ -242,7 +251,7 @@ pub(super) fn verify_and_build(
     if let Some(is_private_email) = is_private_email {
         metadata.insert(
             "is_private_email".into(),
-            MetadataEntryV2::String(is_private_email.into_private_email_string()),
+            MetadataEntryV2::String(private_email_flag(&is_private_email).into()),
         );
     }
     if let Some(name) = name {
@@ -427,7 +436,7 @@ fn verify_claims(
             "Name too long".into(),
         ));
     }
-    if let Some(BoolClaim::String(ref s)) = claims.email_verified {
+    if let Some(EmailVerifiedClaim::String(ref s)) = claims.email_verified {
         if s != "true" && s != "false" {
             return Err(OpenIDJWTVerificationError::GenericError(format!(
                 "email_verified must be 'true' or 'false', got: {}",
@@ -771,18 +780,24 @@ mod tests {
         );
     }
 
+    fn parse_claims(extra: &str) -> Result<Claims, serde_json::Error> {
+        serde_json::from_str(&format!(
+            r#"{{"iss":"https://appleid.apple.com","sub":"sub","aud":"aud","nonce":"n","exp":1,"iat":1{extra}}}"#
+        ))
+    }
+
     #[test]
     fn should_parse_apple_bool_claims_as_bool_or_string() {
         // Apple sends `email_verified` and `is_private_email` as either a
         // boolean or a string.
-        for (email_verified, is_private_email) in [("true", "true"), ("\"true\"", "\"true\"")] {
-            let claims: Claims = serde_json::from_str(&format!(
-                r#"{{"iss":"https://appleid.apple.com","sub":"sub","aud":"aud","nonce":"n","exp":1,"iat":1,"email":"x@privaterelay.appleid.com","email_verified":{email_verified},"is_private_email":{is_private_email}}}"#
+        for value in ["true", "\"true\""] {
+            let claims = parse_claims(&format!(
+                r#","email_verified":{value},"is_private_email":{value}"#
             ))
             .expect("claims should parse");
             assert_eq!(claims.email_verified.unwrap().into_string(), "true");
             assert_eq!(
-                claims.is_private_email.unwrap().into_private_email_string(),
+                private_email_flag(&claims.is_private_email.unwrap()),
                 "true"
             );
         }
@@ -791,15 +806,29 @@ mod tests {
     #[test]
     fn should_store_is_private_email_as_true_unless_plainly_false() {
         for (claim, expected) in [
-            (BoolClaim::Bool(false), "false"),
-            (BoolClaim::String("false".to_string()), "false"),
-            (BoolClaim::String("FALSE".to_string()), "false"),
-            (BoolClaim::Bool(true), "true"),
-            (BoolClaim::String("true".to_string()), "true"),
-            (BoolClaim::String("unexpected".to_string()), "true"),
+            ("false", Some("false")),
+            ("\"false\"", Some("false")),
+            ("\"FALSE\"", Some("false")),
+            ("true", Some("true")),
+            ("\"true\"", Some("true")),
+            ("\"unexpected\"", Some("true")),
+            // Neither `null` nor another type can pass for "not private", and
+            // neither fails the sign-in.
+            ("null", Some("true")),
+            ("0", Some("true")),
+            ("{}", Some("true")),
         ] {
-            assert_eq!(claim.into_private_email_string(), expected);
+            let claims = parse_claims(&format!(r#","is_private_email":{claim}"#))
+                .expect("claims should parse");
+            assert_eq!(
+                claims.is_private_email.as_ref().map(private_email_flag),
+                expected,
+                "is_private_email: {claim}"
+            );
         }
+        // A missing claim stays unknown.
+        let claims = parse_claims("").expect("claims should parse");
+        assert_eq!(claims.is_private_email, None);
     }
 
     #[test]
