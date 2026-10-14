@@ -20,6 +20,7 @@ import {
   browserKeyIdentity,
   type BrowserProof,
   currentBrowserId,
+  signNotificationAppLink,
   StaleBrowserKeyError,
   withBrowserProof,
 } from "./browser-key.store";
@@ -390,6 +391,32 @@ describe("browser key", () => {
     await attempt(IDENTITY, 1);
 
     await expect(browserKeyIdentity(IDENTITY)).resolves.toBeUndefined();
+  });
+
+  it("signs a link token with the key an entry holds", async () => {
+    await signIn(IDENTITY, 1, 7);
+
+    const signature = await signNotificationAppLink({
+      identityNumber: IDENTITY,
+      expiresAtNs: BigInt(5_000),
+    });
+
+    expect(signature?.length).toBe(64);
+  });
+
+  /// The canister verifies a link token against the keys of an entry. A key prepared for
+  /// a sign-in that never completed is in no entry, so the token it signs can only be
+  /// refused, and an install link carrying one sends the user through the steps for
+  /// nothing.
+  it("signs no link token before a sign-in has registered the browser", async () => {
+    await attempt(IDENTITY, 1);
+
+    await expect(
+      signNotificationAppLink({
+        identityNumber: IDENTITY,
+        expiresAtNs: BigInt(5_000),
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it("has the successor sign for itself, so an unheld key cannot be announced", async () => {
