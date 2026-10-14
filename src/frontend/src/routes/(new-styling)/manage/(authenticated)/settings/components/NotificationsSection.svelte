@@ -1,0 +1,202 @@
+<script lang="ts">
+  import BellIcon from "@lucide/svelte/icons/bell";
+  import { invalidateAll } from "$app/navigation";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
+  import Badge from "$lib/components/ui/Badge.svelte";
+  import Toggle from "$lib/components/ui/Toggle.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import { toaster } from "$lib/components/utils/toaster";
+  import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+  import type { BrowserInfo } from "$lib/generated/internet_identity_types";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { ensureRegisteredDevice } from "$lib/utils/notifications/subscribeDevice";
+  import { forgetAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
+  import { notificationsNeedInstallHere } from "$lib/utils/notifications/notificationState";
+  import { requestNotificationPermission } from "$lib/utils/notifications/pushSubscription";
+  import {
+    openInstallTab,
+    prepareInstallUrl,
+  } from "$lib/utils/notifications/installUrl";
+
+  const {
+    identityNumber,
+    browsers,
+    browserId,
+    saidAlreadyInstalled,
+  }: {
+    identityNumber: bigint;
+    /** From `identity_info`, so this renders its real state on first paint. */
+    browsers: BrowserInfo[];
+    /** Which of them this browser is, or `undefined` before a sign-in registered one. */
+    browserId: number | undefined;
+    /** What the user told this browser about their own device, which nothing on chain
+     *  can know. Only consulted where notifications arrive through an installed app. */
+    saidAlreadyInstalled: boolean;
+  } = $props();
+
+  const titleId = $props.id();
+
+  /** Signed while this section renders, because `window.open` needs the click's own
+   *  gesture and an await between the two loses it. The app claims its entry with this
+   *  token: opening the page without one installs an app with nothing to claim. */
+  let installUrl = $state<string | undefined>(undefined);
+  $effect(() => {
+    if (!needsApp) {
+      return;
+    }
+    void prepareInstallUrl(identityNumber).then((url) => {
+      installUrl = url;
+    });
+  });
+
+  /** Where notifications arrive is a Home Screen app on iOS and this browser anywhere
+   *  else, which changes what the switch reports and what turning it on does. */
+  const needsApp = notificationsNeedInstallHere();
+
+  /** The app this browser installed, where it has one. Nothing until this browser knows
+   *  which one it is: an ordinary browser is linked from nowhere, so an undefined id
+   *  matches the first of them and this section would answer for another device. */
+  const ownApp = $derived(
+    browserId === undefined
+      ? undefined
+      : browsers.find(
+          (browser) => browser.linked_from_browser[0] === browserId,
+        ),
+  );
+
+  /**
+   * What the canister holds, which is what the switch shows until a press moves it.
+   * Assigned by the handlers so the switch answers the click, and re-derived from
+   * `identity_info` once `invalidateAll` has refreshed it.
+   */
+  const live = $derived(
+    needsApp
+      ? (ownApp?.notifications_on ?? false) || saidAlreadyInstalled
+      : (browsers.find((browser) => browser.id === browserId)
+          ?.notifications_on ?? false),
+  );
+  let enabled = $derived(live);
+  let busy = $state(false);
+
+  /**
+   * Takes away the registration that brings notifications here. The permission is left
+   * alone: that is the browser's to give and the user's to take back in its settings.
+   *
+   * On iOS the registration belongs to the app this browser installed, not to this
+   * browser. Their word that the device already had one goes too, so turning the switch
+   * back on offers the install again, which is the way out of having said it by mistake.
+   */
+  const turnOff = async () => {
+    const target = needsApp ? ownApp?.id : browserId;
+    if (target !== undefined) {
+      await $authenticatedStore.actor
+        .remove_webpush_subscription({
+          anchor_number: identityNumber,
+          browser_id: target,
+        })
+        .then(throwCanisterError);
+    }
+    if (needsApp) {
+      await forgetAlreadyInstalled(identityNumber);
+    }
+  };
+
+  /**
+   * On iOS notifications arrive in a Home Screen app, and this page cannot install
+   * one: it opens the page that explains how, in this click's own gesture, which is
+   * the only time a browser allows it. Anywhere else this browser receives them, so it
+   * asks for the permission and registers.
+   */
+  const turnOn = async () => {
+    if (needsApp) {
+      if (installUrl === undefined) {
+        toaster.error({
+          title: $t`Couldn't start the install`,
+          description: $t`This browser hasn't finished a sign-in yet. Reload the page and try again.`,
+        });
+        return;
+      }
+      openInstallTab(installUrl);
+      return;
+    }
+    const permission = await requestNotificationPermission();
+    if (permission !== "granted") {
+      toaster.error({
+        title: $t`Notifications are blocked`,
+        description: $t`Allow them for this site in your browser settings, then turn this on again.`,
+      });
+      return;
+    }
+    await ensureRegisteredDevice(identityNumber);
+  };
+
+  const handleToggle = (event: Event) => {
+    if (!(event.currentTarget instanceof HTMLInputElement) || busy) {
+      return;
+    }
+    const wanted = event.currentTarget.checked;
+    enabled = wanted;
+    busy = true;
+    void (async () => {
+      try {
+        await (wanted ? turnOn() : turnOff());
+      } catch (error) {
+        enabled = live;
+        if (isCanisterError(error)) {
+          handleError(error);
+          return;
+        }
+        toaster.error({
+          title: $t`Notifications unavailable`,
+          description: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        busy = false;
+        // Put back to what the canister says once it has been asked again, rather than
+        // left where the press put it. Turning on can finish without a registration:
+        // a permission refused, an install that has only been opened in another tab.
+        await invalidateAll();
+        enabled = live;
+      }
+    })();
+  };
+</script>
+
+<section
+  class="border-border-secondary bg-bg-secondary flex flex-row items-start gap-3 rounded-xl border p-4 sm:gap-4 sm:p-5"
+>
+  <span
+    class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
+    aria-hidden="true"
+  >
+    <BellIcon class="size-5" />
+  </span>
+
+  <div class="flex min-w-0 flex-1 flex-col gap-1">
+    <div
+      class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
+    >
+      <h3 id={titleId} class="text-text-primary text-base font-semibold">
+        {$t`Allow notifications`}
+      </h3>
+      {#if enabled}
+        <Badge color="success" size="sm" dot>
+          {$t`On for this device`}
+        </Badge>
+      {/if}
+    </div>
+    <p class="text-text-tertiary text-sm">
+      <Trans>Get notified in this browser when your apps need you.</Trans>
+    </p>
+  </div>
+
+  <div class="shrink-0">
+    <Toggle
+      checked={enabled}
+      onchange={handleToggle}
+      disabled={busy}
+      aria-labelledby={titleId}
+    />
+  </div>
+</section>

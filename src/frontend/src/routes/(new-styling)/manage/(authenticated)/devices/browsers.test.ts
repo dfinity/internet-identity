@@ -100,6 +100,32 @@ describe("brandNameOf and platformWordOf", () => {
   });
 });
 
+describe("fromCanisterBrowsers", () => {
+  const NANOS = BigInt(1_000_000);
+  const now = Date.UTC(2026, 0, 31);
+  const at = (millis: number) => BigInt(millis) * NANOS;
+
+  /**
+   * A linked app reports the description of the browser that installed it, so listed on
+   * its own it reads as a second copy of that browser, with no sessions and therefore
+   * signed out, offering to sign out something that has nothing to sign out of.
+   */
+  it("leaves a notification app out of the list", () => {
+    const listed = fromCanisterBrowsers([
+      [
+        browser(1, at(now)),
+        {
+          ...browser(2, at(now - 1_000)),
+          notifications_on: true,
+          linked_from_browser: [1] as [number],
+        },
+      ],
+    ]);
+
+    expect(listed.map((entry) => entry.id)).toEqual([1]);
+  });
+});
+
 describe("isSignedOut", () => {
   const DAY = 86_400_000;
   const now = Date.UTC(2026, 0, 31);

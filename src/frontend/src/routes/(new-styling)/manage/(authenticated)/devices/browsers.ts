@@ -251,11 +251,21 @@ export const groupBrowsers = (
   return [...groups.values()];
 };
 
+/**
+ * The browsers this identity has signed in from, which is every entry but the
+ * notification apps.
+ *
+ * A linked app reports the description of the browser that installed it, so listed here
+ * it reads as a second copy of that browser: no sessions, therefore signed out, offering
+ * to sign out something that holds nothing. It is the installing browser's delivery and
+ * is managed where notifications are.
+ */
 export const fromCanisterBrowsers = (
   browsers: [] | [BrowserInfo[]],
   currentBrowserId?: number,
 ): Browser[] =>
   (browsers[0] ?? [])
+    .filter((browser) => browser.linked_from_browser.length === 0)
     .map((browser) => ({
       id: browser.id,
       name: nameOf(browser.description),
