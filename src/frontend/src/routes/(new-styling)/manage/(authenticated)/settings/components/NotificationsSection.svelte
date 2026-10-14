@@ -9,7 +9,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import type { BrowserInfo } from "$lib/generated/internet_identity_types";
-  import { browserKeyActor } from "$lib/utils/notifications/browserActor";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
   import { ensureRegisteredDevice } from "$lib/utils/notifications/subscribeDevice";
   import { forgetAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
   import { notificationsNeedInstallHere } from "$lib/utils/notifications/notificationState";
@@ -67,8 +67,7 @@
   const turnOff = async () => {
     const target = needsApp ? ownApp?.id : browserId;
     if (target !== undefined) {
-      const actor = await browserKeyActor(identityNumber);
-      await actor
+      await $authenticatedStore.actor
         .remove_webpush_subscription({
           anchor_number: identityNumber,
           browser_id: target,
@@ -154,14 +153,7 @@
       {/if}
     </div>
     <p class="text-text-tertiary text-sm">
-      {#if needsApp}
-        <Trans>
-          Get notified on this device when your apps need you. iPhone and iPad
-          receive them through an app on your Home Screen.
-        </Trans>
-      {:else}
-        <Trans>Get notified in this browser when your apps need you.</Trans>
-      {/if}
+      <Trans>Get notified in this browser when your apps need you.</Trans>
     </p>
   </div>
 
