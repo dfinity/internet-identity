@@ -1855,6 +1855,9 @@ type RemoveWebPushSubscriptionRequest = record {
 type SetWebPushSubscriptionError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
+    // A notification app whose installing browser holds no session: delivery is on that
+    // browser's authority, so signing it out stops the app registering again.
+    SignedOut;
     // The pool offered is not newer than the one this endpoint already holds.
     StaleJwtPool;
     InternalCanisterError : text;

@@ -1718,6 +1718,86 @@ mod browser_tests {
         assert_eq!(dropped, vec![0]);
     }
 
+    /// A linked app never signs in, so its `last_used` stays where linking left it and a
+    /// cap counting it would evict it first — taking the user's notifications with it.
+    #[test]
+    fn the_cap_neither_counts_nor_evicts_a_linked_notification_app() {
+        let mut anchor = anchor();
+        let mut parent = 0;
+        for index in 0..MAX_BROWSERS {
+            let (id, _) = anchor
+                .resolve_browser(
+                    browser_key(index as u8),
+                    successor_key(index as u8),
+                    description(&format!("device-{index}")),
+                    index as u64 + 1_000,
+                )
+                .unwrap();
+            parent = id;
+        }
+        // Linked from the browser used most recently, so nothing but the cap counting it
+        // can put the app at the front of the queue.
+        let app = anchor
+            .link_notification_app(parent, browser_key(250), 2_000)
+            .unwrap();
+
+        let (_, dropped) = anchor
+            .resolve_browser(
+                browser_key(200),
+                successor_key(200),
+                description("newest"),
+                10_000,
+            )
+            .unwrap();
+
+        assert_eq!(dropped, vec![0]);
+        assert_eq!(
+            anchor.linked_notification_app(parent).map(|entry| entry.id),
+            Some(app)
+        );
+        assert_eq!(anchor.browsers().len(), MAX_BROWSERS + 1);
+    }
+
+    /// Left behind, an app names a parent that no longer exists: a later sign-in from that
+    /// browser gets a new id, so nothing can replace the orphan and it holds a slot for
+    /// good.
+    #[test]
+    fn evicting_a_browser_drops_the_app_linked_from_it() {
+        let mut anchor = anchor();
+        let (oldest, _) = anchor
+            .resolve_browser(browser_key(0), successor_key(0), description("iPhone"), 1)
+            .unwrap();
+        let app = anchor
+            .link_notification_app(oldest, browser_key(250), 2)
+            .unwrap();
+        for index in 1..MAX_BROWSERS {
+            anchor
+                .resolve_browser(
+                    browser_key(index as u8),
+                    successor_key(index as u8),
+                    description(&format!("device-{index}")),
+                    index as u64 + 1_000,
+                )
+                .unwrap();
+        }
+
+        let (_, dropped) = anchor
+            .resolve_browser(
+                browser_key(200),
+                successor_key(200),
+                description("newest"),
+                10_000,
+            )
+            .unwrap();
+
+        assert_eq!(dropped, vec![oldest, app]);
+        assert!(anchor.browsers().iter().all(|entry| entry.id != app));
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(browser_key(250))),
+            None
+        );
+    }
+
     #[test]
     fn the_cap_evicts_on_use_rather_than_on_enrolment() {
         let mut anchor = anchor();

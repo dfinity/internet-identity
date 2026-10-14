@@ -882,6 +882,19 @@ impl Anchor {
             .find(|entry| entry.linked_from_browser == Some(browser))
     }
 
+    /// The browser that installed `browser_id`, where that entry is a notification app.
+    ///
+    /// `None` for a browser of the identity's own, which is what every caller but a
+    /// linked app is, and for an app whose installing browser is gone.
+    pub fn installing_browser(&self, browser_id: BrowserId) -> Option<&Browser> {
+        let parent = self
+            .browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)?
+            .linked_from_browser?;
+        self.browsers.iter().find(|browser| browser.id == parent)
+    }
+
     /// The browser a caller signing as `principal` is, if the identity is signed in
     /// from it.
     ///
@@ -1165,17 +1178,39 @@ impl Anchor {
             linked_from_browser: None,
         });
 
+        // The cap counts browsers, and a linked notification app is not one: it never
+        // signs in, so its `last_used` stays at the moment it was linked and it would be
+        // the first thing this evicted — taking the user's notifications with it,
+        // silently, on their twenty-first browser.
+        //
+        // A browser that is evicted takes its app with it. Left behind, the app names a
+        // parent that no longer exists: a later sign-in from that browser registers a new
+        // entry with a new id, so nothing can ever replace the orphan and it holds a slot
+        // for good.
         let mut dropped = vec![];
-        while self.browsers.len() > MAX_BROWSERS {
+        let is_browser = |browser: &Browser| browser.linked_from_browser.is_none();
+        loop {
+            if self.browsers.iter().filter(|b| is_browser(b)).count() <= MAX_BROWSERS {
+                break;
+            }
             let least_recently_used = self
                 .browsers
                 .iter()
                 .enumerate()
+                .filter(|(_, browser)| is_browser(browser))
                 .min_by_key(|(_, browser)| (browser.last_used, browser.id))
                 .map(|(index, _)| index);
             match least_recently_used {
                 Some(index) => {
-                    dropped.push(self.browsers.remove(index).id);
+                    let evicted = self.browsers.remove(index).id;
+                    dropped.push(evicted);
+                    self.browsers.retain(|browser| {
+                        if browser.linked_from_browser == Some(evicted) {
+                            dropped.push(browser.id);
+                            return false;
+                        }
+                        true
+                    });
                 }
                 None => break,
             }

@@ -3369,6 +3369,14 @@ impl<M: Memory + Clone> Storage<M> {
         // A browser the identity signed out of must stop being notified for it. The
         // entry itself stays, so that signing back in is not a new browser.
         anchor.set_webpush_subscription(browser_id, None);
+        // The app that browser installed is silenced with it: it carries this identity's
+        // notifications on that browser's authority, and on iOS it is the only thing that
+        // can carry them at all, so leaving it would keep delivering to a device the
+        // identity was just signed out of. Its entry stays too, and opening the app
+        // registers it again.
+        if let Some(app) = anchor.linked_notification_app(browser_id).map(|app| app.id) {
+            anchor.set_webpush_subscription(app, None);
+        }
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;

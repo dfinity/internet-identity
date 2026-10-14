@@ -1053,6 +1053,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'StaleJwtPool' : IDL.Null,
+    'SignedOut' : IDL.Null,
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
   const SmtpEnvelope = IDL.Record({

@@ -29,6 +29,17 @@ pub fn set_subscription(
         ..
     } = request;
 
+    // A linked app delivers on the authority of the browser that installed it, so it may
+    // register only while that browser still holds a session. Signing a browser out
+    // silences its app, and without this the app would write the subscription back on
+    // its next launch, whoever opened it. Signing in again on that device restores
+    // delivery with no further step.
+    if let Some(parent) = anchor.installing_browser(browser_id) {
+        if parent.session_count == 0 {
+            return Err(SetWebPushSubscriptionError::SignedOut);
+        }
+    }
+
     // The same endpoint means this replaces the pool on a registration that is still
     // live, so the registration keeps its age and its queue, and the pool has to move
     // forward: one signature covers one elapsed window, and an older pool would shorten
@@ -130,6 +141,7 @@ mod tests {
     use super::*;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use internet_identity_interface::internet_identity::types::RemoveWebPushSubscriptionRequest;
+    use serde_bytes::ByteBuf;
 
     const ENDPOINT: &str = "https://relay.example/a";
     const ROTATED: &str = "https://relay.example/b";
@@ -139,6 +151,58 @@ mod tests {
         browser_id: BrowserId,
     ) -> Option<WebPushSubscriptionStatus> {
         subscription_status(&anchor(anchor_number), browser_id)
+    }
+
+    /// Links an app to the first browser of a fresh anchor, with that browser holding
+    /// `sessions` sessions.
+    fn anchor_with_app(sessions: u32) -> (AnchorNumber, BrowserId) {
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        crate::state::storage_borrow_mut(|storage| {
+            let mut stored = storage.read(anchor_number).expect("the test anchor");
+            let app = stored
+                .link_notification_app(browsers[0], ByteBuf::from(vec![9; 91]), 0)
+                .expect("linking an app");
+            stored.move_browser_session_counts(&std::collections::BTreeMap::from([(
+                browsers[0],
+                i64::from(sessions),
+            )]));
+            storage.write(stored).expect("writing the test anchor");
+            (anchor_number, app)
+        })
+    }
+
+    /// Delivery is the installing browser's to grant, so signing that browser out has to
+    /// stop its app writing the subscription back on its next launch, whoever opened it.
+    #[test]
+    fn an_app_whose_browser_is_signed_out_may_not_register() {
+        setup();
+        let (anchor_number, app) = anchor_with_app(0);
+
+        assert_eq!(
+            try_subscribe(anchor_number, app, ENDPOINT, 1_000),
+            Err(SetWebPushSubscriptionError::SignedOut)
+        );
+    }
+
+    #[test]
+    fn an_app_whose_browser_is_signed_in_registers() {
+        setup();
+        let (anchor_number, app) = anchor_with_app(1);
+
+        assert_eq!(try_subscribe(anchor_number, app, ENDPOINT, 1_000), Ok(()));
+    }
+
+    /// A browser of the identity's own is not held to this: it is the thing that signs
+    /// in, and its own entry is what a sign-out already clears.
+    #[test]
+    fn a_browser_with_no_sessions_still_registers_for_itself() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+
+        assert_eq!(
+            try_subscribe(anchor_number, browsers[0], ENDPOINT, 1_000),
+            Ok(())
+        );
     }
 
     fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
