@@ -6834,9 +6834,13 @@ mod session_removal_tests {
 }
 
 mod session_revocation_tests {
+    use serde_bytes::ByteBuf;
+
+    use super::description;
     use super::held_references;
     use super::params_at;
     use super::TEST_NOW;
+    use crate::storage::anchor::WebPushSubscription;
     use crate::storage::CreateSessionParams;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -6910,6 +6914,53 @@ mod session_revocation_tests {
             browser_ids(&storage, anchor_number, "https://b.com"),
             Vec::<u32>::new()
         );
+    }
+
+    /// On iOS the app is the only thing that can be notified, so a browser signed out
+    /// of an identity while its app kept delivering would keep that identity's
+    /// notifications arriving on the device it was signed out of.
+    #[test]
+    fn signing_a_browser_out_silences_the_app_it_installed() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let mut anchor = storage.read(anchor_number).unwrap();
+        let (browser_id, _) = anchor
+            .resolve_browser(
+                ByteBuf::from(vec![1; 32]),
+                ByteBuf::from(vec![2; 32]),
+                description(1),
+                1_000,
+            )
+            .unwrap();
+        let app = anchor
+            .link_notification_app(browser_id, ByteBuf::from(vec![9; 32]), 2_000)
+            .unwrap();
+        let subscription = |endpoint: &str| WebPushSubscription {
+            endpoint: endpoint.to_string(),
+            created_at_ns: 0,
+            vapid_public_key: vec![4; 65],
+            jwt_signatures: vec![vec![3; 64]],
+            jwt_issued_at_ns: 0,
+            notifications: Vec::new(),
+            woken_again_at_ns: None,
+        };
+        anchor.set_webpush_subscription(browser_id, Some(subscription("https://relay.example/b")));
+        anchor.set_webpush_subscription(app, Some(subscription("https://web.push.apple.com/a")));
+        storage.write(anchor).unwrap();
+
+        storage
+            .revoke_browser_sessions(anchor_number, browser_id, TEST_NOW)
+            .unwrap();
+
+        let after = storage.read(anchor_number).unwrap();
+        assert_eq!(after.webpush_subscription(browser_id), None);
+        assert_eq!(
+            after.webpush_subscription(app),
+            None,
+            "the app a signed-out browser installed stops delivering with it"
+        );
+        // Both entries survive, so signing back in and opening the app restores delivery
+        // rather than needing a fresh install.
+        assert!(after.browsers().iter().any(|entry| entry.id == app));
     }
 
     #[test]
