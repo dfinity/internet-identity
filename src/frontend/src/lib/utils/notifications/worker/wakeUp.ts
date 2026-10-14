@@ -36,17 +36,22 @@ import {
 
 /** Shown until the delegation that reads the app's own text has been minted. */
 const PLACEHOLDER_TITLE = "Internet Identity";
+const PLACEHOLDER_TAG = "internet-identity";
 const PLACEHOLDER_BODY = "You have a new notification.";
 
 /** What a `userVisibleOnly` subscription owes the user where nothing better can be
  *  shown. */
-export const showPlaceholder = (
+export const showPlaceholder = async (
   registration: ServiceWorkerRegistration,
-): Promise<void> =>
-  registration.showNotification(PLACEHOLDER_TITLE, {
+): Promise<void> => {
+  for (const existing of await shownUnder(registration, PLACEHOLDER_TAG)) {
+    existing.close();
+  }
+  await registration.showNotification(PLACEHOLDER_TITLE, {
     body: PLACEHOLDER_BODY,
-    tag: "internet-identity",
+    tag: PLACEHOLDER_TAG,
   });
+};
 
 export interface WakeUpContext {
   /** The worker's registration, which owns the notifications it shows. */
@@ -84,15 +89,29 @@ const refFor = (
   id: notification.id,
 });
 
-/** Replace by hand rather than by tag: WebKit does not coalesce by tag, so a same-tag
- *  notification arrives beside the one it was meant to replace. */
+/**
+ * What is on screen under `tag`, matched here rather than by the browser.
+ *
+ * WebKit does not coalesce by tag, so a same-tag notification arrives beside the one it
+ * was meant to replace, and asking it to filter by tag answers nothing: on iOS the
+ * placeholder stayed on the lock screen beside the app's own text. Reading them all and
+ * comparing the tag ourselves is what every engine agrees on.
+ */
+const shownUnder = async (
+  registration: ServiceWorkerRegistration,
+  tag: string,
+): Promise<Notification[]> =>
+  (await registration.getNotifications()).filter(
+    (existing) => existing.tag === tag,
+  );
+
 const show = async (
   { registration }: WakeUpContext,
   ref: NotificationRef,
   shown: { title: string; body: string; url: string; icon?: string },
 ): Promise<void> => {
   const tag = tagOf(ref);
-  for (const existing of await registration.getNotifications({ tag })) {
+  for (const existing of await shownUnder(registration, tag)) {
     existing.close();
   }
   await registration.showNotification(shown.title, {
@@ -107,9 +126,7 @@ const closeShown = async (
   { registration }: WakeUpContext,
   ref: NotificationRef,
 ): Promise<void> => {
-  for (const existing of await registration.getNotifications({
-    tag: tagOf(ref),
-  })) {
+  for (const existing of await shownUnder(registration, tagOf(ref))) {
     existing.close();
   }
 };

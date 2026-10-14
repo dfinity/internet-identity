@@ -12,6 +12,7 @@ vi.mock("./claimDeviceApp", () => ({
 }));
 vi.mock("./notificationState", () => ({
   notificationsNeedInstallHere: vi.fn(() => false),
+  notificationAppDelivers: vi.fn(() => Promise.resolve(false)),
 }));
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -20,7 +21,10 @@ import type { DeviceNotificationState } from "./notificationState";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { requestNotificationPermission } from "./pushSubscription";
 import { claimDeviceApp } from "./claimDeviceApp";
-import { notificationsNeedInstallHere } from "./notificationState";
+import {
+  notificationAppDelivers,
+  notificationsNeedInstallHere,
+} from "./notificationState";
 
 const register = vi.mocked(ensureRegisteredDevice);
 const permission = vi.mocked(requestNotificationPermission);
@@ -85,6 +89,7 @@ describe("turnOnNotifications", () => {
     permission.mockResolvedValue("granted");
     vi.mocked(notificationsNeedInstallHere).mockReturnValue(false);
     vi.mocked(claimDeviceApp).mockResolvedValue(true);
+    vi.mocked(notificationAppDelivers).mockResolvedValue(false);
   });
 
   /**
@@ -129,6 +134,29 @@ describe("turnOnNotifications", () => {
 
     // Nothing delivers yet, so nothing is told that this identity allowed it.
     expect(grant).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The browser that installed the app has its own entry for it, and the canister is
+   * what says so: nothing is published to claim, and nothing is owed but the consent.
+   */
+  it("records consent where the app this browser installed already delivers", async () => {
+    vi.mocked(notificationsNeedInstallHere).mockReturnValue(true);
+    vi.mocked(claimDeviceApp).mockResolvedValue(false);
+    vi.mocked(notificationAppDelivers).mockResolvedValue(true);
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: state(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "enabled" });
+
+    expect(grant).toHaveBeenCalledOnce();
   });
 
   it("registers the device before recording consent", async () => {

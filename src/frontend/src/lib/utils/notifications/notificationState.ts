@@ -260,11 +260,14 @@ export const resolveOptIn = async ({
     // can be delivered by without installing anything: answering claims it. Nothing
     // published means nothing installed here, as far as this browser can tell, and the
     // answer is the install.
+    // An app that already delivers for this identity leaves only the consent to
+    // record: there is nothing to install and nothing to claim. A record in the
+    // shared storage is the other way an answer costs the user nothing.
     return {
       screen: "enable",
       state,
       consented,
-      installFirst: record === undefined,
+      installFirst: !delivers && record === undefined,
     };
   }
 

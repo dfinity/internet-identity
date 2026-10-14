@@ -13,7 +13,10 @@ import { throwCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { claimDeviceApp } from "./claimDeviceApp";
-import { notificationsNeedInstallHere } from "./notificationState";
+import {
+  notificationAppDelivers,
+  notificationsNeedInstallHere,
+} from "./notificationState";
 import type { DeviceNotificationState } from "./notificationState";
 
 type GrantArgs = {
@@ -49,7 +52,12 @@ export const turnOnNotifications = async ({
   // the user is the app this device has, and claiming it is the whole of turning
   // notifications on here.
   if (notificationsNeedInstallHere()) {
-    if (!(await claimDeviceApp({ identityNumber }))) {
+    const claimed = await claimDeviceApp({ identityNumber });
+    // Nothing published to claim is not the same as nothing to deliver with: the app
+    // this browser installed itself is already its entry, and the canister is what
+    // says so. Only a browser with neither is owed the install.
+    const delivers = claimed || (await notificationAppDelivers(identityNumber));
+    if (!delivers) {
       return { status: "install-required" };
     }
     if (!consented) {
