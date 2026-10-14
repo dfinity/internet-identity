@@ -11,7 +11,9 @@
   import { readBrowserPushState } from "$lib/utils/notifications/notificationState";
   import { isStandalone } from "./standalone";
   import { decodeLinkToken } from "./linkToken";
-  import { linkAndRegister, linkedIdentity, type LinkOutcome } from "./link";
+  import { linkAndRegister, type LinkOutcome } from "./link";
+  import { readAppKey } from "$lib/utils/notifications/notificationAppKey";
+  import { publishAppRecord } from "./publishRecord";
   import InstallSteps from "./installSteps/InstallSteps.svelte";
   import IosAppSteps from "./blockedSteps/IosAppSteps.svelte";
   import { NOTIFICATION_APP_NAME } from "./appName";
@@ -72,10 +74,14 @@
 
     const token = decodeLinkToken(window.location.hash);
     if (token === undefined) {
-      const linked = await linkedIdentity();
-      return linked === undefined
-        ? { kind: "nothing-to-claim" }
-        : { kind: "ready", identityNumber: linked };
+      const record = await readAppKey();
+      if (record?.identityNumber === undefined) {
+        return { kind: "nothing-to-claim" };
+      }
+      // Published on every launch, not only at install: the pool it carries is spent
+      // by elapsed time, and a browser claiming weeks later needs a newer one.
+      await publishAppRecord(record);
+      return { kind: "ready", identityNumber: record.identityNumber };
     }
 
     const landed = settle(await linkAndRegister(token));

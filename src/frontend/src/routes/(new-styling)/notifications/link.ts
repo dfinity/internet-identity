@@ -8,11 +8,11 @@ import {
   appKeyActor,
   appPublicKey,
   ensureAppKey,
-  readAppKey,
   rememberLinked,
 } from "$lib/utils/notifications/notificationAppKey";
 import type { LinkNotificationAppError } from "$lib/generated/internet_identity_types";
 import type { LinkToken } from "./linkToken";
+import { publishAppRecord } from "./publishRecord";
 
 export type LinkOutcome =
   | { status: "linked"; identityNumber: bigint }
@@ -34,10 +34,6 @@ const describe = (error: unknown): string => {
   }
   return error instanceof Error ? error.message : String(error);
 };
-
-/** The identity this app is already linked to, where a previous launch linked it. */
-export const linkedIdentity = (): Promise<bigint | undefined> =>
-  readAppKey().then((record) => record?.identityNumber);
 
 /**
  * Claims an entry with `token` and registers this app's push subscription under it.
@@ -66,6 +62,9 @@ export const linkAndRegister = async (
     }
 
     await ensureRegisteredDevice(token.identityNumber, actor);
+    // Left where the browsers on this device can read it, which is how an identity
+    // that never installed anything is delivered to.
+    await publishAppRecord({ ...record, identityNumber: token.identityNumber });
     return { status: "linked", identityNumber: token.identityNumber };
   } catch (error) {
     const reason = describe(error);

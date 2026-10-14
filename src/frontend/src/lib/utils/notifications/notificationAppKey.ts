@@ -17,7 +17,7 @@ import { agentOptions, canisterId } from "$lib/globals";
 const APP_KEY_STORE = createStore("ii-notification-app", "key");
 const RECORD_KEY = "key";
 
-interface AppKeyRecord {
+export interface AppKeyRecord {
   keyPair: CryptoKeyPair;
   /** The identity this app was linked to, once the canister has accepted it. Absent
    *  until then, which is what tells a generated key from a linked one. */

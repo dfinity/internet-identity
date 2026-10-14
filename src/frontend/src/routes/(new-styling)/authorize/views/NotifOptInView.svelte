@@ -67,11 +67,16 @@
   // request arrives as a new context, which remounts this component.
   let variant = $state<"enable" | "blocked" | "handoff">("enable");
 
+  /** Whether answering installs the app rather than claiming the one this device has.
+   *  Starts from the resolution and moves only one way: a claim that finds nothing
+   *  published leaves the install as what is left to do. */
+  let needsInstall = $state(installFirst);
+
   /** Signed while this screen renders, because `window.open` needs the click's own
    *  gesture and an await between the two loses it. */
   let installUrl = $state<string | undefined>(undefined);
   $effect(() => {
-    if (!installFirst) {
+    if (!needsInstall) {
       return;
     }
     void prepareInstallUrl(identityNumber).then((url) => {
@@ -141,6 +146,13 @@
         variant = "blocked";
         return;
       }
+      if (result.status === "install-required") {
+        // The app published nothing this browser could read, so there is nothing here
+        // to claim and the install is what answering means. The screen is the same
+        // one; what Allow does changes under it.
+        needsInstall = true;
+        return;
+      }
       if (result.status === "dismissed") {
         // The permission is still `default`, so the prompt can be raised again.
         // Stay where the user is, with Allow still in front of them.
@@ -207,7 +219,7 @@
     {appLogo}
     {origin}
     {busy}
-    onEnable={installFirst ? startInstall : () => void runEnable(device)}
+    onEnable={needsInstall ? startInstall : () => void runEnable(device)}
     onSkip={() => onDone()}
   />
 {:else if variant === "handoff"}

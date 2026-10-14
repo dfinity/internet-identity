@@ -7,12 +7,20 @@ vi.mock("./subscribeDevice", () => ({
 vi.mock("./pushSubscription", () => ({
   requestNotificationPermission: vi.fn(() => Promise.resolve("granted")),
 }));
+vi.mock("./claimDeviceApp", () => ({
+  claimDeviceApp: vi.fn(() => Promise.resolve(true)),
+}));
+vi.mock("./notificationState", () => ({
+  notificationsNeedInstallHere: vi.fn(() => false),
+}));
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { disallowApp, turnOnNotifications } from "./enableNotifications";
 import type { DeviceNotificationState } from "./notificationState";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { requestNotificationPermission } from "./pushSubscription";
+import { claimDeviceApp } from "./claimDeviceApp";
+import { notificationsNeedInstallHere } from "./notificationState";
 
 const register = vi.mocked(ensureRegisteredDevice);
 const permission = vi.mocked(requestNotificationPermission);
@@ -75,6 +83,52 @@ describe("turnOnNotifications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     permission.mockResolvedValue("granted");
+    vi.mocked(notificationsNeedInstallHere).mockReturnValue(false);
+    vi.mocked(claimDeviceApp).mockResolvedValue(true);
+  });
+
+  /**
+   * Every iOS browser is one of these: it cannot hold a subscription, so there is no
+   * permission to ask for and nothing to subscribe. What reaches the user is the app
+   * this device has, and claiming it is the whole of the answer.
+   */
+  it("claims this device's app rather than prompting where none can be held", async () => {
+    vi.mocked(notificationsNeedInstallHere).mockReturnValue(true);
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: state(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "enabled" });
+
+    expect(claimDeviceApp).toHaveBeenCalledWith({ identityNumber: IDENTITY });
+    expect(permission).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
+    expect(grant).toHaveBeenCalledOnce();
+  });
+
+  it("asks for the install where this device has published no app", async () => {
+    vi.mocked(notificationsNeedInstallHere).mockReturnValue(true);
+    vi.mocked(claimDeviceApp).mockResolvedValue(false);
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: state(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "install-required" });
+
+    // Nothing delivers yet, so nothing is told that this identity allowed it.
+    expect(grant).not.toHaveBeenCalled();
   });
 
   it("registers the device before recording consent", async () => {

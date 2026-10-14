@@ -1,4 +1,5 @@
 {
+  "id": "/notifications",
   "name": "Internet Identity Notifications",
   "short_name": "Internet Identity Notifications",
   "description": "Receives the notifications apps send you through Internet Identity.",

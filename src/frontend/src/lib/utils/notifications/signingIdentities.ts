@@ -18,6 +18,7 @@ import {
   registeredIdentityNumbers,
 } from "$lib/stores/browser-key.store";
 import { readAppKey } from "./notificationAppKey";
+import { readDeviceRecord } from "./deviceRecord";
 
 export interface SigningIdentity {
   identityNumber: bigint;
@@ -42,12 +43,14 @@ const fromAppKey = async (): Promise<SigningIdentity[]> => {
   if (record?.identityNumber === undefined) {
     return [];
   }
-  return [
-    {
-      identityNumber: record.identityNumber,
-      identity: await ECDSAKeyIdentity.fromKeyPair(record.keyPair),
-    },
-  ];
+  // One key, one entry per identity. The app claimed the first itself; the rest were
+  // claimed by browsers on this device, which is why the list is read from the record
+  // they write rather than from the app's own storage.
+  const claimed = (await readDeviceRecord())?.identityNumbers ?? [];
+  const identity = await ECDSAKeyIdentity.fromKeyPair(record.keyPair);
+  return [...new Set([record.identityNumber, ...claimed])].map(
+    (identityNumber) => ({ identityNumber, identity }),
+  );
 };
 
 /**

@@ -15,6 +15,7 @@ import { recordPermission } from "./notificationDiagnostics";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
+import { readDeviceRecord } from "./deviceRecord";
 
 /** What this browser can do, and what it is subscribed with. */
 export interface BrowserPushState {
@@ -241,26 +242,36 @@ export const resolveOptIn = async ({
   // delivered to. Consent alone would tell an app yes while nothing reached the user,
   // and would never offer the install to an identity that allowed notifications before
   // any of this existed.
-  const installFirst = notificationsNeedInstallHere();
-  if (installFirst) {
+  if (notificationsNeedInstallHere()) {
     // Two ways this browser can know the user is covered, and it needs both. Its own
     // linked app it can see. An app installed from another browser on the same device
     // it cannot: the canister records which browser installed one, and asking
     // anchor-wide instead would stop the same user's second device being offered the
     // install at all. So the user's own word counts, given on the install steps.
-    const [delivers, saidSo] = await Promise.all([
+    const [delivers, saidSo, record] = await Promise.all([
       notificationAppDelivers(identityNumber),
       saidAlreadyInstalled(identityNumber),
+      readDeviceRecord(),
     ]);
-    return consented && (delivers || saidSo)
-      ? { screen: "skip", granted: true }
-      : { screen: "enable", state, consented, installFirst };
+    if (consented && (delivers || saidSo)) {
+      return { screen: "skip", granted: true };
+    }
+    // An app that has published to the storage this origin shares is one this browser
+    // can be delivered by without installing anything: answering claims it. Nothing
+    // published means nothing installed here, as far as this browser can tell, and the
+    // answer is the install.
+    return {
+      screen: "enable",
+      state,
+      consented,
+      installFirst: record === undefined,
+    };
   }
 
   const screen = resolveOptInScreen(state, consented);
   return screen === "skip"
     ? { screen, granted: consented && deliversHere(state) }
-    : { screen, state, consented, installFirst };
+    : { screen, state, consented, installFirst: false };
 };
 
 /**

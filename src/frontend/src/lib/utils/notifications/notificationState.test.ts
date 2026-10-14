@@ -9,6 +9,7 @@ vi.mock("./alreadyInstalled", () => ({
   recordAlreadyInstalled: vi.fn(),
 }));
 vi.mock("./notificationDiagnostics", () => ({ recordPermission: vi.fn() }));
+vi.mock("./deviceRecord", () => ({ readDeviceRecord: vi.fn() }));
 vi.mock("$lib/utils/describeBrowser", () => ({
   browserAndSystem: vi.fn(() => ({
     os: { Macos: null },
@@ -40,6 +41,7 @@ import {
 } from "./notificationState";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
+import { readDeviceRecord } from "./deviceRecord";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
@@ -662,10 +664,33 @@ describe("resolveOptIn where notifications need an app", () => {
     });
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
     vi.stubGlobal("Notification", { permission: "default" });
+    vi.mocked(readDeviceRecord).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  /** An app that published to the storage this origin shares is one this browser can
+   *  be delivered by, so answering claims it rather than sending anyone to install. */
+  it("asks without the install where this device has an app to claim", async () => {
+    vi.mocked(readDeviceRecord).mockResolvedValueOnce({
+      appKey: Uint8Array.from([1]),
+      endpoint: "https://web.push.apple.com/abc",
+      vapidPublicKey: Uint8Array.from([2]),
+      jwtSignatures: [Uint8Array.from([3])],
+      jwtIssuedAtNs: BigInt(1),
+      identityNumbers: [BigInt(10_001)],
+    });
+
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(false),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toMatchObject({ screen: "enable", installFirst: false });
   });
 
   /** This browser cannot read whether the app is linked and subscribed, so what is
@@ -772,6 +797,7 @@ describe("resolveOptIn where the user says the device already has the app", () =
     });
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
     vi.stubGlobal("Notification", { permission: "default" });
+    vi.mocked(readDeviceRecord).mockResolvedValue(undefined);
     // No app of this browser's own, which is the case the user's word is for.
     vi.mocked(browserKeyActor).mockResolvedValue({
       get_notification_app_status: vi.fn(() => Promise.resolve([])),
