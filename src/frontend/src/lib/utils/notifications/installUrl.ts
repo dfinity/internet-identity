@@ -10,7 +10,7 @@ import { signNotificationAppLink } from "$lib/stores/browser-key.store";
 import {
   encodeLinkToken,
   LINK_TOKEN_LIFETIME_MS,
-} from "../../notifications/linkToken";
+} from "../../../routes/(new-styling)/notifications/linkToken";
 
 const NOTIFICATIONS_PATH = "/notifications";
 

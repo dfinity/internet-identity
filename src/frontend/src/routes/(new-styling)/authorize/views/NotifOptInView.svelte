@@ -10,7 +10,7 @@
   import {
     openInstallTab,
     prepareInstallUrl,
-  } from "./startNotificationInstall";
+  } from "$lib/utils/notifications/installUrl";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import { turnOnNotifications } from "$lib/utils/notifications/enableNotifications";
   import {

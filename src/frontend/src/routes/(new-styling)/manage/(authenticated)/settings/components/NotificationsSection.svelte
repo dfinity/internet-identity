@@ -14,6 +14,10 @@
   import { forgetAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
   import { notificationsNeedInstallHere } from "$lib/utils/notifications/notificationState";
   import { requestNotificationPermission } from "$lib/utils/notifications/pushSubscription";
+  import {
+    openInstallTab,
+    prepareInstallUrl,
+  } from "$lib/utils/notifications/installUrl";
 
   const {
     identityNumber,
@@ -32,6 +36,19 @@
   } = $props();
 
   const titleId = $props.id();
+
+  /** Signed while this section renders, because `window.open` needs the click's own
+   *  gesture and an await between the two loses it. The app claims its entry with this
+   *  token: opening the page without one installs an app with nothing to claim. */
+  let installUrl = $state<string | undefined>(undefined);
+  $effect(() => {
+    if (!needsApp) {
+      return;
+    }
+    void prepareInstallUrl(identityNumber).then((url) => {
+      installUrl = url;
+    });
+  });
 
   /** Where notifications arrive is a Home Screen app on iOS and this browser anywhere
    *  else, which changes what the switch reports and what turning it on does. */
@@ -87,7 +104,14 @@
    */
   const turnOn = async () => {
     if (needsApp) {
-      window.open("/notifications", "_blank");
+      if (installUrl === undefined) {
+        toaster.error({
+          title: $t`Couldn't start the install`,
+          description: $t`This browser hasn't finished a sign-in yet. Reload the page and try again.`,
+        });
+        return;
+      }
+      openInstallTab(installUrl);
       return;
     }
     const permission = await requestNotificationPermission();
