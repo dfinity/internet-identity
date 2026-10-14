@@ -47,7 +47,9 @@ const claimedAnchors = async (record: AppKeyRecord): Promise<bigint[]> => {
     agentOptions: config.agentOptions,
     canisterId: Principal.fromText(config.canisterId),
   });
-  return actor.notification_app_anchors();
+  // Candid's `vec nat64` binds as a typed array or a plain one, and the caller spreads
+  // it into a set.
+  return Array.from(await actor.notification_app_anchors());
 };
 
 const fromAppKey = async (): Promise<SigningIdentity[]> => {
