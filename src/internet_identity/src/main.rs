@@ -41,8 +41,8 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
 use notifications::webpush::{
-    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
-    ValidatedSetWebPushSubscriptionRequest,
+    ValidatedClaimNotificationAppRequest, ValidatedGetWebPushSubscriptionStatusRequest,
+    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
     ValidatedGetNextNotificationRequest, ValidatedGetNotificationDelegationRequest,
@@ -451,6 +451,110 @@ fn link_notification_app(
             .write(anchor)
             .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
     })
+}
+
+/// The identities this notification app carries notifications for.
+///
+/// Answered to the app itself, by its own key, because nothing else can tell it: a
+/// browser is found inside the anchor that holds it, so an app another identity claimed
+/// has no way to learn whose queue it now has to read. Empty for any caller that is no
+/// linked app, so nothing can be probed with it.
+#[query]
+fn notification_app_anchors() -> Vec<AnchorNumber> {
+    let caller = caller();
+    state::storage_borrow(|storage| storage.lookup_anchors_with_notification_app(caller))
+}
+
+/// What this browser's notification app is, for a browser that wants to give the same
+/// app to another identity signed in here.
+///
+/// Authorized by the browser key the caller signs with, and answers only about the app
+/// that browser installed, so one browser cannot read what another has. `None` for a
+/// browser with no app, for an app that has not registered yet, and for a caller that is
+/// no browser of this identity, so none of the three can be probed with it.
+///
+/// An update rather than a query, although it writes nothing: what it answers decides
+/// which key the caller then links to another identity, and a query is one replica's
+/// word. A forged key would be given that identity's wake-ups, and with them the
+/// delegation that reads its notifications.
+#[update]
+fn notification_app_link(request: GetNotificationAppLinkRequest) -> Option<NotificationAppLink> {
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return None;
+    };
+    let app = anchor.linked_notification_app(browser_id)?;
+    let subscription = app.webpush_subscription.as_ref()?;
+    Some(NotificationAppLink {
+        app_key: app.next_browser_key.clone(),
+        endpoint: subscription.endpoint.clone(),
+        vapid_public_key: ByteBuf::from(subscription.vapid_public_key.clone()),
+        jwt_signatures: subscription
+            .jwt_signatures
+            .iter()
+            .map(|signature| ByteBuf::from(signature.clone()))
+            .collect(),
+        jwt_issued_at_ns: subscription.jwt_issued_at_ns,
+    })
+}
+
+/// Authorized by the browser key the caller signs with: a browser says that the app
+/// this device has installed delivers for it too.
+///
+/// The app is not in this conversation. It published its key and its subscription to
+/// storage this origin shares with it, which no other origin can write, so a caller
+/// that read them is running in the same browser the app was installed in. What the
+/// browser can do here it could do anyway: it is already authorized for this identity.
+///
+/// The subscription is written in the same call because the entry is useless without
+/// one, and only the app can sign a pool for it.
+#[update]
+fn claim_notification_app(
+    request: ClaimNotificationAppRequest,
+) -> Result<(), ClaimNotificationAppError> {
+    let validated: ValidatedClaimNotificationAppRequest = request.try_into()?;
+    let (mut anchor, browser_id) =
+        check_browser_authorization(validated.subscription.anchor_number)
+            .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
+    let now = ic_cdk::api::time();
+
+    let app = anchor
+        .claim_notification_app(browser_id, validated.app_key, now)
+        .map_err(|err| match err {
+            storage::anchor::BrowserError::SuccessorAlreadyInUse => {
+                ClaimNotificationAppError::KeyAlreadyInUse
+            }
+            other => ClaimNotificationAppError::InternalCanisterError(format!("{other:?}")),
+        })?;
+
+    // The record a browser reads is published by the app and may be one another browser
+    // has already spent. Saying the same thing twice is not an error: the entry is
+    // already reachable through exactly this subscription, and a pool that is not newer
+    // is the one it holds.
+    if anchor.webpush_subscription(app).is_some_and(|registered| {
+        registered.endpoint == validated.subscription.endpoint
+            && registered.jwt_issued_at_ns >= validated.subscription.jwt_issued_at_ns
+    }) {
+        return Ok(());
+    }
+
+    notifications::webpush::set_subscription(anchor, app, validated.subscription, now).map_err(
+        |err| match err {
+            SetWebPushSubscriptionError::InvalidBrowserKey => {
+                ClaimNotificationAppError::InvalidBrowserKey
+            }
+            // A browser claiming for itself is signed in, which is what authorized this
+            // call, so the app it claims registers under a browser that holds a session.
+            SetWebPushSubscriptionError::SignedOut => {
+                ClaimNotificationAppError::InternalCanisterError("signed out".to_string())
+            }
+            SetWebPushSubscriptionError::StaleJwtPool => {
+                ClaimNotificationAppError::InternalCanisterError("stale JWT pool".to_string())
+            }
+            SetWebPushSubscriptionError::InternalCanisterError(problem) => {
+                ClaimNotificationAppError::InternalCanisterError(problem)
+            }
+        },
+    )
 }
 
 /// Authorized by the browser key the caller signs with.

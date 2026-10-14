@@ -1127,6 +1127,27 @@ pub struct NotificationAppStatus {
     pub subscribed: bool,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppLinkRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What the app a browser installed carries notifications with, as that browser is
+/// entitled to read it: the key is the app's name to the canister, and the subscription
+/// is what the app registered under the entry.
+///
+/// Answered so that another identity signed in to the same browser can be given the
+/// same app, which a browser cannot do from its own storage: the app keeps its key where
+/// no browser can reach it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppLink {
+    pub app_key: PublicKey,
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
 /// Claims the entry a Home Screen app carries notifications under.
 ///
 /// Authorized by the token rather than by the caller being a browser this identity
@@ -1144,6 +1165,32 @@ pub struct LinkNotificationAppRequest {
     pub expires_at_ns: Timestamp,
     /// The installing browser's signature over the anchor number and that expiry.
     pub signature: ByteBuf,
+}
+
+/// What a browser hands over to have the device's notification app deliver for it.
+///
+/// The subscription travels with the key because the entry is useless without it: only
+/// the app holds the VAPID private key the pool is signed with, so a browser cannot
+/// register one for it afterwards.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ClaimNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// The app's public key, DER-encoded, read from the storage this origin shares
+    /// with the installed app.
+    pub app_key: PublicKey,
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ClaimNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// The key is one some browser of this identity already holds as its own.
+    KeyAlreadyInUse,
+    InternalCanisterError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

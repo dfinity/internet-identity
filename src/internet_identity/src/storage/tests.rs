@@ -6833,6 +6833,98 @@ mod session_removal_tests {
     }
 }
 
+mod notification_app_index_tests {
+    use super::description;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+    use serde_bytes::ByteBuf;
+
+    const APP_KEY: [u8; 32] = [9; 32];
+
+    fn app_principal() -> candid::Principal {
+        candid::Principal::self_authenticating(APP_KEY)
+    }
+
+    /// An anchor whose first browser has linked an app, written through the real path so
+    /// the index is maintained the way it is in production.
+    fn anchor_with_app(storage: &mut Storage<VectorMemory>, seed: u8) -> AnchorNumber {
+        let mut anchor = storage.allocate_anchor(0).expect("room in the test range");
+        let anchor_number = anchor.anchor_number();
+        let (browser_id, _) = anchor
+            .resolve_browser(
+                ByteBuf::from(vec![seed; 32]),
+                ByteBuf::from(vec![seed + 1; 32]),
+                description(seed),
+                1_000,
+            )
+            .unwrap();
+        anchor
+            .link_notification_app(browser_id, ByteBuf::from(APP_KEY.to_vec()), 2_000)
+            .unwrap();
+        storage.write(anchor).unwrap();
+        anchor_number
+    }
+
+    fn storage() -> Storage<VectorMemory> {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        storage
+    }
+
+    /// The whole reason the index exists: one key is an entry on every identity that
+    /// claimed the app, and the app knows only its key.
+    #[test]
+    fn one_app_key_names_every_anchor_that_claimed_it() {
+        let mut storage = storage();
+        let first = anchor_with_app(&mut storage, 1);
+        let second = anchor_with_app(&mut storage, 3);
+
+        assert_eq!(
+            storage.lookup_anchors_with_notification_app(app_principal()),
+            vec![first, second]
+        );
+    }
+
+    #[test]
+    fn an_anchor_that_drops_its_app_drops_out_of_the_index() {
+        let mut storage = storage();
+        let first = anchor_with_app(&mut storage, 1);
+        let second = anchor_with_app(&mut storage, 3);
+
+        // Reinstalling replaces the app that browser had, which is how a key stops
+        // being an entry on an anchor.
+        let mut anchor = storage.read(second).unwrap();
+        let parent = anchor
+            .browsers()
+            .iter()
+            .find(|browser| browser.linked_from_browser.is_none())
+            .map(|browser| browser.id)
+            .unwrap();
+        anchor
+            .link_notification_app(parent, ByteBuf::from(vec![7; 32]), 3_000)
+            .unwrap();
+        storage.write(anchor).unwrap();
+
+        assert_eq!(
+            storage.lookup_anchors_with_notification_app(app_principal()),
+            vec![first],
+            "the other identity still has it"
+        );
+    }
+
+    #[test]
+    fn a_key_no_anchor_holds_names_nothing() {
+        let storage = storage();
+
+        assert_eq!(
+            storage.lookup_anchors_with_notification_app(app_principal()),
+            Vec::<AnchorNumber>::new()
+        );
+    }
+}
+
 mod session_revocation_tests {
     use serde_bytes::ByteBuf;
 

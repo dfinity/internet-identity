@@ -339,6 +339,19 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'WrongSolution' : IDL.Record({ 'new_captcha_png_base64' : IDL.Text }),
   });
+  const ClaimNotificationAppRequest = IDL.Record({
+    'endpoint' : IDL.Text,
+    'app_key' : PublicKey,
+    'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
+    'jwt_issued_at_ns' : IDL.Nat64,
+    'anchor_number' : UserNumber,
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const ClaimNotificationAppError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'KeyAlreadyInUse' : IDL.Null,
+  });
   const AccountInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
     'origin' : IDL.Text,
@@ -855,6 +868,16 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
+  const GetNotificationAppLinkRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationAppLink = IDL.Record({
+    'endpoint' : IDL.Text,
+    'app_key' : PublicKey,
+    'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
+    'jwt_issued_at_ns' : IDL.Nat64,
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+  });
   const NotificationConsentGrantedRequest = IDL.Record({
     'origin' : IDL.Text,
     'anchor_number' : UserNumber,
@@ -1297,6 +1320,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'check_session' : IDL.Func([], [IDL.Bool], ['query']),
+    'claim_notification_app' : IDL.Func(
+        [ClaimNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ClaimNotificationAppError })],
+        [],
+      ),
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
     'create_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Text],
@@ -1624,6 +1652,12 @@ export const idlFactory = ({ IDL }) => {
     'mcp_set_config' : IDL.Func(
         [UserNumber, McpConfig],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'notification_app_anchors' : IDL.Func([], [IDL.Vec(UserNumber)], ['query']),
+    'notification_app_link' : IDL.Func(
+        [GetNotificationAppLinkRequest],
+        [IDL.Opt(NotificationAppLink)],
         [],
       ),
     'notification_consent_granted' : IDL.Func(

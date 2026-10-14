@@ -2,7 +2,8 @@
 //! that notifies at all, and fields the canister can deliver against.
 
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, GetWebPushSubscriptionStatusRequest, RemoveWebPushSubscriptionError,
+    AnchorNumber, BrowserId, ClaimNotificationAppError, ClaimNotificationAppRequest,
+    GetWebPushSubscriptionStatusRequest, PublicKey, RemoveWebPushSubscriptionError,
     RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
     Timestamp,
 };
@@ -39,9 +40,64 @@ pub struct ValidatedRemoveWebPushSubscriptionRequest {
     _validated: Validated,
 }
 
+pub struct ValidatedClaimNotificationAppRequest {
+    pub app_key: PublicKey,
+    /// Checked by the same rules as a browser registering for itself, since it is the
+    /// same row with the same delivery behind it.
+    pub subscription: ValidatedSetWebPushSubscriptionRequest,
+    _validated: Validated,
+}
+
 pub struct ValidatedGetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,
     _validated: Validated,
+}
+
+impl TryFrom<ClaimNotificationAppRequest> for ValidatedClaimNotificationAppRequest {
+    type Error = ClaimNotificationAppError;
+
+    fn try_from(
+        ClaimNotificationAppRequest {
+            anchor_number,
+            app_key,
+            endpoint,
+            vapid_public_key,
+            jwt_signatures,
+            jwt_issued_at_ns,
+        }: ClaimNotificationAppRequest,
+    ) -> Result<Self, Self::Error> {
+        let subscription =
+            ValidatedSetWebPushSubscriptionRequest::try_from(SetWebPushSubscriptionRequest {
+                anchor_number,
+                endpoint,
+                vapid_public_key,
+                jwt_signatures,
+                jwt_issued_at_ns,
+            })
+            .map_err(|err| match err {
+                SetWebPushSubscriptionError::InvalidBrowserKey => {
+                    ClaimNotificationAppError::InvalidBrowserKey
+                }
+                // Validation runs before any entry is read, so nothing here can know
+                // yet whether a browser is signed out; the write itself answers that.
+                SetWebPushSubscriptionError::SignedOut => {
+                    ClaimNotificationAppError::InternalCanisterError("signed out".to_string())
+                }
+                // The entry this call creates holds no pool yet, so nothing can be stale.
+                SetWebPushSubscriptionError::StaleJwtPool => {
+                    ClaimNotificationAppError::InternalCanisterError("stale JWT pool".to_string())
+                }
+                SetWebPushSubscriptionError::InternalCanisterError(problems) => {
+                    ClaimNotificationAppError::InternalCanisterError(problems)
+                }
+            })?;
+
+        Ok(Self {
+            app_key,
+            subscription,
+            _validated: Validated,
+        })
+    }
 }
 
 impl TryFrom<SetWebPushSubscriptionRequest> for ValidatedSetWebPushSubscriptionRequest {

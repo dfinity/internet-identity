@@ -531,6 +531,34 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
+export type ClaimNotificationAppError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The key is one some browser of this identity already holds as its own.
+     */
+    'KeyAlreadyInUse' : null
+  };
+/**
+ * What a browser hands over to have the app this device already has deliver for it
+ * too. Authorized by the caller being a browser of this identity: the app is not in the
+ * conversation, and published its key and its subscription to storage this origin
+ * shares with it. The subscription travels along because only the app holds the VAPID
+ * private key a pool is signed with.
+ */
+export interface ClaimNotificationAppRequest {
+  'endpoint' : string,
+  'app_key' : PublicKey,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'anchor_number' : UserNumber,
+  'vapid_public_key' : Uint8Array | number[],
+}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -987,6 +1015,14 @@ export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
 export interface GetNextNotificationResponse {
   'notification' : [] | [NotificationToShow],
 }
+/**
+ * What the app a browser installed carries notifications with, read by that browser so
+ * another identity signed in to the same browser can be given the same app. A browser
+ * cannot read this from its own storage: the app keeps its key in a partition of its own.
+ * An update rather than a query although it writes nothing: its answer decides which key
+ * is linked to another identity, and a query is one replica's word for it.
+ */
+export interface GetNotificationAppLinkRequest { 'anchor_number' : UserNumber }
 /**
  * Whether this browser has a notification app, and whether it can be delivered to. A
  * Home Screen app has an entry of its own, so the browser that installed it cannot see
@@ -1515,6 +1551,13 @@ export interface Notification {
    * Null means II's default retention, which is also the ceiling.
    */
   'expires_at' : [] | [Timestamp],
+}
+export interface NotificationAppLink {
+  'endpoint' : string,
+  'app_key' : PublicKey,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'vapid_public_key' : Uint8Array | number[],
 }
 export interface NotificationAppStatus {
   'browser_id' : number,
@@ -2515,6 +2558,11 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
+  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],
@@ -2946,6 +2994,16 @@ export interface _SERVICE {
     [UserNumber, McpConfig],
     { 'Ok' : null } |
       { 'Err' : string }
+  >,
+  /**
+   * The identities this notification app carries notifications for, answered to the
+   * app by its own key: a browser is found inside the anchor that holds it, so an app
+   * another identity claimed cannot otherwise learn whose queue to read.
+   */
+  'notification_app_anchors' : ActorMethod<[], BigUint64Array | bigint[]>,
+  'notification_app_link' : ActorMethod<
+    [GetNotificationAppLinkRequest],
+    [] | [NotificationAppLink]
   >,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],
