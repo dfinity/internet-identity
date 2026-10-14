@@ -622,6 +622,13 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const GetNotificationAppStatusRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationAppStatus = IDL.Record({
+    'browser_id' : IDL.Nat32,
+    'subscribed' : IDL.Bool,
+  });
   const GetNotificationDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
     'origin' : FrontendHostname,
@@ -734,8 +741,10 @@ export const idlFactory = ({ IDL }) => {
   const BrowserInfo = IDL.Record({
     'id' : IDL.Nat32,
     'session_count' : IDL.Nat32,
+    'notifications_on' : IDL.Bool,
     'description' : BrowserDescription,
     'created_at' : Timestamp,
+    'linked_from_browser' : IDL.Opt(IDL.Nat32),
     'last_used' : Timestamp,
   });
   const McpConfig = IDL.Record({
@@ -797,6 +806,19 @@ export const idlFactory = ({ IDL }) => {
     'InvalidCaller' : IDL.Null,
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
+  });
+  const LinkNotificationAppRequest = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'app_key' : PublicKey,
+    'anchor_number' : UserNumber,
+    'expires_at_ns' : IDL.Nat64,
+  });
+  const LinkNotificationAppError = IDL.Variant({
+    'InvalidLinkToken' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'CallerIsNotTheApp' : IDL.Principal,
+    'LinkTokenExpired' : IDL.Null,
+    'KeyAlreadyInUse' : IDL.Null,
   });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
   const ApplicationInfo = IDL.Record({
@@ -1434,6 +1456,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
         ['query'],
       ),
+    'get_notification_app_status' : IDL.Func(
+        [GetNotificationAppStatusRequest],
+        [IDL.Opt(NotificationAppStatus)],
+        ['query'],
+      ),
     'get_notification_delegation' : IDL.Func(
         [GetNotificationDelegationRequest],
         [
@@ -1511,6 +1538,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'link_notification_app' : IDL.Func(
+        [LinkNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : LinkNotificationAppError })],
+        [],
+      ),
     'list_applications' : IDL.Func(
         [ListApplicationsRequest],
         [

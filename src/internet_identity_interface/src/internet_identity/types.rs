@@ -1106,6 +1106,57 @@ pub enum RemoveWebPushSubscriptionError {
     InternalCanisterError(String),
 }
 
+/// Asks whether this browser has a notification app that can be delivered to.
+///
+/// A Home Screen app has an entry of its own, so the browser that installed it cannot
+/// see it through `get_webpush_subscription_status`, which answers for the caller. This
+/// is how the browser learns the install finished and stops offering it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppStatus {
+    pub browser_id: BrowserId,
+    /// Whether it holds a push subscription, which is what makes it reachable. An app
+    /// that claimed an entry and has not subscribed yet is linked but delivers nothing.
+    pub subscribed: bool,
+}
+
+/// Claims the entry a Home Screen app carries notifications under.
+///
+/// Authorized by the token rather than by the caller being a browser this identity
+/// knows: the app has just generated its key and no entry holds it yet. The token is
+/// signed by the browser that installed the app, which is the party that already has
+/// the authority being spent here.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// The app's own public key, DER-encoded. The caller must be its
+    /// self-authenticating principal, so the token cannot be spent on a key its holder
+    /// does not have.
+    pub app_key: PublicKey,
+    /// When the installing browser's signature stops being accepted.
+    pub expires_at_ns: Timestamp,
+    /// The installing browser's signature over the anchor number and that expiry.
+    pub signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum LinkNotificationAppError {
+    /// No browser of this identity signed this token, or the one that did has rotated
+    /// its key past it since.
+    InvalidLinkToken,
+    /// The token's expiry has passed.
+    LinkTokenExpired,
+    /// The caller is not the key it asks to have linked.
+    CallerIsNotTheApp(Principal),
+    /// The key is one some browser of this identity already holds.
+    KeyAlreadyInUse,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,

@@ -40,6 +40,10 @@ const browser = (
   session_count: 0,
   created_at: createdAtNanos,
   last_used: lastUsedNanos,
+  notifications_on: false,
+  // A browser the user signed in from, which is what these cases are about. A linked
+  // notification app carries the id of the browser that installed it.
+  linked_from_browser: [] as [] | [number],
 });
 
 describe("kindOf", () => {

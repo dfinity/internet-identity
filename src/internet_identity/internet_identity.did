@@ -1083,6 +1083,12 @@ type BrowserInfo = record {
     last_used : Timestamp;
     // Sessions this browser holds. Zero means it is signed in to nothing.
     session_count : nat32;
+    // Whether notifications reach this entry, which is what the settings switch
+    // reports and what turning it off takes away.
+    notifications_on : bool;
+    // The browser that installed this entry, where it is a notification app rather
+    // than a browser of its own.
+    linked_from_browser : opt nat32;
 };
 
 type PrepareAccountSessionRequest = record {
@@ -1859,6 +1865,39 @@ type RemoveWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
+// Whether this browser has a notification app, and whether it can be delivered to. A
+// Home Screen app has an entry of its own, so the browser that installed it cannot see
+// it through get_webpush_subscription_status, which answers for the caller.
+type GetNotificationAppStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+type NotificationAppStatus = record {
+    browser_id : nat32;
+    subscribed : bool;                 // holds a push subscription, so is reachable
+};
+
+// Claims the entry a Home Screen app carries notifications under. Authorized by the
+// token rather than by the caller being a browser this identity knows: the app has just
+// generated its key and no entry holds it yet.
+type LinkNotificationAppRequest = record {
+    anchor_number : UserNumber;
+    app_key : PublicKey;               // the app's own key; the caller must be its principal
+    expires_at_ns : nat64;             // when the installing browser's signature stops counting
+    signature : blob;                  // over the anchor number and that expiry
+};
+
+type LinkNotificationAppError = variant {
+    // No browser of this identity signed this token, or the one that did has rotated
+    // its key past it since.
+    InvalidLinkToken;
+    LinkTokenExpired;
+    // The caller is not the key it asks to have linked.
+    CallerIsNotTheApp : principal;
+    KeyAlreadyInUse;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2510,6 +2549,11 @@ service : (opt InternetIdentityInit) -> {
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
+    // Called by a Home Screen app on first launch, signed with the key it just generated,
+    // spending a token the browser that installed it signed.
+    link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
+    // Called by the browser that installed the app, signed with its own browser key.
+    get_notification_app_status : (GetNotificationAppStatusRequest) -> (opt NotificationAppStatus) query;
 
     // Called by an app's backend canister for the origin it names.
     app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });

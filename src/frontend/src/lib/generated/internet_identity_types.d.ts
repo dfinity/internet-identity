@@ -428,11 +428,21 @@ export interface BrowserInfo {
    */
   'session_count' : number,
   /**
+   * Whether notifications reach this entry, which is what the settings switch
+   * reports and what turning it off takes away.
+   */
+  'notifications_on' : boolean,
+  /**
    * Fixed at registration. A sign-in reporting something else registers its own entry,
    * so this describes a registration rather than the last sign-in.
    */
   'description' : BrowserDescription,
   'created_at' : Timestamp,
+  /**
+   * The browser that installed this entry, where it is a notification app rather
+   * than a browser of its own.
+   */
+  'linked_from_browser' : [] | [number],
   /**
    * Advanced by a sign-in from this browser and by every session refresh it drives.
    */
@@ -977,6 +987,14 @@ export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
 export interface GetNextNotificationResponse {
   'notification' : [] | [NotificationToShow],
 }
+/**
+ * Whether this browser has a notification app, and whether it can be delivered to. A
+ * Home Screen app has an entry of its own, so the browser that installed it cannot see
+ * it through get_webpush_subscription_status, which answers for the caller.
+ */
+export interface GetNotificationAppStatusRequest {
+  'anchor_number' : UserNumber,
+}
 export interface GetNotificationDelegationRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
@@ -1367,6 +1385,33 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LinkNotificationAppError = {
+    /**
+     * No browser of this identity signed this token, or the one that did has rotated
+     * its key past it since.
+     */
+    'InvalidLinkToken' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The caller is not the key it asks to have linked.
+     */
+    'CallerIsNotTheApp' : Principal
+  } |
+  { 'LinkTokenExpired' : null } |
+  { 'KeyAlreadyInUse' : null };
+/**
+ * Claims the entry a Home Screen app carries notifications under. Authorized by the
+ * token rather than by the caller being a browser this identity knows: the app has just
+ * generated its key and no entry holds it yet.
+ */
+export interface LinkNotificationAppRequest {
+  'signature' : Uint8Array | number[],
+  'app_key' : PublicKey,
+  'anchor_number' : UserNumber,
+  'expires_at_ns' : bigint,
+}
 export type ListApplicationsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
@@ -1470,6 +1515,10 @@ export interface Notification {
    * Null means II's default retention, which is also the ceiling.
    */
   'expires_at' : [] | [Timestamp],
+}
+export interface NotificationAppStatus {
+  'browser_id' : number,
+  'subscribed' : boolean,
 }
 export interface NotificationConsentGrantedRequest {
   'origin' : string,
@@ -2662,6 +2711,13 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the browser that installed the app, signed with its own browser key.
+   */
+  'get_notification_app_status' : ActorMethod<
+    [GetNotificationAppStatusRequest],
+    [] | [NotificationAppStatus]
+  >,
   'get_notification_delegation' : ActorMethod<
     [GetNotificationDelegationRequest],
     { 'Ok' : GetNotificationDelegationResponse } |
@@ -2748,6 +2804,15 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  /**
+   * Called by a Home Screen app on first launch, signed with the key it just generated,
+   * spending a token the browser that installed it signed.
+   */
+  'link_notification_app' : ActorMethod<
+    [LinkNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : LinkNotificationAppError }
+  >,
   /**
    * Every app the identity decided a permission for, so the user can change or forget
    * what they decided. Authorized by the identity's own access methods.

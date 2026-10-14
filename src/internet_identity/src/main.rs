@@ -384,6 +384,75 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// Whether this browser has a notification app, and whether it can be delivered to.
+///
+/// Authorized by the browser key the caller signs with, and answers only about what that
+/// browser linked: one browser cannot learn what another has installed. `None` for a
+/// browser that has linked nothing and for a caller that is no browser of this identity,
+/// so neither can be probed with it.
+#[query]
+fn get_notification_app_status(
+    request: GetNotificationAppStatusRequest,
+) -> Option<NotificationAppStatus> {
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return None;
+    };
+    anchor
+        .linked_notification_app(browser_id)
+        .map(|app| NotificationAppStatus {
+            browser_id: app.id,
+            subscribed: app.webpush_subscription.is_some(),
+        })
+}
+
+/// Gives a Home Screen app the entry it carries notifications under.
+///
+/// Authorized by the token the installing browser signed rather than by the caller being
+/// a browser this identity knows: a Home Screen app gets its own storage partition, so it
+/// cannot reach that browser's key, and the key it has just generated is one no entry
+/// holds yet.
+///
+/// The caller must be the key it asks to have linked, so a token cannot be spent on a key
+/// its holder does not have, and a browser may have only one app, so a token still inside
+/// its expiry cannot be spent twice.
+#[update]
+fn link_notification_app(
+    request: LinkNotificationAppRequest,
+) -> Result<(), LinkNotificationAppError> {
+    let now = ic_cdk::api::time();
+    if request.expires_at_ns <= now {
+        return Err(LinkNotificationAppError::LinkTokenExpired);
+    }
+    let caller = caller();
+    if caller != Principal::self_authenticating(&request.app_key) {
+        return Err(LinkNotificationAppError::CallerIsNotTheApp(caller));
+    }
+
+    let mut anchor = state::anchor(request.anchor_number);
+    let parent = anchor
+        .browser_that_signed_link(
+            &request.signature,
+            request.anchor_number,
+            request.expires_at_ns,
+        )
+        .ok_or(LinkNotificationAppError::InvalidLinkToken)?;
+
+    anchor
+        .link_notification_app(parent, request.app_key.clone(), now)
+        .map_err(|err| match err {
+            storage::anchor::BrowserError::SuccessorAlreadyInUse => {
+                LinkNotificationAppError::KeyAlreadyInUse
+            }
+            other => LinkNotificationAppError::InternalCanisterError(format!("{other:?}")),
+        })?;
+
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
 /// Authorized by the browser key the caller signs with.
 #[update]
 fn prepare_notification_delegation(
