@@ -13,6 +13,8 @@
   import { decodeLinkToken } from "./linkToken";
   import { linkAndRegister, type LinkOutcome } from "./link";
   import { readAppKey } from "$lib/utils/notifications/notificationAppKey";
+  import { ensureRegisteredDevice } from "$lib/utils/notifications/subscribeDevice";
+  import { appKeyActor } from "./appKeyActor";
   import { publishAppRecord } from "./publishRecord";
   import InstallSteps from "./installSteps/InstallSteps.svelte";
   import IosAppSteps from "./blockedSteps/IosAppSteps.svelte";
@@ -78,8 +80,15 @@
       if (record?.identityNumber === undefined) {
         return { kind: "nothing-to-claim" };
       }
-      // Published on every launch, not only at install: the pool it carries is spent
-      // by elapsed time, and a browser claiming weeks later needs a newer one.
+      // Registered on every launch, not only at the one that linked: a browser signed
+      // out remotely takes this app's subscription with it, and the app is the only
+      // holder of the key that can write it back. Opening it is the whole of the cure.
+      await ensureRegisteredDevice(
+        record.identityNumber,
+        await appKeyActor(record),
+      );
+      // Published for the same reason: the pool it carries is spent by elapsed time,
+      // and a browser claiming weeks later needs a newer one.
       await publishAppRecord(record);
       return { kind: "ready", identityNumber: record.identityNumber };
     }
@@ -193,7 +202,10 @@
             {$t`Add to Home Screen`}
           </h1>
           <p class="text-text-tertiary mb-5 text-base">
-            <Trans>Follow these steps to get notifications:</Trans>
+            <Trans>
+              Already have the {NOTIFICATION_APP_NAME} app on this device? Open
+              it, that is all it needs. Otherwise follow these steps:
+            </Trans>
           </p>
           <InstallSteps {host} />
 
