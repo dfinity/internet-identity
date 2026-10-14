@@ -39,11 +39,16 @@ import { recordShown, shownRecently } from "./shownRecord";
  * How long a wake-up waits for the delegation that reads the app's own text before it
  * shows the placeholder instead.
  *
- * One update call and the query that follows it, which is seconds on a good network.
- * The budget this sits inside is the browser's: a push handler that shows nothing is
- * answered for by the engine.
+ * Measured on a phone, the mint took 3.25 seconds: an update call, the query that
+ * fetches its chain, and a radio that has just been woken. A deadline under that spends
+ * the placeholder on every ordinary notification, and each one then has to be replaced
+ * by the wake-up the mint earns — two notifications' worth of work, and two on screen
+ * for as long as the replacement takes.
+ *
+ * Eight seconds is well inside the budget a push handler gets, which is tens of seconds,
+ * and leaves the placeholder for a network that genuinely cannot answer.
  */
-const MINT_DEADLINE_MS = 2_500;
+const MINT_DEADLINE_MS = 8_000;
 
 /** Rejects where `work` has not answered within `deadlineMs`; the work carries on, and
  *  what it earns is a wake-up that finds the delegation already there. */
