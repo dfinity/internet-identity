@@ -22,6 +22,25 @@ export interface Browser {
   sessionCount: number;
   /** Several browsers report the same name, so the list marks the one being read from. */
   isCurrent: boolean;
+  /** The notification app this browser installed, where it has one. */
+  app?: NotificationApp;
+}
+
+/**
+ * A Home Screen app a browser installed, which is an entry of its own on the identity
+ * and not a browser: it can never sign in, holds no sessions, and the only thing it
+ * carries is notifications.
+ *
+ * Shown under the browser that installed it rather than beside it. On its own it is
+ * indistinguishable from a second copy of that browser, since it reports the same
+ * description, and the page would offer to sign out something that has nothing to sign
+ * out of.
+ */
+export interface NotificationApp {
+  id: number;
+  lastUsedMillis: number;
+  /** Whether notifications actually reach it, which is what turning it off takes away. */
+  delivers: boolean;
 }
 
 /** Which glyph stands for the machine. Four, because that is what the data can tell. */
@@ -254,8 +273,22 @@ export const groupBrowsers = (
 export const fromCanisterBrowsers = (
   browsers: [] | [BrowserInfo[]],
   currentBrowserId?: number,
-): Browser[] =>
-  (browsers[0] ?? [])
+): Browser[] => {
+  const entries = browsers[0] ?? [];
+  const appOf = (browserId: number): NotificationApp | undefined => {
+    const app = entries.find(
+      (entry) => entry.linked_from_browser[0] === browserId,
+    );
+    return app === undefined
+      ? undefined
+      : {
+          id: app.id,
+          lastUsedMillis: nanosToMillis(app.last_used),
+          delivers: app.notifications_on,
+        };
+  };
+  return entries
+    .filter((browser) => browser.linked_from_browser.length === 0)
     .map((browser) => ({
       id: browser.id,
       name: nameOf(browser.description),
@@ -264,8 +297,34 @@ export const fromCanisterBrowsers = (
       lastUsedMillis: nanosToMillis(browser.last_used),
       sessionCount: browser.session_count,
       isCurrent: browser.id === currentBrowserId,
+      app: appOf(browser.id),
     }))
     .sort((a, b) => b.lastUsedMillis - a.lastUsedMillis);
+};
+
+/**
+ * Stops the app this browser installed from being delivered to.
+ *
+ * The entry stays, as a signed-out browser's does: opening the app registers it again,
+ * where taking the entry away would cost the user a reinstall.
+ */
+export const silenceNotificationApp = async (
+  actor: ActorSubclass<_SERVICE>,
+  identityNumber: bigint,
+  appId: number,
+): Promise<void> => {
+  const result = await actor.remove_webpush_subscription({
+    anchor_number: identityNumber,
+    browser_id: appId,
+  });
+  if ("Err" in result) {
+    throw new Error(
+      "Unauthorized" in result.Err
+        ? "Not authorized to turn these notifications off"
+        : result.Err.InternalCanisterError,
+    );
+  }
+};
 
 /**
  * Ends every session this browser holds, across every app it is signed into.

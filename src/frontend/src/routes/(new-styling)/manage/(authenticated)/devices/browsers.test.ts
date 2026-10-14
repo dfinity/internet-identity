@@ -100,6 +100,55 @@ describe("brandNameOf and platformWordOf", () => {
   });
 });
 
+describe("fromCanisterBrowsers", () => {
+  const NANOS = BigInt(1_000_000);
+  const now = Date.UTC(2026, 0, 31);
+  const at = (millis: number) => BigInt(millis) * NANOS;
+
+  /**
+   * A linked app reports the description of the browser that installed it, so listed on
+   * its own it reads as a second copy of that browser, with no sessions and therefore
+   * signed out, offering to sign out something that has nothing to sign out of.
+   */
+  it("keeps a notification app out of the list and hangs it off its browser", () => {
+    const listed = fromCanisterBrowsers([
+      [
+        browser(1, at(now)),
+        {
+          ...browser(2, at(now - 1_000)),
+          notifications_on: true,
+          linked_from_browser: [1] as [number],
+        },
+      ],
+    ]);
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0].id).toBe(1);
+    expect(listed[0].app).toEqual({
+      id: 2,
+      lastUsedMillis: now - 1_000,
+      delivers: true,
+    });
+  });
+
+  it("says an app that is registered with nothing does not deliver", () => {
+    const listed = fromCanisterBrowsers([
+      [
+        browser(1, at(now)),
+        { ...browser(2, at(now)), linked_from_browser: [1] as [number] },
+      ],
+    ]);
+
+    expect(listed[0].app?.delivers).toBe(false);
+  });
+
+  it("leaves a browser without an app with none", () => {
+    const listed = fromCanisterBrowsers([[browser(1, at(now))]]);
+
+    expect(listed[0].app).toBeUndefined();
+  });
+});
+
 describe("isSignedOut", () => {
   const DAY = 86_400_000;
   const now = Date.UTC(2026, 0, 31);

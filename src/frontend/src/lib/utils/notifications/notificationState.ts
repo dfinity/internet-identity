@@ -8,7 +8,10 @@
 // the registration and the app's consent are read once an identity is chosen.
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type {
+  _SERVICE,
+  NotificationAppStatus,
+} from "$lib/generated/internet_identity_types";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { recordPermission } from "./notificationDiagnostics";
@@ -133,23 +136,27 @@ const deliversHere = (state: DeviceNotificationState): boolean =>
  * `false` where the canister could not be asked, which is the same answer a browser that
  * has linked nothing gets: either way there is an install to offer.
  */
-export const notificationAppDelivers = async (
+export const notificationAppStatus = async (
   identityNumber: bigint,
-): Promise<boolean> => {
+): Promise<NotificationAppStatus | undefined> => {
   try {
     const actor = await browserKeyActor(identityNumber);
     const [status] = await actor.get_notification_app_status({
       anchor_number: identityNumber,
     });
-    return status?.subscribed === true;
+    return status;
   } catch (error) {
-    if (error instanceof UnregisteredBrowserError) {
-      return false;
+    if (!(error instanceof UnregisteredBrowserError)) {
+      console.error(error);
     }
-    console.error(error);
-    return false;
+    return undefined;
   }
 };
+
+export const notificationAppDelivers = async (
+  identityNumber: bigint,
+): Promise<boolean> =>
+  (await notificationAppStatus(identityNumber))?.subscribed === true;
 
 /** iOS has no notifications yet: Safari delivers them only to a Home Screen app, and
  *  that is not built. Nothing is offered there and no app is told otherwise. */

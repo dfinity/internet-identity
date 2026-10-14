@@ -2,7 +2,9 @@
   import type { BrowserDescription } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { brandIconOf, brandNameOf } from "../browsers";
+  import { brandIconOf, brandNameOf, type NotificationApp } from "../browsers";
+  import BellIcon from "@lucide/svelte/icons/bell";
+  import BellOffIcon from "@lucide/svelte/icons/bell-off";
 
   type Action = "sign-out" | "signing-out" | "signed-out" | "none";
 
@@ -17,6 +19,13 @@
     isCurrent?: boolean;
     action: Action;
     onSignOut?: () => void;
+    /** The notification app this browser installed, shown under it rather than as a
+     *  row of its own: it is no browser and has nothing to sign out of. */
+    app?: NotificationApp;
+    /** Already formatted, like the browser's own. */
+    appLastUsed?: string;
+    onSilenceApp?: () => void;
+    silencing?: boolean;
   }
 
   const {
@@ -26,6 +35,10 @@
     isCurrent = false,
     action,
     onSignOut,
+    app,
+    appLastUsed,
+    onSilenceApp,
+    silencing = false,
   }: Props = $props();
 
   const brandIcon = $derived(brandIconOf(description));
@@ -112,5 +125,37 @@
     <span class="col-start-4 row-start-1 flex h-9 items-center justify-center">
       {@render actionControl()}
     </span>
+  {/if}
+
+  <!-- Signing the browser out silences this with it, so the line says what it is for
+       rather than offering a second way to end the same thing. -->
+  {#if app !== undefined}
+    <div
+      class="col-span-4 flex min-w-0 flex-row items-center gap-3 @min-[620px]/list:ps-6"
+    >
+      <span class="flex size-5 shrink-0 items-center justify-center">
+        {#if app.delivers}
+          <BellIcon class="text-text-tertiary size-4" aria-hidden="true" />
+        {:else}
+          <BellOffIcon class="text-text-tertiary size-4" aria-hidden="true" />
+        {/if}
+      </span>
+      <span class="text-text-tertiary min-w-0 flex-1 truncate text-xs">
+        {#if app.delivers}
+          {$t`Notifications arrive through the app on this device's Home Screen`}{#if appLastUsed !== undefined}{` · ${appLastUsed}`}{/if}
+        {:else}
+          {$t`Its Home Screen app receives nothing until it is opened again`}
+        {/if}
+      </span>
+      {#if app.delivers && onSilenceApp !== undefined}
+        <button
+          class="btn btn-tertiary btn-sm flex-none"
+          disabled={silencing}
+          onclick={onSilenceApp}
+        >
+          {silencing ? $t`Turning off…` : $t`Turn off`}
+        </button>
+      {/if}
+    </div>
   {/if}
 </div>

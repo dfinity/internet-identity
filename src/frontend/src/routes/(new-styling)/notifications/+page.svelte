@@ -8,7 +8,10 @@
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import { readBrowserPushState } from "$lib/utils/notifications/notificationState";
+  import {
+    notificationAppStatus,
+    readBrowserPushState,
+  } from "$lib/utils/notifications/notificationState";
   import { isStandalone } from "./standalone";
   import { decodeLinkToken } from "./linkToken";
   import { linkAndRegister, type LinkOutcome } from "./link";
@@ -39,6 +42,9 @@
     | { kind: "refused"; reason: string };
 
   let screen = $state<Screen>({ kind: "working" });
+  /** Whether this browser has an app that exists but receives nothing, which only the
+   *  canister can say: the app's own storage is a partition away. */
+  let hasSilentApp = $state(false);
   /** Read on mount, because this page is rendered at build time where there is no
    *  document to ask. */
   let host = $state("");
@@ -122,6 +128,21 @@
     }
   };
 
+  // Asked only where the steps are up, and only for the identity whose token brought
+  // the user here, since that is the identity whose app the steps are about.
+  $effect(() => {
+    if (screen.kind !== "install") {
+      return;
+    }
+    const token = decodeLinkToken(window.location.hash);
+    if (token === undefined) {
+      return;
+    }
+    void notificationAppStatus(token.identityNumber).then((status) => {
+      hasSilentApp = status !== undefined && !status.subscribed;
+    });
+  });
+
   // Only while the steps are up, and only for the identity whose token brought the user
   // here: the tab goes when the app it is telling them to install has arrived.
   $effect(() => {
@@ -202,12 +223,21 @@
             {$t`Add to Home Screen`}
           </h1>
           <p class="text-text-tertiary mb-5 text-base">
-            <Trans>
-              Already have the {NOTIFICATION_APP_NAME} app on this device? Open
-              it, that is all it needs. Otherwise follow these steps:
-            </Trans>
+            <Trans>Follow these steps to get notifications:</Trans>
           </p>
           <InstallSteps {host} />
+
+          <!-- Only where the canister says this browser already has an app that is not
+               delivering, which is the signed-out and the deleted-app case. Adding it
+               again is not the cure: iOS makes a second icon for a second add. -->
+          {#if hasSilentApp}
+            <p class="text-text-tertiary mt-5 text-sm">
+              <Trans>
+                Already added it? Open the {NOTIFICATION_APP_NAME} app on this device,
+                that is all it needs.
+              </Trans>
+            </p>
+          {/if}
 
           <div class="mt-7 flex flex-col gap-2.5">
             <button
