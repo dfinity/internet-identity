@@ -1,7 +1,7 @@
 {
   "id": "/notifications",
-  "name": "Internet Identity Notifications",
-  "short_name": "Internet Identity Notifications",
+  "name": "ICP Alerts",
+  "short_name": "ICP Alerts",
   "description": "Receives the notifications apps send you through Internet Identity.",
   "start_url": "/notifications",
   "scope": "/notifications",

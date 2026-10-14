@@ -46,7 +46,7 @@
 </script>
 
 <svelte:head>
-  <title>Internet Identity Notifications</title>
+  <title>ICP Alerts</title>
 </svelte:head>
 
 <main class="flex min-h-dvh flex-col items-center justify-center gap-5 p-6">

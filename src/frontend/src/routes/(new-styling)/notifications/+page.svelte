@@ -181,7 +181,7 @@
 </script>
 
 <svelte:head>
-  <title>Internet Identity Notifications</title>
+  <title>ICP Alerts</title>
   <link rel="manifest" href="/notifications.webmanifest" />
   <!-- iOS takes the Home Screen icon from here, not from the manifest, so without it
        the tile is a screenshot of the page. 180px is what it asks for. -->
@@ -194,7 +194,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta
     name="apple-mobile-web-app-title"
-    content="Internet Identity Notifications"
+    content="ICP Alerts"
   />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="robots" content="noindex, nofollow" />

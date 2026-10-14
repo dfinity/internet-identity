@@ -8,4 +8,4 @@
  *
  * Must match `name` in `static/notifications.webmanifest`.
  */
-export const NOTIFICATION_APP_NAME = "Internet Identity Notifications";
+export const NOTIFICATION_APP_NAME = "ICP Alerts";
