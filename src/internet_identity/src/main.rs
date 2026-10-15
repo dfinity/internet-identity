@@ -384,6 +384,11 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// What every Home Screen app endpoint answers with where this deployment does not
+/// notify. The app is a delivery channel like any other, so the deployment switch is
+/// what says whether there is anything to install it for.
+const NOTIFICATIONS_NOT_ENABLED: &str = "notifications are not enabled";
+
 /// Gives a Home Screen app a record of its own, and points the installing browser at it.
 ///
 /// Authorized by the token that browser signed rather than by the caller being a browser
@@ -398,6 +403,11 @@ fn remove_webpush_subscription(
 fn link_notification_app(
     request: LinkNotificationAppRequest,
 ) -> Result<(), LinkNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(LinkNotificationAppError::InternalCanisterError(
+            NOTIFICATIONS_NOT_ENABLED.to_string(),
+        ));
+    }
     let now = ic_cdk::api::time();
     if request.expires_at_ns <= now {
         return Err(LinkNotificationAppError::LinkTokenExpired);
