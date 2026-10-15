@@ -1603,9 +1603,9 @@ export type OpenIdEmailVerification = { 'Google' : null } |
   { 'Unknown' : null } |
   {
     /**
-     * Trusts email_verified like Google, except for Apple's private relay
-     * addresses, which only senders registered with II's Apple developer team
-     * can deliver mail to.
+     * Trusts email_verified like Google. Apple's private relay addresses,
+     * which only senders registered with II's Apple developer team can deliver
+     * mail to, are not kept on the credential at all.
      */
     'Apple' : null
   } |

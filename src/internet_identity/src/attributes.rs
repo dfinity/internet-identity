@@ -1856,78 +1856,23 @@ mod tests {
             })
         }
 
+        // Apple's private relay addresses never reach these tests: they are not
+        // kept on the credential at all (see `openid::verify::reachable_email`).
+
         #[test]
         fn test_apple_returns_verified_email_when_email_verified_is_true() {
             pretty_assert_eq!(
-                apple_verified_email(&[
-                    ("email", "user@icloud.com"),
-                    ("email_verified", "true"),
-                    ("is_private_email", "false"),
-                ]),
+                apple_verified_email(&[("email", "user@icloud.com"), ("email_verified", "true")]),
                 Some("user@icloud.com".to_string())
-            );
-        }
-
-        #[test]
-        fn test_apple_returns_verified_email_when_is_private_email_is_missing() {
-            // Apple may leave the flag out for a real address.
-            pretty_assert_eq!(
-                apple_verified_email(&[("email", "user@example.com"), ("email_verified", "true")]),
-                Some("user@example.com".to_string())
             );
         }
 
         #[test]
         fn test_apple_email_verified_check_is_case_insensitive() {
             pretty_assert_eq!(
-                apple_verified_email(&[
-                    ("email", "user@example.com"),
-                    ("email_verified", "TRUE"),
-                    ("is_private_email", "FALSE"),
-                ]),
+                apple_verified_email(&[("email", "user@example.com"), ("email_verified", "TRUE")]),
                 Some("user@example.com".to_string())
             );
-        }
-
-        #[test]
-        fn test_apple_returns_nothing_for_private_relay_address() {
-            pretty_assert_eq!(
-                apple_verified_email(&[
-                    ("email", "ep9ks2tnph@privaterelay.appleid.com"),
-                    ("email_verified", "true"),
-                    ("is_private_email", "true"),
-                ]),
-                None
-            );
-        }
-
-        #[test]
-        fn test_apple_returns_nothing_when_is_private_email_is_true_on_any_domain() {
-            // A relay address can also end in `@icloud.com`; only the flag
-            // tells it apart.
-            pretty_assert_eq!(
-                apple_verified_email(&[
-                    ("email", "relay-alias@icloud.com"),
-                    ("email_verified", "true"),
-                    ("is_private_email", "true"),
-                ]),
-                None
-            );
-        }
-
-        #[test]
-        fn test_apple_returns_nothing_for_relay_domains_without_the_flag() {
-            for email in [
-                "ep9ks2tnph@privaterelay.appleid.com",
-                "ep9ks2tnph@PrivateRelay.AppleID.com",
-                "ep9ks2tnph@private.icloud.com",
-            ] {
-                pretty_assert_eq!(
-                    apple_verified_email(&[("email", email), ("email_verified", "true")]),
-                    None,
-                    "{email} is a relay address"
-                );
-            }
         }
 
         #[test]
@@ -1948,46 +1893,8 @@ mod tests {
         }
 
         #[test]
-        fn test_apple_returns_nothing_when_email_is_missing_or_empty() {
+        fn test_apple_returns_nothing_when_email_is_missing() {
             pretty_assert_eq!(apple_verified_email(&[("email_verified", "true")]), None);
-            pretty_assert_eq!(
-                apple_verified_email(&[("email", ""), ("email_verified", "true")]),
-                None
-            );
-        }
-
-        #[test]
-        fn test_google_scheme_keeps_addresses_the_apple_scheme_rejects() {
-            // The relay rule is Apple's alone: Google's scheme only reads
-            // `email_verified`.
-            setup_providers();
-
-            let metadata = HashMap::from([
-                (
-                    "email".to_string(),
-                    MetadataEntryV2::String("someone@privaterelay.appleid.com".to_string()),
-                ),
-                (
-                    "email_verified".to_string(),
-                    MetadataEntryV2::String("true".to_string()),
-                ),
-                (
-                    "is_private_email".to_string(),
-                    MetadataEntryV2::String("true".to_string()),
-                ),
-            ]);
-            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
-            let mut requested = request_verified_email_for(google_scope());
-            let result = anchor.prepare_openid_attributes(&mut requested);
-
-            let attrs = result
-                .get(&(
-                    GOOGLE_ISSUER.to_string(),
-                    "google-user-123".to_string(),
-                    "test-client-id".to_string(),
-                ))
-                .expect("credential key should be present");
-            pretty_assert_eq!(attrs.len(), 1);
         }
 
         #[test]

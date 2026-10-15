@@ -91,16 +91,43 @@ fn present_claim<'de, D: serde::Deserializer<'de>>(
     serde_json::Value::deserialize(deserializer).map(Some)
 }
 
-/// Apple's `is_private_email` (a boolean or a string) as stored in the
-/// metadata: `"true"` unless it plainly says false, so that an unexpected value
-/// neither lets a private relay address count as a verified email nor fails
-/// the sign-in.
-fn private_email_flag(claim: &serde_json::Value) -> &'static str {
+/// Domains of Apple's private relay addresses. A relay address can also end in
+/// `@icloud.com`; only the `is_private_email` claim tells that one apart.
+///
+/// See https://developer.apple.com/documentation/signinwithapple/communicating-using-the-private-email-relay-service
+const APPLE_RELAY_DOMAINS: [&str; 2] = ["privaterelay.appleid.com", "private.icloud.com"];
+
+/// Whether Apple's `is_private_email` (a boolean or a string) flags the email
+/// as a private relay address: anything but a plain `false`, so that an
+/// unexpected value fails closed rather than failing the sign-in.
+fn flags_private_email(claim: &serde_json::Value) -> bool {
     match claim {
-        serde_json::Value::Bool(false) => "false",
-        serde_json::Value::String(value) if value.eq_ignore_ascii_case("false") => "false",
-        _ => "true",
+        serde_json::Value::Bool(false) => false,
+        serde_json::Value::String(value) => !value.eq_ignore_ascii_case("false"),
+        _ => true,
     }
+}
+
+/// The `email` claim, if it is an address apps can reach. An empty email
+/// (Apple sends one for some Work & School accounts) is no address at all.
+/// Apple's private relay addresses only take mail from senders registered with
+/// II's Apple developer team, so they are left out too, as if the token had no
+/// email: flagged by `is_private_email`, or by their domain when the flag is
+/// missing.
+fn reachable_email(
+    email: Option<String>,
+    is_private_email: Option<&serde_json::Value>,
+) -> Option<String> {
+    let email = email.filter(|email| !email.is_empty())?;
+    if is_private_email.is_some_and(flags_private_email) {
+        return None;
+    }
+    let relay_domain = email.rsplit_once('@').is_some_and(|(_, domain)| {
+        APPLE_RELAY_DOMAINS
+            .iter()
+            .any(|relay| domain.eq_ignore_ascii_case(relay))
+    });
+    (!relay_domain).then_some(email)
 }
 
 #[derive(Deserialize)]
@@ -237,21 +264,13 @@ pub(super) fn verify_and_build(
 
     // Assemble metadata
     let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
-    // An empty email (Apple sends one for some Work & School accounts) is no
-    // address at all.
-    if let Some(email) = email.filter(|email| !email.is_empty()) {
+    if let Some(email) = reachable_email(email, is_private_email.as_ref()) {
         metadata.insert("email".into(), MetadataEntryV2::String(email));
     }
     if let Some(email_verified) = email_verified {
         metadata.insert(
             "email_verified".into(),
             MetadataEntryV2::String(email_verified.into_string()),
-        );
-    }
-    if let Some(is_private_email) = is_private_email {
-        metadata.insert(
-            "is_private_email".into(),
-            MetadataEntryV2::String(private_email_flag(&is_private_email).into()),
         );
     }
     if let Some(name) = name {
@@ -796,39 +815,63 @@ mod tests {
             ))
             .expect("claims should parse");
             assert_eq!(claims.email_verified.unwrap().into_string(), "true");
-            assert_eq!(
-                private_email_flag(&claims.is_private_email.unwrap()),
-                "true"
-            );
+            assert!(flags_private_email(&claims.is_private_email.unwrap()));
         }
     }
 
     #[test]
-    fn should_store_is_private_email_as_true_unless_plainly_false() {
-        for (claim, expected) in [
-            ("false", Some("false")),
-            ("\"false\"", Some("false")),
-            ("\"FALSE\"", Some("false")),
-            ("true", Some("true")),
-            ("\"true\"", Some("true")),
-            ("\"unexpected\"", Some("true")),
+    fn should_flag_private_email_unless_plainly_false() {
+        for (claim, flagged) in [
+            ("false", false),
+            ("\"false\"", false),
+            ("\"FALSE\"", false),
+            ("true", true),
+            ("\"true\"", true),
+            ("\"unexpected\"", true),
             // Neither `null` nor another type can pass for "not private", and
             // neither fails the sign-in.
-            ("null", Some("true")),
-            ("0", Some("true")),
-            ("{}", Some("true")),
+            ("null", true),
+            ("0", true),
+            ("{}", true),
         ] {
             let claims = parse_claims(&format!(r#","is_private_email":{claim}"#))
                 .expect("claims should parse");
             assert_eq!(
-                claims.is_private_email.as_ref().map(private_email_flag),
-                expected,
+                claims.is_private_email.as_ref().map(flags_private_email),
+                Some(flagged),
                 "is_private_email: {claim}"
             );
         }
         // A missing claim stays unknown.
         let claims = parse_claims("").expect("claims should parse");
         assert_eq!(claims.is_private_email, None);
+    }
+
+    #[test]
+    fn should_keep_only_reachable_emails() {
+        let not_private = serde_json::Value::Bool(false);
+        let private = serde_json::Value::Bool(true);
+        for (email, is_private_email, kept) in [
+            ("user@example.com", None, true),
+            ("user@icloud.com", Some(&not_private), true),
+            // A relay address is flagged on any domain, `@icloud.com` included.
+            ("relay-alias@icloud.com", Some(&private), false),
+            // Without the flag, the relay domains still give it away.
+            ("ep9ks2tnph@privaterelay.appleid.com", None, false),
+            ("ep9ks2tnph@PrivateRelay.AppleID.com", None, false),
+            ("ep9ks2tnph@private.icloud.com", None, false),
+            // An empty email is no address at all.
+            ("", None, false),
+            // Anything else is kept as before, for every provider.
+            ("not-an-address", None, true),
+        ] {
+            assert_eq!(
+                reachable_email(Some(email.to_string()), is_private_email),
+                kept.then(|| email.to_string()),
+                "{email} with is_private_email {is_private_email:?}"
+            );
+        }
+        assert_eq!(reachable_email(None, None), None);
     }
 
     #[test]

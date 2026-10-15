@@ -1586,9 +1586,9 @@ fn should_return_error_for_unavailable_icrc3_attributes() {
     }
 }
 
-/// Verified emails from Apple credentials, under the `Apple` email verification
-/// scheme: Apple vouches for real addresses and private relay addresses alike,
-/// but only real ones count.
+/// Emails from Apple credentials, under the `Apple` email verification scheme:
+/// Apple vouches for real addresses and private relay addresses alike, but only
+/// real ones are kept, and they count as verified.
 mod apple_verified_email {
     use super::*;
     use crate::v2_api::authn_method_test_helpers::{
@@ -1701,45 +1701,36 @@ mod apple_verified_email {
         );
     }
 
-    #[test]
-    fn should_not_verify_apple_private_relay_email() {
-        let relay = "ep9ks2tnph@privaterelay.appleid.com";
-        let (verified_emails, attributes) = link_apple_credential(
-            relay,
-            &[("email_verified", "true"), ("is_private_email", "true")],
-        );
-
+    /// Asserts that the identity got no Apple email at all, verified or not.
+    fn assert_no_apple_email(verified_emails: &[String], attributes: &[(String, String)]) {
         assert_eq!(verified_emails, Vec::<String>::new());
         let keys: Vec<&str> = attributes.iter().map(|(key, _)| key.as_str()).collect();
-        assert!(
-            !keys.contains(&format!("openid:{APPLE_ISSUER}:verified_email").as_str()),
-            "a relay address must not be a verified email, got {keys:?}"
-        );
-        // The address is still there as the plain email.
-        assert!(
-            attributes.contains(&(format!("openid:{APPLE_ISSUER}:email"), relay.to_string())),
-            "expected the relay address as email, got {attributes:?}"
-        );
+        for name in ["email", "verified_email"] {
+            assert!(
+                !keys.contains(&format!("openid:{APPLE_ISSUER}:{name}").as_str()),
+                "expected no Apple {name}, got {keys:?}"
+            );
+        }
     }
 
     #[test]
-    fn should_not_verify_apple_relay_email_flagged_only_by_is_private_email() {
-        // A relay address can end in `@icloud.com`, which no domain rule
-        // catches; only the `is_private_email` claim kept on the credential.
-        let relay = "relay-alias@icloud.com";
-        let (verified_emails, attributes) =
-            link_apple_credential(relay, &[("is_private_email", "true")]);
+    fn should_not_keep_apple_private_relay_email() {
+        let (verified_emails, attributes) = link_apple_credential(
+            "ep9ks2tnph@privaterelay.appleid.com",
+            &[("email_verified", "true"), ("is_private_email", "true")],
+        );
 
-        assert_eq!(verified_emails, Vec::<String>::new());
-        let keys: Vec<&str> = attributes.iter().map(|(key, _)| key.as_str()).collect();
-        assert!(
-            !keys.contains(&format!("openid:{APPLE_ISSUER}:verified_email").as_str()),
-            "a flagged relay address must not be a verified email, got {keys:?}"
-        );
-        assert!(
-            attributes.contains(&(format!("openid:{APPLE_ISSUER}:email"), relay.to_string())),
-            "expected the relay address as email, got {attributes:?}"
-        );
+        assert_no_apple_email(&verified_emails, &attributes);
+    }
+
+    #[test]
+    fn should_not_keep_apple_relay_email_flagged_only_by_is_private_email() {
+        // A relay address can end in `@icloud.com`, which no domain rule
+        // catches; only the `is_private_email` claim does.
+        let (verified_emails, attributes) =
+            link_apple_credential("relay-alias@icloud.com", &[("is_private_email", "true")]);
+
+        assert_no_apple_email(&verified_emails, &attributes);
     }
 
     #[test]
@@ -1747,12 +1738,6 @@ mod apple_verified_email {
         // Apple may send an empty email for Work & School accounts.
         let (verified_emails, attributes) = link_apple_credential("", &[]);
 
-        assert_eq!(verified_emails, Vec::<String>::new());
-        let keys: Vec<&str> = attributes.iter().map(|(key, _)| key.as_str()).collect();
-        assert!(
-            !keys.contains(&format!("openid:{APPLE_ISSUER}:email").as_str())
-                && !keys.contains(&format!("openid:{APPLE_ISSUER}:verified_email").as_str()),
-            "an empty email is no address, got {keys:?}"
-        );
+        assert_no_apple_email(&verified_emails, &attributes);
     }
 }
