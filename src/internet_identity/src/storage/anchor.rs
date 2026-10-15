@@ -948,23 +948,63 @@ impl Anchor {
             .any(|browser| browser.current_browser_key == *key || browser.next_browser_key == *key)
     }
 
-    /// Points `browser_id` at `app_id`, replacing whatever it pointed at before.
+    /// The browser of this identity that points at `app_id`, where one does.
     ///
-    /// One app per browser. Refusing the second instead would leave a user who deleted
-    /// the app from their Home Screen unable to set one up again, ever: iOS destroys its
-    /// storage and the key with it, while a reference here would survive naming a record
-    /// nothing holds.
+    /// At most one, because [`Anchor::point_at_notification_app`] takes the reference off
+    /// every other entry of this identity as it hands it to one.
+    pub fn browser_pointing_at_notification_app(
+        &self,
+        app_id: NotificationAppId,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                browser
+                    .notification_app
+                    .is_some_and(|reference| reference.app_id == app_id)
+            })
+            .map(|browser| browser.id)
+    }
+
+    /// Points `browser_id` at `app_id`, replacing whatever it pointed at before and
+    /// taking that record off every other entry of this identity.
+    ///
+    /// One entry per record, because the app resolves its calls through the one entry it
+    /// finds: a browser that lost its key is a second entry here while the app keeps the
+    /// key it generated, so without this the app would answer for an entry nothing is
+    /// queued on any more.
     ///
     /// Answers the record this browser pointed at before, where that was a different one.
+    /// Pointing at the record this browser already points at changes nothing, switch
+    /// included: the app replays its install URL on every cold launch for as long as the
+    /// token lives, and a replay is not the user asking for delivery back on.
     pub fn point_at_notification_app(
         &mut self,
         browser_id: BrowserId,
         app_id: NotificationAppId,
     ) -> Option<NotificationAppId> {
+        if !self.browsers.iter().any(|browser| browser.id == browser_id) {
+            return None;
+        }
+        for browser in &mut self.browsers {
+            if browser.id != browser_id
+                && browser
+                    .notification_app
+                    .is_some_and(|reference| reference.app_id == app_id)
+            {
+                browser.notification_app = None;
+            }
+        }
         let browser = self
             .browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)?;
+        if browser
+            .notification_app
+            .is_some_and(|reference| reference.app_id == app_id)
+        {
+            return None;
+        }
         browser
             .notification_app
             .replace(NotificationAppRef {
@@ -972,9 +1012,23 @@ impl Anchor {
                 enabled: true,
             })
             .map(|previous| previous.app_id)
-            .filter(|previous| *previous != app_id)
     }
 
+    /// Whether this identity wants the app it points at to deliver for it.
+    ///
+    /// Never a subscription removal: the subscription is the app's and is shared with
+    /// every other identity pointing at it.
+    pub fn set_notification_app_enabled(&mut self, browser_id: BrowserId, enabled: bool) {
+        if let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        {
+            if let Some(reference) = browser.notification_app.as_mut() {
+                reference.enabled = enabled;
+            }
+        }
+    }
     /// The app this browser points at, where it has one.
     pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
         self.browsers
@@ -1061,7 +1115,14 @@ impl Anchor {
     ///
     /// `None` rather than an empty list, because that is the shape the interface
     /// carries and no caller wants the difference.
-    pub fn browsers_info(&self) -> Option<Vec<BrowserInfo>> {
+    ///
+    /// What an app has registered, and when it last called, are asked for rather than
+    /// read here: the record lives outside any anchor, because one app serves however
+    /// many identities point at it.
+    pub fn browsers_info(
+        &self,
+        app_info: impl Fn(NotificationAppId, bool) -> NotificationAppInfo,
+    ) -> Option<Vec<BrowserInfo>> {
         if self.browsers.is_empty() {
             return None;
         }
@@ -1074,6 +1135,9 @@ impl Anchor {
                     created_at: browser.created_at,
                     last_used: browser.last_used,
                     session_count: browser.session_count,
+                    notification_app: browser
+                        .notification_app
+                        .map(|reference| app_info(reference.app_id, reference.enabled)),
                 })
                 .collect(),
         )

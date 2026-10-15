@@ -4,6 +4,9 @@
 use super::validation::{
     ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
+use crate::authz_utils::NotificationCaller;
+use crate::notifications::app::NotificationApp;
+use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
@@ -17,6 +20,7 @@ use internet_identity_interface::internet_identity::types::{
 pub fn set_subscription(
     anchor: Anchor,
     browser_id: BrowserId,
+    caller: NotificationCaller,
     request: ValidatedSetWebPushSubscriptionRequest,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
@@ -28,6 +32,21 @@ pub fn set_subscription(
         jwt_issued_at_ns,
         ..
     } = request;
+
+    // Where the caller is the Home Screen app, what it registers belongs to its record
+    // rather than to this entry: it has one service worker registration however many
+    // identities point at it, and every one of them is delivered through it. The anchor
+    // named in the call is what authorized it, not where the subscription goes.
+    if let NotificationCaller::App(app) = caller {
+        return set_app_subscription(
+            app,
+            endpoint,
+            vapid_public_key,
+            jwt_signatures,
+            jwt_issued_at_ns,
+            now_ns,
+        );
+    }
 
     // The same endpoint means this replaces the pool on a registration that is still
     // live, so the registration keeps its age and its queue, and the pool has to move
@@ -105,14 +124,17 @@ pub(crate) fn clear_gone_subscription(
 pub fn subscription_status(
     anchor: &Anchor,
     browser_id: BrowserId,
+    caller: NotificationCaller,
 ) -> Option<WebPushSubscriptionStatus> {
-    anchor
-        .webpush_subscription(browser_id)
-        .map(|registered| WebPushSubscriptionStatus {
-            endpoint: registered.endpoint.clone(),
-            pool_len: registered.jwt_signatures.len() as u32,
-            issued_at_ns: registered.jwt_issued_at_ns,
-        })
+    let registered = match caller {
+        NotificationCaller::App(app) => app.webpush_subscription,
+        NotificationCaller::Browser => anchor.webpush_subscription(browser_id).cloned(),
+    };
+    registered.map(|registered| WebPushSubscriptionStatus {
+        endpoint: registered.endpoint.clone(),
+        pool_len: registered.jwt_signatures.len() as u32,
+        issued_at_ns: registered.jwt_issued_at_ns,
+    })
 }
 
 fn write_subscription(
@@ -122,6 +144,57 @@ fn write_subscription(
 ) -> Result<(), String> {
     anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
+}
+
+/// What the Home Screen app registered, which is its record's and not any anchor's.
+///
+/// One installed app has one service worker registration however many identities point
+/// at it, so there is one subscription and one pool, and an identity that points at it
+/// later is delivered through what is already here rather than waiting for the app to be
+/// opened again.
+fn set_app_subscription(
+    app: NotificationApp,
+    endpoint: String,
+    vapid_public_key: Vec<u8>,
+    jwt_signatures: Vec<Vec<u8>>,
+    jwt_issued_at_ns: Timestamp,
+    now_ns: Timestamp,
+) -> Result<(), SetWebPushSubscriptionError> {
+    // Same reasoning as a browser's: the same endpoint is a pool replacement on a live
+    // registration, which keeps its age and must move forward, and any other endpoint is
+    // a registration of its own.
+    let (created_at_ns, notifications) = match app.webpush_subscription.as_ref() {
+        Some(registered) if registered.endpoint == endpoint => {
+            if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
+                return Err(SetWebPushSubscriptionError::StaleJwtPool);
+            }
+            (registered.created_at_ns, registered.notifications.clone())
+        }
+        _ => (now_ns, Vec::new()),
+    };
+
+    let stored = state::storage_borrow_mut(|storage| {
+        storage.set_notification_app_subscription(
+            app.id,
+            Some(WebPushSubscription {
+                endpoint,
+                created_at_ns,
+                vapid_public_key,
+                jwt_signatures,
+                jwt_issued_at_ns,
+                notifications,
+                woken_again_at_ns: None,
+            }),
+            now_ns,
+        )
+    });
+    if !stored {
+        return Err(SetWebPushSubscriptionError::InternalCanisterError(format!(
+            "no notification app record {}",
+            app.id
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -138,7 +211,11 @@ mod tests {
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> Option<WebPushSubscriptionStatus> {
-        subscription_status(&anchor(anchor_number), browser_id)
+        subscription_status(
+            &anchor(anchor_number),
+            browser_id,
+            NotificationCaller::Browser,
+        )
     }
 
     fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {

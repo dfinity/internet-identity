@@ -1273,6 +1273,7 @@ mod mirror_verified_email_tests {
 mod browser_tests {
     use super::*;
     use crate::browser_key::test_keys::{claim_token, link_token, public_key, signing_key};
+    use crate::notifications::app::NotificationAppRef;
     use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, FormFactor, OperatingSystem, PublicKey,
@@ -1364,6 +1365,90 @@ mod browser_tests {
 
         assert_eq!(anchor.point_at_notification_app(id, 7), None);
         assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(7));
+    }
+
+    /// The app replays its install URL on every cold launch while its token lives, so a
+    /// browser that switched delivery off stays off until the user says otherwise.
+    #[test]
+    fn pointing_at_the_same_app_again_keeps_it_switched_off() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+        anchor.set_notification_app_enabled(id, false);
+
+        assert_eq!(anchor.point_at_notification_app(id, 7), None);
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef {
+                app_id: 7,
+                enabled: false,
+            })
+        );
+    }
+
+    /// Pointing at a different record is the user installing again, which starts enabled.
+    #[test]
+    fn pointing_at_another_app_starts_enabled() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+        anchor.set_notification_app_enabled(id, false);
+
+        assert_eq!(anchor.point_at_notification_app(id, 8), Some(7));
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef {
+                app_id: 8,
+                enabled: true,
+            })
+        );
+    }
+
+    /// One entry of an identity points at a record. A browser that loses its key signs
+    /// in as a new entry while the app keeps the key it generated, so the second install
+    /// resolves the same record and the first entry has to let go of it.
+    #[test]
+    fn pointing_a_second_browser_at_one_app_takes_it_off_the_first() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(first, 7);
+
+        assert_eq!(anchor.point_at_notification_app(second, 7), None);
+        assert_eq!(anchor.notification_app(first), None);
+        assert_eq!(
+            anchor.notification_app(second).map(|app| app.app_id),
+            Some(7)
+        );
+        assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(second));
     }
 
     /// A browser the registry no longer lists has nothing to point.

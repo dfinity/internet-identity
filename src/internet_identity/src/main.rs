@@ -9,7 +9,8 @@ use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_app_authorization, check_authorization,
-    check_authz_and_record_activity, check_browser_authorization, AuthorizationError,
+    check_authz_and_record_activity, check_browser_authorization, check_notification_authorization,
+    AuthorizationError,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -346,10 +347,16 @@ fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
 ) -> Result<(), SetWebPushSubscriptionError> {
     let validated: ValidatedSetWebPushSubscriptionRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(validated.anchor_number)
+    let (anchor, browser_id, caller) = check_notification_authorization(validated.anchor_number)
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
-    notifications::webpush::set_subscription(anchor, browser_id, validated, ic_cdk::api::time())
+    notifications::webpush::set_subscription(
+        anchor,
+        browser_id,
+        caller,
+        validated,
+        ic_cdk::api::time(),
+    )
 }
 
 /// Authorized by the browser key the caller signs with, like the write it reconciles
@@ -365,11 +372,13 @@ fn get_webpush_subscription_status(
     let Ok(validated) = ValidatedGetWebPushSubscriptionStatusRequest::try_from(request) else {
         return None;
     };
-    let Ok((anchor, browser_id)) = check_browser_authorization(validated.anchor_number) else {
+    let Ok((anchor, browser_id, caller)) =
+        check_notification_authorization(validated.anchor_number)
+    else {
         return None;
     };
 
-    notifications::webpush::subscription_status(&anchor, browser_id)
+    notifications::webpush::subscription_status(&anchor, browser_id, caller)
 }
 
 /// Authorized by the identity rather than by the browser, so a browser that is lost or
@@ -397,6 +406,59 @@ fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool 
     expires_at_ns > now && expires_at_ns <= now.saturating_add(LINK_TOKEN_LIFETIME_NS)
 }
 
+/// What this browser's entry says about the app it points at.
+///
+/// Authorized by the browser key, so the install page can ask without a session: it is
+/// opened in a tab of its own, from a link, and the browser key is the only thing it
+/// carries. Answers only about the caller's own entry, so one browser cannot learn what
+/// another has installed.
+///
+/// `None` both for a browser that points at nothing and for a caller that is no browser
+/// of this identity, so neither can be probed with it.
+#[query]
+fn get_notification_app_status(
+    request: GetNotificationAppStatusRequest,
+) -> Option<NotificationAppInfo> {
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return None;
+    };
+    let reference = anchor.notification_app(browser_id)?;
+    let app = state::storage_borrow(|storage| storage.notification_app(reference.app_id))?;
+    Some(NotificationAppInfo {
+        subscribed: app.webpush_subscription.is_some(),
+        enabled: reference.enabled,
+        last_seen_ns: app.last_used,
+    })
+}
+
+/// Whether this identity wants the app its browser points at to deliver for it.
+///
+/// Authorized as the browser, because it is that identity's choice and nobody else's.
+/// The reference stays either way: coming back is flipping this, not installing
+/// anything again.
+#[update]
+fn set_notification_app_enabled(
+    request: SetNotificationAppEnabledRequest,
+) -> Result<(), SetNotificationAppEnabledError> {
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| SetNotificationAppEnabledError::NoNotificationApp)?;
+    if anchor.notification_app(browser_id).is_none() {
+        return Err(SetNotificationAppEnabledError::NoNotificationApp);
+    }
+
+    anchor.set_notification_app_enabled(browser_id, request.enabled);
+    state::storage_borrow_mut(|storage| {
+        storage.write(anchor).map_err(|err| {
+            SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))
+        })
+    })
+}
+
+/// How long an offered handle is worth spending. Both calls are made by one browser,
+/// one straight after the other, so this is a round trip and not a user's attention.
+const NOTIFICATION_APP_OFFER_LIFETIME_NS: u64 = 60 * 1_000_000_000;
+
+/// Points this browser at the app another identity on it offered.
 /// Points this browser at the Home Screen app another identity on the device has.
 ///
 /// Authorized twice over, and both are load-bearing. The caller is a browser of the
@@ -1535,7 +1597,16 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let browsers = state::anchor(identity_number).browsers_info();
+        let browsers = state::anchor(identity_number).browsers_info(|app_id, enabled| {
+            let app = state::storage_borrow(|storage| storage.notification_app(app_id));
+            NotificationAppInfo {
+                subscribed: app
+                    .as_ref()
+                    .is_some_and(|app| app.webpush_subscription.is_some()),
+                enabled,
+                last_seen_ns: app.map_or(0, |app| app.last_used),
+            }
+        });
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

@@ -1144,6 +1144,47 @@ pub enum LinkNotificationAppError {
     InternalCanisterError(String),
 }
 
+/// Whether this identity wants the app its browser points at to deliver for it.
+///
+/// Never a subscription removal: the subscription is the app's, and every other identity
+/// pointing at it delivers through the same one.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SetNotificationAppEnabledRequest {
+    pub anchor_number: AnchorNumber,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SetNotificationAppEnabledError {
+    /// This browser points at no app, or the caller is no browser of this identity.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+/// Asks what this browser's entry says about the app it points at, for a page that has
+/// the browser key and no session.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What a browser's entry says about the app it points at.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppInfo {
+    /// Whether the app has registered for Web Push. False means it has been opened, the
+    /// record exists, and the permission has not been given yet.
+    pub subscribed: bool,
+    /// Whether this identity wants it to deliver.
+    pub enabled: bool,
+    /// When the app last called, which is the only evidence there is that it still
+    /// exists. Nothing says when a user deletes a web app from their Home Screen: iOS
+    /// destroys its storage and tells nobody, so an app is known to be alive only by it
+    /// having just answered.
+    pub last_seen_ns: Timestamp,
+}
+
+/// Offers the Home Screen app this browser has to another identity signed in on the same
+/// browser, which is the only party that can reach both.
 /// Points this browser at the Home Screen app another identity on the device has, on the
 /// authority of a token that identity signed.
 ///

@@ -104,6 +104,7 @@ pub(super) fn try_subscribe(
     super::set_subscription(
         anchor(anchor_number),
         browser_id,
+        crate::authz_utils::NotificationCaller::Browser,
         validated(anchor_number, endpoint, now_ns),
         now_ns,
     )

@@ -1,4 +1,6 @@
 use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::storage::anchor::WebPushSubscription;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::Timestamp;
@@ -19,6 +21,8 @@ pub struct StorableNotificationApp {
     pub created_at: Timestamp,
     #[n(3)]
     pub last_used: Timestamp,
+    #[n(4)]
+    pub webpush_subscription: Option<StorableWebPushSubscription>,
 }
 
 impl From<NotificationApp> for StorableNotificationApp {
@@ -28,6 +32,9 @@ impl From<NotificationApp> for StorableNotificationApp {
             key: value.key.into_vec(),
             created_at: value.created_at,
             last_used: value.last_used,
+            webpush_subscription: value
+                .webpush_subscription
+                .map(StorableWebPushSubscription::from),
         }
     }
 }
@@ -39,6 +46,7 @@ impl From<StorableNotificationApp> for NotificationApp {
             key: ByteBuf::from(value.key),
             created_at: value.created_at,
             last_used: value.last_used,
+            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
         }
     }
 }
