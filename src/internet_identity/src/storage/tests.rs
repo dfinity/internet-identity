@@ -7790,3 +7790,133 @@ fn an_unoffered_handle_is_refused() {
 
     assert_eq!(storage.take_notification_app_offer([9u8; 32], 1_000), None);
 }
+
+/// An unspent offer outlives the record it names, and claiming it then would write a
+/// reference nothing can deliver through and an index row for a record that is gone.
+#[test]
+fn an_offer_for_a_record_that_is_gone_is_refused() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    anchor.point_at_notification_app(0, app.id);
+    storage.write(anchor).expect("pointing at the app");
+    let handle = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app");
+
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor.stop_pointing_at_notification_app(0);
+    storage.write(anchor).expect("dropping the reference");
+
+    assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating(vec![7u8; 91])),
+        None
+    );
+    assert_eq!(storage.take_notification_app_offer(handle, 1_500), None);
+}
+
+/// Two offers made in one consensus round share everything the handle is derived from
+/// but the nonce, so without it one browser's second offer would be the first one over
+/// again.
+#[test]
+fn two_offers_made_at_the_same_moment_are_two_handles() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+
+    let first = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app");
+    let second = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app again");
+
+    assert_ne!(first, second);
+}
+
+/// A handle that has been spent is never handed out again, however many offers the same
+/// browser makes for the same app afterwards.
+#[test]
+fn a_spent_handle_is_never_offered_a_second_time() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+    let spent = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app");
+    assert_eq!(
+        storage.take_notification_app_offer(spent, 1_500),
+        Some(app.id)
+    );
+
+    for _ in 0..3 {
+        assert_ne!(
+            storage
+                .offer_notification_app(app.id, 10_000, 2_000)
+                .expect("offering the app again"),
+            spent
+        );
+    }
+}
+
+/// One outstanding offer per anchor and app. Nothing else removes an offer nobody
+/// spends, so without this a browser would add a row to the map every round it asked.
+#[test]
+fn a_new_offer_replaces_the_one_that_anchor_already_had() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+
+    let first = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app");
+    let second = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app again");
+
+    assert_eq!(storage.take_notification_app_offer(first, 1_500), None);
+    assert_eq!(
+        storage.take_notification_app_offer(second, 1_500),
+        Some(app.id)
+    );
+}
+
+/// An offer another anchor holds is its own: one browser asking again replaces what it
+/// had and leaves the other where it was.
+#[test]
+fn an_offer_from_one_anchor_leaves_anothers_alone() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+
+    let other = storage
+        .offer_notification_app(app.id, 10_001, 2_000)
+        .expect("offering the app");
+    storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app");
+    storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app again");
+
+    assert_eq!(
+        storage.take_notification_app_offer(other, 1_500),
+        Some(app.id)
+    );
+}

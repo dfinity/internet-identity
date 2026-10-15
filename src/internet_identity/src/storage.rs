@@ -229,6 +229,7 @@ const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 38u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 39u8;
 const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX: u8 = 40u8;
 const NOTIFICATION_APP_HANDLE_MEMORY_INDEX: u8 = 41u8;
+const NOTIFICATION_APP_OFFER_NONCE_MEMORY_INDEX: u8 = 42u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -346,6 +347,12 @@ const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
 /// can point at the app without ever being told its id.
 const NOTIFICATION_APP_HANDLE_MEMORY_ID: MemoryId =
     MemoryId::new(NOTIFICATION_APP_HANDLE_MEMORY_INDEX);
+
+/// The nonce the next handle for an anchor and app is derived with, one row per pair.
+/// It only ever rises, which is what keeps a spent handle from being derived a second
+/// time, and keeping it is also what lets a new offer replace the outstanding one.
+const NOTIFICATION_APP_OFFER_NONCE_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATION_APP_OFFER_NONCE_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -505,6 +512,10 @@ pub struct Storage<M: Memory> {
         StorableNotificationAppOffer,
         ManagedMemory<M>,
     >,
+    /// Memory wrapper used to report the size of the app offer nonces.
+    notification_app_offer_nonce_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    notification_app_offer_nonce_memory:
+        StableBTreeMap<(StorableAnchorNumber, StorableNotificationAppId), u64, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -657,6 +668,8 @@ impl<M: Memory + Clone> Storage<M> {
         let lookup_anchors_with_notification_app_memory =
             memory_manager.get(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID);
         let notification_app_handle_memory = memory_manager.get(NOTIFICATION_APP_HANDLE_MEMORY_ID);
+        let notification_app_offer_nonce_memory =
+            memory_manager.get(NOTIFICATION_APP_OFFER_NONCE_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -772,6 +785,12 @@ impl<M: Memory + Clone> Storage<M> {
                 notification_app_handle_memory.clone(),
             ),
             notification_app_handle_memory: StableBTreeMap::init(notification_app_handle_memory),
+            notification_app_offer_nonce_memory_wrapper: MemoryWrapper::new(
+                notification_app_offer_nonce_memory.clone(),
+            ),
+            notification_app_offer_nonce_memory: StableBTreeMap::init(
+                notification_app_offer_nonce_memory,
+            ),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -1606,21 +1625,30 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// A handle rather than the id itself, because the id is this canister's and says
     /// which anchors share a device. Derived from the salt, so it cannot be guessed, and
-    /// bound to one app and one expiry.
+    /// from a nonce that only ever rises, so two offers made in one consensus round are
+    /// two handles and a spent one is never derived again.
+    ///
+    /// One outstanding offer per anchor and app: a new one replaces whatever that pair
+    /// had, which is what bounds the map. Nothing else removes an offer nobody spends.
     pub fn offer_notification_app(
         &mut self,
         app_id: NotificationAppId,
         anchor_number: AnchorNumber,
         expires_at_ns: Timestamp,
     ) -> Result<[u8; 32], StorageError> {
-        let salt = self.salt().ok_or(StorageError::MissingSalt)?;
-        let mut hasher = Sha256::new();
-        hasher.update(salt);
-        hasher.update(b"ii-notification-app-handle");
-        hasher.update(app_id.to_be_bytes());
-        hasher.update(anchor_number.to_be_bytes());
-        hasher.update(expires_at_ns.to_be_bytes());
-        let handle: [u8; 32] = hasher.finalize().into();
+        let salt = *self.salt().ok_or(StorageError::MissingSalt)?;
+        let nonce = self
+            .notification_app_offer_nonce_memory
+            .get(&(anchor_number, app_id))
+            .unwrap_or(0);
+        if let Some(previous) = nonce.checked_sub(1) {
+            self.notification_app_handle_memory
+                .remove(&StorableNotificationAppHandle(
+                    Self::notification_app_handle(salt, app_id, anchor_number, previous),
+                ));
+        }
+
+        let handle = Self::notification_app_handle(salt, app_id, anchor_number, nonce);
         self.notification_app_handle_memory.insert(
             StorableNotificationAppHandle(handle),
             StorableNotificationAppOffer {
@@ -1628,14 +1656,39 @@ impl<M: Memory + Clone> Storage<M> {
                 expires_at_ns,
             },
         );
+        self.notification_app_offer_nonce_memory.insert(
+            (anchor_number, app_id),
+            nonce
+                .checked_add(1)
+                .ok_or(StorageError::NotificationAppOfferNonceOverflow)?,
+        );
         Ok(handle)
+    }
+
+    fn notification_app_handle(
+        salt: Salt,
+        app_id: NotificationAppId,
+        anchor_number: AnchorNumber,
+        nonce: u64,
+    ) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(salt);
+        hasher.update(b"ii-notification-app-handle");
+        hasher.update(app_id.to_be_bytes());
+        hasher.update(anchor_number.to_be_bytes());
+        hasher.update(nonce.to_be_bytes());
+        hasher.finalize().into()
     }
 
     /// Spends a handle, answering the app it was offered for.
     ///
     /// Good once: a handle that has been spent is gone, so one offer points one identity
     /// at the app and a copied handle is worth nothing after that. An expired one is
-    /// removed rather than honoured, which is also how the map stays small.
+    /// removed rather than honoured.
+    ///
+    /// An offer outlives the record it names, so the record has to still be there: a
+    /// reference to a deleted app is one nothing can deliver through, and writing it
+    /// would put a row back in the index the deletion emptied.
     pub fn take_notification_app_offer(
         &mut self,
         handle: [u8; 32],
@@ -1643,7 +1696,8 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<NotificationAppId> {
         let key = StorableNotificationAppHandle(handle);
         let offer = self.notification_app_handle_memory.remove(&key)?;
-        (offer.expires_at_ns > now).then_some(offer.app_id)
+        (offer.expires_at_ns > now && self.notification_app_memory.contains_key(&offer.app_id))
+            .then_some(offer.app_id)
     }
 
     /// The anchors pointing at `app_id`, which is what the app asks for to know who it
@@ -4559,6 +4613,10 @@ impl<M: Memory + Clone> Storage<M> {
                 self.notification_app_handle_memory_wrapper.size(),
             ),
             (
+                "notification_app_offer_nonce".to_string(),
+                self.notification_app_offer_nonce_memory_wrapper.size(),
+            ),
+            (
                 "lookup_session_with_principal".to_string(),
                 self.lookup_session_with_principal_memory_wrapper.size(),
             ),
@@ -5019,6 +5077,9 @@ pub enum StorageError {
     /// browser pointing at a deleted record must never resolve to another app.
     NotificationAppIdOverflow,
     ErrorUpdatingNotificationAppIdAllocator,
+    /// No offer nonces left for this anchor and app. Refused rather than saturated: a
+    /// nonce handed out twice derives a handle that has already been spent.
+    NotificationAppOfferNonceOverflow,
     /// The canister has no salt yet, so nothing unguessable can be derived from it.
     MissingSalt,
     /// The references a write assembled cannot be stored as they stand.
@@ -5146,6 +5207,9 @@ impl fmt::Display for StorageError {
             }
             Self::ErrorUpdatingNotificationAppIdAllocator => {
                 write!(f, "Error updating the notification app id allocator")
+            }
+            Self::NotificationAppOfferNonceOverflow => {
+                write!(f, "No notification app offer nonces left to allocate")
             }
             Self::MissingSalt => write!(f, "The canister has no salt yet"),
             Self::UnstorableAccountReferenceList {
