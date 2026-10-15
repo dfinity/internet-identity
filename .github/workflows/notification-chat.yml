@@ -14,6 +14,10 @@ on:
       - "demos/notification-chat/**"
       - ".github/workflows/notification-chat.yml"
 
+# Checks only: nothing here writes to the repository.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
