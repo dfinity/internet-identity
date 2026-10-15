@@ -2,9 +2,10 @@
   import type { SvelteHTMLElements } from "svelte/elements";
 
   type Props = SvelteHTMLElements["div"] & {
-    /** The radii the rings are drawn with. `pill` rings a fully rounded control;
-     *  `menu` rings a 5px-radius one, each ring widening by its own inset. */
-    shape?: "pill" | "menu";
+    /** The radii the rings are drawn with. Each ring widens by its own inset, so the
+     *  shape names the radius of the control inside: `pill` is fully rounded, `menu` a
+     *  5px one, `app` a 10px one. */
+    shape?: "pill" | "menu" | "app";
   };
 
   const {
@@ -14,15 +15,16 @@
     ...props
   }: Props = $props();
 
-  const rings =
-    shape === "pill"
-      ? ["rounded-full", "rounded-full", "rounded-full", "rounded-full"]
-      : [
-          "rounded-[10px]",
-          "rounded-[15px]",
-          "rounded-[19px]",
-          "rounded-[23px]",
-        ];
+  const rings = {
+    pill: ["rounded-full", "rounded-full", "rounded-full", "rounded-full"],
+    menu: [
+      "rounded-[10px]",
+      "rounded-[15px]",
+      "rounded-[19px]",
+      "rounded-[23px]",
+    ],
+    app: ["rounded-[15px]", "rounded-[20px]", "rounded-3xl", "rounded-[28px]"],
+  }[shape];
 </script>
 
 <div {...props} class={["relative", className]}>
