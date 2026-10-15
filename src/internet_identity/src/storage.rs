@@ -1674,6 +1674,34 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default()
     }
 
+    /// Takes an app out of every anchor that points at it, which deletes the record.
+    ///
+    /// For the one case where we know the app itself is gone: the push service answered
+    /// that its endpoint no longer exists, which on iOS means the user deleted the web
+    /// app and the partition holding its key went with it. Every browser pointing at it
+    /// falls back to offering the install, which is the truth.
+    pub fn forget_notification_app(&mut self, app_id: NotificationAppId) {
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let Ok(mut anchor) = self.read(anchor_number) else {
+                continue;
+            };
+            let pointing: Vec<BrowserId> = anchor
+                .browsers()
+                .iter()
+                .filter(|browser| {
+                    browser
+                        .notification_app
+                        .is_some_and(|reference| reference.app_id == app_id)
+                })
+                .map(|browser| browser.id)
+                .collect();
+            for browser_id in pointing {
+                anchor.stop_pointing_at_notification_app(browser_id);
+            }
+            let _ = self.write(anchor);
+        }
+    }
+
     /// Forgets a record and the principal that resolved to it. The id is retired with
     /// it: the allocator never looks back, so nothing is ever handed this one again.
     fn delete_notification_app(&mut self, app_id: NotificationAppId) {
@@ -3676,8 +3704,13 @@ impl<M: Memory + Clone> Storage<M> {
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
         // A browser the identity signed out of must stop being notified for it. The
-        // entry itself stays, so that signing back in is not a new browser.
+        // entry itself stays, so that signing back in is not a new browser, and so does
+        // the app it points at: the reference is which app this browser has, not whether
+        // it is routing right now.
         anchor.set_webpush_subscription(browser_id, None);
+        if let Some(queue) = anchor.notifications_mut(browser_id) {
+            queue.clear();
+        }
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;

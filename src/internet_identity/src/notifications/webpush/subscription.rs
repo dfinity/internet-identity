@@ -33,17 +33,17 @@ pub fn set_subscription(
     } = request;
 
     // The same endpoint means this replaces the pool on a registration that is still
-    // live, so the registration keeps its age and its queue, and the pool has to move
-    // forward: one signature covers one elapsed window, and an older pool would shorten
-    // the coverage the browser believes it has. Any other endpoint is a new registration.
-    let (created_at_ns, notifications) = match anchor.webpush_subscription(browser_id) {
+    // live, so the registration keeps its age, and the pool has to move forward: one
+    // signature covers one elapsed window, and an older pool would shorten the coverage
+    // the browser believes it has. Any other endpoint is a new registration.
+    let created_at_ns = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            (registered.created_at_ns, registered.notifications.clone())
+            registered.created_at_ns
         }
-        _ => (now_ns, Vec::new()),
+        _ => now_ns,
     };
 
     write_subscription(
@@ -55,9 +55,6 @@ pub fn set_subscription(
             vapid_public_key,
             jwt_signatures,
             jwt_issued_at_ns,
-            notifications,
-            // A re-subscribe has had no second wake-up of its own yet.
-            woken_again_at_ns: None,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -85,8 +82,13 @@ fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Res
     write_subscription(anchor, browser_id, None)
 }
 
-/// Idempotently remove a registration its relay reported gone, unless the browser has
-/// registered another endpoint since the post went out.
+/// Idempotently remove a registration its relay reported gone, unless whoever holds it
+/// has registered another endpoint since the post went out.
+///
+/// Where the gone endpoint is the Home Screen app's, the app itself is gone: iOS
+/// destroys the partition and the key with it when the user deletes a web app, and
+/// nothing else tells us. So the record goes, and every browser pointing at it falls
+/// back to offering the install.
 pub(crate) fn clear_gone_subscription(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
@@ -94,13 +96,28 @@ pub(crate) fn clear_gone_subscription(
 ) -> Result<(), String> {
     let anchor =
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
-    if anchor
-        .webpush_subscription(browser_id)
-        .is_none_or(|registered| registered.endpoint != endpoint)
-    {
-        return Ok(());
+    if let Some(registered) = anchor.webpush_subscription(browser_id) {
+        if registered.endpoint != endpoint {
+            return Ok(());
+        }
+        return write_subscription(anchor, browser_id, None);
     }
-    write_subscription(anchor, browser_id, None)
+
+    let Some(reference) = anchor.notification_app(browser_id) else {
+        return Ok(());
+    };
+    let gone = storage_borrow(|storage| {
+        storage
+            .notification_app(reference.app_id)
+            .is_some_and(|app| {
+                app.webpush_subscription
+                    .is_some_and(|subscription| subscription.endpoint == endpoint)
+            })
+    });
+    if gone {
+        storage_borrow_mut(|storage| storage.forget_notification_app(reference.app_id));
+    }
+    Ok(())
 }
 
 /// What this browser is registered with, and how much of the pool it signed is left
@@ -118,11 +135,29 @@ pub fn subscription_status(
         })
 }
 
+/// Writes what this browser registered, and clears what was waiting where that address
+/// is going away.
+///
+/// A queue is a list of wake-ups already posted to one endpoint. A registration that is
+/// removed, or replaced by a different endpoint, leaves nothing that could show them, so
+/// they go with it. A pool replacement on the same endpoint keeps them.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
+    let endpoint_kept = match (
+        anchor.webpush_subscription(browser_id),
+        subscription.as_ref(),
+    ) {
+        (Some(registered), Some(replacing)) => registered.endpoint == replacing.endpoint,
+        _ => false,
+    };
+    if !endpoint_kept {
+        if let Some(queue) = anchor.notifications_mut(browser_id) {
+            queue.clear();
+        }
+    }
     anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
 }
@@ -149,14 +184,14 @@ pub fn set_app_subscription(
     // Same reasoning as a browser's: the same endpoint is a pool replacement on a live
     // registration, which keeps its age and its queue and must move forward, and any
     // other endpoint is a registration of its own.
-    let (created_at_ns, notifications) = match app.webpush_subscription.as_ref() {
+    let created_at_ns = match app.webpush_subscription.as_ref() {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
                 return Err(SetNotificationAppSubscriptionError::StaleJwtPool);
             }
-            (registered.created_at_ns, registered.notifications.clone())
+            registered.created_at_ns
         }
-        _ => (now_ns, Vec::new()),
+        _ => now_ns,
     };
 
     state::storage_borrow_mut(|storage| {
@@ -168,8 +203,6 @@ pub fn set_app_subscription(
                 vapid_public_key,
                 jwt_signatures,
                 jwt_issued_at_ns,
-                notifications,
-                woken_again_at_ns: None,
             }),
             now_ns,
         )

@@ -7472,8 +7472,6 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
                 vapid_public_key: vec![4; 65],
                 jwt_signatures: vec![vec![3; 64]],
                 jwt_issued_at_ns: 0,
-                notifications: Vec::new(),
-                woken_again_at_ns: None,
             }),
         );
     }
@@ -7730,8 +7728,6 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
             vapid_public_key: vec![1; 65],
             jwt_signatures: vec![vec![2; 64]],
             jwt_issued_at_ns: 2_000,
-            notifications: Vec::new(),
-            woken_again_at_ns: None,
         }),
         2_000,
     );
@@ -7745,4 +7741,29 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     );
     // Stamped by the app's own call, which is the only liveness anything here has.
     assert_eq!(stored.last_used, 2_000);
+}
+
+/// The one moment we know an installed app is gone: the push service says its endpoint
+/// no longer exists. Every browser pointing at it goes back to offering the install.
+#[test]
+fn forgetting_an_app_takes_every_reference_with_it() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+    for anchor_number in [10_000, 10_001] {
+        let mut anchor = anchor_with_browser(&mut storage, anchor_number);
+        anchor.point_at_notification_app(0, app.id);
+        storage.write(anchor).expect("writing the anchor");
+    }
+
+    storage.forget_notification_app(app.id);
+
+    for anchor_number in [10_000, 10_001] {
+        let anchor = storage.read(anchor_number).expect("reading the anchor");
+        assert_eq!(anchor.notification_app(0), None);
+    }
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(storage.notification_app(app.id), None);
 }

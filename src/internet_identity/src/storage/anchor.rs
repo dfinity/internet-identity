@@ -104,6 +104,14 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// What this identity's service worker has yet to show on this device, oldest first.
+    ///
+    /// Held here rather than on the subscription, because the address may be the app's
+    /// and shared with every other identity pointing at it, while what is waiting is
+    /// this identity's alone.
+    pub notifications: Vec<QueuedNotification>,
+    /// When this entry was last woken again for something it could not show yet.
+    pub woken_again_at_ns: Option<Timestamp>,
     /// The Home Screen app this browser installed or claimed, where it has one.
     ///
     /// A reference rather than an entry of its own: one installed app is one record
@@ -150,11 +158,6 @@ pub struct WebPushSubscription {
     /// Raw ECDSA P-256 signatures, in window order.
     pub jwt_signatures: Vec<Vec<u8>>,
     pub jwt_issued_at_ns: Timestamp,
-    /// What the service worker has yet to show, oldest first, each woken through this
-    /// registration.
-    pub notifications: Vec<QueuedNotification>,
-    /// When this browser was last woken again for something it could not show yet.
-    pub woken_again_at_ns: Option<Timestamp>,
 }
 
 impl From<StorableWebPushSubscription> for WebPushSubscription {
@@ -170,21 +173,6 @@ impl From<StorableWebPushSubscription> for WebPushSubscription {
                 .map(Vec::from)
                 .collect(),
             jwt_issued_at_ns: value.jwt_pool.issued_at_ns,
-            notifications: value
-                .notifications
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|queued| {
-                    Some(QueuedNotification {
-                        application_number: queued.application_number,
-                        sender: Principal::try_from_slice(&queued.sender).ok()?,
-                        notification_id: queued.notification_id,
-                        expires_at_ns: queued.expires_at_ns,
-                        account_number: queued.account_number,
-                    })
-                })
-                .collect(),
-            woken_again_at_ns: value.woken_again_at_ns,
         }
     }
 }
@@ -199,14 +187,10 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
                 issued_at_ns: value.jwt_issued_at_ns,
             },
-            notifications: (!value.notifications.is_empty()).then(|| {
-                value
-                    .notifications
-                    .into_iter()
-                    .map(StorableQueuedNotification::from)
-                    .collect()
-            }),
-            woken_again_at_ns: value.woken_again_at_ns,
+            // Where a browser's queue used to live. Read on the way in so an upgrade
+            // carries what was waiting, never written again.
+            notifications: None,
+            woken_again_at_ns: None,
         }
     }
 }
@@ -221,7 +205,38 @@ impl From<StorableBrowser> for Browser {
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
-            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            webpush_subscription: value
+                .webpush_subscription
+                .clone()
+                .map(WebPushSubscription::from),
+            // Read from wherever it was stored: the entry, or the subscription it used
+            // to live on before an upgrade moved it here.
+            notifications: value
+                .notifications
+                .or_else(|| {
+                    value
+                        .webpush_subscription
+                        .as_ref()
+                        .and_then(|subscription| subscription.notifications.clone())
+                })
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|queued| {
+                    Some(QueuedNotification {
+                        application_number: queued.application_number,
+                        sender: Principal::try_from_slice(&queued.sender).ok()?,
+                        notification_id: queued.notification_id,
+                        expires_at_ns: queued.expires_at_ns,
+                        account_number: queued.account_number,
+                    })
+                })
+                .collect(),
+            woken_again_at_ns: value.woken_again_at_ns.or_else(|| {
+                value
+                    .webpush_subscription
+                    .as_ref()
+                    .and_then(|subscription| subscription.woken_again_at_ns)
+            }),
             notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
@@ -241,6 +256,14 @@ impl From<Browser> for StorableBrowser {
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
+            notifications: (!value.notifications.is_empty()).then(|| {
+                value
+                    .notifications
+                    .into_iter()
+                    .map(StorableQueuedNotification::from)
+                    .collect()
+            }),
+            woken_again_at_ns: value.woken_again_at_ns,
         }
     }
 }
@@ -1009,10 +1032,12 @@ impl Anchor {
         }
     }
 
-    /// The queue of the browser's registration, empty for one not registered.
+    /// What this entry has waiting, empty for one with nothing.
     pub fn notifications(&self, browser_id: BrowserId) -> &[QueuedNotification] {
-        self.webpush_subscription(browser_id)
-            .map_or(&[], |subscription| &subscription.notifications)
+        self.browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .map_or(&[], |browser| &browser.notifications)
     }
 
     pub fn notifications_mut(
@@ -1022,8 +1047,14 @@ impl Anchor {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)
-            .and_then(|browser| browser.webpush_subscription.as_mut())
-            .map(|subscription| &mut subscription.notifications)
+            .map(|browser| &mut browser.notifications)
+    }
+
+    /// Stamps that this entry has been woken again for something still waiting.
+    pub fn set_woken_again(&mut self, browser_id: BrowserId, at_ns: Option<Timestamp>) {
+        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
+            browser.woken_again_at_ns = at_ns;
+        }
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1172,6 +1203,8 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            notifications: Vec::new(),
+            woken_again_at_ns: None,
             notification_app: None,
         });
 

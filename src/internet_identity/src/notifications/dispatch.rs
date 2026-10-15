@@ -3,16 +3,19 @@
 //! spawns the posts rather than awaiting them. Nothing is retried; every outcome is counted.
 
 use crate::notifications::admission_queue::Taken;
+use crate::notifications::app::NotificationApp;
 use crate::notifications::backlog::PendingNotification;
 use crate::notifications::browser_queue::{self, Added};
 use crate::notifications::delegation::NOTIFICATION_DELEGATION_TTL_NS;
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, Browser, QueuedNotification};
+use crate::storage::anchor::{Anchor, Browser, QueuedNotification, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
+use crate::storage::Storage;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
+use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, Timestamp, Urgency,
 };
@@ -268,12 +271,17 @@ fn fan_out_to_browsers(
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
             return;
         };
+        let apps: Vec<Option<NotificationApp>> = anchor
+            .browsers()
+            .iter()
+            .map(|browser| routed_app(storage, browser))
+            .collect();
         let woken: Vec<Delivery> = anchor
             .browsers()
             .iter()
-            .filter_map(|browser| {
-                let subscription = browser.webpush_subscription.as_ref()?;
-                let jwt = wake_up_jwt(browser, now_ns)?;
+            .zip(apps.iter())
+            .filter_map(|(browser, app)| {
+                let (subscription, jwt) = wake_up_address(browser, app.as_ref(), now_ns)?;
                 Some(Delivery {
                     anchor_number: pending.anchor_number,
                     browser_id: browser.id,
@@ -344,18 +352,24 @@ pub(crate) fn claim_rewake(
 ) -> Option<Delivery> {
     storage_borrow_mut(|storage| {
         let mut anchor = storage.read(anchor_number).ok()?;
-        let subscription = anchor.webpush_subscription(browser_id)?;
-        if subscription
+        let browser = anchor
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == browser_id)?;
+        if browser
             .woken_again_at_ns
             .is_some_and(|last| now_ns.saturating_sub(last) < NOTIFICATION_DELEGATION_TTL_NS)
         {
             return None;
         }
 
-        let delivery = rewake_delivery(&anchor, browser_id, now_ns)?;
-        let mut taken = subscription.clone();
-        taken.woken_again_at_ns = Some(now_ns);
-        anchor.set_webpush_subscription(browser_id, Some(taken));
+        let app = anchor
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .and_then(|browser| routed_app(storage, browser));
+        let delivery = rewake_delivery(&anchor, browser_id, app.as_ref(), now_ns)?;
+        anchor.set_woken_again(browser_id, Some(now_ns));
         storage.write(anchor).ok()?;
         Some(delivery)
     })
@@ -363,17 +377,21 @@ pub(crate) fn claim_rewake(
 
 /// The wake-up to post, or `None` where there is nothing left to show, the browser is
 /// not registered, or its signed pool has run out.
-fn rewake_delivery(anchor: &Anchor, browser_id: BrowserId, now_ns: Timestamp) -> Option<Delivery> {
+fn rewake_delivery(
+    anchor: &Anchor,
+    browser_id: BrowserId,
+    app: Option<&NotificationApp>,
+    now_ns: Timestamp,
+) -> Option<Delivery> {
     let browser = anchor
         .browsers()
         .iter()
         .find(|browser| browser.id == browser_id)?;
-    let subscription = browser.webpush_subscription.as_ref()?;
-    let oldest = subscription
+    let oldest = browser
         .notifications
         .iter()
         .find(|queued| queued.expires_at_ns > now_ns)?;
-    let jwt = wake_up_jwt(browser, now_ns)?;
+    let (subscription, jwt) = wake_up_address(browser, app, now_ns)?;
 
     Some(Delivery {
         anchor_number: anchor.anchor_number(),
@@ -388,15 +406,53 @@ fn rewake_delivery(anchor: &Anchor, browser_id: BrowserId, now_ns: Timestamp) ->
     })
 }
 
-/// The authorization a wake-up to `browser` carries now: none unless it was used within
-/// [`BROWSER_GONE_AFTER_NS`], is registered, and its pool holds a signature for now.
-pub(crate) fn wake_up_jwt(browser: &Browser, now_ns: Timestamp) -> Option<String> {
+/// Where a wake-up for this entry goes, and the authorization it carries.
+///
+/// A browser that registered an address of its own is woken at it. Otherwise the app it
+/// points at is, as long as this identity has it enabled and is still signed in here: on
+/// iOS a browser cannot hold a subscription at all, so the app is the only address there
+/// is, and the entry is what says the identity still wants it.
+///
+/// Liveness stays the entry's either way. The app has no reliable liveness of its own,
+/// and the browser's last use is what says the device is still in hand.
+fn wake_up_address<'a>(
+    browser: &'a Browser,
+    app: Option<&'a NotificationApp>,
+    now_ns: Timestamp,
+) -> Option<(&'a WebPushSubscription, String)> {
     if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
         return None;
     }
-    let subscription = browser.webpush_subscription.as_ref()?;
+    let subscription = match browser.webpush_subscription.as_ref() {
+        Some(own) => own,
+        None => app?.webpush_subscription.as_ref()?,
+    };
     let relay_origin = vapid_jwt::relay_origin_of(&subscription.endpoint)?;
-    vapid_jwt::assemble(subscription, &relay_origin, now_ns)
+    let jwt = vapid_jwt::assemble(subscription, &relay_origin, now_ns)?;
+    Some((subscription, jwt))
+}
+
+/// The app this entry routes through, where it has one and wants it.
+fn routed_app<M: Memory + Clone>(
+    storage: &Storage<M>,
+    browser: &Browser,
+) -> Option<NotificationApp> {
+    let reference = browser.notification_app?;
+    if !reference.enabled || browser.session_count == 0 {
+        return None;
+    }
+    storage.notification_app(reference.app_id)
+}
+
+/// Whether anything could be woken for this entry right now, which is what says a send
+/// has somewhere to go.
+pub(crate) fn can_wake<M: Memory + Clone>(
+    storage: &Storage<M>,
+    browser: &Browser,
+    now_ns: Timestamp,
+) -> bool {
+    let app = routed_app(storage, browser);
+    wake_up_address(browser, app.as_ref(), now_ns).is_some()
 }
 
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
