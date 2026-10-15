@@ -506,7 +506,18 @@ fn claim_notification_app(
         storage
             .write(anchor)
             .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
+    })?;
+
+    // Said on the device, because the device is where it matters and nothing there is
+    // showing this screen: an app serving several identities is the only place that can
+    // say which one was just switched on.
+    notifications::dispatch::notify_identity(
+        request.anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(request.anchor_number),
+        ic_cdk::api::time(),
+    );
+    Ok(())
 }
 
 /// The identities this Home Screen app delivers for.

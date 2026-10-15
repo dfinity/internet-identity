@@ -1293,6 +1293,7 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
             account_number: None,
             canister_id: principal_2(),
             id: 1,
+            event: None,
         },
     }
 }

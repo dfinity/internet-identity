@@ -3175,7 +3175,11 @@ impl<M: Memory + Clone> Storage<M> {
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_mut(browser_id) {
-                queue.retain(|queued| !forgotten.contains(&queued.application_number));
+                queue.retain(|queued| {
+                    queued
+                        .application_number
+                        .is_none_or(|number| !forgotten.contains(&number))
+                });
             }
         }
 

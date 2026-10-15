@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Principal } from "@icp-sdk/core/principal";
 import type { Identity } from "@icp-sdk/core/agent";
+import type { NotificationEvent } from "$lib/generated/internet_identity_types";
 
 const signing =
   vi.fn<() => Promise<{ identityNumber: bigint; identity: Identity }[]>>();
@@ -84,6 +85,9 @@ const notification = {
   account_number: [] as [],
   canister_id: SENDER,
   id: BigInt(42),
+  // Sent by an app, which is what the worker fetches text from. Internet Identity's own
+  // carries the event instead, and has its own case below.
+  event: [] as [] | [NotificationEvent],
 };
 
 /** A registration that remembers what is on screen, as the browser would. */
@@ -272,6 +276,28 @@ describe("onWakeUp", () => {
     expect(fetchNotificationContent).not.toHaveBeenCalled();
     expect(ii.removed).toHaveLength(0);
   }, 15_000);
+
+  /// Internet Identity's own. Nothing is fetched and nothing is minted: the canister
+  /// sent what it had to say, and the words are this bundle's.
+  it("shows what Internet Identity itself sent, without minting anything", async () => {
+    const shown = registration();
+    const ii = internetIdentity([
+      { ...notification, event: [{ NotificationsOn: BigInt(10_000) }] },
+    ]);
+
+    await onWakeUp({
+      registration: shown,
+      internetIdentity: ii.factory,
+    });
+
+    expect(shown.shown[0].title).toBe("Notifications are on");
+    expect(shown.shown[0].options.body).toContain("10000");
+    // One notification, and no delegation minted for it.
+    expect(shown.shown).toHaveLength(1);
+    expect(mintPullIdentity).not.toHaveBeenCalled();
+    // Taken off the queue, since it has been shown and nothing is coming back for it.
+    expect(ii.removed).toHaveLength(1);
+  });
 
   it("takes content the app no longer serves as a dismissal", async () => {
     const shown = registration();

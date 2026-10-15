@@ -95,7 +95,7 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_mut(browser_id) {
                 let before = queue.len();
-                queue.retain(|queued| queued.application_number != application_number);
+                queue.retain(|queued| queued.application_number != Some(application_number));
                 removed |= queue.len() < before;
             }
         }
@@ -122,13 +122,26 @@ pub(crate) fn next_to_show(
             .iter()
             .filter(|queued| queued.expires_at_ns > now_ns)
             .find_map(|queued| {
+                // Internet Identity's own is about this identity rather than about an
+                // app, so there is no consent to check and no origin to look up: it is
+                // shown because the user did something here that is worth saying.
+                if let Some(event) = queued.event.clone() {
+                    return Some(NotificationToShow {
+                        origin: FrontendHostname::new(),
+                        account_number: None,
+                        canister_id: queued.sender,
+                        id: queued.notification_id,
+                        event: Some(event),
+                    });
+                }
                 let origin =
-                    storage.lookup_origin_with_application_number(queued.application_number)?;
+                    storage.lookup_origin_with_application_number(queued.application_number?)?;
                 let notification = NotificationToShow {
                     origin,
                     account_number: queued.account_number,
                     canister_id: queued.sender,
                     id: queued.notification_id,
+                    event: None,
                 };
                 storage
                     .read_anchor_application_config(anchor_number, &notification.origin)
@@ -154,7 +167,7 @@ pub(crate) fn remove_shown(
             return Ok(());
         };
         let Some(position) = queue.iter().position(|queued| {
-            queued.application_number == application_number
+            queued.application_number == Some(application_number)
                 && queued.sender == shown.canister_id
                 && queued.notification_id == shown.id
                 && queued.account_number == shown.account_number
@@ -179,11 +192,12 @@ mod tests {
 
     fn queued(notification_id: u64, expires_at_ns: Timestamp) -> QueuedNotification {
         QueuedNotification {
-            application_number: 1,
+            application_number: Some(1),
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
             expires_at_ns,
             account_number: None,
+            event: None,
         }
     }
 
@@ -275,7 +289,7 @@ mod tests {
 
     fn from_app(notification_id: u64, expires_at_ns: Timestamp) -> QueuedNotification {
         QueuedNotification {
-            application_number: app(),
+            application_number: Some(app()),
             ..queued(notification_id, expires_at_ns)
         }
     }
@@ -341,6 +355,7 @@ mod tests {
                 account_number: Some(3),
                 canister_id: Principal::from_slice(&[7; 10]),
                 id: 7,
+                event: None,
             })
         );
         assert_eq!(left_for(anchor_number, browser_id), vec![7, 8]);
@@ -384,7 +399,7 @@ mod tests {
     fn an_app_ii_no_longer_holds_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         let unknown = QueuedNotification {
-            application_number: u64::MAX,
+            application_number: Some(u64::MAX),
             ..queued(1, 60 * SECOND_NS)
         };
         enqueue(
@@ -488,6 +503,7 @@ mod tests {
             account_number: None,
             canister_id: Principal::from_slice(&[7; 10]),
             id: 8,
+            event: None,
         };
 
         remove(anchor_number, browser_id, &gone);

@@ -306,11 +306,13 @@ export const idlFactory = ({ IDL }) => {
   const GetNextNotificationRequest = IDL.Record({
     'anchor_number' : UserNumber,
   });
+  const NotificationEvent = IDL.Variant({ 'NotificationsOn' : UserNumber });
   const AccountNumber = IDL.Nat64;
   const NotificationToShow = IDL.Record({
     'id' : NotificationId,
     'origin' : FrontendHostname,
     'canister_id' : IDL.Principal,
+    'event' : IDL.Opt(NotificationEvent),
     'account_number' : IDL.Opt(AccountNumber),
   });
   const GetNextNotificationResponse = IDL.Record({

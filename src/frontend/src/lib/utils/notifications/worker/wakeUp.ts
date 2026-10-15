@@ -39,6 +39,10 @@ import {
   type NotificationRef,
 } from "./shownNotification";
 import { recordShown, shownRecently } from "./shownRecord";
+import {
+  identityNotificationText,
+  NOTIFICATION_APP_PATH,
+} from "./identityNotification";
 
 /**
  * How long a wake-up waits for the delegation that reads the app's own text before it
@@ -237,6 +241,27 @@ const showQueued = async (
   },
 ): Promise<boolean> => {
   const ref = refFor(identityNumber, notification);
+
+  // Internet Identity's own. It carries what it has to say, so there is no delegation to
+  // mint and no app to ask: the worker already signs to this canister, and the words are
+  // this bundle's. Shown at once, which is also why it cannot spend a placeholder.
+  const [event] = notification.event;
+  if (event !== undefined) {
+    await show(context, ref, {
+      ...identityNotificationText(event),
+      // Opens this app rather than anywhere else: what it is about is here.
+      url: NOTIFICATION_APP_PATH,
+    });
+    sendAndForget(
+      pending,
+      actor.browser_remove_notification({
+        anchor_number: identityNumber,
+        notification,
+      }),
+    );
+    return true;
+  }
+
   const target = {
     origin: notification.origin,
     accountNumber: notification.account_number[0],

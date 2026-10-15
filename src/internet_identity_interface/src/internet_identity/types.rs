@@ -1404,6 +1404,24 @@ pub struct NotificationToShow {
     pub account_number: Option<AccountNumber>,
     pub canister_id: Principal,
     pub id: NotificationId,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    ///
+    /// An app's notification carries no text: the service worker fetches it from the app
+    /// with a delegation it mints for the purpose, which is what keeps the content off
+    /// the push service. One of these carries no text either, for the same reason, but
+    /// there is nothing to fetch and nobody to mint for: the worker already signs to
+    /// this canister, and what it is being told is right here. The words are the
+    /// frontend's, so this says what happened rather than what to show.
+    pub event: Option<NotificationEvent>,
+}
+
+/// Something Internet Identity has to tell the user about their own identity.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationEvent {
+    /// This device now receives this identity's notifications, which is worth saying on
+    /// the device itself: the user allowed it somewhere else, and an app serving several
+    /// identities is the only place that can say which one was switched on.
+    NotificationsOn(AnchorNumber),
 }
 
 /// `None` once nothing is left to show.

@@ -1556,6 +1556,15 @@ export type NotificationDelegationError = {
   { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string };
 /**
+ * Something Internet Identity has to tell the user about their own identity.
+ */
+export type NotificationEvent = {
+    /**
+     * This device now receives this identity's notifications.
+     */
+    'NotificationsOn' : UserNumber
+  };
+/**
  * Why a notification call was refused.
  */
 export type NotificationGrantConsentError = {
@@ -1587,6 +1596,15 @@ export interface NotificationToShow {
   'id' : NotificationId,
   'origin' : FrontendHostname,
   'canister_id' : Principal,
+  /**
+   * Set where Internet Identity sent this itself, and what it has to say. An app's
+   * notification carries no text: the service worker fetches it from the app with a
+   * delegation it mints for the purpose, which is what keeps the content off the push
+   * service. One of these carries no text either, for the same reason, but there is
+   * nothing to fetch and nobody to mint for. The words are the frontend's, so this
+   * says what happened rather than what to show.
+   */
+  'event' : [] | [NotificationEvent],
   'account_number' : [] | [AccountNumber],
 }
 export type OfferNotificationAppError = {

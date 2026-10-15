@@ -17,7 +17,7 @@ use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, Timestamp, Urgency,
+    AnchorNumber, BrowserId, NotificationEvent, Timestamp, Urgency,
 };
 use std::cell::{Cell, RefCell};
 use std::convert::Infallible;
@@ -260,7 +260,8 @@ fn fan_out_to_browsers(
 ) {
     let pending = &taken.entry.item;
     let queued = QueuedNotification {
-        application_number: pending.application_number,
+        application_number: Some(pending.application_number),
+        event: None,
         sender: pending.sender,
         notification_id: pending.notification_id,
         expires_at_ns: taken.entry.expires_at_ns,
@@ -322,6 +323,71 @@ fn fan_out_to_browsers(
             Err(err) => ic_cdk::println!("Failed to queue a notification for its browsers: {err}"),
         }
     });
+}
+
+/// How long Internet Identity's own notification is worth showing. It says something
+/// just happened, so one that reaches a device a day later says nothing true.
+const IDENTITY_NOTIFICATION_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
+
+/// Queues Internet Identity's own notification for one entry, and wakes it.
+///
+/// Not rationed like a second wake-up for something already queued: this is a new
+/// notification, and the entry has nothing else of ours waiting.
+///
+/// Silent where the entry cannot be woken, which is a browser that has registered
+/// nothing, an app that has not been opened, or an identity that has notifications
+/// switched off here. There is nothing to tell them on, and nothing to apologise for:
+/// the screen that sent this said what it did.
+pub(crate) fn notify_identity(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    event: NotificationEvent,
+    now_ns: Timestamp,
+) {
+    if post_capacity() == 0 {
+        return;
+    }
+    let delivery = storage_borrow_mut(|storage| {
+        let mut anchor = storage.read(anchor_number).ok()?;
+        let browser = anchor
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == browser_id)?
+            .clone();
+        let app = routed_app(storage, &browser);
+        let (subscription, jwt) = wake_up_address(&browser, app.as_ref(), now_ns)?;
+        let endpoint = subscription.endpoint.clone();
+        let vapid_public_key = subscription.vapid_public_key.clone();
+
+        let queued = QueuedNotification {
+            application_number: None,
+            // Ours, so the worker signs to us for it rather than fetching it from an app.
+            sender: ic_cdk::api::id(),
+            // Unique per entry without a counter: no two of ours are queued for one
+            // browser in the same nanosecond.
+            notification_id: now_ns,
+            expires_at_ns: now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS),
+            account_number: None,
+            event: Some(event),
+        };
+        let delivery = Delivery {
+            anchor_number,
+            browser_id,
+            notification: Some(queued.clone()),
+            endpoint,
+            vapid_public_key,
+            jwt,
+            urgency: Urgency::Normal,
+            ttl_seconds: IDENTITY_NOTIFICATION_TTL_NS / SECOND_NS,
+        };
+        let queue = anchor.notifications_mut(browser_id)?;
+        browser_queue::add(queue, queued, now_ns);
+        storage.write(anchor).ok()?;
+        Some(delivery)
+    });
+    if let Some(delivery) = delivery {
+        outcalls::spawn_post(delivery);
+    }
 }
 
 /// Post one more wake-up to a browser that already holds something to show, for when
@@ -992,11 +1058,12 @@ mod tests {
             queue.extend(
                 (0..browser_queue::MAX_PER_BROWSER as u64).map(|notification_id| {
                     QueuedNotification {
-                        application_number: 1,
+                        application_number: Some(1),
                         sender: sender(),
                         notification_id,
                         expires_at_ns: 10 * SECOND_NS,
                         account_number: Some(2),
+                        event: None,
                     }
                 }),
             )
@@ -1108,11 +1175,12 @@ mod tests {
         assert_eq!(
             delivery.notification,
             Some(QueuedNotification {
-                application_number: 1,
+                application_number: Some(1),
                 sender: sender(),
                 notification_id: 7,
                 expires_at_ns: 10 * SECOND_NS,
                 account_number: Some(2),
+                event: None,
             })
         );
     }
