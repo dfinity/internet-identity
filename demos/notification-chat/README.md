@@ -30,10 +30,12 @@ It is a project of its own inside this repository (its own Cargo workspace,
   it replaced by the latest message rather than stacked beside it.
 - The **messages** box shows who sent what and when; the **list on the right**
   shows who is in the room. The page reads the room every few seconds.
-- **Show notification stats** opens the library's delivery funnel: how many
-  notifications were queued, accepted by Internet Identity, shown by a browser,
-  and acted on, plus what was dropped or deferred, the backlog waiting to be
-  sent, and whether the canister is misconfigured.
+- **Show notification stats** opens a panel that says what the canister is
+  configured to send for and through, warns when this page or the Internet
+  Identity it signs in with do not match, and shows the library's delivery
+  funnel: how many notifications were queued, accepted by Internet Identity,
+  shown by a browser, and acted on, plus what was dropped or deferred and the
+  backlog waiting to be sent.
 
 Anyone signed in can join. The room holds 100 members and the 100 newest
 messages, and lives on the heap, so an upgrade empties it.
@@ -95,14 +97,35 @@ icp canister status notification_chat -e ic --id-only
 icp deploy -e ic
 ```
 
-Until the origin is set, the stats panel says `misconfigured: Origin` and every
-notification is dropped. The canister serves
+Until the origin is set, the stats panel says so and every notification is
+dropped. The canister serves
 `/.well-known/ii-notification-senders` naming itself, which is how Internet
 Identity learns it may send for that origin.
 
+### Pointing at another Internet Identity
+
 The frontend signs in with mainnet's Internet Identity (`https://id.ai/authorize`,
-`rdmx6-jaaaa-aaaaa-aaadq-cai`). To use another one, build with `VITE_II_URL` and
-`VITE_II_CANISTER_ID` set, and point `notification_sender` at that canister.
+`rdmx6-jaaaa-aaaaa-aaadq-cai`), and the canister sends through the same one.
+Both halves have to name the same deployment, or consent given at one is
+unknown to the other; the stats panel says so when they differ. To use another
+one, say a staging instance:
+
+1. Put its backend canister into `notification_sender` in `icp.yaml`.
+2. Build the frontend with the same canister and that instance's authorize URL,
+   which is its frontend's URL plus `/authorize`. The build runs inside
+   `icp deploy`, so the variables go on that command:
+
+   ```bash
+   VITE_II_URL=https://<its frontend>.icp0.io/authorize \
+   VITE_II_CANISTER_ID=<its backend canister> \
+   icp deploy -e ic
+   ```
+
+   Or keep them in a `.env` file next to `package.json`, which Vite reads and
+   git ignores.
+
+The instance must have notifications enabled (`notifications_enabled`, and the
+frontend's push flag), or sign-in works but every consent request is refused.
 
 ## Local development
 

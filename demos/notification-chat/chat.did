@@ -75,6 +75,16 @@ type Misconfigured = variant {
   NotAuthorizedSender;
 };
 type MisconfiguredSince = record { why : Misconfigured; since : nat64 };
+// What the notification library is configured with, read from the canister's
+// environment as the library reads it. The library notes a misconfiguration
+// when a send hits one and never takes the note back, so this is what says
+// whether one still stands.
+type NotificationConfig = record {
+  // `notification_origin`, where it is set and not empty.
+  origin : opt text;
+  // `notification_sender`, where it is set and a principal.
+  sender : opt principal;
+};
 type Room = record {
   members : vec Member;
   messages : vec Message;
@@ -96,6 +106,7 @@ service : () -> {
   join : () -> ();
   // Leaves the room, so the caller stops being notified.
   leave : () -> ();
+  notification_config : () -> (NotificationConfig) query;
   // The notification library's delivery metrics, an hour per bucket.
   notification_metrics : () -> (Metrics) query;
   // The room, with the names of everyone in it or heard in it.

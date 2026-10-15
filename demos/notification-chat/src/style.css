@@ -205,6 +205,19 @@ main {
   font-size: 0.85rem;
 }
 
+.stats .config {
+  margin: 0 0 0.5rem;
+  padding-left: 1.2rem;
+}
+
+.stats .config li {
+  margin: 0.2rem 0;
+}
+
+.stats .warning {
+  color: #a33;
+}
+
 .stats table {
   border-collapse: collapse;
   margin-top: 0.5rem;

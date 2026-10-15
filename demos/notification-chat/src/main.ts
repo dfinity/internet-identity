@@ -91,6 +91,12 @@ interface Metrics {
   misconfigured: [] | [{ why: Record<string, null>; since: bigint }];
 }
 
+/** What the canister's notification library is configured with. */
+interface NotificationConfig {
+  origin: [] | [string];
+  sender: [] | [Principal];
+}
+
 interface ChatService {
   join: () => Promise<void>;
   leave: () => Promise<void>;
@@ -99,6 +105,7 @@ interface ChatService {
   claim_name: (wanted: string) => Promise<string>;
   room: () => Promise<Room>;
   notification_metrics: () => Promise<Metrics>;
+  notification_config: () => Promise<NotificationConfig>;
 }
 
 const idlFactory: IDL.InterfaceFactory = ({ IDL }) => {
@@ -139,6 +146,16 @@ const idlFactory: IDL.InterfaceFactory = ({ IDL }) => {
     claim_name: IDL.Func([IDL.Text], [IDL.Text], []),
     room: IDL.Func([], [Room], ["query"]),
     notification_metrics: IDL.Func([], [Metrics], ["query"]),
+    notification_config: IDL.Func(
+      [],
+      [
+        IDL.Record({
+          origin: IDL.Opt(IDL.Text),
+          sender: IDL.Opt(IDL.Principal),
+        }),
+      ],
+      ["query"],
+    ),
   });
 };
 
@@ -382,7 +399,79 @@ const add = (into: Counts, from: Counts): Counts => ({
 
 const HOUR_NS = 3_600_000_000_000n;
 
-const renderStats = (metrics: Metrics) => {
+/**
+ * A gateway origin as Internet Identity spells it, so that `icp0.io`,
+ * `icp.net` and `ic0.app` read as the same app. Anything else stands as it is.
+ */
+const fold = (origin: string): string =>
+  origin.replace(
+    /^https:\/\/([a-z0-9-]+)\.(icp0\.io|icp\.net)$/,
+    "https://$1.ic0.app",
+  );
+
+/**
+ * What the canister is set up to do, and what stands in its way. The
+ * library's own misconfiguration note is shown only while it still applies:
+ * the library writes one when a send hits it and never takes it back.
+ */
+const configLines = (
+  config: NotificationConfig,
+  metrics: Metrics,
+): { text: string; warning: boolean }[] => {
+  const origin = config.origin[0];
+  const sender = config.sender[0];
+  const lines: { text: string; warning: boolean }[] = [];
+
+  if (origin === undefined) {
+    lines.push({
+      text: "No origin set, so nothing is sent: put this app's origin into notification_origin in icp.yaml and deploy again.",
+      warning: true,
+    });
+  } else if (sender === undefined) {
+    lines.push({
+      text: `Sending for ${origin}, but notification_sender names no canister, so nothing is sent.`,
+      warning: true,
+    });
+  } else {
+    lines.push({
+      text: `Sending for ${origin} through Internet Identity ${sender.toText()}.`,
+      warning: false,
+    });
+  }
+  if (origin !== undefined && fold(origin) !== fold(location.origin)) {
+    lines.push({
+      text: `This page is at ${location.origin}, which is not that origin: Internet Identity records consent for the origin a page signs in from, and looks for the sender list at the one the canister names.`,
+      warning: true,
+    });
+  }
+  if (sender !== undefined && sender.toText() !== II_CANISTER_ID) {
+    lines.push({
+      text: `This page signs in at Internet Identity ${II_CANISTER_ID}, which is not the one the canister sends through: consent given at one is unknown to the other.`,
+      warning: true,
+    });
+  }
+
+  const noted = metrics.misconfigured[0];
+  if (noted !== undefined) {
+    const why = Object.keys(noted.why)[0];
+    const stillStands =
+      (why === "Origin" && origin === undefined) ||
+      (why === "Sender" && sender === undefined) ||
+      why === "NotAuthorizedSender";
+    if (stillStands) {
+      lines.push({
+        text:
+          why === "NotAuthorizedSender"
+            ? `Internet Identity refused this canister as a sender at ${timeOf(noted.since)}: the origin's /.well-known/ii-notification-senders did not name it. Checked again hourly.`
+            : `The library has dropped every send since ${timeOf(noted.since)} for that reason.`,
+        warning: true,
+      });
+    }
+  }
+  return lines;
+};
+
+const renderStats = (metrics: Metrics, config: NotificationConfig) => {
   const now = BigInt(Date.now()) * 1_000_000n;
   const since = (hours: bigint): Counts =>
     metrics.hours
@@ -390,13 +479,16 @@ const renderStats = (metrics: Metrics) => {
       .map((bucket) => bucket.counts)
       .reduce(add, NOTHING);
 
-  const misconfigured = metrics.misconfigured[0];
+  const configuration = document.createElement("ul");
+  configuration.className = "config";
+  for (const line of configLines(config, metrics)) {
+    const item = document.createElement("li");
+    item.className = line.warning ? "warning" : "";
+    item.textContent = line.text;
+    configuration.append(item);
+  }
   const summary = document.createElement("p");
-  summary.textContent =
-    `backlog ${metrics.backlog} · ` +
-    (misconfigured === undefined
-      ? "configured"
-      : `misconfigured: ${Object.keys(misconfigured.why)[0]} since ${timeOf(misconfigured.since)}`);
+  summary.textContent = `backlog ${metrics.backlog}: notifications waiting for Internet Identity to accept them`;
 
   const stages = [
     "queued",
@@ -428,7 +520,7 @@ const renderStats = (metrics: Metrics) => {
         : `${((Number(counts.opened) / Number(counts.queued)) * 100).toFixed(0)}%`;
   }
 
-  statsEl.replaceChildren(summary, table);
+  statsEl.replaceChildren(configuration, summary, table);
 };
 
 // ===== Reading and writing =====
@@ -454,7 +546,11 @@ const refresh = async () => {
     const chat = await read();
     renderRoom(await chat.room());
     if (!statsEl.hidden) {
-      renderStats(await chat.notification_metrics());
+      const [metrics, config] = await Promise.all([
+        chat.notification_metrics(),
+        chat.notification_config(),
+      ]);
+      renderStats(metrics, config);
     }
   } catch (error) {
     showStatus(describe(error));

@@ -170,6 +170,53 @@ fn notification_metrics() -> Metrics {
     notifications::metrics()
 }
 
+/// What the notification library is configured with, read from the canister's
+/// environment as the library reads it. The library notes a misconfiguration
+/// when a send hits one and never takes the note back, so this is what says
+/// whether one still stands.
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct NotificationConfig {
+    /// `notification_origin`, where it is set and not empty.
+    pub origin: Option<String>,
+    /// `notification_sender`, where it is set and a principal.
+    pub sender: Option<Principal>,
+}
+
+#[query]
+fn notification_config() -> NotificationConfig {
+    NotificationConfig {
+        origin: configured_origin(),
+        sender: environment("notification_sender")
+            .and_then(|sender| Principal::from_text(sender).ok()),
+    }
+}
+
+/// An environment variable the canister was deployed with, where it is set
+/// and not empty.
+fn environment(name: &str) -> Option<String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        use ic_cdk::api::{env_var_name_exists, env_var_value};
+
+        if env_var_name_exists(name) {
+            let value = env_var_value(name);
+            if !value.is_empty() {
+                return Some(value);
+            }
+        }
+        None
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = name;
+        None
+    }
+}
+
+fn configured_origin() -> Option<String> {
+    environment("notification_origin")
+}
+
 fn signed_in_caller() -> Principal {
     let caller = msg_caller();
     if caller == Principal::anonymous() {
@@ -196,18 +243,7 @@ fn short(principal: Principal) -> String {
 /// refuses a URL off the sending origin, which is the origin the library is
 /// configured with, so that is the one named here.
 fn app_url() -> Option<String> {
-    #[cfg(target_arch = "wasm32")]
-    {
-        use ic_cdk::api::{env_var_name_exists, env_var_value};
-
-        if env_var_name_exists("notification_origin") {
-            let origin = env_var_value("notification_origin");
-            if !origin.is_empty() {
-                return Some(format!("{origin}/"));
-            }
-        }
-    }
-    None
+    configured_origin().map(|origin| format!("{origin}/"))
 }
 
 // ===== The frontend =====
