@@ -108,7 +108,8 @@ The frontend signs in with mainnet's Internet Identity (`https://id.ai/authorize
 `rdmx6-jaaaa-aaaaa-aaadq-cai`), and the canister sends through the same one.
 Both halves have to name the same deployment, or consent given at one is
 unknown to the other; the stats panel says so when they differ. To use another
-one, say a staging instance:
+one, for instance the staging deployment at `https://beta.id.ai`, whose
+backend canister is `fgte5-ciaaa-aaaad-aaatq-cai`:
 
 1. Put its backend canister into `notification_sender` in `icp.yaml`.
 2. Build the frontend with the same canister and that instance's authorize URL,
@@ -116,8 +117,8 @@ one, say a staging instance:
    `icp deploy`, so the variables go on that command:
 
    ```bash
-   VITE_II_URL=https://<its frontend>.icp0.io/authorize \
-   VITE_II_CANISTER_ID=<its backend canister> \
+   VITE_II_URL=https://beta.id.ai/authorize \
+   VITE_II_CANISTER_ID=fgte5-ciaaa-aaaad-aaatq-cai \
    icp deploy -e ic
    ```
 
