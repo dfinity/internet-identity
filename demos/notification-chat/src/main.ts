@@ -249,6 +249,8 @@ let busy = false;
 let sending = false;
 /** A claim in flight, likewise. */
 let claiming = false;
+/** A join in flight, so a room that says we are out is not joined twice. */
+let rejoining = false;
 /** Who is called what, by principal, as the last read of the room said. */
 let names = new Map<string, string>();
 /** The room as it was last drawn, so an unchanged room is left alone. */
@@ -302,11 +304,28 @@ const render = () => {
   sendBtn.disabled = textEl.disabled || sending || textEl.value.trim() === "";
 };
 
+/**
+ * Joins again where the room no longer lists this identity: an upgrade empties
+ * the room, and a page left open would otherwise say "Joining…" until it is
+ * reloaded. Not while the sign-out is leaving, which is what `busy` covers.
+ */
+const rejoinIfDropped = () => {
+  if (joined || rejoining || busy || !client.isAuthenticated()) return;
+  rejoining = true;
+  void write()
+    .then((chat) => chat.join())
+    .catch((error) => showStatus(describe(error)))
+    .finally(() => {
+      rejoining = false;
+    });
+};
+
 const renderRoom = (room: Room) => {
   const principal = me()?.toText();
   joined =
     principal !== undefined &&
     room.members.some((member) => member.who.toText() === principal);
+  rejoinIfDropped();
 
   // Left alone when nothing changed: rebuilding the lists on every poll would
   // have assistive technology read them out again. Messages arrive at the end
