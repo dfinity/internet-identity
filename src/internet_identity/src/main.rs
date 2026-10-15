@@ -413,12 +413,16 @@ fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool 
 /// carries. Answers only about the caller's own entry, so one browser cannot learn what
 /// another has installed.
 ///
-/// `None` both for a browser that points at nothing and for a caller that is no browser
-/// of this identity, so neither can be probed with it.
+/// `None` for a browser that points at nothing, for a caller that is no browser of this
+/// identity, and where this deployment does not notify. None of the three can be told
+/// apart, so none can be probed with it.
 #[query]
 fn get_notification_app_status(
     request: GetNotificationAppStatusRequest,
 ) -> Option<NotificationAppInfo> {
+    if !notifications::notifications_enabled() {
+        return None;
+    }
     let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
         return None;
     };
@@ -440,6 +444,11 @@ fn get_notification_app_status(
 fn set_notification_app_enabled(
     request: SetNotificationAppEnabledRequest,
 ) -> Result<(), SetNotificationAppEnabledError> {
+    if !notifications::notifications_enabled() {
+        return Err(SetNotificationAppEnabledError::InternalCanisterError(
+            "notifications are not enabled".to_string(),
+        ));
+    }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
         .map_err(|_| SetNotificationAppEnabledError::NoNotificationApp)?;
     if anchor.notification_app(browser_id).is_none() {
