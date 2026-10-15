@@ -3271,6 +3271,12 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Result<NotificationApp, StorageError> {
         let principal = Principal::self_authenticating(key);
         if let Some(app) = self.notification_app_with_principal(principal) {
+            let app = NotificationApp {
+                last_used: now,
+                ..app
+            };
+            self.notification_app_memory
+                .insert(app.id, StorableNotificationApp::from(app.clone()));
             return Ok(app);
         }
         let app = NotificationApp {

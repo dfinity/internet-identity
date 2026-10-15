@@ -7494,7 +7494,8 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
 
 /// One installed app is one record. The app holds the key it generated on its first open
 /// and presents it again at every later setup, and what it has registered against that
-/// record has to survive the second one.
+/// record has to survive the second one. The second setup is the app itself calling, so
+/// it is also the liveness the install page reads.
 #[test]
 fn an_app_key_seen_again_keeps_the_record_it_already_had() {
     let memory = VectorMemory::default();
@@ -7510,9 +7511,10 @@ fn an_app_key_seen_again_keeps_the_record_it_already_had() {
 
     assert_eq!(first.id, again.id);
     assert_eq!(again.created_at, 1_000);
+    assert_eq!(again.last_used, 2_000);
     assert_eq!(
         storage.notification_app_with_principal(Principal::self_authenticating(&key)),
-        Some(first)
+        Some(again)
     );
 }
 
