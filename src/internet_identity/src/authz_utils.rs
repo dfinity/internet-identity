@@ -1,5 +1,6 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
+use crate::notifications::app::NotificationApp;
 use crate::session_delegation::expected_session_principal;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
@@ -166,6 +167,22 @@ pub fn check_authorization(
     }
 
     Err(AuthorizationError::from(caller))
+}
+
+/// The notification app the caller is signing as, if it is one.
+///
+/// An app key is in no anchor's browser list, so it resolves here and nowhere else, and
+/// a browser key resolves there and not here. The two are different kinds of caller
+/// with different rights: a browser signs in and holds sessions, an app does neither and
+/// may only act on its own record and on the notifications of the identities that point
+/// at it.
+///
+/// Takes no anchor, because an app's record is not inside one. Where a call is about a
+/// particular identity, the caller checks that this app is pointed at by it.
+pub fn check_app_authorization() -> Result<NotificationApp, AuthorizationError> {
+    let caller = caller();
+    state::storage_borrow(|storage| storage.notification_app_with_principal(caller))
+        .ok_or(AuthorizationError::from(caller))
 }
 
 /// Which of this identity's browsers the caller is signing as.

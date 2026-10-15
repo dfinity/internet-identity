@@ -8,8 +8,8 @@ use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
-    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization, AuthorizationError,
+    anchor_operation_with_authz_check, check_app_authorization, check_authorization,
+    check_authz_and_record_activity, check_browser_authorization, AuthorizationError,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -394,6 +394,24 @@ const LINK_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 /// have minted.
 fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
     expires_at_ns > now && expires_at_ns <= now.saturating_add(LINK_TOKEN_LIFETIME_NS)
+}
+
+/// The identities this Home Screen app delivers for.
+///
+/// Authorized as the app rather than as a browser of some identity: the app is in no
+/// anchor's browser list, and the answer is about the app itself. Its own storage knows
+/// only the identity whose token installed it, so without this it could not find the
+/// identities other browsers on the device pointed at it.
+///
+/// Empty where the app has a record nothing points at any more, and where it has no
+/// record at all. Both mean the same thing to the app: there is nobody here to deliver
+/// for, and the user is sent back to their browser to set it up again.
+#[query]
+fn notification_app_anchors() -> Vec<AnchorNumber> {
+    let Ok(app) = check_app_authorization() else {
+        return vec![];
+    };
+    state::storage_borrow(|storage| storage.anchors_with_notification_app(app.id))
 }
 
 /// Gives a Home Screen app a record of its own, and points the installing browser at it.

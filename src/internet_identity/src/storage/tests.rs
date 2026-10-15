@@ -7574,3 +7574,91 @@ fn app_records_and_their_counter_survive_an_upgrade() {
         1
     );
 }
+
+/// An anchor at `anchor_number` with one browser registered, whose id is 0.
+fn anchor_with_browser(
+    storage: &mut Storage<VectorMemory>,
+    anchor_number: AnchorNumber,
+) -> crate::storage::anchor::Anchor {
+    let mut anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+    assert_eq!(anchor.anchor_number(), anchor_number);
+    anchor
+        .resolve_browser(browser_key(1, 0), browser_key(1, 1), description(1), 0)
+        .expect("registering a browser");
+    anchor
+}
+
+/// The index is how an app finds the identities it serves: its own storage knows only
+/// the one whose token installed it.
+#[test]
+fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let key = ByteBuf::from(vec![7u8; 91]);
+    let app = storage
+        .notification_app_for_key(&key, 1_000)
+        .expect("creating the record");
+
+    for anchor_number in [10_000, 10_001] {
+        let mut anchor = anchor_with_browser(&mut storage, anchor_number);
+        anchor.point_at_notification_app(0, app.id);
+        storage.write(anchor).expect("writing the anchor");
+    }
+
+    assert_eq!(
+        storage.anchors_with_notification_app(app.id),
+        vec![10_000, 10_001]
+    );
+}
+
+/// A record nothing points at is gone: it cannot be delivered to, cannot be found, and
+/// cannot be pointed at again, because only a token spent by the app itself makes a
+/// reference and the app would be making a fresh record by then.
+#[test]
+fn an_app_nothing_points_at_is_deleted() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let key = ByteBuf::from(vec![7u8; 91]);
+    let app = storage
+        .notification_app_for_key(&key, 1_000)
+        .expect("creating the record");
+    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    anchor.point_at_notification_app(0, app.id);
+    storage.write(anchor).expect("pointing at the app");
+
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor.stop_pointing_at_notification_app(0);
+    storage.write(anchor).expect("dropping the reference");
+
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
+        None
+    );
+}
+
+/// One identity letting go of an app leaves the record alone while another still points
+/// at it: the app is one thing on the device, shared by everyone who claimed it.
+#[test]
+fn an_app_outlives_one_identity_letting_go_of_it() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let key = ByteBuf::from(vec![7u8; 91]);
+    let app = storage
+        .notification_app_for_key(&key, 1_000)
+        .expect("creating the record");
+    for anchor_number in [10_000, 10_001] {
+        let mut anchor = anchor_with_browser(&mut storage, anchor_number);
+        anchor.point_at_notification_app(0, app.id);
+        storage.write(anchor).expect("writing the anchor");
+    }
+
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor.stop_pointing_at_notification_app(0);
+    storage.write(anchor).expect("dropping one reference");
+
+    assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
+    assert!(storage
+        .notification_app_with_principal(Principal::self_authenticating(&key))
+        .is_some());
+}
