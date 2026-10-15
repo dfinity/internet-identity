@@ -1886,6 +1886,31 @@ type LinkNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
+// Offers the Home Screen app this browser has to another identity signed in on the
+// same browser, which is the only party that can reach both. The handle says nothing
+// about which app it is.
+type OfferNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type OfferNotificationAppError = variant {
+    // This browser has no app to offer.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+// Points this browser at the app another identity on it offered.
+type ClaimNotificationAppRequest = record {
+    anchor_number : UserNumber;
+    handle : blob;                     // good once, and only before it expires
+};
+
+type ClaimNotificationAppError = variant {
+    // Unknown, already spent, or past its expiry.
+    InvalidHandle;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2548,6 +2573,11 @@ service : (opt InternetIdentityInit) -> {
     // record it has, this deployment does not notify, or the caller is not an app.
     notification_app_anchors : () -> (vec UserNumber) query;
 
+    // Called by the identity that has the app, from the browser that has it.
+    offer_notification_app : (OfferNotificationAppRequest) -> (variant { Ok : blob; Err : OfferNotificationAppError });
+
+    // Called by the identity being added, from the same browser, with that handle.
+    claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.

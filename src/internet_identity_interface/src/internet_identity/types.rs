@@ -1144,6 +1144,39 @@ pub enum LinkNotificationAppError {
     InternalCanisterError(String),
 }
 
+/// Offers the Home Screen app this browser has to another identity signed in on the same
+/// browser, which is the only party that can reach both.
+///
+/// The app is one thing on the device and serves every identity that points at it, but
+/// nothing can reach into its storage to ask: it is a partition away. So the identity
+/// that has it offers a handle, and the identity being added spends it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct OfferNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum OfferNotificationAppError {
+    /// This browser has no app to offer.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+/// Points this browser at the app another identity on it offered.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ClaimNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// What the offering identity was given. Good once, and only before it expires.
+    pub handle: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ClaimNotificationAppError {
+    /// The handle is unknown, already spent, or past its expiry.
+    InvalidHandle,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,

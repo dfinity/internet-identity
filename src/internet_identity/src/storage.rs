@@ -126,11 +126,15 @@ use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::notification_app::{
     StorableNotificationApp, StorableNotificationAppId,
 };
+use crate::storage::storable::notification_app_handle::{
+    StorableNotificationAppHandle, StorableNotificationAppOffer,
+};
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
 use crate::storage::storable::session_id::StorableSessionId;
 use internet_identity_interface::internet_identity::types::*;
+use sha2::{Digest, Sha256};
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
 use storable::application::StorableApplication;
@@ -224,6 +228,7 @@ const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 38u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 39u8;
 const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX: u8 = 40u8;
+const NOTIFICATION_APP_HANDLE_MEMORY_INDEX: u8 = 41u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -336,6 +341,11 @@ const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
 /// a record has no one left to deliver for.
 const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX);
+
+/// The short-lived handles a browser hands to another identity on the same device, so it
+/// can point at the app without ever being told its id.
+const NOTIFICATION_APP_HANDLE_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATION_APP_HANDLE_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -488,6 +498,13 @@ pub struct Storage<M: Memory> {
     lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchors_with_notification_app_memory:
         StableBTreeMap<StorableNotificationAppId, StorableAnchorNumberList, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the app handles.
+    notification_app_handle_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    notification_app_handle_memory: StableBTreeMap<
+        StorableNotificationAppHandle,
+        StorableNotificationAppOffer,
+        ManagedMemory<M>,
+    >,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -639,6 +656,7 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
         let lookup_anchors_with_notification_app_memory =
             memory_manager.get(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID);
+        let notification_app_handle_memory = memory_manager.get(NOTIFICATION_APP_HANDLE_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -750,6 +768,10 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_anchors_with_notification_app_memory: StableBTreeMap::init(
                 lookup_anchors_with_notification_app_memory,
             ),
+            notification_app_handle_memory_wrapper: MemoryWrapper::new(
+                notification_app_handle_memory.clone(),
+            ),
+            notification_app_handle_memory: StableBTreeMap::init(notification_app_handle_memory),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -1577,6 +1599,51 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_anchors_with_notification_app_memory
                 .insert(*app_id, StorableAnchorNumberList::from(anchors));
         }
+    }
+
+    /// Offers the app `app_id` to another identity on this device, answering the handle
+    /// that identity spends to point at it.
+    ///
+    /// A handle rather than the id itself, because the id is this canister's and says
+    /// which anchors share a device. Derived from the salt, so it cannot be guessed, and
+    /// bound to one app and one expiry.
+    pub fn offer_notification_app(
+        &mut self,
+        app_id: NotificationAppId,
+        anchor_number: AnchorNumber,
+        expires_at_ns: Timestamp,
+    ) -> Result<[u8; 32], StorageError> {
+        let salt = self.salt().ok_or(StorageError::MissingSalt)?;
+        let mut hasher = Sha256::new();
+        hasher.update(salt);
+        hasher.update(b"ii-notification-app-handle");
+        hasher.update(app_id.to_be_bytes());
+        hasher.update(anchor_number.to_be_bytes());
+        hasher.update(expires_at_ns.to_be_bytes());
+        let handle: [u8; 32] = hasher.finalize().into();
+        self.notification_app_handle_memory.insert(
+            StorableNotificationAppHandle(handle),
+            StorableNotificationAppOffer {
+                app_id,
+                expires_at_ns,
+            },
+        );
+        Ok(handle)
+    }
+
+    /// Spends a handle, answering the app it was offered for.
+    ///
+    /// Good once: a handle that has been spent is gone, so one offer points one identity
+    /// at the app and a copied handle is worth nothing after that. An expired one is
+    /// removed rather than honoured, which is also how the map stays small.
+    pub fn take_notification_app_offer(
+        &mut self,
+        handle: [u8; 32],
+        now: Timestamp,
+    ) -> Option<NotificationAppId> {
+        let key = StorableNotificationAppHandle(handle);
+        let offer = self.notification_app_handle_memory.remove(&key)?;
+        (offer.expires_at_ns > now).then_some(offer.app_id)
     }
 
     /// The anchors pointing at `app_id`, which is what the app asks for to know who it
@@ -4488,6 +4555,10 @@ impl<M: Memory + Clone> Storage<M> {
                     .size(),
             ),
             (
+                "notification_app_handle".to_string(),
+                self.notification_app_handle_memory_wrapper.size(),
+            ),
+            (
                 "lookup_session_with_principal".to_string(),
                 self.lookup_session_with_principal_memory_wrapper.size(),
             ),
@@ -4948,6 +5019,8 @@ pub enum StorageError {
     /// browser pointing at a deleted record must never resolve to another app.
     NotificationAppIdOverflow,
     ErrorUpdatingNotificationAppIdAllocator,
+    /// The canister has no salt yet, so nothing unguessable can be derived from it.
+    MissingSalt,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -5074,6 +5147,7 @@ impl fmt::Display for StorageError {
             Self::ErrorUpdatingNotificationAppIdAllocator => {
                 write!(f, "Error updating the notification app id allocator")
             }
+            Self::MissingSalt => write!(f, "The canister has no salt yet"),
             Self::UnstorableAccountReferenceList {
                 anchor_number,
                 application_number,
