@@ -75,11 +75,21 @@ type Misconfigured = variant {
   NotAuthorizedSender;
 };
 type MisconfiguredSince = record { why : Misconfigured; since : nat64 };
-type Room = record { members : vec Member; messages : vec Message };
+type Room = record {
+  members : vec Member;
+  messages : vec Message;
+  // The claimed names of the members and of whoever wrote a message
+  // still in the room. Filled in by the canister when the room is read.
+  names : vec record { principal; text };
+};
 service : () -> {
   _internet_identity_notification_content : (nat64) -> (opt Content) query;
   _internet_identity_notification_opened : (nat64) -> ();
   _internet_identity_notification_received : (nat64) -> ();
+  // Claims a name for the caller, replacing the one they had: the name as
+  // written where nobody else has it, else the first free `name_1`, `name_2`,
+  // … Returns the name given. Names are kept across upgrades.
+  claim_name : (text) -> (text);
   http_request : (HttpRequest) -> (HttpResponse) query;
   // Joins the room, which is what makes the caller a recipient of what others
   // send. Nothing happens for somebody already in.
@@ -88,6 +98,7 @@ service : () -> {
   leave : () -> ();
   // The notification library's delivery metrics, an hour per bucket.
   notification_metrics : () -> (Metrics) query;
+  // The room, with the names of everyone in it or heard in it.
   room : () -> (Room) query;
   // Posts a message and notifies everyone else in the room.
   send : (text) -> ();

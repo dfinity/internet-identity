@@ -11,6 +11,16 @@
     <header>
       <h1>Notification chat</h1>
       <span id="me" class="me"></span>
+      <form id="claim" class="claim" hidden>
+        <input
+          id="name"
+          type="text"
+          placeholder="Claim a name"
+          maxlength="32"
+          autocomplete="off"
+        />
+        <button id="claim-btn" type="submit" disabled>Claim</button>
+      </form>
       <button id="auth" class="auth" disabled>Loading…</button>
     </header>
 

@@ -36,6 +36,9 @@ pub struct Message {
 pub struct Room {
     pub members: Vec<Member>,
     pub messages: Vec<Message>,
+    /// The claimed names of the members and of whoever wrote a message
+    /// still in the room. Filled in by the canister when the room is read.
+    pub names: Vec<(Principal, String)>,
 }
 
 /// Why the room would not do what was asked.

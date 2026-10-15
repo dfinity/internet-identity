@@ -1,6 +1,7 @@
 // The whole frontend: a sign-in button that also asks Internet Identity
-// whether this app may notify, the room read every few seconds, a line to type
-// in, and a panel with the notification library's delivery stats.
+// whether this app may notify and what the user is called, the room read every
+// few seconds, a line to type in, a line to claim a name on, and a panel with
+// the notification library's delivery stats.
 
 import { AuthClient } from "@icp-sdk/auth/client";
 import { Actor, HttpAgent, type Identity } from "@icp-sdk/core/agent";
@@ -70,6 +71,8 @@ interface Message {
 interface Room {
   members: Member[];
   messages: Message[];
+  /** The claimed names of the members and of whoever wrote a message. */
+  names: [Principal, string][];
 }
 
 interface Counts {
@@ -92,6 +95,8 @@ interface ChatService {
   join: () => Promise<void>;
   leave: () => Promise<void>;
   send: (text: string) => Promise<void>;
+  /** Returns the name given, which is the one asked for unless taken. */
+  claim_name: (wanted: string) => Promise<string>;
   room: () => Promise<Room>;
   notification_metrics: () => Promise<Metrics>;
 }
@@ -110,6 +115,7 @@ const idlFactory: IDL.InterfaceFactory = ({ IDL }) => {
     messages: IDL.Vec(
       IDL.Record({ from: IDL.Principal, at: IDL.Nat64, text: IDL.Text }),
     ),
+    names: IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Text)),
   });
   const Metrics = IDL.Record({
     hours: IDL.Vec(IDL.Record({ start: IDL.Nat64, counts: Counts })),
@@ -130,6 +136,7 @@ const idlFactory: IDL.InterfaceFactory = ({ IDL }) => {
     join: IDL.Func([], [], []),
     leave: IDL.Func([], [], []),
     send: IDL.Func([IDL.Text], [], []),
+    claim_name: IDL.Func([IDL.Text], [IDL.Text], []),
     room: IDL.Func([], [Room], ["query"]),
     notification_metrics: IDL.Func([], [Metrics], ["query"]),
   });
@@ -147,6 +154,50 @@ const actorFor = async (identity?: Identity): Promise<ChatService> => {
   });
 };
 
+// ===== The name Internet Identity may hand over =====
+
+type Icrc3Value =
+  | { Nat: bigint }
+  | { Int: bigint }
+  | { Blob: Uint8Array }
+  | { Text: string }
+  | { Array: Icrc3Value[] }
+  | { Map: [string, Icrc3Value][] };
+
+/** What the signed attributes are encoded as. */
+const Icrc3ValueIdl = IDL.Rec();
+Icrc3ValueIdl.fill(
+  IDL.Variant({
+    Nat: IDL.Nat,
+    Int: IDL.Int,
+    Blob: IDL.Vec(IDL.Nat8),
+    Text: IDL.Text,
+    Array: IDL.Vec(Icrc3ValueIdl),
+    Map: IDL.Vec(IDL.Tuple(IDL.Text, Icrc3ValueIdl)),
+  }),
+);
+
+/**
+ * The name in a signed attribute bundle, or none. The bundle is a map: the
+ * name sits under `name`, or under a scoped key such as
+ * `openid:<issuer>:name`, beside `implicit:*` entries about the bundle itself.
+ * Its signature is not checked: a name is what somebody wants to be called,
+ * and the room treats one Internet Identity handed over no differently from
+ * one typed in.
+ */
+const nameAmong = (data: Uint8Array): string | undefined => {
+  const [bundle] = IDL.decode([Icrc3ValueIdl], data) as unknown as [Icrc3Value];
+  if (!("Map" in bundle)) return undefined;
+  for (const [key, value] of bundle.Map) {
+    const isName =
+      key === "name" || (key.endsWith(":name") && !key.startsWith("implicit:"));
+    if (isName && "Text" in value && value.Text.trim() !== "") {
+      return value.Text.trim();
+    }
+  }
+  return undefined;
+};
+
 // ===== The page =====
 
 const element = <T extends HTMLElement>(id: string): T => {
@@ -157,6 +208,9 @@ const element = <T extends HTMLElement>(id: string): T => {
 
 const authBtn = element<HTMLButtonElement>("auth");
 const meEl = element<HTMLSpanElement>("me");
+const claimEl = element<HTMLFormElement>("claim");
+const nameEl = element<HTMLInputElement>("name");
+const claimBtn = element<HTMLButtonElement>("claim-btn");
 const messagesEl = element<HTMLDivElement>("messages");
 const membersEl = element<HTMLUListElement>("members");
 const composeEl = element<HTMLFormElement>("compose");
@@ -176,6 +230,10 @@ let joined = false;
 let busy = false;
 /** A send in flight: one goes at a time, and the line stays open meanwhile. */
 let sending = false;
+/** A claim in flight, likewise. */
+let claiming = false;
+/** Who is called what, by principal, as the last read of the room said. */
+let names = new Map<string, string>();
 /** The room as it was last drawn, so an unchanged room is left alone. */
 let shownRoom = "";
 /** When the newest message drawn arrived, so a newer one scrolls into view. */
@@ -188,6 +246,10 @@ const short = (principal: Principal): string => {
   const groups = principal.toText().split("-");
   return groups.length > 1 ? `${groups[0]}…${groups.at(-1)}` : groups[0]!;
 };
+
+/** Somebody as they are shown: their claimed name, or their principal's ends. */
+const nameOf = (principal: Principal): string =>
+  names.get(principal.toText()) ?? short(principal);
 
 const timeOf = (nanos: bigint): string =>
   new Date(Number(nanos / 1_000_000n)).toLocaleTimeString();
@@ -204,7 +266,15 @@ const render = () => {
   const principal = me();
   authBtn.textContent = busy ? "…" : signedIn ? "Sign out" : "Sign in";
   authBtn.disabled = busy;
-  meEl.textContent = principal === undefined ? "" : short(principal);
+  meEl.textContent = principal === undefined ? "" : nameOf(principal);
+  meEl.title = principal === undefined ? "" : principal.toText();
+  claimEl.hidden = !signedIn;
+  nameEl.placeholder =
+    principal !== undefined && names.has(principal.toText())
+      ? "Change your name"
+      : "Claim a name";
+  claimBtn.textContent = claiming ? "Claiming…" : "Claim";
+  claimBtn.disabled = busy || claiming || nameEl.value.trim() === "";
   textEl.disabled = !(signedIn && joined);
   textEl.placeholder = signedIn
     ? joined
@@ -228,6 +298,7 @@ const renderRoom = (room: Room) => {
   const fingerprint = [
     principal,
     room.members.map((member) => member.who.toText()).join(","),
+    room.names.map(([who, name]) => `${who.toText()}=${name}`).join(","),
     room.messages.length,
     room.messages[0]?.at,
     newest,
@@ -237,12 +308,13 @@ const renderRoom = (room: Room) => {
     return;
   }
   shownRoom = fingerprint;
+  names = new Map(room.names.map(([who, name]) => [who.toText(), name]));
 
   membersEl.replaceChildren(
     ...room.members.map((member) => {
       const item = document.createElement("li");
       const mine = member.who.toText() === principal;
-      item.textContent = `${short(member.who)}${mine ? " (you)" : ""}`;
+      item.textContent = `${nameOf(member.who)}${mine ? " (you)" : ""}`;
       item.title = member.who.toText();
       return item;
     }),
@@ -267,7 +339,7 @@ const renderRoom = (room: Room) => {
         row.className = mine ? "message mine" : "message";
         const who = document.createElement("span");
         who.className = "who";
-        who.textContent = mine ? "you" : short(message.from);
+        who.textContent = nameOf(message.from);
         who.title = message.from.toText();
         const when = document.createElement("span");
         when.className = "when";
@@ -389,12 +461,20 @@ const refresh = async () => {
   }
 };
 
+/** Claims a name, and says so where what was given is not what was asked. */
+const claim = async (chat: ChatService, wanted: string): Promise<void> => {
+  const given = await chat.claim_name(wanted);
+  if (given !== wanted) {
+    showStatus(`${wanted} is taken, so you are ${given}.`);
+  }
+};
+
 const whileBusy = async (run: () => Promise<void>) => {
   busy = true;
+  showStatus("");
   render();
   try {
     await run();
-    showStatus("");
   } catch (error) {
     showStatus(describe(error));
   } finally {
@@ -429,16 +509,36 @@ authBtn.addEventListener("click", () => {
     const signedIn = client.signIn();
     const consent = client.requestNotificationConsent().then(
       (granted) =>
-        granted ? undefined : "Internet Identity will not notify you here",
-      (error) => `asking to notify failed: ${describe(error)}`,
+        granted
+          ? undefined
+          : "Internet Identity will not notify you here, so you will only see messages on this page.",
+      (error) =>
+        `Asking to notify failed (${describe(error)}), so you will only see messages on this page.`,
     );
+    // The name Internet Identity holds for this identity, where it holds one
+    // and the user agrees to share it. An identity signed in with a passkey
+    // alone has none, and is answered with an empty bundle. A fresh nonce
+    // each time: the bundle is read, not verified.
+    const named = client
+      .requestAttributes({
+        keys: ["name"],
+        nonce: () =>
+          Promise.resolve(crypto.getRandomValues(new Uint8Array(32))),
+      })
+      .then(
+        (signed) => nameAmong(signed.data),
+        () => undefined,
+      );
     await signedIn;
     const notNotified = await consent;
-    await (await write()).join();
+    const provided = await named;
+    const chat = await write();
+    await chat.join();
+    if (provided !== undefined) {
+      await claim(chat, provided);
+    }
     if (notNotified !== undefined) {
-      throw new Error(
-        `${notNotified}, so you will only see messages on this page.`,
-      );
+      showStatus(`${statusEl.textContent ?? ""} ${notNotified}`.trim());
     }
   });
 });
@@ -469,6 +569,29 @@ composeEl.addEventListener("submit", (event) => {
 });
 
 textEl.addEventListener("input", render);
+
+claimEl.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const wanted = nameEl.value.trim();
+  if (wanted === "" || claimBtn.disabled) return;
+  claiming = true;
+  showStatus("");
+  render();
+  void (async () => {
+    try {
+      await claim(await write(), wanted);
+      nameEl.value = "";
+    } catch (error) {
+      showStatus(`Not claimed: ${describe(error)}`);
+    } finally {
+      claiming = false;
+      render();
+      await refresh();
+    }
+  })();
+});
+
+nameEl.addEventListener("input", render);
 
 statsToggle.addEventListener("click", () => {
   statsEl.hidden = !statsEl.hidden;

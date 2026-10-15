@@ -1,9 +1,9 @@
 //! One chatroom, to try Internet Identity notifications end to end.
 //!
 //! Every message notifies everyone else in the room, under one key, so what a
-//! recipient sees is always the latest message. The canister serves its own
-//! frontend, and lists itself as the one canister allowed to notify for its
-//! origin.
+//! recipient sees is always the latest message. Members can claim a name,
+//! unique among the names claimed. The canister serves its own frontend, and
+//! lists itself as the one canister allowed to notify for its origin.
 
 use asset_util::{
     collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType, HeaderField,
@@ -11,16 +11,22 @@ use asset_util::{
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::{canister_self, certified_data_set, msg_caller, time, trap};
 use ic_cdk::{init, post_upgrade, query, update};
-use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
-use ic_stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
+use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
 use identity_notifications as notifications;
 use identity_notifications::{Memories, Metrics, Notification};
 use include_dir::{include_dir, Dir};
 use serde_bytes::ByteBuf;
 use std::cell::RefCell;
 
+mod names;
 mod room;
 use room::{Refused, Room};
+
+type Memory = VirtualMemory<DefaultMemoryImpl>;
+
+/// The library's memories are 0 to 2; this app keeps out of them.
+const NAMES_MEMORY: MemoryId = MemoryId::new(3);
 
 // The endpoints Internet Identity calls: the content of a notification this
 // canister sent, and the reports that one was shown and acted on.
@@ -42,6 +48,11 @@ thread_local! {
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
     static MEMORIES: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
+    /// Who is called what. In stable memory, unlike the room: a name is a
+    /// fact about an identity, and outlives the room an upgrade empties.
+    static NAMES: RefCell<StableBTreeMap<Principal, String, Memory>> = RefCell::new(
+        StableBTreeMap::init(MEMORIES.with_borrow(|manager| manager.get(NAMES_MEMORY))),
+    );
 }
 
 #[init]
@@ -59,8 +70,9 @@ fn init() {
     });
 }
 
-/// The room lives on the heap, so an upgrade empties it. The notification
-/// library's state is in stable memory and only needs its handle back.
+/// The room lives on the heap, so an upgrade empties it. The names and the
+/// notification library's state are in stable memory and only need their
+/// handles back.
 #[post_upgrade]
 fn post_upgrade() {
     init()
@@ -92,13 +104,14 @@ fn send(text: String) {
         .with_borrow_mut(|room| room.post(from, &text, time()))
         .unwrap_or_else(refuse);
 
+    let author = name_of(from).unwrap_or_else(|| short(from));
     for recipient in posted.recipients {
         notifications::send(
             recipient,
             Notification {
                 // Internet Identity puts this app's name in front of the title,
                 // so the title itself names who wrote it.
-                title: short(from),
+                title: author.clone(),
                 body: posted.message.text.clone(),
                 url: app_url(),
                 key: Some(NOTIFICATION_KEY.to_string()),
@@ -108,9 +121,47 @@ fn send(text: String) {
     }
 }
 
+/// The room, with the names of everyone in it or heard in it.
 #[query]
 fn room() -> Room {
-    ROOM.with_borrow(Clone::clone)
+    let mut room = ROOM.with_borrow(Clone::clone);
+    let mut named: Vec<Principal> = room
+        .members
+        .iter()
+        .map(|member| member.who)
+        .chain(room.messages.iter().map(|message| message.from))
+        .collect();
+    named.sort();
+    named.dedup();
+    room.names = named
+        .into_iter()
+        .filter_map(|who| name_of(who).map(|name| (who, name)))
+        .collect();
+    room
+}
+
+/// Claims a name for the caller, replacing the one they had: the name as
+/// written where nobody else has it, else the first free `name_1`, `name_2`,
+/// … Returns the name given. Names are kept across upgrades.
+#[update]
+fn claim_name(wanted: String) -> String {
+    let who = signed_in_caller();
+    NAMES.with_borrow_mut(|names| {
+        let taken_by_others = |candidate: &str| {
+            names
+                .iter()
+                .any(|entry| *entry.key() != who && names::same(&entry.value(), candidate))
+        };
+        let Some(name) = names::assign(&wanted, taken_by_others) else {
+            trap("a name needs at least one character");
+        };
+        names.insert(who, name.clone());
+        name
+    })
+}
+
+fn name_of(who: Principal) -> Option<String> {
+    NAMES.with_borrow(|names| names.get(&who))
 }
 
 /// The notification library's delivery metrics, an hour per bucket.

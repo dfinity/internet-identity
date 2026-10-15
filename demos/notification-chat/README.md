@@ -12,11 +12,19 @@ It is a project of its own inside this repository (its own Cargo workspace,
 
 - **Sign in** signs in with Internet Identity over ICRC-25 and, as part of the
   same ceremony, asks whether this app may notify the user
-  (`requestNotificationConsent`). Allowing registers the browser for Web Push.
-  Once signed in, the identity joins the room. **Sign out** leaves it.
+  (`requestNotificationConsent`) and what they are called (`requestAttributes`
+  for `name`). Allowing registers the browser for Web Push. Once signed in, the
+  identity joins the room. **Sign out** leaves it.
+- **Names.** A name Internet Identity hands over at sign-in is claimed for the
+  identity; an identity without one (a passkey alone carries none) can claim
+  one on the line next to its name, and either can change it later. Names are
+  unique among the names claimed, compared without regard to case: a second
+  Alice becomes `Alice_1`, a third `Alice_2`. Everywhere a name is shown,
+  hovering over it shows the principal, and somebody without a name is shown
+  as their principal's ends. Names outlive an upgrade; the room does not.
 - **Send** stores the message and notifies every other member through the
   [`identity-notifications`](vendor/identity-notifications) library. The
-  notification's title names who wrote it, its body is the message, and its
+  notification's title is the writer's name, its body is the message, and its
   link is this app's origin, so acting on it opens the app. Every notification
   uses the same key, so a recipient who has not acted on the previous one sees
   it replaced by the latest message rather than stacked beside it.
@@ -36,6 +44,7 @@ messages, and lives on the heap, so an upgrade empties it.
 | ------------------------------- | ---------------------------------------------------------------------------------- |
 | `lib.rs`                        | The canister: the room's methods, the notification endpoints, and the frontend.    |
 | `room.rs`                       | The room itself, as plain state with unit tests.                                   |
+| `names.rs`                      | The rule that keeps claimed names unique, with unit tests.                         |
 | `chat.did`                      | The Candid interface, exported from the code (`BLESS=1 cargo test` rewrites it).   |
 | `src/`                          | The frontend: one page, one script, one stylesheet, built with Vite.               |
 | `asset_util/`                   | Asset certification, a copy of `src/asset_util` on the ic-cdk the library needs.   |

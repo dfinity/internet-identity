@@ -60,8 +60,24 @@ h2 {
 }
 
 .me {
-  font-family: ui-monospace, monospace;
-  color: var(--muted);
+  font-weight: 600;
+}
+
+.claim {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.claim[hidden] {
+  display: none;
+}
+
+.claim input {
+  width: 11rem;
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 button {
