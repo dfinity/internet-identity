@@ -24,11 +24,15 @@ vi.mock("$lib/utils/validateDerivationOrigin", () => ({
 /// of. What it resolves to is this suite's subject: whether a question opens a
 /// screen, and whether nothing to ask answers the app without one.
 vi.mock("$lib/utils/notifications/notificationState", () => ({
-  notificationsUnavailableHere: vi.fn(() => false),
   readBrowserPushState: vi.fn(() => Promise.resolve({})),
   readGranted: vi.fn(() => Promise.resolve(true)),
   resolveOptIn: vi.fn(() =>
-    Promise.resolve({ screen: "enable", state: {}, consented: false }),
+    Promise.resolve({
+      screen: "enable",
+      state: {},
+      consented: false,
+      installFirst: false,
+    }),
   ),
 }));
 vi.mock("$lib/stores/authentication.store", async () => {
@@ -62,7 +66,6 @@ import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
 import { waitForStore } from "$lib/utils/utils";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import {
-  notificationsUnavailableHere,
   readBrowserPushState,
   readGranted,
   resolveOptIn,
@@ -135,9 +138,9 @@ beforeEach(async () => {
     screen: "enable",
     state: {} as never,
     consented: false,
+    installFirst: false,
   });
   vi.mocked(readGranted).mockResolvedValue(true);
-  vi.mocked(notificationsUnavailableHere).mockReturnValue(false);
   notificationConsentStore.clear();
   (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(true);
   const { authorizationPromptStore, authorizedStore } =
@@ -362,6 +365,7 @@ describe("handleNotificationConsentRequest", () => {
       screen: "enable",
       state,
       consented: false,
+      installFirst: false,
     });
     let opened: NotificationConsentContext | undefined;
     const unsubscribe = notificationConsentStore.subscribe((context) => {
@@ -495,26 +499,149 @@ describe("handleNotificationConsentRequest", () => {
     expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });
 
-  /** iOS delivers notifications only to a Home Screen app, which is not built, so
-   *  nothing is offered there. The method exists, so this is an answer and not a
-   *  refusal: the app is told plainly that it may not notify here. */
-  it("answers no on iOS without opening a screen", async () => {
-    vi.mocked(notificationsUnavailableHere).mockReturnValue(true);
-    const opened = vi.fn();
+  it("opens the screen on the state the resolution read", async () => {
+    const state = {
+      supported: true,
+      permission: "denied" as NotificationPermission,
+      subscribed: false,
+      registered: false,
+    };
+    vi.mocked(resolveOptIn).mockResolvedValue({
+      screen: "enable",
+      state,
+      consented: false,
+      installFirst: false,
+    });
+    let opened: NotificationConsentContext | undefined;
     const unsubscribe = notificationConsentStore.subscribe((context) => {
-      if (context !== undefined) {
-        opened();
-      }
+      opened ??= context;
     });
 
-    const { sent, errors } = await run({ settle: false });
+    const { sent } = await run();
 
     unsubscribe();
-    expect(opened).not.toHaveBeenCalled();
-    expect(sent[0].result).toEqual({ granted: false });
-    expect(errors).toEqual([]);
-    expect(resolveOptIn).not.toHaveBeenCalled();
-    expect(readGranted).not.toHaveBeenCalled();
+    // Carried over rather than read again, so answering only does what is left.
+    expect(opened?.device).toBe(state);
+    expect(opened?.consented).toBe(false);
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Authorizing is what replaces the screen the user is on, so this request has to
+   *  own one from the moment it is accepted until it has asked: long enough that the
+   *  flow keeps their screen instead of passing through a half-built one. */
+  it("owns the screen from acceptance until the user has answered", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    await waitForStore(notificationConsentStore);
+    expect(get(pendingScreenStore)).toBe(true);
+
+    notificationConsentStore.settle();
+    await running;
+
+    expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  /** Reading the answer back takes two canister calls, and the screen the user came
+   *  from is not what belongs in front of them while that runs — the redirect is. */
+  it("releases the screen before reading the answer back", async () => {
+    let answer: (granted: boolean) => void;
+    vi.mocked(readGranted).mockReturnValueOnce(
+      new Promise((resolve) => (answer = resolve)),
+    );
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await vi.waitFor(() => expect(readGranted).toHaveBeenCalled());
+
+    expect(get(pendingScreenStore)).toBe(false);
+    expect(sent).toEqual([]);
+
+    answer!(true);
+    await running;
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Nothing left to ask puts no screen in front of the user, so the hold it took on
+   *  acceptance goes the moment it knows that. */
+  it("releases the screen where there is nothing to ask", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValueOnce({
+      screen: "skip",
+      granted: true,
+    });
+    const { sent } = await run({ settle: false });
+    expect(sent[0].result).toEqual({ granted: true });
+    expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  it("releases the screen for a request it refuses", async () => {
+    vi.mocked(validateDerivationOrigin).mockResolvedValue({
+      result: "invalid",
+      message: "not a related origin",
+    });
+    const { errors } = await run({ settle: false });
+    expect(errors).toEqual(["unverified-origin"]);
+    expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  /** The probe is taken when a request is accepted, so a ceremony that runs before
+   *  this one's turn can subscribe the browser it found bare. Asking from that
+   *  snapshot would offer to set up a device that is already set up. */
+  it("probes again where a ceremony ran between the probe and its turn", async () => {
+    const channel = {
+      origin: ORIGIN,
+      send: () => Promise.resolve(),
+    } as unknown as Channel;
+    const ask = (id: number) =>
+      handleNotificationConsentRequest(channel, () => {})({
+        jsonrpc: "2.0",
+        id,
+        method: NOTIFICATION_CONSENT_METHOD,
+        params: {},
+      } as unknown as JsonRequest);
+
+    // Both accepted, so both probe, before either holds the queue.
+    const first = ask(1);
+    const second = ask(2);
+    expect(readBrowserPushState).toHaveBeenCalledTimes(2);
+
+    // The first holds the queue. It reused its own probe, taken a moment earlier.
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await first;
+    expect(readBrowserPushState).toHaveBeenCalledTimes(2);
+
+    // The second's turn, with its probe now predating a ceremony.
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await second;
+    expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });
 
   it("reports what the canister recorded", async () => {

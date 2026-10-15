@@ -8,7 +8,12 @@
 // the registration and the app's consent are read once an identity is chosen.
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type {
+  _SERVICE,
+  NotificationAppInfo,
+} from "$lib/generated/internet_identity_types";
+import { browserAppStatus } from "../../../routes/(new-styling)/ios-icp-alerts/appStatus";
+import { claimDeviceApp } from "./deviceApp";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { recordPermission } from "./notificationDiagnostics";
@@ -121,12 +126,29 @@ const isRegisteredHere = async (
 const deliversHere = (state: DeviceNotificationState): boolean =>
   state.permission === "granted" && state.registered;
 
-/** iOS has no notifications yet: Safari delivers them only to a Home Screen app, and
- *  that is not built. Nothing is offered there and no app is told otherwise. */
-export const notificationsUnavailableHere = (): boolean => {
+/** Where what reaches the user is a Home Screen app rather than this browser. iOS
+ *  delivers web push nowhere else, so the browser's own permission and subscription say
+ *  nothing about whether notifications arrive. */
+export const notificationsNeedInstallHere = (): boolean => {
   const { os } = browserAndSystem();
   return "Ios" in os || "Ipados" in os;
 };
+
+/**
+ * The app's state in the shape the screens already read.
+ *
+ * `permission` and `registered` are this browser's words for something that happened in
+ * the app: it was opened and the permission was given there, which is what `subscribed`
+ * says, and this identity has it switched on.
+ */
+const asDeviceState = (
+  app: NotificationAppInfo | undefined,
+): DeviceNotificationState => ({
+  supported: true,
+  permission: app?.subscribed === true ? "granted" : "default",
+  subscribed: app?.subscribed === true,
+  registered: app?.subscribed === true && app.enabled,
+});
 
 export type OptInScreen = "enable" | "skip";
 
@@ -138,6 +160,9 @@ export type OptInResolution =
       screen: "enable";
       state: DeviceNotificationState;
       consented: boolean;
+      /** Whether answering installs the Home Screen app rather than asking this browser
+       *  for a permission it cannot act on. */
+      installFirst: boolean;
     };
 
 /**
@@ -165,6 +190,22 @@ export const resolveOptIn = async ({
       .catch(() => false),
     browser,
   ]);
+
+  // Where delivery is the app's, this browser's own permission and subscription are
+  // beside the point: what matters is whether an app on this device delivers for this
+  // identity. One that another identity here already has is pointed at rather than
+  // installed again, which costs the user nothing and iOS a second icon.
+  if (notificationsNeedInstallHere()) {
+    let app = await browserAppStatus(identityNumber);
+    if (app === undefined && (await claimDeviceApp(identityNumber))) {
+      app = await browserAppStatus(identityNumber);
+    }
+    const state = asDeviceState(app);
+    const screen = resolveOptInScreen(state, consented);
+    return screen === "skip"
+      ? { screen, granted: consented && deliversHere(state) }
+      : { screen, state, consented, installFirst: app?.subscribed !== true };
+  }
   // A browser we could not read is not one with nothing to ask. Offer the question
   // and let answering it read everything again.
   const state =
@@ -180,7 +221,7 @@ export const resolveOptIn = async ({
   const screen = resolveOptInScreen(state, consented);
   return screen === "skip"
     ? { screen, granted: consented && deliversHere(state) }
-    : { screen, state, consented };
+    : { screen, state, consented, installFirst: false };
 };
 
 /**
@@ -198,17 +239,26 @@ export const readGranted = async ({
   origin: string;
   actor: ActorSubclass<_SERVICE>;
 }): Promise<boolean> => {
+  const consented = await actor
+    .notification_consent_granted({ anchor_number: identityNumber, origin })
+    .catch(() => false);
+
+  // Asked the same way the resolution asks it, or an app told yes on one screen would
+  // be told no on the next. Where delivery is the Home Screen app's, this browser's own
+  // permission is not what the answer turns on.
+  if (notificationsNeedInstallHere()) {
+    const state = asDeviceState(await browserAppStatus(identityNumber));
+    return consented && deliversHere(state);
+  }
+
   const browserState = await readBrowserPushState();
   if (browserState === undefined) {
     return false;
   }
-  const [consented, state] = await Promise.all([
-    actor
-      .notification_consent_granted({ anchor_number: identityNumber, origin })
-      .catch(() => false),
-    readDeviceState(identityNumber, browserState),
-  ]);
-  return consented && deliversHere(state);
+  return (
+    consented &&
+    deliversHere(await readDeviceState(identityNumber, browserState))
+  );
 };
 
 /** Picks the opt-in screen from device state and existing consent. */

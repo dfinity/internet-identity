@@ -21,7 +21,7 @@ vi.mock("./pushSubscription", () => ({
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
-  notificationsUnavailableHere,
+  notificationsNeedInstallHere,
   readBrowserPushState,
   readDeviceState,
   readGranted,
@@ -101,17 +101,19 @@ describe("resolveOptInScreen", () => {
   });
 });
 
-describe("notificationsUnavailableHere", () => {
+describe("notificationsNeedInstallHere", () => {
   it("is false where the browser can deliver notifications", () => {
-    expect(notificationsUnavailableHere()).toBe(false);
+    expect(notificationsNeedInstallHere()).toBe(false);
   });
 
   it.each([["Ios"], ["Ipados"]])("is true on %s", (os) => {
-    vi.mocked(browserAndSystem).mockReturnValue({
+    // Once, not for good: every resolution below asks this, and a platform left behind
+    // here would send them all down the Home Screen app's path.
+    vi.mocked(browserAndSystem).mockReturnValueOnce({
       os: { [os]: null },
       brand: { Safari: null },
     } as never);
-    expect(notificationsUnavailableHere()).toBe(true);
+    expect(notificationsNeedInstallHere()).toBe(true);
   });
 });
 
@@ -289,7 +291,12 @@ describe("resolveOptIn", () => {
         actor: actorGranting(false),
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "enable", state: ready, consented: false });
+    ).resolves.toEqual({
+      screen: "enable",
+      state: ready,
+      consented: false,
+      installFirst: false,
+    });
   });
 
   /** A browser that could not be read is not a browser with nothing to ask. The
