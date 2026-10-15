@@ -3261,9 +3261,8 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// The record for `key`, creating one where this key has never been seen.
     ///
-    /// Reusing it is what makes a second setup from the same browser cost nothing: the
-    /// app holds the key it has always held, and the record it already has carries
-    /// whatever has been registered against it.
+    /// Reused rather than replaced, so what is registered against the record survives a
+    /// second setup. Stamped either way: the caller presenting the key is the app.
     pub fn notification_app_for_key(
         &mut self,
         key: &PublicKey,

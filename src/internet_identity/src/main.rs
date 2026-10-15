@@ -384,32 +384,37 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
-/// What every Home Screen app endpoint answers with where this deployment does not
-/// notify. The app is a delivery channel like any other, so the deployment switch is
-/// what says whether there is anything to install it for.
-const NOTIFICATIONS_NOT_ENABLED: &str = "notifications are not enabled";
+/// How long a link token is good for, matching `LINK_TOKEN_LIFETIME_MS` in
+/// `linkToken.ts`. Bounding the claimed expiry from above and not only from below is
+/// what keeps a token signed by a since-retired browser key from being worth anything
+/// years later.
+const LINK_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+/// Whether a token claiming to expire at `expires_at_ns` is one the install page could
+/// have minted.
+fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
+    expires_at_ns > now && expires_at_ns <= now.saturating_add(LINK_TOKEN_LIFETIME_NS)
+}
 
 /// Gives a Home Screen app a record of its own, and points the installing browser at it.
 ///
-/// Authorized by the token that browser signed rather than by the caller being a browser
-/// this identity knows: the app runs in a storage partition of its own, so it cannot
-/// reach that browser's key, and the key it generated there is one nothing has seen. The
-/// caller must be that key, so a token cannot be spent on a key its holder does not have.
+/// The app runs in a storage partition of its own and cannot reach the installing
+/// browser's key, so the token that browser signed is the authorization. The caller must
+/// be the key the token is spent on.
 ///
-/// Spending a token twice is not refused. A browser points at one app, so a second spend
-/// repoints it, which is what a user who deleted the app and added it again needs: iOS
-/// destroyed the old partition and its key, and the app that comes back is a new one.
+/// Spending a token twice repoints the browser rather than being refused: a user who
+/// deletes the app and adds it again comes back with a new key in a new partition.
 #[update]
 fn link_notification_app(
     request: LinkNotificationAppRequest,
 ) -> Result<(), LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
-            NOTIFICATIONS_NOT_ENABLED.to_string(),
+            "notifications are not enabled".to_string(),
         ));
     }
     let now = ic_cdk::api::time();
-    if request.expires_at_ns <= now {
+    if !link_token_expiry_in_range(request.expires_at_ns, now) {
         return Err(LinkNotificationAppError::LinkTokenExpired);
     }
     let caller = caller();
@@ -2845,5 +2850,24 @@ mod test {
         .unwrap_or_else(|e| {
             panic!("the canister code interface is not equal to the did file: {e:?}")
         });
+    }
+
+    /// A browser key retired long ago can still have signed a token, so an expiry
+    /// further ahead than a token's lifetime is refused rather than honoured.
+    #[test]
+    fn a_link_token_outliving_its_lifetime_is_out_of_range() {
+        let now = 1_000_000_000_000;
+
+        assert!(!crate::link_token_expiry_in_range(now, now));
+        assert!(crate::link_token_expiry_in_range(now + 1, now));
+        assert!(crate::link_token_expiry_in_range(
+            now + crate::LINK_TOKEN_LIFETIME_NS,
+            now
+        ));
+        assert!(!crate::link_token_expiry_in_range(
+            now + crate::LINK_TOKEN_LIFETIME_NS + 1,
+            now
+        ));
+        assert!(!crate::link_token_expiry_in_range(u64::MAX, now));
     }
 }
