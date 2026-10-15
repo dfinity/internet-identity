@@ -479,7 +479,7 @@ mod tests {
 
     /// The exact bytes a link token is signed over, for anchor 10000 expiring at 5000.
     ///
-    /// Asserted identically in `browser-key.store.ts`. The browser signs this message
+    /// Asserted identically in `browser-key.link.test.ts`. The browser signs this message
     /// and the canister rebuilds it, so the two layouts have to agree byte for byte:
     /// pinning the bytes on both sides turns a change to either into a failing test
     /// rather than tokens this canister quietly refuses.

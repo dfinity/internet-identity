@@ -923,11 +923,9 @@ impl Anchor {
     /// One app per browser. Refusing the second instead would leave a user who deleted
     /// the app from their Home Screen unable to set one up again, ever: iOS destroys its
     /// storage and the key with it, while a reference here would survive naming a record
-    /// nothing holds. A browser presenting an unexpired token it signed is entitled to
-    /// say where its notifications go, and the newest install is the answer it is giving.
+    /// nothing holds.
     ///
-    /// Answers the record this browser pointed at before, where that was a different one,
-    /// so the caller can drop a reference the record may now have none of.
+    /// Answers the record this browser pointed at before, where that was a different one.
     pub fn point_at_notification_app(
         &mut self,
         browser_id: BrowserId,
