@@ -20,6 +20,7 @@ const OpenIdEmailVerificationIDL = IDL.Variant({
   Google: IDL.Null,
   Unknown: IDL.Null,
   Microsoft: IDL.Null,
+  Apple: IDL.Null,
 });
 
 const backendCanisterConfigIDL = IDL.Record({
@@ -45,7 +46,7 @@ const backendCanisterConfigIDL = IDL.Record({
 
 // Types for above IDL definition
 export type OpenIdEmailVerification =
-  { Google: null } | { Unknown: null } | { Microsoft: null };
+  { Google: null } | { Unknown: null } | { Microsoft: null } | { Apple: null };
 export interface OpenIdConfig {
   auth_uri: string;
   jwks_uri: string;

@@ -523,6 +523,10 @@ pub enum OpenIdEmailVerificationScheme {
     Unknown,
     Google,
     Microsoft,
+    /// Trusts `email_verified` like `Google`. Apple's private relay addresses,
+    /// which only senders registered with II's Apple developer team can deliver
+    /// mail to, are not kept on the credential at all.
+    Apple,
 }
 
 #[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]

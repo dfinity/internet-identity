@@ -264,6 +264,9 @@ impl OpenIdCredential {
             Unknown => None,
             Google => self.get_google_verified_email(),
             Microsoft => self.get_microsoft_verified_email(),
+            // Same check as Google: an Apple private relay address is never
+            // kept on the credential (see `verify::reachable_email`).
+            Apple => self.get_google_verified_email(),
         }
     }
 }

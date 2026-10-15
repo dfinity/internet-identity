@@ -2,7 +2,9 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
-use internet_identity_interface::internet_identity::types::{InternetIdentityInit, OpenIdConfig};
+use internet_identity_interface::internet_identity::types::{
+    InternetIdentityInit, OpenIdConfig, OpenIdEmailVerificationScheme,
+};
 
 #[test]
 fn should_init_default() {
@@ -62,7 +64,7 @@ fn should_init_config() {
                     auth_scope: vec!["openid".into()],
                     auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
                     fedcm_uri: None,
-                    email_verification: None,
+                    email_verification: Some(OpenIdEmailVerificationScheme::Apple),
                     seed_jwks: None,
                 },
             ]),
@@ -227,7 +229,7 @@ fn should_retain_config() {
                     auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
                     auth_scope: vec!["openid".into()],
                     fedcm_uri: None,
-                    email_verification: None,
+                    email_verification: Some(OpenIdEmailVerificationScheme::Apple),
                     seed_jwks: None,
                 },
             ]),

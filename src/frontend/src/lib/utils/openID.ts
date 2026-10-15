@@ -307,6 +307,11 @@ export const createRedirectURL = (
   if (options.loginHint !== undefined) {
     authURL.searchParams.set("login_hint", options.loginHint);
   }
+  // `URLSearchParams` writes a space as `+`, but Apple wants the scopes
+  // separated by a percent-encoded space (`scope=openid%20email`), or it may
+  // leave the email out of the token. Every `+` here stands for a space: a
+  // literal `+` in a value is written as `%2B`.
+  authURL.search = authURL.searchParams.toString().replace(/\+/g, "%20");
 
   return authURL;
 };

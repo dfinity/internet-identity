@@ -513,6 +513,22 @@ describe("createRedirectURL", () => {
     expect(redirectUri).not.toBeNull();
     expect(new URL(redirectUri ?? "").pathname).toBe("/callback");
   });
+
+  it("separates the scopes with a percent-encoded space", () => {
+    // Apple wants `scope=openid%20email`, not `scope=openid+email`.
+    const url = createRedirectURL(
+      {
+        clientId: "test-client",
+        authURL: "https://appleid.apple.com/auth/authorize",
+        authScope: "openid email",
+      },
+      { nonce: "test-nonce", loginHint: "first+tag@example.com" },
+    );
+    expect(url.href).toContain("scope=openid%20email");
+    expect(url.href).not.toContain("+");
+    expect(url.searchParams.get("scope")).toBe("openid email");
+    expect(url.searchParams.get("login_hint")).toBe("first+tag@example.com");
+  });
 });
 
 describe("OAuthProviderError", () => {
