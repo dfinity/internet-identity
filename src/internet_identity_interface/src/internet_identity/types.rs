@@ -1157,6 +1157,8 @@ pub struct OfferNotificationAppRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum OfferNotificationAppError {
+    /// The caller is no browser of this identity.
+    Unauthorized(Principal),
     /// This browser has no app to offer.
     NoNotificationApp,
     InternalCanisterError(String),
@@ -1172,6 +1174,8 @@ pub struct ClaimNotificationAppRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum ClaimNotificationAppError {
+    /// The caller is no browser of this identity, whatever the handle is worth.
+    Unauthorized(Principal),
     /// The handle is unknown, already spent, or past its expiry.
     InvalidHandle,
     InternalCanisterError(String),

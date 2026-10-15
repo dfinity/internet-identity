@@ -1894,6 +1894,8 @@ type OfferNotificationAppRequest = record {
 };
 
 type OfferNotificationAppError = variant {
+    // The caller is no browser of this identity.
+    Unauthorized : principal;
     // This browser has no app to offer.
     NoNotificationApp;
     InternalCanisterError : text;
@@ -1906,6 +1908,8 @@ type ClaimNotificationAppRequest = record {
 };
 
 type ClaimNotificationAppError = variant {
+    // The caller is no browser of this identity, whatever the handle is worth.
+    Unauthorized : principal;
     // Unknown, already spent, or past its expiry.
     InvalidHandle;
     InternalCanisterError : text;

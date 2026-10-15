@@ -415,7 +415,7 @@ fn offer_notification_app(
         ));
     }
     let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| OfferNotificationAppError::NoNotificationApp)?;
+        .map_err(|_| OfferNotificationAppError::Unauthorized(caller()))?;
     let app_id = anchor
         .notification_app(browser_id)
         .ok_or(OfferNotificationAppError::NoNotificationApp)?;
@@ -442,7 +442,7 @@ fn claim_notification_app(
         ));
     }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| ClaimNotificationAppError::InvalidHandle)?;
+        .map_err(|_| ClaimNotificationAppError::Unauthorized(caller()))?;
     let handle: [u8; 32] = request
         .handle
         .as_ref()
