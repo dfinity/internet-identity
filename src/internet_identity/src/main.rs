@@ -398,16 +398,18 @@ fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool 
 
 /// The identities this Home Screen app delivers for.
 ///
-/// Authorized as the app rather than as a browser of some identity: the app is in no
-/// anchor's browser list, and the answer is about the app itself. Its own storage knows
-/// only the identity whose token installed it, so without this it could not find the
-/// identities other browsers on the device pointed at it.
+/// Authorized as the app, which is in no anchor's browser list. Its own storage knows
+/// only the identity whose token installed it, so this is how it finds the other
+/// browsers on the device pointing at it.
 ///
-/// Empty where the app has a record nothing points at any more, and where it has no
-/// record at all. Both mean the same thing to the app: there is nobody here to deliver
-/// for, and the user is sent back to their browser to set it up again.
+/// Empty where the app has no record, where nothing points at the one it has, and where
+/// this deployment does not notify. All three mean the same thing to the app: there is
+/// nobody here to deliver for.
 #[query]
 fn notification_app_anchors() -> Vec<AnchorNumber> {
+    if !notifications::notifications_enabled() {
+        return vec![];
+    }
     let Ok(app) = check_app_authorization() else {
         return vec![];
     };
