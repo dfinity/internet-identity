@@ -174,7 +174,12 @@ const client = new AuthClient({
 /** Whether this identity is in the room, as the last read of it said. */
 let joined = false;
 let busy = false;
-let lastMessageCount = -1;
+/** A send in flight: one goes at a time, and the line stays open meanwhile. */
+let sending = false;
+/** The room as it was last drawn, so an unchanged room is left alone. */
+let shownRoom = "";
+/** When the newest message drawn arrived, so a newer one scrolls into view. */
+let newestShown: bigint | undefined;
 
 const me = (): Principal | undefined => client.getPrincipal();
 
@@ -206,7 +211,8 @@ const render = () => {
       ? "Message the room"
       : "Joining…"
     : "Sign in to chat";
-  sendBtn.disabled = textEl.disabled || textEl.value.trim() === "";
+  sendBtn.textContent = sending ? "Sending…" : "Send";
+  sendBtn.disabled = textEl.disabled || sending || textEl.value.trim() === "";
 };
 
 const renderRoom = (room: Room) => {
@@ -214,6 +220,23 @@ const renderRoom = (room: Room) => {
   joined =
     principal !== undefined &&
     room.members.some((member) => member.who.toText() === principal);
+
+  // Left alone when nothing changed: rebuilding the lists on every poll would
+  // have assistive technology read them out again. Messages arrive at the end
+  // and leave at the start, so the ends and the count name the list.
+  const newest = room.messages.at(-1)?.at;
+  const fingerprint = [
+    principal,
+    room.members.map((member) => member.who.toText()).join(","),
+    room.messages.length,
+    room.messages[0]?.at,
+    newest,
+  ].join("|");
+  if (fingerprint === shownRoom) {
+    render();
+    return;
+  }
+  shownRoom = fingerprint;
 
   membersEl.replaceChildren(
     ...room.members.map((member) => {
@@ -258,8 +281,8 @@ const renderRoom = (room: Room) => {
     );
   }
   // Something new is at the bottom, so that is where to look.
-  if (room.messages.length !== lastMessageCount) {
-    lastMessageCount = room.messages.length;
+  if (newest !== newestShown) {
+    newestShown = newest;
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
   render();
@@ -340,8 +363,15 @@ const renderStats = (metrics: Metrics) => {
 
 let reader: Promise<ChatService> | undefined;
 
-/** The anonymous actor: queries need no identity. */
-const read = (): Promise<ChatService> => (reader ??= actorFor());
+/**
+ * The anonymous actor: queries need no identity. Made once, unless making it
+ * failed (a replica still starting, say), when the next poll tries again.
+ */
+const read = (): Promise<ChatService> =>
+  (reader ??= actorFor().catch((error: unknown) => {
+    reader = undefined;
+    throw error;
+  }));
 
 /** An actor as the signed-in identity, for the calls that change the room. */
 const write = async (): Promise<ChatService> =>
@@ -377,10 +407,16 @@ const whileBusy = async (run: () => Promise<void>) => {
 authBtn.addEventListener("click", () => {
   void whileBusy(async () => {
     if (client.isAuthenticated()) {
-      // A session that lapsed cannot leave, and need not: it was never notified.
-      await write()
-        .then((chat) => chat.leave())
-        .catch(() => undefined);
+      // Leaving is what stops the notifications, so a failure to leave keeps
+      // the sign-in: signed out but still in the room, the user would go on
+      // being notified with no way to stop it until the next sign-in.
+      try {
+        await (await write()).leave();
+      } catch (error) {
+        throw new Error(
+          `Could not leave the room, so you are still signed in; try again. (${describe(error)})`,
+        );
+      }
       await client.signOut();
       joined = false;
       return;
@@ -411,16 +447,25 @@ composeEl.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = textEl.value.trim();
   if (text === "" || sendBtn.disabled) return;
-  void whileBusy(async () => {
-    sendBtn.disabled = true;
-    sendBtn.textContent = "Sending…";
+  // The line is cleared at once and stays open, so the next message can be
+  // typed while this one is on its way; the button keeps them one at a time.
+  sending = true;
+  textEl.value = "";
+  render();
+  void (async () => {
     try {
       await (await write()).send(text);
-      textEl.value = "";
+      showStatus("");
+    } catch (error) {
+      showStatus(`Not sent: ${describe(error)}`);
+      // Handed back to the line, where nothing else has been typed meanwhile.
+      if (textEl.value === "") textEl.value = text;
     } finally {
-      sendBtn.textContent = "Send";
+      sending = false;
+      render();
+      await refresh();
     }
-  });
+  })();
 });
 
 textEl.addEventListener("input", render);
