@@ -7660,3 +7660,52 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .notification_app_with_principal(Principal::self_authenticating(&key))
         .is_some());
 }
+
+/// An offer is good once. A second identity on the device spends it to point at the same
+/// app, and a copy of it is worth nothing afterwards.
+#[test]
+fn an_app_offer_is_spent_once() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+
+    let handle = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app");
+
+    assert_eq!(
+        storage.take_notification_app_offer(handle, 1_500),
+        Some(app.id)
+    );
+    assert_eq!(storage.take_notification_app_offer(handle, 1_500), None);
+}
+
+/// An offer past its expiry is not honoured, and goes rather than lingering.
+#[test]
+fn an_expired_app_offer_is_refused() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+
+    let handle = storage
+        .offer_notification_app(app.id, 10_000, 2_000)
+        .expect("offering the app");
+
+    assert_eq!(storage.take_notification_app_offer(handle, 2_000), None);
+}
+
+/// A handle nobody offered is worth nothing, which is what stops one being guessed.
+#[test]
+fn an_unoffered_handle_is_refused() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+
+    assert_eq!(storage.take_notification_app_offer([9u8; 32], 1_000), None);
+}

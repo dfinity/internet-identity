@@ -384,6 +384,63 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// How long an offered handle is worth spending. Both calls are made by one browser,
+/// one straight after the other, so this is a round trip and not a user's attention.
+const NOTIFICATION_APP_OFFER_LIFETIME_NS: u64 = 60 * 1_000_000_000;
+
+/// Offers this browser's app to another identity signed in on the same browser.
+///
+/// Authorized as the browser that has the app. The handle says nothing about which app
+/// it is: the record's id is this canister's and would tell the identity spending it
+/// which anchors share a device.
+#[update]
+fn offer_notification_app(
+    request: OfferNotificationAppRequest,
+) -> Result<ByteBuf, OfferNotificationAppError> {
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| OfferNotificationAppError::NoNotificationApp)?;
+    let app_id = anchor
+        .notification_app(browser_id)
+        .ok_or(OfferNotificationAppError::NoNotificationApp)?;
+
+    let expires_at_ns = ic_cdk::api::time().saturating_add(NOTIFICATION_APP_OFFER_LIFETIME_NS);
+    state::storage_borrow_mut(|storage| {
+        storage.offer_notification_app(app_id, request.anchor_number, expires_at_ns)
+    })
+    .map(|handle| ByteBuf::from(handle.to_vec()))
+    .map_err(|err| OfferNotificationAppError::InternalCanisterError(format!("{err:?}")))
+}
+
+/// Points this browser at the app another identity on it offered.
+///
+/// The app itself is not involved and does not need to be: it is already installed, has
+/// its own record, and is already registered for push. Nothing about it changes, which
+/// is why a second identity starts receiving the moment this returns.
+#[update]
+fn claim_notification_app(
+    request: ClaimNotificationAppRequest,
+) -> Result<(), ClaimNotificationAppError> {
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| ClaimNotificationAppError::InvalidHandle)?;
+    let handle: [u8; 32] = request
+        .handle
+        .as_ref()
+        .try_into()
+        .map_err(|_| ClaimNotificationAppError::InvalidHandle)?;
+
+    let app_id = state::storage_borrow_mut(|storage| {
+        storage.take_notification_app_offer(handle, ic_cdk::api::time())
+    })
+    .ok_or(ClaimNotificationAppError::InvalidHandle)?;
+
+    anchor.point_at_notification_app(browser_id, app_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
 /// The identities this Home Screen app delivers for.
 ///
 /// Authorized as the app rather than as a browser of some identity: the app is in no
