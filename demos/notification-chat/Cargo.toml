@@ -1,14 +1,7 @@
+# A workspace of its own rather than a member of Internet Identity's: the
+# vendored notification library needs ic-cdk 0.20, which that workspace does
+# not resolve.
 [workspace]
-members = ["asset_util"]
-
-# Shared by the canister and `asset_util` so the workspace resolves a single
-# ic-cdk version. The vendored notification library needs ic-cdk 0.20, which
-# is why this app is a workspace of its own rather than a member of Internet
-# Identity's.
-[workspace.dependencies]
-ic-cdk = "0.20"
-include_dir = "0.7"
-serde = "1"
 
 [package]
 name = "notification_chat"
@@ -21,15 +14,15 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-asset_util = { path = "asset_util" }
 candid = "0.10"
-ic-cdk = { workspace = true }
+ic-asset-certification = "3.0.3"
+ic-cdk = "0.20"
+ic-http-certification = "3.0.3"
 ic-stable-structures = "0.7"
 # Vendored while the library repo is internal; see vendor/identity-notifications/README.md.
 identity-notifications = { path = "vendor/identity-notifications" }
-include_dir = { workspace = true }
-serde = { workspace = true }
-serde_bytes = "0.11"
+include_dir = "0.7"
+serde = "1"
 serde_json = "1"
 
 [profile.release]

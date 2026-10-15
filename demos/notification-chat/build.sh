@@ -11,5 +11,6 @@ npm run build
 cargo build --release --target wasm32-unknown-unknown
 ic-wasm target/wasm32-unknown-unknown/release/notification_chat.wasm -o notification_chat.wasm shrink
 ic-wasm notification_chat.wasm -o notification_chat.wasm metadata candid:service -f chat.did -v public
-# Certificate versions 1 and 2 are both served, as `asset_util` certifies them.
+# Declared as Internet Identity declares its own; a gateway then asks for version 2,
+# which is what the asset router certifies.
 ic-wasm notification_chat.wasm -o notification_chat.wasm metadata supported_certificate_versions -d "1,2" -v public

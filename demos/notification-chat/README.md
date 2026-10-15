@@ -61,7 +61,9 @@ so an agent can find and use it:
   it to describe every method's effects honestly.
 - `/.well-known/ii-derivation-origin` is not served: the app derives
   identities for the origin it is visited on, which is what its absence
-  means.
+  means. Its absence is a certified 404, as for any path the canister does
+  not have, so a gateway passes it on as one rather than refusing an
+  uncertified answer as a 503.
 - The optional query layer (`schema` and `execute`) is not implemented: the
   room is small enough to read whole.
 
@@ -83,7 +85,6 @@ icp canister call notification_chat get_api_doc '()' -e ic
 | `api_doc.md`                    | What `get_api_doc` returns: the interface's semantics, for an agent.               |
 | `chat.did`                      | The Candid interface, exported from the code (`BLESS=1 cargo test` rewrites it).   |
 | `src/`                          | The frontend: one page, one script, one stylesheet, built with Vite.               |
-| `asset_util/`                   | Asset certification, a copy of `src/asset_util` on the ic-cdk the library needs.   |
 | `vendor/identity-notifications` | The notification library, vendored while its repository is internal.               |
 | `vendor/icp-sdk-auth-*.tgz`     | A build of `@icp-sdk/auth` with `requestNotificationConsent`, not yet published.   |
 | `build.sh`                      | Builds the frontend into `dist/`, then the canister into `notification_chat.wasm`. |

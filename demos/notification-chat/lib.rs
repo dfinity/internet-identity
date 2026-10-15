@@ -5,18 +5,16 @@
 //! unique among the names claimed. The canister serves its own frontend, and
 //! lists itself as the one canister allowed to notify for its origin.
 
-use asset_util::{
-    collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType, HeaderField,
-};
 use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::api::{canister_self, certified_data_set, msg_caller, time, trap};
+use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
+use ic_cdk::api::{canister_self, certified_data_set, data_certificate, msg_caller, time, trap};
 use ic_cdk::{init, post_upgrade, query, update};
+use ic_http_certification::{HttpRequest, HttpResponse, StatusCode};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
 use identity_notifications as notifications;
 use identity_notifications::{Memories, Metrics, Notification};
 use include_dir::{include_dir, Dir};
-use serde_bytes::ByteBuf;
 use std::cell::RefCell;
 
 mod names;
@@ -54,7 +52,7 @@ static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 
 thread_local! {
     static ROOM: RefCell<Room> = RefCell::new(Room::default());
-    static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
+    static ASSETS: RefCell<AssetRouter<'static>> = RefCell::new(AssetRouter::new());
     static MEMORIES: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
     /// Who is called what. In stable memory, unlike the room: a name is a
@@ -264,46 +262,27 @@ fn app_url() -> Option<String> {
 
 // ===== The frontend =====
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct HttpRequest {
-    pub method: String,
-    pub url: String,
-    pub headers: Vec<HeaderField>,
-    pub body: ByteBuf,
-    pub certificate_version: Option<u16>,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct HttpResponse {
-    pub status_code: u16,
-    pub headers: Vec<HeaderField>,
-    pub body: ByteBuf,
-}
+/// Where a request for nothing the canister has ends up: a certified 404,
+/// so a gateway passes it on as one. An uncertified answer it refuses as a
+/// 503, which reads as the app being down to whoever asked for a file the
+/// app does not have, such as `/.well-known/ii-derivation-origin`.
+const NOT_FOUND_PATH: &str = "not-found.txt";
 
 #[query]
-fn http_request(req: HttpRequest) -> HttpResponse {
-    let path = req.url.split('?').next().unwrap_or("/");
-    ASSETS
-        .with_borrow(|assets| assets.get_certified_asset(path, req.certificate_version, None))
-        .map(|asset| {
-            let mut headers = asset.headers;
-            headers.extend(static_headers());
-            HttpResponse {
-                status_code: asset.status_code,
-                headers,
-                body: ByteBuf::from(asset.content),
-            }
-        })
-        .unwrap_or_else(|| HttpResponse {
-            status_code: 404,
-            headers: static_headers(),
-            body: ByteBuf::from(format!("Asset {path} not found.")),
-        })
+fn http_request(request: HttpRequest) -> HttpResponse<'static> {
+    ASSETS.with_borrow(|assets| {
+        assets
+            .serve_asset(
+                &data_certificate().expect("a query has a data certificate"),
+                &request,
+            )
+            .unwrap_or_else(|error| trap(format!("could not serve the asset: {error}")))
+    })
 }
 
 /// Readable from any origin: Internet Identity's service worker reads the
 /// well-known files from its own origin before it opens a notification's link.
-fn static_headers() -> Vec<HeaderField> {
+fn static_headers() -> Vec<(String, String)> {
     vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())]
 }
 
@@ -320,41 +299,131 @@ fn name_canister(html: &str) -> String {
     )
 }
 
-/// Everything in `dist/`, plus the two well-known files that name this
-/// canister: the sender list for Internet Identity, and the architecture
-/// manifest for an agent. Both are written here rather than committed, since
-/// the id is only known once the canister exists.
-fn init_assets() {
-    let mut assets = collect_assets(&ASSET_DIR, Some(name_canister));
-    let id = canister_self().to_text();
-    assets.push(Asset {
-        url_path: NOTIFICATION_SENDERS_PATH.to_string(),
-        content: serde_json::json!({ "senders": [id] })
-            .to_string()
-            .into_bytes(),
-        encoding: ContentEncoding::Identity,
-        content_type: ContentType::JSON,
-    });
-    assets.push(Asset {
-        url_path: IC_ARCHITECTURE_PATH.to_string(),
-        content: serde_json::json!({
-            "version": "1.0.0",
-            "canisters": [{
-                "id": id,
-                "name": "notification_chat",
-                "role": "the app: its backend and its frontend",
-                "description": "one chat room whose messages notify through Internet Identity; call get_api_doc() first",
-            }],
+/// Every file under `dir`, with its path relative to the embedded root.
+fn files_in(dir: &'static Dir<'static>) -> Vec<(String, Vec<u8>)> {
+    let mut files: Vec<(String, Vec<u8>)> = dir
+        .files()
+        .map(|file| {
+            (
+                file.path().to_string_lossy().into_owned(),
+                file.contents().to_vec(),
+            )
         })
-        .to_string()
-        .into_bytes(),
-        encoding: ContentEncoding::Identity,
-        content_type: ContentType::JSON,
-    });
+        .collect();
+    for subdir in dir.dirs() {
+        files.extend(files_in(subdir));
+    }
+    files
+}
 
-    ASSETS.with_borrow_mut(|certified_assets| {
-        *certified_assets = CertifiedAssets::certify_assets(assets, &static_headers());
-        certified_data_set(&certified_assets.root_hash()[..]);
+fn content_type_of(path: &str) -> &'static str {
+    match path.rsplit('.').next() {
+        Some("html") => "text/html",
+        Some("js") => "text/javascript",
+        Some("css") => "text/css",
+        Some("json") => "application/json",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("ico") => "image/x-icon",
+        Some("txt") => "text/plain",
+        _ => "application/octet-stream",
+    }
+}
+
+/// Everything in `dist/`, the two well-known files that name this canister
+/// (the sender list for Internet Identity, the architecture manifest for an
+/// agent) and the not-found answer. The files naming the canister are written
+/// here rather than committed, since the id is only known once it exists.
+fn init_assets() {
+    let id = canister_self().to_text();
+    let mut assets = Vec::new();
+    let mut configs = Vec::new();
+
+    for (path, content) in files_in(&ASSET_DIR) {
+        let is_html = path.ends_with(".html");
+        let content = if is_html {
+            name_canister(std::str::from_utf8(&content).expect("HTML is UTF-8")).into_bytes()
+        } else {
+            content
+        };
+        // Vite names everything but the page by its hash, so it never changes
+        // under a URL; the page does, and is what names the rest.
+        let cache = if path.starts_with("assets/") {
+            "public, max-age=31536000, immutable"
+        } else {
+            "public, no-cache, no-store"
+        };
+        let mut headers = static_headers();
+        headers.push(("Cache-Control".to_string(), cache.to_string()));
+        configs.push(AssetConfig::File {
+            path: path.clone(),
+            content_type: Some(content_type_of(&path).to_string()),
+            headers,
+            fallback_for: vec![],
+            aliased_by: if path == "index.html" {
+                vec!["/".to_string()]
+            } else {
+                vec![]
+            },
+            encodings: vec![AssetEncoding::Identity.default_config()],
+        });
+        assets.push(Asset::new(path, content));
+    }
+
+    for (path, json) in [
+        (
+            NOTIFICATION_SENDERS_PATH,
+            serde_json::json!({ "senders": [id] }),
+        ),
+        (
+            IC_ARCHITECTURE_PATH,
+            serde_json::json!({
+                "version": "1.0.0",
+                "canisters": [{
+                    "id": id,
+                    "name": "notification_chat",
+                    "role": "the app: its backend and its frontend",
+                    "description": "one chat room whose messages notify through Internet Identity; call get_api_doc() first",
+                }],
+            }),
+        ),
+    ] {
+        let path = path.trim_start_matches('/').to_string();
+        let mut headers = static_headers();
+        headers.push((
+            "Cache-Control".to_string(),
+            "public, no-cache, no-store".to_string(),
+        ));
+        configs.push(AssetConfig::File {
+            path: path.clone(),
+            content_type: Some("application/json".to_string()),
+            headers,
+            fallback_for: vec![],
+            aliased_by: vec![],
+            encodings: vec![AssetEncoding::Identity.default_config()],
+        });
+        assets.push(Asset::new(path, json.to_string().into_bytes()));
+    }
+
+    configs.push(AssetConfig::File {
+        path: NOT_FOUND_PATH.to_string(),
+        content_type: Some("text/plain".to_string()),
+        headers: static_headers(),
+        fallback_for: vec![AssetFallbackConfig {
+            scope: "/".to_string(),
+            status_code: Some(StatusCode::NOT_FOUND),
+        }],
+        aliased_by: vec![],
+        encodings: vec![AssetEncoding::Identity.default_config()],
+    });
+    assets.push(Asset::new(NOT_FOUND_PATH, b"Not found.".to_vec()));
+
+    ASSETS.with_borrow_mut(|router| {
+        router.delete_all_assets();
+        router
+            .certify_assets(assets, configs)
+            .unwrap_or_else(|error| trap(format!("could not certify the assets: {error}")));
+        certified_data_set(router.root_hash());
     });
 }
 
