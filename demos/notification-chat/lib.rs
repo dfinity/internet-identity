@@ -36,6 +36,15 @@ notifications::endpoints!();
 /// This canister sends its own, so it lists itself.
 const NOTIFICATION_SENDERS_PATH: &str = "/.well-known/ii-notification-senders";
 
+/// What this app is made of, for an agent that wants to use it: one canister,
+/// this one. Serving it opts the app into ICP MCP under the App Operator
+/// Terms; see the README.
+const IC_ARCHITECTURE_PATH: &str = "/.well-known/ic-architecture";
+
+/// The guide an agent reads after the Candid interface: what the types do not
+/// say. Kept beside the code so a change to one is a change to the other.
+const API_DOC: &str = include_str!("api_doc.md");
+
 /// What every notification is about. One key, so a new message replaces the
 /// notification a recipient has not acted on yet rather than stacking beside
 /// it: the one they see carries the last message.
@@ -182,6 +191,13 @@ pub struct NotificationConfig {
     pub sender: Option<Principal>,
 }
 
+/// What the Candid interface does not say: units, who may call what, what
+/// cannot be undone. For an agent, after the interface and before a call.
+#[query]
+fn get_api_doc() -> String {
+    API_DOC.to_string()
+}
+
 #[query]
 fn notification_config() -> NotificationConfig {
     NotificationConfig {
@@ -304,14 +320,34 @@ fn name_canister(html: &str) -> String {
     )
 }
 
-/// Everything in `dist/`, plus the sender list.
+/// Everything in `dist/`, plus the two well-known files that name this
+/// canister: the sender list for Internet Identity, and the architecture
+/// manifest for an agent. Both are written here rather than committed, since
+/// the id is only known once the canister exists.
 fn init_assets() {
     let mut assets = collect_assets(&ASSET_DIR, Some(name_canister));
+    let id = canister_self().to_text();
     assets.push(Asset {
         url_path: NOTIFICATION_SENDERS_PATH.to_string(),
-        content: serde_json::json!({ "senders": [canister_self().to_text()] })
+        content: serde_json::json!({ "senders": [id] })
             .to_string()
             .into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
+    });
+    assets.push(Asset {
+        url_path: IC_ARCHITECTURE_PATH.to_string(),
+        content: serde_json::json!({
+            "version": "1.0.0",
+            "canisters": [{
+                "id": id,
+                "name": "notification_chat",
+                "role": "the app: its backend and its frontend",
+                "description": "one chat room whose messages notify through Internet Identity; call get_api_doc() first",
+            }],
+        })
+        .to_string()
+        .into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::JSON,
     });

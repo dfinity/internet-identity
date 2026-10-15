@@ -40,6 +40,39 @@ It is a project of its own inside this repository (its own Cargo workspace,
 Anyone signed in can join. The room holds 100 members and the 100 newest
 messages, and lives on the heap, so an upgrade empties it.
 
+## Service discoverability
+
+The app follows the [service discoverability
+skill](https://skills.internetcomputer.org/skills/service-discoverability/),
+so an agent can find and use it:
+
+- `/.well-known/ic-architecture` lists the canisters that make up the app:
+  this one. The canister writes the file when it starts, with its own id, so
+  no id is committed. Serving this file opts the app into ICP MCP and counts
+  as the operator's acceptance of the [ICP MCP App Operator
+  Terms](https://internetcomputer.org/icp-mcp/app-operator-terms/): whoever
+  deploys it is agreeing on the operator's behalf. Removing the file (and
+  deploying) stops new reads and calls.
+- The Candid interface is in the canister's public `candid:service` metadata,
+  which `build.sh` attaches; do not strip it.
+- `get_api_doc` returns [`api_doc.md`](api_doc.md): what the types do not say,
+  such as units, which calls need a signed caller, what cannot be undone, and
+  how the notifications behave. Keep it true to the code; the terms require
+  it to describe every method's effects honestly.
+- `/.well-known/ii-derivation-origin` is not served: the app derives
+  identities for the origin it is visited on, which is what its absence
+  means.
+- The optional query layer (`schema` and `execute`) is not implemented: the
+  room is small enough to read whole.
+
+To check a deployment:
+
+```bash
+curl -s https://<origin>/.well-known/ic-architecture | jq '.canisters[].id'
+icp canister metadata notification_chat candid:service -e ic
+icp canister call notification_chat get_api_doc '()' -e ic
+```
+
 ## Layout
 
 | Path                            | What it is                                                                         |
@@ -47,6 +80,7 @@ messages, and lives on the heap, so an upgrade empties it.
 | `lib.rs`                        | The canister: the room's methods, the notification endpoints, and the frontend.    |
 | `room.rs`                       | The room itself, as plain state with unit tests.                                   |
 | `names.rs`                      | The rule that keeps claimed names unique, with unit tests.                         |
+| `api_doc.md`                    | What `get_api_doc` returns: the interface's semantics, for an agent.               |
 | `chat.did`                      | The Candid interface, exported from the code (`BLESS=1 cargo test` rewrites it).   |
 | `src/`                          | The frontend: one page, one script, one stylesheet, built with Vite.               |
 | `asset_util/`                   | Asset certification, a copy of `src/asset_util` on the ic-cdk the library needs.   |

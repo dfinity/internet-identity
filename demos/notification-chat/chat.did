@@ -100,6 +100,9 @@ service : () -> {
   // written where nobody else has it, else the first free `name_1`, `name_2`,
   // … Returns the name given. Names are kept across upgrades.
   claim_name : (text) -> (text);
+  // What the Candid interface does not say: units, who may call what, what
+  // cannot be undone. For an agent, after the interface and before a call.
+  get_api_doc : () -> (text) query;
   http_request : (HttpRequest) -> (HttpResponse) query;
   // Joins the room, which is what makes the caller a recipient of what others
   // send. Nothing happens for somebody already in.
