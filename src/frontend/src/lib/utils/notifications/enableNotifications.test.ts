@@ -7,6 +7,15 @@ vi.mock("./subscribeDevice", () => ({
 vi.mock("./pushSubscription", () => ({
   requestNotificationPermission: vi.fn(() => Promise.resolve("granted")),
 }));
+// Where notifications arrive is the platform's business, and every case here is a
+// browser that receives them itself. The Home Screen app's path has its own tests.
+vi.mock("./notificationState", () => ({
+  notificationsNeedInstallHere: vi.fn(() => false),
+}));
+vi.mock("./deviceApp", () => ({ claimDeviceApp: vi.fn() }));
+vi.mock("../../../routes/(new-styling)/ios-icp-alerts/appStatus", () => ({
+  browserAppStatus: vi.fn(),
+}));
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { disallowApp, turnOnNotifications } from "./enableNotifications";

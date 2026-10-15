@@ -14,6 +14,9 @@ export interface NotificationConsentContext {
   device: DeviceNotificationState;
   /** Whether this app already holds consent from this identity. */
   consented: boolean;
+  /** Whether answering sends the user to install the Home Screen app that carries
+   *  notifications, because this browser has no prompt to raise. */
+  installFirst: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();

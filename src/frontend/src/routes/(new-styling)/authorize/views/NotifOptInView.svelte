@@ -6,6 +6,11 @@
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
+  import NotifInstallHandoff from "./NotifInstallHandoff.svelte";
+  import {
+    openInstallTab,
+    prepareInstallUrl,
+  } from "$lib/utils/notifications/installUrl";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import { turnOnNotifications } from "$lib/utils/notifications/enableNotifications";
   import {
@@ -21,6 +26,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { isCanisterError } from "$lib/utils/utils";
+  import { allowApp } from "$lib/utils/notifications/enableNotifications";
 
   interface Props {
     /** dApp name for the copy, or undefined when it isn't known. */
@@ -36,7 +42,11 @@
     device: DeviceNotificationState;
     /** Whether this app already holds consent from this identity. */
     consented: boolean;
-    /** Continues sign-in: after enabling, allowing or skipping. */
+    /** Answering sends the user to install the app that carries notifications, because
+     *  this browser has no prompt to raise. The screen is the same; Allow differs. */
+    installFirst: boolean;
+    /** Continues sign-in: after enabling, allowing, skipping, or handing the user to
+     *  the install. */
     onDone: () => void;
   }
 
@@ -48,13 +58,56 @@
     actor,
     device,
     consented,
+    installFirst,
     onDone,
   }: Props = $props();
 
   // Always opens on the ask, so the unblock guidance is only ever reached by asking
   // and being refused, with the reason for the question already on screen. A new
   // request arrives as a new context, which remounts this component.
-  let variant = $state<"enable" | "blocked">("enable");
+  let variant = $state<"enable" | "blocked" | "handoff">("enable");
+
+  /** Whether answering installs the app rather than claiming the one this device has.
+   *  Starts from the resolution and moves only one way: a claim that finds nothing
+   *  published leaves the install as what is left to do. */
+  let needsInstall = $state(installFirst);
+
+  /** Signed while this screen renders, because `window.open` needs the click's own
+   *  gesture and an await between the two loses it. */
+  let installUrl = $state<string | undefined>(undefined);
+  $effect(() => {
+    if (!needsInstall) {
+      return;
+    }
+    void prepareInstallUrl(identityNumber).then((url) => {
+      installUrl = url;
+    });
+  });
+
+  /**
+   * Hands the user to the install.
+   *
+   * Consent is recorded first, because the user has said yes here and the install
+   * finishing later must not need them to say it again. Sign-in is settled next, so it
+   * is complete whatever happens to the tab, and the tab is opened last and from this
+   * click: a browser allows `window.open` only inside the gesture, and an await between
+   * the two loses it.
+   *
+   * A tab the browser would not open is not a failure. The screen behind it carries the
+   * link, which the user can follow themselves.
+   */
+  const startInstall = () => {
+    if (installUrl === undefined) {
+      reportFailure(new Error("this browser has not completed a sign-in"));
+      return;
+    }
+    variant = "handoff";
+    if (!consented) {
+      void allowApp({ identityNumber, origin, actor }).catch(reportFailure);
+    }
+    onDone();
+    openInstallTab(installUrl);
+  };
   let busy = $state(false);
 
   /**
@@ -95,6 +148,13 @@
       if (result.status === "denied") {
         recordFailure("permission-denied");
         variant = "blocked";
+        return;
+      }
+      if (result.status === "install-required") {
+        // The app published nothing this browser could read, so there is nothing here
+        // to claim and the install is what answering means. The screen is the same
+        // one; what Allow does changes under it.
+        needsInstall = true;
         return;
       }
       if (result.status === "dismissed") {
@@ -163,9 +223,11 @@
     {appLogo}
     {origin}
     {busy}
-    onEnable={() => void runEnable(device)}
-    onSkip={onDone}
+    onEnable={needsInstall ? startInstall : () => void runEnable(device)}
+    onSkip={() => onDone()}
   />
+{:else if variant === "handoff"}
+  <NotifInstallHandoff url={installUrl} {onDone} />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
        app that asked, and the design gives it the panel to itself. -->
@@ -183,7 +245,11 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button class="btn btn-tertiary btn-xl" onclick={onDone} disabled={busy}>
+      <button
+        class="btn btn-tertiary btn-xl"
+        onclick={() => onDone()}
+        disabled={busy}
+      >
         {$t`Not now`}
       </button>
     </div>

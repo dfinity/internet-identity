@@ -690,6 +690,7 @@
         actor={$notificationConsentStore.actor}
         device={$notificationConsentStore.device}
         consented={$notificationConsentStore.consented}
+        installFirst={$notificationConsentStore.installFirst}
         onDone={() => notificationConsentStore.settle()}
       />
     {/key}

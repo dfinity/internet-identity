@@ -12,6 +12,9 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
+import { claimDeviceApp } from "./deviceApp";
+import { notificationsNeedInstallHere } from "./notificationState";
+import { browserAppStatus } from "../../../routes/(new-styling)/ios-icp-alerts/appStatus";
 import type { DeviceNotificationState } from "./notificationState";
 
 type GrantArgs = {
@@ -21,9 +24,11 @@ type GrantArgs = {
 };
 
 export type EnableNotificationsResult = {
-  /** `dismissed` is a prompt closed without an answer, which leaves the permission
-   * at `default` and can be asked again; `denied` cannot, and needs unblock steps. */
-  status: "enabled" | "denied" | "dismissed";
+  /** `dismissed` is a prompt closed without an answer, which leaves the permission at
+   * `default` and can be asked again; `denied` cannot, and needs unblock steps.
+   * `install-required` is a device whose notifications arrive in a Home Screen app that
+   * is not there, which is the install steps rather than anything this can do. */
+  status: "enabled" | "denied" | "dismissed" | "install-required";
 };
 
 export const turnOnNotifications = async ({
@@ -41,6 +46,24 @@ export const turnOnNotifications = async ({
   device: DeviceNotificationState;
   consented: boolean;
 }): Promise<EnableNotificationsResult> => {
+  // A browser that cannot hold a subscription has nothing to prompt for: what reaches
+  // the user is the app this device has, and pointing this identity at it is the whole
+  // of turning notifications on here.
+  if (notificationsNeedInstallHere()) {
+    const app =
+      (await browserAppStatus(identityNumber)) ??
+      ((await claimDeviceApp(identityNumber))
+        ? await browserAppStatus(identityNumber)
+        : undefined);
+    if (app?.subscribed !== true) {
+      return { status: "install-required" };
+    }
+    if (!consented) {
+      await grantConsent({ identityNumber, origin, actor });
+    }
+    return { status: "enabled" };
+  }
+
   if (device.permission !== "granted") {
     const permission = await requestNotificationPermission();
     if (permission !== "granted") {

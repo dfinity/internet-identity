@@ -3,7 +3,9 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { fromCanisterMcpConfig } from "$lib/utils/mcpConfig";
+  import { currentBrowserId } from "$lib/stores/browser-key.store";
   import CliAccessSection from "./components/CliAccessSection.svelte";
+  import NotificationsSection from "./components/NotificationsSection.svelte";
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
   import type { PageProps } from "./$types";
 
@@ -15,6 +17,17 @@
   const mcpConfig = $derived(
     fromCanisterMcpConfig(data.identityInfo.mcp_config),
   );
+
+  // This browser's own id is in its storage rather than in the identity's record, so it
+  // is read here and handed down: the section renders from `identity_info` like the
+  // others.
+  const browsers = $derived(data.identityInfo.browsers[0] ?? []);
+  let browserId = $state<number | undefined>(undefined);
+  $effect(() => {
+    void currentBrowserId($authenticatedStore.identityNumber).then((id) => {
+      browserId = id;
+    });
+  });
 </script>
 
 <header class="flex flex-col gap-3">
@@ -27,6 +40,11 @@
 </header>
 
 <div class="mt-10 flex max-w-3xl flex-col gap-5">
+  <NotificationsSection
+    identityNumber={$authenticatedStore.identityNumber}
+    {browsers}
+    {browserId}
+  />
   <CliAccessSection identityNumber={$authenticatedStore.identityNumber} />
   <McpTrustedServersSection
     identityNumber={$authenticatedStore.identityNumber}
