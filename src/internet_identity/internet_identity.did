@@ -1087,6 +1087,24 @@ type BrowserInfo = record {
     last_used : Timestamp;
     // Sessions this browser holds. Zero means it is signed in to nothing.
     session_count : nat32;
+    // The Home Screen app this browser points at, where it has one. Absent is the whole
+    // of "not installed, or installed and never opened": the record is created by the
+    // app's first open, so there is nothing to point at before that.
+    notification_app : opt NotificationAppInfo;
+};
+
+// Asks what this browser's entry says about the app it points at, for a page that has
+// the browser key and no session.
+type GetNotificationAppStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+type NotificationAppInfo = record {
+    // Whether the app has registered for Web Push. False means it has been opened and
+    // the permission has not been given yet.
+    subscribed : bool;
+    // Whether this identity wants it to deliver.
+    enabled : bool;
 };
 
 type PrepareAccountSessionRequest = record {
@@ -1886,6 +1904,36 @@ type LinkNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
+// What the Home Screen app registered for Web Push. Takes no anchor: the subscription
+// is the app's, which has one service worker registration however many identities point
+// at it, and writing it is the app's alone.
+type SetNotificationAppSubscriptionRequest = record {
+    endpoint : text;
+    vapid_public_key : blob;
+    jwt_signatures : vec blob;
+    jwt_issued_at_ns : nat64;
+};
+
+type SetNotificationAppSubscriptionError = variant {
+    // The caller is no app this canister knows, which is what an app whose record was
+    // deleted while it sat on the Home Screen gets.
+    NoNotificationApp;
+    StaleJwtPool;
+    InternalCanisterError : text;
+};
+
+// Whether this identity wants the app its browser points at to deliver for it. Never a
+// subscription removal: the subscription is the app's and is shared.
+type SetNotificationAppEnabledRequest = record {
+    anchor_number : UserNumber;
+    enabled : bool;
+};
+
+type SetNotificationAppEnabledError = variant {
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
 // Offers the Home Screen app this browser has to another identity signed in on the
 // same browser, which is the only party that can reach both. The handle says nothing
 // about which app it is.
@@ -2577,6 +2625,16 @@ service : (opt InternetIdentityInit) -> {
 
     // Called by the identity being added, from the same browser, with that handle.
     claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+
+    // Called by the Home Screen app, signing as itself.
+    set_notification_app_subscription : (SetNotificationAppSubscriptionRequest) -> (variant { Ok; Err : SetNotificationAppSubscriptionError });
+
+    // Called by the identity, from the browser that points at the app.
+    set_notification_app_enabled : (SetNotificationAppEnabledRequest) -> (variant { Ok; Err : SetNotificationAppEnabledError });
+
+    // Called by the browser, which may hold nothing but its key: the install page is a
+    // tab of its own with no session.
+    get_notification_app_status : (GetNotificationAppStatusRequest) -> (opt NotificationAppInfo) query;
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.

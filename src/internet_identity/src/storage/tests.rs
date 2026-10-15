@@ -7709,3 +7709,40 @@ fn an_unoffered_handle_is_refused() {
 
     assert_eq!(storage.take_notification_app_offer([9u8; 32], 1_000), None);
 }
+
+/// The subscription is the app's, so a second identity pointing at it delivers through
+/// what is already registered rather than waiting for the app to be opened again.
+#[test]
+fn an_apps_subscription_is_the_records_and_not_an_anchors() {
+    use crate::storage::anchor::WebPushSubscription;
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+
+    storage.set_notification_app_subscription(
+        app.id,
+        Some(WebPushSubscription {
+            endpoint: "https://web.push.apple.com/one".to_string(),
+            created_at_ns: 2_000,
+            vapid_public_key: vec![1; 65],
+            jwt_signatures: vec![vec![2; 64]],
+            jwt_issued_at_ns: 2_000,
+            notifications: Vec::new(),
+            woken_again_at_ns: None,
+        }),
+        2_000,
+    );
+
+    let stored = storage.notification_app(app.id).expect("the record");
+    assert_eq!(
+        stored
+            .webpush_subscription
+            .map(|subscription| subscription.endpoint),
+        Some("https://web.push.apple.com/one".to_string())
+    );
+    // Stamped by the app's own call, which is the only liveness anything here has.
+    assert_eq!(stored.last_used, 2_000);
+}

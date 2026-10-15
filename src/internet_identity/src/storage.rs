@@ -112,7 +112,7 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
+use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1553,6 +1553,7 @@ impl<M: Memory + Clone> Storage<M> {
             browsers
                 .iter()
                 .filter_map(|browser| browser.notification_app)
+                .map(|reference| reference.app_id)
                 .collect::<BTreeSet<_>>()
         };
         let previous = apps_of(previous_browsers);
@@ -1634,6 +1635,34 @@ impl<M: Memory + Clone> Storage<M> {
         let key = StorableNotificationAppHandle(handle);
         let offer = self.notification_app_handle_memory.remove(&key)?;
         (offer.expires_at_ns > now).then_some(offer.app_id)
+    }
+
+    /// Stores what the app has registered for Web Push, and stamps its liveness.
+    ///
+    /// The only writer is the app itself. A browser pointing at it turns its own
+    /// delivery off by letting go of the reference, never by clearing this: the
+    /// subscription belongs to the app and every other identity delivers through it.
+    pub fn set_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+        now: Timestamp,
+    ) {
+        let Some(stored) = self.notification_app_memory.get(&app_id) else {
+            return;
+        };
+        let mut app = NotificationApp::from(stored);
+        app.webpush_subscription = subscription;
+        app.last_used = now;
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
+    }
+
+    /// The record `app_id` names, if it is still there.
+    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
+        self.notification_app_memory
+            .get(&app_id)
+            .map(NotificationApp::from)
     }
 
     /// The anchors pointing at `app_id`, which is what the app asks for to know who it
@@ -3449,6 +3478,7 @@ impl<M: Memory + Clone> Storage<M> {
             key: key.clone(),
             created_at: now,
             last_used: now,
+            webpush_subscription: None,
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));

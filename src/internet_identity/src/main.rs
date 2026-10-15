@@ -42,7 +42,7 @@ use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
-    ValidatedSetWebPushSubscriptionRequest,
+    ValidatedSetNotificationAppSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
     ValidatedGetNextNotificationRequest, ValidatedGetNotificationDelegationRequest,
@@ -384,6 +384,73 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// Registers the Home Screen app for Web Push, and replaces the pool it is running on.
+///
+/// Authorized as the app, and takes no anchor: the subscription is the app's, it has one
+/// service worker registration however many identities point at it, and every one of them
+/// delivers through this. A browser turns its own delivery off by letting go of the
+/// reference, never by clearing this.
+#[update]
+fn set_notification_app_subscription(
+    request: SetNotificationAppSubscriptionRequest,
+) -> Result<(), SetNotificationAppSubscriptionError> {
+    let validated: ValidatedSetNotificationAppSubscriptionRequest = request.try_into()?;
+    let app = check_app_authorization()
+        .map_err(|_| SetNotificationAppSubscriptionError::NoNotificationApp)?;
+
+    notifications::webpush::set_app_subscription(app, validated, ic_cdk::api::time())
+}
+
+/// What this browser's entry says about the app it points at.
+///
+/// Authorized by the browser key, so the install page can ask without a session: it is
+/// opened in a tab of its own, from a link, and the browser key is the only thing it
+/// carries. Answers only about the caller's own entry, so one browser cannot learn what
+/// another has installed.
+///
+/// `None` both for a browser that points at nothing and for a caller that is no browser
+/// of this identity, so neither can be probed with it.
+#[query]
+fn get_notification_app_status(
+    request: GetNotificationAppStatusRequest,
+) -> Option<NotificationAppInfo> {
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return None;
+    };
+    let reference = anchor.notification_app(browser_id)?;
+    Some(NotificationAppInfo {
+        subscribed: state::storage_borrow(|storage| {
+            storage
+                .notification_app(reference.app_id)
+                .is_some_and(|app| app.webpush_subscription.is_some())
+        }),
+        enabled: reference.enabled,
+    })
+}
+
+/// Whether this identity wants the app its browser points at to deliver for it.
+///
+/// Authorized as the browser, because it is that identity's choice and nobody else's.
+/// The reference stays either way: coming back is flipping this, not installing
+/// anything again.
+#[update]
+fn set_notification_app_enabled(
+    request: SetNotificationAppEnabledRequest,
+) -> Result<(), SetNotificationAppEnabledError> {
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| SetNotificationAppEnabledError::NoNotificationApp)?;
+    if anchor.notification_app(browser_id).is_none() {
+        return Err(SetNotificationAppEnabledError::NoNotificationApp);
+    }
+
+    anchor.set_notification_app_enabled(browser_id, request.enabled);
+    state::storage_borrow_mut(|storage| {
+        storage.write(anchor).map_err(|err| {
+            SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))
+        })
+    })
+}
+
 /// How long an offered handle is worth spending. Both calls are made by one browser,
 /// one straight after the other, so this is a round trip and not a user's attention.
 const NOTIFICATION_APP_OFFER_LIFETIME_NS: u64 = 60 * 1_000_000_000;
@@ -401,7 +468,8 @@ fn offer_notification_app(
         .map_err(|_| OfferNotificationAppError::NoNotificationApp)?;
     let app_id = anchor
         .notification_app(browser_id)
-        .ok_or(OfferNotificationAppError::NoNotificationApp)?;
+        .ok_or(OfferNotificationAppError::NoNotificationApp)?
+        .app_id;
 
     let expires_at_ns = ic_cdk::api::time().saturating_add(NOTIFICATION_APP_OFFER_LIFETIME_NS);
     state::storage_borrow_mut(|storage| {
@@ -1512,7 +1580,13 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let browsers = state::anchor(identity_number).browsers_info();
+        let browsers = state::anchor(identity_number).browsers_info(|app_id| {
+            state::storage_borrow(|storage| {
+                storage
+                    .notification_app(app_id)
+                    .is_some_and(|app| app.webpush_subscription.is_some())
+            })
+        });
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

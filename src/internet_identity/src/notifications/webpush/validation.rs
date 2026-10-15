@@ -3,8 +3,9 @@
 
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, GetWebPushSubscriptionStatusRequest, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    Timestamp,
+    RemoveWebPushSubscriptionRequest, SetNotificationAppSubscriptionError,
+    SetNotificationAppSubscriptionRequest, SetWebPushSubscriptionError,
+    SetWebPushSubscriptionRequest, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::ops::RangeInclusive;
@@ -33,6 +34,14 @@ pub struct ValidatedSetWebPushSubscriptionRequest {
     _validated: Validated,
 }
 
+pub struct ValidatedSetNotificationAppSubscriptionRequest {
+    pub endpoint: String,
+    pub vapid_public_key: Vec<u8>,
+    pub jwt_signatures: Vec<Vec<u8>>,
+    pub jwt_issued_at_ns: Timestamp,
+    _validated: Validated,
+}
+
 pub struct ValidatedRemoveWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,
     pub browser_id: BrowserId,
@@ -42,6 +51,49 @@ pub struct ValidatedRemoveWebPushSubscriptionRequest {
 pub struct ValidatedGetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,
     _validated: Validated,
+}
+
+impl TryFrom<SetNotificationAppSubscriptionRequest>
+    for ValidatedSetNotificationAppSubscriptionRequest
+{
+    type Error = SetNotificationAppSubscriptionError;
+
+    fn try_from(
+        SetNotificationAppSubscriptionRequest {
+            endpoint,
+            vapid_public_key,
+            jwt_signatures,
+            jwt_issued_at_ns,
+        }: SetNotificationAppSubscriptionRequest,
+    ) -> Result<Self, Self::Error> {
+        check_enabled().map_err(SetNotificationAppSubscriptionError::InternalCanisterError)?;
+
+        let vapid_public_key = vapid_public_key.into_vec();
+        let jwt_signatures: Vec<Vec<u8>> =
+            jwt_signatures.into_iter().map(ByteBuf::into_vec).collect();
+
+        let problems: Vec<String> = [
+            validate_endpoint(&endpoint),
+            validate_vapid_public_key(&vapid_public_key),
+            validate_jwt_pool(&jwt_signatures),
+        ]
+        .into_iter()
+        .filter_map(Result::err)
+        .collect();
+        if !problems.is_empty() {
+            return Err(SetNotificationAppSubscriptionError::InternalCanisterError(
+                problems.join("; "),
+            ));
+        }
+
+        Ok(Self {
+            endpoint,
+            vapid_public_key,
+            jwt_signatures,
+            jwt_issued_at_ns,
+            _validated: Validated,
+        })
+    }
 }
 
 impl TryFrom<SetWebPushSubscriptionRequest> for ValidatedSetWebPushSubscriptionRequest {

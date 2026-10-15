@@ -1144,6 +1144,65 @@ pub enum LinkNotificationAppError {
     InternalCanisterError(String),
 }
 
+/// What the Home Screen app registered for Web Push.
+///
+/// Takes no anchor: the subscription belongs to the app, which has one service worker
+/// registration however many identities it delivers for, and writing it is the app's
+/// alone.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SetNotificationAppSubscriptionRequest {
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SetNotificationAppSubscriptionError {
+    /// The caller is no app this canister knows, which is what an app whose record was
+    /// deleted while it sat on the Home Screen gets. There is nothing here to register
+    /// against, and nothing the app can do about it: the user sets it up again from
+    /// their browser.
+    NoNotificationApp,
+    /// The pool offered is not newer than the one this endpoint already holds.
+    StaleJwtPool,
+    InternalCanisterError(String),
+}
+
+/// Whether this identity wants the app its browser points at to deliver for it.
+///
+/// Never a subscription removal: the subscription is the app's, and every other identity
+/// pointing at it delivers through the same one.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SetNotificationAppEnabledRequest {
+    pub anchor_number: AnchorNumber,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SetNotificationAppEnabledError {
+    /// This browser points at no app.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+/// Asks what this browser's entry says about the app it points at, for a page that has
+/// the browser key and no session.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What a browser's entry says about the app it points at.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppInfo {
+    /// Whether the app has registered for Web Push. False means it has been opened, the
+    /// record exists, and the permission has not been given yet.
+    pub subscribed: bool,
+    /// Whether this identity wants it to deliver.
+    pub enabled: bool,
+}
+
 /// Offers the Home Screen app this browser has to another identity signed in on the same
 /// browser, which is the only party that can reach both.
 ///

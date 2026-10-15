@@ -1,12 +1,13 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
-use crate::notifications::app::NotificationAppId;
+use crate::notifications::app::{NotificationAppId, NotificationAppRef};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
@@ -110,7 +111,7 @@ pub struct Browser {
     /// session, is signed out of nothing, and costs the user no slot in this list. The
     /// reference outlives signing out and turning notifications off, both of which stop
     /// routing without forgetting which app this browser has.
-    pub notification_app: Option<NotificationAppId>,
+    pub notification_app: Option<NotificationAppRef>,
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -221,7 +222,7 @@ impl From<StorableBrowser> for Browser {
             last_used: value.last_used,
             session_count: value.session_count,
             webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
-            notification_app: value.notification_app,
+            notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
 }
@@ -239,7 +240,7 @@ impl From<Browser> for StorableBrowser {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
-            notification_app: value.notification_app,
+            notification_app: value.notification_app.map(StorableNotificationAppRef::from),
         }
     }
 }
@@ -939,8 +940,28 @@ impl Anchor {
             .find(|browser| browser.id == browser_id)?;
         browser
             .notification_app
-            .replace(app_id)
+            .replace(NotificationAppRef {
+                app_id,
+                enabled: true,
+            })
+            .map(|previous| previous.app_id)
             .filter(|previous| *previous != app_id)
+    }
+
+    /// Whether this identity wants the app it points at to deliver for it.
+    ///
+    /// Never a subscription removal: the subscription is the app's and is shared with
+    /// every other identity pointing at it.
+    pub fn set_notification_app_enabled(&mut self, browser_id: BrowserId, enabled: bool) {
+        if let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        {
+            if let Some(reference) = browser.notification_app.as_mut() {
+                reference.enabled = enabled;
+            }
+        }
     }
 
     /// Stops `browser_id` pointing at the app it had, answering which one that was.
@@ -957,10 +978,11 @@ impl Anchor {
             .find(|browser| browser.id == browser_id)?
             .notification_app
             .take()
+            .map(|reference| reference.app_id)
     }
 
     /// The app this browser points at, where it has one.
-    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppId> {
+    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
         self.browsers
             .iter()
             .find(|browser| browser.id == browser_id)
@@ -1045,7 +1067,14 @@ impl Anchor {
     ///
     /// `None` rather than an empty list, because that is the shape the interface
     /// carries and no caller wants the difference.
-    pub fn browsers_info(&self) -> Option<Vec<BrowserInfo>> {
+    ///
+    /// Whether an app has registered for Web Push is asked for rather than read here:
+    /// the record lives outside any anchor, because one app serves however many
+    /// identities point at it.
+    pub fn browsers_info(
+        &self,
+        app_subscribed: impl Fn(NotificationAppId) -> bool,
+    ) -> Option<Vec<BrowserInfo>> {
         if self.browsers.is_empty() {
             return None;
         }
@@ -1058,6 +1087,12 @@ impl Anchor {
                     created_at: browser.created_at,
                     last_used: browser.last_used,
                     session_count: browser.session_count,
+                    notification_app: browser.notification_app.map(|reference| {
+                        NotificationAppInfo {
+                            subscribed: app_subscribed(reference.app_id),
+                            enabled: reference.enabled,
+                        }
+                    }),
                 })
                 .collect(),
         )
