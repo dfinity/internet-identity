@@ -17,6 +17,7 @@ import {
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/worker/shownNotification";
+import { openable } from "$lib/utils/notifications/worker/openTarget";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 
@@ -70,7 +71,9 @@ worker.addEventListener("notificationclick", (event) => {
       // and the link is the app's.
       if (target !== undefined && url !== undefined) {
         // A refused window must not cost the app its report.
-        await worker.clients.openWindow(url).catch(() => undefined);
+        await worker.clients
+          .openWindow(await openable(url))
+          .catch(() => undefined);
       } else {
         const clients = await worker.clients.matchAll({
           type: "window",

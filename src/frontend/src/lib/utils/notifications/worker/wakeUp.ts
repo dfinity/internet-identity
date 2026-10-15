@@ -10,17 +10,19 @@
  * so it can be read, and tested, without a worker around it.
  */
 
-import { Actor, HttpAgent, type ActorSubclass } from "@icp-sdk/core/agent";
+import {
+  Actor,
+  HttpAgent,
+  type ActorSubclass,
+  type Identity,
+} from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
 import type {
   _SERVICE,
   NotificationToShow,
 } from "$lib/generated/internet_identity_types";
-import {
-  browserKeyIdentity,
-  registeredIdentityNumbers,
-} from "$lib/stores/browser-key.store";
+import { signingIdentities, type SigningIdentity } from "../signingIdentities";
 import { config } from "../workerConfig";
 import { fetchAppMetadata, logoAsDataUrl } from "$lib/utils/appMetadata";
 import {
@@ -36,46 +38,77 @@ import {
   tagOf,
   type NotificationRef,
 } from "./shownNotification";
+import { recordShown, shownRecently } from "./shownRecord";
+
+/**
+ * How long a wake-up waits for the delegation that reads the app's own text before it
+ * shows the placeholder instead.
+ *
+ * Measured on a phone, the mint took 3.25 seconds: an update call, the query that
+ * fetches its chain, and a radio that has just been woken. A deadline under that spends
+ * the placeholder on every ordinary notification, and each one then has to be replaced
+ * by the wake-up the mint earns — two notifications' worth of work, and two on screen
+ * for as long as the replacement takes.
+ *
+ * Eight seconds is well inside the budget a push handler gets, which is tens of seconds,
+ * and leaves the placeholder for a network that genuinely cannot answer.
+ */
+const MINT_DEADLINE_MS = 8_000;
+
+/** Rejects where `work` has not answered within `deadlineMs`; the work carries on, and
+ *  what it earns is a wake-up that finds the delegation already there. */
+const withDeadline = <T>(work: Promise<T>, deadlineMs: number): Promise<T> =>
+  Promise.race([
+    work,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("deadline")), deadlineMs),
+    ),
+  ]);
 
 /** Shown until the delegation that reads the app's own text has been minted. */
 const PLACEHOLDER_TITLE = "Internet Identity";
+const PLACEHOLDER_TAG = "internet-identity";
 const PLACEHOLDER_BODY = "You have a new notification.";
 
 /** What a `userVisibleOnly` subscription owes the user where nothing better can be
  *  shown. */
-export const showPlaceholder = (
+export const showPlaceholder = async (
   registration: ServiceWorkerRegistration,
-): Promise<void> =>
-  registration.showNotification(PLACEHOLDER_TITLE, {
+): Promise<void> => {
+  for (const existing of await shownUnder(registration, PLACEHOLDER_TAG)) {
+    existing.close();
+  }
+  await registration.showNotification(PLACEHOLDER_TITLE, {
     body: PLACEHOLDER_BODY,
-    tag: "internet-identity",
+    tag: PLACEHOLDER_TAG,
   });
+  await recordShown();
+};
 
 export interface WakeUpContext {
   /** The worker's registration, which owns the notifications it shows. */
   registration: ServiceWorkerRegistration;
-  /** The canister, as this browser. Injected so a test can answer for it. */
+  /** What this storage can sign for. Injected so a test can answer for it. */
+  signing?: () => Promise<SigningIdentity[]>;
+  /** The canister, as one of them. Injected so a test can answer for it. */
   internetIdentity?: (
-    identityNumber: bigint,
-  ) => Promise<ActorSubclass<_SERVICE> | undefined>;
+    signing: SigningIdentity,
+  ) => Promise<ActorSubclass<_SERVICE>>;
 }
 
-const internetIdentityActor = async (
-  identityNumber: bigint,
-): Promise<ActorSubclass<_SERVICE> | undefined> => {
-  const identity = await browserKeyIdentity(identityNumber);
-  if (identity === undefined) {
-    return undefined;
-  }
-  return Actor.createActor<_SERVICE>(internetIdentityIDL, {
-    agent: HttpAgent.createSync({
-      ...config.agentOptions,
-      identity,
-      retryTimes: 0,
+const internetIdentityActor = ({
+  identity,
+}: SigningIdentity): Promise<ActorSubclass<_SERVICE>> =>
+  Promise.resolve(
+    Actor.createActor<_SERVICE>(internetIdentityIDL, {
+      agent: HttpAgent.createSync({
+        ...config.agentOptions,
+        identity,
+        retryTimes: 0,
+      }),
+      canisterId: Principal.fromText(config.canisterId),
     }),
-    canisterId: Principal.fromText(config.canisterId),
-  });
-};
+  );
 
 const refFor = (
   identityNumber: bigint,
@@ -88,15 +121,29 @@ const refFor = (
   id: notification.id,
 });
 
-/** Replace by hand rather than by tag: WebKit does not coalesce by tag, so a same-tag
- *  notification arrives beside the one it was meant to replace. */
+/**
+ * What is on screen under `tag`, matched here rather than by the browser.
+ *
+ * iOS ignores `tag` entirely — a same-tag notification arrives beside the one it was
+ * meant to replace rather than updating it — so replacing means closing by hand. The
+ * filtered form of the query is the one engines disagree about, so the tag is compared
+ * here instead.
+ */
+const shownUnder = async (
+  registration: ServiceWorkerRegistration,
+  tag: string,
+): Promise<Notification[]> =>
+  (await registration.getNotifications()).filter(
+    (existing) => existing.tag === tag,
+  );
+
 const show = async (
   { registration }: WakeUpContext,
   ref: NotificationRef,
   shown: { title: string; body: string; url: string; icon?: string },
 ): Promise<void> => {
   const tag = tagOf(ref);
-  for (const existing of await registration.getNotifications({ tag })) {
+  for (const existing of await shownUnder(registration, tag)) {
     existing.close();
   }
   await registration.showNotification(shown.title, {
@@ -105,15 +152,14 @@ const show = async (
     tag,
     data: dataOf(ref, shown.url),
   });
+  await recordShown();
 };
 
 const closeShown = async (
   { registration }: WakeUpContext,
   ref: NotificationRef,
 ): Promise<void> => {
-  for (const existing of await registration.getNotifications({
-    tag: tagOf(ref),
-  })) {
+  for (const existing of await shownUnder(registration, tagOf(ref))) {
     existing.close();
   }
 };
@@ -155,14 +201,12 @@ interface Queued {
  *  the canister remembers having answered. */
 const nextFor = async (
   context: WakeUpContext,
-  { identityNumber }: { identityNumber: bigint },
+  signing: SigningIdentity,
 ): Promise<Queued | undefined> => {
+  const { identityNumber } = signing;
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
-    identityNumber,
+    signing,
   );
-  if (actor === undefined) {
-    return undefined;
-  }
   const next = await actor.browser_get_next_notification({
     anchor_number: identityNumber,
   });
@@ -204,30 +248,36 @@ const showQueued = async (
     nowMillis: Date.now(),
   });
 
-  if (held === undefined) {
-    // Nothing to read the content with yet. Say that something arrived, then ask for a
-    // delegation — which is what wakes this worker again to replace this with the
-    // app's own text.
+  // Minting is an update call, so it is raced against a deadline rather than waited
+  // for: a worker that shows nothing is one the browser answers for, with its own
+  // "site updated in the background" or, on iOS, by holding the silence against the
+  // subscription. Inside the deadline the user sees the app's own text once; outside
+  // it they see the placeholder, and the wake-up the mint earns replaces it.
+  //
+  // The mint goes into `pending` as well as into the race, because what is raced is
+  // only how long the screen waits. Past the deadline the mint still has a delegation
+  // to cache, and a worker the browser is free to kill never writes it: the next
+  // wake-up then mints again and spends another placeholder on it.
+  const mintWithin = (): Promise<Identity | undefined> => {
+    const mint = mintPullIdentity({ actor, identityNumber, target });
+    sendAndForget(pending, mint);
+    return withDeadline(mint, MINT_DEADLINE_MS).catch(() => undefined);
+  };
+  const minted = held ?? (await mintWithin());
+
+  if (minted === undefined) {
     await show(context, ref, {
       title: PLACEHOLDER_TITLE,
       body: PLACEHOLDER_BODY,
       url: notification.origin,
     });
-    sendAndForget(
-      pending,
-      mintPullIdentity({
-        actor,
-        identityNumber,
-        target,
-      }),
-    );
     return true;
   }
 
   const content = await fetchNotificationContent({
     appCanisterId: notification.canister_id,
     id: notification.id,
-    identity: held,
+    identity: minted,
   });
   if (content === undefined) {
     // The app dismissed it, or it expired: there is nothing to show and nothing left
@@ -266,7 +316,7 @@ const showQueued = async (
     reportNotificationReceived({
       appCanisterId: notification.canister_id,
       id: notification.id,
-      identity: held,
+      identity: minted,
     }),
   );
   sendAndForget(
@@ -283,17 +333,14 @@ const showQueued = async (
  *  Nothing depends on it: the notification is already shown. */
 const topUpPool = async (
   context: WakeUpContext,
-  { identityNumber }: { identityNumber: bigint },
+  signing: SigningIdentity,
 ): Promise<void> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
-    identityNumber,
+    signing,
   );
-  if (actor === undefined) {
-    return;
-  }
   await refillJwtPool({
     actor,
-    identityNumber,
+    identityNumber: signing.identityNumber,
     nowNs: BigInt(Date.now()) * BigInt(1_000_000),
   });
 };
@@ -343,14 +390,12 @@ const closeDismissed = async (context: WakeUpContext): Promise<void> => {
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
 export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
-  const identityNumbers = await registeredIdentityNumbers();
+  const signing = await (context.signing ?? signingIdentities)();
   // One round trip each, side by side: a wake-up shows one notification, so asking
-  // the identities one after another would only make the screen wait on the answers
-  // it ends up throwing away.
+  // the entries one after another would only make the screen wait on the answers it
+  // ends up throwing away.
   const queued = await Promise.all(
-    identityNumbers.map((identityNumber) =>
-      nextFor(context, { identityNumber }).catch(() => undefined),
-    ),
+    signing.map((one) => nextFor(context, one).catch(() => undefined)),
   );
 
   const pending: Promise<unknown>[] = [];
@@ -371,8 +416,8 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
 
   // The pool of signed wake-up authorizations is spent by elapsed time, and a
   // browser whose user never opens the page again would let it run out.
-  for (const identityNumber of identityNumbers) {
-    sendAndForget(pending, topUpPool(context, { identityNumber }));
+  for (const one of signing) {
+    sendAndForget(pending, topUpPool(context, one));
   }
 
   if (shown) {
@@ -381,7 +426,13 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     // Whether this wake-up still owes the user something depends on what is on
     // screen, and an app may have dismissed what is on screen.
     await closeDismissed(context).catch(() => undefined);
-    if ((await context.registration.getNotifications()).length === 0) {
+    // The browser is asked first, since it knows the live screen. Our own stamp covers
+    // what it cannot: it answered an empty array on iOS before 17.0, and a wake-up that
+    // believed the screen empty put a placeholder beside what was already there.
+    const onScreen =
+      (await context.registration.getNotifications()).length > 0 ||
+      (await shownRecently());
+    if (!onScreen) {
       // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
       // nothing on screen owes the user something.
       await showPlaceholder(context.registration);
