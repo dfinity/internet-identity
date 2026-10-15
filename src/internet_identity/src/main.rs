@@ -409,6 +409,11 @@ const NOTIFICATION_APP_OFFER_LIFETIME_NS: u64 = 60 * 1_000_000_000;
 fn offer_notification_app(
     request: OfferNotificationAppRequest,
 ) -> Result<ByteBuf, OfferNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(OfferNotificationAppError::InternalCanisterError(
+            "notifications are not enabled".to_string(),
+        ));
+    }
     let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
         .map_err(|_| OfferNotificationAppError::NoNotificationApp)?;
     let app_id = anchor
@@ -425,13 +430,17 @@ fn offer_notification_app(
 
 /// Points this browser at the app another identity on it offered.
 ///
-/// The app itself is not involved and does not need to be: it is already installed, has
-/// its own record, and is already registered for push. Nothing about it changes, which
-/// is why a second identity starts receiving the moment this returns.
+/// The app itself is not involved: it is already installed and already registered for
+/// push, so a second identity starts receiving the moment this returns.
 #[update]
 fn claim_notification_app(
     request: ClaimNotificationAppRequest,
 ) -> Result<(), ClaimNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(ClaimNotificationAppError::InternalCanisterError(
+            "notifications are not enabled".to_string(),
+        ));
+    }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
         .map_err(|_| ClaimNotificationAppError::InvalidHandle)?;
     let handle: [u8; 32] = request
