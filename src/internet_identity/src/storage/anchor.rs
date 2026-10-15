@@ -1,5 +1,6 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
+use crate::notifications::app::NotificationAppId;
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
@@ -102,6 +103,14 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// The Home Screen app this browser installed or claimed, where it has one.
+    ///
+    /// A reference rather than an entry of its own: one installed app is one record
+    /// however many identities point at it, and it is not a browser, so it holds no
+    /// session, is signed out of nothing, and costs the user no slot in this list. The
+    /// reference outlives signing out and turning notifications off, both of which stop
+    /// routing without forgetting which app this browser has.
+    pub notification_app: Option<NotificationAppId>,
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -212,6 +221,7 @@ impl From<StorableBrowser> for Browser {
             last_used: value.last_used,
             session_count: value.session_count,
             webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            notification_app: value.notification_app,
         }
     }
 }
@@ -229,6 +239,7 @@ impl From<Browser> for StorableBrowser {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
+            notification_app: value.notification_app,
         }
     }
 }
@@ -867,6 +878,79 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
+    /// The browser of this anchor that signed a link token, if any still holds the key
+    /// it was signed with.
+    ///
+    /// Both slots are tried, because a browser announces a successor at every sign-in and
+    /// the token may have been signed on either side of one. A browser that has signed in
+    /// twice since has rotated past both, and its token is no longer accepted: the user
+    /// starts the install again, which is a step they are already standing in front of.
+    pub fn browser_that_signed_link(
+        &self,
+        signature: &[u8],
+        anchor_number: AnchorNumber,
+        expires_at_ns: Timestamp,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                [&browser.current_browser_key, &browser.next_browser_key]
+                    .iter()
+                    .any(|key| {
+                        crate::browser_key::verify_notification_app_link(
+                            key,
+                            signature,
+                            anchor_number,
+                            expires_at_ns,
+                        )
+                    })
+            })
+            .map(|browser| browser.id)
+    }
+
+    /// Whether a browser of this anchor already signs with `key`.
+    ///
+    /// An app key is generated in a partition no browser can reach, so a collision here
+    /// is not a reinstall: it is a key being presented as two different things.
+    pub fn browser_holds_key(&self, key: &PublicKey) -> bool {
+        self.browsers
+            .iter()
+            .any(|browser| browser.current_browser_key == *key || browser.next_browser_key == *key)
+    }
+
+    /// Points `browser_id` at `app_id`, replacing whatever it pointed at before.
+    ///
+    /// One app per browser. Refusing the second instead would leave a user who deleted
+    /// the app from their Home Screen unable to set one up again, ever: iOS destroys its
+    /// storage and the key with it, while a reference here would survive naming a record
+    /// nothing holds. A browser presenting an unexpired token it signed is entitled to
+    /// say where its notifications go, and the newest install is the answer it is giving.
+    ///
+    /// Answers the record this browser pointed at before, where that was a different one,
+    /// so the caller can drop a reference the record may now have none of.
+    pub fn point_at_notification_app(
+        &mut self,
+        browser_id: BrowserId,
+        app_id: NotificationAppId,
+    ) -> Option<NotificationAppId> {
+        let browser = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)?;
+        browser
+            .notification_app
+            .replace(app_id)
+            .filter(|previous| *previous != app_id)
+    }
+
+    /// The app this browser points at, where it has one.
+    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppId> {
+        self.browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .and_then(|browser| browser.notification_app)
+    }
+
     /// What this browser registered for Web Push, if anything.
     pub fn webpush_subscription(&self, browser_id: BrowserId) -> Option<&WebPushSubscription> {
         self.browsers
@@ -1037,6 +1121,7 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            notification_app: None,
         });
 
         let mut dropped = vec![];

@@ -384,6 +384,54 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// Gives a Home Screen app a record of its own, and points the installing browser at it.
+///
+/// Authorized by the token that browser signed rather than by the caller being a browser
+/// this identity knows: the app runs in a storage partition of its own, so it cannot
+/// reach that browser's key, and the key it generated there is one nothing has seen. The
+/// caller must be that key, so a token cannot be spent on a key its holder does not have.
+///
+/// Spending a token twice is not refused. A browser points at one app, so a second spend
+/// repoints it, which is what a user who deleted the app and added it again needs: iOS
+/// destroyed the old partition and its key, and the app that comes back is a new one.
+#[update]
+fn link_notification_app(
+    request: LinkNotificationAppRequest,
+) -> Result<(), LinkNotificationAppError> {
+    let now = ic_cdk::api::time();
+    if request.expires_at_ns <= now {
+        return Err(LinkNotificationAppError::LinkTokenExpired);
+    }
+    let caller = caller();
+    if caller != Principal::self_authenticating(&request.app_key) {
+        return Err(LinkNotificationAppError::CallerIsNotTheApp(caller));
+    }
+
+    let mut anchor = state::anchor(request.anchor_number);
+    let installing_browser = anchor
+        .browser_that_signed_link(
+            &request.signature,
+            request.anchor_number,
+            request.expires_at_ns,
+        )
+        .ok_or(LinkNotificationAppError::InvalidLinkToken)?;
+    if anchor.browser_holds_key(&request.app_key) {
+        return Err(LinkNotificationAppError::KeyAlreadyInUse);
+    }
+
+    let app = state::storage_borrow_mut(|storage| {
+        storage.notification_app_for_key(&request.app_key, now)
+    })
+    .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
+    anchor.point_at_notification_app(installing_browser, app.id);
+
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
 /// Authorized by the browser key the caller signs with.
 #[update]
 fn prepare_notification_delegation(

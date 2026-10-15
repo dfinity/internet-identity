@@ -1309,6 +1309,90 @@ mod browser_tests {
         ByteBuf::from(key)
     }
 
+    /// A browser points at the app it installed, and at only one: a second install from
+    /// the same browser is the user's answer to having lost the first.
+    #[test]
+    fn a_browser_points_at_one_app_at_a_time() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(anchor.notification_app(id), None);
+        assert_eq!(anchor.point_at_notification_app(id, 7), None);
+        assert_eq!(anchor.notification_app(id), Some(7));
+    }
+
+    /// The record it pointed at before is answered, because it may now have no browser
+    /// pointing at it at all, and the caller is the only one that can go and look.
+    #[test]
+    fn repointing_a_browser_answers_the_app_it_left() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(anchor.point_at_notification_app(id, 8), Some(7));
+        assert_eq!(anchor.notification_app(id), Some(8));
+    }
+
+    /// Pointing a browser at the record it already points at leaves nothing behind.
+    #[test]
+    fn pointing_at_the_same_app_twice_leaves_nothing_behind() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(anchor.point_at_notification_app(id, 7), None);
+        assert_eq!(anchor.notification_app(id), Some(7));
+    }
+
+    /// A browser the registry no longer lists has nothing to point.
+    #[test]
+    fn an_unknown_browser_points_at_nothing() {
+        let mut anchor = anchor();
+
+        assert_eq!(anchor.point_at_notification_app(42, 7), None);
+        assert_eq!(anchor.notification_app(42), None);
+    }
+
+    /// An app key is generated where no browser can reach it, so a key a browser signs
+    /// with is not an app's: it is one key being presented as two different things.
+    #[test]
+    fn a_key_a_browser_signs_with_is_recognised_in_either_slot() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert!(anchor.browser_holds_key(&browser_key(1)));
+        assert!(anchor.browser_holds_key(&successor_key(1)));
+        assert!(!anchor.browser_holds_key(&browser_key(2)));
+    }
+
     #[test]
     fn an_unseen_key_registers_a_new_device() {
         let mut anchor = anchor();

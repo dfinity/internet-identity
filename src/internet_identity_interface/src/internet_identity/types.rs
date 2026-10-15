@@ -1110,6 +1110,40 @@ pub enum RemoveWebPushSubscriptionError {
     InternalCanisterError(String),
 }
 
+/// Gives a Home Screen app a record of its own, on the authority of a browser that is
+/// signed in.
+///
+/// Authorized by the token rather than by the caller being a browser this identity knows:
+/// the app runs in a storage partition of its own, holds a key it has just generated, and
+/// is not a browser and never will be. The token is signed by the browser that installed
+/// it, which is the party whose authority is being spent.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// The app's own public key, DER-encoded. The caller must be its self-authenticating
+    /// principal, so a token cannot be spent on a key its holder does not have.
+    pub app_key: PublicKey,
+    /// When the installing browser's signature stops being accepted.
+    pub expires_at_ns: Timestamp,
+    /// The installing browser's signature over the anchor number and that expiry.
+    pub signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum LinkNotificationAppError {
+    /// No browser of this identity signed this token, or the one that did has rotated its
+    /// key past it since.
+    InvalidLinkToken,
+    /// The token's expiry has passed.
+    LinkTokenExpired,
+    /// The caller is not the key it asks to have linked.
+    CallerIsNotTheApp(Principal),
+    /// The key is one a browser of this identity already signs with. An app key is never
+    /// a browser key, so this is a collision rather than a reinstall.
+    KeyAlreadyInUse,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,

@@ -16,6 +16,15 @@ const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 /// replayed in the other's role.
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 
+/// A third prefix, for the token a browser signs to let a Home Screen app it installed
+/// claim an entry.
+///
+/// What actually keeps a sign-in signature from being spent as a link token is that the
+/// messages cannot collide: a sign-in covers a session key and another browser key, a
+/// link token covers an anchor number and an expiry, and they are different lengths. The
+/// prefix is defence in depth for a later change that makes two messages the same shape.
+const NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-link";
+
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
 const BROWSER_KEY_SIGNATURE_BYTES: usize = 64;
 
@@ -80,6 +89,36 @@ pub fn verify_browser_keys(
         current: current_browser_key.clone(),
         next: next_browser_key.clone(),
     })
+}
+
+/// Whether `key` signed a link token for `anchor_number` expiring at `expires_at_ns`.
+///
+/// The expiry is covered so it cannot be extended, and the anchor number so a token
+/// signed for one identity cannot be spent on another. The app's own key is deliberately
+/// not covered: the installing browser signs before the app exists, which is the reason
+/// a bearer token is needed at all. What keeps the token from being spent on a key its
+/// holder does not have is the caller check at the endpoint. Spending it twice is not a
+/// refusal: a browser references one app, so a second spend repoints that reference, and
+/// a reinstall after iOS destroyed the app's storage needs exactly that.
+pub fn verify_notification_app_link(
+    key: &PublicKey,
+    signature: &[u8],
+    anchor_number: u64,
+    expires_at_ns: u64,
+) -> bool {
+    verify(
+        key,
+        signature,
+        &link_token_message(anchor_number, expires_at_ns),
+    )
+}
+
+fn link_token_message(anchor_number: u64, expires_at_ns: u64) -> Vec<u8> {
+    let mut message = Vec::with_capacity(NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN.len() + 16);
+    message.extend_from_slice(NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN);
+    message.extend_from_slice(&anchor_number.to_be_bytes());
+    message.extend_from_slice(&expires_at_ns.to_be_bytes());
+    message
 }
 
 fn verify(key: &PublicKey, signature: &[u8], message: &[u8]) -> bool {
@@ -174,6 +213,13 @@ mod tests {
 
         fn successor(&self, session_key: &SessionKey, current: &PublicKey) -> Vec<u8> {
             self.sign(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, current)
+        }
+
+        fn link_token(&self, anchor_number: u64, expires_at_ns: u64) -> Vec<u8> {
+            let signature: Signature = self
+                .signing
+                .sign(&link_token_message(anchor_number, expires_at_ns));
+            signature.to_bytes().to_vec()
         }
     }
 
@@ -379,5 +425,95 @@ mod tests {
             &session
         )
         .is_none());
+    }
+    #[test]
+    fn a_browser_key_signs_a_link_token_for_its_own_anchor_and_expiry() {
+        let browser = key(1);
+
+        assert!(verify_notification_app_link(
+            &browser.public,
+            &browser.link_token(10_000, 5_000),
+            10_000,
+            5_000,
+        ));
+    }
+
+    /// The anchor number is covered, so a token signed for one identity cannot be spent
+    /// on another.
+    #[test]
+    fn a_link_token_does_not_verify_for_another_anchor() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_link(
+            &browser.public,
+            &browser.link_token(10_000, 5_000),
+            10_001,
+            5_000,
+        ));
+    }
+
+    /// The expiry is covered, so a holder cannot extend it by asking for longer.
+    #[test]
+    fn a_link_token_does_not_verify_for_a_later_expiry() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_link(
+            &browser.public,
+            &browser.link_token(10_000, 5_000),
+            10_000,
+            6_000,
+        ));
+    }
+
+    #[test]
+    fn another_key_does_not_verify_a_link_token() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_link(
+            &key(2).public,
+            &browser.link_token(10_000, 5_000),
+            10_000,
+            5_000,
+        ));
+    }
+
+    /// The exact bytes a link token is signed over, for anchor 10000 expiring at 5000.
+    ///
+    /// Asserted identically in `browser-key.store.ts`. The browser signs this message
+    /// and the canister rebuilds it, so the two layouts have to agree byte for byte:
+    /// pinning the bytes on both sides turns a change to either into a failing test
+    /// rather than tokens this canister quietly refuses.
+    #[test]
+    fn the_link_token_message_is_the_bytes_the_frontend_signs() {
+        assert_eq!(
+            hex::encode(link_token_message(10_000, 5_000)),
+            "69692d6e6f74696669636174696f6e2d6170702d6c696e6b00000000000027100000000000001388"
+        );
+    }
+
+    /// A signature a browser produced for signing in is not accepted as a link token,
+    /// which is what stops every sign-in from being a linkable capability.
+    ///
+    /// Holds because the two messages cannot collide, not because of the domain prefix:
+    /// swapping the prefixes leaves this passing. There is no test for the prefix alone,
+    /// because no two messages of these shapes are ever equal.
+    #[test]
+    fn a_sign_in_signature_is_not_accepted_as_a_link_token() {
+        let browser = key(1);
+        let next = key(2);
+        let session = session_key(3);
+
+        assert!(!verify_notification_app_link(
+            &browser.public,
+            &browser.current(&session, &next.public),
+            10_000,
+            5_000,
+        ));
+        assert!(!verify_notification_app_link(
+            &browser.public,
+            &browser.successor(&session, &next.public),
+            10_000,
+            5_000,
+        ));
     }
 }

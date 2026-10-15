@@ -7491,3 +7491,84 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     assert_eq!(reloaded.notifications(queued_on), [3, 1, 2].map(queued));
     assert!(reloaded.notifications(left_empty).is_empty());
 }
+
+/// One installed app is one record. The app holds the key it generated on its first open
+/// and presents it again at every later setup, and what it has registered against that
+/// record has to survive the second one.
+#[test]
+fn an_app_key_seen_again_keeps_the_record_it_already_had() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((1, 2), memory.clone());
+    let key = ByteBuf::from(vec![7u8; 91]);
+
+    let first = storage
+        .notification_app_for_key(&key, 1_000)
+        .expect("creating the record");
+    let again = storage
+        .notification_app_for_key(&key, 2_000)
+        .expect("reading the record back");
+
+    assert_eq!(first.id, again.id);
+    assert_eq!(again.created_at, 1_000);
+    assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
+        Some(first)
+    );
+}
+
+/// Ids are handed out and never handed out again, so a browser still pointing at a
+/// deleted record cannot be given somebody else's app by that reference.
+#[test]
+fn app_ids_are_never_reissued() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((1, 2), memory.clone());
+
+    let ids: Vec<_> = (1u8..=3)
+        .map(|seed| {
+            storage
+                .notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 1_000)
+                .expect("creating the record")
+                .id
+        })
+        .collect();
+
+    assert_eq!(ids, vec![0, 1, 2]);
+}
+
+/// A caller nothing has ever seen has no record, which is what says the app is not
+/// installed, or installed and never opened.
+#[test]
+fn an_unseen_caller_has_no_app_record() {
+    let memory = VectorMemory::default();
+    let storage = Storage::new((1, 2), memory.clone());
+
+    assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating([9u8; 91])),
+        None
+    );
+}
+
+/// The records survive an upgrade, along with the counter that says which ids are spent.
+#[test]
+fn app_records_and_their_counter_survive_an_upgrade() {
+    let memory = VectorMemory::default();
+    let first_key = ByteBuf::from(vec![1u8; 91]);
+    let mut storage = Storage::new((1, 2), memory.clone());
+    let before = storage
+        .notification_app_for_key(&first_key, 1_000)
+        .expect("creating the record");
+
+    let mut reloaded = Storage::from_memory(memory);
+
+    assert_eq!(
+        reloaded.notification_app_with_principal(Principal::self_authenticating(&first_key)),
+        Some(before)
+    );
+    assert_eq!(
+        reloaded
+            .notification_app_for_key(&ByteBuf::from(vec![2u8; 91]), 2_000)
+            .expect("creating the second record")
+            .id,
+        1
+    );
+}

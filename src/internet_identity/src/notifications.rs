@@ -5,6 +5,7 @@
 //! spelling consent is keyed by.
 
 pub(crate) mod admission_queue;
+pub mod app;
 pub(crate) mod backlog;
 pub(crate) mod browser_queue;
 pub mod delegation;
