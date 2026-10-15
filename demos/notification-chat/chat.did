@@ -1,0 +1,94 @@
+// One hour of the delivery pipeline.
+type Bucket = record {
+  // The instant the hour begins, nanoseconds since the epoch.
+  start : nat64;
+  counts : Counts;
+};
+// What a channel pulls back. The rest of a [`Notification`] never leaves this
+// canister.
+type Content = record { url : opt text; title : text; body : text };
+// What became of a set of notifications, counted once each and attributed to
+// where they came in rather than to when each step happened, so the three
+// stages read as one funnel: of `queued`, how many Internet Identity took, of
+// those how many a channel showed, and of those how many were acted on.
+// 
+// `deferred` is not a stage — Internet Identity asking to be tried later
+// delays a notification rather than losing it — and a notification still on
+// its way is in none of the later counts yet, so gaps in a window that has not
+// settled are not yet losses.
+type Counts = record {
+  // Given up on: never accepted before its window closed, or accepted and
+  // expired without any channel showing it.
+  dropped : nat64;
+  // Somebody acted on it: the last stage, and the only one that says the
+  // notification did its job. Counted while the notification's own window is
+  // open, which is the period the app declared it relevant for.
+  opened : nat64;
+  accepted : nat64;
+  // Every call to [`crate::send`], including one the capacity ceiling
+  // refused.
+  queued : nat64;
+  received : nat64;
+  // How often Internet Identity asked for one to come back later.
+  deferred : nat64;
+};
+// What became of the notifications an app labelled with one funnel name.
+type Funnel = record { name : text; counts : Counts };
+type HttpRequest = record {
+  url : text;
+  method : text;
+  body : blob;
+  headers : vec record { text; text };
+  certificate_version : opt nat16;
+};
+type HttpResponse = record {
+  body : blob;
+  headers : vec record { text; text };
+  status_code : nat16;
+};
+type Member = record {
+  who : principal;
+  // Nanoseconds since the epoch.
+  joined_at : nat64;
+};
+type Message = record {
+  // Nanoseconds since the epoch.
+  at : nat64;
+  from : principal;
+  "text" : text;
+};
+type Metrics = record {
+  misconfigured : opt MisconfiguredSince;
+  // Up to 720 buckets, oldest first. Hours with no traffic are absent.
+  hours : vec Bucket;
+  // One per funnel an app has labelled, until it forgets it.
+  funnels : vec Funnel;
+  // Notifications waiting for Internet Identity to accept them.
+  backlog : nat64;
+};
+type Misconfigured = variant {
+  // `notification_origin` is unset or empty.
+  Origin;
+  // `notification_sender` is unset or not a principal.
+  Sender;
+  // The origin does not publish this canister as one of its senders.
+  NotAuthorizedSender;
+};
+type MisconfiguredSince = record { why : Misconfigured; since : nat64 };
+type Room = record { members : vec Member; messages : vec Message };
+service : () -> {
+  _internet_identity_notification_content : (nat64) -> (opt Content) query;
+  _internet_identity_notification_opened : (nat64) -> ();
+  _internet_identity_notification_received : (nat64) -> ();
+  http_request : (HttpRequest) -> (HttpResponse) query;
+  // Joins the room, which is what makes the caller a recipient of what others
+  // send. Nothing happens for somebody already in.
+  join : () -> ();
+  // Leaves the room, so the caller stops being notified.
+  leave : () -> ();
+  // The notification library's delivery metrics, an hour per bucket.
+  notification_metrics : () -> (Metrics) query;
+  room : () -> (Room) query;
+  // Posts a message and notifies everyone else in the room.
+  send : (text) -> ();
+}

@@ -1,0 +1,16 @@
+[package]
+name = "asset_util"
+description = "Asset certification utility library for asset serving canisters"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+base64 = "0.22"
+ic-cdk = { workspace = true }
+ic-certification = "3.0.3"
+ic-representation-independent-hash = "3.0.3"
+include_dir = { workspace = true }
+lazy_static = "1.5"
+serde = { workspace = true }
+serde_cbor = "0.11"
+sha2 = "0.10"

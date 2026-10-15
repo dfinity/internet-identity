@@ -1,0 +1,4 @@
+dist/
+target/
+node_modules/
+notification_chat.wasm
