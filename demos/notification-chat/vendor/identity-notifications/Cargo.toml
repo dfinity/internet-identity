@@ -1,0 +1,19 @@
+[package]
+name = "identity-notifications"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Notify Internet Identity users from a Rust canister: one send call, the library handles the rest."
+license = "Apache-2.0"
+repository = "https://github.com/dfinity/identity-notifications"
+publish = false
+keywords = ["internet-computer", "internet-identity", "notifications", "web-push", "icp"]
+categories = ["api-bindings", "wasm"]
+
+[dependencies]
+candid = "0.10"
+ic-cdk = "0.20"
+ic-cdk-timers = "1.0"
+ic-stable-structures = "0.7"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"

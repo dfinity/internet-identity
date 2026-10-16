@@ -1,0 +1,221 @@
+// One hour of the delivery pipeline.
+type Bucket = record {
+  // The instant the hour begins, nanoseconds since the epoch.
+  start : nat64;
+  counts : Counts;
+};
+// What a channel pulls back. The rest of a [`Notification`] never leaves this
+// canister.
+type Content = record { url : opt text; title : text; body : text };
+// What became of a set of notifications, counted once each and attributed to
+// where they came in rather than to when each step happened, so the three
+// stages read as one funnel: of `queued`, how many Internet Identity took, of
+// those how many a channel showed, and of those how many were acted on.
+// 
+// `deferred` is not a stage — Internet Identity asking to be tried later
+// delays a notification rather than losing it — and a notification still on
+// its way is in none of the later counts yet, so gaps in a window that has not
+// settled are not yet losses.
+type Counts = record {
+  // Given up on: never accepted before its window closed, or accepted and
+  // expired without any channel showing it.
+  dropped : nat64;
+  // Somebody acted on it: the last stage, and the only one that says the
+  // notification did its job. Counted while the notification's own window is
+  // open, which is the period the app declared it relevant for.
+  opened : nat64;
+  accepted : nat64;
+  // Every call to [`crate::send`], including one the capacity ceiling
+  // refused.
+  queued : nat64;
+  received : nat64;
+  // How often Internet Identity asked for one to come back later.
+  deferred : nat64;
+};
+// What became of the notifications an app labelled with one funnel name.
+type Funnel = record { name : text; counts : Counts };
+// A Candid-encodable representation of an HTTP request. This struct is used by
+// the `http_request` method of the HTTP Gateway Protocol's Candid interface.
+// 
+// # Examples
+// 
+// ```
+// use ic_http_certification::{HttpRequest, Method};
+// 
+// let request = HttpRequest::builder()
+// .with_method(Method::GET)
+// .with_url("/")
+// .with_headers(vec![("X-Custom-Foo".into(), "Bar".into())])
+// .with_body(&[1, 2, 3])
+// .with_certificate_version(2)
+// .build();
+// 
+// assert_eq!(request.method(), Method::GET);
+// assert_eq!(request.url(), "/");
+// assert_eq!(request.headers(), &[("X-Custom-Foo".into(), "Bar".into())]);
+// assert_eq!(request.body(), &[1, 2, 3]);
+// assert_eq!(request.certificate_version(), Some(2));
+// ```
+// 
+// # Helpers
+// 
+// There are also a number of convenience methods for quickly creating an [HttpRequest] with
+// commonly used HTTP methods:
+// 
+// - [GET](HttpRequest::get)
+// - [POST](HttpRequest::post)
+// - [PUT](HttpRequest::put)
+// - [PATCH](HttpRequest::patch)
+// - [DELETE](HttpRequest::delete)
+// 
+// ```
+// use ic_http_certification::HttpRequest;
+// 
+// let request = HttpRequest::get("/").build();
+// 
+// assert_eq!(request.method(), "GET");
+// assert_eq!(request.url(), "/");
+// ```
+type HttpRequest = record {
+  // HTTP request URL.
+  url : text;
+  // HTTP request method.
+  method : text;
+  // HTTP request body as an array of bytes.
+  body : blob;
+  // HTTP request headers.
+  headers : vec record { text; text };
+  // The max response verification version to use in the response's
+  // certificate.
+  certificate_version : opt nat16;
+};
+// A Candid-encodable representation of an HTTP response. This struct is used
+// by the `http_request` method of the HTTP Gateway Protocol's Candid interface.
+// 
+// # Examples
+// 
+// ```
+// use ic_http_certification::{HttpResponse, StatusCode};
+// 
+// let response = HttpResponse::builder()
+// .with_status_code(StatusCode::OK)
+// .with_headers(vec![("Content-Type".into(), "text/plain".into())])
+// .with_body(b"Hello, World!")
+// .with_upgrade(false)
+// .build();
+// 
+// assert_eq!(response.status_code(), StatusCode::OK);
+// assert_eq!(response.headers(), &[("Content-Type".into(), "text/plain".into())]);
+// assert_eq!(response.body(), b"Hello, World!");
+// assert_eq!(response.upgrade(), Some(false));
+// ```
+// 
+// # Helpers
+// 
+// There are also a number of convenience methods for quickly creating an [HttpResponse] with
+// commonly used HTTP status codes:
+// 
+// - [OK](HttpResponse::ok)
+// - [CREATED](HttpResponse::created)
+// - [NO_CONTENT](HttpResponse::no_content)
+// - [MOVED_PERMANENTLY](HttpResponse::moved_permanently)
+// - [TEMPORARY_REDIRECT](HttpResponse::temporary_redirect)
+// - [BAD_REQUEST](HttpResponse::bad_request)
+// - [UNAUTHORIZED](HttpResponse::unauthorized)
+// - [FORBIDDEN](HttpResponse::forbidden)
+// - [NOT_FOUND](HttpResponse::not_found)
+// - [METHOD_NOT_ALLOWED](HttpResponse::method_not_allowed)
+// - [TOO_MANY_REQUESTS](HttpResponse::too_many_requests)
+// - [INTERNAL_SERVER_ERROR](HttpResponse::internal_server_error)
+// 
+// ```
+// use ic_http_certification::{HttpResponse, StatusCode};
+// 
+// let response = HttpResponse::ok(b"Hello, World!", vec![("Content-Type".into(), "text/plain".into())]).build();
+// 
+// assert_eq!(response.status_code(), StatusCode::OK);
+// assert_eq!(response.headers(), &[("Content-Type".into(), "text/plain".into())]);
+// assert_eq!(response.body(), b"Hello, World!");
+// ```
+type HttpResponse = record {
+  // HTTP response body as an array of bytes.
+  body : blob;
+  // HTTP response headers.
+  headers : vec record { text; text };
+  // Whether the corresponding HTTP request should be upgraded to an update
+  // call.
+  upgrade : opt bool;
+  // HTTP response status code.
+  status_code : nat16;
+};
+type Member = record {
+  who : principal;
+  // Nanoseconds since the epoch.
+  joined_at : nat64;
+};
+type Message = record {
+  // Nanoseconds since the epoch.
+  at : nat64;
+  from : principal;
+  "text" : text;
+};
+type Metrics = record {
+  misconfigured : opt MisconfiguredSince;
+  // Up to 720 buckets, oldest first. Hours with no traffic are absent.
+  hours : vec Bucket;
+  // One per funnel an app has labelled, until it forgets it.
+  funnels : vec Funnel;
+  // Notifications waiting for Internet Identity to accept them.
+  backlog : nat64;
+};
+type Misconfigured = variant {
+  // `notification_origin` is unset or empty.
+  Origin;
+  // `notification_sender` is unset or not a principal.
+  Sender;
+  // The origin does not publish this canister as one of its senders.
+  NotAuthorizedSender;
+};
+type MisconfiguredSince = record { why : Misconfigured; since : nat64 };
+// What the notification library is configured with, read from the canister's
+// environment as the library reads it. The library notes a misconfiguration
+// when a send hits one and never takes the note back, so this is what says
+// whether one still stands.
+type NotificationConfig = record {
+  // `notification_origin`, where it is set and not empty.
+  origin : opt text;
+  // `notification_sender`, where it is set and a principal.
+  sender : opt principal;
+};
+type Room = record {
+  members : vec Member;
+  messages : vec Message;
+  // The claimed names of the members and of whoever wrote a message
+  // still in the room. Filled in by the canister when the room is read.
+  names : vec record { principal; text };
+};
+service : () -> {
+  _internet_identity_notification_content : (nat64) -> (opt Content) query;
+  _internet_identity_notification_opened : (nat64) -> ();
+  _internet_identity_notification_received : (nat64) -> ();
+  // Claims a name for the caller, replacing the one they had: the name as
+  // written where nobody else has it, else the first free `name_1`, `name_2`,
+  // … Returns the name given. Names are kept across upgrades.
+  claim_name : (text) -> (text);
+  // What the Candid interface does not say: units, who may call what, what
+  // cannot be undone. For an agent, after the interface and before a call.
+  get_api_doc : () -> (text) query;
+  http_request : (HttpRequest) -> (HttpResponse) query;
+  // Joins the room, which is what makes the caller a recipient of what others
+  // send. Nothing happens for somebody already in.
+  join : () -> ();
+  // Leaves the room, so the caller stops being notified.
+  leave : () -> ();
+  notification_config : () -> (NotificationConfig) query;
+  // The notification library's delivery metrics, an hour per bucket.
+  notification_metrics : () -> (Metrics) query;
+  // The room, with the names of everyone in it or heard in it.
+  room : () -> (Room) query;
+  // Posts a message and notifies everyone else in the room.
+  send : (text) -> ();
+}

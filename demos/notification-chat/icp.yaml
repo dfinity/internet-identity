@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v0.2.7/docs/schemas/icp-yaml-schema.json
+
+canisters:
+  - name: notification_chat
+    settings:
+      # Read by the notification library (vendor/identity-notifications).
+      environment_variables:
+        # The Internet Identity this canister sends through, and whose signed
+        # caller info it trusts when it serves a notification's content.
+        # Mainnet's by default; a local Internet Identity has its own id.
+        notification_sender: "fgte5-ciaaa-aaaad-aaatq-cai"
+        # This app's own origin, exactly as the browser reaches it. It names
+        # the canister, so it is only known once the canister exists: deploy,
+        # read the id, fill this in, deploy again. Until then nothing is sent
+        # and the stats panel says "misconfigured: origin".
+        notification_origin: "https://oizmi-wyaaa-aaaam-ajo5q-cai.icp.net"
+    build:
+      steps:
+        - type: script
+          commands:
+            - "./build.sh"
+            - 'cp notification_chat.wasm "$ICP_WASM_OUTPUT_PATH"'

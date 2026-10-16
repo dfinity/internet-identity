@@ -1,0 +1,26 @@
+{
+  "name": "@dfinity/internet-identity-notification-chat",
+  "type": "module",
+  "private": true,
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "dependencies": {
+    "@icp-sdk/auth": "file:vendor/icp-sdk-auth-10.0.0-notification-consent.tgz",
+    "@icp-sdk/core": "^6.1.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "npm run check && vite build",
+    "format": "prettier --write .",
+    "format-check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3",
+    "vite": "^7.3.1"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
