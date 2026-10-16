@@ -1,6 +1,7 @@
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
+use crate::notifications::webpush::fixtures::app_key;
 use crate::openid::{Domain, OpenIdCredential};
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -6939,6 +6940,33 @@ mod session_revocation_tests {
         );
     }
 
+    /// Signing out takes the address the wake-ups went to, so the stamp that rations a
+    /// second wake-up is rationing one for an entry that is waiting for nothing. Left
+    /// behind, it costs the browser its second wake-up for the next eight hours.
+    #[test]
+    fn signing_a_browser_out_clears_its_re_wake_stamp() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        create(&mut storage, anchor_number, "https://a.com", 1, 0, 1_000);
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.set_woken_again(0, Some(1_000));
+        storage.write(anchor).unwrap();
+
+        storage
+            .revoke_browser_sessions(anchor_number, 0, TEST_NOW)
+            .unwrap();
+
+        assert_eq!(
+            storage
+                .read(anchor_number)
+                .unwrap()
+                .browsers()
+                .iter()
+                .find(|browser| browser.id == 0)
+                .and_then(|browser| browser.woken_again_at_ns),
+            None
+        );
+    }
+
     #[test]
     fn signing_out_a_browser_with_nothing_to_revoke_writes_nothing() {
         let (mut storage, anchor_number) = storage_with_anchor();
@@ -7472,8 +7500,6 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
                 vapid_public_key: vec![4; 65],
                 jwt_signatures: vec![vec![3; 64]],
                 jwt_issued_at_ns: 0,
-                notifications: Vec::new(),
-                woken_again_at_ns: None,
             }),
         );
     }
@@ -7500,7 +7526,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
 fn an_app_key_seen_again_keeps_the_record_it_already_had() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((1, 2), memory.clone());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let key = app_key(7);
 
     let first = storage
         .notification_app_for_key(&key, 1_000)
@@ -7528,7 +7554,7 @@ fn app_ids_are_never_reissued() {
     let ids: Vec<_> = (1u8..=3)
         .map(|seed| {
             storage
-                .notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 1_000)
+                .notification_app_for_key(&app_key(seed), 1_000)
                 .expect("creating the record")
                 .id
         })
@@ -7545,7 +7571,7 @@ fn an_unseen_caller_has_no_app_record() {
     let storage = Storage::new((1, 2), memory.clone());
 
     assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating([9u8; 91])),
+        storage.notification_app_with_principal(Principal::self_authenticating(app_key(9))),
         None
     );
 }
@@ -7554,7 +7580,7 @@ fn an_unseen_caller_has_no_app_record() {
 #[test]
 fn app_records_and_their_counter_survive_an_upgrade() {
     let memory = VectorMemory::default();
-    let first_key = ByteBuf::from(vec![1u8; 91]);
+    let first_key = app_key(1);
     let mut storage = Storage::new((1, 2), memory.clone());
     let before = storage
         .notification_app_for_key(&first_key, 1_000)
@@ -7568,7 +7594,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     );
     assert_eq!(
         reloaded
-            .notification_app_for_key(&ByteBuf::from(vec![2u8; 91]), 2_000)
+            .notification_app_for_key(&app_key(2), 2_000)
             .expect("creating the second record")
             .id,
         1
@@ -7589,8 +7615,9 @@ fn anchor_with_browser(storage: &mut Storage<VectorMemory>) -> Anchor {
 /// the one whose token installed it.
 #[test]
 fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
-    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let key = app_key(7);
     let app = storage
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
@@ -7612,8 +7639,9 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
 /// reference and the app would be making a fresh record by then.
 #[test]
 fn an_app_nothing_points_at_is_deleted() {
-    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let key = app_key(7);
     let app = storage
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
@@ -7639,8 +7667,9 @@ fn an_app_nothing_points_at_is_deleted() {
 /// at it: the app is one thing on the device, shared by everyone who claimed it.
 #[test]
 fn an_app_outlives_one_identity_letting_go_of_it() {
-    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let key = app_key(7);
     let app = storage
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
@@ -7670,6 +7699,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
@@ -7696,6 +7726,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
     assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating(app_key(7))),
         storage.notification_app_with_principal(Principal::self_authenticating(&key)),
         None
     );
@@ -7729,6 +7760,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
@@ -7753,9 +7785,19 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
 
+    storage.set_notification_app_subscription(
+        app.id,
+        Some(WebPushSubscription {
+            endpoint: "https://web.push.apple.com/one".to_string(),
+            created_at_ns: 2_000,
+            vapid_public_key: vec![1; 65],
+            jwt_signatures: vec![vec![2; 64]],
+            jwt_issued_at_ns: 2_000,
+        }),
+        2_000,
     assert!(
         storage.set_notification_app_subscription(
             app.id,
@@ -7784,23 +7826,326 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     assert_eq!(stored.last_used, 2_000);
 }
 
-/// A caller is told its write landed nowhere rather than reporting a registration the
-/// record it named no longer has: ids are never reissued, so a record that is gone is
-/// gone for good.
+/// The one moment we know an installed app is gone: the push service says its endpoint
+/// no longer exists. Every browser pointing at it goes back to offering the install.
 #[test]
-fn registering_against_a_record_that_is_gone_stores_nothing() {
+fn forgetting_an_app_takes_every_reference_with_it() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
-    let gone = app.id + 1;
+    for anchor_number in [10_000, 10_001] {
+        let mut anchor = anchor_with_browser(&mut storage, anchor_number);
+        anchor.point_at_notification_app(0, app.id);
+        storage.write(anchor).expect("writing the anchor");
+    }
 
-    assert!(!storage.set_notification_app_subscription(gone, None, 2_000));
-    assert_eq!(storage.notification_app(gone), None);
-    // The record that is there is left alone by a write naming another.
+    for anchor_number in [10_000, 10_001] {
+        let mut anchor = storage.read(anchor_number).expect("reading the anchor");
+        anchor
+            .notifications_mut(0)
+            .expect("a listed browser")
+            .push(queued_notification(7));
+        storage.write(anchor).expect("queueing");
+    }
+
+    assert!(storage.forget_notification_app(app.id));
+
+    for anchor_number in [10_000, 10_001] {
+        let anchor = storage.read(anchor_number).expect("reading the anchor");
+        assert_eq!(anchor.notification_app(0), None);
+        // A replacement app must not inherit what the dead one was sent.
+        assert!(anchor.notifications(0).is_empty());
+    }
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(storage.notification_app(app.id), None);
+}
+
+/// A record being deleted takes the reference from every entry that held one, because
+/// nothing may point at a record that is not there. It takes the queue and the re-wake
+/// stamp only from the entries it delivered for: an entry woken at an address of its own
+/// still has somewhere to show what it has waiting.
+///
+/// One entry per record, so the two browsers pointing at one app are two identities.
+#[test]
+fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+
+    let mut own = anchor_with_browser(&mut storage, 10_000);
+    own.point_at_notification_app(0, app.id);
+    own.set_webpush_subscription(0, Some(app_subscription("https://own")));
+    own.notifications_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(7));
+    own.set_woken_again(0, Some(1_000));
+    storage
+        .write(own)
+        .expect("writing the entry with its own address");
+
+    let mut routed = anchor_with_browser(&mut storage, 10_001);
+    routed.point_at_notification_app(0, app.id);
+    routed
+        .notifications_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(8));
+    routed.set_woken_again(0, Some(1_000));
+    storage.write(routed).expect("writing the routed entry");
+
+    assert!(storage.forget_notification_app(app.id));
+
+    let own = storage.read(10_000).expect("reading the anchor");
     assert_eq!(
-        storage.notification_app(app.id).map(|app| app.last_used),
+        own.notification_app(0),
+        None,
+        "the reference goes either way"
+    );
+    assert_eq!(
+        own.notifications(0)
+            .iter()
+            .map(|queued| queued.notification_id)
+            .collect::<Vec<_>>(),
+        vec![7]
+    );
+    assert_eq!(
+        own.browsers()
+            .iter()
+            .find(|browser| browser.id == 0)
+            .and_then(|browser| browser.woken_again_at_ns),
         Some(1_000)
     );
+
+    let routed = storage.read(10_001).expect("reading the anchor");
+    assert_eq!(
+        routed.notification_app(0),
+        None,
+        "the reference goes either way"
+    );
+    assert!(routed.notifications(0).is_empty());
+    assert_eq!(
+        routed
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == 0)
+            .and_then(|browser| browser.woken_again_at_ns),
+        None
+    );
+
+    assert_eq!(storage.notification_app(app.id), None);
+}
+
+fn queued_notification(notification_id: u64) -> crate::storage::anchor::QueuedNotification {
+    crate::storage::anchor::QueuedNotification {
+        application_number: 1,
+        sender: Principal::from_slice(&[7; 10]),
+        notification_id,
+        expires_at_ns: u64::MAX,
+        account_number: None,
+    }
+}
+
+fn app_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
+    crate::storage::anchor::WebPushSubscription {
+        endpoint: endpoint.to_string(),
+        created_at_ns: 1_000,
+        vapid_public_key: vec![1; 65],
+        jwt_signatures: vec![vec![2; 64]],
+        jwt_issued_at_ns: 1_000,
+    }
+}
+
+/// A queue entry stands for a wake-up posted to one address. An app that registers a
+/// different one leaves nothing that could show them, and a hundred entries nobody can
+/// take would suppress every wake-up to the new address until they expire.
+#[test]
+fn a_new_app_address_drops_what_the_old_one_was_sent() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    anchor.point_at_notification_app(0, app.id);
+    storage.write(anchor).expect("pointing at the app");
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor
+        .notifications_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(7));
+    anchor.set_woken_again(0, Some(1_000));
+    storage.write(anchor).expect("queueing");
+
+    // The same address is a pool replacement, which keeps what is waiting.
+    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 2_000);
+    assert_eq!(
+        storage
+            .read(10_000)
+            .expect("reading")
+            .notifications(0)
+            .len(),
+        1
+    );
+
+    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000);
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+    assert!(anchor.notifications(0).is_empty());
+    assert_eq!(
+        anchor
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == 0)
+            .and_then(|browser| browser.woken_again_at_ns),
+        None
+    );
+}
+
+/// Routing through the app is holding no registration of its own, which is how the send
+/// path picks the app's address. An entry that has one was woken at that address, so the
+/// app rotating its own leaves what that entry has waiting perfectly showable, while the
+/// entry routing through the app loses it.
+///
+/// One entry per record, so the two browsers pointing at one app are two identities.
+#[test]
+fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+
+    let mut own = anchor_with_browser(&mut storage, 10_000);
+    own.point_at_notification_app(0, app.id);
+    own.set_webpush_subscription(0, Some(app_subscription("https://own")));
+    own.notifications_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(7));
+    own.set_woken_again(0, Some(1_000));
+    storage
+        .write(own)
+        .expect("writing the entry with its own address");
+
+    let mut routed = anchor_with_browser(&mut storage, 10_001);
+    routed.point_at_notification_app(0, app.id);
+    routed
+        .notifications_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(8));
+    routed.set_woken_again(0, Some(1_000));
+    storage.write(routed).expect("writing the routed entry");
+
+    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000);
+
+    let own = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(
+        own.notifications(0)
+            .iter()
+            .map(|queued| queued.notification_id)
+            .collect::<Vec<_>>(),
+        vec![7]
+    );
+    assert_eq!(
+        own.browsers()
+            .iter()
+            .find(|browser| browser.id == 0)
+            .and_then(|browser| browser.woken_again_at_ns),
+        Some(1_000)
+    );
+
+    let routed = storage.read(10_001).expect("reading the anchor");
+    assert!(routed.notifications(0).is_empty());
+    assert_eq!(
+        routed
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == 0)
+            .and_then(|browser| browser.woken_again_at_ns),
+        None
+    );
+}
+
+/// What delivers for an entry is not always the entry's own registration: on a phone it
+/// is the Home Screen app it points at, and the entry holds none. Anything that asks the
+/// entry alone refuses the app everything it needs.
+#[test]
+fn an_entry_delivers_through_the_app_it_points_at() {
+    use crate::notifications::webpush::delivering_subscription;
+    use crate::storage::anchor::WebPushSubscription;
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    storage.set_notification_app_subscription(
+        app.id,
+        Some(WebPushSubscription {
+            endpoint: "https://web.push.apple.com/one".to_string(),
+            created_at_ns: 1_000,
+            vapid_public_key: vec![1; 65],
+            jwt_signatures: vec![vec![2; 64]],
+            jwt_issued_at_ns: 1_000,
+        }),
+        1_000,
+    );
+    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    anchor.point_at_notification_app(0, app.id);
+    anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
+    storage.write(anchor).expect("pointing at the app");
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+
+    assert_eq!(
+        delivering_subscription(&storage, &anchor, 0).map(|one| one.endpoint),
+        Some("https://web.push.apple.com/one".to_string())
+    );
+}
+
+/// An app speaks for an entry only while that entry routes through it. Switching
+/// delivery off, or signing out on the browser, leaves the reference in place and the
+/// app with nothing to deliver to.
+#[test]
+fn an_entry_that_stopped_routing_delivers_through_nothing() {
+    use crate::notifications::webpush::delivering_subscription;
+    use crate::storage::anchor::WebPushSubscription;
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    storage.set_notification_app_subscription(
+        app.id,
+        Some(WebPushSubscription {
+            endpoint: "https://web.push.apple.com/one".to_string(),
+            created_at_ns: 1_000,
+            vapid_public_key: vec![1; 65],
+            jwt_signatures: vec![vec![2; 64]],
+            jwt_issued_at_ns: 1_000,
+        }),
+        1_000,
+    );
+    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    anchor.point_at_notification_app(0, app.id);
+    anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
+    anchor.set_notification_app_enabled(0, false);
+    storage.write(anchor).expect("pointing at the app");
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(delivering_subscription(&storage, &anchor, 0), None);
+
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor.set_notification_app_enabled(0, true);
+    anchor.move_browser_session_counts(&BTreeMap::from([(0, -1)]));
+    storage.write(anchor).expect("signing the browser out");
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(delivering_subscription(&storage, &anchor, 0), None);
 }

@@ -1403,7 +1403,9 @@ pub struct GetNextNotificationResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum GetNextNotificationError {
-    /// Also a caller that is no browser of the identity.
+    /// The caller signs with no key this identity is signed in from, and with no key of
+    /// an app one of its browsers routes through.
+    InvalidBrowserKey,
     InternalCanisterError(String),
 }
 
@@ -1419,6 +1421,8 @@ pub struct RemoveNotificationResponse {}
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum RemoveNotificationError {
-    /// Also a caller that is no browser of the identity.
+    /// The caller signs with no key this identity is signed in from, and with no key of
+    /// an app one of its browsers routes through.
+    InvalidBrowserKey,
     InternalCanisterError(String),
 }

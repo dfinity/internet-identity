@@ -1,6 +1,7 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
 use crate::notifications::app::NotificationApp;
+use crate::notifications::dispatch;
 use crate::session_delegation::expected_session_principal;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
@@ -196,6 +197,11 @@ pub fn check_app_authorization() -> Result<NotificationApp, AuthorizationError> 
 /// Answers which kind the caller turned out to be, because what a write does differs: a
 /// browser's subscription is its entry's, and an app's is its record's, shared with
 /// every identity pointing at it.
+///
+/// An app speaks for an entry only while that entry routes through it. The reference
+/// outlives signing out and switching delivery off, so holding one is not authority: a
+/// phone the user signed out of would otherwise go on minting delegations and reading
+/// the entry's queue with the key in its partition.
 pub fn check_notification_authorization(
     anchor_number: AnchorNumber,
 ) -> Result<(Anchor, BrowserId, NotificationCaller), AuthorizationError> {
@@ -204,11 +210,14 @@ pub fn check_notification_authorization(
     if let Some(browser_id) = anchor.browser_by_principal(caller) {
         return Ok((anchor, browser_id, NotificationCaller::Browser));
     }
-    let app = state::storage_borrow(|storage| storage.notification_app_with_principal(caller))
-        .ok_or(AuthorizationError::from(caller))?;
-    let browser_id = anchor
-        .browser_pointing_at_notification_app(app.id)
-        .ok_or(AuthorizationError::from(caller))?;
+    let routed = state::storage_borrow(|storage| {
+        let app = storage.notification_app_with_principal(caller)?;
+        let browser = anchor.browsers().iter().find(|browser| {
+            dispatch::routed_app(storage, browser).is_some_and(|routed| routed.id == app.id)
+        })?;
+        Some((browser.id, app))
+    });
+    let (browser_id, app) = routed.ok_or(AuthorizationError::from(caller))?;
     Ok((anchor, browser_id, NotificationCaller::App(app)))
 }
 

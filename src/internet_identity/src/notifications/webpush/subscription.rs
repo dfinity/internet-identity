@@ -6,9 +6,12 @@ use super::validation::{
 };
 use crate::authz_utils::NotificationCaller;
 use crate::notifications::app::NotificationApp;
+use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, WebPushSubscription};
+use crate::storage::anchor::{keeps_endpoint, Anchor, WebPushSubscription};
+use crate::storage::Storage;
+use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError,
     Timestamp, WebPushSubscriptionStatus,
@@ -42,17 +45,17 @@ pub fn set_subscription(
     } = request;
 
     // The same endpoint means this replaces the pool on a registration that is still
-    // live, so the registration keeps its age and its queue, and the pool has to move
-    // forward: one signature covers one elapsed window, and an older pool would shorten
-    // the coverage the browser believes it has. Any other endpoint is a new registration.
-    let (created_at_ns, notifications) = match anchor.webpush_subscription(browser_id) {
+    // live, so the registration keeps its age, and the pool has to move forward: one
+    // signature covers one elapsed window, and an older pool would shorten the coverage
+    // the browser believes it has. Any other endpoint is a new registration.
+    let created_at_ns = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            (registered.created_at_ns, registered.notifications.clone())
+            registered.created_at_ns
         }
-        _ => (now_ns, Vec::new()),
+        _ => now_ns,
     };
 
     write_subscription(
@@ -64,9 +67,6 @@ pub fn set_subscription(
             vapid_public_key,
             jwt_signatures,
             jwt_issued_at_ns,
-            notifications,
-            // A re-subscribe has had no second wake-up of its own yet.
-            woken_again_at_ns: None,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -89,27 +89,83 @@ pub fn remove_subscription(
 }
 
 fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Result<(), String> {
-    let anchor =
+    let mut anchor =
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
+    // On a phone the entry holds no registration of its own, so clearing one would
+    // silence nothing: what delivers is the app it routes through. The reference stays,
+    // because it is which app this browser has rather than whether it is routing.
+    anchor.set_notification_app_enabled(browser_id, false);
     write_subscription(anchor, browser_id, None)
 }
 
-/// Idempotently remove a registration its relay reported gone, unless the browser has
-/// registered another endpoint since the post went out.
+/// Idempotently remove a registration its relay reported gone, unless whoever holds it
+/// has registered another endpoint since the post went out.
+///
+/// `target` says who held the posted endpoint, rather than whoever the entry points at
+/// by the time the relay answers: a browser that switched apps mid-flight would
+/// otherwise leave the dead record and every reference to it standing.
+///
+/// Where the gone endpoint is the Home Screen app's, the app itself is gone: iOS
+/// destroys the partition and the key with it when the user deletes a web app, and
+/// nothing else tells us. So the record goes, and every browser pointing at it falls
+/// back to offering the install.
 pub(crate) fn clear_gone_subscription(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
+    target: DeliveryTarget,
     endpoint: &str,
 ) -> Result<(), String> {
-    let anchor =
-        storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
-    if anchor
-        .webpush_subscription(browser_id)
-        .is_none_or(|registered| registered.endpoint != endpoint)
-    {
-        return Ok(());
+    match target {
+        DeliveryTarget::Browser => {
+            let anchor = storage_borrow(|storage| storage.read(anchor_number))
+                .map_err(|err| format!("{err}"))?;
+            let Some(registered) = anchor.webpush_subscription(browser_id) else {
+                return Ok(());
+            };
+            if registered.endpoint != endpoint {
+                return Ok(());
+            }
+            write_subscription(anchor, browser_id, None)
+        }
+        DeliveryTarget::App(app_id) => {
+            let gone = storage_borrow(|storage| {
+                storage.notification_app(app_id).is_some_and(|app| {
+                    app.webpush_subscription
+                        .is_some_and(|subscription| subscription.endpoint == endpoint)
+                })
+            });
+            if gone && !storage_borrow_mut(|storage| storage.forget_notification_app(app_id)) {
+                return Err(format!(
+                    "notification app {app_id} is gone but is still referenced"
+                ));
+            }
+            Ok(())
+        }
     }
-    write_subscription(anchor, browser_id, None)
+}
+
+/// What delivers this entry's notifications, wherever it is kept.
+///
+/// A browser that registered an address of its own, or the Home Screen app it routes
+/// through, whose subscription belongs to the app's record and is shared with every
+/// identity pointing at it. On a phone the entry holds none of its own, so anything
+/// asking "is this entry reachable" has to ask this rather than the entry.
+///
+/// Takes the storage it reads rather than opening a borrow of its own, because callers
+/// hold one already.
+pub(crate) fn delivering_subscription<M: Memory + Clone>(
+    storage: &Storage<M>,
+    anchor: &Anchor,
+    browser_id: BrowserId,
+) -> Option<WebPushSubscription> {
+    if let Some(own) = anchor.webpush_subscription(browser_id) {
+        return Some(own.clone());
+    }
+    let browser = anchor
+        .browsers()
+        .iter()
+        .find(|browser| browser.id == browser_id)?;
+    dispatch::routed_app(storage, browser)?.webpush_subscription
 }
 
 /// What this browser is registered with, and how much of the pool it signed is left
@@ -130,11 +186,28 @@ pub fn subscription_status(
     })
 }
 
+/// Writes what this browser registered, and clears what was waiting where that address
+/// is going away.
+///
+/// A queue is a list of wake-ups already posted to one endpoint. A registration that is
+/// removed, or replaced by a different endpoint, leaves nothing that could show them, so
+/// they go with it, and so does the re-wake stamp: it rations second wake-ups for an
+/// entry still waiting, and this entry is waiting for nothing. A pool replacement on the
+/// same endpoint keeps both.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
+    if !keeps_endpoint(
+        anchor.webpush_subscription(browser_id),
+        subscription.as_ref(),
+    ) {
+        if let Some(queue) = anchor.notifications_mut(browser_id) {
+            queue.clear();
+        }
+        anchor.set_woken_again(browser_id, None);
+    }
     anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
 }
@@ -162,14 +235,14 @@ fn set_app_subscription(
     // Same reasoning as a browser's: the same endpoint is a pool replacement on a live
     // registration, which keeps its age and must move forward, and any other endpoint is
     // a registration of its own.
-    let (created_at_ns, notifications) = match app.webpush_subscription.as_ref() {
+    let created_at_ns = match app.webpush_subscription.as_ref() {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            (registered.created_at_ns, registered.notifications.clone())
+            registered.created_at_ns
         }
-        _ => (now_ns, Vec::new()),
+        _ => now_ns,
     };
 
     let stored = state::storage_borrow_mut(|storage| {
@@ -181,8 +254,6 @@ fn set_app_subscription(
                 vapid_public_key,
                 jwt_signatures,
                 jwt_issued_at_ns,
-                notifications,
-                woken_again_at_ns: None,
             }),
             now_ns,
         )
@@ -242,6 +313,54 @@ mod tests {
         };
         remove_subscription(request.try_into().expect("the fixture request validates"))
             .expect("removing a subscription");
+    }
+
+    /// Silencing a lost device from another browser has to reach the app it routes
+    /// through: a phone holds no registration of its own, so clearing one silences
+    /// nothing. The reference stays, so coming back is the switch and not a reinstall.
+    #[test]
+    fn silencing_a_browser_switches_off_the_app_it_routes_through() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        let app = storage_borrow_mut(|storage| {
+            storage
+                .notification_app_for_key(&app_key(9), 0)
+                .expect("creating the app record")
+        });
+        let mut stored = anchor(anchor_number);
+        stored.point_at_notification_app(browsers[0], app.id);
+        storage_borrow_mut(|storage| storage.write(stored)).expect("pointing at the app");
+
+        remove(anchor_number, browsers[0]);
+
+        let reference = anchor(anchor_number)
+            .notification_app(browsers[0])
+            .expect("the reference stays");
+        assert_eq!(reference.app_id, app.id);
+        assert!(!reference.enabled);
+    }
+
+    /// The re-wake stamp rations a second wake-up for an entry still waiting. An entry
+    /// whose queue was just emptied is waiting for nothing, so it starts clear.
+    #[test]
+    fn a_new_endpoint_clears_the_re_wake_stamp() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+        let mut stored = anchor(anchor_number);
+        stored.set_woken_again(browsers[0], Some(1_000));
+        storage_borrow_mut(|storage| storage.write(stored)).expect("stamping");
+
+        subscribe(anchor_number, browsers[0], ROTATED, 2_000);
+
+        assert_eq!(
+            anchor(anchor_number)
+                .browsers()
+                .iter()
+                .find(|browser| browser.id == browsers[0])
+                .and_then(|browser| browser.woken_again_at_ns),
+            None
+        );
     }
 
     #[test]

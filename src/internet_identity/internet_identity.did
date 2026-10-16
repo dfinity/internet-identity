@@ -2083,7 +2083,9 @@ type GetNextNotificationResponse = record {
 };
 
 type GetNextNotificationError = variant {
-    // Also a caller that is no browser of the identity.
+    // The caller signs with no key this identity is signed in from, and with no key of
+    // an app one of its browsers routes through.
+    InvalidBrowserKey;
     InternalCanisterError : text;
 };
 
@@ -2096,7 +2098,9 @@ type RemoveNotificationRequest = record {
 type RemoveNotificationResponse = record {};
 
 type RemoveNotificationError = variant {
-    // Also a caller that is no browser of the identity.
+    // The caller signs with no key this identity is signed in from, and with no key of
+    // an app one of its browsers routes through.
+    InvalidBrowserKey;
     InternalCanisterError : text;
 };
 

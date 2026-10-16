@@ -112,7 +112,9 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
+use crate::storage::anchor::{
+    keeps_endpoint, Anchor, Browser, BrowserError, WebPushSubscription, MAX_BROWSERS,
+};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1587,6 +1589,9 @@ impl<M: Memory + Clone> Storage<M> {
     /// delivery off by letting go of the reference, never by clearing this: the
     /// subscription belongs to the app and every other identity delivers through it.
     ///
+    /// An address that is replaced or removed takes with it what every browser routing
+    /// through it had waiting, the same way a browser's own re-registration does.
+    ///
     /// False where `app_id` names no record, so a caller never reports a registration
     /// that was dropped.
     pub fn set_notification_app_subscription(
@@ -1599,11 +1604,77 @@ impl<M: Memory + Clone> Storage<M> {
             return false;
         };
         let mut app = NotificationApp::from(stored);
+        let endpoint_kept =
+            keeps_endpoint(app.webpush_subscription.as_ref(), subscription.as_ref());
         app.webpush_subscription = subscription;
         app.last_used = now;
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
+        if !endpoint_kept {
+            self.clear_queues_routed_through(app_id);
+        }
         true
+    }
+
+    /// Drops what every browser routing through `app_id` had waiting, and its re-wake
+    /// stamp with it.
+    ///
+    /// A queue entry stands for a wake-up already posted to one address, and nothing at
+    /// a different address can take it. Leaving them would also hold off the posts to
+    /// the new address: [`browser_queue::add`] answers `ReplacedOldest` on a full queue
+    /// and posts nothing, so up to [`browser_queue::MAX_PER_BROWSER`] entries nobody can
+    /// show would suppress every wake-up until they expire.
+    ///
+    /// Which entries those are is [`delivered_through_notification_app`].
+    ///
+    /// [`browser_queue::add`]: crate::notifications::browser_queue::add
+    /// [`browser_queue::MAX_PER_BROWSER`]: crate::notifications::browser_queue::MAX_PER_BROWSER
+    fn clear_queues_routed_through(&mut self, app_id: NotificationAppId) {
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let Ok(mut anchor) = self.read(anchor_number) else {
+                ic_cdk::println!(
+                    "Failed to read anchor {anchor_number} to clear what app {app_id} queued"
+                );
+                continue;
+            };
+            let pointing: Vec<(BrowserId, bool)> = anchor
+                .browsers()
+                .iter()
+                .filter(|browser| delivered_through_notification_app(browser, app_id))
+                .map(|browser| (browser.id, browser.woken_again_at_ns.is_some()))
+                .collect();
+            let mut cleared = false;
+            for (browser_id, was_woken_again) in pointing {
+                if let Some(queue) = anchor.notifications_mut(browser_id) {
+                    cleared |= !queue.is_empty();
+                    queue.clear();
+                }
+                cleared |= was_woken_again;
+                anchor.set_woken_again(browser_id, None);
+            }
+            if !cleared {
+                continue;
+            }
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
+                );
+            }
+        }
+    }
+
+    /// Stamps that the app signing as `principal` has just called.
+    ///
+    /// The only evidence there is that an installed app still exists: iOS destroys its
+    /// storage when the user deletes it and tells nobody, so nothing here hears about it
+    /// and the app answering is all there is to go on.
+    pub fn stamp_notification_app_use(&mut self, principal: Principal, now: Timestamp) {
+        let Some(mut app) = self.notification_app_with_principal(principal) else {
+            return;
+        };
+        app.last_used = now;
+        self.notification_app_memory
+            .insert(app.id, StorableNotificationApp::from(app));
     }
 
     /// The record `app_id` names, if it is still there.
@@ -1626,6 +1697,79 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default()
     }
 
+    /// Takes an app out of every anchor that points at it, which deletes the record.
+    ///
+    /// For the one case where we know the app itself is gone: the push service answered
+    /// that its endpoint no longer exists, which on iOS means the user deleted the web
+    /// app and the partition holding its key went with it. Every browser pointing at it
+    /// falls back to offering the install, which is the truth, and what it had waiting
+    /// goes with the address it was posted to.
+    ///
+    /// False where a reference survived. The record is then still held by something, so
+    /// a caller that answered `Ok` would be reporting a deletion that did not happen and
+    /// the browser would be shown "installed, no permission yet" instead of the install.
+    ///
+    /// A read or a write that fails is counted and passed over rather than ending the
+    /// run, which leaves the record alive with the references of the anchors already
+    /// visited stripped. Nothing repairs that, and nothing has to: the references that
+    /// survived still route wake-ups to the address the relay called gone, the relay
+    /// answers gone again, and this runs again from the top. `false` reaches
+    /// `notifications::dispatch::settle` as an `Err` that is printed and nothing else,
+    /// so a partial run costs a log line and one more wake-up.
+    pub fn forget_notification_app(&mut self, app_id: NotificationAppId) -> bool {
+        let mut all_dropped = true;
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let Ok(mut anchor) = self.read(anchor_number) else {
+                ic_cdk::println!(
+                    "Failed to read anchor {anchor_number} to drop notification app {app_id}"
+                );
+                all_dropped = false;
+                continue;
+            };
+            // The reference goes from every entry that holds one, because nothing may
+            // point at a record that is not there. The queue and the stamp go only from
+            // the entries this record's address delivered for: an entry woken at its own
+            // still has somewhere to show what it has waiting, and a record it pointed
+            // at being deleted does not change that.
+            let pointing: Vec<(BrowserId, bool)> = anchor
+                .browsers()
+                .iter()
+                .filter(|browser| points_at_notification_app(browser, app_id))
+                .map(|browser| {
+                    (
+                        browser.id,
+                        delivered_through_notification_app(browser, app_id),
+                    )
+                })
+                .collect();
+            for (browser_id, delivered_through_it) in pointing {
+                anchor.stop_pointing_at_notification_app(browser_id);
+                if !delivered_through_it {
+                    continue;
+                }
+                if let Some(queue) = anchor.notifications_mut(browser_id) {
+                    queue.clear();
+                }
+                anchor.set_woken_again(browser_id, None);
+            }
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to drop notification app {app_id} from anchor {anchor_number}: {err}"
+                );
+                all_dropped = false;
+            }
+        }
+        all_dropped
+    }
+
+    /// Forgets a record, the principal that resolved to it, and every offer ever made of
+    /// it. The id is retired with it: the allocator never looks back, so nothing is ever
+    /// handed this one again, and a handle derived from it is never derived again either.
+    ///
+    /// The offers are what would otherwise accumulate without bound: an identity that
+    /// links a fresh key each time is a fresh record every time, and an offer nobody
+    /// spends is removed by nothing else. The sweep ranges over the anchors this record
+    /// was offered to rather than the whole map.
     /// Forgets a record and the principal that resolved to it. The id is retired with
     /// it: the allocator never looks back, so nothing is ever handed this one again.
     fn delete_notification_app(&mut self, app_id: NotificationAppId) {
@@ -3656,8 +3800,16 @@ impl<M: Memory + Clone> Storage<M> {
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
         // A browser the identity signed out of must stop being notified for it. The
-        // entry itself stays, so that signing back in is not a new browser.
+        // entry itself stays, so that signing back in is not a new browser, and so does
+        // the app it points at: the reference is which app this browser has, not whether
+        // it is routing right now.
         anchor.set_webpush_subscription(browser_id, None);
+        if let Some(queue) = anchor.notifications_mut(browser_id) {
+            queue.clear();
+        }
+        // The stamp rations a second wake-up for an entry still waiting, and this entry
+        // is waiting for nothing.
+        anchor.set_woken_again(browser_id, None);
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -4591,6 +4743,34 @@ pub struct CreateSessionParams {
     pub max_idle_ns: Option<u64>,
     pub read_only: bool,
     pub now_ns: Timestamp,
+}
+
+/// Whether this entry points at `app_id`, whichever address delivers for it.
+///
+/// Pointing is which app this browser has, not where its wake-ups went: an entry that
+/// registered an address of its own is woken at that one and points at the app all the
+/// same. Only the questions about the reference itself ask this.
+fn points_at_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {
+    browser
+        .notification_app
+        .is_some_and(|reference| reference.app_id == app_id)
+}
+
+/// Whether this entry's wake-ups were posted to `app_id`'s address, which is what says
+/// that address going away takes this entry's queue and re-wake stamp with it.
+///
+/// Holding no registration of its own is the condition the send path picks the app's
+/// address by, in `notifications::dispatch::wake_up_address`. An entry that has one was
+/// woken at that instead, so the app's is not where its entries were posted and the app
+/// changing, losing or being deleted leaves them showable. An entry that registers one
+/// later is covered by `write_subscription` in the webpush module, which clears the
+/// queue and the stamp on any endpoint change including none to some, so what was posted
+/// to the app's address is already gone by then.
+///
+/// One rule for every site that clears on an address going away, so narrowing it in one
+/// place cannot leave another deciding the same thing differently.
+fn delivered_through_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {
+    browser.webpush_subscription.is_none() && points_at_notification_app(browser, app_id)
 }
 
 #[cfg(not(test))]

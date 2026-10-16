@@ -1274,7 +1274,7 @@ mod browser_tests {
     use super::*;
     use crate::browser_key::test_keys::{claim_token, link_token, public_key, signing_key};
     use crate::notifications::app::{NotificationApp, NotificationAppRef};
-    use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
+    use crate::storage::anchor::{BrowserError, QueuedNotification, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, FormFactor, NotificationAppInfo, OperatingSystem,
         PublicKey,
@@ -1450,7 +1450,96 @@ mod browser_tests {
             anchor.notification_app(second).map(|app| app.app_id),
             Some(7)
         );
-        assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(second));
+    }
+
+    /// The queue goes with the address. An entry that loses the record loses the address
+    /// its wake-ups were posted to, so what it had waiting can never be shown and its
+    /// re-wake stamp is rationing a second wake-up for nothing.
+    #[test]
+    fn taking_an_app_off_an_entry_drops_what_it_had_waiting() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(first, 7);
+        anchor
+            .notifications_mut(first)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: 1,
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+            });
+        anchor.set_woken_again(first, Some(1_000));
+
+        anchor.point_at_notification_app(second, 7);
+
+        assert!(anchor.notifications(first).is_empty());
+        assert_eq!(
+            anchor
+                .browsers()
+                .iter()
+                .find(|browser| browser.id == first)
+                .and_then(|browser| browser.woken_again_at_ns),
+            None
+        );
+    }
+
+    /// The queue is a list of wake-ups posted to the old app's address, and the app
+    /// answering now holds a different registration.
+    #[test]
+    fn repointing_a_browser_drops_what_the_old_app_was_sent() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_mut(id)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: 1,
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+            });
+        anchor.set_woken_again(id, Some(1_000));
+
+        anchor.point_at_notification_app(id, 7);
+        assert_eq!(anchor.notifications(id).len(), 1);
+
+        anchor.point_at_notification_app(id, 8);
+
+        assert!(anchor.notifications(id).is_empty());
+        assert_eq!(
+            anchor
+                .browsers()
+                .iter()
+                .find(|browser| browser.id == id)
+                .and_then(|browser| browser.woken_again_at_ns),
+            None
+        );
     }
 
     /// A record as storage answers with one, with nothing registered: an app that has
