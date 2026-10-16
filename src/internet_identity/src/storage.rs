@@ -1450,6 +1450,7 @@ impl<M: Memory + Clone> Storage<M> {
             .collect::<BTreeSet<_>>();
 
         let principals_to_be_removed = previous_principals.difference(&current_principals);
+        let principals_to_be_added = current_principals.difference(&previous_principals);
 
         for principal in principals_to_be_removed {
             let Some(existing_anchor_number) = self
@@ -1467,33 +1468,23 @@ impl<M: Memory + Clone> Storage<M> {
                 .remove(principal);
         }
 
-        // (Re-)index all current passkeys, not just the newly added ones, so that passkeys
-        // that are missing from the index (e.g., because their entry was held by another
-        // anchor that has since dropped it) get indexed on the next write.
-        for principal in &current_principals {
-            match self
+        for principal in principals_to_be_added {
+            if self
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(principal)
+                .contains_key(principal)
             {
-                Some(existing_anchor_number) if existing_anchor_number == anchor_number => {}
-                Some(existing_anchor_number) => {
-                    // This principal is already occupied; do not overwrite it.
-                    if !previous_principals.contains(principal) {
-                        ic_cdk::println!(
-                            "WARNING: Principal {:?} derived from a passkey credential pubkey is \
-                             already indexed for anchor number {}; skipping indexing for anchor \
-                             number {}",
-                            principal,
-                            existing_anchor_number,
-                            anchor_number,
-                        );
-                    }
-                }
-                None => {
-                    self.lookup_anchor_with_passkey_pubkey_hash_memory
-                        .insert(*principal, anchor_number);
-                }
-            }
+                // This principal is already occupied; do not overwrite it.
+                ic_cdk::println!(
+                    "WARNING: Principal {:?} derived from a passkey credential pubkey is already \
+                     indexed for another anchor; skipping indexing for anchor number {}",
+                    principal,
+                    anchor_number,
+                );
+                continue;
+            };
+
+            self.lookup_anchor_with_passkey_pubkey_hash_memory
+                .insert(*principal, anchor_number);
         }
     }
 

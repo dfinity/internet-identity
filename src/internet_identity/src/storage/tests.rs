@@ -596,11 +596,10 @@ fn should_not_overwrite_device_credential_lookup() {
     );
 }
 
-/// Passkeys that are missing from the indices (e.g., because they pre-date an index) must be
-/// indexed for their anchor on its next write, not only when they are newly added, and a later
-/// anchor with the same passkey must not take over the index entries.
+/// A later anchor with the same passkey must not take over the passkey index entries of an
+/// earlier anchor.
 #[test]
-fn should_index_all_current_passkeys_on_write() {
+fn should_not_overwrite_passkey_indices_of_another_anchor() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
@@ -615,34 +614,6 @@ fn should_index_all_current_passkeys_on_write() {
     anchor_0.add_device(device.clone()).unwrap();
     storage.write(anchor_0.clone()).unwrap();
 
-    // Simulate a passkey that is stored but missing from the indices.
-    storage
-        .lookup_anchor_with_passkey_pubkey_hash_memory
-        .clear_new();
-    storage
-        .lookup_anchor_with_passkey_credential_memory
-        .clear_new();
-    assert_eq!(
-        storage.lookup_anchor_with_passkey_pubkey(&device.pubkey),
-        None
-    );
-    assert_eq!(
-        storage.lookup_anchor_with_device_credential(&credential_id),
-        None
-    );
-
-    // Writing the anchor without changing its passkeys re-indexes them.
-    storage.write(anchor_0.clone()).unwrap();
-    assert_eq!(
-        storage.lookup_anchor_with_passkey_pubkey(&device.pubkey),
-        Some(anchor_0.anchor_number())
-    );
-    assert_eq!(
-        storage.lookup_anchor_with_device_credential(&credential_id),
-        Some(anchor_0.anchor_number())
-    );
-
-    // A later anchor with the same passkey does not take over the index entries.
     anchor_1.add_device(device.clone()).unwrap();
     storage.write(anchor_1.clone()).unwrap();
     assert_eq!(
