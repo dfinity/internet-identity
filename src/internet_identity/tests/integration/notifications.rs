@@ -1309,8 +1309,8 @@ mod app_anchors {
     use internet_identity_interface::internet_identity::types::LinkNotificationAppRequest;
     use pretty_assertions::assert_eq;
 
-    /// Well inside the half hour a token may claim, so the window holds however many
-    /// rounds a test spends before spending it.
+    /// What the tests here claim as a token's expiry: long enough that the window is
+    /// still open after however many rounds a test spends before spending it.
     const LINK_TOKEN_VALID_FOR_NS: u64 = 3 * 60 * 1_000_000_000;
 
     /// A canister that notifies, and two identities signed in from a browser each:

@@ -1581,6 +1581,10 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// The anchors pointing at `app_id`, which is what the app asks for to know who it
     /// is delivering for.
+    ///
+    /// In the order the identities began pointing at the app, oldest first, and stable
+    /// across calls: an anchor is appended when it starts pointing and removed in place
+    /// when it stops, so the answer only ever loses entries or gains them at the end.
     pub fn anchors_with_notification_app(&self, app_id: NotificationAppId) -> Vec<AnchorNumber> {
         self.lookup_anchors_with_notification_app_memory
             .get(&app_id)
