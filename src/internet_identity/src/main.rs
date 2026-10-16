@@ -385,9 +385,9 @@ fn remove_webpush_subscription(
 }
 
 /// How long a link token is good for, matching `LINK_TOKEN_LIFETIME_MS` in
-/// `linkToken.ts`. Bounding the claimed expiry from above and not only from below is
-/// what keeps a token signed by a since-retired browser key from being worth anything
-/// years later.
+/// `src/frontend/src/lib/utils/notifications/linkToken.ts`. Bounding the claimed expiry
+/// from above and not only from below is what keeps a token signed by a since-retired
+/// browser key from being worth anything years later.
 const LINK_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 
 /// Whether a token claiming to expire at `expires_at_ns` is one the install page could
