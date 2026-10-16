@@ -410,7 +410,7 @@ fn link_notification_app(
 ) -> Result<(), LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
-            "notifications are not enabled".to_string(),
+            notifications::NOT_ENABLED.to_string(),
         ));
     }
     let now = ic_cdk::api::time();

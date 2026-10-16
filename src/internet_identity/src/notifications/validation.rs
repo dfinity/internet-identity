@@ -99,7 +99,8 @@ impl TryFrom<RemoveNotificationRequest> for ValidatedRemoveNotificationRequest {
     }
 }
 
-const NOT_ENABLED: &str = "notifications are not enabled";
+/// The message a refusal carries while this deployment does not notify.
+pub(crate) const NOT_ENABLED: &str = "notifications are not enabled";
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {
     type Error = NotificationGrantConsentError;

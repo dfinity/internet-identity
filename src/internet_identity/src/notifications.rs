@@ -27,6 +27,7 @@ use internet_identity_interface::internet_identity::types::{
     NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
     Timestamp,
 };
+pub(crate) use validation::NOT_ENABLED;
 pub use validation::{
     notifications_enabled, ValidatedGetNextNotificationRequest,
     ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
