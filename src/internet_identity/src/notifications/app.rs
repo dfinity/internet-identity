@@ -26,7 +26,8 @@ pub struct NotificationApp {
     /// When the app first opened and claimed this record, which is also the first moment
     /// anything knew it had been installed.
     pub created_at: Timestamp,
-    /// When the app last called. Stamped by the app's own calls, not by the browsers
-    /// that point at it.
+    /// When the app last called. Stamped by the app's own update calls, which is
+    /// `link_notification_app` alone: a query cannot write, so an app asking a question
+    /// leaves this where it was.
     pub last_used: Timestamp,
 }
