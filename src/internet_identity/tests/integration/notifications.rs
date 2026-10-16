@@ -1,5 +1,6 @@
 //! Tests for the notification API, exercised through Candid against a canister.
 
+use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
     browser_get_next_notification, browser_remove_notification, consent_granted, grant_consent,
@@ -54,13 +55,32 @@ fn sign_in_at(
     origin: &str,
     browser_seed: u8,
 ) {
+    sign_in_as(
+        env,
+        canister_id,
+        principal_1(),
+        anchor,
+        origin,
+        browser_seed,
+    );
+}
+
+/// As [`sign_in_at`], for an identity `owner` rather than [`principal_1`] registered.
+fn sign_in_as(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    owner: Principal,
+    anchor: AnchorNumber,
+    origin: &str,
+    browser_seed: u8,
+) {
     let browser = BrowserKey::new(browser_seed);
     let session_key = ByteBuf::from(vec![1; 32]);
     let next_browser_key = browser.successor().public_key();
     prepare_account_session(
         env,
         canister_id,
-        principal_1(),
+        owner,
         PrepareAccountSessionRequest {
             identity_number: anchor,
             origin: origin.to_string(),
@@ -863,7 +883,6 @@ mod subscription_status {
 mod pull_delegation {
     use super::subscriptions::{install_with_browser, key_holder, ENDPOINT};
     use super::*;
-    use candid::Principal;
     use canister_tests::api::internet_identity::api_v2::{
         prepare_account_delegation, AccountDelegationParams,
     };
@@ -1277,6 +1296,168 @@ mod browser_queue {
             browser_remove_notification(&env, canister_id, principal_2(), remove_request(anchor))?,
             Err(RemoveNotificationError::InternalCanisterError(_))
         ));
+        Ok(())
+    }
+}
+
+mod app_anchors {
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        link_notification_app, notification_app_anchors,
+    };
+    use canister_tests::framework::device_data_2;
+    use internet_identity_interface::internet_identity::types::LinkNotificationAppRequest;
+    use pretty_assertions::assert_eq;
+
+    /// Well inside the half hour a token may claim, so the window holds however many
+    /// rounds a test spends before spending it.
+    const LINK_TOKEN_VALID_FOR_NS: u64 = 3 * 60 * 1_000_000_000;
+
+    /// A canister that notifies, and two identities signed in from a browser each:
+    /// `principal_1` on the first, `principal_2` on the second.
+    fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
+        let canister_id =
+            install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
+        let first = flows::register_anchor(env, canister_id);
+        sign_in_at(env, canister_id, first, ORIGIN, 1);
+        let second = flows::register_anchor_with_device(env, canister_id, &device_data_2());
+        sign_in_as(env, canister_id, principal_2(), second, ORIGIN, 2);
+        (canister_id, first, second)
+    }
+
+    /// Installs the Home Screen app `app_seed` names on `anchor`, spending a token the
+    /// browser `browser_seed` names signed. Answers the principal the app signs as.
+    fn link_app(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_seed: u8,
+        app_seed: u8,
+    ) -> Principal {
+        let app = BrowserKey::new(app_seed);
+        let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + LINK_TOKEN_VALID_FOR_NS;
+        link_notification_app(
+            env,
+            canister_id,
+            app.principal(),
+            LinkNotificationAppRequest {
+                anchor_number: anchor,
+                app_key: app.public_key(),
+                expires_at_ns,
+                // The successor the sign-in announced, which is the key the browser is
+                // left holding and the only one a link token is honoured from.
+                signature: BrowserKey::new(browser_seed)
+                    .successor()
+                    .sign_link_token(anchor, expires_at_ns),
+            },
+        )
+        .expect("link_notification_app rejected")
+        .expect("link_notification_app returned Err");
+        app.principal()
+    }
+
+    /// The whole of what an app may learn: the identities whose browsers point at it,
+    /// and nothing about the identities pointing at the app next to it on the device.
+    #[test]
+    fn should_answer_an_app_only_the_identities_that_point_at_it() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let shared = link_app(&env, canister_id, first, 1, 100);
+        assert_eq!(link_app(&env, canister_id, second, 2, 100), shared);
+        sign_in_as(&env, canister_id, principal_2(), second, ORIGIN, 3);
+        let private = link_app(&env, canister_id, second, 3, 101);
+
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, shared)?,
+            vec![first, second]
+        );
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, private)?,
+            vec![second]
+        );
+        Ok(())
+    }
+
+    /// The caller has to be an app. A browser key is a caller this canister knows, and
+    /// still not one that delivers for anybody.
+    #[test]
+    fn should_answer_nothing_to_a_caller_that_is_no_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        link_app(&env, canister_id, anchor, 1, 100);
+
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, Principal::anonymous())?,
+            Vec::<AnchorNumber>::new()
+        );
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                BrowserKey::new(1).successor().principal()
+            )?,
+            Vec::<AnchorNumber>::new()
+        );
+        Ok(())
+    }
+
+    /// A deployment that does not notify answers an app nothing, although the links are
+    /// there and answer again as soon as it does.
+    #[test]
+    fn should_answer_nothing_while_notifications_are_disabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, anchor, 1, 100);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, app)?,
+            Vec::<AnchorNumber>::new()
+        );
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            arg_with_notifications_enabled(),
+        )?;
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, app)?,
+            vec![anchor]
+        );
+        Ok(())
+    }
+
+    /// A browser points at one app, so installing a second drops the reference the first
+    /// was reachable by, and the app it was is no longer anything this canister knows.
+    #[test]
+    fn should_answer_nothing_once_the_last_reference_is_dropped() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        let first = link_app(&env, canister_id, anchor, 1, 100);
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, first)?,
+            vec![anchor]
+        );
+
+        let second = link_app(&env, canister_id, anchor, 1, 101);
+
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, first)?,
+            Vec::<AnchorNumber>::new()
+        );
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, second)?,
+            vec![anchor]
+        );
         Ok(())
     }
 }
