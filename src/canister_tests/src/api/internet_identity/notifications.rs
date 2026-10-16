@@ -18,7 +18,6 @@ use internet_identity_interface::internet_identity::types::{
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
-use serde_bytes::ByteBuf;
 
 pub fn grant_consent(
     env: &PocketIc,

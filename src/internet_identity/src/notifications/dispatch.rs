@@ -759,7 +759,8 @@ mod tests {
     use super::*;
     use crate::notifications::backlog::NOTIFICATION_BACKLOG;
     use crate::notifications::webpush::fixtures::{
-        anchor, anchor_with_browsers, setup, stored_subscription, subscribe,
+        anchor, anchor_with_browsers, setup, stored_subscription, subscribe, APP_RELAY,
+        OTHER_APP_RELAY,
     };
     use crate::state::storage_borrow;
     use candid::Principal;
@@ -850,9 +851,6 @@ mod tests {
             queue.remove(0);
         });
     }
-
-    const APP_RELAY: &str = "https://web.push.apple.com/a";
-    const OTHER_APP_RELAY: &str = "https://web.push.apple.com/b";
 
     /// Points `browser_id` at the app record the key `seed` names, creating it where no
     /// app has presented that key yet and registering it at `endpoint`. The identity is

@@ -347,16 +347,6 @@ const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
 const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID: MemoryId =
     MemoryId::new(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX);
 
-/// The short-lived handles a browser hands to another identity on the same device, so it
-/// can point at the app without ever being told its id.
-
-/// The nonce the next handle for an app and anchor is derived with, one row per pair.
-/// It only ever rises, which is what keeps a spent handle from being derived a second
-/// time, and keeping it is also what lets a new offer replace the outstanding one.
-///
-/// Keyed by the app first, so deleting a record can range over exactly the anchors it
-/// was offered to and leave nothing of itself behind.
-
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
@@ -1611,7 +1601,6 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert(*app_id, StorableAnchorNumberList::from(anchors));
         }
     }
-
 
     /// Stores what the app has registered for Web Push, and stamps its liveness.
     ///

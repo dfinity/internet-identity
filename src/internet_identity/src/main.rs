@@ -466,7 +466,6 @@ fn set_notification_app_enabled(
     })
 }
 
-
 /// Wakes the Home Screen app this browser points at, and answers which probe to watch.
 ///
 /// The browser watches for that notification leaving its queue. An empty pending probe

@@ -53,4 +53,3 @@ pub struct NotificationAppRef {
     /// subscription removal: that would take every other identity down with it.
     pub enabled: bool,
 }
-

@@ -256,7 +256,7 @@ pub(crate) fn remove_shown(
 mod tests {
     use super::*;
     use crate::notifications::app::NotificationAppId;
-    use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
+    use crate::notifications::webpush::fixtures::{anchor, setup, subscribe, APP_RELAY};
     use crate::notifications::write_notifications_decision;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{
@@ -455,8 +455,6 @@ mod tests {
     fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {
         ids(anchor(anchor_number).notifications(browser_id))
     }
-
-    const APP_RELAY: &str = "https://web.push.apple.com/a";
 
     /// The iOS case: the entry holds no registration of its own and is delivered through
     /// the record of the Home Screen app it points at.

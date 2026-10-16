@@ -995,7 +995,6 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
-
     /// Whether a browser of this anchor already signs with `key`.
     ///
     /// An app key is generated in a partition no browser can reach, so a collision here

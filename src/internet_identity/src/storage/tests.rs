@@ -7700,7 +7700,6 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
@@ -7727,7 +7726,6 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
     assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(app_key(7))),
         storage.notification_app_with_principal(Principal::self_authenticating(&key)),
         None
     );
@@ -7761,7 +7759,6 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
@@ -7789,16 +7786,6 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
         .notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
 
-    storage.set_notification_app_subscription(
-        app.id,
-        Some(WebPushSubscription {
-            endpoint: "https://web.push.apple.com/one".to_string(),
-            created_at_ns: 2_000,
-            vapid_public_key: vec![1; 65],
-            jwt_signatures: vec![vec![2; 64]],
-            jwt_issued_at_ns: 2_000,
-        }),
-        2_000,
     assert!(
         storage.set_notification_app_subscription(
             app.id,
@@ -7808,8 +7795,6 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
                 vapid_public_key: vec![1; 65],
                 jwt_signatures: vec![vec![2; 64]],
                 jwt_issued_at_ns: 2_000,
-                notifications: Vec::new(),
-                woken_again_at_ns: None,
             }),
             2_000,
         ),
@@ -7836,8 +7821,8 @@ fn forgetting_an_app_takes_every_reference_with_it() {
     let app = storage
         .notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
-    for anchor_number in [10_000, 10_001] {
-        let mut anchor = anchor_with_browser(&mut storage, anchor_number);
+    for _ in 0..2 {
+        let mut anchor = anchor_with_browser(&mut storage);
         anchor.point_at_notification_app(0, app.id);
         storage.write(anchor).expect("writing the anchor");
     }
@@ -7878,7 +7863,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
-    let mut own = anchor_with_browser(&mut storage, 10_000);
+    let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));
     own.notifications_mut(0)
@@ -7889,7 +7874,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         .write(own)
         .expect("writing the entry with its own address");
 
-    let mut routed = anchor_with_browser(&mut storage, 10_001);
+    let mut routed = anchor_with_browser(&mut storage);
     routed.point_at_notification_app(0, app.id);
     routed
         .notifications_mut(0)
@@ -7972,7 +7957,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         .notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
-    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
     storage.write(anchor).expect("pointing at the app");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
@@ -8023,7 +8008,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
-    let mut own = anchor_with_browser(&mut storage, 10_000);
+    let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));
     own.notifications_mut(0)
@@ -8034,7 +8019,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
         .write(own)
         .expect("writing the entry with its own address");
 
-    let mut routed = anchor_with_browser(&mut storage, 10_001);
+    let mut routed = anchor_with_browser(&mut storage);
     routed.point_at_notification_app(0, app.id);
     routed
         .notifications_mut(0)
@@ -8097,7 +8082,7 @@ fn an_entry_delivers_through_the_app_it_points_at() {
         }),
         1_000,
     );
-    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
     anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
     storage.write(anchor).expect("pointing at the app");
@@ -8134,7 +8119,7 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
         }),
         1_000,
     );
-    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
     anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
     anchor.set_notification_app_enabled(0, false);
@@ -8164,7 +8149,7 @@ fn an_identity_notification_is_queued_without_an_application() {
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
-    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    let mut anchor = anchor_with_browser(&mut storage);
     anchor
         .notifications_mut(0)
         .expect("a registered browser")

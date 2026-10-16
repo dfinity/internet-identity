@@ -1309,6 +1309,12 @@ const TOKEN_VALID_FOR_NS: u64 = 3 * 60 * 1_000_000_000;
 
 /// A canister that notifies, and two identities signed in from a browser each:
 /// `principal_1` on the first, `principal_2` on the second.
+/// The browser each identity signs in from in these fixtures. Named rather than spelled at
+/// every call site, because `link_app` takes the seed and the token has to be minted by the
+/// same browser the canister will verify it against.
+const FIRST_BROWSER_SEED: u8 = 1;
+const SECOND_BROWSER_SEED: u8 = 2;
+
 fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
     let canister_id =
         install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
@@ -1467,7 +1473,6 @@ mod app_anchors {
 /// Waking the Home Screen app a browser points at, which is the only way to learn
 /// whether it is still installed.
 mod probe {
-    use super::app_anchors::{install_with_two_anchors, link_app};
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
@@ -1779,26 +1784,6 @@ mod claims {
         assert_eq!(
             claim(&env, canister_id, (second, 2), (first, 1), expires_at(&env))?,
             Err(ClaimNotificationAppError::NoNotificationApp)
-        let turned_off = status(&env, canister_id, browser(2), second)?.expect("the second entry");
-        assert!(!turned_off.enabled);
-        assert!(turned_off.subscribed, "the app's registration is untouched");
-        let still_on = status(&env, canister_id, browser(1), first)?.expect("the first entry");
-        assert!(still_on.enabled);
-        assert!(still_on.subscribed);
-        // An app speaks for an entry only while that entry routes through it, so the
-        // identity that switched it off is one it may no longer act for.
-        assert_eq!(
-            get_webpush_subscription_status(&env, canister_id, app, second)?,
-            None,
-            "the app may not act for an entry that stopped routing through it"
-        );
-        // What it lost is the standing, not the registration: the same address is still
-        // the one it delivers at for the identity that has it on.
-        assert_eq!(
-            get_webpush_subscription_status(&env, canister_id, app, first)?
-                .expect("the app reads its own registration")
-                .endpoint,
-            ENDPOINT
         );
         Ok(())
     }
