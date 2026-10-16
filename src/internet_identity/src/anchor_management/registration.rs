@@ -138,11 +138,7 @@ pub fn register(
 /// registering with a `temp_key`, this prevents creating anchors with another anchor's device.
 fn check_device_is_not_used(device: &Device) -> Result<(), String> {
     anchor_management::check_passkey_pubkey_is_not_used(&device.pubkey)?;
-
-    let device_principal = Principal::self_authenticating(&device.pubkey);
-    if anchor_management::lookup_caller_identity_by_recovery_phrase(device_principal).is_some() {
-        return Err("device with this public key is already used".to_string());
-    }
+    anchor_management::check_recovery_phrase_pubkey_is_not_used(&device.pubkey)?;
 
     if let Some(ref credential_id) = device.credential_id {
         if state::storage_borrow(|storage| {
