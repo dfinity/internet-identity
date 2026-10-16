@@ -113,6 +113,52 @@ pub fn verify_notification_app_link(
     )
 }
 
+/// What a browser presents and what it signs, for tests of the callers that verify one.
+///
+/// Lives here so the encodings are written once: a test elsewhere that built its own
+/// would be agreeing with itself rather than with what this module accepts.
+///
+/// `#[cfg(test)]`, so no canister build can reach it.
+#[cfg(test)]
+pub mod test_keys {
+    use super::*;
+    use p256::ecdsa::signature::Signer;
+    use p256::ecdsa::SigningKey;
+    use serde_bytes::ByteBuf;
+
+    /// The algorithm identifier RFC 5480 fixes for a `secp256r1` public key, which is
+    /// what a WebCrypto `exportKey("spki")` writes ahead of the point.
+    const P256_ALGORITHM: [u8; 21] = [
+        0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86,
+        0x48, 0xce, 0x3d, 0x03, 0x01, 0x07,
+    ];
+
+    /// The SPKI a key travels in, built around whichever point encoding is handed in, so
+    /// a test can offer the compressed one the same way a caller could.
+    pub fn spki(point: &[u8]) -> PublicKey {
+        let mut der = vec![0x30, (P256_ALGORITHM.len() + point.len() + 3) as u8];
+        der.extend_from_slice(&P256_ALGORITHM);
+        der.extend_from_slice(&[0x03, (point.len() + 1) as u8, 0x00]);
+        der.extend_from_slice(point);
+        ByteBuf::from(der)
+    }
+
+    pub fn signing_key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; 32].into()).expect("failed to build a browser key")
+    }
+
+    /// The key as a browser registers it.
+    pub fn public_key(key: &SigningKey) -> PublicKey {
+        spki(VerifyingKey::from(key).to_encoded_point(false).as_bytes())
+    }
+
+    /// A link token as the install page mints one.
+    pub fn link_token(key: &SigningKey, anchor_number: u64, expires_at_ns: u64) -> Vec<u8> {
+        let signature: Signature = key.sign(&link_token_message(anchor_number, expires_at_ns));
+        signature.to_bytes().to_vec()
+    }
+}
+
 fn link_token_message(anchor_number: u64, expires_at_ns: u64) -> Vec<u8> {
     let mut message = Vec::with_capacity(NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN.len() + 16);
     message.extend_from_slice(NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN);
@@ -162,27 +208,11 @@ fn signed_message(domain: &[u8], session_key: &SessionKey, other_key: &PublicKey
 
 #[cfg(test)]
 mod tests {
+    use super::test_keys::{public_key, signing_key, spki};
     use super::*;
     use p256::ecdsa::signature::Signer;
     use p256::ecdsa::SigningKey;
     use serde_bytes::ByteBuf;
-
-    /// The algorithm identifier RFC 5480 fixes for a `secp256r1` public key, which is
-    /// what a WebCrypto `exportKey("spki")` writes ahead of the point.
-    const P256_ALGORITHM: [u8; 21] = [
-        0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86,
-        0x48, 0xce, 0x3d, 0x03, 0x01, 0x07,
-    ];
-
-    /// The SPKI a key travels in, built around whichever point encoding is handed in, so
-    /// a test can offer the compressed one the same way a caller could.
-    fn spki(point: &[u8]) -> PublicKey {
-        let mut der = vec![0x30, (P256_ALGORITHM.len() + point.len() + 3) as u8];
-        der.extend_from_slice(&P256_ALGORITHM);
-        der.extend_from_slice(&[0x03, (point.len() + 1) as u8, 0x00]);
-        der.extend_from_slice(point);
-        ByteBuf::from(der)
-    }
 
     struct Key {
         signing: SigningKey,
@@ -190,12 +220,8 @@ mod tests {
     }
 
     fn key(seed: u8) -> Key {
-        let signing = SigningKey::from_bytes(&[seed; 32].into()).unwrap();
-        let public = spki(
-            VerifyingKey::from(&signing)
-                .to_encoded_point(false)
-                .as_bytes(),
-        );
+        let signing = signing_key(seed);
+        let public = public_key(&signing);
         Key { signing, public }
     }
 
@@ -216,10 +242,7 @@ mod tests {
         }
 
         fn link_token(&self, anchor_number: u64, expires_at_ns: u64) -> Vec<u8> {
-            let signature: Signature = self
-                .signing
-                .sign(&link_token_message(anchor_number, expires_at_ns));
-            signature.to_bytes().to_vec()
+            super::test_keys::link_token(&self.signing, anchor_number, expires_at_ns)
         }
     }
 

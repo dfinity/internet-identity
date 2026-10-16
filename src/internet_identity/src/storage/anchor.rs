@@ -881,10 +881,16 @@ impl Anchor {
     /// The browser of this anchor that signed a link token, if any still holds the key
     /// it was signed with.
     ///
-    /// Both slots are tried, because a browser announces a successor at every sign-in and
-    /// the token may have been signed on either side of one. A browser that has signed in
-    /// twice since has rotated past both, and its token is no longer accepted: the user
-    /// starts the install again, which is a step they are already standing in front of.
+    /// The successor slot only, as in [`Self::browser_by_principal`]. A holder of the
+    /// retired private key can mint a token of its own at any time, so accepting that
+    /// slot would let them pass the expiry bounds and repoint the victim's browser at a
+    /// record they control, which hands them the anchor number and moves delivery to
+    /// their subscription.
+    ///
+    /// The price is that a sign-in in another tab during the install window retires the
+    /// key the install page minted its token with. The launch carries on without it, by
+    /// looking the anchor up instead, and lands on a screen from which a fresh token is
+    /// one press away.
     pub fn browser_that_signed_link(
         &self,
         signature: &[u8],
@@ -894,16 +900,12 @@ impl Anchor {
         self.browsers
             .iter()
             .find(|browser| {
-                [&browser.current_browser_key, &browser.next_browser_key]
-                    .iter()
-                    .any(|key| {
-                        crate::browser_key::verify_notification_app_link(
-                            key,
-                            signature,
-                            anchor_number,
-                            expires_at_ns,
-                        )
-                    })
+                crate::browser_key::verify_notification_app_link(
+                    &browser.next_browser_key,
+                    signature,
+                    anchor_number,
+                    expires_at_ns,
+                )
             })
             .map(|browser| browser.id)
     }

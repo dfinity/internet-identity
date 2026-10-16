@@ -1272,6 +1272,7 @@ mod mirror_verified_email_tests {
 
 mod browser_tests {
     use super::*;
+    use crate::browser_key::test_keys::{link_token, public_key, signing_key};
     use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, FormFactor, OperatingSystem, PublicKey,
@@ -1813,6 +1814,33 @@ mod browser_tests {
         assert_eq!(
             anchor.browser_by_principal(Principal::self_authenticating(browser_key(9))),
             None
+        );
+    }
+
+    /// A link token is honoured from the successor slot only, so a copied key stops
+    /// being able to mint one as soon as the sign-in that retired it lands.
+    #[test]
+    fn a_link_token_is_signed_by_the_key_the_browser_still_holds() {
+        let retired = signing_key(1);
+        let held = signing_key(2);
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                public_key(&retired),
+                public_key(&held),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_that_signed_link(&link_token(&held, 10_000, 5_000), 10_000, 5_000),
+            Some(id)
+        );
+        assert_eq!(
+            anchor.browser_that_signed_link(&link_token(&retired, 10_000, 5_000), 10_000, 5_000),
+            None,
+            "the key the sign-in retired must not sign a link token"
         );
     }
 
