@@ -14,6 +14,7 @@
 //! A caller-supplied discovery domain is validated as a bare authority (see
 //! `validate_discovery_domain`); there is no domain allowlist.
 
+use super::domain::Domain;
 use super::verify::{Descriptor, SsoProvider};
 use super::OpenIDJWTVerificationError;
 use crate::openid::AudClaim;
@@ -132,8 +133,6 @@ const MAX_STABLE_IDENTIFIER_CLAIM_LENGTH: usize = 255;
 /// Maximum length of the display name from the well-known.
 #[cfg(not(test))]
 const MAX_SSO_NAME_LENGTH: usize = 255;
-/// Maximum length of an SSO discovery domain.
-const MAX_DOMAIN_LENGTH: usize = 255;
 
 /// The result of resolving a discovery domain (hop 1 + hop 2). Carries
 /// everything the redemption path needs (`issuer`, `jwks_uri`) and everything
@@ -318,35 +317,36 @@ fn new_jwks_cache() -> JwksCache {
 /// is running, and once discovery has resolved, ensure the JWKS fill for its
 /// `jwks_uri` is running too. Only an update may call this — it can spawn the
 /// outcalls the fills make. Reads ([`peek_discovery`], [`read_jwks`]) stay
-/// peek-only, so a query never needs this and never spawns. A no-op for a
-/// disallowed domain.
-pub(super) fn prefetch(domain: &str) {
-    let domain = domain.to_ascii_lowercase();
-    if validate_discovery_domain(&domain).is_err() {
-        return;
-    }
-    if let Cached::Ready(discovery_config) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
+/// peek-only, so a query never needs this and never spawns.
+pub(super) fn prefetch(domain: &Domain) {
+    if let Cached::Ready(discovery_config) =
+        single_flight_cache::get(&DISCOVERY_CACHE, domain.as_str().to_string())
+    {
         single_flight_cache::get(&JWKS_CACHE, discovery_config.jwks_uri);
     }
 }
 
 /// Read the cached discovery result for `domain`, peek-only (never spawns) so
-/// it's safe from a query. `Pending` means no cached value yet; the caller
-/// gates on [`validate_discovery_domain`] separately where it needs to
-/// tell a disallowed domain apart from a cold one.
-pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
-    single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
+/// it's safe from a query. `Pending` means no cached value yet.
+pub(super) fn peek_discovery(domain: &Domain) -> Cached<DiscoveredConfig> {
+    single_flight_cache::peek(&DISCOVERY_CACHE, &domain.as_str().to_string())
+}
+
+/// When the discovery fetch for `domain` is retried, in absolute nanoseconds,
+/// while it is parked after a failed fetch and has no value to serve. Peek-only.
+pub(super) fn discovery_retry_at_ns(domain: &Domain) -> Option<u64> {
+    single_flight_cache::retry_at(&DISCOVERY_CACHE, &domain.as_str().to_string())
+        .map(|retry_at_secs| retry_at_secs.saturating_mul(1_000_000_000))
 }
 
 /// Resolve an SSO domain into a verify descriptor + `jwks_uri` from the cached
 /// discovery result, cross-checking the JWT's issuer against the discovered
 /// issuer. Peek-only.
 pub(super) fn resolve(
-    domain: &str,
+    domain: &Domain,
     jwt_iss: &str,
     jwt_aud: &AudClaim,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    validate_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
     let discovery_config = match peek_discovery(domain) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(discovery_config) => discovery_config,
@@ -368,7 +368,7 @@ pub(super) fn resolve(
         issuer: discovery_config.issuer,
         client_id: discovery_config.client_id,
         sso: Some(SsoProvider {
-            domain: domain.to_string(),
+            domain: domain.clone(),
             name: discovery_config.name,
             stable_identifier_claim: non_default_stable_claim(
                 &discovery_config.stable_identifier_claim,
@@ -400,56 +400,6 @@ fn sso_allow_insecure_discovery() -> bool {
     {
         tests::TEST_ALLOW_INSECURE.with_borrow(|b| *b)
     }
-}
-
-/// Validate a caller-supplied SSO discovery domain: it must be within the length
-/// cap and a bare URL authority (a host, optionally `host:port`, and nothing
-/// else). The bare-authority check is the security boundary — `domain` is
-/// interpolated into a discovery URL (`{scheme}://{domain}/.well-known/...`), so
-/// inputs carrying userinfo (`evil.com@127.0.0.1`), a path, a query, or a
-/// fragment could otherwise change the effective request target.
-pub fn validate_discovery_domain(domain: &str) -> Result<(), String> {
-    if domain.len() > MAX_DOMAIN_LENGTH {
-        return Err(format!(
-            "SSO discovery domain exceeds {MAX_DOMAIN_LENGTH} bytes"
-        ));
-    }
-    if !is_bare_authority(domain) {
-        return Err(format!(
-            "SSO discovery domain is not a bare authority: {domain}"
-        ));
-    }
-    Ok(())
-}
-
-/// True if `domain` is a bare URL authority — a host, optionally `host:port`,
-/// and nothing else: no scheme, userinfo, path, query, or fragment. It is
-/// parsed the same way it is later used (as the authority of an `https`
-/// discovery URL) and required to round-trip exactly, so anything the URL
-/// parser would reinterpret — embedded userinfo/path/query/fragment, stripped
-/// control characters, an injected scheme — is rejected. (A redundant
-/// `:443`/`:80` default port is normalized away by the parser and thus rejected
-/// too; real discovery domains don't carry one.)
-fn is_bare_authority(domain: &str) -> bool {
-    let Ok(url) = url::Url::parse(&format!("https://{domain}")) else {
-        return false;
-    };
-    if !url.username().is_empty()
-        || url.password().is_some()
-        || url.query().is_some()
-        || url.fragment().is_some()
-        || !matches!(url.path(), "" | "/")
-    {
-        return false;
-    }
-    let Some(host) = url.host_str() else {
-        return false;
-    };
-    let authority = match url.port() {
-        Some(port) => format!("{host}:{port}"),
-        None => host.to_string(),
-    };
-    authority == domain.to_ascii_lowercase()
 }
 
 /// `http` discovery is permitted only for a loopback host, and only when the
@@ -934,9 +884,10 @@ pub(super) fn test_setup_discovery(
         m.insert(discovery_config.jwks_uri.clone(), jwks);
     });
     // First pass warms discovery; the second warms JWKS now that discovery is Ready.
-    prefetch(domain);
+    let domain = Domain::try_from(domain).expect("a test domain");
+    prefetch(&domain);
     run_detached();
-    prefetch(domain);
+    prefetch(&domain);
     run_detached();
 }
 
@@ -1016,23 +967,8 @@ mod tests {
         AudClaim::Single(sample_config().client_id)
     }
 
-    fn allowed(domain: &str) -> bool {
-        validate_discovery_domain(domain).is_ok()
-    }
-
-    #[test]
-    fn resolve_rejects_non_authority_domain() {
-        reset();
-        // No allowlist: any bare authority is accepted; a non-authority is not.
-        assert!(allowed("not-allowed.com"));
-        assert!(!allowed("evil.com@127.0.0.1"));
-        // The verify path rejects a non-authority domain.
-        assert!(resolve(
-            "evil.com@127.0.0.1",
-            "https://idp.example.org",
-            &test_aud_claim()
-        )
-        .is_err());
+    fn domain(value: &str) -> Domain {
+        Domain::try_from(value).expect("a test domain")
     }
 
     fn seed(domain: &str) -> DiscoveredConfig {
@@ -1042,16 +978,104 @@ mod tests {
         config
     }
 
+    mod status {
+        use super::*;
+        use crate::openid::{app_sso_domain_status, get_sso_discovery_status};
+        use internet_identity_interface::internet_identity::types::{
+            AppSsoDomainStatus, SsoDiscoveryStatus,
+        };
+
+        const NOW_SECS: u64 = 1_700_000_000;
+
+        #[test]
+        fn unfetched_domain_is_pending() {
+            reset();
+            assert_eq!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Pending
+            );
+            assert_eq!(
+                app_sso_domain_status(&domain("example.org")),
+                AppSsoDomainStatus::Pending
+            );
+        }
+
+        #[test]
+        fn resolved_domain_is_available_with_its_name() {
+            reset();
+            seed("example.org");
+            prefetch(&domain("example.org"));
+            run_detached();
+            assert!(matches!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+            assert_eq!(
+                app_sso_domain_status(&domain("example.org")),
+                AppSsoDomainStatus::Available {
+                    name: Some("Example".to_string())
+                }
+            );
+        }
+
+        #[test]
+        fn failed_fetch_fails_until_its_retry() {
+            reset();
+            prefetch(&domain("example.org")); // nothing seeded: the fill fails
+            run_detached();
+            let retry_after = Some((NOW_SECS + RETRY_BASE_SECONDS) * 1_000_000_000);
+            assert_eq!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Failed {
+                    retry_after,
+                    reason: None
+                }
+            );
+            assert_eq!(
+                app_sso_domain_status(&domain("example.org")),
+                AppSsoDomainStatus::Unavailable {
+                    retry_after,
+                    reason: None
+                }
+            );
+
+            // Once the backoff ends a retry is due, which reads as pending.
+            set_test_now(NOW_SECS + RETRY_BASE_SECONDS);
+            assert_eq!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Pending
+            );
+        }
+
+        #[test]
+        fn failed_refresh_keeps_a_cached_result_resolved() {
+            reset();
+            seed("example.org");
+            prefetch(&domain("example.org"));
+            run_detached();
+            TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
+
+            set_test_now(NOW_SECS + FRESH_FOR_SECONDS);
+            prefetch(&domain("example.org"));
+            run_detached();
+
+            assert!(matches!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+        }
+    }
+
     #[test]
     fn discover_sso_fetches_an_expired_jwks_for_a_cached_discovery() {
         reset();
         let config = seed("example.org");
-        prefetch("example.org");
+        prefetch(&domain("example.org"));
         run_detached();
         set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + JWKS_STALE_FOR_SECONDS);
         assert!(matches!(read_jwks(&config.jwks_uri), Cached::Pending));
 
-        prefetch("example.org");
+        prefetch(&domain("example.org"));
         run_detached();
 
         assert!(matches!(read_jwks(&config.jwks_uri), Cached::Ready(_)));
@@ -1061,12 +1085,15 @@ mod tests {
     fn discovery_outlives_the_jwks() {
         reset();
         let config = seed("example.org");
-        prefetch("example.org");
+        prefetch(&domain("example.org"));
         run_detached();
 
         set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + DISCOVERY_STALE_FOR_SECONDS - 1);
 
-        assert!(matches!(peek_discovery("example.org"), Cached::Ready(_)));
+        assert!(matches!(
+            peek_discovery(&domain("example.org")),
+            Cached::Ready(_)
+        ));
         assert!(matches!(read_jwks(&config.jwks_uri), Cached::Pending));
     }
 
@@ -1074,24 +1101,18 @@ mod tests {
     fn failed_discovery_refresh_stops_serving_an_old_result() {
         reset();
         seed("example.org");
-        prefetch("example.org");
+        prefetch(&domain("example.org"));
         run_detached();
         TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
 
         set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + 24 * 60 * 60);
-        prefetch("example.org");
+        prefetch(&domain("example.org"));
         run_detached();
 
-        assert!(matches!(peek_discovery("example.org"), Cached::Pending));
-    }
-
-    #[test]
-    fn any_bare_authority_is_allowed() {
-        reset();
-        // No allowlist: any bare-authority domain passes the discovery gate.
-        assert!(allowed("not-allowed.com"));
-        assert!(allowed("example.org"));
-        assert!(allowed("sub.example.com:8443"));
+        assert!(matches!(
+            peek_discovery(&domain("example.org")),
+            Cached::Pending
+        ));
     }
 
     #[test]
@@ -1112,60 +1133,19 @@ mod tests {
     }
 
     #[test]
-    fn non_authority_domain_is_rejected() {
-        reset();
-
-        // Bare authorities pass: host, sub-host, and explicit (non-default)
-        // port, case-insensitively.
-        assert!(allowed("example.com"));
-        assert!(allowed("sub.example.com"));
-        assert!(allowed("example.com:8443"));
-        assert!(allowed("Example.COM"));
-
-        // Anything that isn't a bare host[:port] is rejected even with the flag
-        // on, so the caller-controlled value can't reshape the interpolated
-        // discovery URL (`{scheme}://{domain}/.well-known/...`).
-        for bad in [
-            "evil.com@127.0.0.1",    // userinfo — real host is 127.0.0.1
-            "user:pass@example.com", // userinfo
-            "example.com/..",        // path traversal
-            "example.com/foo",       // path
-            "example.com?x=1",       // query
-            "example.com#frag",      // fragment
-            "https://example.com",   // injected scheme
-            "example.com:443",       // redundant default port (normalized away)
-            "exa mple.com",          // whitespace in host
-            "",                      // empty
-        ] {
-            assert!(!allowed(bad), "expected `{bad}` to be rejected");
-        }
-    }
-
-    #[test]
-    fn over_long_domain_is_rejected() {
-        reset();
-        let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
-        assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
-        assert!(allowed(&at_cap));
-        let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
-        assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
-        assert!(!allowed(&over_cap));
-    }
-
-    #[test]
     fn prefetch_then_peek_resolves() {
         reset();
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
         // Reading without prefetching stays Pending — no fill was spawned.
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
         // Prefetch spawns the discovery fill; the read is still Pending until
         // the detached fill runs.
-        prefetch("example.org");
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        prefetch(&domain("example.org"));
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
         run_detached();
-        match peek_discovery("example.org") {
+        match peek_discovery(&domain("example.org")) {
             Cached::Ready(discovery_config) => {
                 assert_eq!(discovery_config.issuer, "https://idp.example.org")
             }
@@ -1181,13 +1161,17 @@ mod tests {
         });
         // peek_discovery/resolve are peek-only: without a prefetch they stay
         // Pending even after draining detached tasks, because none was spawned.
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
         assert!(matches!(
-            resolve("example.org", "https://idp.example.org", &test_aud_claim()),
+            resolve(
+                &domain("example.org"),
+                "https://idp.example.org",
+                &test_aud_claim()
+            ),
             Ok(Cached::Pending),
         ));
         run_detached();
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
     }
 
     #[test]
@@ -1399,13 +1383,22 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        prefetch("example.org");
+        prefetch(&domain("example.org"));
         run_detached();
         // Wrong issuer is rejected (the audience matches, so it's the issuer
         // cross-check that fails).
-        assert!(resolve("example.org", "https://evil.example.org", &test_aud_claim()).is_err());
+        assert!(resolve(
+            &domain("example.org"),
+            "https://evil.example.org",
+            &test_aud_claim()
+        )
+        .is_err());
         // Matching issuer resolves to a descriptor + jwks_uri.
-        match resolve("example.org", "https://idp.example.org", &test_aud_claim()) {
+        match resolve(
+            &domain("example.org"),
+            "https://idp.example.org",
+            &test_aud_claim(),
+        ) {
             Ok(Cached::Ready((descriptor, jwks_uri))) => {
                 assert_eq!(jwks_uri, "https://idp.example.org/jwks");
                 assert!(descriptor.sso.is_some());

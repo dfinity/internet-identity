@@ -13,6 +13,16 @@ const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+/** The named durations (seconds, ascending) a session-duration picker offers. */
+export const SESSION_DURATION_PRESETS = [
+  10 * MINUTE,
+  HOUR,
+  8 * HOUR,
+  DAY,
+  7 * DAY,
+  30 * DAY,
+];
+
 /** The longest session II grants, in seconds. Matches the backend's 30-day
  *  session-delegation cap (`MAX_SESSION_DELEGATION_TTL_NS`), which is also the
  *  default when a request omits `maxTimeToLive`. Flows use it as the ceiling

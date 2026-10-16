@@ -125,9 +125,21 @@ export type AppSessionError = {
     'NoSuchSession' : null
   };
 /**
- * An app the identity has signed in to, for the user's own list of their apps. Only
- * apps some account was used at: consent, a named account or a chosen default can each
- * be stored at an app the identity never signed in to.
+ * Whether an organization domain can be used for SSO sign-in, read by
+ * `app_sso_domain_status`. `name` is the organization's display name;
+ * `retry_after` and `reason` are as for `SsoDiscoveryStatus.Failed`.
+ */
+export type AppSsoDomainStatus = { 'Available' : { 'name' : [] | [string] } } |
+  {
+    'Unavailable' : {
+      'retry_after' : [] | [Timestamp],
+      'reason' : [] | [string],
+    }
+  } |
+  { 'Pending' : null };
+/**
+ * An app the identity decided a permission for, allowed or denied, for the user's own
+ * list of their apps.
  */
 export interface ApplicationInfo {
   /**
@@ -146,9 +158,10 @@ export interface ApplicationInfo {
    */
   'last_notified' : [] | [Timestamp],
   /**
-   * The latest sign-in to any of the identity's accounts at the app.
+   * The latest sign-in to any of the identity's accounts at the app, or null where
+   * none was used.
    */
-  'last_used' : Timestamp,
+  'last_used' : [] | [Timestamp],
 }
 /**
  * Configuration parameters related to the archive.
@@ -808,6 +821,15 @@ export interface EmailRecoveryGetDelegationArgs {
   'session_key' : SessionKey,
   'expiration' : Timestamp,
   'nonce' : string,
+}
+export type ForgetApplicationsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export interface ForgetApplicationsRequest {
+  /**
+   * As list_applications spells them.
+   */
+  'origins' : Array<FrontendHostname>,
+  'anchor_number' : UserNumber,
 }
 /**
  * Reported where the client can state it and inferred where it cannot, so unknown is a
@@ -1579,6 +1601,14 @@ export type OpenIdDelegationError = {
   { 'JwtVerificationFailed' : null };
 export type OpenIdEmailVerification = { 'Google' : null } |
   { 'Unknown' : null } |
+  {
+    /**
+     * Trusts email_verified like Google. Apple's private relay addresses,
+     * which only senders registered with II's Apple developer team can deliver
+     * mail to, are not kept on the credential at all.
+     */
+    'Apple' : null
+  } |
   { 'Microsoft' : null };
 export interface OpenIdPrepareDelegationResponse {
   'user_key' : UserKey,
@@ -2114,11 +2144,16 @@ export interface SsoDiscovery {
   'session_max_age_ns' : bigint,
 }
 /**
- * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
- * failed fetch isn't a distinct status — it reads as `Pending` and the frontend
- * times out — so the statuses are: resolved, or in flight.
+ * Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
+ * `Failed.retry_after` is when II fetches the domain again (a retry before then
+ * fails the same way), and is absent when no retry can help, such as a value
+ * that is not a domain. `reason` explains the failure, to show as is, when II
+ * has one.
  */
-export type SsoDiscoveryStatus = { 'Resolved' : SsoDiscovery } |
+export type SsoDiscoveryStatus = {
+    'Failed' : { 'retry_after' : [] | [Timestamp], 'reason' : [] | [string] }
+  } |
+  { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
 /**
  * Request for `sso_get_delegation`.
@@ -2286,6 +2321,15 @@ export interface _SERVICE {
       { 'Err' : SendNotificationError }
   >,
   /**
+   * Whether an organization domain can be used for SSO sign-in, for apps that
+   * check a domain before sending the user into the flow. Call
+   * `app_sso_domain_check` (update) once to start the fetch, then poll
+   * `app_sso_domain_status` (query) until it reads `Available` or
+   * `Unavailable`.
+   */
+  'app_sso_domain_check' : ActorMethod<[string], undefined>,
+  'app_sso_domain_status' : ActorMethod<[string], AppSsoDomainStatus>,
+  /**
    * Adds a new authentication method to the identity.
    * Requires authentication.
    */
@@ -2436,12 +2480,10 @@ export interface _SERVICE {
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
-   * SSO discovery for the sign-in initiation flow. The frontend polls
-   * `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
-   * on-demand two-hop discovery fetch with `discover_sso` (update); once the
-   * fetch completes the query returns `Resolved` with the config. The frontend
-   * calls `discover_sso` once more on `Resolved`, which refreshes a stale
-   * result and fetches the domain's keys ahead of verification.
+   * SSO discovery for the sign-in initiation flow. The frontend calls
+   * `discover_sso` (update) once, which starts the two-hop discovery fetch and
+   * the domain's key fetch, or refreshes a stale result, then polls
+   * `get_sso_discovery_status` (query) until it reads `Resolved` or `Failed`.
    * 
    * The optional second argument is the target dapp origin; when supplied,
    * `resolved_client_id` reports the client that origin must use (`null` = denied).
@@ -2555,6 +2597,17 @@ export interface _SERVICE {
    * Only callable by this IIs archive canister.
    */
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
+  /**
+   * Undoes every permission decision for the apps, drops what they queued for the
+   * identity's browsers and signs out every session at them, as one write. Accounts and
+   * the default account stay. An origin the identity holds nothing at is already
+   * forgotten.
+   */
+  'forget_applications' : ActorMethod<
+    [ForgetApplicationsRequest],
+    { 'Ok' : null } |
+      { 'Err' : ForgetApplicationsError }
+  >,
   'get_account_delegation' : ActorMethod<
     [
       UserNumber,
@@ -2704,8 +2757,8 @@ export interface _SERVICE {
    */
   'init_salt' : ActorMethod<[], undefined>,
   /**
-   * Every app the identity holds accounts at, so the user can see where they have
-   * signed in. Authorized by the identity's own access methods.
+   * Every app the identity decided a permission for, so the user can change or forget
+   * what they decided. Authorized by the identity's own access methods.
    */
   'list_applications' : ActorMethod<
     [ListApplicationsRequest],

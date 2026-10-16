@@ -523,6 +523,10 @@ pub enum OpenIdEmailVerificationScheme {
     Unknown,
     Google,
     Microsoft,
+    /// Trusts `email_verified` like `Google`. Apple's private relay addresses,
+    /// which only senders registered with II's Apple developer team can deliver
+    /// mail to, are not kept on the credential at all.
+    Apple,
 }
 
 #[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
@@ -585,9 +589,7 @@ pub struct SsoDiscovery {
     pub session_max_age_ns: u64,
 }
 
-/// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
-/// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
-/// times out — so the statuses are: resolved, or in flight.
+/// Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SsoDiscoveryStatus {
     /// Discovery completed; the resolved configuration.
@@ -595,6 +597,34 @@ pub enum SsoDiscoveryStatus {
     /// Discovery is in flight (or not yet started) — drive it with
     /// `discover_sso` and poll again.
     Pending,
+    /// Discovery failed. `retry_after` is when II fetches the domain again; a
+    /// retry before then fails the same way. `None` when no retry can help,
+    /// such as a value that is not a domain. `reason` explains the failure,
+    /// to show as is, when II has one.
+    Failed {
+        retry_after: Option<Timestamp>,
+        reason: Option<String>,
+    },
+}
+
+/// Whether an organization domain can be used for SSO sign-in, read by
+/// `app_sso_domain_status`. The app-facing counterpart of
+/// [`SsoDiscoveryStatus`], without the configuration an app has no use for.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppSsoDomainStatus {
+    /// The domain resolves; `name` is the organization's display name, if it
+    /// publishes one.
+    Available { name: Option<String> },
+    /// Not resolved yet: call `app_sso_domain_check` if nothing has, and poll
+    /// again.
+    Pending,
+    /// The domain cannot be used. `retry_after` is when II fetches it again;
+    /// `None` when no retry can help. `reason` explains why, to show as is,
+    /// when II has one.
+    Unavailable {
+        retry_after: Option<Timestamp>,
+        reason: Option<String>,
+    },
 }
 
 /// Request for `get_sso_discovery_status`.
@@ -690,14 +720,15 @@ pub enum GetAccountsError {
     Unauthorized(Principal),
 }
 
-/// An app the identity has signed in to, for the user's own list of their apps.
+/// An app the identity decided a permission for, for the user's own list of their apps.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct ApplicationInfo {
     /// The origin the app's identity is derived for: what its accounts and its
     /// notification consent are stored under.
     pub origin: FrontendHostname,
-    /// The latest sign-in to any of the identity's accounts at the app.
-    pub last_used: Timestamp,
+    /// The latest sign-in to any of the identity's accounts at the app, or `None` where
+    /// none was used.
+    pub last_used: Option<Timestamp>,
     /// Whether the app may notify the identity: it holds consent, and this deployment
     /// notifies for it.
     pub notifications_allowed: bool,
@@ -709,6 +740,18 @@ pub struct ApplicationInfo {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct ListApplicationsRequest {
     pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ForgetApplicationsRequest {
+    pub anchor_number: AnchorNumber,
+    pub origins: Vec<FrontendHostname>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ForgetApplicationsError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

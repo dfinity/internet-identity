@@ -6,12 +6,12 @@ const millis = (value: number): bigint => BigInt(value) * BigInt(1_000_000);
 
 const application = (
   origin: string,
-  last_used: bigint,
+  last_used: bigint | undefined,
   notifications_allowed = false,
   last_notified?: bigint,
 ): ApplicationInfo => ({
   origin,
-  last_used,
+  last_used: last_used !== undefined ? [last_used] : [],
   notifications_allowed,
   last_notified: last_notified !== undefined ? [last_notified] : [],
 });
@@ -45,6 +45,18 @@ describe("appsFrom", () => {
         notificationsAllowed: false,
         lastNotifiedMillis: undefined,
       },
+    ]);
+  });
+
+  it("lists an app no account was used at last", () => {
+    expect(
+      appsFrom([
+        application("https://never-used.example", undefined),
+        application("https://used.example", millis(1_000)),
+      ]).map(({ origin, lastUsedMillis }) => [origin, lastUsedMillis]),
+    ).toEqual([
+      ["https://used.example", 1_000],
+      ["https://never-used.example", undefined],
     ]);
   });
 

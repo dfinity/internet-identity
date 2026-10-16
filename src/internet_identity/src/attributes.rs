@@ -1233,6 +1233,7 @@ mod tests {
         const MICROSOFT_PERSONAL_TID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
         const MICROSOFT_RESOLVED_ISSUER: &str =
             "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0";
+        const APPLE_ISSUER: &str = "https://appleid.apple.com";
 
         fn setup_providers() {
             crate::openid::setup(vec![
@@ -1258,6 +1259,18 @@ mod tests {
                     auth_scope: vec![],
                     fedcm_uri: None,
                     email_verification: Some(OpenIdEmailVerificationScheme::Microsoft),
+                    seed_jwks: None,
+                },
+                OpenIdConfig {
+                    name: "Apple".to_string(),
+                    logo: String::new(),
+                    issuer: APPLE_ISSUER.to_string(),
+                    client_id: "test-client-id".to_string(),
+                    jwks_uri: String::new(),
+                    auth_uri: String::new(),
+                    auth_scope: vec![],
+                    fedcm_uri: None,
+                    email_verification: Some(OpenIdEmailVerificationScheme::Apple),
                     seed_jwks: None,
                 },
             ]);
@@ -1797,6 +1810,91 @@ mod tests {
                 )),
                 "should contain name"
             );
+        }
+
+        // ── Apple verified email tests ───────────────────────────────────
+
+        /// The `openid:<apple>:verified_email` value for an Apple credential
+        /// carrying `metadata`, if any.
+        fn apple_verified_email(metadata: &[(&str, &str)]) -> Option<String> {
+            setup_providers();
+
+            let credential = OpenIdCredential {
+                iss: APPLE_ISSUER.to_string(),
+                sub: "001234.apple-user.0789".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: metadata
+                    .iter()
+                    .map(|(key, value)| {
+                        (key.to_string(), MetadataEntryV2::String(value.to_string()))
+                    })
+                    .collect(),
+                sso_domain: None,
+                sso_name: None,
+                stable_id: None,
+            };
+            let anchor = anchor_with_openid_credentials(vec![credential]);
+            let mut requested = request_verified_email_for(Some(AttributeScope::OpenId {
+                issuer: APPLE_ISSUER.to_string(),
+            }));
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(
+                    APPLE_ISSUER.to_string(),
+                    "001234.apple-user.0789".to_string(),
+                    "test-client-id".to_string(),
+                ))
+                .expect("credential key should be present");
+            let pairs = attribute_pairs(attrs);
+            assert!(pairs.len() <= 1);
+            pairs.into_iter().next().map(|(key, value)| {
+                pretty_assert_eq!(key, format!("openid:{APPLE_ISSUER}:verified_email"));
+                value
+            })
+        }
+
+        // Apple's private relay addresses never reach these tests: they are not
+        // kept on the credential at all (see `openid::verify::reachable_email`).
+
+        #[test]
+        fn test_apple_returns_verified_email_when_email_verified_is_true() {
+            pretty_assert_eq!(
+                apple_verified_email(&[("email", "user@icloud.com"), ("email_verified", "true")]),
+                Some("user@icloud.com".to_string())
+            );
+        }
+
+        #[test]
+        fn test_apple_email_verified_check_is_case_insensitive() {
+            pretty_assert_eq!(
+                apple_verified_email(&[("email", "user@example.com"), ("email_verified", "TRUE")]),
+                Some("user@example.com".to_string())
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_verified_is_false() {
+            // Sign in with Apple at Work & School accounts may not be verified.
+            pretty_assert_eq!(
+                apple_verified_email(&[
+                    ("email", "student@school.example"),
+                    ("email_verified", "false"),
+                ]),
+                None
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_verified_is_missing() {
+            pretty_assert_eq!(apple_verified_email(&[("email", "user@example.com")]), None);
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_is_missing() {
+            pretty_assert_eq!(apple_verified_email(&[("email_verified", "true")]), None);
         }
 
         #[test]
@@ -2429,7 +2527,7 @@ mod tests {
                 metadata,
                 // Stamped SSO credential — `discovery_domain()` /
                 // `matched_attribute_scope()` read this directly.
-                sso_domain: Some(SSO_DOMAIN.to_string()),
+                sso_domain: Some(crate::openid::Domain::try_from(SSO_DOMAIN).unwrap()),
                 sso_name: None,
                 stable_id: None,
             }
@@ -2470,7 +2568,10 @@ mod tests {
         #[test]
         fn credential_reports_discovery_domain() {
             let credential = sso_credential_with(email_and_name_metadata());
-            pretty_assert_eq!(credential.discovery_domain(), Some(SSO_DOMAIN.to_string()),);
+            pretty_assert_eq!(
+                credential.discovery_domain(),
+                Some(&crate::openid::Domain::try_from(SSO_DOMAIN).unwrap())
+            );
         }
 
         // `matched_attribute_scope()` returns `Sso { .. }` for an

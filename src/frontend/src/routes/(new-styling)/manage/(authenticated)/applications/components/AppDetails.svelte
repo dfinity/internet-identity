@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { untrack } from "svelte";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { t } from "$lib/stores/locale.store";
@@ -17,25 +15,23 @@
     /** Whether this Internet Identity notifies at all. Without it there is nothing to
      *  switch, so the switch is left out. */
     canNotify: boolean;
-    /** Whether the app may notify, as the canister holds it. */
+    /** Whether the app may notify. */
     allowed: boolean;
-    onSave: (allowed: boolean) => Promise<void>;
+    /** Whether a permission change is in flight, which holds every other change back. */
+    saving: boolean;
+    onToggle: (allowed: boolean) => void;
+    onForget: () => void;
   }
 
-  const { titleId, origin, canNotify, allowed, onSave }: Props = $props();
-
-  let draftAllowed = $state(untrack(() => allowed));
-  let isSaving = $state(false);
-  const hasChanges = $derived(draftAllowed !== allowed);
-
-  const handleSave = async () => {
-    isSaving = true;
-    try {
-      await onSave(draftAllowed);
-    } finally {
-      isSaving = false;
-    }
-  };
+  const {
+    titleId,
+    origin,
+    canNotify,
+    allowed,
+    saving,
+    onToggle,
+    onForget,
+  }: Props = $props();
 
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
@@ -72,38 +68,45 @@
     </p>
   {/if}
 
-  {#if canNotify}
-    <div aria-hidden="true" class="border-border-tertiary my-6 border-t"></div>
-    <div class="flex flex-row items-center gap-4">
-      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span id={switchId} class="text-text-primary text-sm font-semibold">
-          {$t`Notifications`}
-        </span>
-        <span id={hintId} class="text-text-tertiary text-sm text-pretty">
-          {$t`Let ${name} notify you.`}
-        </span>
+  <div aria-hidden="true" class="border-border-tertiary my-6 border-t"></div>
+  <div class="flex flex-col gap-6">
+    {#if canNotify}
+      <div class="flex flex-row items-center gap-4">
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span id={switchId} class="text-text-primary text-sm font-semibold">
+            {$t`Notifications`}
+          </span>
+          <span id={hintId} class="text-text-tertiary text-sm text-pretty">
+            {$t`Let ${name} notify you.`}
+          </span>
+        </div>
+        <div class="flex h-6 shrink-0 items-center">
+          <Toggle
+            checked={allowed}
+            disabled={saving}
+            onchange={(event) => onToggle(event.currentTarget.checked)}
+            aria-labelledby={switchId}
+            aria-describedby={hintId}
+          />
+        </div>
       </div>
-      <div class="flex h-6 shrink-0 items-center">
-        <Toggle
-          bind:checked={draftAllowed}
-          disabled={isSaving}
-          aria-labelledby={switchId}
-          aria-describedby={hintId}
-        />
-      </div>
-    </div>
-  {/if}
-
-  <button
-    onclick={handleSave}
-    disabled={!hasChanges || isSaving}
-    class="btn btn-primary btn-xl mt-10 w-full"
-  >
-    {#if isSaving}
-      <ProgressRing />
-      <span>{$t`Saving changes...`}</span>
-    {:else}
-      <span>{$t`Save changes`}</span>
     {/if}
-  </button>
+    <div class="flex flex-row flex-wrap items-center gap-x-4 gap-y-3">
+      <div class="flex min-w-50 flex-1 flex-col gap-0.5">
+        <span class="text-text-primary text-sm font-semibold">
+          {$t`Remove this app`}
+        </span>
+        <span class="text-text-tertiary text-sm text-pretty">
+          {$t`Signs you out and clears its settings.`}
+        </span>
+      </div>
+      <button
+        onclick={onForget}
+        disabled={saving}
+        class="btn btn-secondary btn-sm btn-danger shrink-0"
+      >
+        {$t`Remove`}
+      </button>
+    </div>
+  </div>
 </div>

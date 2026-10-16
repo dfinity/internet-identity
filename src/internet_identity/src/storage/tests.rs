@@ -1,7 +1,7 @@
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
-use crate::openid::OpenIdCredential;
+use crate::openid::{Domain, OpenIdCredential};
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
@@ -437,7 +437,7 @@ fn should_write_and_update_sso_stable_id_index() {
     // key is scoped by it.
     let mut bridged = openid_credential(0);
     bridged.stable_id = Some(stable_id.to_string());
-    bridged.sso_domain = Some(sso_domain.to_string());
+    bridged.sso_domain = Some(Domain::try_from(sso_domain).unwrap());
     // A second credential on the same anchor without a `stable_id` — it must
     // never appear in the SSO stable-id index.
     let plain = openid_credential(1);
@@ -806,7 +806,7 @@ fn should_report_sso_domain_of_registered_openid_credential() {
 
     let mut anchor = storage.allocate_anchor(0).unwrap();
     let stamped = OpenIdCredential {
-        sso_domain: Some("example.org".to_string()),
+        sso_domain: Some(Domain::try_from("example.org").unwrap()),
         ..openid_credential(0)
     };
     // A credential stored before the stamp existed decodes with `None`.

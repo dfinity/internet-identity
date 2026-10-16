@@ -8,6 +8,11 @@ import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
 const BROADCAST_CHANNEL = "redirect_callback";
 const REDIRECT_CALLBACK_PATH = "/callback";
+// How often `redirectInPopup` checks whether the popup was closed.
+const POPUP_CLOSED_POLL_INTERVAL_MS = 250;
+// How long `redirectInPopup` keeps waiting for the callback payload after the
+// popup first reads as closed, before treating the flow as cancelled.
+const POPUP_CLOSED_GRACE_MS = 1000;
 
 export class CallbackPopupClosedError extends Error {}
 
@@ -105,14 +110,26 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
     };
     // Periodically check if popup was closed by the user.
     // We can't listen for close events due to cross-origin restrictions,
-    // so we poll every 500ms to detect closure. The interval balances
-    // responsiveness with resource consumption.
+    // so we poll to detect closure.
+    //
+    // A closed popup doesn't mean the payload is lost: the callback page
+    // posts it and closes itself back to back, and in Chromium the message
+    // hops through the browser process, so the popup can already read as
+    // closed while the message is still in flight. Keep listening for a
+    // grace period after first seeing the popup closed; if the payload
+    // arrives in time, the message listener resolves and cleans up.
+    let closedSince: number | undefined;
     const closeInterval = setInterval(() => {
-      if (redirectWindow.closed === true) {
-        cleanup();
-        reject(new CallbackPopupClosedError());
+      if (redirectWindow.closed !== true) {
+        return;
       }
-    }, 500);
+      closedSince ??= Date.now();
+      if (Date.now() - closedSince < POPUP_CLOSED_GRACE_MS) {
+        return;
+      }
+      cleanup();
+      reject(new CallbackPopupClosedError());
+    }, POPUP_CLOSED_POLL_INTERVAL_MS);
     // Listen to the popup, we expect a message with the payload of the
     // callback, after receiving it we can close the popup and resolve the
     // promise.
@@ -290,6 +307,11 @@ export const createRedirectURL = (
   if (options.loginHint !== undefined) {
     authURL.searchParams.set("login_hint", options.loginHint);
   }
+  // `URLSearchParams` writes a space as `+`, but Apple wants the scopes
+  // separated by a percent-encoded space (`scope=openid%20email`), or it may
+  // leave the email out of the token. Every `+` here stands for a space: a
+  // literal `+` in a value is written as `%2B`.
+  authURL.search = authURL.searchParams.toString().replace(/\+/g, "%20");
 
   return authURL;
 };

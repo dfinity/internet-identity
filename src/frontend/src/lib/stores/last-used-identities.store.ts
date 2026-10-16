@@ -19,6 +19,12 @@ export type LastUsedAccounts = {
     [accountNumber: string]: LastUsedAccount;
   };
 };
+/** The account and session duration last chosen for an app with all options
+ *  shown, on this browser. */
+export type AuthorizeOptions = {
+  accountNumber: bigint | undefined;
+  sessionDurationSeconds: number;
+};
 export type LastUsedIdentity = {
   identityNumber: bigint;
   name?: string;
@@ -50,6 +56,8 @@ export type LastUsedIdentity = {
         };
       };
   accounts?: LastUsedAccounts;
+  /** Keyed by the app's origin. */
+  authorizeOptions?: { [origin: string]: AuthorizeOptions };
   lastUsedTimestampMillis: number;
   createdAtMillis?: number;
   /** When this browser first saw this identity, which is not when the identity was
@@ -79,6 +87,11 @@ type LastUsedIdentitiesStore = Readable<{
   ) => void;
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
+  ) => void;
+  setAuthorizeOptions: (
+    identityNumber: bigint,
+    origin: string,
+    options: AuthorizeOptions,
   ) => void;
   restoreIdentity: (identity: LastUsedIdentity) => void;
   removeIdentity: (identityNumber: bigint) => void;
@@ -124,6 +137,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         const identity = lastUsedIdentities[params.identityNumber.toString()];
         lastUsedIdentities[params.identityNumber.toString()] = {
           accounts: identity?.accounts,
+          authorizeOptions: identity?.authorizeOptions,
           ...params,
           lastUsedTimestampMillis: Date.now(),
           // Kept from the first time this browser saw the identity, so it does not
@@ -168,6 +182,19 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         ] = {
           ...params,
           lastUsedTimestampMillis: Date.now(),
+        };
+        return lastUsedIdentities;
+      });
+    },
+    setAuthorizeOptions: (identityNumber, origin, options) => {
+      lastUsedStore.update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[identityNumber.toString()];
+        if (identity === undefined) {
+          return lastUsedIdentities;
+        }
+        identity.authorizeOptions = {
+          ...identity.authorizeOptions,
+          [origin]: options,
         };
         return lastUsedIdentities;
       });

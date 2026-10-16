@@ -382,6 +382,28 @@ pub fn discover_sso(
     )
 }
 
+pub fn app_sso_domain_check(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+) -> Result<(), RejectResponse> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "app_sso_domain_check",
+        (domain,),
+    )
+}
+
+pub fn app_sso_domain_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+) -> Result<types::AppSsoDomainStatus, RejectResponse> {
+    query_candid(env, canister_id, "app_sso_domain_status", (domain,)).map(|(x,)| x)
+}
+
 pub fn get_sso_discovery(
     env: &PocketIc,
     canister_id: CanisterId,

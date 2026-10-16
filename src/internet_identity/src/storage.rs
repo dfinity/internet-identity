@@ -104,7 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
-use crate::openid::OpenIdCredentialKey;
+use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
@@ -1122,7 +1122,7 @@ impl<M: Memory + Clone> Storage<M> {
                 &cred.iss == iss
                     && &cred.sub == sub
                     && &cred.aud == aud
-                    && cred.sso_domain.as_deref() == discovery_domain
+                    && cred.sso_domain.as_ref().map(Domain::as_str) == discovery_domain
             })
             .then_some(anchor_number)
     }
@@ -1151,7 +1151,7 @@ impl<M: Memory + Clone> Storage<M> {
             .openid_credentials()
             .iter()
             .find(|cred| &cred.iss == iss && &cred.sub == sub && &cred.aud == aud)
-            .map(|cred| cred.sso_domain.clone())
+            .map(|cred| cred.sso_domain.clone().map(String::from))
     }
 
     /// The `(iss, sub, aud)` index read behind both lookups above.
@@ -2814,42 +2814,94 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
-    /// Every app this identity has signed in to: its origin, the latest sign-in to any of
-    /// the identity's accounts there, and what the identity configured for it.
-    ///
-    /// Only where some account was used. Granting consent, naming an account and choosing
-    /// a default each store a list at an app the identity may never have signed in to,
-    /// and a tombstone holds no account at all.
+    /// Every app this identity decided a permission for: its origin, the latest sign-in to
+    /// any of the identity's accounts there (`None` where none was used), and what the
+    /// identity configured for it.
     pub fn list_applications(
         &self,
         anchor_number: AnchorNumber,
-    ) -> Vec<(FrontendHostname, Timestamp, AnchorApplicationConfig)> {
-        self.stable_account_reference_list_memory
+    ) -> Vec<(FrontendHostname, Option<Timestamp>, AnchorApplicationConfig)> {
+        self.stable_anchor_application_config_memory
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
             )
-            .filter_map(|((_, application_number), list)| {
-                let last_used = Vec::<AccountReference>::from(list)
-                    .iter()
-                    .filter_map(|reference| reference.last_used)
-                    .max()?;
-                // Illegal, as `account_state` explains, and skipped for the same reason:
-                // one bad list must not hide the identity's other apps.
+            .filter(|(_, config)| config.has_permission_decision())
+            .filter_map(|((_, application_number), config)| {
+                // A config is stored with its reference list and reclaimed with it, so
+                // its application exists. Skipped rather than refused where it does not:
+                // one bad row must not hide the identity's other apps.
                 let Some(application) = self.stable_application_memory.get(&application_number)
                 else {
                     ic_cdk::println!(
-                        "ERROR: account reference list invariant violated: identity \
-                         {anchor_number} holds a list for application {application_number}, \
+                        "ERROR: anchor application config invariant violated: identity \
+                         {anchor_number} holds a config for application {application_number}, \
                          which is not stored."
                     );
                     return None;
                 };
-                let config = self
-                    .anchor_application_config(anchor_number, application_number)
-                    .unwrap_or_default();
+                let last_used = self
+                    .stored_account_references(anchor_number, application_number)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|reference| reference.last_used)
+                    .max();
                 Some((application.origin, last_used, config))
             })
             .collect()
+    }
+
+    /// Forgets the apps at `origins`: undoes every permission decision for them, drops what
+    /// they queued for the identity's browsers and signs out every session at them.
+    ///
+    /// One write for all of them, so forgetting several never stops part way. Accounts and
+    /// the default account stay, so signing in again lands where it did before. An origin
+    /// the identity holds nothing at is already forgotten.
+    pub fn forget_applications(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origins: &BTreeSet<FrontendHostname>,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let mut anchor = self.read(anchor_number)?;
+        let mut writes = BTreeMap::new();
+        let mut forgotten = BTreeSet::new();
+        for origin in origins {
+            let Some(application_number) = self.lookup_application_number_with_origin(origin)
+            else {
+                continue;
+            };
+            let Some(references) =
+                self.stored_account_references(anchor_number, application_number)
+            else {
+                continue;
+            };
+            let account_references = references
+                .into_iter()
+                .map(|mut reference| {
+                    reference.sessions.clear();
+                    AccountReferenceWrite::from(reference)
+                })
+                .collect();
+            let config = self
+                .anchor_application_config(anchor_number, application_number)
+                .map(AnchorApplicationConfig::forgotten);
+            writes.insert(origin.clone(), Some((account_references, config)));
+            forgotten.insert(application_number);
+        }
+        if writes.is_empty() {
+            return Ok(());
+        }
+
+        let browser_ids: Vec<BrowserId> =
+            anchor.browsers().iter().map(|browser| browser.id).collect();
+        for browser_id in browser_ids {
+            if let Some(queue) = anchor.notifications_mut(browser_id) {
+                queue.retain(|queued| !forgotten.contains(&queued.application_number));
+            }
+        }
+
+        self.write_account_state(anchor, now, writes)?;
+        Ok(())
     }
 
     fn anchor_application_config(

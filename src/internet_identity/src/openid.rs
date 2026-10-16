@@ -13,7 +13,7 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
+    AnchorNumber, AppSsoDomainStatus, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
     OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, SsoDiscovery,
     SsoDiscoveryStatus, Timestamp, UserKey,
 };
@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 mod configured;
+mod domain;
 
 #[cfg(test)]
 pub(crate) use configured::{clear_for_test, setup_for_test};
@@ -34,6 +35,7 @@ mod sso_gating;
 mod verify;
 
 pub use crate::single_flight_cache::Cached;
+pub use domain::Domain;
 pub use sso_bundle::{
     get_sso_attr_bundle_signature, prepare_sso_attr_bundle, read_certified_sso_bundle,
 };
@@ -100,7 +102,7 @@ pub struct OpenIdCredential {
     /// SSO discovery domain this credential was verified through, stamped at
     /// verification time. `None` for direct-provider credentials (Google /
     /// Microsoft / Apple).
-    pub sso_domain: Option<String>,
+    pub sso_domain: Option<Domain>,
     /// Human-readable SSO label from the domain's hop-1
     /// `ii-openid-configuration`. May be `None` even for SSO credentials —
     /// domains aren't required to publish a `name`.
@@ -188,8 +190,8 @@ impl OpenIdCredential {
     }
 
     /// The SSO discovery domain this credential was verified through, if any.
-    pub fn discovery_domain(&self) -> Option<String> {
-        self.sso_domain.clone()
+    pub fn discovery_domain(&self) -> Option<&Domain> {
+        self.sso_domain.as_ref()
     }
 
     /// The single `AttributeScope` this credential is addressable under — the
@@ -201,7 +203,9 @@ impl OpenIdCredential {
     ///   credential isn't SSO — credential is unreachable.
     pub fn matched_attribute_scope(&self) -> Option<AttributeScope> {
         if let Some(domain) = self.sso_domain.clone() {
-            return Some(AttributeScope::Sso { domain });
+            return Some(AttributeScope::Sso {
+                domain: domain.into(),
+            });
         }
         configured::config_issuer_for(self).map(|issuer| AttributeScope::OpenId { issuer })
     }
@@ -260,6 +264,9 @@ impl OpenIdCredential {
             Unknown => None,
             Google => self.get_google_verified_email(),
             Microsoft => self.get_microsoft_verified_email(),
+            // Same check as Google: an Apple private relay address is never
+            // kept on the credential (see `verify::reachable_email`).
+            Apple => self.get_google_verified_email(),
         }
     }
 }
@@ -311,51 +318,44 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
     configured::setup(configs);
 }
 
-/// Canonicalize an untrusted SSO discovery domain received as a canister-call
-/// argument: trim surrounding whitespace and lowercase ASCII. Domains are
-/// case-insensitive (DNS), but the value is stamped onto the credential as
-/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing,
-/// so it must be canonical the moment it crosses the trust boundary. Every
-/// endpoint taking a `discovery_domain` runs this before any further use.
-pub fn canonical_discovery_domain(domain: &str) -> String {
-    domain.trim().to_ascii_lowercase()
-}
-
-/// [`canonical_discovery_domain`] over an optional argument (the JWT endpoints,
-/// where the domain selects an SSO vs configured provider).
-pub fn canonical_discovery_domain_opt(domain: Option<String>) -> Option<String> {
-    domain.map(|domain| canonical_discovery_domain(&domain))
+/// Parse an optional caller-supplied discovery domain. A value that is not a
+/// domain fails the way a JWT that cannot be verified does, naming every
+/// problem with it.
+pub fn parse_discovery_domain(
+    domain: Option<&str>,
+) -> Result<Option<Domain>, OpenIDJWTVerificationError> {
+    domain
+        .map(Domain::try_from)
+        .transpose()
+        .map_err(OpenIDJWTVerificationError::GenericError)
 }
 
 /// Drive the on-demand SSO discovery / JWKS fetches for `domain` forward. Only
 /// an update may call this — it spawns the outcalls the fills make. A no-op for
-/// `None` (a configured provider needs no fetch) and for a disallowed domain.
-/// After calling this, [`verify_jwt`] / [`discover_sso`] read the result once
-/// the cache is warm.
-pub fn prefetch_sso(domain: Option<&str>) {
+/// `None` (a configured provider needs no fetch). After calling this,
+/// [`verify_jwt`] / [`discover_sso`] read the result once the cache is warm.
+pub fn prefetch_sso(domain: Option<&Domain>) {
     if let Some(domain) = domain {
         sso::prefetch(domain);
     }
 }
 
 /// Drive the SSO discovery and JWKS fetches for `domain` forward. The sign-in
-/// initiation calls this from an update while [`get_sso_discovery_status`]
-/// reads `Pending`, and once more when it resolves, so a stale discovery result
-/// and the domain's keys refresh while the user signs in at the IdP. A no-op
-/// for a disallowed domain (the query reports `NotAllowed`).
-pub fn discover_sso(domain: &str) {
+/// initiation calls this once from an update before polling
+/// [`get_sso_discovery_status`], so a stale discovery result and the domain's
+/// keys refresh while the user signs in at the IdP.
+pub fn discover_sso(domain: &Domain) {
     sso::prefetch(domain);
 }
 
-/// Read the status of `domain`'s SSO discovery: the resolved config, or still
-/// pending.
+/// Read the status of `domain`'s SSO discovery: the resolved config, still
+/// pending, or failed.
 ///
 /// With `origin`, `resolved_client_id` is that origin's client, or `None` when
 /// the origin is gated out.
-pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscoveryStatus {
-    // Peek-only: `Pending` until the fill (driven by `prefetch_sso`) resolves.
-    // A malformed domain never resolves (the fill rejects non-bare-authorities),
-    // so it simply reads `Pending` until the frontend times out.
+pub fn get_sso_discovery_status(domain: &Domain, origin: Option<&str>) -> SsoDiscoveryStatus {
+    // Peek-only: a query cannot start the fetch, `discover_sso` does. A cached
+    // value wins over a failed refresh of it, which keeps serving it.
     match sso::peek_discovery(domain) {
         Cached::Ready(discovery_config) => {
             let resolved_client_id = match origin {
@@ -363,7 +363,7 @@ pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscov
                 Some(origin) => discovery_config.resolve_client_for_origin(origin).ok(),
             };
             SsoDiscoveryStatus::Resolved(SsoDiscovery {
-                discovery_domain: domain.to_ascii_lowercase(),
+                discovery_domain: domain.to_string(),
                 client_id: discovery_config.client_id,
                 issuer: discovery_config.issuer,
                 authorization_endpoint: discovery_config.authorization_endpoint,
@@ -373,7 +373,31 @@ pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscov
                 session_max_age_ns: discovery_config.session_max_age_ns,
             })
         }
-        Cached::Pending => SsoDiscoveryStatus::Pending,
+        Cached::Pending => match sso::discovery_retry_at_ns(domain) {
+            Some(retry_at_ns) => SsoDiscoveryStatus::Failed {
+                retry_after: Some(retry_at_ns),
+                reason: None,
+            },
+            None => SsoDiscoveryStatus::Pending,
+        },
+    }
+}
+
+/// Whether `domain` can be used for SSO sign-in: [`get_sso_discovery_status`]
+/// without the configuration.
+pub fn app_sso_domain_status(domain: &Domain) -> AppSsoDomainStatus {
+    match get_sso_discovery_status(domain, None) {
+        SsoDiscoveryStatus::Resolved(discovery) => AppSsoDomainStatus::Available {
+            name: discovery.name,
+        },
+        SsoDiscoveryStatus::Pending => AppSsoDomainStatus::Pending,
+        SsoDiscoveryStatus::Failed {
+            retry_after,
+            reason,
+        } => AppSsoDomainStatus::Unavailable {
+            retry_after,
+            reason,
+        },
     }
 }
 
@@ -407,11 +431,11 @@ pub(super) fn decode_iss_aud_claims(
 /// offer a sign-up that registration would reject as a duplicate.
 pub fn resolve_anchor_with_openid_credential(
     key: &OpenIdCredentialKey,
-    discovery_domain: Option<&str>,
+    discovery_domain: Option<&Domain>,
 ) -> Result<AnchorNumber, OpenIdDelegationError> {
     state::storage_borrow(|storage| {
         if let Some(anchor_number) =
-            storage.lookup_anchor_with_openid_credential(key, discovery_domain)
+            storage.lookup_anchor_with_openid_credential(key, discovery_domain.map(Domain::as_str))
         {
             return Ok(anchor_number);
         }
@@ -436,7 +460,7 @@ pub fn resolve_anchor_with_openid_credential(
 pub fn verify_jwt(
     jwt: &str,
     salt: &[u8; 32],
-    discovery_domain: Option<&str>,
+    discovery_domain: Option<&Domain>,
 ) -> Result<Cached<OpenIdCredential>, OpenIDJWTVerificationError> {
     let (iss, aud, claims) = decode_iss_aud_claims(jwt)?;
 
@@ -636,24 +660,6 @@ mod tests {
             }
             other => panic!("expected Ready credential, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn canonical_discovery_domain_trims_and_lowercases() {
-        // Untrusted canister-call args: a mixed-case / padded domain that
-        // passes the case-insensitive allowlist gate must be canonicalized so
-        // the stamped `sso:<domain>` scope matches the allowlisted value, and
-        // so the discovery endpoints (`discover_sso` / `get_sso_discovery_status`) gate
-        // on the same canonical form as the JWT endpoints.
-        assert_eq!(canonical_discovery_domain("  Example.ORG  "), "example.org");
-        assert_eq!(canonical_discovery_domain("example.org"), "example.org");
-        // Optional wrapper for the JWT endpoints: a configured provider supplies
-        // no domain.
-        assert_eq!(
-            canonical_discovery_domain_opt(Some("  Example.ORG  ".to_string())),
-            Some("example.org".to_string())
-        );
-        assert_eq!(canonical_discovery_domain_opt(None), None);
     }
 
     #[test]

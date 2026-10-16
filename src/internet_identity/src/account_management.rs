@@ -23,8 +23,9 @@ use internet_identity_interface::{
     archive::types::{Operation, Private},
     internet_identity::types::{
         AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, ApplicationInfo,
-        CreateAccountError, Delegation, FrontendHostname, GetAccountError, GetDefaultAccountError,
-        SessionKey, SetDefaultAccountError, SignedDelegation, Timestamp, UpdateAccountError,
+        CreateAccountError, Delegation, ForgetApplicationsError, FrontendHostname, GetAccountError,
+        GetDefaultAccountError, SessionKey, SetDefaultAccountError, SignedDelegation, Timestamp,
+        UpdateAccountError,
     },
 };
 #[cfg(test)]
@@ -45,13 +46,25 @@ pub fn list_applications(anchor_number: AnchorNumber) -> Vec<ApplicationInfo> {
     storage_borrow(|storage| storage.list_applications(anchor_number))
         .into_iter()
         .map(|(origin, last_used, config)| ApplicationInfo {
-            notifications_allowed: config.notifications_consented_at_ns.is_some()
+            notifications_allowed: config.notifications_allowed()
                 && crate::notifications::notifications_enabled(),
             last_notified: config.last_notified_at_ns,
             origin,
             last_used,
         })
         .collect()
+}
+
+/// Forgets the identity's apps at `origins`, as one write.
+pub fn forget_applications(
+    anchor_number: AnchorNumber,
+    origins: Vec<FrontendHostname>,
+) -> Result<(), ForgetApplicationsError> {
+    let origins = origins.into_iter().collect();
+    storage_borrow_mut(|storage| {
+        storage.forget_applications(anchor_number, &origins, ic_cdk::api::time())
+    })
+    .map_err(|err| ForgetApplicationsError::InternalCanisterError(err.to_string()))
 }
 
 /// Helper function to read an account, unlike `storage.read_account` this returns

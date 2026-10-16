@@ -199,6 +199,79 @@ describe("lastUsedIdentitiesStore", () => {
     });
   });
 
+  describe("setAuthorizeOptions", () => {
+    const origin = "https://example.com";
+    const otherOrigin = "https://other.example.com";
+    const addIdentity = () =>
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber: identity1,
+        name: name1,
+        authMethod: { passkey: { credentialId: credId1 } },
+      });
+    const authorizeOptions = () =>
+      get(lastUsedIdentitiesStore).identities[identity1.toString()]
+        .authorizeOptions;
+
+    it("should keep options per origin", () => {
+      addIdentity();
+      lastUsedIdentitiesStore.setAuthorizeOptions(identity1, origin, {
+        accountNumber: BigInt(7),
+        sessionDurationSeconds: 3600,
+      });
+      lastUsedIdentitiesStore.setAuthorizeOptions(identity1, otherOrigin, {
+        accountNumber: undefined,
+        sessionDurationSeconds: 600,
+      });
+      lastUsedIdentitiesStore.setAuthorizeOptions(identity1, origin, {
+        accountNumber: BigInt(8),
+        sessionDurationSeconds: 86400,
+      });
+      expect(authorizeOptions()).toEqual({
+        [origin]: { accountNumber: BigInt(8), sessionDurationSeconds: 86400 },
+        [otherOrigin]: {
+          accountNumber: undefined,
+          sessionDurationSeconds: 600,
+        },
+      });
+    });
+
+    it("should keep options when the identity is used again and its accounts sync", () => {
+      addIdentity();
+      lastUsedIdentitiesStore.setAuthorizeOptions(identity1, origin, {
+        accountNumber: BigInt(7),
+        sessionDurationSeconds: 3600,
+      });
+      vi.setSystemTime(mockTimestamp2);
+      addIdentity();
+      lastUsedIdentitiesStore.syncLastUsedAccounts(identity1, origin, [
+        { name: [], origin, account_number: [BigInt(7)], last_used: [] },
+      ]);
+      expect(authorizeOptions()).toEqual({
+        [origin]: { accountNumber: BigInt(7), sessionDurationSeconds: 3600 },
+      });
+    });
+
+    it("should not add an identity this browser does not know", () => {
+      lastUsedIdentitiesStore.setAuthorizeOptions(identity1, origin, {
+        accountNumber: BigInt(7),
+        sessionDurationSeconds: 3600,
+      });
+      expect(get(lastUsedIdentitiesStore).identities).toEqual({});
+    });
+
+    it("should persist the account number to localStorage", () => {
+      addIdentity();
+      lastUsedIdentitiesStore.setAuthorizeOptions(identity1, origin, {
+        accountNumber: BigInt(7),
+        sessionDurationSeconds: 3600,
+      });
+      const stored = Object.values(localStorage)
+        .map((value) => String(value))
+        .find((value) => value.includes("authorizeOptions"));
+      expect(stored).toContain('"accountNumber":{"__bigint__":"7"}');
+    });
+  });
+
   describe("addLastUsedIdentityIfMissing", () => {
     it("should add the identity if it does not exist", () => {
       lastUsedIdentitiesStore.addLastUsedIdentityIfMissing({

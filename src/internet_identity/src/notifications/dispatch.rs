@@ -957,8 +957,13 @@ mod tests {
     /// `APP` allowed to notify the identity, which gives the app a config to record
     /// against. Returns the number II holds the app under.
     fn allow_app(anchor_number: AnchorNumber) -> ApplicationNumber {
-        crate::notifications::write_consent(anchor_number, &APP.to_string(), Some(0), 0)
-            .expect("allowing the app");
+        crate::notifications::write_notifications_decision(
+            anchor_number,
+            &APP.to_string(),
+            true,
+            0,
+        )
+        .expect("allowing the app");
         storage_borrow(|storage| storage.lookup_application_number_with_origin(&APP.to_string()))
             .expect("allowing the app stores it")
     }

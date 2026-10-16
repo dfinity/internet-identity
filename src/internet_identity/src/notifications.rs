@@ -19,6 +19,7 @@ pub mod webpush;
 pub(crate) const BROWSER_GONE_AFTER_NS: u64 = 60 * 24 * 60 * 60 * 1_000_000_000;
 
 use crate::state::{storage_borrow, storage_borrow_mut};
+use crate::storage::storable::anchor_application_config::PermissionDecision;
 use crate::storage::StorageError;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, FrontendHostname, NotAccepted, NotAcceptedReason, Notification,
@@ -63,7 +64,7 @@ pub fn grant_consent(
     }: ValidatedNotificationGrantConsentRequest,
     now_ns: Timestamp,
 ) -> Result<(), NotificationGrantConsentError> {
-    write_consent(anchor_number, &origin, Some(now_ns), now_ns)
+    write_notifications_decision(anchor_number, &origin, true, now_ns)
         .map_err(|err| NotificationGrantConsentError::InternalCanisterError(format!("{err}")))
 }
 
@@ -79,7 +80,7 @@ pub fn revoke_consent(
 ) -> Result<(), NotificationRevokeConsentError> {
     // Consent that cannot exist is already withdrawn, so an app the identity never
     // reached is nothing to report.
-    let _ = write_consent(anchor_number, &origin, None, now_ns);
+    let _ = write_notifications_decision(anchor_number, &origin, false, now_ns);
     browser_queue::remove_app(anchor_number, &origin);
     Ok(())
 }
@@ -91,8 +92,7 @@ pub fn consent_granted_for(anchor_number: AnchorNumber, origin: &FrontendHostnam
     storage_borrow(|storage| {
         storage
             .read_anchor_application_config(anchor_number, origin)
-            .and_then(|config| config.notifications_consented_at_ns)
-            .is_some()
+            .is_some_and(|config| config.notifications_allowed())
     })
 }
 
@@ -106,18 +106,32 @@ pub fn consent_granted(
     consent_granted_for(anchor_number, &origin)
 }
 
-/// Moves the one field this owns, leaving the rest of the app's config as it stands.
-fn write_consent(
+/// Records the identity's answer for notifications, leaving the rest of the app's config
+/// as it stands.
+///
+/// Only an answer that changes something is written, so `changed_at_ns` is when it last
+/// changed. Denying an app the identity never allowed decides nothing: it stays unset.
+fn write_notifications_decision(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
-    consented_at_ns: Option<Timestamp>,
+    allowed: bool,
     now_ns: Timestamp,
 ) -> Result<(), StorageError> {
     storage_borrow_mut(|storage| {
         let mut config = storage
             .read_anchor_application_config(anchor_number, origin)
             .unwrap_or_default();
-        config.notifications_consented_at_ns = consented_at_ns;
+        let unchanged = match config.notifications {
+            Some(decision) => decision.allowed == allowed,
+            None => !allowed,
+        };
+        if unchanged {
+            return Ok(());
+        }
+        config.notifications = Some(PermissionDecision {
+            allowed,
+            changed_at_ns: now_ns,
+        });
         storage.write_anchor_application_config(anchor_number, origin, config, now_ns)
     })
 }

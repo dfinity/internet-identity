@@ -186,9 +186,38 @@ jobs:
   # The Rust canister tests #
   ###########################
 
+  # A release tag on a commit from main skips the canister tests: main's own run
+  # already tested that commit, against the release then in production. On the
+  # tag's run the "previous" release would be the one this run is publishing,
+  # so the upgrade and rollback tests would compare it with itself, or fail
+  # while its assets are still uploading. A tag on a commit that is not on
+  # main (e.g. a hotfix) still runs them.
+  canister-tests-needed:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run=true
+          if [[ "$GITHUB_REF" == refs/tags/release-* ]]; then
+            # If the lookup fails, run the tests rather than skip them
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .status || echo unknown)
+            echo "$GITHUB_SHA compared to main: $status"
+            if [[ "$status" == "identical" || "$status" == "behind" ]]; then
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   # Run the tests, user the output of the docker build as Wasm module
   # (note: this runs _all_ cargo tests)
+  # canister-tests-run needs this job, so it is skipped along with it.
   canister-tests-build:
+    needs: canister-tests-needed
+    if: needs.canister-tests-needed.outputs.run == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -327,7 +356,13 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
-    needs: [docker-build-internet_identity, docker-build-archive]
+    needs:
+      [
+        canister-tests-needed,
+        docker-build-internet_identity,
+        docker-build-archive,
+      ]
+    if: needs.canister-tests-needed.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -608,92 +643,6 @@ jobs:
     needs: [e2e-playwright]
     steps:
       - run: echo e2e ok
-
-  # This deploys the production build to mainnet (to a canister that we use for release testing) alongside
-  # some other canisters useful for testing & playing with II.
-  deploy:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/release-')
-    needs: [docker-build-internet_identity, docker-build-archive]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install icp-cli
-        run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
-
-      - name: "Download II wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_backend.wasm.gz
-          path: .
-
-      - name: "Download archive wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: archive.wasm.gz
-          path: .
-
-      # Render the frontend canister's init_args file from the template
-      # so `icp.yaml`'s `init_args.path` resolves when icp-cli loads the
-      # project. This deploy targets mainnet via `--args` overrides, so
-      # the rendered placeholder content is never parsed.
-      - name: "Render frontend init_args stub"
-        run: scripts/render-local-init-args
-
-      - name: "Install key"
-        env:
-          ICP_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
-        run: |
-          key_pem=$(mktemp)
-          printenv "ICP_DEPLOY_KEY" > "$key_pem"
-          icp identity import --disable-encryption --force default "$key_pem"
-          rm "$key_pem"
-
-      - name: "Deploy II"
-        run: |
-          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          sha=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1 | sed 's/../\\&/g')
-          icp canister install y2aaj-miaaa-aaaad-aacxq-cai \
-            -e ic --proxy "$wallet" --mode upgrade \
-            --args "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
-            --wasm internet_identity_backend.wasm.gz
-
-      - name: "Fetch test app"
-        uses: ./.github/actions/fetch-test-app
-
-      - name: "Deploy test app"
-        run: |
-          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          icp canister install vt36r-2qaaa-aaaad-aad5a-cai \
-            -e ic --proxy "$wallet" --mode upgrade \
-            --wasm .test-app/test_app.wasm
-
-      - name: "Fetch VC issuer release"
-        uses: ./.github/actions/fetch-vc-issuer
-
-      - name: "Deploy Issuer"
-        run: |
-          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          icp canister install v2yvn-myaaa-aaaad-aad4q-cai \
-            -e ic --proxy "$wallet" --mode upgrade \
-            --wasm .vc-issuer/vc_demo_issuer.wasm.gz
-          ./scripts/provision-issuer \
-            --ii-canister-id y2aaj-miaaa-aaaad-aacxq-cai \
-            --icp-network ic \
-            --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \
-            --proxy "$wallet"
-
-      - name: "Deploy archive"
-        run: |
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          scripts/deploy-archive --wasm archive.wasm.gz --canister-id y2aaj-miaaa-aaaad-aacxq-cai --network ic
 
   # This prepares all the files necessary for a release (all flavors of Wasm, release notes).
   # On release tags, a new release is created and the assets are uploaded.

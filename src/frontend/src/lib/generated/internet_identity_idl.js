@@ -31,6 +31,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIdEmailVerification = IDL.Variant({
     'Google' : IDL.Null,
     'Unknown' : IDL.Null,
+    'Apple' : IDL.Null,
     'Microsoft' : IDL.Null,
   });
   const OpenIdConfig = IDL.Record({
@@ -203,6 +204,14 @@ export const idlFactory = ({ IDL }) => {
     'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
     'InternalCanisterError' : IDL.Text,
     'NoSuchSender' : IDL.Null,
+  });
+  const AppSsoDomainStatus = IDL.Variant({
+    'Available' : IDL.Record({ 'name' : IDL.Opt(IDL.Text) }),
+    'Unavailable' : IDL.Record({
+      'retry_after' : IDL.Opt(Timestamp),
+      'reason' : IDL.Opt(IDL.Text),
+    }),
+    'Pending' : IDL.Null,
   });
   const IdentityNumber = IDL.Nat64;
   const AuthnMethodProtection = IDL.Variant({
@@ -457,6 +466,14 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
+  const ForgetApplicationsRequest = IDL.Record({
+    'origins' : IDL.Vec(FrontendHostname),
+    'anchor_number' : UserNumber,
+  });
+  const ForgetApplicationsError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const Permissions = IDL.Variant({ 'all' : IDL.Null, 'queries' : IDL.Null });
   const AccountDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
@@ -642,6 +659,10 @@ export const idlFactory = ({ IDL }) => {
     'session_max_age_ns' : IDL.Nat64,
   });
   const SsoDiscoveryStatus = IDL.Variant({
+    'Failed' : IDL.Record({
+      'retry_after' : IDL.Opt(Timestamp),
+      'reason' : IDL.Opt(IDL.Text),
+    }),
     'Resolved' : SsoDiscovery,
     'Pending' : IDL.Null,
   });
@@ -783,7 +804,7 @@ export const idlFactory = ({ IDL }) => {
     'origin' : FrontendHostname,
     'notifications_allowed' : IDL.Bool,
     'last_notified' : IDL.Opt(Timestamp),
-    'last_used' : Timestamp,
+    'last_used' : IDL.Opt(Timestamp),
   });
   const ListApplicationsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -1127,6 +1148,12 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'app_sso_domain_check' : IDL.Func([IDL.Text], [], []),
+    'app_sso_domain_status' : IDL.Func(
+        [IDL.Text],
+        [AppSsoDomainStatus],
+        ['query'],
+      ),
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],
@@ -1320,6 +1347,11 @@ export const idlFactory = ({ IDL }) => {
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
+    'forget_applications' : IDL.Func(
+        [ForgetApplicationsRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ForgetApplicationsError })],
+        [],
+      ),
     'get_account_delegation' : IDL.Func(
         [
           UserNumber,
@@ -1839,6 +1871,7 @@ export const init = ({ IDL }) => {
   const OpenIdEmailVerification = IDL.Variant({
     'Google' : IDL.Null,
     'Unknown' : IDL.Null,
+    'Apple' : IDL.Null,
     'Microsoft' : IDL.Null,
   });
   const OpenIdConfig = IDL.Record({

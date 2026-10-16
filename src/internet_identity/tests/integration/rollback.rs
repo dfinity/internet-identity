@@ -6,7 +6,9 @@ use canister_tests::api::internet_identity::api_v2::create_account;
 use canister_tests::api::internet_identity::api_v2::get_accounts;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use internet_identity_interface::internet_identity::types::DeviceData;
+use internet_identity_interface::internet_identity::types::{
+    DeviceData, InternetIdentityInit, OpenIdConfig, OpenIdEmailVerificationScheme,
+};
 
 /// Tests simple upgrade and downgrade.
 #[test]
@@ -17,6 +19,69 @@ fn ii_canister_can_be_upgraded_and_rolled_back() {
     api::health_check(&env, canister_id);
     upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
     api::health_check(&env, canister_id);
+}
+
+/// Verifies that the `Apple` email verification scheme doesn't block a
+/// rollback: a previous release that doesn't know it yet reads it as no
+/// scheme, and keeps the other providers' schemes.
+#[test]
+fn should_roll_back_with_apple_email_verification_scheme() {
+    let env = env();
+    let provider = |name: &str, issuer: &str, scheme| OpenIdConfig {
+        name: name.into(),
+        logo: String::new(),
+        issuer: issuer.into(),
+        client_id: "app.example.com".into(),
+        jwks_uri: format!("{issuer}/keys"),
+        auth_uri: format!("{issuer}/authorize"),
+        auth_scope: vec!["openid".into(), "email".into()],
+        fedcm_uri: None,
+        email_verification: Some(scheme),
+        seed_jwks: None,
+    };
+    let google = provider(
+        "Google",
+        "https://accounts.google.com",
+        OpenIdEmailVerificationScheme::Google,
+    );
+    let apple = provider(
+        "Apple",
+        "https://appleid.apple.com",
+        OpenIdEmailVerificationScheme::Apple,
+    );
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            openid_configs: Some(vec![google.clone(), apple.clone()]),
+            ..Default::default()
+        }),
+    );
+
+    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+    api::health_check(&env, canister_id);
+
+    let configs = api::config(&env, canister_id)
+        .unwrap()
+        .openid_configs
+        .unwrap();
+    assert_eq!(configs.len(), 2);
+    assert_eq!(configs[0], google);
+    // `None` while the previous release predates the scheme, `Apple` after.
+    assert!(matches!(
+        configs[1].email_verification,
+        None | Some(OpenIdEmailVerificationScheme::Apple)
+    ));
+    assert_eq!(
+        OpenIdConfig {
+            email_verification: None,
+            ..configs[1].clone()
+        },
+        OpenIdConfig {
+            email_verification: None,
+            ..apple
+        }
+    );
 }
 
 /// Tests that the devices can still be read after upgrade and rollback.

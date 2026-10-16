@@ -1,6 +1,6 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
-use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
+use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::browser_description::StorableBrowserDescription;
@@ -335,7 +335,7 @@ impl From<OpenIdCredential> for OpenIdCredentialData {
             aud: openid_credential.aud,
             last_usage_timestamp: openid_credential.last_usage_timestamp,
             metadata: openid_credential.metadata,
-            sso_domain: openid_credential.sso_domain,
+            sso_domain: openid_credential.sso_domain.map(String::from),
             sso_name: openid_credential.sso_name,
         }
     }
@@ -349,7 +349,7 @@ impl From<OpenIdCredentialData> for OpenIdCredential {
             aud: openid_credential.aud,
             last_usage_timestamp: openid_credential.last_usage_timestamp,
             metadata: openid_credential.metadata,
-            sso_domain: openid_credential.sso_domain,
+            sso_domain: openid_credential.sso_domain.map(Domain::from_stored),
             sso_name: openid_credential.sso_name,
             // The candid `OpenIdCredentialData` deliberately has no `stable_id`;
             // the SSO write path sets it explicitly on the primary credential.

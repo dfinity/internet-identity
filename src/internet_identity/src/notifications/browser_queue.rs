@@ -132,7 +132,7 @@ pub(crate) fn next_to_show(
                 };
                 storage
                     .read_anchor_application_config(anchor_number, &notification.origin)
-                    .and_then(|config| config.notifications_consented_at_ns)
+                    .filter(|config| config.notifications_allowed())
                     .map(|_| notification)
             })
     })
@@ -170,7 +170,7 @@ pub(crate) fn remove_shown(
 mod tests {
     use super::*;
     use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
-    use crate::notifications::write_consent;
+    use crate::notifications::write_notifications_decision;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::NotificationRevokeConsentRequest;
     use pretty_assertions::assert_eq;
@@ -261,7 +261,8 @@ mod tests {
             .expect("signing in registers the browser")
             .id;
         subscribe(anchor_number, browser_id, RELAY, 0);
-        write_consent(anchor_number, &ORIGIN.to_string(), Some(0), 0).expect("granting consent");
+        write_notifications_decision(anchor_number, &ORIGIN.to_string(), true, 0)
+            .expect("granting consent");
         (anchor_number, browser_id)
     }
 
@@ -399,7 +400,7 @@ mod tests {
     fn an_app_that_lost_consent_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
-        write_consent(anchor_number, &ORIGIN.to_string(), None, SECOND_NS)
+        write_notifications_decision(anchor_number, &ORIGIN.to_string(), false, SECOND_NS)
             .expect("revoking consent");
 
         assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
@@ -418,13 +419,8 @@ mod tests {
             SECOND_NS,
         )
         .expect("revoking consent");
-        write_consent(
-            anchor_number,
-            &ORIGIN.to_string(),
-            Some(SECOND_NS),
-            SECOND_NS,
-        )
-        .expect("granting consent again");
+        write_notifications_decision(anchor_number, &ORIGIN.to_string(), true, SECOND_NS)
+            .expect("granting consent again");
 
         assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
         assert!(left_for(anchor_number, browser_id).is_empty());

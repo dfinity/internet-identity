@@ -455,6 +455,10 @@ type OpenIdEmailVerification = variant {
     Unknown;
     Google;
     Microsoft;
+    // Trusts email_verified like Google. Apple's private relay addresses,
+    // which only senders registered with II's Apple developer team can deliver
+    // mail to, are not kept on the credential at all.
+    Apple;
 };
 
 type OpenIdConfig = record {
@@ -495,12 +499,24 @@ type SsoDiscovery = record {
     session_max_age_ns : nat64;
 };
 
-// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
-// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
-// times out — so the statuses are: resolved, or in flight.
+// Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
+// `Failed.retry_after` is when II fetches the domain again (a retry before then
+// fails the same way), and is absent when no retry can help, such as a value
+// that is not a domain. `reason` explains the failure, to show as is, when II
+// has one.
 type SsoDiscoveryStatus = variant {
     Resolved : SsoDiscovery;
     Pending;
+    Failed : record { retry_after : opt Timestamp; reason : opt text };
+};
+
+// Whether an organization domain can be used for SSO sign-in, read by
+// `app_sso_domain_status`. `name` is the organization's display name;
+// `retry_after` and `reason` are as for `SsoDiscoveryStatus.Failed`.
+type AppSsoDomainStatus = variant {
+    Available : record { name : opt text };
+    Pending;
+    Unavailable : record { retry_after : opt Timestamp; reason : opt text };
 };
 
 // Request for `get_sso_discovery_status`.
@@ -1513,15 +1529,15 @@ type AccountUpdate = record {
     name : opt text;
 };
 
-// An app the identity has signed in to, for the user's own list of their apps. Only
-// apps some account was used at: consent, a named account or a chosen default can each
-// be stored at an app the identity never signed in to.
+// An app the identity decided a permission for, allowed or denied, for the user's own
+// list of their apps.
 type ApplicationInfo = record {
     // The origin the app's identity is derived for: what its accounts and its
     // notification consent are stored under.
     origin : FrontendHostname;
-    // The latest sign-in to any of the identity's accounts at the app.
-    last_used : Timestamp;
+    // The latest sign-in to any of the identity's accounts at the app, or null where
+    // none was used.
+    last_used : opt Timestamp;
     // Whether the app may notify the identity: it holds consent, and this deployment
     // notifies for it, as notification_consent_granted answers.
     notifications_allowed : bool;
@@ -1535,6 +1551,17 @@ type ListApplicationsRequest = record {
 };
 
 type ListApplicationsError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type ForgetApplicationsRequest = record {
+    anchor_number : UserNumber;
+    // As list_applications spells them.
+    origins : vec FrontendHostname;
+};
+
+type ForgetApplicationsError = variant {
     Unauthorized : principal;
     InternalCanisterError : text;
 };
@@ -2117,17 +2144,23 @@ service : (opt InternetIdentityInit) -> {
     openid_prepare_delegation : (JWT, Salt, SessionKey, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
-    // SSO discovery for the sign-in initiation flow. The frontend polls
-    // `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
-    // on-demand two-hop discovery fetch with `discover_sso` (update); once the
-    // fetch completes the query returns `Resolved` with the config. The frontend
-    // calls `discover_sso` once more on `Resolved`, which refreshes a stale
-    // result and fetches the domain's keys ahead of verification.
+    // SSO discovery for the sign-in initiation flow. The frontend calls
+    // `discover_sso` (update) once, which starts the two-hop discovery fetch and
+    // the domain's key fetch, or refreshes a stale result, then polls
+    // `get_sso_discovery_status` (query) until it reads `Resolved` or `Failed`.
     //
     // The optional second argument is the target dapp origin; when supplied,
     // `resolved_client_id` reports the client that origin must use (`null` = denied).
     discover_sso : (text) -> ();
     get_sso_discovery_status : (GetSsoDiscoveryStatusRequest) -> (SsoDiscoveryStatus) query;
+
+    // Whether an organization domain can be used for SSO sign-in, for apps that
+    // check a domain before sending the user into the flow. Call
+    // `app_sso_domain_check` (update) once to start the fetch, then poll
+    // `app_sso_domain_status` (query) until it reads `Available` or
+    // `Unavailable`.
+    app_sso_domain_check : (text) -> ();
+    app_sso_domain_status : (text) -> (AppSsoDomainStatus) query;
 
     // SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
     // client the target origin resolves to. `Pending` means the discovery/JWKS
@@ -2255,9 +2288,14 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
     ) -> (variant { Ok : vec AccountInfo; Err: GetAccountsError }) query;
 
-    // Every app the identity holds accounts at, so the user can see where they have
-    // signed in. Authorized by the identity's own access methods.
+    // Every app the identity decided a permission for, so the user can change or forget
+    // what they decided. Authorized by the identity's own access methods.
     list_applications : (ListApplicationsRequest) -> (variant { Ok : vec ApplicationInfo; Err : ListApplicationsError }) query;
+    // Undoes every permission decision for the apps, drops what they queued for the
+    // identity's browsers and signs out every session at them, as one write. Accounts and
+    // the default account stay. An origin the identity holds nothing at is already
+    // forgotten.
+    forget_applications : (ForgetApplicationsRequest) -> (variant { Ok; Err : ForgetApplicationsError });
 
     create_account : (
         anchor_number : UserNumber,
