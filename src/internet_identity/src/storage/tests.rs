@@ -7,7 +7,7 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::account::AccountReference;
 use crate::storage::account::{Account, AccountKey};
-use crate::storage::anchor::{Anchor, Device};
+use crate::storage::anchor::{Anchor, Device, MAX_BROWSERS};
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::{AccountReferenceListWrite, AccountReferenceWrite};
@@ -7575,13 +7575,10 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     );
 }
 
-/// An anchor at `anchor_number` with one browser registered, whose id is 0.
-fn anchor_with_browser(
-    storage: &mut Storage<VectorMemory>,
-    anchor_number: AnchorNumber,
-) -> crate::storage::anchor::Anchor {
+/// The next anchor the allocator hands out, with one browser registered, whose id is 0
+/// and whose `last_used` is 0.
+fn anchor_with_browser(storage: &mut Storage<VectorMemory>) -> Anchor {
     let mut anchor = storage.allocate_anchor(0).expect("allocating an anchor");
-    assert_eq!(anchor.anchor_number(), anchor_number);
     anchor
         .resolve_browser(browser_key(1, 0), browser_key(1, 1), description(1), 0)
         .expect("registering a browser");
@@ -7592,15 +7589,14 @@ fn anchor_with_browser(
 /// the one whose token installed it.
 #[test]
 fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
 
-    for anchor_number in [10_000, 10_001] {
-        let mut anchor = anchor_with_browser(&mut storage, anchor_number);
+    for _ in 0..2 {
+        let mut anchor = anchor_with_browser(&mut storage);
         anchor.point_at_notification_app(0, app.id);
         storage.write(anchor).expect("writing the anchor");
     }
@@ -7616,18 +7612,20 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
 /// reference and the app would be making a fresh record by then.
 #[test]
 fn an_app_nothing_points_at_is_deleted() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
-    let mut anchor = anchor_with_browser(&mut storage, 10_000);
+    let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
     storage.write(anchor).expect("pointing at the app");
 
+    let replacement = storage
+        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.stop_pointing_at_notification_app(0);
+    anchor.point_at_notification_app(0, replacement.id);
     storage.write(anchor).expect("dropping the reference");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
@@ -7641,20 +7639,22 @@ fn an_app_nothing_points_at_is_deleted() {
 /// at it: the app is one thing on the device, shared by everyone who claimed it.
 #[test]
 fn an_app_outlives_one_identity_letting_go_of_it() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
         .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
-    for anchor_number in [10_000, 10_001] {
-        let mut anchor = anchor_with_browser(&mut storage, anchor_number);
+    for _ in 0..2 {
+        let mut anchor = anchor_with_browser(&mut storage);
         anchor.point_at_notification_app(0, app.id);
         storage.write(anchor).expect("writing the anchor");
     }
 
+    let replacement = storage
+        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.stop_pointing_at_notification_app(0);
+    anchor.point_at_notification_app(0, replacement.id);
     storage.write(anchor).expect("dropping one reference");
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
