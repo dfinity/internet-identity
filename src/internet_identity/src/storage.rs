@@ -1538,6 +1538,16 @@ impl<M: Memory + Clone> Storage<M> {
 
         for app_id in previous.difference(&current) {
             let Some(anchors) = self.lookup_anchors_with_notification_app_memory.get(app_id) else {
+                // Every pointer is written through this index, so the app a browser pointed
+                // at has an entry naming this anchor. There is no reference left to count
+                // down and nothing here can rebuild one, so the write carries on: an anchor
+                // must not fail over bookkeeping it cannot fix.
+                ic_cdk::println!(
+                    "ERROR: Anchor number {} stopped pointing at notification app {}, which has \
+                     no index entry.",
+                    anchor_number,
+                    app_id,
+                );
                 continue;
             };
             let remaining: Vec<AnchorNumber> = Vec::from(anchors)
@@ -1582,6 +1592,14 @@ impl<M: Memory + Clone> Storage<M> {
     /// it: the allocator never looks back, so nothing is ever handed this one again.
     fn delete_notification_app(&mut self, app_id: NotificationAppId) {
         let Some(app) = self.notification_app_memory.remove(&app_id) else {
+            // An id is handed out with the record it names and retired with it, so an id
+            // reaching here names a record. Without the record there is no key, so the
+            // principal that resolves to it cannot be derived, and its lookup entry is
+            // left naming a record that is not there.
+            ic_cdk::println!(
+                "ERROR: Notification app {} has no record to forget.",
+                app_id,
+            );
             return;
         };
         self.lookup_notification_app_with_principal_memory
