@@ -340,8 +340,10 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 // ---- Notifications: called by II's frontend / service worker ----
 
-/// Authorized by the browser key the caller signs with, which is what says whose
-/// subscription this is: the row it writes is the caller's own.
+/// Authorized by the key the caller signs with, a browser's or the key of the Home
+/// Screen app a browser of this identity points at, which is what says whose
+/// subscription this is: the row it writes is the caller's own, a browser's being its
+/// entry and an app's being its record.
 #[update]
 fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
@@ -359,12 +361,13 @@ fn set_webpush_subscription(
     )
 }
 
-/// Authorized by the browser key the caller signs with, like the write it reconciles
-/// against: a browser asks about its own registration, so the key that says which
-/// browser is asking is also the answer to which one to report.
+/// Authorized by the key the caller signs with, like the write it reconciles against: a
+/// browser, or the Home Screen app it points at, asks about its own registration, so the
+/// key that says who is asking is also the answer to which registration to report.
 ///
-/// `None` for a deployment that does not notify and for a caller that is no browser of
-/// this identity, so neither can be probed with it.
+/// `None` for a deployment that does not notify and for a caller that is neither a
+/// browser of this identity nor an app one of its browsers points at, so neither can be
+/// probed with it.
 #[query]
 fn get_webpush_subscription_status(
     request: GetWebPushSubscriptionStatusRequest,
