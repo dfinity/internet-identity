@@ -24,6 +24,14 @@ pub fn set_subscription(
     request: ValidatedSetWebPushSubscriptionRequest,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
+    // Where the caller is the Home Screen app, what it registers belongs to its record
+    // rather than to this entry: it has one service worker registration however many
+    // identities point at it, and every one of them is delivered through it. The anchor
+    // named in the call is what authorized it, not where the subscription goes.
+    if let NotificationCaller::App(app) = caller {
+        return set_app_subscription(app, request, now_ns);
+    }
+
     let ValidatedSetWebPushSubscriptionRequest {
         anchor_number: _,
         endpoint,
@@ -32,21 +40,6 @@ pub fn set_subscription(
         jwt_issued_at_ns,
         ..
     } = request;
-
-    // Where the caller is the Home Screen app, what it registers belongs to its record
-    // rather than to this entry: it has one service worker registration however many
-    // identities point at it, and every one of them is delivered through it. The anchor
-    // named in the call is what authorized it, not where the subscription goes.
-    if let NotificationCaller::App(app) = caller {
-        return set_app_subscription(
-            app,
-            endpoint,
-            vapid_public_key,
-            jwt_signatures,
-            jwt_issued_at_ns,
-            now_ns,
-        );
-    }
 
     // The same endpoint means this replaces the pool on a registration that is still
     // live, so the registration keeps its age and its queue, and the pool has to move
@@ -154,12 +147,18 @@ fn write_subscription(
 /// opened again.
 fn set_app_subscription(
     app: NotificationApp,
-    endpoint: String,
-    vapid_public_key: Vec<u8>,
-    jwt_signatures: Vec<Vec<u8>>,
-    jwt_issued_at_ns: Timestamp,
+    request: ValidatedSetWebPushSubscriptionRequest,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
+    let ValidatedSetWebPushSubscriptionRequest {
+        anchor_number: _,
+        endpoint,
+        vapid_public_key,
+        jwt_signatures,
+        jwt_issued_at_ns,
+        ..
+    } = request;
+
     // Same reasoning as a browser's: the same endpoint is a pool replacement on a live
     // registration, which keeps its age and must move forward, and any other endpoint is
     // a registration of its own.
@@ -189,10 +188,9 @@ fn set_app_subscription(
         )
     });
     if !stored {
-        return Err(SetWebPushSubscriptionError::InternalCanisterError(format!(
-            "no notification app record {}",
-            app.id
-        )));
+        return Err(SetWebPushSubscriptionError::InternalCanisterError(
+            "no notification app record".to_string(),
+        ));
     }
     Ok(())
 }
