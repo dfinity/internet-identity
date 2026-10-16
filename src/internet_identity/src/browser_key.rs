@@ -25,6 +25,14 @@ const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 /// prefix is defence in depth for a later change that makes two messages the same shape.
 const NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-link";
 
+/// A fourth prefix, for the token a browser signs to let another identity on the device
+/// point at the Home Screen app this one installed.
+///
+/// As with the link token, the messages cannot collide: a claim token covers two anchor
+/// numbers and an expiry, one number more than a link token does. The prefix is defence
+/// in depth for a later change that makes two messages the same shape.
+const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
+
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
 const BROWSER_KEY_SIGNATURE_BYTES: usize = 64;
 
@@ -113,6 +121,32 @@ pub fn verify_notification_app_link(
     )
 }
 
+/// Whether `key` signed a claim token handing the app it points at to
+/// `claiming_anchor_number`, expiring at `expires_at_ns`.
+///
+/// Both anchor numbers are covered: the offering one so a token cannot be spent against
+/// another identity's browser list, and the claiming one so the identity it was signed
+/// for is the only one that can spend it. The expiry is covered so it cannot be
+/// extended. Nothing says which app it is, because the signer has only one per browser
+/// and the identity spending the token is never told which record it reached.
+pub fn verify_notification_app_claim(
+    key: &PublicKey,
+    signature: &[u8],
+    offering_anchor_number: u64,
+    claiming_anchor_number: u64,
+    expires_at_ns: u64,
+) -> bool {
+    verify(
+        key,
+        signature,
+        &claim_token_message(
+            offering_anchor_number,
+            claiming_anchor_number,
+            expires_at_ns,
+        ),
+    )
+}
+
 /// What a browser presents and what it signs, for tests of the callers that verify one.
 ///
 /// Lives here so the encodings are written once: a test elsewhere that built its own
@@ -157,12 +191,40 @@ pub mod test_keys {
         let signature: Signature = key.sign(&link_token_message(anchor_number, expires_at_ns));
         signature.to_bytes().to_vec()
     }
+
+    /// A claim token as the identity that has the app mints one.
+    pub fn claim_token(
+        key: &SigningKey,
+        offering_anchor_number: u64,
+        claiming_anchor_number: u64,
+        expires_at_ns: u64,
+    ) -> Vec<u8> {
+        let signature: Signature = key.sign(&claim_token_message(
+            offering_anchor_number,
+            claiming_anchor_number,
+            expires_at_ns,
+        ));
+        signature.to_bytes().to_vec()
+    }
 }
 
 fn link_token_message(anchor_number: u64, expires_at_ns: u64) -> Vec<u8> {
     let mut message = Vec::with_capacity(NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN.len() + 16);
     message.extend_from_slice(NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN);
     message.extend_from_slice(&anchor_number.to_be_bytes());
+    message.extend_from_slice(&expires_at_ns.to_be_bytes());
+    message
+}
+
+fn claim_token_message(
+    offering_anchor_number: u64,
+    claiming_anchor_number: u64,
+    expires_at_ns: u64,
+) -> Vec<u8> {
+    let mut message = Vec::with_capacity(NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN.len() + 24);
+    message.extend_from_slice(NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN);
+    message.extend_from_slice(&offering_anchor_number.to_be_bytes());
+    message.extend_from_slice(&claiming_anchor_number.to_be_bytes());
     message.extend_from_slice(&expires_at_ns.to_be_bytes());
     message
 }
@@ -243,6 +305,20 @@ mod tests {
 
         fn link_token(&self, anchor_number: u64, expires_at_ns: u64) -> Vec<u8> {
             super::test_keys::link_token(&self.signing, anchor_number, expires_at_ns)
+        }
+
+        fn claim_token(
+            &self,
+            offering_anchor_number: u64,
+            claiming_anchor_number: u64,
+            expires_at_ns: u64,
+        ) -> Vec<u8> {
+            super::test_keys::claim_token(
+                &self.signing,
+                offering_anchor_number,
+                claiming_anchor_number,
+                expires_at_ns,
+            )
         }
     }
 
@@ -536,6 +612,137 @@ mod tests {
         assert!(!verify_notification_app_link(
             &browser.public,
             &browser.successor(&session, &next.public),
+            10_000,
+            5_000,
+        ));
+    }
+
+    #[test]
+    fn a_browser_key_signs_a_claim_token_for_its_own_anchors_and_expiry() {
+        let browser = key(1);
+
+        assert!(verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_001,
+            5_000,
+        ));
+    }
+
+    /// The claiming anchor is covered, so the identity the app was handed to is the only
+    /// one that can point at it.
+    #[test]
+    fn a_claim_token_does_not_verify_for_another_claiming_anchor() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_002,
+            5_000,
+        ));
+    }
+
+    /// The offering anchor is covered, so a token cannot be presented against another
+    /// identity's browser list.
+    #[test]
+    fn a_claim_token_does_not_verify_for_another_offering_anchor() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_002,
+            10_001,
+            5_000,
+        ));
+    }
+
+    /// The expiry is covered, so a holder cannot extend it by asking for longer.
+    #[test]
+    fn a_claim_token_does_not_verify_for_a_later_expiry() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_001,
+            6_000,
+        ));
+    }
+
+    #[test]
+    fn another_key_does_not_verify_a_claim_token() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &key(2).public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_001,
+            5_000,
+        ));
+    }
+
+    /// The exact bytes a claim token is signed over, for anchor 10000 handing its app to
+    /// anchor 10001, expiring at 5000.
+    ///
+    /// Pinned on both sides for the same reason the link token's message is: the browser
+    /// signs this message and the canister rebuilds it, so a change to either layout is
+    /// a failing test rather than tokens this canister quietly refuses.
+    #[test]
+    fn the_claim_token_message_is_the_bytes_the_frontend_signs() {
+        assert_eq!(
+            hex::encode(claim_token_message(10_000, 10_001, 5_000)),
+            "69692d6e6f74696669636174696f6e2d6170702d636c61696d0000000000002710000000000000271100\
+             00000000001388"
+        );
+    }
+
+    /// Neither of the signatures a browser makes to sign in is accepted as a claim token,
+    /// which is what stops every sign-in from being a capability over the app.
+    #[test]
+    fn a_sign_in_signature_is_not_accepted_as_a_claim_token() {
+        let browser = key(1);
+        let next = key(2);
+        let session = session_key(3);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.current(&session, &next.public),
+            10_000,
+            10_001,
+            5_000,
+        ));
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.successor(&session, &next.public),
+            10_000,
+            10_001,
+            5_000,
+        ));
+    }
+
+    /// The two notification tokens are not each other: a link token hands a record to an
+    /// app, a claim token hands it to another identity, and either spent in the other's
+    /// place would be an authority its signer never gave.
+    #[test]
+    fn a_link_token_and_a_claim_token_are_not_interchangeable() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.link_token(10_000, 5_000),
+            10_000,
+            10_001,
+            5_000,
+        ));
+        assert!(!verify_notification_app_link(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
             10_000,
             5_000,
         ));

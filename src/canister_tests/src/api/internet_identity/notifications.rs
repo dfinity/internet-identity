@@ -2,8 +2,9 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, GetNextNotificationError,
-    GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationDelegationRequest,
+    AnchorNumber, BrowserId, ClaimNotificationAppError, ClaimNotificationAppRequest,
+    FrontendHostname, GetNextNotificationError, GetNextNotificationRequest,
+    GetNextNotificationResponse, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
     LinkNotificationAppError, LinkNotificationAppRequest, NotificationConsentGrantedRequest,
     NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
@@ -225,4 +226,21 @@ pub fn notification_app_anchors(
     sender: Principal,
 ) -> Result<Vec<AnchorNumber>, RejectResponse> {
     query_candid_as(env, canister_id, sender, "notification_app_anchors", ()).map(|(x,)| x)
+}
+
+pub fn claim_notification_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: ClaimNotificationAppRequest,
+) -> Result<Result<(), ClaimNotificationAppError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "claim_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
 }

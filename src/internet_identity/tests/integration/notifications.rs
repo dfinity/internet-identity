@@ -4,20 +4,20 @@ use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
     browser_get_next_notification, browser_remove_notification, consent_granted, grant_consent,
-    revoke_consent,
+    link_notification_app, revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
-    arg_with_captcha_disabled, arg_with_notifications_enabled, env, install_ii_canister_with_arg,
-    principal_1, principal_2, upgrade_ii_canister, upgrade_ii_canister_with_arg, BrowserKey,
-    II_WASM,
+    arg_with_captcha_disabled, arg_with_notifications_enabled, device_data_2, env,
+    install_ii_canister_with_arg, principal_1, principal_2, upgrade_ii_canister,
+    upgrade_ii_canister_with_arg, BrowserKey, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
     GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
-    NotificationGrantConsentError, NotificationRevokeConsentError, NotificationToShow,
-    OperatingSystem, PrepareAccountSessionRequest, RemoveNotificationError,
+    LinkNotificationAppRequest, NotificationGrantConsentError, NotificationRevokeConsentError,
+    NotificationToShow, OperatingSystem, PrepareAccountSessionRequest, RemoveNotificationError,
     RemoveNotificationRequest, RemoveNotificationResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
@@ -1300,61 +1300,57 @@ mod browser_queue {
     }
 }
 
+/// Well inside the half hour a token may claim, so the window holds however many rounds
+/// a test spends before spending it.
+const TOKEN_VALID_FOR_NS: u64 = 3 * 60 * 1_000_000_000;
+
+/// A canister that notifies, and two identities signed in from a browser each:
+/// `principal_1` on the first, `principal_2` on the second.
+fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
+    let canister_id =
+        install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
+    let first = flows::register_anchor(env, canister_id);
+    sign_in_at(env, canister_id, first, ORIGIN, 1);
+    let second = flows::register_anchor_with_device(env, canister_id, &device_data_2());
+    sign_in_as(env, canister_id, principal_2(), second, ORIGIN, 2);
+    (canister_id, first, second)
+}
+
+/// Installs the Home Screen app `app_seed` names on `anchor`, spending a token the
+/// browser `browser_seed` names signed. Answers the principal the app signs as.
+fn link_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    anchor: AnchorNumber,
+    browser_seed: u8,
+    app_seed: u8,
+) -> Principal {
+    let app = BrowserKey::new(app_seed);
+    let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + TOKEN_VALID_FOR_NS;
+    link_notification_app(
+        env,
+        canister_id,
+        app.principal(),
+        LinkNotificationAppRequest {
+            anchor_number: anchor,
+            app_key: app.public_key(),
+            expires_at_ns,
+            // The successor the sign-in announced, which is the key the browser is left
+            // holding and the only one a link token is honoured from.
+            signature: BrowserKey::new(browser_seed)
+                .successor()
+                .sign_link_token(anchor, expires_at_ns),
+        },
+    )
+    .expect("link_notification_app rejected")
+    .expect("link_notification_app returned Err");
+    app.principal()
+}
+
 mod app_anchors {
     use super::*;
-    use canister_tests::api::internet_identity::notifications::{
-        link_notification_app, notification_app_anchors,
-    };
-    use canister_tests::framework::device_data_2;
-    use internet_identity_interface::internet_identity::types::LinkNotificationAppRequest;
+    use canister_tests::api::internet_identity::notifications::notification_app_anchors;
     use pretty_assertions::assert_eq;
-
-    /// What the tests here claim as a token's expiry: long enough that the window is
-    /// still open after however many rounds a test spends before spending it.
-    const LINK_TOKEN_VALID_FOR_NS: u64 = 3 * 60 * 1_000_000_000;
-
-    /// A canister that notifies, and two identities signed in from a browser each:
-    /// `principal_1` on the first, `principal_2` on the second.
-    fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
-        let canister_id =
-            install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
-        let first = flows::register_anchor(env, canister_id);
-        sign_in_at(env, canister_id, first, ORIGIN, 1);
-        let second = flows::register_anchor_with_device(env, canister_id, &device_data_2());
-        sign_in_as(env, canister_id, principal_2(), second, ORIGIN, 2);
-        (canister_id, first, second)
-    }
-
-    /// Installs the Home Screen app `app_seed` names on `anchor`, spending a token the
-    /// browser `browser_seed` names signed. Answers the principal the app signs as.
-    fn link_app(
-        env: &PocketIc,
-        canister_id: CanisterId,
-        anchor: AnchorNumber,
-        browser_seed: u8,
-        app_seed: u8,
-    ) -> Principal {
-        let app = BrowserKey::new(app_seed);
-        let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + LINK_TOKEN_VALID_FOR_NS;
-        link_notification_app(
-            env,
-            canister_id,
-            app.principal(),
-            LinkNotificationAppRequest {
-                anchor_number: anchor,
-                app_key: app.public_key(),
-                expires_at_ns,
-                // The successor the sign-in announced, which is the key the browser is
-                // left holding and the only one a link token is honoured from.
-                signature: BrowserKey::new(browser_seed)
-                    .successor()
-                    .sign_link_token(anchor, expires_at_ns),
-            },
-        )
-        .expect("link_notification_app rejected")
-        .expect("link_notification_app returned Err");
-        app.principal()
-    }
 
     /// The whole of what an app may learn: the identities whose browsers point at it,
     /// and nothing about the identities pointing at the app next to it on the device.
@@ -1458,6 +1454,149 @@ mod app_anchors {
             notification_app_anchors(&env, canister_id, second)?,
             vec![anchor]
         );
+        Ok(())
+    }
+}
+
+/// A second identity on the device pointing at the app the first one installed, which is
+/// one call carrying a signature and nothing stored in between.
+mod claims {
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        claim_notification_app, notification_app_anchors,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        ClaimNotificationAppError, ClaimNotificationAppRequest,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// An expiry a token minted now may claim.
+    fn expires_at(env: &PocketIc) -> u64 {
+        env.get_time().as_nanos_since_unix_epoch() + TOKEN_VALID_FOR_NS
+    }
+
+    /// Points the browser `claiming_browser_seed` names at the app the identity on
+    /// `offering_browser_seed` has, with a token that browser signed.
+    fn claim(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        claiming: (AnchorNumber, u8),
+        offering: (AnchorNumber, u8),
+        expires_at_ns: u64,
+    ) -> Result<Result<(), ClaimNotificationAppError>, RejectResponse> {
+        let (claiming_anchor, claiming_browser_seed) = claiming;
+        let (offering_anchor, offering_browser_seed) = offering;
+        claim_notification_app(
+            env,
+            canister_id,
+            BrowserKey::new(claiming_browser_seed)
+                .successor()
+                .principal(),
+            ClaimNotificationAppRequest {
+                anchor_number: claiming_anchor,
+                offering_anchor_number: offering_anchor,
+                expires_at_ns,
+                // The successor the sign-in announced, which is the key the browser is
+                // left holding and the only one a claim token is honoured from.
+                signature: BrowserKey::new(offering_browser_seed)
+                    .successor()
+                    .sign_claim_token(offering_anchor, claiming_anchor, expires_at_ns),
+            },
+        )
+    }
+
+    /// The app is already installed and already registered for push, so the identity
+    /// that claims it is one this canister delivers for the moment the call returns.
+    #[test]
+    fn should_deliver_for_a_second_identity_after_one_call() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, first, 1, 100);
+
+        claim(&env, canister_id, (second, 2), (first, 1), expires_at(&env))?
+            .expect("claim_notification_app returned Err");
+
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, app)?,
+            vec![first, second]
+        );
+        Ok(())
+    }
+
+    /// The claiming identity's own consent is what the caller check is: a browser of
+    /// another identity cannot route this one's notifications through an app.
+    #[test]
+    fn should_refuse_a_claim_for_an_anchor_the_caller_is_no_browser_of(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, first, 1, 100);
+
+        // Everything the offering identity signed, presented by its own browser rather
+        // than by a browser of the identity the token names.
+        assert_eq!(
+            claim(&env, canister_id, (second, 1), (first, 1), expires_at(&env))?,
+            Err(ClaimNotificationAppError::InvalidBrowserKey)
+        );
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, app)?,
+            vec![first]
+        );
+        Ok(())
+    }
+
+    /// A signature from a browser with no app hands over nothing, and says so rather
+    /// than writing a reference to a record that does not exist.
+    #[test]
+    fn should_refuse_a_claim_whose_offering_browser_points_at_nothing() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+
+        assert_eq!(
+            claim(&env, canister_id, (second, 2), (first, 1), expires_at(&env))?,
+            Err(ClaimNotificationAppError::NoNotificationApp)
+        );
+        Ok(())
+    }
+
+    /// A browser key retired long ago can still have signed a token, so the expiry is
+    /// bounded at both ends and a token past it is worth nothing.
+    #[test]
+    fn should_refuse_an_expired_claim_token() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, first, 1, 100);
+
+        let now = env.get_time().as_nanos_since_unix_epoch();
+        assert_eq!(
+            claim(&env, canister_id, (second, 2), (first, 1), now)?,
+            Err(ClaimNotificationAppError::ClaimTokenExpired)
+        );
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, app)?,
+            vec![first]
+        );
+        Ok(())
+    }
+
+    /// Replay is idempotent: the second call points the same browser at the record it
+    /// already points at, which is why the token needs no nonce and nothing is stored.
+    #[test]
+    fn should_accept_the_same_claim_token_twice() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, first, 1, 100);
+        let expires_at_ns = expires_at(&env);
+
+        for _ in 0..2 {
+            claim(&env, canister_id, (second, 2), (first, 1), expires_at_ns)?
+                .expect("claim_notification_app returned Err");
+            assert_eq!(
+                notification_app_anchors(&env, canister_id, app)?,
+                vec![first, second]
+            );
+        }
         Ok(())
     }
 }

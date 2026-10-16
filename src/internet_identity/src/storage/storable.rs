@@ -23,7 +23,6 @@ pub mod mcp_grant;
 pub mod mcp_registration;
 pub mod metadata_v2;
 pub mod notification_app;
-pub mod notification_app_handle;
 pub mod notifications;
 pub mod openid_credential;
 pub mod openid_credential_key;

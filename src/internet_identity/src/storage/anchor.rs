@@ -911,6 +911,33 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
+    /// The browser of this anchor that signed a claim token for `claiming_anchor_number`,
+    /// if any still holds the key it was signed with.
+    ///
+    /// The successor slot only, as in [`Self::browser_that_signed_link`]: a holder of a
+    /// retired private key can mint a token of its own at any time, so accepting that
+    /// slot would let them hand the app this identity has to an identity they control,
+    /// moving its delivery to a subscription of their own.
+    pub fn browser_that_signed_claim(
+        &self,
+        signature: &[u8],
+        claiming_anchor_number: AnchorNumber,
+        expires_at_ns: Timestamp,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                crate::browser_key::verify_notification_app_claim(
+                    &browser.next_browser_key,
+                    signature,
+                    self.anchor_number,
+                    claiming_anchor_number,
+                    expires_at_ns,
+                )
+            })
+            .map(|browser| browser.id)
+    }
+
     /// Whether a browser of this anchor already signs with `key`.
     ///
     /// An app key is generated in a partition no browser can reach, so a collision here

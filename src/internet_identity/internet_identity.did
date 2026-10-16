@@ -1886,32 +1886,25 @@ type LinkNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
-// Offers the Home Screen app this browser has to another identity signed in on the
-// same browser, which is the only party that can reach both. The handle says nothing
-// about which app it is.
-type OfferNotificationAppRequest = record {
-    anchor_number : UserNumber;
-};
-
-type OfferNotificationAppError = variant {
-    // The caller is no browser of this identity.
-    Unauthorized : principal;
-    // This browser has no app to offer.
-    NoNotificationApp;
-    InternalCanisterError : text;
-};
-
-// Points this browser at the app another identity on it offered.
+// Points this browser at the Home Screen app another identity on the device has, on
+// the authority of a token that identity signed. Nothing is stored between the two
+// halves: the signature is the whole of the authority.
 type ClaimNotificationAppRequest = record {
-    anchor_number : UserNumber;
-    handle : blob;                     // good once, and only before it expires
+    anchor_number : UserNumber;            // the claiming identity; the caller is a browser of it
+    offering_anchor_number : UserNumber;   // the identity that has the app
+    expires_at_ns : nat64;                 // when the offering browser's signature stops counting
+    signature : blob;                      // over both anchor numbers and that expiry
 };
 
 type ClaimNotificationAppError = variant {
-    // The caller is no browser of this identity, whatever the handle is worth.
-    Unauthorized : principal;
-    // Unknown, already spent, or past its expiry.
-    InvalidHandle;
+    // The key the caller signed with is no browser key of the identity it named.
+    InvalidBrowserKey;
+    // No browser of the offering identity signed this, or the one that did has
+    // rotated its key past it since.
+    InvalidClaimToken;
+    ClaimTokenExpired;
+    // The offering identity's browser points at no app to hand over.
+    NoNotificationApp;
     InternalCanisterError : text;
 };
 
@@ -2577,11 +2570,10 @@ service : (opt InternetIdentityInit) -> {
     // record it has, this deployment does not notify, or the caller is not an app.
     notification_app_anchors : () -> (vec UserNumber) query;
 
-    // Called by the identity that has the app, from the browser that has it.
-    offer_notification_app : (OfferNotificationAppRequest) -> (variant { Ok : blob; Err : OfferNotificationAppError });
-
-    // Called by the identity being added, from the same browser, with that handle.
+    // Called by the identity being added, from its own browser on the device, with a
+    // token the identity that has the app signed for it.
     claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.

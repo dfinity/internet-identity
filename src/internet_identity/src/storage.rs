@@ -126,15 +126,11 @@ use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::notification_app::{
     StorableNotificationApp, StorableNotificationAppId,
 };
-use crate::storage::storable::notification_app_handle::{
-    StorableNotificationAppHandle, StorableNotificationAppOffer,
-};
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
 use crate::storage::storable::session_id::StorableSessionId;
 use internet_identity_interface::internet_identity::types::*;
-use sha2::{Digest, Sha256};
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
 use storable::application::StorableApplication;
@@ -228,8 +224,7 @@ const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 38u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 39u8;
 const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX: u8 = 40u8;
-const NOTIFICATION_APP_HANDLE_MEMORY_INDEX: u8 = 41u8;
-const NOTIFICATION_APP_OFFER_NONCE_MEMORY_INDEX: u8 = 42u8;
+// Indexes 41 and 42 are unused: the numbering skips them.
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -342,20 +337,6 @@ const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
 /// a record has no one left to deliver for.
 const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX);
-
-/// The short-lived handles a browser hands to another identity on the same device, so it
-/// can point at the app without ever being told its id.
-const NOTIFICATION_APP_HANDLE_MEMORY_ID: MemoryId =
-    MemoryId::new(NOTIFICATION_APP_HANDLE_MEMORY_INDEX);
-
-/// The nonce the next handle for an app and anchor is derived with, one row per pair.
-/// It only ever rises, which is what keeps a spent handle from being derived a second
-/// time, and keeping it is also what lets a new offer replace the outstanding one.
-///
-/// Keyed by the app first, so deleting a record can range over exactly the anchors it
-/// was offered to and leave nothing of itself behind.
-const NOTIFICATION_APP_OFFER_NONCE_MEMORY_ID: MemoryId =
-    MemoryId::new(NOTIFICATION_APP_OFFER_NONCE_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -508,17 +489,6 @@ pub struct Storage<M: Memory> {
     lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchors_with_notification_app_memory:
         StableBTreeMap<StorableNotificationAppId, StorableAnchorNumberList, ManagedMemory<M>>,
-    /// Memory wrapper used to report the size of the app handles.
-    notification_app_handle_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    notification_app_handle_memory: StableBTreeMap<
-        StorableNotificationAppHandle,
-        StorableNotificationAppOffer,
-        ManagedMemory<M>,
-    >,
-    /// Memory wrapper used to report the size of the app offer nonces.
-    notification_app_offer_nonce_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    notification_app_offer_nonce_memory:
-        StableBTreeMap<(StorableNotificationAppId, StorableAnchorNumber), u64, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -670,9 +640,6 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
         let lookup_anchors_with_notification_app_memory =
             memory_manager.get(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID);
-        let notification_app_handle_memory = memory_manager.get(NOTIFICATION_APP_HANDLE_MEMORY_ID);
-        let notification_app_offer_nonce_memory =
-            memory_manager.get(NOTIFICATION_APP_OFFER_NONCE_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -783,16 +750,6 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchors_with_notification_app_memory: StableBTreeMap::init(
                 lookup_anchors_with_notification_app_memory,
-            ),
-            notification_app_handle_memory_wrapper: MemoryWrapper::new(
-                notification_app_handle_memory.clone(),
-            ),
-            notification_app_handle_memory: StableBTreeMap::init(notification_app_handle_memory),
-            notification_app_offer_nonce_memory_wrapper: MemoryWrapper::new(
-                notification_app_offer_nonce_memory.clone(),
-            ),
-            notification_app_offer_nonce_memory: StableBTreeMap::init(
-                notification_app_offer_nonce_memory,
             ),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
@@ -1623,87 +1580,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// Offers the app `app_id` to another identity on this device, answering the handle
-    /// that identity spends to point at it.
-    ///
-    /// A handle rather than the id itself, because the id is this canister's and says
-    /// which anchors share a device. Derived from the salt, so it cannot be guessed, and
-    /// from a nonce that only ever rises, so two offers made in one consensus round are
-    /// two handles and a spent one is never derived again.
-    ///
-    /// One outstanding offer per app and anchor: a new one replaces whatever that pair
-    /// had. Everything a pair left behind goes with the record, in
-    /// [`Self::delete_notification_app`].
-    pub fn offer_notification_app(
-        &mut self,
-        app_id: NotificationAppId,
-        anchor_number: AnchorNumber,
-        expires_at_ns: Timestamp,
-    ) -> Result<[u8; 32], StorageError> {
-        let salt = *self.salt().ok_or(StorageError::MissingSalt)?;
-        let nonce = self
-            .notification_app_offer_nonce_memory
-            .get(&(app_id, anchor_number))
-            .unwrap_or(0);
-        if let Some(previous) = nonce.checked_sub(1) {
-            self.notification_app_handle_memory
-                .remove(&StorableNotificationAppHandle(
-                    Self::notification_app_handle(salt, app_id, anchor_number, previous),
-                ));
-        }
-
-        let handle = Self::notification_app_handle(salt, app_id, anchor_number, nonce);
-        self.notification_app_handle_memory.insert(
-            StorableNotificationAppHandle(handle),
-            StorableNotificationAppOffer {
-                app_id,
-                expires_at_ns,
-            },
-        );
-        self.notification_app_offer_nonce_memory.insert(
-            (app_id, anchor_number),
-            nonce
-                .checked_add(1)
-                .ok_or(StorageError::NotificationAppOfferNonceOverflow)?,
-        );
-        Ok(handle)
-    }
-
-    fn notification_app_handle(
-        salt: Salt,
-        app_id: NotificationAppId,
-        anchor_number: AnchorNumber,
-        nonce: u64,
-    ) -> [u8; 32] {
-        let mut hasher = Sha256::new();
-        hasher.update(salt);
-        hasher.update(b"ii-notification-app-handle");
-        hasher.update(app_id.to_be_bytes());
-        hasher.update(anchor_number.to_be_bytes());
-        hasher.update(nonce.to_be_bytes());
-        hasher.finalize().into()
-    }
-
-    /// Spends a handle, answering the app it was offered for.
-    ///
-    /// Good once: a handle that has been spent is gone, so one offer points one identity
-    /// at the app and a copied handle is worth nothing after that. An expired one is
-    /// removed rather than honoured.
-    ///
-    /// An offer outlives the record it names, so the record has to still be there: a
-    /// reference to a deleted app is one nothing can deliver through, and writing it
-    /// would put a row back in the index the deletion emptied.
-    pub fn take_notification_app_offer(
-        &mut self,
-        handle: [u8; 32],
-        now: Timestamp,
-    ) -> Option<NotificationAppId> {
-        let key = StorableNotificationAppHandle(handle);
-        let offer = self.notification_app_handle_memory.remove(&key)?;
-        (offer.expires_at_ns > now && self.notification_app_memory.contains_key(&offer.app_id))
-            .then_some(offer.app_id)
-    }
-
     /// The anchors pointing at `app_id`, which is what the app asks for to know who it
     /// is delivering for.
     ///
@@ -1717,14 +1593,8 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default()
     }
 
-    /// Forgets a record, the principal that resolved to it, and every offer ever made of
-    /// it. The id is retired with it: the allocator never looks back, so nothing is ever
-    /// handed this one again, and a handle derived from it is never derived again either.
-    ///
-    /// The offers are what would otherwise accumulate without bound: an identity that
-    /// links a fresh key each time is a fresh record every time, and an offer nobody
-    /// spends is removed by nothing else. The sweep ranges over the anchors this record
-    /// was offered to rather than the whole map.
+    /// Forgets a record and the principal that resolved to it. The id is retired with
+    /// it: the allocator never looks back, so nothing is ever handed this one again.
     fn delete_notification_app(&mut self, app_id: NotificationAppId) {
         let Some(app) = self.notification_app_memory.remove(&app_id) else {
             // An id is handed out with the record it names and retired with it, so an id
@@ -1739,25 +1609,6 @@ impl<M: Memory + Clone> Storage<M> {
         };
         self.lookup_notification_app_with_principal_memory
             .remove(&Principal::self_authenticating(&app.key));
-
-        let salt = self.salt().copied();
-        let offered_to: Vec<(AnchorNumber, u64)> = self
-            .notification_app_offer_nonce_memory
-            .range((app_id, AnchorNumber::MIN)..=(app_id, AnchorNumber::MAX))
-            .map(|((_, anchor_number), nonce)| (anchor_number, nonce))
-            .collect();
-        for (anchor_number, nonce) in offered_to {
-            // The nonce is the one the next handle would use, so the outstanding handle
-            // is the one before it.
-            if let (Some(salt), Some(outstanding)) = (salt, nonce.checked_sub(1)) {
-                self.notification_app_handle_memory
-                    .remove(&StorableNotificationAppHandle(
-                        Self::notification_app_handle(salt, app_id, anchor_number, outstanding),
-                    ));
-            }
-            self.notification_app_offer_nonce_memory
-                .remove(&(app_id, anchor_number));
-        }
     }
 
     /// Forgets a record no anchor points at.
@@ -4638,14 +4489,6 @@ impl<M: Memory + Clone> Storage<M> {
                     .size(),
             ),
             (
-                "notification_app_handle".to_string(),
-                self.notification_app_handle_memory_wrapper.size(),
-            ),
-            (
-                "notification_app_offer_nonce".to_string(),
-                self.notification_app_offer_nonce_memory_wrapper.size(),
-            ),
-            (
                 "lookup_session_with_principal".to_string(),
                 self.lookup_session_with_principal_memory_wrapper.size(),
             ),
@@ -5106,11 +4949,6 @@ pub enum StorageError {
     /// browser pointing at a deleted record must never resolve to another app.
     NotificationAppIdOverflow,
     ErrorUpdatingNotificationAppIdAllocator,
-    /// No offer nonces left for this anchor and app. Refused rather than saturated: a
-    /// nonce handed out twice derives a handle that has already been spent.
-    NotificationAppOfferNonceOverflow,
-    /// The canister has no salt yet, so nothing unguessable can be derived from it.
-    MissingSalt,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -5237,10 +5075,6 @@ impl fmt::Display for StorageError {
             Self::ErrorUpdatingNotificationAppIdAllocator => {
                 write!(f, "Error updating the notification app id allocator")
             }
-            Self::NotificationAppOfferNonceOverflow => {
-                write!(f, "No notification app offer nonces left to allocate")
-            }
-            Self::MissingSalt => write!(f, "The canister has no salt yet"),
             Self::UnstorableAccountReferenceList {
                 anchor_number,
                 application_number,

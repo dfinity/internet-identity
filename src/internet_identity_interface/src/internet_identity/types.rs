@@ -1144,40 +1144,41 @@ pub enum LinkNotificationAppError {
     InternalCanisterError(String),
 }
 
-/// Offers the Home Screen app this browser has to another identity signed in on the same
-/// browser, which is the only party that can reach both.
+/// Points this browser at the Home Screen app another identity on the device has, on the
+/// authority of a token that identity signed.
 ///
 /// The app is one thing on the device and serves every identity that points at it, but
 /// nothing can reach into its storage to ask: it is a partition away. So the identity
-/// that has it offers a handle, and the identity being added spends it.
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct OfferNotificationAppRequest {
-    pub anchor_number: AnchorNumber,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum OfferNotificationAppError {
-    /// The caller is no browser of this identity.
-    Unauthorized(Principal),
-    /// This browser has no app to offer.
-    NoNotificationApp,
-    InternalCanisterError(String),
-}
-
-/// Points this browser at the app another identity on it offered.
+/// that has it signs for the identity being added, which presents the signature here.
+///
+/// Nothing is stored between the two halves: the signature is the whole of the
+/// authority, and spending it again points the same browser at the same record.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct ClaimNotificationAppRequest {
+    /// The claiming identity, whose browser ends up pointing at the app. The caller must
+    /// be a browser of it, which is this identity's consent to having its notifications
+    /// routed through an app another identity installed.
     pub anchor_number: AnchorNumber,
-    /// What the offering identity was given. Good once, and only before it expires.
-    pub handle: ByteBuf,
+    /// The identity that has the app. A signature cannot be searched for, so the browser
+    /// list to verify against has to be named.
+    pub offering_anchor_number: AnchorNumber,
+    /// When the offering browser's signature stops being accepted.
+    pub expires_at_ns: Timestamp,
+    /// The offering browser's signature over both anchor numbers and that expiry.
+    pub signature: ByteBuf,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum ClaimNotificationAppError {
-    /// The caller is no browser of this identity, whatever the handle is worth.
-    Unauthorized(Principal),
-    /// The handle is unknown, already spent, or past its expiry.
-    InvalidHandle,
+    /// The key the caller signed with is no browser key of the identity it named.
+    InvalidBrowserKey,
+    /// No browser of the offering identity signed this, or the one that did has rotated
+    /// its key past it since.
+    InvalidClaimToken,
+    /// The token's expiry has passed.
+    ClaimTokenExpired,
+    /// The offering identity's browser points at no app to hand over.
+    NoNotificationApp,
     InternalCanisterError(String),
 }
 

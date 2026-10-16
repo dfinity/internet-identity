@@ -40,6 +40,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
+use notifications::validation::NOT_ENABLED;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
@@ -396,63 +397,51 @@ fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool 
     expires_at_ns > now && expires_at_ns <= now.saturating_add(LINK_TOKEN_LIFETIME_NS)
 }
 
-/// How long an offered handle is worth spending. Both calls are made by one browser,
-/// one straight after the other, so this is a round trip and not a user's attention.
-const NOTIFICATION_APP_OFFER_LIFETIME_NS: u64 = 60 * 1_000_000_000;
-
-/// Offers this browser's app to another identity signed in on the same browser.
+/// Points this browser at the Home Screen app another identity on the device has.
 ///
-/// Authorized as the browser that has the app. The handle says nothing about which app
-/// it is: the record's id is this canister's and would tell the identity spending it
-/// which anchors share a device.
-#[update]
-fn offer_notification_app(
-    request: OfferNotificationAppRequest,
-) -> Result<ByteBuf, OfferNotificationAppError> {
-    if !notifications::notifications_enabled() {
-        return Err(OfferNotificationAppError::InternalCanisterError(
-            "notifications are not enabled".to_string(),
-        ));
-    }
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| OfferNotificationAppError::Unauthorized(caller()))?;
-    let app_id = anchor
-        .notification_app(browser_id)
-        .ok_or(OfferNotificationAppError::NoNotificationApp)?;
-
-    let expires_at_ns = ic_cdk::api::time().saturating_add(NOTIFICATION_APP_OFFER_LIFETIME_NS);
-    state::storage_borrow_mut(|storage| {
-        storage.offer_notification_app(app_id, request.anchor_number, expires_at_ns)
-    })
-    .map(|handle| ByteBuf::from(handle.to_vec()))
-    .map_err(|err| OfferNotificationAppError::InternalCanisterError(format!("{err:?}")))
-}
-
-/// Points this browser at the app another identity on it offered.
+/// Authorized twice over, and both are load-bearing. The caller is a browser of the
+/// claiming identity, which is that identity's consent to having its notifications
+/// routed through an app another identity installed, and which also selects the browser
+/// entry this device is. The token is signed by a browser of the offering identity,
+/// which is that identity's consent to sharing the app it installed.
 ///
 /// The app itself is not involved: it is already installed and already registered for
-/// push, so a second identity starts receiving the moment this returns.
+/// push, so the claiming identity starts receiving the moment this returns. Spending the
+/// same token twice is accepted and changes nothing the second time, which is why there
+/// is no nonce and nothing stored between the two halves.
 #[update]
 fn claim_notification_app(
     request: ClaimNotificationAppRequest,
 ) -> Result<(), ClaimNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(ClaimNotificationAppError::InternalCanisterError(
-            "notifications are not enabled".to_string(),
+            NOT_ENABLED.to_string(),
         ));
     }
+    let now = ic_cdk::api::time();
+    // The same bound as a link token's, for the same reason: a browser key retired long
+    // ago can still have signed, so a token claiming to expire years from now is refused
+    // rather than honoured.
+    if !link_token_expiry_in_range(request.expires_at_ns, now) {
+        return Err(ClaimNotificationAppError::ClaimTokenExpired);
+    }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| ClaimNotificationAppError::Unauthorized(caller()))?;
-    let handle: [u8; 32] = request
-        .handle
-        .as_ref()
-        .try_into()
-        .map_err(|_| ClaimNotificationAppError::InvalidHandle)?;
+        .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
 
-    let app_id = state::storage_borrow_mut(|storage| {
-        storage.take_notification_app_offer(handle, ic_cdk::api::time())
-    })
-    .ok_or(ClaimNotificationAppError::InvalidHandle)?;
+    let offering_anchor = state::anchor(request.offering_anchor_number);
+    let offering_browser = offering_anchor
+        .browser_that_signed_claim(
+            &request.signature,
+            request.anchor_number,
+            request.expires_at_ns,
+        )
+        .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
+    // The app id comes off the offering browser's own reference, so the claiming
+    // identity is never told which record it reached.
+    let app_id = offering_anchor
+        .notification_app(offering_browser)
+        .ok_or(ClaimNotificationAppError::NoNotificationApp)?
+        .app_id;
 
     anchor.point_at_notification_app(browser_id, app_id);
     state::storage_borrow_mut(|storage| {

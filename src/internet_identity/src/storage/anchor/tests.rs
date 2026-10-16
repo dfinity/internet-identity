@@ -1272,7 +1272,7 @@ mod mirror_verified_email_tests {
 
 mod browser_tests {
     use super::*;
-    use crate::browser_key::test_keys::{link_token, public_key, signing_key};
+    use crate::browser_key::test_keys::{claim_token, link_token, public_key, signing_key};
     use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, FormFactor, OperatingSystem, PublicKey,
@@ -1841,6 +1841,67 @@ mod browser_tests {
             anchor.browser_that_signed_link(&link_token(&retired, 10_000, 5_000), 10_000, 5_000),
             None,
             "the key the sign-in retired must not sign a link token"
+        );
+    }
+
+    /// A claim token is honoured from the successor slot only, for the same reason: a
+    /// holder of the retired key could otherwise hand this identity's app to one of
+    /// their own and take delivery with it.
+    #[test]
+    fn a_claim_token_is_signed_by_the_key_the_browser_still_holds() {
+        let retired = signing_key(1);
+        let held = signing_key(2);
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                public_key(&retired),
+                public_key(&held),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_that_signed_claim(
+                &claim_token(&held, 10_000, 10_001, 5_000),
+                10_001,
+                5_000
+            ),
+            Some(id)
+        );
+        assert_eq!(
+            anchor.browser_that_signed_claim(
+                &claim_token(&retired, 10_000, 10_001, 5_000),
+                10_001,
+                5_000
+            ),
+            None,
+            "the key the sign-in retired must not sign a claim token"
+        );
+    }
+
+    /// The offering anchor is the anchor the list belongs to, so a token signed naming
+    /// another identity as the one handing the app over is not this anchor's.
+    #[test]
+    fn a_claim_token_signed_for_another_offering_anchor_names_no_browser() {
+        let held = signing_key(2);
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                public_key(&signing_key(1)),
+                public_key(&held),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_that_signed_claim(
+                &claim_token(&held, 10_002, 10_001, 5_000),
+                10_001,
+                5_000
+            ),
+            None
         );
     }
 
