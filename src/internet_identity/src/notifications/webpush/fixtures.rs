@@ -1,6 +1,8 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
 use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
+use crate::authz_utils::NotificationCaller;
+use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
@@ -101,13 +103,72 @@ pub(super) fn try_subscribe(
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
+    try_subscribe_as(
+        NotificationCaller::Browser,
+        anchor_number,
+        browser_id,
+        endpoint,
+        now_ns,
+    )
+}
+
+/// As [`try_subscribe`], for a caller that may be the Home Screen app: what it registers
+/// goes on its record rather than on the browser's entry, so which caller it is decides
+/// where the write lands.
+pub(super) fn try_subscribe_as(
+    caller: NotificationCaller,
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    endpoint: &str,
+    now_ns: Timestamp,
+) -> Result<(), SetWebPushSubscriptionError> {
     super::set_subscription(
         anchor(anchor_number),
         browser_id,
-        crate::authz_utils::NotificationCaller::Browser,
+        caller,
         validated(anchor_number, endpoint, now_ns),
         now_ns,
     )
+}
+
+/// A Home Screen app record, created as the app's first call creates it, with `anchor`'s
+/// browser `browser_id` pointing at it.
+pub(super) fn app_pointed_at_by(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    key_seed: u8,
+    now_ns: Timestamp,
+) -> NotificationAppId {
+    let app_id = storage_borrow_mut(|storage| {
+        storage
+            .notification_app_for_key(&key(key_seed), now_ns)
+            .expect("creating the app record")
+            .id
+    });
+    point_at_app(anchor_number, browser_id, app_id);
+    app_id
+}
+
+/// A second identity on the device pointing at the app the first installed, which is
+/// what claiming an offer leaves behind.
+pub(super) fn point_at_app(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    app_id: NotificationAppId,
+) {
+    let mut anchor = anchor(anchor_number);
+    anchor.point_at_notification_app(browser_id, app_id);
+    storage_borrow_mut(|storage| storage.write(anchor)).expect("pointing at the app");
+}
+
+/// The record as it stands, which is where an app's own subscription lives.
+pub(super) fn app(app_id: NotificationAppId) -> NotificationApp {
+    storage_borrow(|storage| storage.notification_app(app_id)).expect("reading the app record")
+}
+
+/// The caller an app's own call arrives as.
+pub(super) fn app_caller(app_id: NotificationAppId) -> NotificationCaller {
+    NotificationCaller::App(app(app_id))
 }
 
 pub(crate) fn subscribe(

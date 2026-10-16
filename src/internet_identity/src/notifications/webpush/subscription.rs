@@ -459,4 +459,142 @@ mod tests {
 
         assert_eq!(stored_endpoint(anchor_number, unlisted), None);
     }
+
+    /// A seed no browser of a fixture anchor is registered under, so an app key is its
+    /// own key rather than one already in a browser list.
+    const APP_KEY_SEED: u8 = 200;
+
+    /// What the app registers is the record's, so the entry of the browser whose anchor
+    /// authorized the call keeps whatever it had, which is nothing.
+    #[test]
+    fn an_app_registers_on_its_record_rather_than_on_a_browser_entry() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
+
+        try_subscribe_as(
+            app_caller(app_id),
+            anchor_number,
+            browsers[0],
+            ENDPOINT,
+            1_000,
+        )
+        .expect("an app registers its subscription");
+
+        assert_eq!(
+            app(app_id).webpush_subscription.map(|s| s.endpoint),
+            Some(ENDPOINT.to_string())
+        );
+        assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
+        assert_eq!(
+            subscription_status(&anchor(anchor_number), browsers[0], app_caller(app_id)),
+            Some(WebPushSubscriptionStatus {
+                endpoint: ENDPOINT.to_string(),
+                pool_len: 3,
+                issued_at_ns: 1_000,
+            })
+        );
+        // The browser is answered about its own entry, which the app's write left alone.
+        assert_eq!(status(anchor_number, browsers[0]), None);
+    }
+
+    /// A pool covers the windows after the one it was minted in, so an app replacing one
+    /// has to move forward for the same reason a browser does.
+    #[test]
+    fn an_app_pool_no_newer_than_the_stored_one_is_refused() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
+        try_subscribe_as(
+            app_caller(app_id),
+            anchor_number,
+            browsers[0],
+            ENDPOINT,
+            5_000,
+        )
+        .expect("an app registers its subscription");
+
+        for stale in [4_999, 5_000] {
+            assert_eq!(
+                try_subscribe_as(
+                    app_caller(app_id),
+                    anchor_number,
+                    browsers[0],
+                    ENDPOINT,
+                    stale
+                ),
+                Err(SetWebPushSubscriptionError::StaleJwtPool),
+                "{stale} must not replace the pool minted at 5000"
+            );
+        }
+        assert_eq!(
+            app(app_id).webpush_subscription.map(|s| s.jwt_issued_at_ns),
+            Some(5_000)
+        );
+    }
+
+    /// Another endpoint is another registration, so it starts its own age rather than
+    /// inheriting the one it replaces.
+    #[test]
+    fn an_app_rotating_its_endpoint_starts_a_fresh_registration() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
+        try_subscribe_as(
+            app_caller(app_id),
+            anchor_number,
+            browsers[0],
+            ENDPOINT,
+            5_000,
+        )
+        .expect("an app registers its subscription");
+
+        try_subscribe_as(
+            app_caller(app_id),
+            anchor_number,
+            browsers[0],
+            ROTATED,
+            1_000,
+        )
+        .expect("a rotated endpoint is not a pool replacement");
+
+        let stored = app(app_id).webpush_subscription.expect("a subscription");
+        assert_eq!(stored.endpoint, ROTATED);
+        assert_eq!(stored.created_at_ns, 1_000);
+    }
+
+    /// One installed app is one registration however many identities point at it, which
+    /// is what lets the second be delivered to without the app being opened again. It is
+    /// also not the browser's: an entry that registered for itself keeps what it has.
+    #[test]
+    fn one_app_registration_answers_every_identity_pointing_at_it() {
+        setup();
+        let (first, first_browsers) = anchor_with_browsers(1);
+        let (second, second_browsers) = anchor_with_browsers(1);
+        let app_id = app_pointed_at_by(first, first_browsers[0], APP_KEY_SEED, 1_000);
+        point_at_app(second, second_browsers[0], app_id);
+        subscribe(second, second_browsers[0], ROTATED, 1_000);
+
+        try_subscribe_as(
+            app_caller(app_id),
+            first,
+            first_browsers[0],
+            ENDPOINT,
+            2_000,
+        )
+        .expect("an app registers its subscription");
+
+        for (anchor_number, browsers) in [(first, &first_browsers), (second, &second_browsers)] {
+            assert_eq!(
+                subscription_status(&anchor(anchor_number), browsers[0], app_caller(app_id))
+                    .map(|s| s.endpoint),
+                Some(ENDPOINT.to_string()),
+                "every identity pointing at the app reads its one registration"
+            );
+        }
+        assert_eq!(
+            stored_endpoint(second, second_browsers[0]).as_deref(),
+            Some(ROTATED)
+        );
+    }
 }
