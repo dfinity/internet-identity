@@ -9,13 +9,12 @@ use internet_identity_interface::internet_identity::types::{
     LinkNotificationAppError, LinkNotificationAppRequest, NotificationAppInfo,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationId, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, OfferNotificationAppError, OfferNotificationAppRequest,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, SetNotificationAppEnabledError,
-    SetNotificationAppEnabledRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    WebPushSubscriptionStatus,
+    NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, ProbeNotificationAppError, ProbeNotificationAppRequest,
+    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
+    SetNotificationAppEnabledError, SetNotificationAppEnabledRequest, SetWebPushSubscriptionError,
+    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};

@@ -466,9 +466,6 @@ fn set_notification_app_enabled(
     })
 }
 
-/// How long an offered handle is worth spending. Both calls are made by one browser,
-/// one straight after the other, so this is a round trip and not a user's attention.
-const NOTIFICATION_APP_OFFER_LIFETIME_NS: u64 = 60 * 1_000_000_000;
 
 /// Wakes the Home Screen app this browser points at, and answers which probe to watch.
 ///
@@ -530,36 +527,6 @@ fn identity_for_notification(anchor: &storage::anchor::Anchor) -> IdentityForNot
     }
 }
 
-/// Offers this browser's app to another identity signed in on the same browser.
-///
-/// Authorized as the browser that has the app. The handle says nothing about which app
-/// it is: the record's id is this canister's and would tell the identity spending it
-/// which anchors share a device.
-#[update]
-fn offer_notification_app(
-    request: OfferNotificationAppRequest,
-) -> Result<ByteBuf, OfferNotificationAppError> {
-    if !notifications::notifications_enabled() {
-        return Err(OfferNotificationAppError::InternalCanisterError(
-            "notifications are not enabled".to_string(),
-        ));
-    }
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| OfferNotificationAppError::Unauthorized(caller()))?;
-    let app_id = anchor
-        .notification_app(browser_id)
-        .ok_or(OfferNotificationAppError::NoNotificationApp)?
-        .app_id;
-
-    let expires_at_ns = ic_cdk::api::time().saturating_add(NOTIFICATION_APP_OFFER_LIFETIME_NS);
-    state::storage_borrow_mut(|storage| {
-        storage.offer_notification_app(app_id, request.anchor_number, expires_at_ns)
-    })
-    .map(|handle| ByteBuf::from(handle.to_vec()))
-    .map_err(|err| OfferNotificationAppError::InternalCanisterError(format!("{err:?}")))
-}
-
-/// Points this browser at the app another identity on it offered.
 /// Points this browser at the Home Screen app another identity on the device has.
 ///
 /// Authorized twice over, and both are load-bearing. The caller is a browser of the
@@ -1732,7 +1699,6 @@ mod v2_api {
                 // asked of one of them: a probe is read where it was sent.
                 pending_probe: None,
             }
-            state::storage_borrow(|storage| storage.notification_app(app_id))
         });
 
         let identity_info = IdentityInfo {

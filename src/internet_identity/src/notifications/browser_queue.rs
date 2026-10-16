@@ -256,9 +256,7 @@ pub(crate) fn remove_shown(
 mod tests {
     use super::*;
     use crate::notifications::app::NotificationAppId;
-    use crate::notifications::webpush::fixtures::{
-        anchor, app_key, setup, subscribe, APP_RELAY, OTHER_APP_RELAY,
-    };
+    use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
     use crate::notifications::write_notifications_decision;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{
@@ -458,10 +456,13 @@ mod tests {
         ids(anchor(anchor_number).notifications(browser_id))
     }
 
+    const APP_RELAY: &str = "https://web.push.apple.com/a";
+
     /// The iOS case: the entry holds no registration of its own and is delivered through
     /// the record of the Home Screen app it points at.
     fn routed_through_an_app() -> (AnchorNumber, BrowserId, NotificationAppId) {
         use crate::storage::anchor::WebPushSubscription;
+        use serde_bytes::ByteBuf;
 
         setup();
         let anchor_number = storage_borrow_mut(|storage| {
@@ -478,7 +479,7 @@ mod tests {
             .id;
         let app_id = storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&app_key(9), 0)
+                .notification_app_for_key(&ByteBuf::from(vec![9u8; 91]), 0)
                 .expect("creating the app record");
             storage.set_notification_app_subscription(
                 app.id,
@@ -556,7 +557,7 @@ mod tests {
             browser_id,
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
-            OTHER_APP_RELAY,
+            "https://web.push.apple.com/b",
             2 * SECOND_NS,
         );
 

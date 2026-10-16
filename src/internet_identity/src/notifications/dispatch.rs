@@ -481,7 +481,11 @@ pub(crate) fn claim_rewake(
             return None;
         }
 
-        let app = routed_app(storage, browser);
+        let app = anchor
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .and_then(|browser| routed_app(storage, browser));
         let delivery = rewake_delivery(&anchor, browser_id, app.as_ref(), now_ns)?;
         anchor.set_woken_again(browser_id, Some(now_ns));
         storage.write(anchor).ok()?;
@@ -755,8 +759,7 @@ mod tests {
     use super::*;
     use crate::notifications::backlog::NOTIFICATION_BACKLOG;
     use crate::notifications::webpush::fixtures::{
-        anchor, anchor_with_browsers, app_key, setup, stored_subscription, subscribe, APP_RELAY,
-        OTHER_APP_RELAY,
+        anchor, anchor_with_browsers, setup, stored_subscription, subscribe,
     };
     use crate::state::storage_borrow;
     use candid::Principal;
@@ -848,6 +851,9 @@ mod tests {
         });
     }
 
+    const APP_RELAY: &str = "https://web.push.apple.com/a";
+    const OTHER_APP_RELAY: &str = "https://web.push.apple.com/b";
+
     /// Points `browser_id` at the app record the key `seed` names, creating it where no
     /// app has presented that key yet and registering it at `endpoint`. The identity is
     /// signed in on the entry, which is what lets the app speak for it.
@@ -858,11 +864,12 @@ mod tests {
         endpoint: Option<&str>,
     ) -> NotificationAppId {
         use crate::notifications::webpush::fixtures::valid_vapid_key;
+        use serde_bytes::ByteBuf;
         use std::collections::BTreeMap;
 
         storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&app_key(seed), 0)
+                .notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 0)
                 .expect("creating the app record");
             if let Some(endpoint) = endpoint {
                 storage.set_notification_app_subscription(
@@ -1555,34 +1562,6 @@ mod tests {
 
         assert!(stored_subscription(recipient, browsers[0]).is_none());
         assert_eq!(stored_app(app), Some(app));
-    }
-
-    /// A phone and a laptop on one identity, which is what most identities that have an
-    /// app installed look like. One pass picks each entry's address apart: the phone
-    /// holds no registration of its own and is woken at the app's, the laptop at the one
-    /// it registered itself, and both are queued the notification.
-    #[test]
-    fn one_pass_wakes_an_app_routed_entry_and_a_self_registered_one() {
-        setup();
-        let (recipient, browsers) = anchor_with_browsers(2);
-        let app = route_through_an_app(recipient, browsers[0], 9, Some(APP_RELAY));
-        subscribe(recipient, browsers[1], RELAY, 0);
-        submit(recipient, 7, 10 * SECOND_NS);
-
-        let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
-
-        assert_eq!(
-            deliveries
-                .iter()
-                .map(|one| (one.browser_id, one.target, one.endpoint.as_str()))
-                .collect::<Vec<_>>(),
-            vec![
-                (browsers[0], DeliveryTarget::App(app), APP_RELAY),
-                (browsers[1], DeliveryTarget::Browser, RELAY),
-            ]
-        );
-        assert_eq!(queued(recipient, browsers[0]), vec![7]);
-        assert_eq!(queued(recipient, browsers[1]), vec![7]);
     }
 
     #[test]

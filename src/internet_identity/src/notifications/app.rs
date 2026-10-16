@@ -54,16 +54,3 @@ pub struct NotificationAppRef {
     pub enabled: bool,
 }
 
-/// What a browser holds about the app it points at.
-///
-/// The reference outlives signing out and turning delivery off. Both stop routing
-/// without forgetting which app this browser has, so coming back is signing in or
-/// flipping the switch rather than installing anything again.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct NotificationAppRef {
-    pub app_id: NotificationAppId,
-    /// Whether this identity wants its notifications delivered through the app. The
-    /// subscription is the app's and is shared, so turning off here can never be a
-    /// subscription removal: that would take every other identity down with it.
-    pub enabled: bool,
-}

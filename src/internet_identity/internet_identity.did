@@ -1929,21 +1929,6 @@ type SetNotificationAppEnabledError = variant {
     InternalCanisterError : text;
 };
 
-// Offers the Home Screen app this browser has to another identity signed in on the
-// same browser, which is the only party that can reach both. The handle says nothing
-// about which app it is.
-type OfferNotificationAppRequest = record {
-    anchor_number : UserNumber;
-};
-
-type OfferNotificationAppError = variant {
-    // The caller is no browser of this identity.
-    Unauthorized : principal;
-    // This browser has no app to offer.
-    NoNotificationApp;
-    InternalCanisterError : text;
-};
-
 // Points this browser at the app another identity on it offered.
 // Points this browser at the Home Screen app another identity on the device has, on
 // the authority of a token that identity signed. Nothing is stored between the two
