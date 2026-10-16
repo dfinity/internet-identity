@@ -1,9 +1,9 @@
 //! One chatroom, to try Internet Identity notifications end to end.
 //!
-//! Every message notifies everyone else in the room, under one key, so what a
-//! recipient sees is always the latest message. Members can claim a name,
-//! unique among the names claimed. The canister serves its own frontend, and
-//! lists itself as the one canister allowed to notify for its origin.
+//! Every message notifies everyone else in the room, as a notification of its
+//! own. Members can claim a name, unique among the names claimed. The canister
+//! serves its own frontend, and lists itself as the one canister allowed to
+//! notify for its origin.
 
 use candid::{CandidType, Deserialize, Principal};
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
@@ -42,11 +42,6 @@ const IC_ARCHITECTURE_PATH: &str = "/.well-known/ic-architecture";
 /// The guide an agent reads after the Candid interface: what the types do not
 /// say. Kept beside the code so a change to one is a change to the other.
 const API_DOC: &str = include_str!("api_doc.md");
-
-/// What every notification is about. One key, so a new message replaces the
-/// notification a recipient has not acted on yet rather than stacking beside
-/// it: the one they see carries the last message.
-const NOTIFICATION_KEY: &str = "room";
 
 static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 
@@ -121,7 +116,11 @@ fn send(text: String) {
                 title: author.clone(),
                 body: posted.message.text.clone(),
                 url: app_url(),
-                key: Some(NOTIFICATION_KEY.to_string()),
+                // No key: a key names what a notification is about, and a
+                // second one with the same key replaces the first. Every
+                // message is news of its own, so none of them replaces
+                // another, and none can be dismissed by name either.
+                key: None,
                 ..Default::default()
             },
         );

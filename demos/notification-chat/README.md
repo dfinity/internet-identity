@@ -25,9 +25,9 @@ It is a project of its own inside this repository (its own Cargo workspace,
 - **Send** stores the message and notifies every other member through the
   [`identity-notifications`](vendor/identity-notifications) library. The
   notification's title is the writer's name, its body is the message, and its
-  link is this app's origin, so acting on it opens the app. Every notification
-  uses the same key, so a recipient who has not acted on the previous one sees
-  it replaced by the latest message rather than stacked beside it.
+  link is this app's origin, so acting on it opens the app. Notifications
+  carry no key, so each message is a notification of its own: none replaces
+  another, and a burst of messages is a burst of notifications.
 - The **messages** box shows who sent what and when; the **list on the right**
   shows who is in the room. The page reads the room every few seconds.
 - **Show notification stats** opens a panel that says what the canister is

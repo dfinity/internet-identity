@@ -26,8 +26,8 @@ member through Internet Identity's notifications.
 - `send : (text) -> ()` posts a message. Refused with `join the room first`
   for a caller who is not in. It notifies every other member: the title is the
   writer's name, or the ends of their principal without one; the body is the
-  text; the link is this app's origin. All of them carry the key `room`, so a
-  newer message replaces a notification its recipient has not acted on yet.
+  text; the link is this app's origin. Each message is a notification of its
+  own, with no key, so a newer message never replaces an earlier one.
 - `claim_name : (text) -> (text)` names the caller, replacing any name they
   had, and returns the name given: as written when nobody else holds it,
   otherwise the first free one of `name_1`, `name_2`, … Names are compared
