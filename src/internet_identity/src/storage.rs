@@ -226,7 +226,7 @@ const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 38u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 39u8;
 const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX: u8 = 40u8;
-// Indexes 41 and 42 are unused: the numbering skips them.
+const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 41u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -339,6 +339,23 @@ const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
 /// a record has no one left to deliver for.
 const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX);
+
+/// Monotonic allocator for the ids of Internet Identity's own notifications. An app
+/// numbers the ones it sends itself, so this is a space of its own that overlaps with an
+/// app's from the first id that app picks: what tells the two apart is the entry they
+/// are queued on and never the id.
+const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID: MemoryId =
+    MemoryId::new(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX);
+
+/// The short-lived handles a browser hands to another identity on the same device, so it
+/// can point at the app without ever being told its id.
+
+/// The nonce the next handle for an app and anchor is derived with, one row per pair.
+/// It only ever rises, which is what keeps a spent handle from being derived a second
+/// time, and keeping it is also what lets a new offer replace the outstanding one.
+///
+/// Keyed by the app first, so deleting a record can range over exactly the anchors it
+/// was offered to and leave nothing of itself behind.
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -487,6 +504,9 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the notification app id allocator.
     next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the identity notification id allocator.
+    next_identity_notification_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    next_identity_notification_id_memory: StableCell<NotificationId, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the anchors-per-app index.
     lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchors_with_notification_app_memory:
@@ -642,6 +662,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
         let lookup_anchors_with_notification_app_memory =
             memory_manager.get(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID);
+        let next_identity_notification_id_memory =
+            memory_manager.get(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -747,6 +769,14 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             next_notification_app_id_memory: StableCell::init(next_notification_app_id_memory, 0)
                 .expect("next_notification_app_id_memory"),
+            next_identity_notification_id_memory_wrapper: MemoryWrapper::new(
+                next_identity_notification_id_memory.clone(),
+            ),
+            next_identity_notification_id_memory: StableCell::init(
+                next_identity_notification_id_memory,
+                0,
+            )
+            .expect("next_identity_notification_id_memory"),
             lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper::new(
                 lookup_anchors_with_notification_app_memory.clone(),
             ),
@@ -1675,6 +1705,22 @@ impl<M: Memory + Clone> Storage<M> {
         app.last_used = now;
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app));
+    }
+
+    /// Hands out the next id for one of Internet Identity's own notifications.
+    ///
+    /// Counted rather than taken from the clock. Block time is the same for every
+    /// message in a round, so two of ours queued for one entry in one round would carry
+    /// the same id, and an acknowledgement matches by id.
+    ///
+    /// Saturates at the ceiling. One identity notification per id is worth having, and
+    /// a canister that reached 2^64 of them has nothing left to allocate either way.
+    pub fn allocate_identity_notification_id(&mut self) -> NotificationId {
+        let id = *self.next_identity_notification_id_memory.get();
+        let _ = self
+            .next_identity_notification_id_memory
+            .set(id.saturating_add(1));
+        id
     }
 
     /// The record `app_id` names, if it is still there.
@@ -3266,7 +3312,11 @@ impl<M: Memory + Clone> Storage<M> {
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_mut(browser_id) {
-                queue.retain(|queued| !forgotten.contains(&queued.application_number));
+                queue.retain(|queued| {
+                    queued
+                        .application_number
+                        .is_none_or(|number| !forgotten.contains(&number))
+                });
             }
         }
 
@@ -4670,6 +4720,10 @@ impl<M: Memory + Clone> Storage<M> {
                 self.next_notification_app_id_memory_wrapper.size(),
             ),
             (
+                "next_identity_notification_id".to_string(),
+                self.next_identity_notification_id_memory_wrapper.size(),
+            ),
+            (
                 "lookup_anchors_with_notification_app".to_string(),
                 self.lookup_anchors_with_notification_app_memory_wrapper
                     .size(),
@@ -4774,14 +4828,14 @@ fn delivered_through_notification_app(browser: &Browser, app_id: NotificationApp
 }
 
 #[cfg(not(test))]
-fn canister_id() -> Principal {
+pub(crate) fn canister_id() -> Principal {
     ic_cdk::id()
 }
 
 /// `ic_cdk::id()` traps outside a canister, so the unit tests derive principals against
 /// a fixed canister id.
 #[cfg(test)]
-fn canister_id() -> Principal {
+pub(crate) fn canister_id() -> Principal {
     Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 7, 1, 1])
 }
 /// Which of the counters derived from a reference list a delta is applied to.

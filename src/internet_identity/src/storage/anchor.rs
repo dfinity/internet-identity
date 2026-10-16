@@ -7,7 +7,11 @@ use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+    StorableNotificationEvent, StorableQueuedNotification,
+use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
+use crate::storage::storable::notifications::browser_queue::{
+};
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -111,6 +115,9 @@ pub struct Browser {
     pub notifications: Vec<QueuedNotification>,
     /// When this entry was last woken again for something it could not show yet.
     pub woken_again_at_ns: Option<Timestamp>,
+    /// The probe this entry last sent to the app it points at, which the install page
+    /// watches for leaving the queue.
+    pub pending_probe: Option<NotificationId>,
     /// The Home Screen app this browser installed or claimed, where it has one.
     ///
     /// A reference rather than an entry of its own: one installed app is one record
@@ -122,21 +129,30 @@ pub struct Browser {
 }
 
 /// A notification a browser's service worker has yet to take.
+///
+/// Sent by an app, which the service worker fetches the text from, or by Internet
+/// Identity itself, which has no app behind it and carries what it has to say.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QueuedNotification {
-    pub application_number: ApplicationNumber,
-    /// The app canister that sent it, which the service worker fetches it from.
+    /// `None` where Internet Identity sent this itself.
+    pub application_number: Option<ApplicationNumber>,
+    /// The canister that sent it, which for an app's notification is what the service
+    /// worker fetches the text from.
     pub sender: Principal,
     pub notification_id: NotificationId,
     pub expires_at_ns: Timestamp,
-    /// `None` is the unreserved default account.
+    /// `None` is the unreserved default account, and is always `None` for Internet
+    /// Identity's own.
     pub account_number: Option<AccountNumber>,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    pub event: Option<NotificationEvent>,
 }
 
 impl From<QueuedNotification> for StorableQueuedNotification {
     fn from(value: QueuedNotification) -> Self {
         StorableQueuedNotification {
             application_number: value.application_number,
+            event: value.event.map(StorableNotificationEvent::from),
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
             expires_at_ns: value.expires_at_ns,
@@ -241,6 +257,7 @@ impl From<StorableBrowser> for Browser {
                 .filter_map(|queued| {
                     Some(QueuedNotification {
                         application_number: queued.application_number,
+                        event: queued.event.map(NotificationEvent::from),
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
                         notification_id: queued.notification_id,
                         expires_at_ns: queued.expires_at_ns,
@@ -255,6 +272,7 @@ impl From<StorableBrowser> for Browser {
                     .and_then(|subscription| subscription.woken_again_at_ns)
             }),
             notification_app: value.notification_app.map(NotificationAppRef::from),
+            pending_probe: value.pending_probe,
         }
     }
 }
@@ -281,6 +299,7 @@ impl From<Browser> for StorableBrowser {
                     .collect()
             }),
             woken_again_at_ns: value.woken_again_at_ns,
+            pending_probe: value.pending_probe,
         }
     }
 }
@@ -1017,9 +1036,10 @@ impl Anchor {
             {
                 browser.notification_app = None;
                 // The address belongs to another entry now, so nothing here can show
-                // what it had waiting.
+                // what it had waiting, the probe included.
                 browser.notifications.clear();
                 browser.woken_again_at_ns = None;
+                browser.pending_probe = None;
             }
         }
         let browser = self
@@ -1042,9 +1062,11 @@ impl Anchor {
         if previous.is_some() {
             // Every entry waiting stands for a wake-up posted to the old app's address,
             // and the app that answers now is a different one holding a different
-            // registration. Nothing there can take them.
+            // registration. Nothing there can take them, and the probe asked of the app
+            // that is gone has nobody left to answer it.
             browser.notifications.clear();
             browser.woken_again_at_ns = None;
+            browser.pending_probe = None;
         }
         previous
     }
@@ -1164,6 +1186,71 @@ impl Anchor {
         if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
             browser.woken_again_at_ns = at_ns;
         }
+    }
+
+    /// Records the probe this entry has just sent to the app it points at.
+    pub fn set_pending_probe(&mut self, browser_id: BrowserId, notification_id: NotificationId) {
+        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
+            browser.pending_probe = Some(notification_id);
+        }
+    }
+
+    /// Forgets a probe whose notification has left the queue, so a field that means
+    /// "still outstanding" stops naming something gone. Called wherever an entry is
+    /// taken out: what it names was taken by the app, evicted by a full queue, or
+    /// dropped because its relay post failed.
+    ///
+    /// An entry still queued but past its expiry is left named, because the only thing
+    /// that prunes it is the next write to this queue, and [`Anchor::pending_probe`] is
+    /// what decides that it is no longer pending.
+    pub fn clear_pending_probe_if_gone(&mut self, browser_id: BrowserId) {
+        let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) else {
+            return;
+        };
+        let Some(probe) = browser.pending_probe else {
+            return;
+        };
+        let queued = browser
+            .notifications
+            .iter()
+            .any(|queued| queued.notification_id == probe && queued.event.is_some());
+        if !queued {
+            browser.pending_probe = None;
+        }
+    }
+
+    /// The probe this entry sent that is still queued for the app to take.
+    ///
+    /// Answered against the queue rather than remembered on its own, so the answer is
+    /// about this identity on this device: the app's record is shared with every other
+    /// identity pointing at it, and an app on another phone answering its own probe
+    /// leaves this one exactly where it was.
+    ///
+    /// An entry past its expiry is not pending. The app is never shown one, so counting
+    /// it would answer the same dead id for good and never post again, and the only
+    /// thing that prunes it is another notification for this browser, which on a phone
+    /// whose app is gone never comes.
+    ///
+    /// `None` says the entry is no longer queued and nothing more: it was taken,
+    /// evicted by a full queue, or dropped because its relay post failed. It is not
+    /// evidence that the app took anything. What proves the app is alive is its
+    /// `last_used`, stamped on the call only a live app makes.
+    pub fn pending_probe(
+        &self,
+        browser_id: BrowserId,
+        now_ns: Timestamp,
+    ) -> Option<NotificationId> {
+        let browser = self.browsers.iter().find(|one| one.id == browser_id)?;
+        let probe = browser.pending_probe?;
+        browser
+            .notifications
+            .iter()
+            .any(|queued| {
+                queued.notification_id == probe
+                    && queued.event.is_some()
+                    && queued.expires_at_ns > now_ns
+            })
+            .then_some(probe)
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1309,6 +1396,7 @@ impl Anchor {
             webpush_subscription: None,
             notifications: Vec::new(),
             woken_again_at_ns: None,
+            pending_probe: None,
             notification_app: None,
         });
 

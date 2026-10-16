@@ -47,4 +47,13 @@ pub struct StorableBrowser {
     /// again only once the delegation it was for has expired.
     #[n(10)]
     pub woken_again_at_ns: Option<StorableTimestamp>,
+    /// The probe this entry last sent to the Home Screen app it points at. Whether it
+    /// is still pending is read off the queue, so this id outliving the entry says
+    /// nothing on its own.
+    ///
+    /// Kept so the browser watching for its answer is told about its own probe and not
+    /// about some other notification of ours that happens to be queued: both are
+    /// Internet Identity's own, and the queue cannot tell them apart.
+    #[n(11)]
+    pub pending_probe: Option<u64>,
 }

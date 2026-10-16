@@ -1464,6 +1464,212 @@ mod app_anchors {
     }
 }
 
+/// Waking the Home Screen app a browser points at, which is the only way to learn
+/// whether it is still installed.
+mod probe {
+    use super::app_anchors::{install_with_two_anchors, link_app};
+    use super::subscriptions::{request, ENDPOINT};
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        get_notification_app_status, probe_notification_app, set_webpush_subscription,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        GetNotificationAppStatusRequest, NotificationId, ProbeNotificationAppError,
+        ProbeNotificationAppRequest, SetWebPushSubscriptionRequest,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// The key a browser is left holding after the sign-in `browser_seed` names, which is
+    /// the one its own calls arrive signed with.
+    fn browser(browser_seed: u8) -> Principal {
+        BrowserKey::new(browser_seed).successor().principal()
+    }
+
+    /// A pool whose first window covers the time the test runs at, which is what a
+    /// wake-up has to be signed with. The pool is spent by elapsed time, so one issued at
+    /// a fixed instant signs nothing.
+    fn pool_issued_now(
+        env: &PocketIc,
+        anchor: AnchorNumber,
+        endpoint: &str,
+    ) -> SetWebPushSubscriptionRequest {
+        SetWebPushSubscriptionRequest {
+            jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
+            ..request(anchor, endpoint)
+        }
+    }
+
+    fn probe(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<Result<NotificationId, ProbeNotificationAppError>, RejectResponse> {
+        probe_notification_app(
+            env,
+            canister_id,
+            sender,
+            ProbeNotificationAppRequest {
+                anchor_number: anchor,
+            },
+        )
+    }
+
+    fn pending_probe(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<Option<NotificationId>, RejectResponse> {
+        Ok(get_notification_app_status(
+            env,
+            canister_id,
+            sender,
+            GetNotificationAppStatusRequest {
+                anchor_number: anchor,
+            },
+        )?
+        .and_then(|info| info.pending_probe))
+    }
+
+    /// An identity whose browser points at a Home Screen app that has registered for
+    /// push, which is the one shape a probe can be sent in.
+    fn install_with_a_registered_app(
+        env: &PocketIc,
+    ) -> (CanisterId, AnchorNumber, AnchorNumber, Principal) {
+        let (canister_id, first, second) = install_with_two_anchors(env);
+        let app = link_app(env, canister_id, first, 1, 100);
+        set_webpush_subscription(env, canister_id, app, pool_issued_now(env, first, ENDPOINT))
+            .expect("set_webpush_subscription rejected")
+            .expect("set_webpush_subscription returned Err");
+        (canister_id, first, second, app)
+    }
+
+    /// The probe is queued for this browser's entry and the page is told which
+    /// notification to watch for leaving it.
+    #[test]
+    fn should_queue_a_probe_for_the_app_and_answer_its_id() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        let id = probe(&env, canister_id, browser(1), anchor)?
+            .expect("probe_notification_app returned Err");
+
+        assert_eq!(
+            pending_probe(&env, canister_id, browser(1), anchor)?,
+            Some(id)
+        );
+        Ok(())
+    }
+
+    /// One probe is the whole of the question, so a page that remounts is given the one
+    /// already out rather than paying for an outcall that can tell it nothing more.
+    #[test]
+    fn should_hand_back_an_outstanding_probe_rather_than_sending_a_second(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        let first = probe(&env, canister_id, browser(1), anchor)?
+            .expect("probe_notification_app returned Err");
+        let again =
+            probe(&env, canister_id, browser(1), anchor)?.expect("a second probe returned Err");
+
+        assert_eq!(again, first);
+        Ok(())
+    }
+
+    /// The question is about the app, so the browser's own registration is no answer to
+    /// it: what that would deliver is evidence about the browser.
+    #[test]
+    fn should_not_fall_back_to_the_browsers_own_registration() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, _) = install_with_two_anchors(&env);
+        link_app(&env, canister_id, first, 1, 100);
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            browser(1),
+            pool_issued_now(&env, first, ENDPOINT),
+        )?
+        .expect("set_webpush_subscription returned Err");
+
+        assert_eq!(
+            probe(&env, canister_id, browser(1), first)?,
+            Err(ProbeNotificationAppError::NotReachable)
+        );
+        assert_eq!(pending_probe(&env, canister_id, browser(1), first)?, None);
+        Ok(())
+    }
+
+    /// A browser that points at no app has nothing to wake.
+    #[test]
+    fn should_answer_a_browser_that_points_at_no_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, _, second, _) = install_with_a_registered_app(&env);
+
+        assert_eq!(
+            probe(&env, canister_id, browser(2), second)?,
+            Err(ProbeNotificationAppError::NoNotificationApp)
+        );
+        Ok(())
+    }
+
+    /// Authorized by the browser key, so a caller holding another identity's key is told
+    /// about its key rather than about what this identity has installed.
+    #[test]
+    fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        assert_eq!(
+            probe(&env, canister_id, browser(2), anchor)?,
+            Err(ProbeNotificationAppError::InvalidBrowserKey)
+        );
+        assert_eq!(
+            probe(&env, canister_id, Principal::anonymous(), anchor)?,
+            Err(ProbeNotificationAppError::InvalidBrowserKey)
+        );
+        Ok(())
+    }
+
+    /// A deployment that does not notify says so, rather than reporting an app that may
+    /// be gone or a browser that points at none: both would be claims about this
+    /// identity's state, and the state is not what stopped the wake-up.
+    #[test]
+    fn should_answer_the_switch_while_notifications_are_disabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
+        assert_eq!(
+            probe(&env, canister_id, browser(1), anchor)?,
+            Err(ProbeNotificationAppError::InternalCanisterError(
+                "notifications are not enabled".to_string()
+            ))
+        );
+        assert_eq!(pending_probe(&env, canister_id, browser(1), anchor)?, None);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            arg_with_notifications_enabled(),
+        )?;
+        probe(&env, canister_id, browser(1), anchor)?
+            .expect("probe_notification_app returned Err once notifications are back");
+        Ok(())
+    }
+}
+
 /// A second identity on the device pointing at the app the first one installed, which is
 /// one call carrying a signature and nothing stored in between.
 mod claims {
@@ -1650,6 +1856,7 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
             account_number: None,
             canister_id: principal_2(),
             id: 1,
+            event: None,
         },
     }
 }

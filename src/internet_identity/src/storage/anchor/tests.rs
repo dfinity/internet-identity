@@ -1479,11 +1479,12 @@ mod browser_tests {
             .notifications_mut(first)
             .expect("a listed browser")
             .push(QueuedNotification {
-                application_number: 1,
+                application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
                 account_number: None,
+                event: None,
             });
         anchor.set_woken_again(first, Some(1_000));
 
@@ -1518,11 +1519,12 @@ mod browser_tests {
             .notifications_mut(id)
             .expect("a listed browser")
             .push(QueuedNotification {
-                application_number: 1,
+                application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
                 account_number: None,
+                event: None,
             });
         anchor.set_woken_again(id, Some(1_000));
 

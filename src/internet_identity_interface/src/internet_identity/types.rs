@@ -1183,6 +1183,17 @@ pub struct NotificationAppInfo {
     /// destroys its storage and tells nobody, so an app is known to be alive only by it
     /// having just answered.
     pub last_seen_ns: Timestamp,
+    /// The probe this browser last sent, while it is still queued and unexpired.
+    ///
+    /// Empty says the entry is no longer queued and nothing more: the app may have
+    /// taken it, a full queue may have evicted it, or the relay post may have failed,
+    /// and none of the three can be told apart from here. The signal that proves the
+    /// app is alive is `last_seen_ns`, stamped on the call only a live app makes.
+    ///
+    /// Queued for this browser's entry, so an app on another device answering its own
+    /// probe can never clear this one: what is waiting here is this identity's, on this
+    /// device, and only the app this browser points at is woken for it.
+    pub pending_probe: Option<NotificationId>,
 }
 
 /// Offers the Home Screen app this browser has to another identity signed in on the same
@@ -1393,6 +1404,59 @@ pub struct NotificationToShow {
     pub account_number: Option<AccountNumber>,
     pub canister_id: Principal,
     pub id: NotificationId,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    ///
+    /// An app's notification carries no text: the service worker fetches it from the app
+    /// with a delegation it mints for the purpose, which is what keeps the content off
+    /// the push service. One of these carries no text either, for the same reason, but
+    /// there is nothing to fetch and nobody to mint for: the worker already signs to
+    /// this canister, and what it is being told is right here. The words are the
+    /// frontend's, so this says what happened rather than what to show.
+    pub event: Option<NotificationEvent>,
+}
+
+/// Asks the canister to wake the Home Screen app this browser points at, so the browser
+/// can learn whether it is still there.
+///
+/// Nothing says when a user deletes a web app: iOS destroys its storage and tells
+/// nobody. The only way to find out is to send it something and see what happens, which
+/// is why the answer is also worth showing the user rather than being a silent test.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ProbeNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ProbeNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app, so there is nothing to wake.
+    NoNotificationApp,
+    /// Nothing was sent, so there is nothing to watch for. The app has registered
+    /// nothing yet, this identity has it switched off or is signed out on this browser,
+    /// the browser itself has been unused for long enough to count as gone, or the
+    /// canister had no room for another outcall. The browser's own registration is never
+    /// woken instead: what it would deliver says nothing about the app.
+    NotReachable,
+    InternalCanisterError(String),
+}
+
+/// Something Internet Identity has to tell the user about their own identity.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationEvent {
+    /// This device now receives this identity's notifications, which is worth saying on
+    /// the device itself: the user allowed it somewhere else, and an app serving several
+    /// identities is the only place that can say which one was switched on.
+    NotificationsOn(IdentityForNotification),
+}
+
+/// Which identity a notification is about, in the terms the user knows it by.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdentityForNotification {
+    pub anchor_number: AnchorNumber,
+    /// What the user called it, where they have named it. Nobody recognises an identity
+    /// by its number, so the number is what is shown only when there is nothing better.
+    pub name: Option<String>,
 }
 
 /// `None` once nothing is left to show.
