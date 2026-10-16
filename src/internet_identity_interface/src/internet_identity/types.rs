@@ -166,6 +166,8 @@ pub enum RegisterResponse {
     CanisterFull,
     #[serde(rename = "bad_challenge")]
     BadChallenge,
+    #[serde(rename = "device_already_used")]
+    DeviceAlreadyUsed,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

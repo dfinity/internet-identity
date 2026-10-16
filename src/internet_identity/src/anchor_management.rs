@@ -311,6 +311,14 @@ pub fn check_passkey_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String
         .ok_or_else(|| "passkey with this public key is already used".to_string())
 }
 
+/// Check if the given `PublicKey` is not used as a recovery phrase by any anchor.
+pub fn check_recovery_phrase_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String> {
+    lookup_caller_identity_by_recovery_phrase(Principal::self_authenticating(pubkey))
+        .is_none()
+        .then_some(())
+        .ok_or_else(|| "recovery phrase with this public key is already used".to_string())
+}
+
 /// Set `name` of the given anchor.
 /// Return an error if the `name` to be updated is too long.
 pub fn set_name(anchor: &mut Anchor, name: Option<String>) -> Result<Operation, AnchorError> {

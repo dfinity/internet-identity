@@ -116,7 +116,8 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), RejectRespo
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number_1 = flows::register_anchor(&env, canister_id);
-    let identity_number_2 = flows::register_anchor(&env, canister_id);
+    let identity_number_2 =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
     let prepare_id_alias_req_1 = PrepareIdAliasRequest {
@@ -155,7 +156,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), RejectRespo
         let prepared_id_alias_2 = api::vc_mvp::prepare_id_alias(
             &env,
             canister_id,
-            principal_1(),
+            principal_2(),
             prepare_id_alias_req_2,
         )?
         .expect("prepare id_alias failed");
@@ -177,7 +178,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), RejectRespo
             .expect("failed to get id_alias credentials");
 
     let id_alias_credentials_2 =
-        api::vc_mvp::get_id_alias(&env, canister_id, principal_1(), get_id_alias_req_2)?
+        api::vc_mvp::get_id_alias(&env, canister_id, principal_2(), get_id_alias_req_2)?
             .expect("failed to get id_alias credentials");
 
     assert_eq!(

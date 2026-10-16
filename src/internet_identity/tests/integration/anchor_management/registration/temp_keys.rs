@@ -125,16 +125,16 @@ fn should_not_allow_temp_key_to_equal_device_key() -> Result<(), RejectResponse>
     Ok(())
 }
 
-/// Tests that the temp key is bound to a specific anchor even if the same device is used on multiple anchors.
+/// Tests that the temp key is bound to a specific anchor.
 #[test]
 fn should_not_allow_temp_key_for_different_anchor() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let device = device_data_1();
     let temp_key = test_principal(1);
 
-    let anchor_without_temp_key = flows::register_anchor_with_device(&env, canister_id, &device);
-    register_with_temp_key(&env, canister_id, temp_key, &device);
+    let anchor_without_temp_key =
+        flows::register_anchor_with_device(&env, canister_id, &device_data_2());
+    register_with_temp_key(&env, canister_id, temp_key, &device_data_1());
 
     let result = api::get_anchor_info(&env, canister_id, temp_key, anchor_without_temp_key);
     expect_user_error_with_message(
@@ -145,18 +145,16 @@ fn should_not_allow_temp_key_for_different_anchor() -> Result<(), RejectResponse
     Ok(())
 }
 
-/// Tests that the same device can be used for multiple anchor registrations with different temp keys
-/// and that the temp keys are bound to their respective anchors.
+/// Tests that the temp keys of multiple anchor registrations are bound to their respective anchors.
 #[test]
-fn should_separate_temp_keys_by_anchor_for_same_device() -> Result<(), RejectResponse> {
+fn should_separate_temp_keys_by_anchor() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let device = device_data_1();
     let temp_key_1 = test_principal(1);
     let temp_key_2 = test_principal(2);
 
-    let anchor1 = register_with_temp_key(&env, canister_id, temp_key_1, &device);
-    let anchor2 = register_with_temp_key(&env, canister_id, temp_key_2, &device);
+    let anchor1 = register_with_temp_key(&env, canister_id, temp_key_1, &device_data_1());
+    let anchor2 = register_with_temp_key(&env, canister_id, temp_key_2, &device_data_2());
 
     // make an authenticate call to verify that the temp key is working
     api::get_anchor_info(&env, canister_id, temp_key_1, anchor1)?;
@@ -235,6 +233,7 @@ fn device(n: u64) -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from([n as u8; 64]),
         alias: "Device ".to_string() + n.to_string().as_str(),
+        credential_id: Some(ByteBuf::from([n as u8; 16])),
         ..DeviceData::auth_test_device()
     }
 }

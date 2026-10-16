@@ -596,6 +596,36 @@ fn should_not_overwrite_device_credential_lookup() {
     );
 }
 
+/// A later anchor with the same passkey must not take over the passkey index entries of an
+/// earlier anchor.
+#[test]
+fn should_not_overwrite_passkey_indices_of_another_anchor() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let mut anchor_0 = storage.allocate_anchor(0).unwrap();
+    let mut anchor_1 = storage.allocate_anchor(0).unwrap();
+    let device = Device {
+        pubkey: ByteBuf::from(vec![0]),
+        credential_id: Some(ByteBuf::from(vec![0])),
+        ..sample_device()
+    };
+    let credential_id = device.credential_id.clone().unwrap();
+    anchor_0.add_device(device.clone()).unwrap();
+    storage.write(anchor_0.clone()).unwrap();
+
+    anchor_1.add_device(device.clone()).unwrap();
+    storage.write(anchor_1.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_with_passkey_pubkey(&device.pubkey),
+        Some(anchor_0.anchor_number())
+    );
+    assert_eq!(
+        storage.lookup_anchor_with_device_credential(&credential_id),
+        Some(anchor_0.anchor_number())
+    );
+}
+
 #[test]
 fn should_record_that_a_named_account_was_used() {
     let memory = VectorMemory::default();

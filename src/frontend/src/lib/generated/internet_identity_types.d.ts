@@ -1886,6 +1886,12 @@ export interface RateLimitConfig {
 }
 export type RegisterResponse = {
     /**
+     * The device (its public key or credential id) is already used by an identity.
+     */
+    'device_already_used' : null
+  } |
+  {
+    /**
      * The challenge was not successful.
      */
     'bad_challenge' : null

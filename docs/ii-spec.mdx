@@ -457,7 +457,7 @@ The summary is given by the Candid interface:
 
 **Authorization**: This `register` request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
-The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ Identity Anchor, creates the Identity record, and adds the given device as the first device.
+The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ Identity Anchor, creates the Identity record, and adds the given device as the first device. If the public key or the credential id of the given device is already used by an identity, the call returns `device_already_used` and no Identity Anchor is created.
 
 In order to protect the Internet Computer from too many "free" update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a CAPTCHA challenge. The `register` call can only succeed if the `ChallengeResult` contains a `key` for a challenge that was created with `create_challenge` (see below) in the last 5 minutes _and_ if the `chars` match the characters that the Internet Identity Service has stored internally for that `key`.
 

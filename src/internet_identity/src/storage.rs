@@ -1574,17 +1574,30 @@ impl<M: Memory + Clone> Storage<M> {
                 .remove(credential_id);
         }
 
-        for credential_id in current_passkey_credential_ids {
+        for credential_id in current_passkey_credential_ids.iter() {
             // Only insert if the credential id isn't yet assigned to an anchor.
-            if self
+            match self
                 .lookup_anchor_with_passkey_credential_memory
-                .contains_key(&credential_id)
+                .get(credential_id)
             {
-                continue;
+                Some(existing_anchor_number) if existing_anchor_number == anchor_number => {}
+                Some(existing_anchor_number) => {
+                    // This credential id is already occupied; do not overwrite it.
+                    if !previous_passkey_credential_ids.contains(credential_id) {
+                        ic_cdk::println!(
+                            "WARNING: Passkey credential id {} is already indexed for anchor \
+                             number {}; skipping indexing for anchor number {}",
+                            hex::encode(credential_id.to_bytes()),
+                            existing_anchor_number,
+                            anchor_number,
+                        );
+                    }
+                }
+                None => {
+                    self.lookup_anchor_with_passkey_credential_memory
+                        .insert(credential_id.clone(), anchor_number);
+                }
             }
-
-            self.lookup_anchor_with_passkey_credential_memory
-                .insert(credential_id, anchor_number);
         }
     }
 

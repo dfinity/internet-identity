@@ -532,9 +532,28 @@ pub fn device_with_origin(origin: Option<String>) -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from(origin.as_deref().unwrap_or(PUBKEY_1)),
         alias: "My Device".to_string(),
-        credential_id: Some(ByteBuf::from("credential id 1")),
+        credential_id: Some(ByteBuf::from(
+            origin
+                .as_deref()
+                .map_or("credential id 1".to_string(), |origin| {
+                    format!("credential id {origin}")
+                }),
+        )),
         origin,
         ..DeviceData::auth_test_device()
+    }
+}
+
+/// Returns a copy of `device` with a pubkey and credential id derived from `n`, so that it can be
+/// registered on another anchor (devices must be unique across anchors).
+pub fn distinct_device(device: &DeviceData, n: u64) -> DeviceData {
+    let pubkey = [device.pubkey.as_slice(), format!(" #{n}").as_bytes()].concat();
+    DeviceData {
+        pubkey: ByteBuf::from(pubkey.clone()),
+        credential_id: Some(ByteBuf::from(
+            [b"credential id of ".as_slice(), &pubkey].concat(),
+        )),
+        ..device.clone()
     }
 }
 

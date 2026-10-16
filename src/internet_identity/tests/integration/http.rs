@@ -206,7 +206,11 @@ fn metrics_user_count_should_increase_after_register() -> Result<(), RejectRespo
         0f64,
     );
     for count in 0..2 {
-        flows::register_anchor(&env, canister_id);
+        flows::register_anchor_with_device(
+            &env,
+            canister_id,
+            &distinct_device(&device_data_1(), count),
+        );
         assert_metric(
             &get_metrics(&env, canister_id),
             "internet_identity_user_count",
@@ -432,8 +436,9 @@ fn metrics_inflight_challenges() -> Result<(), RejectResponse> {
 fn metrics_device_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device_2 = distinct_device(&device_data_1(), 0);
     let user_number_1 = flows::register_anchor(&env, canister_id);
-    let user_number_2 = flows::register_anchor(&env, canister_id);
+    let user_number_2 = flows::register_anchor_with_device(&env, canister_id, &device_2);
 
     let metrics = get_metrics(&env, canister_id);
     let (challenge_count, _) =
@@ -441,7 +446,7 @@ fn metrics_device_registration_mode() -> Result<(), RejectResponse> {
     assert_eq!(challenge_count, 0f64);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
-    api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_2)?;
+    api::enter_device_registration_mode(&env, canister_id, device_2.principal(), user_number_2)?;
 
     let metrics = get_metrics(&env, canister_id);
     let (challenge_count, _) =
