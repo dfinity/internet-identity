@@ -7894,6 +7894,48 @@ fn a_new_offer_replaces_the_one_that_anchor_already_had() {
     );
 }
 
+/// Every offer ever made of a record goes with it. A browser that links a fresh app key
+/// gets a fresh record and a fresh id, so the offers of the record it left behind are
+/// rows nothing else would ever remove: expiry does not, and neither does a claim that
+/// never comes.
+#[test]
+fn deleting_an_app_takes_every_offer_made_of_it() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    storage.update_salt([5u8; 32]);
+    let anchor = anchor_with_browser(&mut storage, 10_000);
+    storage.write(anchor).expect("writing the anchor");
+
+    // Each round is the app installed again under a key of its own, and offered to a
+    // second identity on the device that never spends it.
+    let mut handle = [0u8; 32];
+    let mut key = ByteBuf::new();
+    for round in 0..4u8 {
+        key = ByteBuf::from(vec![round; 91]);
+        let app = storage
+            .notification_app_for_key(&key, 1_000)
+            .expect("creating the record");
+        let mut anchor = storage.read(10_000).expect("reading the anchor");
+        anchor.point_at_notification_app(0, app.id);
+        storage.write(anchor).expect("writing the anchor");
+        handle = storage
+            .offer_notification_app(app.id, 10_001, 2_000)
+            .expect("offering the app");
+    }
+
+    assert_eq!(storage.notification_app_handle_memory.len(), 1);
+    assert_eq!(storage.notification_app_offer_nonce_memory.len(), 1);
+
+    // And what is left is the live record's own offer, still spendable.
+    let live = storage
+        .notification_app_with_principal(Principal::self_authenticating(&key))
+        .expect("the live record");
+    assert_eq!(
+        storage.take_notification_app_offer(handle, 1_500),
+        Some(live.id)
+    );
+}
+
 /// An offer another anchor holds is its own: one browser asking again replaces what it
 /// had and leaves the other where it was.
 #[test]

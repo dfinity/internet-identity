@@ -348,9 +348,12 @@ const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
 const NOTIFICATION_APP_HANDLE_MEMORY_ID: MemoryId =
     MemoryId::new(NOTIFICATION_APP_HANDLE_MEMORY_INDEX);
 
-/// The nonce the next handle for an anchor and app is derived with, one row per pair.
+/// The nonce the next handle for an app and anchor is derived with, one row per pair.
 /// It only ever rises, which is what keeps a spent handle from being derived a second
 /// time, and keeping it is also what lets a new offer replace the outstanding one.
+///
+/// Keyed by the app first, so deleting a record can range over exactly the anchors it
+/// was offered to and leave nothing of itself behind.
 const NOTIFICATION_APP_OFFER_NONCE_MEMORY_ID: MemoryId =
     MemoryId::new(NOTIFICATION_APP_OFFER_NONCE_MEMORY_INDEX);
 
@@ -515,7 +518,7 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the app offer nonces.
     notification_app_offer_nonce_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     notification_app_offer_nonce_memory:
-        StableBTreeMap<(StorableAnchorNumber, StorableNotificationAppId), u64, ManagedMemory<M>>,
+        StableBTreeMap<(StorableNotificationAppId, StorableAnchorNumber), u64, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -1628,8 +1631,9 @@ impl<M: Memory + Clone> Storage<M> {
     /// from a nonce that only ever rises, so two offers made in one consensus round are
     /// two handles and a spent one is never derived again.
     ///
-    /// One outstanding offer per anchor and app: a new one replaces whatever that pair
-    /// had, which is what bounds the map. Nothing else removes an offer nobody spends.
+    /// One outstanding offer per app and anchor: a new one replaces whatever that pair
+    /// had. Everything a pair left behind goes with the record, in
+    /// [`Self::delete_notification_app`].
     pub fn offer_notification_app(
         &mut self,
         app_id: NotificationAppId,
@@ -1639,7 +1643,7 @@ impl<M: Memory + Clone> Storage<M> {
         let salt = *self.salt().ok_or(StorageError::MissingSalt)?;
         let nonce = self
             .notification_app_offer_nonce_memory
-            .get(&(anchor_number, app_id))
+            .get(&(app_id, anchor_number))
             .unwrap_or(0);
         if let Some(previous) = nonce.checked_sub(1) {
             self.notification_app_handle_memory
@@ -1657,7 +1661,7 @@ impl<M: Memory + Clone> Storage<M> {
             },
         );
         self.notification_app_offer_nonce_memory.insert(
-            (anchor_number, app_id),
+            (app_id, anchor_number),
             nonce
                 .checked_add(1)
                 .ok_or(StorageError::NotificationAppOfferNonceOverflow)?,
@@ -1713,8 +1717,14 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default()
     }
 
-    /// Forgets a record and the principal that resolved to it. The id is retired with
-    /// it: the allocator never looks back, so nothing is ever handed this one again.
+    /// Forgets a record, the principal that resolved to it, and every offer ever made of
+    /// it. The id is retired with it: the allocator never looks back, so nothing is ever
+    /// handed this one again, and a handle derived from it is never derived again either.
+    ///
+    /// The offers are what would otherwise accumulate without bound: an identity that
+    /// links a fresh key each time is a fresh record every time, and an offer nobody
+    /// spends is removed by nothing else. The sweep ranges over the anchors this record
+    /// was offered to rather than the whole map.
     fn delete_notification_app(&mut self, app_id: NotificationAppId) {
         let Some(app) = self.notification_app_memory.remove(&app_id) else {
             // An id is handed out with the record it names and retired with it, so an id
@@ -1729,6 +1739,25 @@ impl<M: Memory + Clone> Storage<M> {
         };
         self.lookup_notification_app_with_principal_memory
             .remove(&Principal::self_authenticating(&app.key));
+
+        let salt = self.salt().copied();
+        let offered_to: Vec<(AnchorNumber, u64)> = self
+            .notification_app_offer_nonce_memory
+            .range((app_id, AnchorNumber::MIN)..=(app_id, AnchorNumber::MAX))
+            .map(|((_, anchor_number), nonce)| (anchor_number, nonce))
+            .collect();
+        for (anchor_number, nonce) in offered_to {
+            // The nonce is the one the next handle would use, so the outstanding handle
+            // is the one before it.
+            if let (Some(salt), Some(outstanding)) = (salt, nonce.checked_sub(1)) {
+                self.notification_app_handle_memory
+                    .remove(&StorableNotificationAppHandle(
+                        Self::notification_app_handle(salt, app_id, anchor_number, outstanding),
+                    ));
+            }
+            self.notification_app_offer_nonce_memory
+                .remove(&(app_id, anchor_number));
+        }
     }
 
     /// Forgets a record no anchor points at.
