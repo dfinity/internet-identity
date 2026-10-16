@@ -1,7 +1,7 @@
 use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
-use crate::state;
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
+use crate::{anchor_management, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
@@ -86,6 +86,10 @@ pub fn register(
     // sanity check
     verify_caller_is_device_or_temp_key(&temp_key, &device_principal);
 
+    // Enforce global uniqueness of the device across all anchors (same as for `add`, `replace`,
+    // `update` and `identity_registration_finish`). This must happen before an anchor is allocated.
+    check_device_is_not_used(&device).unwrap_or_else(|err| trap(&err));
+
     let now = time();
     let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor(now));
     let Some(mut anchor) = allocation else {
@@ -127,6 +131,30 @@ pub fn register(
     RegisterResponse::Registered {
         user_number: anchor_number,
     }
+}
+
+/// Check that neither the public key nor the credential id of the given device is already used
+/// by any anchor. Since the caller does not have to prove possession of the device key when
+/// registering with a `temp_key`, this prevents creating anchors with another anchor's device.
+fn check_device_is_not_used(device: &Device) -> Result<(), String> {
+    anchor_management::check_passkey_pubkey_is_not_used(&device.pubkey)?;
+
+    let device_principal = Principal::self_authenticating(&device.pubkey);
+    if anchor_management::lookup_caller_identity_by_recovery_phrase(device_principal).is_some() {
+        return Err("device with this public key is already used".to_string());
+    }
+
+    if let Some(ref credential_id) = device.credential_id {
+        if state::storage_borrow(|storage| {
+            storage.lookup_anchor_with_device_credential(credential_id)
+        })
+        .is_some()
+        {
+            return Err("passkey with this credential id is already used".to_string());
+        }
+    }
+
+    Ok(())
 }
 
 /// Perform a sanity check on the caller. If the caller is neither the device nor the temporary key, then we

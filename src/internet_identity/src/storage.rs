@@ -1450,7 +1450,6 @@ impl<M: Memory + Clone> Storage<M> {
             .collect::<BTreeSet<_>>();
 
         let principals_to_be_removed = previous_principals.difference(&current_principals);
-        let principals_to_be_added = current_principals.difference(&previous_principals);
 
         for principal in principals_to_be_removed {
             let Some(existing_anchor_number) = self
@@ -1468,23 +1467,33 @@ impl<M: Memory + Clone> Storage<M> {
                 .remove(principal);
         }
 
-        for principal in principals_to_be_added {
-            if self
+        // (Re-)index all current passkeys, not just the newly added ones, so that passkeys
+        // that are missing from the index (e.g., because their entry was held by another
+        // anchor that has since dropped it) get indexed on the next write.
+        for principal in &current_principals {
+            match self
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .contains_key(principal)
+                .get(principal)
             {
-                // This principal is already occupied; do not overwrite it.
-                ic_cdk::println!(
-                    "WARNING: Principal {:?} derived from a passkey credential pubkey is already \
-                     indexed for another anchor; skipping indexing for anchor number {}",
-                    principal,
-                    anchor_number,
-                );
-                continue;
-            };
-
-            self.lookup_anchor_with_passkey_pubkey_hash_memory
-                .insert(*principal, anchor_number);
+                Some(existing_anchor_number) if existing_anchor_number == anchor_number => {}
+                Some(existing_anchor_number) => {
+                    // This principal is already occupied; do not overwrite it.
+                    if !previous_principals.contains(principal) {
+                        ic_cdk::println!(
+                            "WARNING: Principal {:?} derived from a passkey credential pubkey is \
+                             already indexed for anchor number {}; skipping indexing for anchor \
+                             number {}",
+                            principal,
+                            existing_anchor_number,
+                            anchor_number,
+                        );
+                    }
+                }
+                None => {
+                    self.lookup_anchor_with_passkey_pubkey_hash_memory
+                        .insert(*principal, anchor_number);
+                }
+            }
         }
     }
 
@@ -1574,17 +1583,30 @@ impl<M: Memory + Clone> Storage<M> {
                 .remove(credential_id);
         }
 
-        for credential_id in current_passkey_credential_ids {
+        for credential_id in current_passkey_credential_ids.iter() {
             // Only insert if the credential id isn't yet assigned to an anchor.
-            if self
+            match self
                 .lookup_anchor_with_passkey_credential_memory
-                .contains_key(&credential_id)
+                .get(credential_id)
             {
-                continue;
+                Some(existing_anchor_number) if existing_anchor_number == anchor_number => {}
+                Some(existing_anchor_number) => {
+                    // This credential id is already occupied; do not overwrite it.
+                    if !previous_passkey_credential_ids.contains(credential_id) {
+                        ic_cdk::println!(
+                            "WARNING: Passkey credential id {} is already indexed for anchor \
+                             number {}; skipping indexing for anchor number {}",
+                            hex::encode(credential_id.to_bytes()),
+                            existing_anchor_number,
+                            anchor_number,
+                        );
+                    }
+                }
+                None => {
+                    self.lookup_anchor_with_passkey_credential_memory
+                        .insert(credential_id.clone(), anchor_number);
+                }
             }
-
-            self.lookup_anchor_with_passkey_credential_memory
-                .insert(credential_id, anchor_number);
         }
     }
 

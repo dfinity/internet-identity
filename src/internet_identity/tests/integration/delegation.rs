@@ -530,7 +530,7 @@ fn should_return_different_principals_for_different_users() -> Result<(), Reject
     let user_number_1 =
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
-        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
     let frontend_hostname = "https://dapp-1.com";
 
     let dapp_principal_1 = api::get_principal(
@@ -544,7 +544,7 @@ fn should_return_different_principals_for_different_users() -> Result<(), Reject
     let dapp_principal_2 = api::get_principal(
         &env,
         canister_id,
-        principal_1(),
+        principal_2(),
         user_number_2,
         frontend_hostname,
     )?;

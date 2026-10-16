@@ -12,6 +12,7 @@ use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
 use regex::Regex;
+use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 /// Tests user registration with cross checks for get_anchor_credentials, get_anchor_info and get_principal.
@@ -39,8 +40,7 @@ fn should_register_new_anchor() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Tests that multiple anchors can be registered (even with the same device / keys). This is useful
-/// for users to separate different contexts using multiple anchors.
+/// Tests that multiple anchors can be registered with different devices.
 #[test]
 fn should_allow_multiple_registrations() {
     let env = env();
@@ -48,9 +48,112 @@ fn should_allow_multiple_registrations() {
     let user_number_1 =
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
-        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
 
     assert_ne!(user_number_1, user_number_2);
+}
+
+/// Tests that a device that is already used by another anchor cannot be registered again,
+/// neither by the device itself nor via a temp key (which does not prove possession of the device).
+#[test]
+fn should_not_register_device_used_by_another_anchor() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number =
+        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+    let attacker = test_principal(42);
+
+    let cases = [
+        (principal_1(), device_data_1(), None),
+        (attacker, device_data_1(), Some(attacker)),
+        // Same pubkey, different credential id.
+        (
+            attacker,
+            DeviceData {
+                credential_id: Some(ByteBuf::from("another credential id")),
+                ..device_data_1()
+            },
+            Some(attacker),
+        ),
+        // Same credential id, different pubkey.
+        (
+            attacker,
+            DeviceData {
+                pubkey: ByteBuf::from(PUBKEY_2),
+                ..device_data_1()
+            },
+            Some(attacker),
+        ),
+    ];
+
+    let already_used = Regex::new("is already used").unwrap();
+    for (sender, device, temp_key) in cases {
+        let challenge = api::create_challenge(&env, canister_id)?;
+        let result = api::register(
+            &env,
+            canister_id,
+            sender,
+            &device,
+            &ChallengeAttempt {
+                chars: "a".to_string(),
+                key: challenge.challenge_key,
+            },
+            temp_key,
+        );
+        expect_user_error_with_message(result, CanisterCalledTrap, already_used.clone());
+    }
+
+    // No anchor was allocated for the rejected registrations.
+    let next_user_number =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+    assert_eq!(next_user_number, user_number + 1);
+
+    // The credential id still resolves to the original anchor.
+    let lookup = api::lookup_device_key(
+        &env,
+        canister_id,
+        Principal::anonymous(),
+        device_data_1().credential_id.as_ref().unwrap(),
+    )?
+    .expect("credential id should be indexed");
+    assert_eq!(lookup.anchor_number, user_number);
+    assert_eq!(lookup.pubkey, device_data_1().pubkey);
+    Ok(())
+}
+
+/// Tests that a recovery phrase that is already used by another anchor cannot be registered again.
+#[test]
+fn should_not_register_recovery_phrase_used_by_another_anchor() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    api::add(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        &recovery_device_data_1(),
+    )?;
+    let attacker = test_principal(42);
+
+    let challenge = api::create_challenge(&env, canister_id)?;
+    let result = api::register(
+        &env,
+        canister_id,
+        attacker,
+        &recovery_device_data_1(),
+        &ChallengeAttempt {
+            chars: "a".to_string(),
+            key: challenge.challenge_key,
+        },
+        Some(attacker),
+    );
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("is already used").unwrap(),
+    );
+    Ok(())
 }
 
 /// Tests that the user numbers start at the beginning of the init range and are capped at the end (exclusive).
@@ -63,15 +166,16 @@ fn should_assign_correct_user_numbers() -> Result<(), RejectResponse> {
     let user_number = flows::register_anchor(&env, canister_id);
     assert_eq!(user_number, 127);
 
-    let user_number = flows::register_anchor(&env, canister_id);
+    let user_number = flows::register_anchor_with_device(&env, canister_id, &device_data_2());
     assert_eq!(user_number, 128);
 
+    let device = distinct_device(&device_data_1(), 0);
     let challenge = api::create_challenge(&env, canister_id)?;
     let result = api::register(
         &env,
         canister_id,
-        principal_1(),
-        &device_data_1(),
+        device.principal(),
+        &device,
         &ChallengeAttempt {
             chars: "a".to_string(),
             key: challenge.challenge_key,
@@ -228,8 +332,12 @@ fn should_rate_limit_register_calls() -> Result<(), RejectResponse> {
         }),
     );
 
-    for _ in 0..2 {
-        flows::register_anchor(&env, canister_id);
+    for i in 0..2 {
+        flows::register_anchor_with_device(
+            &env,
+            canister_id,
+            &distinct_device(&device_data_1(), i),
+        );
     }
     let challenge = api::create_challenge(&env, canister_id)?;
     let result = api::register(
@@ -285,8 +393,12 @@ fn should_not_allow_more_than_max_tokens_calls_on_rate_limit() -> Result<(), Rej
     );
 
     // the canister starts out with max_tokens, so use some to make the replenish actually do something
-    for _ in 0..10 {
-        flows::register_anchor(&env, canister_id);
+    for i in 0..10 {
+        flows::register_anchor_with_device(
+            &env,
+            canister_id,
+            &distinct_device(&device_data_1(), i),
+        );
     }
 
     assert_metric(
@@ -298,7 +410,7 @@ fn should_not_allow_more_than_max_tokens_calls_on_rate_limit() -> Result<(), Rej
     env.advance_time(Duration::from_secs(100));
 
     // some activity required to process the rate limit (which will use one token)
-    flows::register_anchor(&env, canister_id);
+    flows::register_anchor_with_device(&env, canister_id, &distinct_device(&device_data_1(), 10));
 
     assert_metric(
         &get_metrics(&env, canister_id),
