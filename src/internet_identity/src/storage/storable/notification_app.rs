@@ -1,4 +1,4 @@
-use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::storage::anchor::WebPushSubscription;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use ic_stable_structures::storable::Bound;

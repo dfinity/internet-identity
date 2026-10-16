@@ -1273,10 +1273,11 @@ mod mirror_verified_email_tests {
 mod browser_tests {
     use super::*;
     use crate::browser_key::test_keys::{claim_token, link_token, public_key, signing_key};
-    use crate::notifications::app::NotificationAppRef;
+    use crate::notifications::app::{NotificationApp, NotificationAppRef};
     use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
-        BrowserBrand, BrowserDescription, FormFactor, OperatingSystem, PublicKey,
+        BrowserBrand, BrowserDescription, FormFactor, NotificationAppInfo, OperatingSystem,
+        PublicKey,
     };
 
     fn anchor() -> Anchor {
@@ -1326,14 +1327,15 @@ mod browser_tests {
             .unwrap();
 
         assert_eq!(anchor.notification_app(id).map(|app| app.app_id), None);
-        assert_eq!(anchor.point_at_notification_app(id, 7), None);
+        anchor.point_at_notification_app(id, 7);
         assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(7));
     }
 
-    /// The record it pointed at before is answered, because it may now have no browser
-    /// pointing at it at all, and the caller is the only one that can go and look.
+    /// A browser points at the record it was pointed at last, and lets go of the one it
+    /// had: an entry carries one reference, so the record it left may now have no browser
+    /// pointing at it at all.
     #[test]
-    fn repointing_a_browser_answers_the_app_it_left() {
+    fn repointing_a_browser_lets_go_of_the_app_it_left() {
         let mut anchor = anchor();
         let (id, _) = anchor
             .resolve_browser(
@@ -1345,13 +1347,13 @@ mod browser_tests {
             .unwrap();
         anchor.point_at_notification_app(id, 7);
 
-        assert_eq!(anchor.point_at_notification_app(id, 8), Some(7));
+        anchor.point_at_notification_app(id, 8);
         assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(8));
     }
 
-    /// Pointing a browser at the record it already points at leaves nothing behind.
+    /// Pointing a browser at the record it already points at leaves it pointing there.
     #[test]
-    fn pointing_at_the_same_app_twice_leaves_nothing_behind() {
+    fn pointing_at_the_same_app_twice_leaves_it_pointed_there() {
         let mut anchor = anchor();
         let (id, _) = anchor
             .resolve_browser(
@@ -1363,7 +1365,7 @@ mod browser_tests {
             .unwrap();
         anchor.point_at_notification_app(id, 7);
 
-        assert_eq!(anchor.point_at_notification_app(id, 7), None);
+        anchor.point_at_notification_app(id, 7);
         assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(7));
     }
 
@@ -1383,7 +1385,7 @@ mod browser_tests {
         anchor.point_at_notification_app(id, 7);
         anchor.set_notification_app_enabled(id, false);
 
-        assert_eq!(anchor.point_at_notification_app(id, 7), None);
+        anchor.point_at_notification_app(id, 7);
         assert_eq!(
             anchor.notification_app(id),
             Some(NotificationAppRef {
@@ -1408,7 +1410,7 @@ mod browser_tests {
         anchor.point_at_notification_app(id, 7);
         anchor.set_notification_app_enabled(id, false);
 
-        assert_eq!(anchor.point_at_notification_app(id, 8), Some(7));
+        anchor.point_at_notification_app(id, 8);
         assert_eq!(
             anchor.notification_app(id),
             Some(NotificationAppRef {
@@ -1442,7 +1444,7 @@ mod browser_tests {
             .unwrap();
         anchor.point_at_notification_app(first, 7);
 
-        assert_eq!(anchor.point_at_notification_app(second, 7), None);
+        anchor.point_at_notification_app(second, 7);
         assert_eq!(anchor.notification_app(first), None);
         assert_eq!(
             anchor.notification_app(second).map(|app| app.app_id),
@@ -1451,12 +1453,86 @@ mod browser_tests {
         assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(second));
     }
 
+    /// A record as storage answers with one, with nothing registered: an app that has
+    /// been opened and has not been given permission yet.
+    fn record(app_id: NotificationAppId, last_used: Timestamp) -> NotificationApp {
+        NotificationApp {
+            id: app_id,
+            key: ByteBuf::from(vec![app_id as u8; 91]),
+            created_at: 1_000,
+            last_used,
+            webpush_subscription: None,
+        }
+    }
+
+    /// A reference naming a record that is gone is no app this identity has. The record
+    /// is the only evidence the app exists, so answering one without it would report a
+    /// vanished app as an app last seen at the epoch.
+    #[test]
+    fn a_reference_whose_record_is_gone_reads_as_no_app() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(
+            anchor.notification_app_info(id, |app_id| Some(record(app_id, 2_000))),
+            Some(NotificationAppInfo {
+                subscribed: false,
+                enabled: true,
+                last_seen_ns: 2_000,
+            })
+        );
+        assert_eq!(anchor.notification_app_info(id, |_| None), None);
+        // What is gone is the record. The reference stays, because the only thing that
+        // creates one is a token the app itself spent.
+        assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(7));
+    }
+
+    /// The identity's own view of its browsers answers what the browser's own read of
+    /// the same entry does, a record that is gone included.
+    #[test]
+    fn a_browsers_entry_reads_as_no_app_where_the_record_is_gone() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(
+            anchor
+                .browsers_info(|app_id| Some(record(app_id, 2_000)))
+                .expect("one browser")[0]
+                .notification_app,
+            Some(NotificationAppInfo {
+                subscribed: false,
+                enabled: true,
+                last_seen_ns: 2_000,
+            })
+        );
+        assert_eq!(
+            anchor.browsers_info(|_| None).expect("one browser")[0].notification_app,
+            None
+        );
+    }
+
     /// A browser the registry no longer lists has nothing to point.
     #[test]
     fn an_unknown_browser_points_at_nothing() {
         let mut anchor = anchor();
 
-        assert_eq!(anchor.point_at_notification_app(42, 7), None);
+        anchor.point_at_notification_app(42, 7);
         assert_eq!(anchor.notification_app(42).map(|app| app.app_id), None);
     }
 

@@ -1156,7 +1156,9 @@ pub struct SetNotificationAppEnabledRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SetNotificationAppEnabledError {
-    /// This browser points at no app, or the caller is no browser of this identity.
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app.
     NoNotificationApp,
     InternalCanisterError(String),
 }

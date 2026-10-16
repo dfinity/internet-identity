@@ -1358,8 +1358,11 @@ mod app_anchors {
     fn should_answer_an_app_only_the_identities_that_point_at_it() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let shared = link_app(&env, canister_id, first, 1, 100);
-        assert_eq!(link_app(&env, canister_id, second, 2, 100), shared);
+        let shared = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        assert_eq!(
+            link_app(&env, canister_id, second, SECOND_BROWSER_SEED, 100),
+            shared
+        );
         sign_in_as(&env, canister_id, principal_2(), second, ORIGIN, 3);
         let private = link_app(&env, canister_id, second, 3, 101);
 
@@ -1380,7 +1383,7 @@ mod app_anchors {
     fn should_answer_nothing_to_a_caller_that_is_no_app() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        link_app(&env, canister_id, anchor, 1, 100);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
 
         assert_eq!(
             notification_app_anchors(&env, canister_id, Principal::anonymous())?,
@@ -1390,7 +1393,7 @@ mod app_anchors {
             notification_app_anchors(
                 &env,
                 canister_id,
-                BrowserKey::new(1).successor().principal()
+                BrowserKey::new(FIRST_BROWSER_SEED).successor().principal()
             )?,
             Vec::<AnchorNumber>::new()
         );
@@ -1403,7 +1406,7 @@ mod app_anchors {
     fn should_answer_nothing_while_notifications_are_disabled() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, anchor, 1, 100);
+        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
 
         upgrade_ii_canister_with_arg(
             &env,
@@ -1438,13 +1441,13 @@ mod app_anchors {
     fn should_answer_nothing_once_the_last_reference_is_dropped() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        let first = link_app(&env, canister_id, anchor, 1, 100);
+        let first = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
         assert_eq!(
             notification_app_anchors(&env, canister_id, first)?,
             vec![anchor]
         );
 
-        let second = link_app(&env, canister_id, anchor, 1, 101);
+        let second = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 101);
 
         assert_eq!(
             notification_app_anchors(&env, canister_id, first)?,
@@ -1511,7 +1514,7 @@ mod claims {
     fn should_deliver_for_a_second_identity_after_one_call() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, first, 1, 100);
+        let app = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
 
         claim(&env, canister_id, (second, 2), (first, 1), expires_at(&env))?
             .expect("claim_notification_app returned Err");

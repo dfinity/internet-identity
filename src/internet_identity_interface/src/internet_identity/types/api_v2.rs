@@ -88,9 +88,10 @@ pub struct BrowserInfo {
     pub last_used: Timestamp,
     /// Sessions this browser holds, counted from the stored records.
     pub session_count: u32,
-    /// The Home Screen app this browser points at, where it has one. Absent is the whole
-    /// of "not installed, or installed and never opened": the record is created by the
-    /// app's first open, so there is nothing to point at before it.
+    /// The Home Screen app this browser points at, where it has one. Absent is "not
+    /// installed, or installed and never opened": the record is created by the app's
+    /// first open, so there is nothing to point at before it. Absent too where the
+    /// record this browser points at is gone, and where this deployment does not notify.
     pub notification_app: Option<NotificationAppInfo>,
 }
 

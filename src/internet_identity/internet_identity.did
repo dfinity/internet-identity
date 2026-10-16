@@ -1087,9 +1087,10 @@ type BrowserInfo = record {
     last_used : Timestamp;
     // Sessions this browser holds. Zero means it is signed in to nothing.
     session_count : nat32;
-    // The Home Screen app this browser points at, where it has one. Absent is the whole
-    // of "not installed, or installed and never opened": the record is created by the
-    // app's first open, so there is nothing to point at before that.
+    // The Home Screen app this browser points at, where it has one. Absent is "not
+    // installed, or installed and never opened": the record is created by the app's
+    // first open, so there is nothing to point at before that. Absent too where the
+    // record this browser points at is gone, and where this deployment does not notify.
     notification_app : opt NotificationAppInfo;
 };
 
@@ -1915,7 +1916,9 @@ type SetNotificationAppEnabledRequest = record {
 };
 
 type SetNotificationAppEnabledError = variant {
-    // This browser points at no app, or the caller is no browser of this identity.
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app.
     NoNotificationApp;
     InternalCanisterError : text;
 };

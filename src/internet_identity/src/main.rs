@@ -413,9 +413,9 @@ fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool 
 /// carries. Answers only about the caller's own entry, so one browser cannot learn what
 /// another has installed.
 ///
-/// `None` for a browser that points at nothing, for a caller that is no browser of this
-/// identity, and where this deployment does not notify. None of the three can be told
-/// apart, so none can be probed with it.
+/// `None` for a browser that points at nothing, for a reference whose record is gone,
+/// for a caller that is no browser of this identity, and where this deployment does not
+/// notify. None of the four can be told apart, so none can be probed with it.
 #[query]
 fn get_notification_app_status(
     request: GetNotificationAppStatusRequest,
@@ -426,12 +426,8 @@ fn get_notification_app_status(
     let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
         return None;
     };
-    let reference = anchor.notification_app(browser_id)?;
-    let app = state::storage_borrow(|storage| storage.notification_app(reference.app_id))?;
-    Some(NotificationAppInfo {
-        subscribed: app.webpush_subscription.is_some(),
-        enabled: reference.enabled,
-        last_seen_ns: app.last_used,
+    anchor.notification_app_info(browser_id, |app_id| {
+        state::storage_borrow(|storage| storage.notification_app(app_id))
     })
 }
 
@@ -446,11 +442,11 @@ fn set_notification_app_enabled(
 ) -> Result<(), SetNotificationAppEnabledError> {
     if !notifications::notifications_enabled() {
         return Err(SetNotificationAppEnabledError::InternalCanisterError(
-            "notifications are not enabled".to_string(),
+            notifications::NOT_ENABLED.to_string(),
         ));
     }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| SetNotificationAppEnabledError::NoNotificationApp)?;
+        .map_err(|_| SetNotificationAppEnabledError::InvalidBrowserKey)?;
     if anchor.notification_app(browser_id).is_none() {
         return Err(SetNotificationAppEnabledError::NoNotificationApp);
     }
@@ -1606,15 +1602,11 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let browsers = state::anchor(identity_number).browsers_info(|app_id, enabled| {
-            let app = state::storage_borrow(|storage| storage.notification_app(app_id));
-            NotificationAppInfo {
-                subscribed: app
-                    .as_ref()
-                    .is_some_and(|app| app.webpush_subscription.is_some()),
-                enabled,
-                last_seen_ns: app.map_or(0, |app| app.last_used),
+        let browsers = state::anchor(identity_number).browsers_info(|app_id| {
+            if !notifications::notifications_enabled() {
+                return None;
             }
+            state::storage_borrow(|storage| storage.notification_app(app_id))
         });
 
         let identity_info = IdentityInfo {
