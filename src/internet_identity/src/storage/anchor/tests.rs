@@ -1324,9 +1324,9 @@ mod browser_tests {
             )
             .unwrap();
 
-        assert_eq!(anchor.notification_app(id), None);
+        assert_eq!(anchor.notification_app(id).map(|app| app.app_id), None);
         assert_eq!(anchor.point_at_notification_app(id, 7), None);
-        assert_eq!(anchor.notification_app(id), Some(7));
+        assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(7));
     }
 
     /// The record it pointed at before is answered, because it may now have no browser
@@ -1345,7 +1345,7 @@ mod browser_tests {
         anchor.point_at_notification_app(id, 7);
 
         assert_eq!(anchor.point_at_notification_app(id, 8), Some(7));
-        assert_eq!(anchor.notification_app(id), Some(8));
+        assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(8));
     }
 
     /// Pointing a browser at the record it already points at leaves nothing behind.
@@ -1363,7 +1363,7 @@ mod browser_tests {
         anchor.point_at_notification_app(id, 7);
 
         assert_eq!(anchor.point_at_notification_app(id, 7), None);
-        assert_eq!(anchor.notification_app(id), Some(7));
+        assert_eq!(anchor.notification_app(id).map(|app| app.app_id), Some(7));
     }
 
     /// A browser the registry no longer lists has nothing to point.
@@ -1372,7 +1372,7 @@ mod browser_tests {
         let mut anchor = anchor();
 
         assert_eq!(anchor.point_at_notification_app(42, 7), None);
-        assert_eq!(anchor.notification_app(42), None);
+        assert_eq!(anchor.notification_app(42).map(|app| app.app_id), None);
     }
 
     /// An app key is generated where no browser can reach it, so a key a browser signs

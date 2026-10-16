@@ -1,4 +1,4 @@
-use crate::notifications::app::{NotificationApp, NotificationAppId};
+use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::Timestamp;
@@ -55,4 +55,36 @@ impl Storable for StorableNotificationApp {
     }
 
     const BOUND: Bound = Bound::Unbounded;
+}
+
+/// What a browser entry holds about the app it points at: which record, and whether this
+/// identity wants that app to deliver for it.
+///
+/// The switch rides on the reference rather than on the record, because the record is
+/// shared by every identity pointing at it while the answer is each identity's own.
+#[derive(Encode, Decode, Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[cbor(map)]
+pub struct StorableNotificationAppRef {
+    #[n(0)]
+    pub app_id: StorableNotificationAppId,
+    #[n(1)]
+    pub enabled: bool,
+}
+
+impl From<NotificationAppRef> for StorableNotificationAppRef {
+    fn from(value: NotificationAppRef) -> Self {
+        StorableNotificationAppRef {
+            app_id: value.app_id,
+            enabled: value.enabled,
+        }
+    }
+}
+
+impl From<StorableNotificationAppRef> for NotificationAppRef {
+    fn from(value: StorableNotificationAppRef) -> Self {
+        NotificationAppRef {
+            app_id: value.app_id,
+            enabled: value.enabled,
+        }
+    }
 }
