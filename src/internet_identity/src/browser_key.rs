@@ -449,6 +449,7 @@ mod tests {
         )
         .is_none());
     }
+
     #[test]
     fn a_browser_key_signs_a_link_token_for_its_own_anchor_and_expiry() {
         let browser = key(1);
