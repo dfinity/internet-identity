@@ -402,9 +402,10 @@ fn link_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool 
 /// only the identity whose token installed it, so this is how it finds the other
 /// browsers on the device pointing at it.
 ///
-/// Empty where the app has no record, where nothing points at the one it has, and where
-/// this deployment does not notify. All three mean the same thing to the app: there is
-/// nobody here to deliver for.
+/// Empty in four situations, which all mean the same thing to the app: there is nobody
+/// here to deliver for. They are three code paths, because a key with no record and a
+/// caller that is not an app both fail `check_app_authorization`; the other two are a
+/// record nothing points at, and a deployment that does not notify.
 #[query]
 fn notification_app_anchors() -> Vec<AnchorNumber> {
     if !notifications::notifications_enabled() {
