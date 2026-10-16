@@ -7662,3 +7662,41 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .notification_app_with_principal(Principal::self_authenticating(&key))
         .is_some());
 }
+
+/// Eviction at the browser cap is the third way a pointer disappears, and it collects the
+/// record the same as the other two: the reference rides on the entry that is dropped.
+#[test]
+fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let key = ByteBuf::from(vec![7u8; 91]);
+    let app = storage
+        .notification_app_for_key(&key, 1_000)
+        .expect("creating the record");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id);
+    storage.write(anchor).expect("pointing at the app");
+
+    // The victim is the entry with the lowest `(last_used, id)`, so stamping every
+    // browser that follows later than the pointing one names it the victim outright.
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    let mut evicted = vec![];
+    for seed in 2..=(MAX_BROWSERS as u8 + 1) {
+        let (_, dropped) = anchor
+            .resolve_browser(
+                browser_key(seed, 0),
+                browser_key(seed, 1),
+                description(seed),
+                1,
+            )
+            .expect("registering a browser");
+        evicted.extend(dropped);
+    }
+    assert_eq!(evicted, vec![0]);
+    storage.write(anchor).expect("writing the evicted list");
+
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
+        None
+    );
+}
