@@ -948,22 +948,6 @@ impl Anchor {
             .filter(|previous| *previous != app_id)
     }
 
-    /// Stops `browser_id` pointing at the app it had, answering which one that was.
-    ///
-    /// What the user does to turn notifications off for good on this device, and what an
-    /// evicted entry takes with it. The record itself is not this list's to delete: the
-    /// caller is the one that can see whether anything still points at it.
-    pub fn stop_pointing_at_notification_app(
-        &mut self,
-        browser_id: BrowserId,
-    ) -> Option<NotificationAppId> {
-        self.browsers
-            .iter_mut()
-            .find(|browser| browser.id == browser_id)?
-            .notification_app
-            .take()
-    }
-
     /// The app this browser points at, where it has one.
     pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
         self.browsers
