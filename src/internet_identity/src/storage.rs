@@ -1588,6 +1588,21 @@ impl<M: Memory + Clone> Storage<M> {
             .remove(&Principal::self_authenticating(&app.key));
     }
 
+    /// Forgets a record no anchor points at.
+    ///
+    /// What the endpoint that created one calls when the write that was to point at it
+    /// failed. The record and the principal that resolves to it are committed with the
+    /// reply even where that reply is an `Err`, and a record with no pointer has no index
+    /// entry to count down, so nothing else would ever reach it.
+    ///
+    /// A second token spent on a record identities already hold leaves it alone.
+    pub(crate) fn delete_unreferenced_notification_app(&mut self, app_id: NotificationAppId) {
+        if !self.anchors_with_notification_app(app_id).is_empty() {
+            return;
+        }
+        self.delete_notification_app(app_id);
+    }
+
     fn sync_anchor_with_passkey_pubkey_index(
         &mut self,
         anchor_number: AnchorNumber,

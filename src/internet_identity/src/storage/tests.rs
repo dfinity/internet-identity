@@ -7700,3 +7700,46 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
         None
     );
 }
+
+/// The record an anchor write was to point at, where that write failed: the record is
+/// committed with the reply, and with no pointer and no index entry nothing else would
+/// ever reach it.
+#[test]
+fn an_app_no_anchor_points_at_is_deleted_on_request() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let key = ByteBuf::from(vec![7u8; 91]);
+    let app = storage
+        .notification_app_for_key(&key, 1_000)
+        .expect("creating the record");
+
+    storage.delete_unreferenced_notification_app(app.id);
+
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
+        None
+    );
+}
+
+/// A second token spent on a record identities already hold: a write that fails leaves
+/// nothing to collect, and collecting it anyway would take the app off every browser
+/// pointing at it.
+#[test]
+fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let key = ByteBuf::from(vec![7u8; 91]);
+    let app = storage
+        .notification_app_for_key(&key, 1_000)
+        .expect("creating the record");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id);
+    storage.write(anchor).expect("pointing at the app");
+
+    storage.delete_unreferenced_notification_app(app.id);
+
+    assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_000]);
+    assert_eq!(
+        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
+        Some(app)
+    );
+}

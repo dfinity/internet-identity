@@ -461,9 +461,16 @@ fn link_notification_app(
     anchor.point_at_notification_app(installing_browser, app.id);
 
     state::storage_borrow_mut(|storage| {
-        storage
-            .write(anchor)
-            .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
+        let Err(err) = storage.write(anchor) else {
+            return Ok(());
+        };
+        // The record and the principal that resolves to it are already written, and this
+        // reply commits them whether it carries `Ok` or `Err`. A record the pointer never
+        // landed on has no index entry either, so nothing else collects it.
+        storage.delete_unreferenced_notification_app(app.id);
+        Err(LinkNotificationAppError::InternalCanisterError(format!(
+            "{err:?}"
+        )))
     })
 }
 
