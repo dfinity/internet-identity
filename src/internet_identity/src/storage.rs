@@ -1530,7 +1530,7 @@ impl<M: Memory + Clone> Storage<M> {
         let apps_of = |browsers: &[StorableBrowser]| {
             browsers
                 .iter()
-                .filter_map(|browser| browser.notification_app)
+                .filter_map(|browser| browser.notification_app.as_ref().map(|app| app.app_id))
                 .collect::<BTreeSet<_>>()
         };
         let previous = apps_of(previous_browsers);
