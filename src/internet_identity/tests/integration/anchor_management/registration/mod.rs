@@ -86,7 +86,6 @@ fn should_not_register_device_used_by_another_anchor() -> Result<(), RejectRespo
         ),
     ];
 
-    let already_used = Regex::new("is already used").unwrap();
     for (sender, device, temp_key) in cases {
         let challenge = api::create_challenge(&env, canister_id)?;
         let result = api::register(
@@ -99,8 +98,8 @@ fn should_not_register_device_used_by_another_anchor() -> Result<(), RejectRespo
                 key: challenge.challenge_key,
             },
             temp_key,
-        );
-        expect_user_error_with_message(result, CanisterCalledTrap, already_used.clone());
+        )?;
+        assert!(matches!(result, RegisterResponse::DeviceAlreadyUsed));
     }
 
     // No anchor was allocated for the rejected registrations.
@@ -147,12 +146,8 @@ fn should_not_register_recovery_phrase_used_by_another_anchor() -> Result<(), Re
             key: challenge.challenge_key,
         },
         Some(attacker),
-    );
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("is already used").unwrap(),
-    );
+    )?;
+    assert!(matches!(result, RegisterResponse::DeviceAlreadyUsed));
     Ok(())
 }
 
