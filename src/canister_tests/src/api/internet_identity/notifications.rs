@@ -4,15 +4,16 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, ClaimNotificationAppError, ClaimNotificationAppRequest,
     FrontendHostname, GetNextNotificationError, GetNextNotificationRequest,
-    GetNextNotificationResponse, GetNotificationDelegationRequest,
+    GetNextNotificationResponse, GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
-    LinkNotificationAppError, LinkNotificationAppRequest, NotificationConsentGrantedRequest,
-    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
-    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
-    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
-    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
+    LinkNotificationAppError, LinkNotificationAppRequest, NotificationAppStatus,
+    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
+    NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
+    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
+    SetNotificationAppEnabledError, SetNotificationAppEnabledRequest, SetWebPushSubscriptionError,
     SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
@@ -258,6 +259,39 @@ pub fn claim_notification_app(
         RawEffectivePrincipal::None,
         sender,
         "claim_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_notification_app_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: GetNotificationAppStatusRequest,
+) -> Result<NotificationAppStatus, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_notification_app_status",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn set_notification_app_enabled(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: SetNotificationAppEnabledRequest,
+) -> Result<Result<(), SetNotificationAppEnabledError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "set_notification_app_enabled",
         (request,),
     )
     .map(|(x,)| x)

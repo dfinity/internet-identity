@@ -1112,13 +1112,16 @@ pub enum RemoveWebPushSubscriptionError {
     InternalCanisterError(String),
 }
 
-/// Gives a Home Screen app a record of its own, on the authority of a browser that is
-/// signed in. The token is the authorization, not the caller being a browser we know.
+/// Registers the one-shot key a browser is about to hand its install, so the app that
+/// spends it is the one this browser sent.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PrepareNotificationAppLinkRequest {
     pub anchor_number: AnchorNumber,
     /// The principal of the one-shot key this browser is putting in the install URL.
     pub link_principal: Principal,
+    /// Set where the user has said the app is gone, which is the only thing that can
+    /// contradict a record still claiming to deliver.
+    pub replacing_existing: bool,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1128,6 +1131,10 @@ pub enum PrepareNotificationAppLinkError {
     /// The principal named is not one a key can sign as, so no app could ever present
     /// it: the install URL's authority is the key behind this principal and nothing else.
     LinkPrincipalIsNotAKey,
+    /// This browser already points at an app that is delivering for this identity, and
+    /// an install takes delivery off it. A user whose app still works walks the install
+    /// steps only after saying it is gone, which turns delivery off first.
+    AppAlreadyDelivering,
     InternalCanisterError(String),
 }
 
@@ -1150,6 +1157,50 @@ pub enum LinkNotificationAppError {
     /// The key is one a browser of this identity already signs with.
     KeyAlreadyInUse,
     InternalCanisterError(String),
+}
+
+/// Whether this identity wants the app its browser points at to deliver for it. Never a
+/// subscription removal: the subscription is the app's and is shared.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SetNotificationAppEnabledRequest {
+    pub anchor_number: AnchorNumber,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SetNotificationAppEnabledError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+/// Asks what this browser's entry says about the app it points at, with no session.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What a browser's entry says about the app it points at.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppInfo {
+    /// Whether the app has registered for Web Push; false means opened without permission.
+    pub subscribed: bool,
+    /// Whether this identity wants it to deliver.
+    pub enabled: bool,
+    /// When the app last called, which is the only evidence there is that it still exists.
+    pub last_seen_ns: Timestamp,
+}
+
+/// What a browser has. An install reads as `AwaitingInstall` only while its key can still
+/// be spent; past that the app holding it can never finish, so it reads as nothing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationAppStatus {
+    Linked(NotificationAppInfo),
+    /// When the key this browser handed its install stops being spendable.
+    AwaitingInstall(Timestamp),
+    NoApp,
 }
 
 /// Points this browser at the Home Screen app another identity on the device has, on the

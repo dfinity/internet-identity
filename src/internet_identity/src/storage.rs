@@ -112,7 +112,7 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
+use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1570,6 +1570,38 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_anchors_with_notification_app_memory
                 .insert(*app_id, StorableAnchorNumberList::from(anchors));
         }
+    }
+
+    /// Stores what the app has registered for Web Push, and stamps its liveness.
+    ///
+    /// The only writer is the app itself. A browser pointing at it turns its own
+    /// delivery off by letting go of the reference, never by clearing this: the
+    /// subscription belongs to the app and every other identity delivers through it.
+    ///
+    /// False where `app_id` names no record, so a caller never reports a registration
+    /// that was dropped.
+    pub fn set_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+        now: Timestamp,
+    ) -> bool {
+        let Some(stored) = self.notification_app_memory.get(&app_id) else {
+            return false;
+        };
+        let mut app = NotificationApp::from(stored);
+        app.webpush_subscription = subscription;
+        app.last_used = now;
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
+        true
+    }
+
+    /// The record `app_id` names, if it is still there.
+    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
+        self.notification_app_memory
+            .get(&app_id)
+            .map(NotificationApp::from)
     }
 
     /// The anchors pointing at `app_id`, in the order they began pointing, oldest first,
@@ -3409,6 +3441,7 @@ impl<M: Memory + Clone> Storage<M> {
             key: key.clone(),
             created_at: now,
             last_used: now,
+            webpush_subscription: None,
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
