@@ -40,6 +40,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
+use notifications::validation::NOT_ENABLED;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
@@ -421,6 +422,57 @@ fn prepare_notification_app_link(
         storage.write(anchor).map_err(|err| {
             PrepareNotificationAppLinkError::InternalCanisterError(format!("{err:?}"))
         })
+    })
+}
+
+/// Authorized twice: the caller is a browser of the claiming identity, and the token is
+/// signed by a browser of the offering one. Spending it twice changes nothing the second time.
+/// The ceiling on a claimed expiry, which keeps a token signed by a since-retired
+/// browser key worthless years later. A caller asks for less than this on purpose: the
+/// expiry is read off the device's own clock and checked against the canister's, so a
+/// phone running fast would be refused every time if it asked for the whole window.
+const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
+    expires_at_ns > now && expires_at_ns <= now.saturating_add(CLAIM_TOKEN_LIFETIME_NS)
+}
+
+#[update]
+fn claim_notification_app(
+    request: ClaimNotificationAppRequest,
+) -> Result<(), ClaimNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(ClaimNotificationAppError::InternalCanisterError(
+            NOT_ENABLED.to_string(),
+        ));
+    }
+    let now = ic_cdk::api::time();
+    if !claim_token_expiry_in_range(request.expires_at_ns, now) {
+        return Err(ClaimNotificationAppError::ClaimTokenExpired);
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
+
+    let offering_anchor = state::anchor(request.offering_anchor_number);
+    let offering_browser = offering_anchor
+        .browser_that_signed_claim(
+            &request.signature,
+            request.anchor_number,
+            request.expires_at_ns,
+        )
+        .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
+    // Taken from the offering browser's own reference, so the claiming identity is never
+    // told which record it reached.
+    let app_id = offering_anchor
+        .notification_app(offering_browser)
+        .and_then(|reference| reference.linked_app())
+        .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
+
+    anchor.point_at_notification_app(browser_id, app_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
     })
 }
 
