@@ -8,7 +8,13 @@
 // the registration and the app's consent are read once an identity is chosen.
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type {
+  _SERVICE,
+  NotificationAppInfo,
+} from "$lib/generated/internet_identity_types";
+import { browserAppStatus } from "$lib/utils/notifications/appStatus";
+import { claimDeviceApp, type ClaimOutcome } from "./deviceApp";
+import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { recordPermission } from "./notificationDiagnostics";
@@ -24,7 +30,9 @@ export interface BrowserPushState {
   endpoint?: string;
 }
 
-export interface DeviceNotificationState {
+/** `permission` is Safari's own word for what the user answered here, so it says something only on this path. */
+export interface BrowserDeviceState {
+  source: "browser";
   supported: boolean;
   permission: NotificationPermission;
   /** This browser holds a live subscription for the signing key we still keep. */
@@ -34,6 +42,17 @@ export interface DeviceNotificationState {
    * another identity's re-subscribe left behind is registered on a dead endpoint. */
   registered: boolean;
 }
+
+/** Carries no permission: the one that decides delivery was given in a storage partition nothing here can read. */
+export interface AppDeviceState {
+  source: "app";
+  /** The app holds a push subscription, which being opened and allowed there leaves behind. */
+  subscribed: boolean;
+  /** This identity has the app switched on. */
+  enabled: boolean;
+}
+
+export type DeviceNotificationState = BrowserDeviceState | AppDeviceState;
 
 /**
  * This browser's push state, or `undefined` where it could not be read.
@@ -72,12 +91,19 @@ export const readBrowserPushState = async (): Promise<
 export const readDeviceState = async (
   identityNumber: bigint,
   browser: BrowserPushState,
-): Promise<DeviceNotificationState> => {
+): Promise<BrowserDeviceState> => {
   const { supported, permission, endpoint } = browser;
   if (!supported || endpoint === undefined) {
-    return { supported, permission, subscribed: false, registered: false };
+    return {
+      source: "browser",
+      supported,
+      permission,
+      subscribed: false,
+      registered: false,
+    };
   }
   return {
+    source: "browser",
     supported,
     permission,
     subscribed: true,
@@ -111,21 +137,32 @@ const isRegisteredHere = async (
   return status?.endpoint === endpoint;
 };
 
-/**
- * Whether notifications reach this identity in this browser right now.
- *
- * The permission as well as the registration: a permission reset to "default" leaves
- * the rows in place while the browser shows nothing, so a registration alone is not
- * delivery. `registered` already implies supported and subscribed.
- */
+/** A permission reset to "default" leaves the rows in place, so a registration alone is not delivery. */
 const deliversHere = (state: DeviceNotificationState): boolean =>
-  state.permission === "granted" && state.registered;
+  state.source === "app"
+    ? state.subscribed && state.enabled
+    : state.permission === "granted" && state.registered;
 
-/** iOS has no notifications yet: Safari delivers them only to a Home Screen app, and
- *  that is not built. Nothing is offered there and no app is told otherwise. */
-export const notificationsUnavailableHere = (): boolean => {
+/** iOS delivers web push only to a Home Screen app, so the browser's own permission and subscription say nothing. */
+export const notificationsNeedInstallHere = (): boolean => {
   const { os } = browserAndSystem();
   return "Ios" in os || "Ipados" in os;
+};
+
+/** `undefined` is both a device with no app and one the canister could not be asked about; neither delivers. */
+const asAppState = (app: NotificationAppInfo | undefined): AppDeviceState => ({
+  source: "app",
+  subscribed: app?.subscribed === true,
+  enabled: app?.enabled === true,
+});
+
+/** Nothing is known, so nothing is decided: the question is put to the user. */
+const unreadBrowserState: BrowserDeviceState = {
+  source: "browser",
+  supported: true,
+  permission: "default",
+  subscribed: false,
+  registered: false,
 };
 
 export type OptInScreen = "enable" | "skip";
@@ -138,13 +175,16 @@ export type OptInResolution =
       screen: "enable";
       state: DeviceNotificationState;
       consented: boolean;
+      /** Whether answering installs the Home Screen app rather than asking this browser. */
+      installFirst: boolean;
     };
 
 /**
  * Which screen this app and identity need.
  *
- * The app's consent and this browser's state are independent, so they are read at
- * once; only the registration has to wait, since it is read against the endpoint the
+ * The app's consent and this device's state are independent, so the consent goes out
+ * first and is awaited alongside whichever state this device's delivery turns on; only
+ * the browser's registration has to wait, since it is read against the endpoint the
  * browser turns out to hold. A failure is left to the caller: it shows the same toast
  * whenever it happens, and the screen it lands on is the one that asks.
  */
@@ -159,28 +199,84 @@ export const resolveOptIn = async ({
   actor: ActorSubclass<_SERVICE>;
   browser: Promise<BrowserPushState | undefined>;
 }): Promise<OptInResolution> => {
-  const [consented, browserState] = await Promise.all([
-    actor
-      .notification_consent_granted({ anchor_number: identityNumber, origin })
-      .catch(() => false),
-    browser,
-  ]);
-  // A browser we could not read is not one with nothing to ask. Offer the question
-  // and let answering it read everything again.
+  // Started rather than awaited: the consent and this device's state need nothing from each other.
+  const consent = actor
+    .notification_consent_granted({ anchor_number: identityNumber, origin })
+    .catch(() => false);
+
+  // Asked first: where delivery is the app's, this browser's own permission and subscription are beside the point.
+  if (notificationsNeedInstallHere()) {
+    return resolveAppOptIn(identityNumber, await consent);
+  }
+
+  const [consented, browserState] = await Promise.all([consent, browser]);
   const state =
     browserState === undefined
-      ? {
-          supported: true,
-          permission: "default" as NotificationPermission,
-          subscribed: false,
-          registered: false,
-        }
+      ? unreadBrowserState
       : await readDeviceState(identityNumber, browserState);
+  // This browser's own permission, the one the unblock guidance is written about; the app's path records none.
   recordPermission(state.permission);
   const screen = resolveOptInScreen(state, consented);
   return screen === "skip"
     ? { screen, granted: consented && deliversHere(state) }
-    : { screen, state, consented };
+    : { screen, state, consented, installFirst: false };
+};
+
+/** An app another identity here already has is pointed at rather than installed again, but only where the canister says there is no app. */
+const resolveAppOptIn = async (
+  identityNumber: bigint,
+  consented: boolean,
+): Promise<OptInResolution> => {
+  let status = await browserAppStatus(identityNumber);
+  let claim: ClaimOutcome = "no-donor";
+  if (status.kind === "no-app") {
+    // The claim is written before its reply arrives, so a lost reply must not deny an app this browser already points at.
+    claim = await claimDeviceApp(identityNumber);
+    status = await browserAppStatus(identityNumber);
+  }
+
+  switch (status.kind) {
+    case "unanswered": {
+      // Nothing was learned, so nothing is decided; an install is offered only once an answer says there is no app.
+      console.error(`the app could not be read: ${status.reason}`);
+      const state = asAppState(undefined);
+      return { screen: "enable", state, consented, installFirst: false };
+    }
+    case "no-app": {
+      if (claim === "indeterminate") {
+        // Nothing was asked of any donor, so this is not an answer that there is no app
+        // here: offering the install would hand a second one to a device that has one.
+        const state = asAppState(undefined);
+        return { screen: "enable", state, consented, installFirst: false };
+      }
+      // The canister records which browser points at an app, so a second browser on the same phone finds none of its own and would keep asking.
+      if (consented && (await saidAlreadyInstalled(identityNumber))) {
+        return { screen: "skip", granted: consented };
+      }
+      const state = asAppState(undefined);
+      return {
+        screen: "enable",
+        state,
+        consented,
+        // Their word is about the app, not about this dapp: somebody who has the app
+        // and has not allowed this one still has a question to answer.
+        installFirst: !(await saidAlreadyInstalled(identityNumber)),
+      };
+    }
+    case "awaiting-install": {
+      // An install this browser handed a key to and nobody has opened: nothing delivers
+      // yet, and the steps are where the user is told to open it.
+      const state = asAppState(undefined);
+      return { screen: "enable", state, consented, installFirst: true };
+    }
+    case "app": {
+      const state = asAppState(status.app);
+      const screen = resolveOptInScreen(state, consented);
+      return screen === "skip"
+        ? { screen, granted: consented && deliversHere(state) }
+        : { screen, state, consented, installFirst: !status.app.subscribed };
+    }
+  }
 };
 
 /**
@@ -198,17 +294,52 @@ export const readGranted = async ({
   origin: string;
   actor: ActorSubclass<_SERVICE>;
 }): Promise<boolean> => {
-  const browserState = await readBrowserPushState();
+  // Started rather than awaited: the consent query has nothing to learn from what this device says.
+  const consent = actor
+    .notification_consent_granted({ anchor_number: identityNumber, origin })
+    .catch(() => false);
+
+  // Asked the same way the resolution asks it, or an app told yes on one screen would be told no on the next.
+  if (notificationsNeedInstallHere()) {
+    return readAppGranted(identityNumber, consent);
+  }
+
+  const [consented, browserState] = await Promise.all([
+    consent,
+    readBrowserPushState(),
+  ]);
   if (browserState === undefined) {
     return false;
   }
-  const [consented, state] = await Promise.all([
-    actor
-      .notification_consent_granted({ anchor_number: identityNumber, origin })
-      .catch(() => false),
-    readDeviceState(identityNumber, browserState),
+  return (
+    consented &&
+    deliversHere(await readDeviceState(identityNumber, browserState))
+  );
+};
+
+/** Must agree with the resolution on every answer the canister can give about this device. */
+const readAppGranted = async (
+  identityNumber: bigint,
+  consent: Promise<boolean>,
+): Promise<boolean> => {
+  const [consented, status] = await Promise.all([
+    consent,
+    browserAppStatus(identityNumber),
   ]);
-  return consented && deliversHere(state);
+  switch (status.kind) {
+    case "app":
+      return consented && deliversHere(asAppState(status.app));
+    case "no-app":
+      // The same word the resolution reads: an app told yes on the way in must not be told no on the way out.
+      return consented && (await saidAlreadyInstalled(identityNumber));
+    case "awaiting-install":
+      // An install nobody has opened has nothing registered to deliver to.
+      return false;
+    case "unanswered":
+      // An answer that could not be read is not one that delivers.
+      console.error(`the app could not be read: ${status.reason}`);
+      return false;
+  }
 };
 
 /** Picks the opt-in screen from device state and existing consent. */
@@ -216,7 +347,8 @@ export const resolveOptInScreen = (
   state: DeviceNotificationState,
   allowed: boolean,
 ): OptInScreen => {
-  if (!state.supported) {
+  // Only this browser's path can be unable to carry notifications at all.
+  if (state.source === "browser" && !state.supported) {
     return "skip";
   }
   if (allowed && deliversHere(state)) {

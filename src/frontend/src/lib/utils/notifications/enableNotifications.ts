@@ -41,17 +41,23 @@ export const turnOnNotifications = async ({
   device: DeviceNotificationState;
   consented: boolean;
 }): Promise<EnableNotificationsResult> => {
-  if (device.permission !== "granted") {
-    const permission = await requestNotificationPermission();
-    if (permission !== "granted") {
-      return { status: permission === "denied" ? "denied" : "dismissed" };
+  // Both steps are this browser's own. Where a Home Screen app delivers, the permission
+  // was given inside the app and the subscription is the app's: raising a prompt here
+  // would ask for one that decides nothing, and subscribing would register an endpoint
+  // iOS never delivers to.
+  if (device.source === "browser") {
+    if (device.permission !== "granted") {
+      const permission = await requestNotificationPermission();
+      if (permission !== "granted") {
+        return { status: permission === "denied" ? "denied" : "dismissed" };
+      }
     }
-  }
 
-  if (!device.registered) {
-    // Subscribing drops the endpoint every other identity here is registered with, so
-    // this is the one call that must not run for a browser already registered.
-    await ensureRegisteredDevice(identityNumber);
+    if (!device.registered) {
+      // Subscribing drops the endpoint every other identity here is registered with, so
+      // this is the one call that must not run for a browser already registered.
+      await ensureRegisteredDevice(identityNumber);
+    }
   }
 
   if (!consented) {

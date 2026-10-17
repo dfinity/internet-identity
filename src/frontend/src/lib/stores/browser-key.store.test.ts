@@ -401,11 +401,13 @@ describe("browser key", () => {
     ]);
   });
 
-  it("lists no identities where storage refuses to answer", async () => {
+  it("raises where storage refuses to answer, which is not an empty list", async () => {
     await signIn(IDENTITY, 1, 7);
     storage.readsFail = true;
 
-    await expect(registeredIdentityNumbers()).resolves.toEqual([]);
+    await expect(registeredIdentityNumbers()).rejects.toBeInstanceOf(
+      BrowserKeyUnreadableError,
+    );
   });
 
   /**
