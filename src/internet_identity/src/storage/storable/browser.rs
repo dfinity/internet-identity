@@ -42,4 +42,8 @@ pub struct StorableBrowser {
     /// yet. Allowed again only once the delegation it was for has expired.
     #[n(10)]
     pub woken_again_at_ns: Option<StorableTimestamp>,
+    /// The probe this entry last sent to the Home Screen app it points at. Whether it is
+    /// still pending is read off the queue, so this id outliving the entry says nothing.
+    #[n(11)]
+    pub pending_probe: Option<u64>,
 }

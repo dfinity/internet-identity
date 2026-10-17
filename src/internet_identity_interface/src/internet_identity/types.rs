@@ -1191,6 +1191,9 @@ pub struct NotificationAppInfo {
     pub enabled: bool,
     /// When the app last called, which is the only evidence there is that it still exists.
     pub last_seen_ns: Timestamp,
+    /// The probe this browser last sent, while it is still queued and unexpired. Empty says
+    /// only that the entry is no longer queued; `last_seen_ns` is what proves the app alive.
+    pub pending_probe: Option<NotificationId>,
 }
 
 /// What a browser has. An install reads as `AwaitingInstall` only while its key can still
@@ -1399,6 +1402,42 @@ pub struct NotificationToShow {
     pub account_number: Option<AccountNumber>,
     pub canister_id: Principal,
     pub id: NotificationId,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    pub event: Option<NotificationEvent>,
+}
+
+/// Asks the canister to wake the Home Screen app this browser points at, so the browser
+/// can learn whether it is still there.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ProbeNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ProbeNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app, so there is nothing to wake.
+    NoNotificationApp,
+    /// Nothing was sent, so there is nothing to watch for: the app has registered nothing,
+    /// this identity has it switched off or is signed out, or there was no room to send.
+    NotReachable,
+    InternalCanisterError(String),
+}
+
+/// Something Internet Identity has to tell the user about their own identity.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationEvent {
+    /// This device now receives this identity's notifications.
+    NotificationsOn(IdentityForNotification),
+}
+
+/// Which identity a notification is about, in the terms the user knows it by.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdentityForNotification {
+    pub anchor_number: AnchorNumber,
+    /// What the user called it, where they have named it.
+    pub name: Option<String>,
 }
 
 /// `None` once nothing is left to show.

@@ -3,15 +3,20 @@
 //! one it shows on every wake-up, so wake-ups and shown notifications stay one to one.
 //! The queue lives on the browser's entry, and is cleared when its wake-up address changes.
 
+use crate::authz_utils::NotificationCaller;
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, QueuedNotification};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, NotificationToShow, Timestamp,
+    AnchorNumber, BrowserId, FrontendHostname, NotificationId, NotificationToShow, Timestamp,
 };
 
 /// Most entries one browser holds. A new one past it replaces the oldest.
 pub(crate) const MAX_PER_BROWSER: usize = 100;
+
+/// The origin Internet Identity's own notification is shown under: it is about this
+/// identity rather than an app, so there is nothing to name and nothing is looked up.
+pub(crate) const NO_APP_ORIGIN: &str = "";
 
 /// Where an added entry went.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -62,25 +67,10 @@ pub(crate) fn remove_after_failed_wake_up(
             DeliveryTarget::Browser => anchor
                 .webpush_subscription(browser_id)
                 .map(|registered| registered.endpoint.clone()),
-            DeliveryTarget::App(app_id) => {
-                // The app's address stands for this entry only while the entry still
-                // routes through it. A switch to another app, an install started, or a
-                // registration of its own makes the queue somebody else's, and a late
-                // failure from the old address would drop a notification this entry can
-                // still show.
-                let still_routed = anchor.webpush_subscription(browser_id).is_none()
-                    && anchor
-                        .notification_app(browser_id)
-                        .and_then(|reference| reference.linked_app())
-                        == Some(app_id);
-                if !still_routed {
-                    return;
-                }
-                storage
-                    .notification_app(app_id)
-                    .and_then(|app| app.webpush_subscription)
-                    .map(|registered| registered.endpoint)
-            }
+            DeliveryTarget::App(app_id) => storage
+                .notification_app(app_id)
+                .and_then(|app| app.webpush_subscription)
+                .map(|registered| registered.endpoint),
         };
         if posted_to.is_none_or(|registered| registered != endpoint) {
             return;
@@ -97,6 +87,7 @@ pub(crate) fn remove_after_failed_wake_up(
             }
             None => return,
         }
+        anchor.clear_pending_probe_if_gone(browser_id);
         if let Err(err) = storage.write(anchor) {
             ic_cdk::println!("Failed to drop a notification whose wake-up failed: {err}");
         }
@@ -119,7 +110,7 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_mut(browser_id) {
                 let before = queue.len();
-                queue.retain(|queued| queued.application_number != application_number);
+                queue.retain(|queued| queued.application_number != Some(application_number));
                 removed |= queue.len() < before;
             }
         }
@@ -132,27 +123,59 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
     });
 }
 
-/// The oldest entry the browser has yet to show, passing over what expired and what
-/// belongs to an app that lost consent or that II no longer holds.
+/// A browser caller may not answer a probe posted to the app: both resolve to the same
+/// entry and read the same queue.
+fn probe_only_the_app_may_answer(
+    anchor: &Anchor,
+    browser_id: BrowserId,
+    caller: &NotificationCaller,
+    now_ns: Timestamp,
+) -> Option<NotificationId> {
+    match caller {
+        NotificationCaller::App(_) => None,
+        NotificationCaller::Browser => anchor.pending_probe(browser_id, now_ns),
+    }
+}
+
+/// Only Internet Identity's own entry can be the probe: an app picks its own ids, and the
+/// two id spaces overlap.
+fn is_the_probe(queued: &QueuedNotification, probe: Option<NotificationId>) -> bool {
+    queued.application_number.is_none() && Some(queued.notification_id) == probe
+}
+
+/// The oldest entry the browser has yet to show, passing over what it may not be shown.
 pub(crate) fn next_to_show(
     anchor: &Anchor,
     browser_id: BrowserId,
+    caller: &NotificationCaller,
     now_ns: Timestamp,
 ) -> Option<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
+    let probe = probe_only_the_app_may_answer(anchor, browser_id, caller, now_ns);
     storage_borrow(|storage| {
         anchor
             .notifications(browser_id)
             .iter()
             .filter(|queued| queued.expires_at_ns > now_ns)
+            .filter(|queued| !is_the_probe(queued, probe))
             .find_map(|queued| {
+                if let Some(event) = queued.event.clone() {
+                    return Some(NotificationToShow {
+                        origin: NO_APP_ORIGIN.to_string(),
+                        account_number: None,
+                        canister_id: queued.sender,
+                        id: queued.notification_id,
+                        event: Some(event),
+                    });
+                }
                 let origin =
-                    storage.lookup_origin_with_application_number(queued.application_number)?;
+                    storage.lookup_origin_with_application_number(queued.application_number?)?;
                 let notification = NotificationToShow {
                     origin,
                     account_number: queued.account_number,
                     canister_id: queued.sender,
                     id: queued.notification_id,
+                    event: None,
                 };
                 storage
                     .read_anchor_application_config(anchor_number, &notification.origin)
@@ -162,30 +185,40 @@ pub(crate) fn next_to_show(
     })
 }
 
-/// Remove the entry the service worker shows. One already gone is no error: expiry, a
-/// full queue or a failed wake-up may have dropped it first.
+/// Removing one already gone is no error. Which app the entry belongs to is read off the
+/// entry rather than off the request.
 pub(crate) fn remove_shown(
     mut anchor: Anchor,
     browser_id: BrowserId,
+    caller: &NotificationCaller,
     shown: &NotificationToShow,
+    now_ns: Timestamp,
 ) -> Result<(), String> {
+    let probe = probe_only_the_app_may_answer(&anchor, browser_id, caller, now_ns);
     storage_borrow_mut(|storage| {
-        let Some(application_number) = storage.lookup_application_number_with_origin(&shown.origin)
-        else {
+        // Every part of what identifies an entry, origin included: a sender may queue
+        // the same id for two applications, and one that is expired or belongs to
+        // another one must not shadow the live entry being acknowledged. `next_to_show`
+        // hands out only unexpired entries, so this searches the same set it does.
+        let shown_by = storage.lookup_application_number_with_origin(&shown.origin);
+        let Some(position) = anchor.notifications(browser_id).iter().position(|queued| {
+            !is_the_probe(queued, probe)
+                && queued.sender == shown.canister_id
+                && queued.notification_id == shown.id
+                && queued.account_number == shown.account_number
+                && queued.expires_at_ns > now_ns
+                // Internet Identity's own is queued with no application number and no origin.
+                && queued
+                    .application_number
+                    .is_none_or(|application_number| Some(application_number) == shown_by)
+        }) else {
             return Ok(());
         };
         let Some(queue) = anchor.notifications_mut(browser_id) else {
             return Ok(());
         };
-        let Some(position) = queue.iter().position(|queued| {
-            queued.application_number == application_number
-                && queued.sender == shown.canister_id
-                && queued.notification_id == shown.id
-                && queued.account_number == shown.account_number
-        }) else {
-            return Ok(());
-        };
         queue.remove(position);
+        anchor.clear_pending_probe_if_gone(browser_id);
         storage.write(anchor).map_err(|err| format!("{err}"))
     })
 }
@@ -194,23 +227,24 @@ pub(crate) fn remove_shown(
 mod tests {
     use super::*;
     use crate::notifications::app::NotificationAppId;
-    use crate::notifications::webpush::fixtures::{
-        anchor, app_key, setup, subscribe, APP_RELAY, OTHER_APP_RELAY,
-    };
+    use crate::notifications::webpush::fixtures::{anchor, setup, subscribe, APP_RELAY};
     use crate::notifications::write_notifications_decision;
     use candid::Principal;
-    use internet_identity_interface::internet_identity::types::NotificationRevokeConsentRequest;
+    use internet_identity_interface::internet_identity::types::{
+        IdentityForNotification, NotificationEvent, NotificationRevokeConsentRequest,
+    };
     use pretty_assertions::assert_eq;
 
     const SECOND_NS: u64 = 1_000_000_000;
 
     fn queued(notification_id: u64, expires_at_ns: Timestamp) -> QueuedNotification {
         QueuedNotification {
-            application_number: 1,
+            application_number: Some(1),
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
             expires_at_ns,
             account_number: None,
+            event: None,
         }
     }
 
@@ -302,7 +336,7 @@ mod tests {
 
     fn from_app(notification_id: u64, expires_at_ns: Timestamp) -> QueuedNotification {
         QueuedNotification {
-            application_number: app(),
+            application_number: Some(app()),
             ..queued(notification_id, expires_at_ns)
         }
     }
@@ -320,12 +354,33 @@ mod tests {
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
 
+    /// What the Home Screen app signing as `app_id` reads and acknowledges.
+    fn as_app(app_id: NotificationAppId) -> NotificationCaller {
+        NotificationCaller::App(
+            storage_borrow(|storage| storage.notification_app(app_id)).expect("a stored app"),
+        )
+    }
+
+    fn next_as(
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        caller: &NotificationCaller,
+        now_ns: Timestamp,
+    ) -> Option<NotificationToShow> {
+        next_to_show(&anchor(anchor_number), browser_id, caller, now_ns)
+    }
+
     fn next(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
         now_ns: Timestamp,
     ) -> Option<NotificationToShow> {
-        next_to_show(&anchor(anchor_number), browser_id, now_ns)
+        next_as(
+            anchor_number,
+            browser_id,
+            &NotificationCaller::Browser,
+            now_ns,
+        )
     }
 
     fn next_id(
@@ -336,12 +391,36 @@ mod tests {
         next(anchor_number, browser_id, now_ns).map(|one| one.id)
     }
 
+    fn remove_as(
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        caller: &NotificationCaller,
+        notification: &NotificationToShow,
+        now_ns: Timestamp,
+    ) {
+        remove_shown(
+            anchor(anchor_number),
+            browser_id,
+            caller,
+            notification,
+            now_ns,
+        )
+        .expect("removing");
+    }
+
     fn remove(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
         notification: &NotificationToShow,
+        now_ns: Timestamp,
     ) {
-        remove_shown(anchor(anchor_number), browser_id, notification).expect("removing");
+        remove_as(
+            anchor_number,
+            browser_id,
+            &NotificationCaller::Browser,
+            notification,
+            now_ns,
+        );
     }
 
     fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {
@@ -352,6 +431,7 @@ mod tests {
     /// the app it points at.
     fn routed_through_an_app() -> (AnchorNumber, BrowserId, NotificationAppId) {
         use crate::storage::anchor::WebPushSubscription;
+        use serde_bytes::ByteBuf;
 
         setup();
         let anchor_number = storage_borrow_mut(|storage| {
@@ -368,7 +448,7 @@ mod tests {
             .id;
         let app_id = storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&app_key(9), 0)
+                .notification_app_for_key(&ByteBuf::from(vec![9u8; 91]), 0)
                 .expect("creating the app record");
             storage.set_notification_app_subscription(
                 app.id,
@@ -438,11 +518,219 @@ mod tests {
             browser_id,
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
-            OTHER_APP_RELAY,
+            "https://web.push.apple.com/b",
             2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), vec![7]);
+    }
+
+    /// A probe this browser asked of the app it points at, queued and remembered on the entry.
+    fn probe(anchor_number: AnchorNumber, browser_id: BrowserId, notification_id: u64) {
+        enqueue(
+            anchor_number,
+            browser_id,
+            [identity_event(notification_id, 60 * SECOND_NS)],
+        );
+        let mut stored = anchor(anchor_number);
+        stored.set_pending_probe(browser_id, notification_id);
+        storage_borrow_mut(|storage| storage.write(stored)).expect("recording the probe");
+    }
+
+    #[test]
+    fn a_probe_stops_being_pending_when_its_post_failed() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        probe(anchor_number, browser_id, 1);
+        assert_eq!(
+            anchor(anchor_number).pending_probe(browser_id, 2 * SECOND_NS),
+            Some(1)
+        );
+
+        remove_after_failed_wake_up(
+            anchor_number,
+            browser_id,
+            DeliveryTarget::App(app_id),
+            &identity_event(1, 60 * SECOND_NS),
+            APP_RELAY,
+            2 * SECOND_NS,
+        );
+
+        assert_eq!(
+            anchor(anchor_number).pending_probe(browser_id, 2 * SECOND_NS),
+            None
+        );
+        assert!(left_for(anchor_number, browser_id).is_empty());
+    }
+
+    #[test]
+    fn only_the_app_is_shown_the_probe_it_was_sent() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        probe(anchor_number, browser_id, 1);
+        enqueue(anchor_number, browser_id, [from_app(2, 60 * SECOND_NS)]);
+
+        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
+        assert_eq!(
+            next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS).map(|one| one.id),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn an_app_notification_sharing_a_stale_probe_id_is_still_shown_and_taken() {
+        let (anchor_number, browser_id, _) = routed_through_an_app();
+        let mut stored = anchor(anchor_number);
+        stored.set_pending_probe(browser_id, 1);
+        storage_borrow_mut(|storage| storage.write(stored)).expect("recording the probe");
+        enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+
+        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the app's own is shown");
+
+        assert_eq!(shown.id, 1);
+        assert_eq!(shown.event, None);
+
+        remove(anchor_number, browser_id, &shown, 2 * SECOND_NS);
+
+        assert!(left_for(anchor_number, browser_id).is_empty());
+    }
+
+    #[test]
+    fn an_app_notification_sharing_a_queued_probe_id_is_shown_and_leaves_the_probe() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        probe(anchor_number, browser_id, 1);
+        enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+
+        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the app's own is shown");
+        assert_eq!(shown.id, 1);
+        assert_eq!(shown.event, None);
+
+        remove(anchor_number, browser_id, &shown, 2 * SECOND_NS);
+
+        assert_eq!(left_for(anchor_number, browser_id), vec![1]);
+        assert_eq!(
+            next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS).map(|one| one.id),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn an_acknowledgement_takes_the_entry_it_names_and_not_the_one_its_origin_points_at() {
+        let (anchor_number, browser_id) = signed_in();
+        enqueue(
+            anchor_number,
+            browser_id,
+            [
+                identity_event(1, 60 * SECOND_NS),
+                from_app(1, 60 * SECOND_NS),
+            ],
+        );
+        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the oldest is shown");
+        assert!(shown.event.is_some());
+
+        let crafted = NotificationToShow {
+            origin: ORIGIN.to_string(),
+            event: None,
+            ..shown
+        };
+        remove(anchor_number, browser_id, &crafted, 2 * SECOND_NS);
+
+        assert_eq!(
+            anchor(anchor_number).notifications(browser_id),
+            [from_app(1, 60 * SECOND_NS)]
+        );
+    }
+
+    #[test]
+    fn a_crafted_acknowledgement_leaves_the_probe_for_the_app() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        probe(anchor_number, browser_id, 1);
+        let crafted = NotificationToShow {
+            origin: NO_APP_ORIGIN.to_string(),
+            account_number: None,
+            canister_id: Principal::from_slice(&[7; 10]),
+            id: 1,
+            event: Some(NotificationEvent::NotificationsOn(
+                IdentityForNotification {
+                    anchor_number: 10_000,
+                    name: None,
+                },
+            )),
+        };
+
+        remove(anchor_number, browser_id, &crafted, 2 * SECOND_NS);
+
+        assert_eq!(left_for(anchor_number, browser_id), vec![1]);
+        let shown = next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS)
+            .expect("the app is still shown the probe");
+        remove_as(
+            anchor_number,
+            browser_id,
+            &as_app(app_id),
+            &shown,
+            2 * SECOND_NS,
+        );
+        assert!(left_for(anchor_number, browser_id).is_empty());
+    }
+
+    #[test]
+    fn only_the_app_may_acknowledge_the_probe_it_was_sent() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        probe(anchor_number, browser_id, 1);
+        let shown = next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS)
+            .expect("the app is shown the probe");
+
+        remove_as(
+            anchor_number,
+            browser_id,
+            &NotificationCaller::Browser,
+            &shown,
+            2 * SECOND_NS,
+        );
+        assert_eq!(left_for(anchor_number, browser_id), vec![1]);
+
+        remove_as(
+            anchor_number,
+            browser_id,
+            &as_app(app_id),
+            &shown,
+            2 * SECOND_NS,
+        );
+        assert_eq!(left_for(anchor_number, browser_id), Vec::<u64>::new());
+    }
+
+    fn identity_event(notification_id: u64, expires_at_ns: Timestamp) -> QueuedNotification {
+        QueuedNotification {
+            application_number: None,
+            event: Some(NotificationEvent::NotificationsOn(
+                IdentityForNotification {
+                    anchor_number: 10_000,
+                    name: None,
+                },
+            )),
+            ..queued(notification_id, expires_at_ns)
+        }
+    }
+
+    #[test]
+    fn an_identity_event_can_be_acknowledged_and_leaves_the_queue() {
+        let (anchor_number, browser_id) = signed_in();
+        enqueue(
+            anchor_number,
+            browser_id,
+            [
+                identity_event(1, 60 * SECOND_NS),
+                from_app(2, 60 * SECOND_NS),
+            ],
+        );
+
+        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the event is shown");
+        assert_eq!(shown.id, 1);
+        assert!(shown.event.is_some());
+        assert_eq!(shown.origin, NO_APP_ORIGIN);
+
+        remove(anchor_number, browser_id, &shown, 2 * SECOND_NS);
+
+        assert_eq!(left_for(anchor_number, browser_id), vec![2]);
+        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
     }
 
     #[test]
@@ -465,6 +753,7 @@ mod tests {
                 account_number: Some(3),
                 canister_id: Principal::from_slice(&[7; 10]),
                 id: 7,
+                event: None,
             })
         );
         assert_eq!(left_for(anchor_number, browser_id), vec![7, 8]);
@@ -487,7 +776,7 @@ mod tests {
         );
         let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a next one");
 
-        remove(anchor_number, browser_id, &shown);
+        remove(anchor_number, browser_id, &shown, 2 * SECOND_NS);
 
         assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(8));
     }
@@ -508,7 +797,7 @@ mod tests {
     fn an_app_ii_no_longer_holds_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         let unknown = QueuedNotification {
-            application_number: u64::MAX,
+            application_number: Some(u64::MAX),
             ..queued(1, 60 * SECOND_NS)
         };
         enqueue(
@@ -573,7 +862,7 @@ mod tests {
         );
         let seven = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
 
-        remove(anchor_number, browser_id, &seven);
+        remove(anchor_number, browser_id, &seven, 2 * SECOND_NS);
 
         assert_eq!(left_for(anchor_number, browser_id), vec![8]);
     }
@@ -592,7 +881,7 @@ mod tests {
         );
         let without_account = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
 
-        remove(anchor_number, browser_id, &without_account);
+        remove(anchor_number, browser_id, &without_account, 2 * SECOND_NS);
 
         assert_eq!(
             anchor(anchor_number).notifications(browser_id),
@@ -612,9 +901,10 @@ mod tests {
             account_number: None,
             canister_id: Principal::from_slice(&[7; 10]),
             id: 8,
+            event: None,
         };
 
-        remove(anchor_number, browser_id, &gone);
+        remove(anchor_number, browser_id, &gone, 2 * SECOND_NS);
 
         assert_eq!(left_for(anchor_number, browser_id), vec![7]);
     }
