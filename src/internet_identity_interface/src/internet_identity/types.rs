@@ -1112,6 +1112,46 @@ pub enum RemoveWebPushSubscriptionError {
     InternalCanisterError(String),
 }
 
+/// Gives a Home Screen app a record of its own, on the authority of a browser that is
+/// signed in. The token is the authorization, not the caller being a browser we know.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareNotificationAppLinkRequest {
+    pub anchor_number: AnchorNumber,
+    /// The principal of the one-shot key this browser is putting in the install URL.
+    pub link_principal: Principal,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareNotificationAppLinkError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// The principal named is not one a key can sign as, so no app could ever present
+    /// it: the install URL's authority is the key behind this principal and nothing else.
+    LinkPrincipalIsNotAKey,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// The app's own public key, DER-encoded. The record is looked up by it.
+    pub app_key: PublicKey,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum LinkNotificationAppError {
+    /// The bytes offered are not a P-256 public key in the single encoding WebCrypto
+    /// emits. A record keyed by anything else is one no app could ever sign as, and the
+    /// install that reached here is spent either way.
+    InvalidAppKey,
+    /// No browser of this identity is waiting for this caller, or the install it started
+    /// has expired.
+    NoPendingLink,
+    /// The key is one a browser of this identity already signs with.
+    KeyAlreadyInUse,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,

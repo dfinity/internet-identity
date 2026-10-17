@@ -82,6 +82,39 @@ pub fn verify_browser_keys(
     })
 }
 
+/// What a browser presents and what it signs, for tests of the callers that verify one.
+#[cfg(test)]
+pub mod test_keys {
+    use super::*;
+    use p256::ecdsa::SigningKey;
+    use serde_bytes::ByteBuf;
+
+    /// The algorithm identifier RFC 5480 fixes for a `secp256r1` public key, as a WebCrypto
+    /// `exportKey("spki")` writes it.
+    const P256_ALGORITHM: [u8; 21] = [
+        0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86,
+        0x48, 0xce, 0x3d, 0x03, 0x01, 0x07,
+    ];
+
+    /// The SPKI a key travels in, built around whichever point encoding is handed in.
+    pub fn spki(point: &[u8]) -> PublicKey {
+        let mut der = vec![0x30, (P256_ALGORITHM.len() + point.len() + 3) as u8];
+        der.extend_from_slice(&P256_ALGORITHM);
+        der.extend_from_slice(&[0x03, (point.len() + 1) as u8, 0x00]);
+        der.extend_from_slice(point);
+        ByteBuf::from(der)
+    }
+
+    pub fn signing_key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; 32].into()).expect("failed to build a browser key")
+    }
+
+    /// The key as a browser registers it.
+    pub fn public_key(key: &SigningKey) -> PublicKey {
+        spki(VerifyingKey::from(key).to_encoded_point(false).as_bytes())
+    }
+}
+
 fn verify(key: &PublicKey, signature: &[u8], message: &[u8]) -> bool {
     if signature.len() != BROWSER_KEY_SIGNATURE_BYTES {
         return false;
@@ -95,6 +128,8 @@ fn verify(key: &PublicKey, signature: &[u8], message: &[u8]) -> bool {
     key.verify(message, &signature).is_ok()
 }
 
+/// Whether these bytes are a key at all, by the rule [`verifying_key`] sets out.
+///
 /// One encoding of a key, so one key is one browser.
 ///
 /// `from_public_key_der` accepts the compressed SEC1 point as readily as the uncompressed
@@ -104,6 +139,10 @@ fn verify(key: &PublicKey, signature: &[u8], message: &[u8]) -> bool {
 /// only one WebCrypto can emit: `exportKey("spki")` on a P-256 key writes `0x04 || X || Y`
 /// and the API offers no alternative, so nothing legitimate is turned away and nothing
 /// stored today needs migrating.
+pub fn is_one_key(key: &PublicKey) -> bool {
+    verifying_key(key).is_some()
+}
+
 fn verifying_key(key: &PublicKey) -> Option<VerifyingKey> {
     let verifying = VerifyingKey::from_public_key_der(key).ok()?;
     let uncompressed = verifying.to_encoded_point(false);
@@ -123,27 +162,11 @@ fn signed_message(domain: &[u8], session_key: &SessionKey, other_key: &PublicKey
 
 #[cfg(test)]
 mod tests {
+    use super::test_keys::{public_key, signing_key, spki};
     use super::*;
     use p256::ecdsa::signature::Signer;
     use p256::ecdsa::SigningKey;
     use serde_bytes::ByteBuf;
-
-    /// The algorithm identifier RFC 5480 fixes for a `secp256r1` public key, which is
-    /// what a WebCrypto `exportKey("spki")` writes ahead of the point.
-    const P256_ALGORITHM: [u8; 21] = [
-        0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86,
-        0x48, 0xce, 0x3d, 0x03, 0x01, 0x07,
-    ];
-
-    /// The SPKI a key travels in, built around whichever point encoding is handed in, so
-    /// a test can offer the compressed one the same way a caller could.
-    fn spki(point: &[u8]) -> PublicKey {
-        let mut der = vec![0x30, (P256_ALGORITHM.len() + point.len() + 3) as u8];
-        der.extend_from_slice(&P256_ALGORITHM);
-        der.extend_from_slice(&[0x03, (point.len() + 1) as u8, 0x00]);
-        der.extend_from_slice(point);
-        ByteBuf::from(der)
-    }
 
     struct Key {
         signing: SigningKey,
@@ -151,12 +174,8 @@ mod tests {
     }
 
     fn key(seed: u8) -> Key {
-        let signing = SigningKey::from_bytes(&[seed; 32].into()).unwrap();
-        let public = spki(
-            VerifyingKey::from(&signing)
-                .to_encoded_point(false)
-                .as_bytes(),
-        );
+        let signing = signing_key(seed);
+        let public = public_key(&signing);
         Key { signing, public }
     }
 

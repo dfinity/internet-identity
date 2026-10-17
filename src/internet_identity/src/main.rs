@@ -384,6 +384,87 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// How long an install has to complete. Long enough to walk the steps at a reading pace,
+/// short enough that a fragment left in a browser history is of little use.
+const PENDING_LINK_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+/// Hands this browser's install a one-shot key, named by the principal the app will sign
+/// the link call as. The private half travels to the app in the URL fragment and never
+/// crosses the network, so a boundary node that sees the link call cannot replay it
+/// against a key of its own.
+#[update]
+fn prepare_notification_app_link(
+    request: PrepareNotificationAppLinkRequest,
+) -> Result<(), PrepareNotificationAppLinkError> {
+    if !notifications::notifications_enabled() {
+        return Err(PrepareNotificationAppLinkError::InternalCanisterError(
+            notifications::NOT_ENABLED.to_string(),
+        ));
+    }
+    // The whole authority of an install URL is the key behind this principal, so a
+    // principal no key can sign as is an install nothing could ever complete, and an
+    // anonymous one is an install anybody could.
+    if !authz_utils::is_self_authenticating(request.link_principal) {
+        return Err(PrepareNotificationAppLinkError::LinkPrincipalIsNotAKey);
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
+
+    let now = ic_cdk::api::time();
+    anchor.start_notification_app_link(
+        browser_id,
+        request.link_principal,
+        now.saturating_add(PENDING_LINK_LIFETIME_NS),
+    );
+
+    state::storage_borrow_mut(|storage| {
+        storage.write(anchor).map_err(|err| {
+            PrepareNotificationAppLinkError::InternalCanisterError(format!("{err:?}"))
+        })
+    })
+}
+
+/// Called by the Home Screen app, signed with the one-shot key its installing browser put
+/// in the URL fragment. The signature covers this call and nothing else, so it cannot be
+/// lifted onto a call naming another key, and the slot it spends is cleared here.
+#[update]
+fn link_notification_app(
+    request: LinkNotificationAppRequest,
+) -> Result<(), LinkNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(LinkNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED.to_string(),
+        ));
+    }
+    // Checked before the slot is spent: a record keyed by something no app can sign as
+    // leaves this browser pointing at an app that can never call, and the one-shot key
+    // is gone. The record is also keyed by these bytes and kept for as long as an
+    // identity points at it, so nothing unbounded is written either.
+    if !browser_key::is_one_key(&request.app_key) {
+        return Err(LinkNotificationAppError::InvalidAppKey);
+    }
+    let now = ic_cdk::api::time();
+    let mut anchor = state::anchor(request.anchor_number);
+    let installing_browser = anchor
+        .browser_awaiting_link(caller(), now)
+        .ok_or(LinkNotificationAppError::NoPendingLink)?;
+    if anchor.browser_holds_key(&request.app_key) {
+        return Err(LinkNotificationAppError::KeyAlreadyInUse);
+    }
+
+    let app = state::storage_borrow_mut(|storage| {
+        storage.notification_app_for_key(&request.app_key, now)
+    })
+    .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
+    anchor.point_at_notification_app(installing_browser, app.id);
+
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
 /// Authorized by the browser key the caller signs with.
 #[update]
 fn prepare_notification_delegation(
