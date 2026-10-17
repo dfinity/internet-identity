@@ -12,8 +12,8 @@
     title: string;
     /** What to do, with the words to look for in the mock marked up. */
     instruction: Snippet;
-    /** The mock the instruction points at. */
-    children: Snippet;
+    /** The mock the instruction points at, where there is one to point at. */
+    children?: Snippet;
   } = $props();
 </script>
 
@@ -29,8 +29,13 @@
     </div>
     <h2 class="text-text-primary m-0 text-lg leading-7 font-normal">{title}</h2>
   </div>
-  <p class="text-text-primary mb-5 text-sm leading-5">
+  <p
+    class={[
+      "text-text-primary text-sm leading-5",
+      children !== undefined && "mb-5",
+    ]}
+  >
     {@render instruction()}
   </p>
-  {@render children()}
+  {@render children?.()}
 </li>
