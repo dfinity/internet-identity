@@ -17,12 +17,13 @@ import {
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/worker/shownNotification";
+import { openable } from "$lib/utils/notifications/worker/openTarget";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 
 // What the page put on this worker's registration URL, read once. A woken worker has
 // no page to ask and no document to read, and the registration keeps the URL it was
-// made with — so this is the whole of what the worker is told.
+// made with, so this is the whole of what the worker is told.
 const configured = initWorkerConfig(worker.location.search);
 
 worker.addEventListener("install", () => {
@@ -66,11 +67,13 @@ worker.addEventListener("notificationclick", (event) => {
     (async () => {
       // Opening comes first: the click is what permits a worker to open a window,
       // and that permission does not survive an await on a canister call. The
-      // app's window cannot be focused instead — `matchAll` sees this origin only,
-      // and the link is the app's.
+      // app's window cannot be focused instead, because `matchAll` sees this origin
+      // only and the link is the app's.
       if (target !== undefined && url !== undefined) {
         // A refused window must not cost the app its report.
-        await worker.clients.openWindow(url).catch(() => undefined);
+        await worker.clients
+          .openWindow(await openable(url))
+          .catch(() => undefined);
       } else {
         const clients = await worker.clients.matchAll({
           type: "window",
