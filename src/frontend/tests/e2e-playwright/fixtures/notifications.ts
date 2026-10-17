@@ -60,6 +60,26 @@ export const liftPermissionInSettings = (
   );
 
 /**
+ * Turns the push feature flag on for every page this context opens.
+ *
+ * Off by default, so every scenario that wants the feature says so. The key shape is
+ * `LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name` from `featureFlags.ts`, spelled out so a
+ * changed prefix fails loudly instead of running with the feature off.
+ */
+const armTheFeatureFlag = async (context: BrowserContext): Promise<void> => {
+  await context.addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        "ii-localstorage-feature-flags__PUSH_NOTIFICATIONS",
+        JSON.stringify(true),
+      );
+    } catch {
+      // localStorage may be locked in some test contexts.
+    }
+  });
+};
+
+/**
  * Installs the stub and turns the feature flag on, for every page this context opens.
  * Context-wide rather than page-wide, because the ceremony happens in a window the test
  * app opens after the scenario starts.
@@ -174,19 +194,7 @@ export const armPushNotifications = async (
     },
   );
 
-  // Off by default, so every scenario that wants the feature says so. The key shape is
-  // `LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name` from `featureFlags.ts`, spelled out so a
-  // changed prefix fails loudly instead of running with the feature off.
-  await context.addInitScript(() => {
-    try {
-      window.localStorage.setItem(
-        "ii-localstorage-feature-flags__PUSH_NOTIFICATIONS",
-        JSON.stringify(true),
-      );
-    } catch {
-      // localStorage may be locked in some test contexts.
-    }
-  });
+  await armTheFeatureFlag(context);
 };
 
 /**
@@ -206,20 +214,46 @@ export interface PushRelay {
   /** Resolves once the canister has posted at least `count` wake-ups. */
   waitForWakeUps: (count: number) => Promise<void>;
   received: () => number;
+  /** The paths the canister posted wake-ups to, in order.
+   *
+   *  A browser registers the endpoint it was handed, so posting to one path rather than
+   *  another is the canister having been told a new endpoint. That is the only way from
+   *  out here to tell a launch that registered from one that merely looked right. */
+  receivedPaths: () => string[];
+  /**
+   * Answers every later wake-up the way a push service answers one for a subscription
+   * that no longer exists.
+   *
+   * The one thing that tells Internet Identity a Home Screen app is gone: iOS destroys
+   * the app's storage when the user deletes it and tells nobody, so the push coming
+   * back dead is the only evidence there is.
+   */
+  reportGone: (gone: boolean) => void;
   close: () => Promise<void>;
 }
 
-/// A fixed port, because the canister keeps the endpoint a browser registered:
-/// an ephemeral one leaves every stored subscription pointing at a relay that no
-/// longer exists, and its wake-up is refused rather than delivered.
-const RELAY_PORT = 11190;
+/// Fixed for the life of a worker, and a worker's own. Fixed, because the canister keeps
+/// the endpoint a browser registered: an ephemeral one leaves every stored subscription
+/// pointing at a relay that no longer exists, and its wake-up is refused rather than
+/// delivered. A worker's own, because the scenarios that take a relay run in parallel off
+/// CI, and two of them on one port is `EADDRINUSE` rather than a test failure anyone can
+/// read. Nothing outside the suite names this port.
+const RELAY_PORT = 11190 + Number(process.env.TEST_PARALLEL_INDEX ?? 0);
 
 export const startPushRelay = async (): Promise<PushRelay> => {
   let received = 0;
+  let gone = false;
+  const paths: string[] = [];
   const server = createServer((request, response) => {
     request.resume();
     request.on("end", () => {
       received += 1;
+      paths.push(request.url ?? "");
+      if (gone) {
+        // What a push service answers for a subscription that no longer exists.
+        response.writeHead(410).end();
+        return;
+      }
       // A relay answers 201 with nothing in it.
       response.writeHead(201).end();
     });
@@ -232,6 +266,10 @@ export const startPushRelay = async (): Promise<PushRelay> => {
   return {
     endpoint: `http://127.0.0.1:${RELAY_PORT}/push`,
     received: () => received,
+    receivedPaths: () => [...paths],
+    reportGone: (report: boolean) => {
+      gone = report;
+    },
     waitForWakeUps: async (count) => {
       await expect
         .poll(() => received, {
@@ -278,16 +316,7 @@ export const armRealWorkerPush = async (
       Promise.resolve(subscription as PushSubscription | null);
   }, endpoint);
 
-  await context.addInitScript(() => {
-    try {
-      window.localStorage.setItem(
-        "ii-localstorage-feature-flags__PUSH_NOTIFICATIONS",
-        JSON.stringify(true),
-      );
-    } catch {
-      // localStorage may be locked in some test contexts.
-    }
-  });
+  await armTheFeatureFlag(context);
 };
 
 /**
@@ -325,4 +354,19 @@ export const deliverPush = async (
     data: "",
   });
   await session.detach();
+};
+
+/** What the worker registered in this context has on screen, as the browser holds it. */
+export const shownByTheWorker = async (
+  context: BrowserContext,
+): Promise<{ title: string; body: string }[]> => {
+  const [worker] = context.serviceWorkers();
+  if (worker === undefined) {
+    return [];
+  }
+  return await worker.evaluate(async () => {
+    const scope = self as unknown as ServiceWorkerGlobalScope;
+    const shown = await scope.registration.getNotifications();
+    return shown.map((one) => ({ title: one.title, body: one.body }));
+  });
 };
