@@ -1,5 +1,5 @@
 use crate::openid::OpenIdCredential;
-use crate::storage::anchor::{Anchor, AnchorError, Device};
+use crate::storage::anchor::{Anchor, AnchorError, Device, WebPushSubscription};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, MetadataEntryV2, Purpose,
@@ -1274,7 +1274,7 @@ mod browser_tests {
     use super::*;
     use crate::browser_key::test_keys::{claim_token, public_key, signing_key};
     use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
-    use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
+    use crate::storage::anchor::{BrowserError, QueuedNotification, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, BrowserId, FormFactor, NotificationAppInfo,
         NotificationAppStatus, OperatingSystem, PublicKey,
@@ -1581,7 +1581,156 @@ mod browser_tests {
                 .and_then(|app| app.linked_app()),
             Some(7)
         );
-        assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(second));
+    }
+
+    #[test]
+    fn taking_an_app_off_an_entry_drops_what_it_had_waiting() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(first, 7);
+        anchor
+            .notifications_mut(first)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: 1,
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+            });
+        anchor.set_woken_again(first, Some(1_000));
+
+        anchor.point_at_notification_app(second, 7);
+
+        assert!(anchor.notifications(first).is_empty());
+        assert_eq!(
+            anchor
+                .browsers()
+                .iter()
+                .find(|browser| browser.id == first)
+                .and_then(|browser| browser.woken_again_at_ns),
+            None
+        );
+    }
+
+    /// A queue is cleared because what is in it was posted to an address this entry can
+    /// no longer read. An entry that registered an address of its own was posted to at
+    /// that address, and the app reference moving says nothing about it.
+    #[test]
+    fn repointing_a_browser_with_its_own_address_keeps_what_it_was_sent() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor.set_webpush_subscription(
+            id,
+            Some(WebPushSubscription {
+                endpoint: "https://push.example/one".to_string(),
+                created_at_ns: 1_000,
+                vapid_public_key: vec![1; 8],
+                jwt_signatures: vec![],
+                jwt_issued_at_ns: 1_000,
+            }),
+        );
+        anchor
+            .notifications_mut(id)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: 1,
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+            });
+
+        anchor.point_at_notification_app(id, 8);
+
+        assert_eq!(anchor.notifications(id).len(), 1);
+    }
+
+    /// An install that has not completed is a route of its own: what was posted while
+    /// the entry pointed at the app before it is unreadable by the app that finishes.
+    #[test]
+    fn finishing_an_install_over_an_old_app_drops_what_that_app_was_sent() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_mut(id)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: 1,
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+            });
+        anchor.set_woken_again(id, Some(1_000));
+        anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
+
+        anchor.point_at_notification_app(id, 8);
+
+        assert!(anchor.notifications(id).is_empty());
+        assert_eq!(
+            anchor
+                .browsers()
+                .iter()
+                .find(|browser| browser.id == id)
+                .and_then(|browser| browser.woken_again_at_ns),
+            None
+        );
+    }
+
+    #[test]
+    fn repointing_a_browser_drops_what_the_old_app_was_sent() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_mut(id)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: 1,
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+            });
+        anchor.set_woken_again(id, Some(1_000));
+
+        anchor.point_at_notification_app(id, 7);
+        assert_eq!(anchor.notifications(id).len(), 1);
+
+        anchor.point_at_notification_app(id, 8);
+
+        assert!(anchor.notifications(id).is_empty());
+        assert_eq!(
+            anchor
+                .browsers()
+                .iter()
+                .find(|browser| browser.id == id)
+                .and_then(|browser| browser.woken_again_at_ns),
+            None
+        );
     }
 
     /// A reference naming a record that is gone is no app this identity has. The record

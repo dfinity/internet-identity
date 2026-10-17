@@ -112,7 +112,9 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
+use crate::storage::anchor::{
+    keeps_endpoint, Anchor, Browser, BrowserError, WebPushSubscription, MAX_BROWSERS,
+};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1572,14 +1574,8 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// Stores what the app has registered for Web Push, and stamps its liveness.
-    ///
-    /// The only writer is the app itself. A browser pointing at it turns its own
-    /// delivery off by letting go of the reference, never by clearing this: the
-    /// subscription belongs to the app and every other identity delivers through it.
-    ///
-    /// False where `app_id` names no record, so a caller never reports a registration
-    /// that was dropped.
+    /// Stores what the app has registered for Web Push, and stamps its liveness. The only
+    /// writer is the app itself. False where `app_id` names no record.
     pub fn set_notification_app_subscription(
         &mut self,
         app_id: NotificationAppId,
@@ -1590,11 +1586,63 @@ impl<M: Memory + Clone> Storage<M> {
             return false;
         };
         let mut app = NotificationApp::from(stored);
+        let endpoint_kept =
+            keeps_endpoint(app.webpush_subscription.as_ref(), subscription.as_ref());
         app.webpush_subscription = subscription;
         app.last_used = now;
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
+        if !endpoint_kept {
+            self.clear_queues_routed_through(app_id);
+        }
         true
+    }
+
+    /// Drops what every browser routing through `app_id` had waiting, and its re-wake stamp.
+    /// Left in place, entries nobody can show would suppress every wake-up until they expire.
+    fn clear_queues_routed_through(&mut self, app_id: NotificationAppId) {
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let Ok(mut anchor) = self.read(anchor_number) else {
+                ic_cdk::println!(
+                    "Failed to read anchor {anchor_number} to clear what app {app_id} queued"
+                );
+                continue;
+            };
+            let pointing: Vec<(BrowserId, bool)> = anchor
+                .browsers()
+                .iter()
+                .filter(|browser| delivered_through_notification_app(browser, app_id))
+                .map(|browser| (browser.id, browser.woken_again_at_ns.is_some()))
+                .collect();
+            let mut cleared = false;
+            for (browser_id, was_woken_again) in pointing {
+                if let Some(queue) = anchor.notifications_mut(browser_id) {
+                    cleared |= !queue.is_empty();
+                    queue.clear();
+                }
+                cleared |= was_woken_again;
+                anchor.set_woken_again(browser_id, None);
+            }
+            if !cleared {
+                continue;
+            }
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
+                );
+            }
+        }
+    }
+
+    /// Stamps that the app signing as `principal` has just called, which is the only
+    /// evidence there is that an installed app still exists.
+    pub fn stamp_notification_app_use(&mut self, principal: Principal, now: Timestamp) {
+        let Some(mut app) = self.notification_app_with_principal(principal) else {
+            return;
+        };
+        app.last_used = now;
+        self.notification_app_memory
+            .insert(app.id, StorableNotificationApp::from(app));
     }
 
     /// The record `app_id` names, if it is still there.
@@ -1611,6 +1659,51 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&app_id)
             .map(Vec::from)
             .unwrap_or_default()
+    }
+
+    /// Takes an app out of every anchor that points at it, which deletes the record.
+    /// False where a reference survived, so the record is still held by something.
+    pub fn forget_notification_app(&mut self, app_id: NotificationAppId) -> bool {
+        let mut all_dropped = true;
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let Ok(mut anchor) = self.read(anchor_number) else {
+                ic_cdk::println!(
+                    "Failed to read anchor {anchor_number} to drop notification app {app_id}"
+                );
+                all_dropped = false;
+                continue;
+            };
+            // The reference goes from every entry that holds one. The queue and the stamp
+            // go only from the entries this record's address delivered for.
+            let pointing: Vec<(BrowserId, bool)> = anchor
+                .browsers()
+                .iter()
+                .filter(|browser| points_at_notification_app(browser, app_id))
+                .map(|browser| {
+                    (
+                        browser.id,
+                        delivered_through_notification_app(browser, app_id),
+                    )
+                })
+                .collect();
+            for (browser_id, delivered_through_it) in pointing {
+                anchor.stop_pointing_at_notification_app(browser_id);
+                if !delivered_through_it {
+                    continue;
+                }
+                if let Some(queue) = anchor.notifications_mut(browser_id) {
+                    queue.clear();
+                }
+                anchor.set_woken_again(browser_id, None);
+            }
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to drop notification app {app_id} from anchor {anchor_number}: {err}"
+                );
+                all_dropped = false;
+            }
+        }
+        all_dropped
     }
 
     /// Forgets a record and the principal that resolved to it. Its id is retired with it.
@@ -3638,9 +3731,15 @@ impl<M: Memory + Clone> Storage<M> {
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
-        // A browser the identity signed out of must stop being notified for it. The
-        // entry itself stays, so that signing back in is not a new browser.
+        // A browser the identity signed out of must stop being notified for it. The entry
+        // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
+        if let Some(queue) = anchor.notifications_mut(browser_id) {
+            queue.clear();
+        }
+        // The stamp rations a second wake-up for an entry still waiting, and this entry
+        // is waiting for nothing.
+        anchor.set_woken_again(browser_id, None);
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -4574,6 +4673,20 @@ pub struct CreateSessionParams {
     pub max_idle_ns: Option<u64>,
     pub read_only: bool,
     pub now_ns: Timestamp,
+}
+
+/// Whether this entry points at `app_id`. Pointing is which app this browser has, not
+/// where its wake-ups went.
+fn points_at_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {
+    browser
+        .notification_app
+        .is_some_and(|reference| reference.linked_app() == Some(app_id))
+}
+
+/// Whether this entry's wake-ups were posted to `app_id`'s address, which is what says that
+/// address going away takes this entry's queue and re-wake stamp with it.
+fn delivered_through_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {
+    browser.webpush_subscription.is_none() && points_at_notification_app(browser, app_id)
 }
 
 #[cfg(not(test))]
