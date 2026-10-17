@@ -122,8 +122,9 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::notification_app::{
-    StorableNotificationApp, StorableNotificationAppId,
+    StorableNotificationApp, StorableNotificationAppId, StorableNotificationAppRef,
 };
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -222,6 +223,7 @@ const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 38u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 39u8;
+const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX: u8 = 40u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -325,6 +327,10 @@ const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`NotificationAppId`] allocator: an id is retired with its record, never reissued.
 const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
     MemoryId::new(NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX);
+
+/// Which anchors point at an app; its emptiness says a record has no one left to deliver for.
+const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -473,6 +479,10 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the notification app id allocator.
     next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the anchors-per-app index.
+    lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_anchors_with_notification_app_memory:
+        StableBTreeMap<StorableNotificationAppId, StorableAnchorNumberList, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -622,6 +632,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_ID);
         let next_notification_app_id_memory =
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
+        let lookup_anchors_with_notification_app_memory =
+            memory_manager.get(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -727,6 +739,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             next_notification_app_id_memory: StableCell::init(next_notification_app_id_memory, 0)
                 .expect("next_notification_app_id_memory"),
+            lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper::new(
+                lookup_anchors_with_notification_app_memory.clone(),
+            ),
+            lookup_anchors_with_notification_app_memory: StableBTreeMap::init(
+                lookup_anchors_with_notification_app_memory,
+            ),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -963,6 +981,7 @@ impl<M: Memory + Clone> Storage<M> {
             previous_passkey_credentials,
             previous_recovery_keys,
             previous_email_recovery,
+            previous_browsers,
         ) = if let Some(StorableAnchor {
             // The following fields need to be compared with the previous anchor
             openid_credentials,
@@ -970,11 +989,12 @@ impl<M: Memory + Clone> Storage<M> {
             recovery_keys,
             email_recovery,
 
+            browsers,
+
             // The following fields do not require merging.
             created_at_ns: _,
             name: _,
             verified_emails: _,
-            browsers: _,
             next_browser_id: _,
             session_count: _,
         }) = previous_anchor_maybe
@@ -984,10 +1004,11 @@ impl<M: Memory + Clone> Storage<M> {
                 passkey_credentials.unwrap_or_default(),
                 recovery_keys.unwrap_or_default(),
                 email_recovery.unwrap_or_default(),
+                browsers.unwrap_or_default(),
             )
         } else {
             // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
-            (vec![], vec![], vec![], vec![])
+            (vec![], vec![], vec![], vec![], vec![])
         };
         // `storable_anchor.verified_emails` is not synced through any
         // reverse-lookup index — verified emails are addressable only
@@ -1023,6 +1044,12 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             &previous_passkey_credentials,
             &current_passkey_credentials,
+        );
+
+        self.sync_anchor_with_notification_app_index(
+            anchor_number,
+            &previous_browsers,
+            storable_anchor.browsers.as_deref().unwrap_or_default(),
         );
 
         // The reverse address index for email recovery: map
@@ -1479,6 +1506,102 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert(hash, anchor_number);
         }
         Ok(())
+    }
+
+    /// Keeps the anchors-per-app index in step with the apps this anchor's browsers point
+    /// at, and deletes a record the last browser has just stopped pointing at. The index is
+    /// also the reference count.
+    fn sync_anchor_with_notification_app_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous_browsers: &[StorableBrowser],
+        current_browsers: &[StorableBrowser],
+    ) {
+        let apps_of = |browsers: &[StorableBrowser]| {
+            browsers
+                .iter()
+                .filter_map(|browser| match browser.notification_app {
+                    Some(StorableNotificationAppRef::Linked(app_id, _)) => Some(app_id),
+                    _ => None,
+                })
+                .collect::<BTreeSet<_>>()
+        };
+        let previous = apps_of(previous_browsers);
+        let current = apps_of(current_browsers);
+
+        for app_id in previous.difference(&current) {
+            let Some(anchors) = self.lookup_anchors_with_notification_app_memory.get(app_id) else {
+                // There is no reference left to count down and nothing here can rebuild
+                // one, so the write carries on: an anchor must not fail over bookkeeping
+                // it cannot fix.
+                ic_cdk::println!(
+                    "ERROR: Anchor number {} stopped pointing at notification app {}, which has \
+                     no index entry.",
+                    anchor_number,
+                    app_id,
+                );
+                continue;
+            };
+            let remaining: Vec<AnchorNumber> = Vec::from(anchors)
+                .into_iter()
+                .filter(|number| *number != anchor_number)
+                .collect();
+            if remaining.is_empty() {
+                self.lookup_anchors_with_notification_app_memory
+                    .remove(app_id);
+                self.delete_notification_app(*app_id);
+                continue;
+            }
+            self.lookup_anchors_with_notification_app_memory
+                .insert(*app_id, StorableAnchorNumberList::from(remaining));
+        }
+
+        for app_id in current.difference(&previous) {
+            let mut anchors = self
+                .lookup_anchors_with_notification_app_memory
+                .get(app_id)
+                .map(Vec::from)
+                .unwrap_or_default();
+            if anchors.contains(&anchor_number) {
+                continue;
+            }
+            anchors.push(anchor_number);
+            self.lookup_anchors_with_notification_app_memory
+                .insert(*app_id, StorableAnchorNumberList::from(anchors));
+        }
+    }
+
+    /// The anchors pointing at `app_id`, in the order they began pointing, oldest first,
+    /// and stable across calls.
+    pub fn anchors_with_notification_app(&self, app_id: NotificationAppId) -> Vec<AnchorNumber> {
+        self.lookup_anchors_with_notification_app_memory
+            .get(&app_id)
+            .map(Vec::from)
+            .unwrap_or_default()
+    }
+
+    /// Forgets a record and the principal that resolved to it. Its id is retired with it.
+    fn delete_notification_app(&mut self, app_id: NotificationAppId) {
+        let Some(app) = self.notification_app_memory.remove(&app_id) else {
+            // An id is handed out with the record it names and retired with it, so an id
+            // reaching here names a record.
+            ic_cdk::println!(
+                "ERROR: Notification app {} has no record to forget.",
+                app_id,
+            );
+            return;
+        };
+        self.lookup_notification_app_with_principal_memory
+            .remove(&Principal::self_authenticating(&app.key));
+    }
+
+    /// Forgets a record no anchor points at. The record and the principal that resolves to
+    /// it are committed with the reply even where that reply is an `Err`.
+    pub(crate) fn delete_unreferenced_notification_app(&mut self, app_id: NotificationAppId) {
+        if !self.anchors_with_notification_app(app_id).is_empty() {
+            return;
+        }
+        self.delete_notification_app(app_id);
     }
 
     fn sync_anchor_with_passkey_pubkey_index(
@@ -4342,6 +4465,11 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "next_notification_app_id".to_string(),
                 self.next_notification_app_id_memory_wrapper.size(),
+            ),
+            (
+                "lookup_anchors_with_notification_app".to_string(),
+                self.lookup_anchors_with_notification_app_memory_wrapper
+                    .size(),
             ),
             (
                 "lookup_session_with_principal".to_string(),

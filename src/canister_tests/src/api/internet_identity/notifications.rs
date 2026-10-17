@@ -236,3 +236,11 @@ pub fn browser_remove_notification(
     )
     .map(|(x,)| x)
 }
+
+pub fn notification_app_anchors(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Vec<AnchorNumber>, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "notification_app_anchors", ()).map(|(x,)| x)
+}

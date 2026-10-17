@@ -1,5 +1,6 @@
 //! Tests for the notification API, exercised through Candid against a canister.
 
+use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
     browser_get_next_notification, browser_remove_notification, consent_granted, grant_consent,
@@ -54,13 +55,32 @@ fn sign_in_at(
     origin: &str,
     browser_seed: u8,
 ) {
+    sign_in_as(
+        env,
+        canister_id,
+        principal_1(),
+        anchor,
+        origin,
+        browser_seed,
+    );
+}
+
+/// As [`sign_in_at`], for an identity `owner` rather than [`principal_1`] registered.
+fn sign_in_as(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    owner: Principal,
+    anchor: AnchorNumber,
+    origin: &str,
+    browser_seed: u8,
+) {
     let browser = BrowserKey::new(browser_seed);
     let session_key = ByteBuf::from(vec![1; 32]);
     let next_browser_key = browser.successor().public_key();
     prepare_account_session(
         env,
         canister_id,
-        principal_1(),
+        owner,
         PrepareAccountSessionRequest {
             identity_number: anchor,
             origin: origin.to_string(),
@@ -863,7 +883,6 @@ mod subscription_status {
 mod pull_delegation {
     use super::subscriptions::{install_with_browser, key_holder, ENDPOINT};
     use super::*;
-    use candid::Principal;
     use canister_tests::api::internet_identity::api_v2::{
         prepare_account_delegation, AccountDelegationParams,
     };
@@ -1277,6 +1296,164 @@ mod browser_queue {
             browser_remove_notification(&env, canister_id, principal_2(), remove_request(anchor))?,
             Err(RemoveNotificationError::InternalCanisterError(_))
         ));
+        Ok(())
+    }
+}
+
+mod app_anchors {
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        link_notification_app, notification_app_anchors, prepare_notification_app_link,
+    };
+    use canister_tests::framework::device_data_2;
+    use internet_identity_interface::internet_identity::types::{
+        LinkNotificationAppRequest, PrepareNotificationAppLinkRequest,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// A canister that notifies, and two identities signed in from a browser each:
+    /// `principal_1` on the first, `principal_2` on the second.
+    fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
+        let canister_id =
+            install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
+        let first = flows::register_anchor(env, canister_id);
+        sign_in_at(env, canister_id, first, ORIGIN, 1);
+        let second = flows::register_anchor_with_device(env, canister_id, &device_data_2());
+        sign_in_as(env, canister_id, principal_2(), second, ORIGIN, 2);
+        (canister_id, first, second)
+    }
+
+    /// Installs the Home Screen app `app_seed` names on `anchor`: the browser `browser_seed`
+    /// names registers the one-shot key, and the app links as it. Answers the principal the
+    /// app signs as.
+    fn link_app(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_seed: u8,
+        app_seed: u8,
+    ) -> Principal {
+        let app = BrowserKey::new(app_seed);
+        let link = BrowserKey::new(app_seed.wrapping_add(1));
+        prepare_notification_app_link(
+            env,
+            canister_id,
+            BrowserKey::new(browser_seed).successor().principal(),
+            PrepareNotificationAppLinkRequest {
+                anchor_number: anchor,
+                link_principal: link.principal(),
+            },
+        )
+        .expect("prepare_notification_app_link rejected")
+        .expect("prepare_notification_app_link returned Err");
+        link_notification_app(
+            env,
+            canister_id,
+            link.principal(),
+            LinkNotificationAppRequest {
+                anchor_number: anchor,
+                app_key: app.public_key(),
+            },
+        )
+        .expect("link_notification_app rejected")
+        .expect("link_notification_app returned Err");
+        app.principal()
+    }
+
+    #[test]
+    fn should_answer_an_app_only_the_identities_that_point_at_it() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let shared = link_app(&env, canister_id, first, 1, 100);
+        assert_eq!(link_app(&env, canister_id, second, 2, 100), shared);
+        sign_in_as(&env, canister_id, principal_2(), second, ORIGIN, 3);
+        let private = link_app(&env, canister_id, second, 3, 101);
+
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, shared)?,
+            vec![first, second]
+        );
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, private)?,
+            vec![second]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_nothing_to_a_caller_that_is_no_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        link_app(&env, canister_id, anchor, 1, 100);
+
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, Principal::anonymous())?,
+            Vec::<AnchorNumber>::new()
+        );
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                BrowserKey::new(1).successor().principal()
+            )?,
+            Vec::<AnchorNumber>::new()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_nothing_while_notifications_are_disabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, anchor, 1, 100);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, app)?,
+            Vec::<AnchorNumber>::new()
+        );
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            arg_with_notifications_enabled(),
+        )?;
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, app)?,
+            vec![anchor]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_nothing_once_the_last_reference_is_dropped() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        let first = link_app(&env, canister_id, anchor, 1, 100);
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, first)?,
+            vec![anchor]
+        );
+
+        let second = link_app(&env, canister_id, anchor, 1, 101);
+
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, first)?,
+            Vec::<AnchorNumber>::new()
+        );
+        assert_eq!(
+            notification_app_anchors(&env, canister_id, second)?,
+            vec![anchor]
+        );
         Ok(())
     }
 }

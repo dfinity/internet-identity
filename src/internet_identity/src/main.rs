@@ -8,8 +8,8 @@ use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
-    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization, AuthorizationError,
+    anchor_operation_with_authz_check, check_app_authorization, check_authorization,
+    check_authz_and_record_activity, check_browser_authorization, AuthorizationError,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -424,6 +424,19 @@ fn prepare_notification_app_link(
     })
 }
 
+/// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
+/// nobody to deliver for, and those cases cannot be told apart.
+#[query]
+fn notification_app_anchors() -> Vec<AnchorNumber> {
+    if !notifications::notifications_enabled() {
+        return vec![];
+    }
+    let Ok(app) = check_app_authorization() else {
+        return vec![];
+    };
+    state::storage_borrow(|storage| storage.anchors_with_notification_app(app.id))
+}
+
 /// Called by the Home Screen app, signed with the one-shot key its installing browser put
 /// in the URL fragment. The signature covers this call and nothing else, so it cannot be
 /// lifted onto a call naming another key, and the slot it spends is cleared here.
@@ -459,9 +472,15 @@ fn link_notification_app(
     anchor.point_at_notification_app(installing_browser, app.id);
 
     state::storage_borrow_mut(|storage| {
-        storage
-            .write(anchor)
-            .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
+        let Err(err) = storage.write(anchor) else {
+            return Ok(());
+        };
+        // The record and the principal that resolves to it are already written, and this
+        // reply commits them whether it carries `Ok` or `Err`.
+        storage.delete_unreferenced_notification_app(app.id);
+        Err(LinkNotificationAppError::InternalCanisterError(format!(
+            "{err:?}"
+        )))
     })
 }
 
