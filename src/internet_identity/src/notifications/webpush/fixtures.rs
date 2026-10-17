@@ -35,6 +35,15 @@ fn key(seed: u8) -> PublicKey {
     ByteBuf::from(vec![seed.wrapping_add(1); 91])
 }
 
+/// The key a Home Screen app generated in its own partition and presents on every call.
+pub(crate) fn app_key(seed: u8) -> PublicKey {
+    ByteBuf::from(vec![seed; 91])
+}
+
+/// Where a Home Screen app's own registration sends its wake-ups.
+pub(crate) const APP_RELAY: &str = "https://web.push.apple.com/a";
+pub(crate) const OTHER_APP_RELAY: &str = "https://web.push.apple.com/b";
+
 fn chrome_on_a_mac() -> BrowserDescription {
     BrowserDescription {
         brand: BrowserBrand::Chrome,
@@ -56,7 +65,7 @@ pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {
 }
 
 /// A real, fixed SEC1 point: a length-only fixture cannot pass the curve check.
-pub(super) fn valid_vapid_key() -> Vec<u8> {
+pub(crate) fn valid_vapid_key() -> Vec<u8> {
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
     secret

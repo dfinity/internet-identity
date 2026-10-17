@@ -104,6 +104,10 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// What this identity's service worker has yet to show on this device, oldest first.
+    pub notifications: Vec<QueuedNotification>,
+    /// When this entry was last woken again for something it could not show yet.
+    pub woken_again_at_ns: Option<Timestamp>,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
@@ -145,11 +149,18 @@ pub struct WebPushSubscription {
     /// Raw ECDSA P-256 signatures, in window order.
     pub jwt_signatures: Vec<Vec<u8>>,
     pub jwt_issued_at_ns: Timestamp,
-    /// What the service worker has yet to show, oldest first, each woken through this
-    /// registration.
-    pub notifications: Vec<QueuedNotification>,
-    /// When this browser was last woken again for something it could not show yet.
-    pub woken_again_at_ns: Option<Timestamp>,
+}
+
+/// Whether a write replaces the JWT pool on the address that is already registered, rather
+/// than moving to a different one. Every holder of a registration decides it the same way.
+pub fn keeps_endpoint(
+    registered: Option<&WebPushSubscription>,
+    replacing: Option<&WebPushSubscription>,
+) -> bool {
+    match (registered, replacing) {
+        (Some(registered), Some(replacing)) => registered.endpoint == replacing.endpoint,
+        _ => false,
+    }
 }
 
 impl From<StorableWebPushSubscription> for WebPushSubscription {
@@ -165,21 +176,6 @@ impl From<StorableWebPushSubscription> for WebPushSubscription {
                 .map(Vec::from)
                 .collect(),
             jwt_issued_at_ns: value.jwt_pool.issued_at_ns,
-            notifications: value
-                .notifications
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|queued| {
-                    Some(QueuedNotification {
-                        application_number: queued.application_number,
-                        sender: Principal::try_from_slice(&queued.sender).ok()?,
-                        notification_id: queued.notification_id,
-                        expires_at_ns: queued.expires_at_ns,
-                        account_number: queued.account_number,
-                    })
-                })
-                .collect(),
-            woken_again_at_ns: value.woken_again_at_ns,
         }
     }
 }
@@ -194,14 +190,9 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
                 issued_at_ns: value.jwt_issued_at_ns,
             },
-            notifications: (!value.notifications.is_empty()).then(|| {
-                value
-                    .notifications
-                    .into_iter()
-                    .map(StorableQueuedNotification::from)
-                    .collect()
-            }),
-            woken_again_at_ns: value.woken_again_at_ns,
+            // The entry holds both, so they are read here and never written.
+            notifications: None,
+            woken_again_at_ns: None,
         }
     }
 }
@@ -216,7 +207,37 @@ impl From<StorableBrowser> for Browser {
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
-            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            webpush_subscription: value
+                .webpush_subscription
+                .clone()
+                .map(WebPushSubscription::from),
+            // From the entry, or from the subscription for a record that carries it there.
+            notifications: value
+                .notifications
+                .or_else(|| {
+                    value
+                        .webpush_subscription
+                        .as_ref()
+                        .and_then(|subscription| subscription.notifications.clone())
+                })
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|queued| {
+                    Some(QueuedNotification {
+                        application_number: queued.application_number,
+                        sender: Principal::try_from_slice(&queued.sender).ok()?,
+                        notification_id: queued.notification_id,
+                        expires_at_ns: queued.expires_at_ns,
+                        account_number: queued.account_number,
+                    })
+                })
+                .collect(),
+            woken_again_at_ns: value.woken_again_at_ns.or_else(|| {
+                value
+                    .webpush_subscription
+                    .as_ref()
+                    .and_then(|subscription| subscription.woken_again_at_ns)
+            }),
             notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
@@ -236,6 +257,14 @@ impl From<Browser> for StorableBrowser {
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
+            notifications: (!value.notifications.is_empty()).then(|| {
+                value
+                    .notifications
+                    .into_iter()
+                    .map(StorableQueuedNotification::from)
+                    .collect()
+            }),
+            woken_again_at_ns: value.woken_again_at_ns,
         }
     }
 }
@@ -1004,10 +1033,25 @@ impl Anchor {
                     .is_some_and(|reference| reference.linked_app() == Some(app_id))
             {
                 browser.notification_app = None;
+                // The address belongs to another entry now, so nothing here can show
+                // what it had waiting. An entry that registered an address of its own
+                // was posted to at that address and can still show it.
+                if browser.webpush_subscription.is_none() {
+                    browser.notifications.clear();
+                    browser.woken_again_at_ns = None;
+                }
             }
         }
+        // Anything other than this same app: another app, or an install this entry
+        // started and has not finished. Both mean what is waiting was posted somewhere
+        // the app answering now cannot read.
+        let followed_another_route = self.browsers[index].notification_app.is_some();
         self.browsers[index].notification_app =
             Some(NotificationAppRef::Linked { app_id, enabled });
+        if followed_another_route && self.browsers[index].webpush_subscription.is_none() {
+            self.browsers[index].notifications.clear();
+            self.browsers[index].woken_again_at_ns = None;
+        }
     }
 
     /// Whether this identity wants the app it points at to deliver for it. Never a
@@ -1028,6 +1072,24 @@ impl Anchor {
             return;
         };
         *current = enabled;
+    }
+
+    /// Called from `Storage::forget_notification_app`, which runs when a push service
+    /// answers that the app's endpoint is gone: on iOS that is the user having deleted the
+    /// web app, taking the partition that held its key with it, so every entry pointing at
+    /// the record points at something that cannot be reached again. The record itself is
+    /// not this list's to delete: the caller is the one that can see whether anything
+    /// still points at it.
+    pub fn stop_pointing_at_notification_app(
+        &mut self,
+        browser_id: BrowserId,
+    ) -> Option<NotificationAppId> {
+        self.browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)?
+            .notification_app
+            .take()
+            .and_then(|reference| reference.linked_app())
     }
 
     /// The app this browser points at, where it has one.
@@ -1108,12 +1170,21 @@ impl Anchor {
         }
     }
 
-    /// The queue of the browser's registration, empty for one not registered.
+    /// What this entry has waiting, empty for one with nothing.
     pub fn notifications(&self, browser_id: BrowserId) -> &[QueuedNotification] {
-        self.webpush_subscription(browser_id)
-            .map_or(&[], |subscription| &subscription.notifications)
+        self.browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .map_or(&[], |browser| &browser.notifications)
     }
 
+    /// What this entry has waiting, to add to or take from.
+    ///
+    /// `Some` for every browser the registry lists, an empty queue included, and `None`
+    /// only where no entry carries this id. The queue belongs to the entry and not to a
+    /// subscription, so a browser that registered nothing of its own has one too: a
+    /// caller reading `None` as "not registered for notifications" would be reading it
+    /// as something it does not say.
     pub fn notifications_mut(
         &mut self,
         browser_id: BrowserId,
@@ -1121,8 +1192,14 @@ impl Anchor {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)
-            .and_then(|browser| browser.webpush_subscription.as_mut())
-            .map(|subscription| &mut subscription.notifications)
+            .map(|browser| &mut browser.notifications)
+    }
+
+    /// Stamps that this entry has been woken again for something still waiting.
+    pub fn set_woken_again(&mut self, browser_id: BrowserId, at_ns: Option<Timestamp>) {
+        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
+            browser.woken_again_at_ns = at_ns;
+        }
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1266,6 +1343,8 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            notifications: Vec::new(),
+            woken_again_at_ns: None,
             notification_app: None,
         });
 

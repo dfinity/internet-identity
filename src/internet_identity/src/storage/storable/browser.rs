@@ -1,7 +1,9 @@
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
+use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
+use crate::storage::storable::timestamp::StorableTimestamp;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
 
@@ -33,4 +35,11 @@ pub struct StorableBrowser {
     /// The notification app record this browser points at, where it has one.
     #[n(8)]
     pub notification_app: Option<StorableNotificationAppRef>,
+    /// What this identity's service worker has yet to show on this device, oldest first.
+    #[n(9)]
+    pub notifications: Option<Vec<StorableQueuedNotification>>,
+    /// When this entry was last woken a second time for a notification it could not show
+    /// yet. Allowed again only once the delegation it was for has expired.
+    #[n(10)]
+    pub woken_again_at_ns: Option<StorableTimestamp>,
 }

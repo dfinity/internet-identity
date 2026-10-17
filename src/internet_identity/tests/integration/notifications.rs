@@ -1289,14 +1289,14 @@ mod browser_queue {
         let env = env();
         let (canister_id, anchor, _, _) = install_with_browser(&env);
 
-        assert!(matches!(
+        assert_eq!(
             browser_get_next_notification(&env, canister_id, principal_2(), next_request(anchor))?,
-            Err(GetNextNotificationError::InternalCanisterError(_))
-        ));
-        assert!(matches!(
+            Err(GetNextNotificationError::InvalidBrowserKey)
+        );
+        assert_eq!(
             browser_remove_notification(&env, canister_id, principal_2(), remove_request(anchor))?,
-            Err(RemoveNotificationError::InternalCanisterError(_))
-        ));
+            Err(RemoveNotificationError::InvalidBrowserKey)
+        );
         Ok(())
     }
 }
@@ -1789,8 +1789,12 @@ mod shared_app {
         let still_on = linked(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?;
         assert!(still_on.enabled);
         assert!(still_on.subscribed);
+        // Read for the identity that still routes through it: an identity that switched
+        // the app off does not route through it any more, so the app cannot ask as that
+        // one. What the switch must not touch is the registration itself, and the
+        // browser's own read above says it is still there.
         assert_eq!(
-            get_webpush_subscription_status(&env, canister_id, app, second)?
+            get_webpush_subscription_status(&env, canister_id, app, first)?
                 .expect("the app reads its own registration")
                 .endpoint,
             ENDPOINT
@@ -1953,8 +1957,6 @@ mod claims {
         Ok(())
     }
 
-    /// The claiming identity's own consent is what the caller check is: a browser of
-    /// another identity cannot route this one's notifications through an app.
     #[test]
     fn should_refuse_a_claim_for_an_anchor_the_caller_is_no_browser_of(
     ) -> Result<(), RejectResponse> {
@@ -1974,8 +1976,6 @@ mod claims {
         Ok(())
     }
 
-    /// A signature from a browser with no app hands over nothing, and says so rather
-    /// than writing a reference to a record that does not exist.
     #[test]
     fn should_refuse_a_claim_whose_offering_browser_points_at_nothing() -> Result<(), RejectResponse>
     {
