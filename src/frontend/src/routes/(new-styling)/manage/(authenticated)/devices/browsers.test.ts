@@ -40,6 +40,8 @@ const browser = (
   session_count: 0,
   created_at: createdAtNanos,
   last_used: lastUsedNanos,
+  // A browser the user signed in from; a Home Screen app is a record this would point at, and is not a row here.
+  notification_app: [] as [],
 });
 
 describe("kindOf", () => {

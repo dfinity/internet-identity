@@ -1,0 +1,85 @@
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import { throwCanisterError } from "$lib/utils/utils";
+import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+import { exportLinkKey, generateLinkKey } from "./linkKey";
+import { encodeLinkToken } from "./linkToken";
+import { NOTIFICATION_APP_PATH } from "./appPath";
+
+/** `undefined` where no sign-in has registered this browser; rejects where its key could not be read, which is not the same thing. */
+const registeredBrowserActor = async (
+  identityNumber: bigint,
+): Promise<ActorSubclass<_SERVICE> | undefined> => {
+  try {
+    return await browserKeyActor(identityNumber);
+  } catch (error) {
+    if (error instanceof UnregisteredBrowserError) {
+      return undefined;
+    }
+    throw error;
+  }
+};
+
+/** `undefined` where this browser is not registered; rejects where its key could not be read or the canister refused the install. */
+export const prepareInstallUrl = async ({
+  identityNumber,
+  replacingExisting,
+}: {
+  identityNumber: bigint;
+  /** The user has said the app is gone, which the canister takes as leave to replace a record that still claims to deliver. */
+  replacingExisting: boolean;
+}): Promise<string | undefined> => {
+  const actor = await registeredBrowserActor(identityNumber);
+  if (actor === undefined) {
+    return undefined;
+  }
+  const keyPair = await generateLinkKey();
+  const [identity, linkKey] = await Promise.all([
+    ECDSAKeyIdentity.fromKeyPair(keyPair),
+    exportLinkKey(keyPair),
+  ]);
+  // The slot is written before the key is handed out, so a URL that exists is one the canister is waiting for.
+  await actor
+    .prepare_notification_app_link({
+      anchor_number: identityNumber,
+      link_principal: identity.getPrincipal(),
+      replacing_existing: replacingExisting,
+    })
+    .then(throwCanisterError);
+  return `${NOTIFICATION_APP_PATH}#${encodeLinkToken({
+    identityNumber,
+    linkKey,
+  })}`;
+};
+
+/** Must be called straight from the click, which is the only time a browser allows it; the tab is opened empty and pointed once the URL resolves.
+ *  A blocked tab is not an error: the screen shows the link instead. */
+export const openInstallTab = (
+  url: string | Promise<string | undefined>,
+): boolean => {
+  const opened = window.open("", "_blank");
+  if (opened === null) {
+    return false;
+  }
+  if (typeof url === "string") {
+    opened.location.href = url;
+    return true;
+  }
+  void url.then(
+    (resolved) => {
+      if (resolved === undefined) {
+        // Nothing to send them to, and an empty tab says less than none.
+        opened.close();
+        return;
+      }
+      opened.location.href = resolved;
+    },
+    (error: unknown) => {
+      // A rejection left here would be an empty tab nothing ever closes.
+      console.error(error);
+      opened.close();
+    },
+  );
+  return true;
+};
