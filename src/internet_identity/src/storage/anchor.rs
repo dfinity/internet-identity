@@ -1,11 +1,13 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
+use crate::notifications::app::{NotificationAppId, NotificationAppRef};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
@@ -102,6 +104,9 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// The Home Screen app this browser installed or claimed, where it has one. The
+    /// reference outlives signing out and turning notifications off.
+    pub notification_app: Option<NotificationAppRef>,
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -212,6 +217,7 @@ impl From<StorableBrowser> for Browser {
             last_used: value.last_used,
             session_count: value.session_count,
             webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
 }
@@ -229,6 +235,7 @@ impl From<Browser> for StorableBrowser {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
+            notification_app: value.notification_app.map(StorableNotificationAppRef::from),
         }
     }
 }
@@ -867,6 +874,71 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
+    /// Whether a browser of this anchor already signs with `key`. An app key comes from a
+    /// partition no browser can reach, so a collision here is not a reinstall.
+    pub fn browser_holds_key(&self, key: &PublicKey) -> bool {
+        self.browsers
+            .iter()
+            .any(|browser| browser.current_browser_key == *key || browser.next_browser_key == *key)
+    }
+
+    /// Records that `browser_id` has started an install, naming the only caller that may
+    /// complete it. Replaces any earlier pending install of that browser, so minting a
+    /// second install URL retires the first.
+    pub fn start_notification_app_link(
+        &mut self,
+        browser_id: BrowserId,
+        link_principal: Principal,
+        expires_at_ns: Timestamp,
+    ) {
+        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+            return;
+        };
+        browser.notification_app = Some(NotificationAppRef::Pending {
+            link_principal,
+            expires_at_ns,
+        });
+    }
+
+    /// The browser of this anchor whose pending install names `caller`, where the slot has
+    /// not expired.
+    pub fn browser_awaiting_link(&self, caller: Principal, now_ns: Timestamp) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| match browser.notification_app {
+                Some(NotificationAppRef::Pending {
+                    link_principal,
+                    expires_at_ns,
+                }) => link_principal == caller && expires_at_ns > now_ns,
+                _ => false,
+            })
+            .map(|browser| browser.id)
+    }
+
+    /// Points `browser_id` at `app_id`, which also spends the pending install that
+    /// authorized it.
+    ///
+    /// One app per browser. Refusing a second instead would leave a user who deleted the
+    /// app from their Home Screen unable to set one up again: iOS destroys its storage and
+    /// the key with it, while a reference here would survive naming a record nothing holds.
+    pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
+        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+            return;
+        };
+        browser.notification_app = Some(NotificationAppRef::Linked {
+            app_id,
+            enabled: true,
+        });
+    }
+
+    /// The app this browser points at, where it has one.
+    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
+        self.browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .and_then(|browser| browser.notification_app)
+    }
+
     /// What this browser registered for Web Push, if anything.
     pub fn webpush_subscription(&self, browser_id: BrowserId) -> Option<&WebPushSubscription> {
         self.browsers
@@ -1037,6 +1109,7 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            notification_app: None,
         });
 
         let mut dropped = vec![];

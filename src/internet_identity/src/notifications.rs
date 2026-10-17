@@ -5,13 +5,14 @@
 //! spelling consent is keyed by.
 
 pub(crate) mod admission_queue;
+pub mod app;
 pub(crate) mod backlog;
 pub(crate) mod browser_queue;
 pub mod delegation;
 pub(crate) mod dispatch;
 pub mod senders;
 pub mod submission;
-mod validation;
+pub(crate) mod validation;
 pub mod webpush;
 
 /// A browser unused for this long counts as gone and is not woken. The send endpoint
@@ -26,6 +27,7 @@ use internet_identity_interface::internet_identity::types::{
     NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
     Timestamp,
 };
+pub(crate) use validation::NOT_ENABLED;
 pub use validation::{
     notifications_enabled, ValidatedGetNextNotificationRequest,
     ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,

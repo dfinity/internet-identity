@@ -1272,7 +1272,8 @@ mod mirror_verified_email_tests {
 
 mod browser_tests {
     use super::*;
-    use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
+    use crate::notifications::app::NotificationAppRef;
+    use crate::storage::anchor::{BrowserError, BrowserId, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, FormFactor, OperatingSystem, PublicKey,
     };
@@ -1307,6 +1308,141 @@ mod browser_tests {
         let mut key = vec![browser; 91];
         key[0] = step;
         ByteBuf::from(key)
+    }
+
+    /// The one-shot principal a browser names when it mints an install URL.
+    fn link_principal(seed: u8) -> Principal {
+        Principal::self_authenticating([seed; 32])
+    }
+
+    /// An anchor holding the one registered browser an install starts from.
+    fn anchor_with_browser() -> (Anchor, BrowserId) {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        (anchor, id)
+    }
+
+    #[test]
+    fn a_pending_install_is_found_by_the_principal_it_names() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(
+            anchor.browser_awaiting_link(link_principal(1), 2_000),
+            Some(id)
+        );
+    }
+
+    #[test]
+    fn a_pending_install_is_not_found_by_another_principal() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(2), 2_000), None);
+    }
+
+    #[test]
+    fn a_pending_install_is_not_found_once_it_has_expired() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 5_000), None);
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 5_001), None);
+    }
+
+    #[test]
+    fn a_second_install_retires_the_principal_the_first_named() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+        anchor.start_notification_app_link(id, link_principal(2), 6_000);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
+        assert_eq!(
+            anchor.browser_awaiting_link(link_principal(2), 2_000),
+            Some(id)
+        );
+    }
+
+    #[test]
+    fn a_pending_install_points_at_no_app_yet() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(
+            anchor.notification_app(id).and_then(|app| app.linked_app()),
+            None
+        );
+    }
+
+    #[test]
+    fn linking_points_the_browser_at_the_app_with_delivery_on() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: true
+            })
+        );
+    }
+
+    #[test]
+    fn linking_spends_the_pending_install() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
+    }
+
+    #[test]
+    fn a_browser_points_at_one_app_at_a_time() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 8);
+
+        assert_eq!(
+            anchor.notification_app(id).and_then(|app| app.linked_app()),
+            Some(8)
+        );
+    }
+
+    #[test]
+    fn an_unknown_browser_holds_neither_an_install_nor_an_app() {
+        let mut anchor = anchor();
+
+        anchor.start_notification_app_link(42, link_principal(1), 5_000);
+        anchor.point_at_notification_app(42, 7);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
+        assert_eq!(anchor.notification_app(42), None);
+    }
+
+    #[test]
+    fn a_key_a_browser_signs_with_is_recognised_in_either_slot() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert!(anchor.browser_holds_key(&browser_key(1)));
+        assert!(anchor.browser_holds_key(&successor_key(1)));
+        assert!(!anchor.browser_holds_key(&browser_key(2)));
     }
 
     #[test]

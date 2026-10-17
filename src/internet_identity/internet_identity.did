@@ -1865,6 +1865,40 @@ type RemoveWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
+// Gives a Home Screen app a record of its own, on the authority of a browser that is
+// signed in. Authorized by the token rather than by the caller being a browser this
+// identity knows: the app runs in a storage partition of its own and the key it
+// generated there is one nothing has seen.
+type PrepareNotificationAppLinkRequest = record {
+    anchor_number : UserNumber;
+    // The principal of the one-shot key this browser puts in the install URL.
+    link_principal : principal;
+};
+
+type PrepareNotificationAppLinkError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // The principal named is not one a key can sign as, so no app could ever present it.
+    LinkPrincipalIsNotAKey;
+    InternalCanisterError : text;
+};
+
+type LinkNotificationAppRequest = record {
+    anchor_number : UserNumber;
+    app_key : PublicKey;               // the app's own key; the record is looked up by it
+};
+
+type LinkNotificationAppError = variant {
+    // Not a P-256 public key in the single encoding WebCrypto emits.
+    InvalidAppKey;
+    // No browser of this identity is waiting for this caller, or the install it started
+    // has expired.
+    NoPendingLink;
+    // The key is one a browser of this identity already signs with.
+    KeyAlreadyInUse;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2515,6 +2549,13 @@ service : (opt InternetIdentityInit) -> {
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
+
+    // Called by the browser starting an install, naming the one-shot key it puts in the
+    // install URL as the only caller that may complete the link.
+    prepare_notification_app_link : (PrepareNotificationAppLinkRequest) -> (variant { Ok; Err : PrepareNotificationAppLinkError });
+    // Called by the Home Screen app on its first open, signed with that one-shot key.
+    // Creates the app's record where its key has none, and points the browser at it.
+    link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.
