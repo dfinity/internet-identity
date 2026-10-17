@@ -46,6 +46,15 @@ export class StaleBrowserKeyError extends Error {
   }
 }
 
+/** Kept apart from an absent key: reading the one as the other walks the user through the install again. */
+export class BrowserKeyUnreadableError extends Error {
+  constructor(cause: unknown) {
+    super("this browser's key store refused to answer");
+    this.name = "BrowserKeyUnreadableError";
+    this.cause = cause;
+  }
+}
+
 const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
 
 /** Must match the domains the canister verifies the two signatures under. */
@@ -67,7 +76,8 @@ const generate = (): Promise<CryptoKeyPair> =>
     "verify",
   ]) as Promise<CryptoKeyPair>;
 
-const read = async (
+/** The stored record, raising {@link BrowserKeyUnreadableError} where storage refused to answer. */
+const readOrThrow = async (
   identityNumber: bigint,
 ): Promise<BrowserKeyRecord | undefined> => {
   try {
@@ -75,10 +85,14 @@ const read = async (
       storageKey(identityNumber),
       BROWSER_KEY_STORE,
     );
-  } catch {
-    return undefined;
+  } catch (error) {
+    throw new BrowserKeyUnreadableError(error);
   }
 };
+
+/** The stored record, with a storage failure read as no record. */
+const read = (identityNumber: bigint): Promise<BrowserKeyRecord | undefined> =>
+  readOrThrow(identityNumber).catch(() => undefined);
 
 const write = async (
   identityNumber: bigint,
@@ -161,6 +175,7 @@ const forDescription = async (
   identityNumber: bigint,
   description: BrowserDescription,
 ): Promise<BrowserKeyRecord | undefined> => {
+  // A storage failure reads as no record, which signs this browser in under a key pair of its own.
   const stored = await read(identityNumber);
   if (
     stored?.description === undefined ||
@@ -183,6 +198,7 @@ const prepared = async (
 ): Promise<
   Required<Pick<BrowserKeyRecord, "keyPair" | "announcedSuccessor">>
 > => {
+  // A storage failure reads as no record: raising would refuse a sign-in over a read the ceremony can do without.
   const stored = from ?? (await read(identityNumber));
   const keyPair = stored?.keyPair ?? (await generate());
   // Both halves go on disk before the call. The canister may accept this sign-in and
@@ -286,11 +302,8 @@ export const withBrowserProof = <T>(
       if (!(error instanceof StaleBrowserKeyError)) {
         throw error;
       }
+      // No successor to promote starts this browser over on a fresh key: a second row in the user's list beats a browser that can never sign in again.
       const stored = await read(identityNumber);
-      // Nothing to promote means the canister holds an entry this browser can no longer
-      // reach — only possible where a write was lost, since the successor is stored before
-      // it is announced. Starting over costs a second row in the user's list, which beats
-      // a browser that can never sign in again.
       const promoted: BrowserKeyRecord = {
         keyPair: stored?.announcedSuccessor ?? (await generate()),
       };
@@ -308,19 +321,11 @@ export const withBrowserProof = <T>(
     }
   });
 
-/** Which browser the canister knows this one as, for the settings list to mark it. */
+/** A storage failure reads as no record, so the list goes unmarked. */
 export const currentBrowserId = async (
   identityNumber: bigint,
 ): Promise<number | undefined> => (await read(identityNumber))?.browserId;
 
-/**
- * An identity signing as this browser, which is how the canister tells which browser a
- * Web Push call comes from.
- *
- * The key the last sign-in left us holding, which is the successor the canister
- * recorded and the only slot it matches. `undefined` before any sign-in has completed,
- * when there is no entry to sign as.
- */
 /**
  * The identities this browser holds a key for.
  *
@@ -338,14 +343,19 @@ export const registeredIdentityNumbers = async (): Promise<bigint[]> => {
       }
     });
   } catch {
+    // A storage failure reads as no identities, so the wake-up it answers asks after
+    // none and the notification goes unshown. Nothing is registered off this either,
+    // and the next wake-up asks again.
     return [];
   }
 };
 
+/** `undefined` before any sign-in has completed, when there is no entry to sign as.
+ *  Raises {@link BrowserKeyUnreadableError} where storage refused, which a caller must not read as a browser the canister never registered. */
 export const browserKeyIdentity = async (
   identityNumber: bigint,
 ): Promise<SignIdentity | undefined> => {
-  const stored = await read(identityNumber);
+  const stored = await readOrThrow(identityNumber);
   if (stored?.browserId === undefined) {
     return undefined;
   }
