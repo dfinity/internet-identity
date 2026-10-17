@@ -14,7 +14,12 @@ vi.mock("./browserActor", () => ({
 }));
 
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
-import { openInstallTab, prepareInstallUrl } from "./installUrl";
+import {
+  installUrlOrNone,
+  openInstallTab,
+  openPendingInstallTab,
+  prepareInstallUrl,
+} from "./installUrl";
 import { NOTIFICATION_APP_PATH } from "./appPath";
 import { importLinkKey } from "./linkKey";
 import { decodeLinkToken } from "./linkToken";
@@ -26,6 +31,11 @@ const tab = () => ({ close: vi.fn(), location: { href: "" } });
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
+  prepare.mockClear();
+  prepare.mockResolvedValue({ Ok: null });
+  actor.mockResolvedValue({
+    prepare_notification_app_link: prepare,
+  } as unknown as Awaited<ReturnType<typeof browserKeyActor>>);
 });
 
 afterEach(() => {
@@ -54,14 +64,6 @@ const linkKeyOf = (url: string): Promise<CryptoKeyPair> => {
 };
 
 describe("prepareInstallUrl", () => {
-  beforeEach(() => {
-    prepare.mockClear();
-    prepare.mockResolvedValue({ Ok: null });
-    actor.mockResolvedValue({
-      prepare_notification_app_link: prepare,
-    } as unknown as Awaited<ReturnType<typeof browserKeyActor>>);
-  });
-
   // The canister matches the app's call against the principal registered here, so a URL
   // carrying any other key installs an app the link refuses.
   it("registers the key it puts in the URL", async () => {
@@ -167,5 +169,63 @@ describe("openInstallTab", () => {
     expect(openInstallTab(Promise.resolve("/ios-icp-alerts#token"))).toBe(
       false,
     );
+  });
+});
+
+describe("installUrlOrNone", () => {
+  it("points at the app's own path, with the token in the fragment", async () => {
+    const url = await installUrlOrNone(IDENTITY);
+
+    expect(url).toMatch(new RegExp(`^${NOTIFICATION_APP_PATH}#anchor=10772&`));
+  });
+
+  it("has nowhere to send a browser no sign-in has registered", async () => {
+    actor.mockRejectedValue(new UnregisteredBrowserError());
+
+    await expect(installUrlOrNone(IDENTITY)).resolves.toBeUndefined();
+  });
+
+  it("reports the reason and sends them nowhere where the key store is shut", async () => {
+    const reason = new Error("the key store is shut");
+    actor.mockRejectedValue(reason);
+
+    await expect(installUrlOrNone(IDENTITY)).resolves.toBeUndefined();
+    expect(console.error).toHaveBeenCalledWith(reason);
+  });
+});
+
+describe("openPendingInstallTab", () => {
+  it("opens the tab before it has anywhere to point it", () => {
+    const opened = tab();
+    vi.spyOn(window, "open").mockReturnValue(opened as unknown as Window);
+
+    expect(openPendingInstallTab().opened).toBe(true);
+    expect(opened.location.href).toBe("");
+  });
+
+  it("points the tab where the press says, once it knows", async () => {
+    const opened = tab();
+    vi.spyOn(window, "open").mockReturnValue(opened as unknown as Window);
+
+    openPendingInstallTab().point("/ios-icp-alerts#token");
+    await settled();
+
+    expect(opened.location.href).toBe("/ios-icp-alerts#token");
+  });
+
+  it("closes the tab where the press had nothing to point it at", async () => {
+    const opened = tab();
+    vi.spyOn(window, "open").mockReturnValue(opened as unknown as Window);
+
+    openPendingInstallTab().point(undefined);
+    await settled();
+
+    expect(opened.close).toHaveBeenCalledOnce();
+  });
+
+  it("reports a refused tab to the press that opened it", () => {
+    vi.spyOn(window, "open").mockReturnValue(null);
+
+    expect(openPendingInstallTab().opened).toBe(false);
   });
 });

@@ -22,6 +22,9 @@ vi.mock("./browserActor", () => {
   class UnregisteredBrowserError extends Error {}
   return { browserKeyActor: vi.fn(), UnregisteredBrowserError };
 });
+vi.mock("./turnedOff", () => ({
+  notificationsTurnedOff: vi.fn(() => Promise.resolve(false)),
+}));
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -34,6 +37,7 @@ import {
   subscribeAndRegisterDevice,
 } from "./subscribeDevice";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+import { notificationsTurnedOff } from "./turnedOff";
 
 const ENDPOINT = "https://relay.example/abc";
 const DAY_NS = BigInt(24 * 60 * 60) * BigInt(1_000_000_000);
@@ -71,10 +75,22 @@ const run = (a: ReturnType<typeof actor>) => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isPushSupported).mockReturnValue(true);
+  vi.mocked(notificationsTurnedOff).mockResolvedValue(false);
   vi.stubGlobal("Notification", { permission: "granted" });
 });
 
 describe("reconcileDeviceNotifications", () => {
+  it("registers nothing for an identity that switched notifications off", async () => {
+    vi.mocked(notificationsTurnedOff).mockResolvedValue(true);
+    vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
+    vi.mocked(loadVapidKey).mockResolvedValue(key("https://relay.example/old"));
+    const a = actor();
+    await run(a);
+    expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
+    expect(registerStoredDevice).not.toHaveBeenCalled();
+    expect(a.get_webpush_subscription_status).not.toHaveBeenCalled();
+  });
+
   it("does nothing when permission isn't granted", async () => {
     vi.stubGlobal("Notification", { permission: "default" });
     const a = actor();

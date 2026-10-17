@@ -9,6 +9,7 @@ import {
 } from "./subscribeDevice";
 import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+import { notificationsTurnedOff } from "./turnedOff";
 
 export { currentDeviceSubscription };
 
@@ -26,6 +27,10 @@ export const reconcileDeviceNotifications = async (
   identityNumber: bigint,
 ): Promise<void> => {
   if (!isPushSupported() || Notification.permission !== "granted") {
+    return;
+  }
+  // The switch in settings takes this identity's registration away; registering it again here is what would make turning notifications off not stay off.
+  if (await notificationsTurnedOff(identityNumber)) {
     return;
   }
   const subscription = await currentDeviceSubscription();

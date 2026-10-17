@@ -30,6 +30,10 @@ const write = (value: NotificationDiagnostics): void => {
 
 export const readDiagnostics = (): NotificationDiagnostics => read();
 
+/** What to show for a failure that carries no wording worth improving on; shown as it came, which makes a screenshot enough to act on. */
+export const failureMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 export const recordFailure = (
   reason: FailureReason,
   message?: string,
