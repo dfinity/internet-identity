@@ -1152,6 +1152,34 @@ pub enum LinkNotificationAppError {
     InternalCanisterError(String),
 }
 
+/// Points this browser at the Home Screen app another identity on the device has, on the
+/// authority of a token that identity signed. Spending it again changes nothing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ClaimNotificationAppRequest {
+    /// The claiming identity, whose browser ends up pointing at the app. The caller must be
+    /// a browser of it.
+    pub anchor_number: AnchorNumber,
+    /// The identity that has the app, whose browser list the signature is verified against.
+    pub offering_anchor_number: AnchorNumber,
+    /// When the offering browser's signature stops being accepted.
+    pub expires_at_ns: Timestamp,
+    /// The offering browser's signature over both anchor numbers and that expiry.
+    pub signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ClaimNotificationAppError {
+    /// The key the caller signed with is no browser key of the identity it named.
+    InvalidBrowserKey,
+    /// No browser of the offering identity signed this, or the one that did has rotated it.
+    InvalidClaimToken,
+    /// The token's expiry has passed.
+    ClaimTokenExpired,
+    /// The offering identity's browser points at no app to hand over.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,
