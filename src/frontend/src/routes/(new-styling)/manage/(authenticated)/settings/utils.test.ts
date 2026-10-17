@@ -3,7 +3,7 @@ import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import type { BackendCanisterConfig } from "$lib/globals";
 import type { McpConfig } from "$lib/utils/mcpConfig";
-import { trustedUrl, writeMcpConfig } from "./utils";
+import { knownBrowserId, trustedUrl, writeMcpConfig } from "./utils";
 
 const OFFICIAL: Pick<BackendCanisterConfig, "mcp_official_url"> = {
   mcp_official_url: ["https://official-mcp.id.ai/mcp"],
@@ -99,5 +99,19 @@ describe("writeMcpConfig", () => {
     await expect(
       writeMcpConfig(asActor(actor), ANCHOR, cfg(true, CUSTOM)),
     ).rejects.toThrow("config is too large");
+  });
+});
+
+describe("knownBrowserId", () => {
+  it("is the id the lookup found", () => {
+    expect(knownBrowserId(7)).toBe(7);
+  });
+
+  it("is nothing where no sign-in has registered this browser", () => {
+    expect(knownBrowserId(undefined)).toBeUndefined();
+  });
+
+  it("is nothing while the lookup is still running", () => {
+    expect(knownBrowserId("unread")).toBeUndefined();
   });
 });

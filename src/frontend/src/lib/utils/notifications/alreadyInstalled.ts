@@ -40,14 +40,6 @@ export const saidAlreadyInstalled = async (
   }
 };
 
-/** Forgets it, so the install is offered again. The way back from having said it by
- *  mistake: turning the switch in settings off and on again clears this. */
-export const forgetAlreadyInstalled = async (
-  identityNumber: bigint,
-): Promise<void> => {
-  try {
-    await idbDel(identityNumber.toString(), ALREADY_INSTALLED_STORE);
-  } catch {
-    // Nothing to do: it stays said, and the switch is the way to say otherwise.
-  }
-};
+/** Forgets it, so the install is offered again. Throws where it could not be forgotten, or the switch would report off while the storage still says installed. */
+export const forgetAlreadyInstalled = (identityNumber: bigint): Promise<void> =>
+  idbDel(identityNumber.toString(), ALREADY_INSTALLED_STORE);

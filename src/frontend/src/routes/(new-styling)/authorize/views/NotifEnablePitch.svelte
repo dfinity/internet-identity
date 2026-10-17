@@ -45,7 +45,7 @@
   {/if}
 {/snippet}
 
-<div class="flex min-w-0 flex-col items-stretch">
+<div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
   <!-- Ported from the design. Hidden from assistive technology: the messages are
        made up, and a screen reader would read them ahead of the heading as though
        they were real. -->
