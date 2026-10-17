@@ -1301,13 +1301,11 @@ mod browser_queue {
     }
 }
 
-/// A canister that notifies, and two identities signed in from a browser each.
-/// The browser each identity signs in from in these fixtures. Named rather than spelled
-/// at every call site, because `link_app` takes the seed and the token has to be minted
-/// by the same browser the canister will verify it against.
+/// The browser each identity signs in from in these fixtures.
 const FIRST_BROWSER_SEED: u8 = 1;
 const SECOND_BROWSER_SEED: u8 = 2;
 
+/// A canister that notifies, and two identities signed in from a browser each.
 fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
     let canister_id =
         install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
@@ -1606,6 +1604,200 @@ mod app_anchors {
     }
 }
 
+/// Waking the Home Screen app a browser points at.
+mod probe {
+    use super::subscriptions::{request, ENDPOINT};
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        get_notification_app_status, probe_notification_app, set_webpush_subscription,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        GetNotificationAppStatusRequest, NotificationAppStatus, NotificationId,
+        ProbeNotificationAppError, ProbeNotificationAppRequest, SetWebPushSubscriptionRequest,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// The key a browser is left holding after the sign-in `browser_seed` names.
+    fn browser(browser_seed: u8) -> Principal {
+        BrowserKey::new(browser_seed).successor().principal()
+    }
+
+    /// A pool whose first window covers the time the test runs at. The pool is spent by
+    /// elapsed time, so one issued at a fixed instant signs nothing.
+    fn pool_issued_now(
+        env: &PocketIc,
+        anchor: AnchorNumber,
+        endpoint: &str,
+    ) -> SetWebPushSubscriptionRequest {
+        SetWebPushSubscriptionRequest {
+            jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
+            ..request(anchor, endpoint)
+        }
+    }
+
+    fn probe(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<Result<NotificationId, ProbeNotificationAppError>, RejectResponse> {
+        probe_notification_app(
+            env,
+            canister_id,
+            sender,
+            ProbeNotificationAppRequest {
+                anchor_number: anchor,
+            },
+        )
+    }
+
+    fn pending_probe(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<Option<NotificationId>, RejectResponse> {
+        Ok(
+            match get_notification_app_status(
+                env,
+                canister_id,
+                sender,
+                GetNotificationAppStatusRequest {
+                    anchor_number: anchor,
+                },
+            )? {
+                NotificationAppStatus::Linked(info) => info.pending_probe,
+                NotificationAppStatus::AwaitingInstall(_) | NotificationAppStatus::NoApp => None,
+            },
+        )
+    }
+
+    /// An identity whose browser points at a Home Screen app that has registered for push.
+    fn install_with_a_registered_app(
+        env: &PocketIc,
+    ) -> (CanisterId, AnchorNumber, AnchorNumber, Principal) {
+        let (canister_id, first, second) = install_with_two_anchors(env);
+        let app = link_app(env, canister_id, first, 1, 100);
+        set_webpush_subscription(env, canister_id, app, pool_issued_now(env, first, ENDPOINT))
+            .expect("set_webpush_subscription rejected")
+            .expect("set_webpush_subscription returned Err");
+        (canister_id, first, second, app)
+    }
+
+    #[test]
+    fn should_queue_a_probe_for_the_app_and_answer_its_id() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        let id = probe(&env, canister_id, browser(1), anchor)?
+            .expect("probe_notification_app returned Err");
+
+        assert_eq!(
+            pending_probe(&env, canister_id, browser(1), anchor)?,
+            Some(id)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_hand_back_an_outstanding_probe_rather_than_sending_a_second(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        let first = probe(&env, canister_id, browser(1), anchor)?
+            .expect("probe_notification_app returned Err");
+        let again =
+            probe(&env, canister_id, browser(1), anchor)?.expect("a second probe returned Err");
+
+        assert_eq!(again, first);
+        Ok(())
+    }
+
+    #[test]
+    fn should_not_fall_back_to_the_browsers_own_registration() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, _) = install_with_two_anchors(&env);
+        link_app(&env, canister_id, first, 1, 100);
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            browser(1),
+            pool_issued_now(&env, first, ENDPOINT),
+        )?
+        .expect("set_webpush_subscription returned Err");
+
+        assert_eq!(
+            probe(&env, canister_id, browser(1), first)?,
+            Err(ProbeNotificationAppError::NotReachable)
+        );
+        assert_eq!(pending_probe(&env, canister_id, browser(1), first)?, None);
+        Ok(())
+    }
+
+    /// A browser that points at no app has nothing to wake.
+    #[test]
+    fn should_answer_a_browser_that_points_at_no_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, _, second, _) = install_with_a_registered_app(&env);
+
+        assert_eq!(
+            probe(&env, canister_id, browser(2), second)?,
+            Err(ProbeNotificationAppError::NoNotificationApp)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        assert_eq!(
+            probe(&env, canister_id, browser(2), anchor)?,
+            Err(ProbeNotificationAppError::InvalidBrowserKey)
+        );
+        assert_eq!(
+            probe(&env, canister_id, Principal::anonymous(), anchor)?,
+            Err(ProbeNotificationAppError::InvalidBrowserKey)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_the_switch_while_notifications_are_disabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_a_registered_app(&env);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
+        assert_eq!(
+            probe(&env, canister_id, browser(1), anchor)?,
+            Err(ProbeNotificationAppError::InternalCanisterError(
+                "notifications are not enabled".to_string()
+            ))
+        );
+        assert_eq!(pending_probe(&env, canister_id, browser(1), anchor)?, None);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            arg_with_notifications_enabled(),
+        )?;
+        probe(&env, canister_id, browser(1), anchor)?
+            .expect("probe_notification_app returned Err once notifications are back");
+        Ok(())
+    }
+}
+
 /// A second identity on the device pointing at the app the first one installed.
 /// One Home Screen app, several identities pointing at it. What is shared is the record,
 /// its key and its one Web Push registration; what is not is whether each identity wants
@@ -1896,12 +2088,13 @@ mod shared_app {
 }
 
 mod claims {
+    use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        claim_notification_app, notification_app_anchors,
+        claim_notification_app, notification_app_anchors, set_webpush_subscription,
     };
     use internet_identity_interface::internet_identity::types::{
-        ClaimNotificationAppError, ClaimNotificationAppRequest,
+        ClaimNotificationAppError, ClaimNotificationAppRequest, SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -2024,6 +2217,60 @@ mod claims {
         }
         Ok(())
     }
+
+    /// The claim queues a notification saying delivery is on. A token stays claimable
+    /// for its half hour, so a replay must not queue a second one: every one of those is
+    /// a paid wake-up, and past the queue's limit each evicts a real notification.
+    #[test]
+    fn should_queue_one_notification_however_often_a_token_is_spent() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, first, 1, 100);
+        // Nothing is queued for an entry nothing can be posted to, so the app has to be
+        // delivering for the replay to have anything to duplicate.
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            app,
+            SetWebPushSubscriptionRequest {
+                // A stale pool JWT has no wake-up address, and then nothing is queued at all.
+                jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
+                ..request(first, ENDPOINT)
+            },
+        )?
+        .expect("set_webpush_subscription returned Err");
+        let expires_at_ns = expires_at(&env);
+        let claiming = BrowserKey::new(2).successor().principal();
+
+        for _ in 0..3 {
+            claim(&env, canister_id, (second, 2), (first, 1), expires_at_ns)?
+                .expect("claim_notification_app returned Err");
+        }
+
+        let shown =
+            browser_get_next_notification(&env, canister_id, claiming, next_request(second))?
+                .expect("browser_get_next_notification returned Err")
+                .notification
+                .expect("the claim queued one");
+        browser_remove_notification(
+            &env,
+            canister_id,
+            claiming,
+            RemoveNotificationRequest {
+                anchor_number: second,
+                notification: shown,
+            },
+        )?
+        .expect("browser_remove_notification returned Err");
+
+        assert_eq!(
+            browser_get_next_notification(&env, canister_id, claiming, next_request(second))?,
+            Ok(GetNextNotificationResponse { notification: None }),
+            "a replay queued another"
+        );
+        Ok(())
+    }
 }
 
 fn next_request(anchor_number: AnchorNumber) -> GetNextNotificationRequest {
@@ -2038,6 +2285,7 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
             account_number: None,
             canister_id: principal_2(),
             id: 1,
+            event: None,
         },
     }
 }

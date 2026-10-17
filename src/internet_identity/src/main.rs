@@ -461,7 +461,9 @@ fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> Noti
     let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
         return NotificationAppStatus::NoApp;
     };
-    anchor.notification_app_status(browser_id, ic_cdk::api::time(), |app_id| {
+    let now = ic_cdk::api::time();
+    let pending_probe = anchor.pending_probe(browser_id, now);
+    anchor.notification_app_status(browser_id, pending_probe, now, |app_id| {
         state::storage_borrow(|storage| storage.notification_app(app_id))
     })
 }
@@ -494,6 +496,45 @@ fn set_notification_app_enabled(
             SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))
         })
     })
+}
+
+/// An empty pending probe says only that the entry is no longer queued; `last_seen_ns` is
+/// what proves the app alive. A browser with a probe outstanding is given that one back.
+#[update]
+fn probe_notification_app(
+    request: ProbeNotificationAppRequest,
+) -> Result<NotificationId, ProbeNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(ProbeNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED.to_string(),
+        ));
+    }
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| ProbeNotificationAppError::InvalidBrowserKey)?;
+    if anchor.notification_app(browser_id).is_none() {
+        return Err(ProbeNotificationAppError::NoNotificationApp);
+    }
+    let now_ns = ic_cdk::api::time();
+    if let Some(outstanding) = anchor.pending_probe(browser_id, now_ns) {
+        return Ok(outstanding);
+    }
+
+    notifications::dispatch::notify_identity(
+        request.anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity_for_notification(&anchor)),
+        notifications::dispatch::IdentityNotification::Probe,
+        now_ns,
+    )
+    .ok_or(ProbeNotificationAppError::NotReachable)
+}
+
+/// Which identity a notification is about, in the terms the user knows it by.
+fn identity_for_notification(anchor: &storage::anchor::Anchor) -> IdentityForNotification {
+    IdentityForNotification {
+        anchor_number: anchor.anchor_number(),
+        name: anchor.name(),
+    }
 }
 
 /// Matches `CLAIM_TOKEN_LIFETIME_MS` in the frontend. Bounding a claimed expiry from above
@@ -538,12 +579,33 @@ fn claim_notification_app(
         .and_then(|reference| reference.linked_app())
         .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
 
+    // A token stays claimable for its half hour, so the same one arriving twice is
+    // ordinary. The first spend did everything; a second would queue and pay for another
+    // wake-up saying the same thing, and past the queue's limit evict a real one.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        == Some(app_id)
+    {
+        return Ok(());
+    }
+
     anchor.point_at_notification_app(browser_id, app_id);
+    let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
             .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
+    })?;
+
+    notifications::dispatch::notify_identity(
+        request.anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity),
+        notifications::dispatch::IdentityNotification::News,
+        ic_cdk::api::time(),
+    );
+    Ok(())
 }
 
 /// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
@@ -638,13 +700,15 @@ fn browser_get_next_notification(
     request: GetNextNotificationRequest,
 ) -> Result<GetNextNotificationResponse, GetNextNotificationError> {
     let request: ValidatedGetNextNotificationRequest = request.try_into()?;
-    let (anchor, browser_id, _) = check_notification_authorization(request.anchor_number)
-        .map_err(|_| GetNextNotificationError::InvalidBrowserKey)?;
+    let (anchor, browser_id, notification_caller) =
+        check_notification_authorization(request.anchor_number)
+            .map_err(|_| GetNextNotificationError::InvalidBrowserKey)?;
 
     Ok(GetNextNotificationResponse {
         notification: notifications::browser_queue::next_to_show(
             &anchor,
             browser_id,
+            &notification_caller,
             ic_cdk::api::time(),
         ),
     })
@@ -656,20 +720,23 @@ fn browser_remove_notification(
     request: RemoveNotificationRequest,
 ) -> Result<RemoveNotificationResponse, RemoveNotificationError> {
     let request: ValidatedRemoveNotificationRequest = request.try_into()?;
-    let (anchor, browser_id, _) = check_notification_authorization(request.anchor_number)
-        .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
+    let (anchor, browser_id, notification_caller) =
+        check_notification_authorization(request.anchor_number)
+            .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
 
-    // Nothing at all for a browser caller, which is the common one: the stamp lands only
-    // where the caller resolves to an app record. For a Home Screen app it is the one
-    // thing that says it is still installed, since iOS destroys its storage when the
-    // user deletes it and tells nobody.
-    state::storage_borrow_mut(|storage| {
-        storage.stamp_notification_app_use(caller(), ic_cdk::api::time())
-    });
+    let now_ns = ic_cdk::api::time();
+    // An acknowledgement is the only thing that tells us the app is still installed.
+    state::storage_borrow_mut(|storage| storage.stamp_notification_app_use(caller(), now_ns));
 
-    notifications::browser_queue::remove_shown(anchor, browser_id, &request.notification)
-        .map(|()| RemoveNotificationResponse {})
-        .map_err(RemoveNotificationError::InternalCanisterError)
+    notifications::browser_queue::remove_shown(
+        anchor,
+        browser_id,
+        &notification_caller,
+        &request.notification,
+        now_ns,
+    )
+    .map(|()| RemoveNotificationResponse {})
+    .map_err(RemoveNotificationError::InternalCanisterError)
 }
 
 #[update]
@@ -1611,6 +1678,8 @@ mod v2_api {
         };
 
         let browsers = state::anchor(identity_number).browsers_info(|app_id| {
+            // A deployment that does not notify says nothing about an app, here as
+            // everywhere else: the entries stay, and nothing reads them back.
             if !notifications::notifications_enabled() {
                 return None;
             }
