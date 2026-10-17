@@ -1,6 +1,7 @@
 //! The record a Home Screen app has of its own, which browsers point at. One installed
 //! app is one record however many identities it serves.
 
+use crate::storage::anchor::WebPushSubscription;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{PublicKey, Timestamp};
 
@@ -17,6 +18,8 @@ pub struct NotificationApp {
     pub created_at: Timestamp,
     /// Stamped by the app's own update calls only, so a query leaves it where it was.
     pub last_used: Timestamp,
+    /// One subscription for the whole record, absent until the app has permission.
+    pub webpush_subscription: Option<WebPushSubscription>,
 }
 
 /// What a browser holds about a Home Screen app: an install it has handed a key to, or
