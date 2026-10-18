@@ -7512,11 +7512,12 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
         .expect("registering a browser");
     let queued = |notification_id: u64| QueuedNotification {
-        application_number: 4,
+        application_number: Some(4),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: 100 * notification_id,
         account_number: Some(notification_id),
+        event: None,
     };
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
@@ -7708,7 +7709,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
@@ -7760,7 +7761,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
@@ -7980,11 +7981,12 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
 
 fn queued_notification(notification_id: u64) -> crate::storage::anchor::QueuedNotification {
     crate::storage::anchor::QueuedNotification {
-        application_number: 1,
+        application_number: Some(1),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: u64::MAX,
         account_number: None,
+        event: None,
     }
 }
 
@@ -8172,4 +8174,190 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
 
     let anchor = storage.read(10_000).expect("reading the anchor");
     assert_eq!(delivering_subscription(&storage, &anchor, 0), None);
+}
+
+/// The probe went to the app's address, so a new address for that app strands it, even
+/// for an entry whose own queue was never posted there.
+#[test]
+fn an_apps_new_address_strands_the_probe_of_an_entry_with_its_own() {
+    use crate::storage::anchor::{QueuedNotification, WebPushSubscription};
+    use internet_identity_interface::internet_identity::types::{
+        IdentityForNotification, NotificationEvent,
+    };
+
+    let subscription = |endpoint: &str| WebPushSubscription {
+        endpoint: endpoint.to_string(),
+        created_at_ns: 1_000,
+        vapid_public_key: vec![1; 65],
+        jwt_signatures: vec![vec![2; 64]],
+        jwt_issued_at_ns: 1_000,
+    };
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    storage.set_notification_app_subscription(
+        app.id,
+        Some(subscription("https://web.push.apple.com/app")),
+        1_000,
+    );
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.set_webpush_subscription(0, Some(subscription("https://web.push.apple.com/own")));
+    anchor.point_at_notification_app(0, app.id);
+    let queue = anchor.notifications_mut(0).expect("a registered browser");
+    queue.push(QueuedNotification {
+        application_number: Some(1),
+        sender: Principal::from_slice(&[7; 10]),
+        notification_id: 4,
+        expires_at_ns: 90_000,
+        account_number: None,
+        event: None,
+    });
+    queue.push(QueuedNotification {
+        application_number: None,
+        sender: Principal::from_slice(&[7; 10]),
+        notification_id: 9,
+        expires_at_ns: 90_000,
+        account_number: None,
+        event: Some(NotificationEvent::NotificationsOn(
+            IdentityForNotification {
+                anchor_number: 10_000,
+                name: None,
+            },
+        )),
+    });
+    anchor.set_pending_probe(0, 9);
+    storage.write(anchor).expect("writing the anchor");
+
+    storage.set_notification_app_subscription(
+        app.id,
+        Some(subscription("https://web.push.apple.com/moved")),
+        2_000,
+    );
+
+    let reloaded = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(reloaded.pending_probe(0, 2_000), None);
+    assert_eq!(
+        reloaded
+            .notifications(0)
+            .iter()
+            .map(|queued| queued.notification_id)
+            .collect::<Vec<_>>(),
+        vec![4],
+        "only the probe went to the address that changed"
+    );
+}
+
+/// A probe is addressed to the app whatever address the entry registered for itself, so
+/// a reference that moves takes the probe with it. The rest of the queue went to this
+/// entry's own address and is still showable.
+#[test]
+fn moving_to_another_app_takes_the_probe_and_leaves_the_rest() {
+    use crate::storage::anchor::{QueuedNotification, WebPushSubscription};
+    use internet_identity_interface::internet_identity::types::{
+        IdentityForNotification, NotificationEvent,
+    };
+
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    let replacement = storage
+        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 1_000)
+        .expect("creating the record the entry moves to");
+    let mut anchor = anchor_with_browser(&mut storage);
+    // An address of its own, which is what keeps the rest of the queue showable.
+    anchor.set_webpush_subscription(
+        0,
+        Some(WebPushSubscription {
+            endpoint: "https://web.push.apple.com/own".to_string(),
+            created_at_ns: 1_000,
+            vapid_public_key: vec![1; 65],
+            jwt_signatures: vec![vec![2; 64]],
+            jwt_issued_at_ns: 1_000,
+        }),
+    );
+    anchor.point_at_notification_app(0, app.id);
+    let queue = anchor.notifications_mut(0).expect("a registered browser");
+    queue.push(QueuedNotification {
+        application_number: Some(1),
+        sender: Principal::from_slice(&[7; 10]),
+        notification_id: 4,
+        expires_at_ns: 90_000,
+        account_number: None,
+        event: None,
+    });
+    queue.push(QueuedNotification {
+        application_number: None,
+        sender: Principal::from_slice(&[7; 10]),
+        notification_id: 9,
+        expires_at_ns: 90_000,
+        account_number: None,
+        event: Some(NotificationEvent::NotificationsOn(
+            IdentityForNotification {
+                anchor_number: 10_000,
+                name: None,
+            },
+        )),
+    });
+    anchor.set_pending_probe(0, 9);
+
+    anchor.point_at_notification_app(0, replacement.id);
+
+    assert_eq!(anchor.pending_probe(0, 2_000), None);
+    assert_eq!(
+        anchor
+            .notifications(0)
+            .iter()
+            .map(|queued| queued.notification_id)
+            .collect::<Vec<_>>(),
+        vec![4],
+        "the probe goes with the reference and nothing else does"
+    );
+}
+
+#[test]
+fn an_identity_notification_is_queued_without_an_application() {
+    use crate::storage::anchor::QueuedNotification;
+    use internet_identity_interface::internet_identity::types::{
+        IdentityForNotification, NotificationEvent,
+    };
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor
+        .notifications_mut(0)
+        .expect("a registered browser")
+        .push(QueuedNotification {
+            application_number: None,
+            sender: Principal::from_slice(&[7; 10]),
+            notification_id: 1,
+            expires_at_ns: 2_000,
+            account_number: None,
+            event: Some(NotificationEvent::NotificationsOn(
+                IdentityForNotification {
+                    anchor_number: 10_000,
+                    name: Some("Work".to_string()),
+                },
+            )),
+        });
+    storage.write(anchor).expect("writing the anchor");
+
+    let reloaded = Storage::from_memory(memory)
+        .read(10_000)
+        .expect("reading the anchor");
+
+    assert_eq!(
+        reloaded
+            .notifications(0)
+            .first()
+            .and_then(|one| one.event.clone()),
+        Some(NotificationEvent::NotificationsOn(
+            IdentityForNotification {
+                anchor_number: 10_000,
+                name: Some("Work".to_string()),
+            }
+        ))
+    );
 }

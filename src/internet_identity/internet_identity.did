@@ -1111,6 +1111,12 @@ type NotificationAppInfo = record {
     // When the app last called, which is the only evidence there is that it still
     // exists: nothing says when a user deletes a web app from their Home Screen.
     last_seen_ns : nat64;
+    // The probe this browser last sent, while it is still queued and unexpired. Empty
+    // says the entry is no longer there and nothing more: the app may have taken it, a
+    // full queue may have evicted it, or the relay post may have failed. What proves
+    // the app is alive is last_seen_ns. Queued for this browser's entry, so an app on
+    // another device cannot clear it.
+    pending_probe : opt NotificationId;
 };
 
 // What a browser has. An install reads as AwaitingInstall only while its key can still be
@@ -1951,21 +1957,6 @@ type SetNotificationAppEnabledError = variant {
     InternalCanisterError : text;
 };
 
-// Offers the Home Screen app this browser has to another identity signed in on the
-// same browser, which is the only party that can reach both. The handle says nothing
-// about which app it is.
-type OfferNotificationAppRequest = record {
-    anchor_number : UserNumber;
-};
-
-type OfferNotificationAppError = variant {
-    // The caller is no browser of this identity.
-    Unauthorized : principal;
-    // This browser has no app to offer.
-    NoNotificationApp;
-    InternalCanisterError : text;
-};
-
 // Points this browser at the Home Screen app another identity on the device has, on
 // the authority of a token that identity signed. Nothing is stored between the two
 // halves: the signature is the whole of the authority.
@@ -2102,6 +2093,46 @@ type NotificationToShow = record {
     account_number : opt AccountNumber;   // null = the unreserved default account
     canister_id : principal;
     id : NotificationId;
+    // Set where Internet Identity sent this itself, and what it has to say. An app's
+    // notification carries no text: the service worker fetches it from the app with a
+    // delegation it mints for the purpose, which is what keeps the content off the push
+    // service. One of these carries no text either, for the same reason, but there is
+    // nothing to fetch and nobody to mint for. The words are the frontend's, so this
+    // says what happened rather than what to show.
+    event : opt NotificationEvent;
+};
+
+// Something Internet Identity has to tell the user about their own identity.
+type NotificationEvent = variant {
+    // This device now receives this identity's notifications.
+    NotificationsOn : IdentityForNotification;
+};
+
+// Which identity a notification is about, in the terms the user knows it by: nobody
+// recognises an identity by its number.
+type IdentityForNotification = record {
+    anchor_number : UserNumber;
+    name : opt text;
+};
+
+// Asks the canister to wake the Home Screen app this browser points at, so the browser
+// can learn whether it is still there. Nothing says when a user deletes a web app, so
+// the only way to find out is to send it something and see what happens.
+type ProbeNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type ProbeNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app, so there is nothing to wake.
+    NoNotificationApp;
+    // Nothing was sent, so there is nothing to watch for: the app has registered
+    // nothing, this identity has it switched off or is signed out on this browser, the
+    // browser counts as gone, or there was no room for another outcall. The browser's
+    // own registration is never woken instead.
+    NotReachable;
+    InternalCanisterError : text;
 };
 
 // Null once nothing is left to show.
@@ -2669,6 +2700,11 @@ service : (opt InternetIdentityInit) -> {
     // Called by the browser, which may hold nothing but its key: the install page is a
     // tab of its own with no session.
     get_notification_app_status : (GetNotificationAppStatusRequest) -> (NotificationAppStatus) query;
+
+    // Called by the browser, which watches for the answer leaving its own queue: that
+    // is what says the app this browser points at is still installed.
+    probe_notification_app : (ProbeNotificationAppRequest) -> (variant { Ok : NotificationId; Err : ProbeNotificationAppError });
+
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.

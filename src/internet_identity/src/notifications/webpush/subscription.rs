@@ -165,14 +165,8 @@ pub fn subscription_status(
     })
 }
 
-/// Writes what this browser registered, and clears what was waiting where that address
-/// is going away.
-///
-/// A queue is a list of wake-ups already posted to one endpoint. A registration that is
-/// removed, or replaced by a different endpoint, leaves nothing that could show them, so
-/// they go with it, and so does the re-wake stamp: it rations second wake-ups for an
-/// entry still waiting, and this entry is waiting for nothing. A pool replacement on the
-/// same endpoint keeps both.
+/// A registration that is removed, or replaced by a different endpoint, leaves nothing that
+/// could show what was queued, so the queue and the re-wake stamp go with it.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
@@ -186,6 +180,7 @@ fn write_subscription(
             queue.clear();
         }
         anchor.set_woken_again(browser_id, None);
+        anchor.clear_pending_probe_if_gone(browser_id);
     }
     anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
@@ -265,11 +260,12 @@ mod tests {
             .notifications_mut(browser_id)
             .expect("a registered browser")
             .push(crate::storage::anchor::QueuedNotification {
-                application_number: 1,
+                application_number: Some(1),
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
                 account_number: None,
+                event: None,
             });
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }

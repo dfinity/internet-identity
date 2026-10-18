@@ -8,7 +8,9 @@ use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
-use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
+use crate::storage::storable::notifications::browser_queue::{
+    StorableNotificationEvent, StorableQueuedNotification,
+};
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -108,6 +110,8 @@ pub struct Browser {
     pub notifications: Vec<QueuedNotification>,
     /// When this entry was last woken again for something it could not show yet.
     pub woken_again_at_ns: Option<Timestamp>,
+    /// The probe this entry last sent to the app it points at.
+    pub pending_probe: Option<NotificationId>,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
@@ -116,19 +120,23 @@ pub struct Browser {
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QueuedNotification {
-    pub application_number: ApplicationNumber,
-    /// The app canister that sent it, which the service worker fetches it from.
+    /// `None` where Internet Identity sent this itself.
+    pub application_number: Option<ApplicationNumber>,
+    /// The canister that sent it, which the service worker fetches the text from.
     pub sender: Principal,
     pub notification_id: NotificationId,
     pub expires_at_ns: Timestamp,
-    /// `None` is the unreserved default account.
+    /// `None` is the unreserved default account, and always `None` for our own.
     pub account_number: Option<AccountNumber>,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    pub event: Option<NotificationEvent>,
 }
 
 impl From<QueuedNotification> for StorableQueuedNotification {
     fn from(value: QueuedNotification) -> Self {
         StorableQueuedNotification {
             application_number: value.application_number,
+            event: value.event.map(StorableNotificationEvent::from),
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
             expires_at_ns: value.expires_at_ns,
@@ -225,6 +233,7 @@ impl From<StorableBrowser> for Browser {
                 .filter_map(|queued| {
                     Some(QueuedNotification {
                         application_number: queued.application_number,
+                        event: queued.event.map(NotificationEvent::from),
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
                         notification_id: queued.notification_id,
                         expires_at_ns: queued.expires_at_ns,
@@ -239,6 +248,7 @@ impl From<StorableBrowser> for Browser {
                     .and_then(|subscription| subscription.woken_again_at_ns)
             }),
             notification_app: value.notification_app.map(NotificationAppRef::from),
+            pending_probe: value.pending_probe,
         }
     }
 }
@@ -265,6 +275,7 @@ impl From<Browser> for StorableBrowser {
                     .collect()
             }),
             woken_again_at_ns: value.woken_again_at_ns,
+            pending_probe: value.pending_probe,
         }
     }
 }
@@ -1033,6 +1044,10 @@ impl Anchor {
                     .is_some_and(|reference| reference.linked_app() == Some(app_id))
             {
                 browser.notification_app = None;
+                // A probe only ever goes to the app, so it goes with the reference, and
+                // the entry it named goes too: the rest of this queue may have been
+                // posted to this entry's own address, but the probe never was.
+                drop_probe_of(browser);
                 // The address belongs to another entry now, so nothing here can show
                 // what it had waiting. An entry that registered an address of its own
                 // was posted to at that address and can still show it.
@@ -1048,9 +1063,16 @@ impl Anchor {
         let followed_another_route = self.browsers[index].notification_app.is_some();
         self.browsers[index].notification_app =
             Some(NotificationAppRef::Linked { app_id, enabled });
-        if followed_another_route && self.browsers[index].webpush_subscription.is_none() {
-            self.browsers[index].notifications.clear();
-            self.browsers[index].woken_again_at_ns = None;
+        if followed_another_route {
+            // Outstanding for the app this entry has just stopped pointing at, and the
+            // app answering now must not be able to take it. The queued entry goes with
+            // the marker: the rest of this queue may have gone to the entry's own
+            // address, but the probe went to the app.
+            drop_probe_of(&mut self.browsers[index]);
+            if self.browsers[index].webpush_subscription.is_none() {
+                self.browsers[index].notifications.clear();
+                self.browsers[index].woken_again_at_ns = None;
+            }
         }
     }
 
@@ -1084,12 +1106,26 @@ impl Anchor {
         &mut self,
         browser_id: BrowserId,
     ) -> Option<NotificationAppId> {
-        self.browsers
+        let browser = self
+            .browsers
             .iter_mut()
-            .find(|browser| browser.id == browser_id)?
+            .find(|browser| browser.id == browser_id)?;
+        // The app's address is what the probe went to, so it goes with the reference,
+        // whatever address this entry registered for itself.
+        drop_probe_of(browser);
+        browser
             .notification_app
             .take()
             .and_then(|reference| reference.linked_app())
+    }
+
+    /// Drops the probe this entry sent to the app, whether or not it has been taken.
+    /// `true` where there was one to drop.
+    pub fn drop_pending_probe(&mut self, browser_id: BrowserId) -> bool {
+        self.browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+            .is_some_and(drop_probe_of)
     }
 
     /// The app this browser points at, where it has one.
@@ -1111,6 +1147,7 @@ impl Anchor {
     fn linked_app_info(
         &self,
         browser_id: BrowserId,
+        pending_probe: Option<NotificationId>,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> Option<NotificationAppInfo> {
         let NotificationAppRef::Linked { app_id, enabled } = self.notification_app(browser_id)?
@@ -1122,6 +1159,7 @@ impl Anchor {
             subscribed: app.webpush_subscription.is_some(),
             enabled,
             last_seen_ns: app.last_used,
+            pending_probe,
         })
     }
 
@@ -1132,6 +1170,7 @@ impl Anchor {
     pub fn notification_app_status(
         &self,
         browser_id: BrowserId,
+        pending_probe: Option<NotificationId>,
         now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> NotificationAppStatus {
@@ -1144,7 +1183,7 @@ impl Anchor {
                 NotificationAppStatus::NoApp
             };
         }
-        match self.linked_app_info(browser_id, app) {
+        match self.linked_app_info(browser_id, pending_probe, app) {
             Some(info) => NotificationAppStatus::Linked(info),
             None => NotificationAppStatus::NoApp,
         }
@@ -1178,13 +1217,6 @@ impl Anchor {
             .map_or(&[], |browser| &browser.notifications)
     }
 
-    /// What this entry has waiting, to add to or take from.
-    ///
-    /// `Some` for every browser the registry lists, an empty queue included, and `None`
-    /// only where no entry carries this id. The queue belongs to the entry and not to a
-    /// subscription, so a browser that registered nothing of its own has one too: a
-    /// caller reading `None` as "not registered for notifications" would be reading it
-    /// as something it does not say.
     pub fn notifications_mut(
         &mut self,
         browser_id: BrowserId,
@@ -1200,6 +1232,51 @@ impl Anchor {
         if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
             browser.woken_again_at_ns = at_ns;
         }
+    }
+
+    /// Records the probe this entry has just sent to the app it points at.
+    pub fn set_pending_probe(&mut self, browser_id: BrowserId, notification_id: NotificationId) {
+        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
+            browser.pending_probe = Some(notification_id);
+        }
+    }
+
+    /// Forgets a probe whose notification has left the queue. An entry still queued but
+    /// past its expiry is left named, because only the next write to this queue prunes it.
+    pub fn clear_pending_probe_if_gone(&mut self, browser_id: BrowserId) {
+        let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) else {
+            return;
+        };
+        let Some(probe) = browser.pending_probe else {
+            return;
+        };
+        let queued = browser
+            .notifications
+            .iter()
+            .any(|queued| queued.notification_id == probe && queued.event.is_some());
+        if !queued {
+            browser.pending_probe = None;
+        }
+    }
+
+    /// The probe this entry sent that is still queued for the app to take. An entry past
+    /// its expiry is not pending, and `None` says only that the entry is no longer queued.
+    pub fn pending_probe(
+        &self,
+        browser_id: BrowserId,
+        now_ns: Timestamp,
+    ) -> Option<NotificationId> {
+        let browser = self.browsers.iter().find(|one| one.id == browser_id)?;
+        let probe = browser.pending_probe?;
+        browser
+            .notifications
+            .iter()
+            .any(|queued| {
+                queued.notification_id == probe
+                    && queued.event.is_some()
+                    && queued.expires_at_ns > now_ns
+            })
+            .then_some(probe)
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1263,7 +1340,8 @@ impl Anchor {
                     created_at: browser.created_at,
                     last_used: browser.last_used,
                     session_count: browser.session_count,
-                    notification_app: self.linked_app_info(browser.id, &app),
+                    // A probe is read where it was sent, not off the identity's app list.
+                    notification_app: self.linked_app_info(browser.id, None, &app),
                 })
                 .collect(),
         )
@@ -1345,6 +1423,7 @@ impl Anchor {
             webpush_subscription: None,
             notifications: Vec::new(),
             woken_again_at_ns: None,
+            pending_probe: None,
             notification_app: None,
         });
 
@@ -1716,6 +1795,21 @@ impl Anchor {
     pub fn created_at(&self) -> Option<Timestamp> {
         self.created_at
     }
+}
+
+/// Takes the probe this entry sent, marker and queued entry both, and leaves the rest of
+/// the queue alone. A probe is addressed to the app whatever address the entry registered
+/// for itself, so a reference that is replaced or dropped takes the probe with it while
+/// notifications posted to the entry's own address stay showable. `true` where there was
+/// a probe to take.
+fn drop_probe_of(browser: &mut Browser) -> bool {
+    let Some(probe) = browser.pending_probe.take() else {
+        return false;
+    };
+    browser
+        .notifications
+        .retain(|queued| !(queued.notification_id == probe && queued.event.is_some()));
+    true
 }
 
 /// Possible outcomes of domain bound activity for an anchor since a specific timestamp.
