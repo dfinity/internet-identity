@@ -169,41 +169,27 @@
       }
     }
 
-    // Reserved before anything is awaited, because a browser allows `window.open` only
-    // inside the press itself. An app this browser already points at and that is
-    // delivering needs no tab, and that is read off the entry this page rendered rather
-    // than from a call that would have to be awaited first.
-    const tab =
-      ownApp?.subscribed === true ? undefined : openPendingInstallTab();
-    try {
-      // This identity's say-so is recorded the moment it is given, as turning off records
-      // it: an install started from this press finishes by carrying the flag, so leaving it
-      // until the app links would lose the answer somewhere along the way.
-      if (ownApp !== undefined && !ownApp.enabled) {
-        await setAppEnabled({ identityNumber, enabled: true });
-      }
-      if (tab === undefined) {
-        return true;
-      }
-      const outcome = await turnOnWithApp({ identityNumber, ownApp });
-      if (outcome.delivering) {
-        tab.point(undefined);
-        // A claim carries whatever answer the browser it came from had given, so a
-        // reference it moves here can arrive switched off. This press is a yes.
-        if (ownApp === undefined) {
-          await setAppEnabled({ identityNumber, enabled: true });
-        }
-        return true;
-      }
-      tab.point(outcome.installUrl);
-      // A tab the browser refused is not a failure: the link goes on the section.
-      refusedInstallUrl = tab.opened ? undefined : outcome.installUrl;
-      return false;
-    } catch (error) {
-      // A tab left on the placeholder is one nothing ever closes.
-      tab?.point(undefined);
-      throw error;
+    // This identity's say-so is recorded the moment it is given, as turning off records
+    // it: an install started from this press finishes by carrying the flag, so leaving it
+    // until the app links would lose the answer somewhere along the way.
+    if (ownApp !== undefined && !ownApp.enabled) {
+      await setAppEnabled({ identityNumber, enabled: true });
     }
+    // An app this browser already points at and that is delivering needs nothing more.
+    if (ownApp?.subscribed === true) {
+      return true;
+    }
+    // The tab is opened before anything is awaited, because a browser allows `window.open` only inside the press itself.
+    const tab = openPendingInstallTab();
+    const outcome = await turnOnWithApp({ identityNumber, ownApp });
+    if (outcome.delivering) {
+      tab.point(undefined);
+      return true;
+    }
+    tab.point(outcome.installUrl);
+    // A tab the browser refused is not a failure: the link goes on the section.
+    refusedInstallUrl = tab.opened ? undefined : outcome.installUrl;
+    return false;
   };
 
   const handleToggle = (event: Event) => {

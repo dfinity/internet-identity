@@ -12,8 +12,7 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
-import { claimDeviceApp, type ClaimOutcome } from "./deviceApp";
-import { saidAlreadyInstalled } from "./alreadyInstalled";
+import { claimDeviceApp } from "./deviceApp";
 import { setAppEnabled } from "./appEnabled";
 import { clearNotificationsOff } from "./turnedOff";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
@@ -88,10 +87,9 @@ const turnOnInApp = async ({
   consented,
 }: GrantArgs & { consented: boolean }): Promise<EnableNotificationsResult> => {
   let status = await browserAppStatus(identityNumber);
-  let claim: ClaimOutcome = "no-donor";
   if (status.kind === "no-app") {
     // The claim is written before its reply arrives, so a lost reply must not deny an app this browser already points at.
-    claim = await claimDeviceApp(identityNumber);
+    await claimDeviceApp(identityNumber);
     status = await browserAppStatus(identityNumber);
   }
 
@@ -101,27 +99,8 @@ const turnOnInApp = async ({
     // An install this browser handed a key to and nobody has opened leaves the same thing
     // to do as no install at all: walk the steps, which say to open it.
     case "awaiting-install":
+    case "no-app":
       return { status: "install-required" };
-    case "no-app": {
-      if (claim === "indeterminate") {
-        // Nothing was asked of any donor, so this is not an answer that there is no app
-        // here: offering the install would hand a second one to a device that has one.
-        return {
-          status: "unanswered",
-          reason: "the apps on this device could not be read",
-        };
-      }
-      // The canister records which browser points at an app, so a second browser on the
-      // same phone finds none of its own: their word is the only evidence there is, and
-      // the opt-in resolution already answers on it.
-      if (await saidAlreadyInstalled(identityNumber)) {
-        if (!consented) {
-          await grantConsent({ identityNumber, origin, actor });
-        }
-        return { status: "enabled" };
-      }
-      return { status: "install-required" };
-    }
     case "app": {
       const { subscribed, enabled } = status.app;
       if (!enabled) {

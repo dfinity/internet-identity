@@ -9,14 +9,9 @@ export type AppSwitchOutcome =
 
 /** A handle is offered on the strength of the donor browser pointing at an app, which does not mean the app has a subscription, so what the canister says after the claim is what answers. */
 const claimedAppDelivers = async (identityNumber: bigint): Promise<boolean> => {
-  const claim = await claimDeviceApp(identityNumber);
-  if (claim === "indeterminate") {
-    // Nothing was asked of any donor, so this says nothing about this device: offering
-    // the install on it would hand a second app to a phone that already has one.
-    throw new Error("the apps on this device could not be read");
-  }
-  // Only a claim that happened says this device has an app.
-  if (claim !== "claimed") {
+  // Only a claim that happened says this device has an app: "no donor" and "nothing was
+  // asked" both leave the switch with nothing to report.
+  if ((await claimDeviceApp(identityNumber)) !== "claimed") {
     return false;
   }
   const status = await browserAppStatus(identityNumber);
