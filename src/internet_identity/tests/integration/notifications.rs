@@ -1690,6 +1690,55 @@ mod shared_app {
         )
     }
 
+    /// The app delivers for this identity, so it is the one that reads and acknowledges
+    /// that identity's queue. A probe is sent to the app whatever address the entry
+    /// registered, so this has to hold for an entry with one of its own too.
+    #[test]
+    fn should_let_the_app_read_and_acknowledge_what_it_delivers() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, _second, app) = install_with_shared_app(&env);
+
+        assert_eq!(
+            browser_get_next_notification(&env, canister_id, app, next_request(first))?,
+            Ok(GetNextNotificationResponse { notification: None })
+        );
+        assert_eq!(
+            browser_remove_notification(&env, canister_id, app, remove_request(first))?,
+            Ok(RemoveNotificationResponse {})
+        );
+        Ok(())
+    }
+
+    /// Switching delivery off is this identity saying the app does not act for it, so the
+    /// app stops being a caller it recognises.
+    #[test]
+    fn should_refuse_the_app_for_an_identity_that_switched_delivery_off(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, _first, second, app) = install_with_shared_app(&env);
+
+        set_notification_app_enabled(
+            &env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            SetNotificationAppEnabledRequest {
+                anchor_number: second,
+                enabled: false,
+            },
+        )?
+        .expect("set_notification_app_enabled returned Err");
+
+        assert_eq!(
+            browser_get_next_notification(&env, canister_id, app, next_request(second))?,
+            Err(GetNextNotificationError::InvalidBrowserKey)
+        );
+        assert_eq!(
+            browser_remove_notification(&env, canister_id, app, remove_request(second))?,
+            Err(RemoveNotificationError::InvalidBrowserKey)
+        );
+        Ok(())
+    }
+
     /// The app this browser points at, for a read that is only meaningful once it does.
     fn linked(
         env: &PocketIc,
