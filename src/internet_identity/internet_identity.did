@@ -2556,6 +2556,13 @@ service : (opt InternetIdentityInit) -> {
     // Called by the Home Screen app on its first open, signed with that one-shot key.
     // Creates the app's record where its key has none, and points the browser at it.
     link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
+
+    // Called by the Home Screen app, signing as itself. The identities whose browsers
+    // point at it, which is the whole of what it can deliver for. Empty in four cases,
+    // which all mean the same thing to the app: it has no record, nothing points at the
+    // record it has, this deployment does not notify, or the caller is not an app.
+    notification_app_anchors : () -> (vec UserNumber) query;
+
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.

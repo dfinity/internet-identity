@@ -1,5 +1,6 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
+use crate::notifications::app::NotificationApp;
 use crate::session_delegation::expected_session_principal;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
@@ -166,6 +167,13 @@ pub fn check_authorization(
     }
 
     Err(AuthorizationError::from(caller))
+}
+
+/// The notification app the caller is signing as, if it is one.
+pub fn check_app_authorization() -> Result<NotificationApp, AuthorizationError> {
+    let caller = caller();
+    state::storage_borrow(|storage| storage.notification_app_with_principal(caller))
+        .ok_or(AuthorizationError::from(caller))
 }
 
 /// Which of this identity's browsers the caller is signing as.
