@@ -4,6 +4,7 @@
 // subscription. Shared by opt-in, the settings toggle, and the reconcile pass.
 
 import { throwCanisterError } from "$lib/utils/utils";
+import { millisToNanos } from "$lib/utils/time";
 import { generateVapidKeypair, signJwtPool } from "./vapidPool";
 import {
   currentDeviceSubscription,
@@ -29,7 +30,7 @@ export const registerStoredDevice = async (
   identityNumber: bigint,
   { endpoint, privateKey, publicKeyRaw }: StoredVapidKey,
 ): Promise<string> => {
-  const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
+  const issuedAtNs = millisToNanos(Date.now());
   const signatures = await signJwtPool(
     privateKey,
     relayOriginOf(endpoint),

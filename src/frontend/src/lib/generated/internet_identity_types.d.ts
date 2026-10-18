@@ -428,6 +428,13 @@ export interface BrowserInfo {
    */
   'session_count' : number,
   /**
+   * The Home Screen app this browser points at, where it has one. Absent is "not
+   * installed, or installed and never opened": the record is created by the app's
+   * first open, so there is nothing to point at before that. Absent too where the
+   * record this browser points at is gone, and where this deployment does not notify.
+   */
+  'notification_app' : [] | [NotificationAppInfo],
+  /**
    * Fixed at registration. A sign-in reporting something else registers its own entry,
    * so this describes a registration rather than the last sign-in.
    */
@@ -521,6 +528,38 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
+export type ClaimNotificationAppError = {
+    /**
+     * The offering identity's browser points at no app to hand over.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The key the caller signed with is no browser key of the identity it named.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No browser of the offering identity signed this, or the one that did has
+     * rotated its key past it since.
+     */
+    'InvalidClaimToken' : null
+  } |
+  { 'ClaimTokenExpired' : null };
+/**
+ * Points this browser at the Home Screen app another identity on the device has, on
+ * the authority of a token that identity signed. Nothing is stored between the two
+ * halves: the signature is the whole of the authority.
+ */
+export interface ClaimNotificationAppRequest {
+  'signature' : Uint8Array | number[],
+  'offering_anchor_number' : UserNumber,
+  'anchor_number' : UserNumber,
+  'expires_at_ns' : bigint,
+}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -966,16 +1005,25 @@ export interface GetIdAliasRequest {
 }
 export type GetNextNotificationError = {
     /**
-     * Also a caller that is no browser of the identity.
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
      */
-    'InternalCanisterError' : string
-  };
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
 export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
 /**
  * Null once nothing is left to show.
  */
 export interface GetNextNotificationResponse {
   'notification' : [] | [NotificationToShow],
+}
+/**
+ * Asks what this browser's entry says about the app it points at, for a page that has
+ * the browser key and no session.
+ */
+export interface GetNotificationAppStatusRequest {
+  'anchor_number' : UserNumber,
 }
 export interface GetNotificationDelegationRequest {
   'session_key' : SessionKey,
@@ -1116,6 +1164,14 @@ export interface IdentityAnchorInfo {
 export interface IdentityAuthnInfo {
   'authn_methods' : Array<AuthnMethod>,
   'recovery_authn_methods' : Array<AuthnMethod>,
+}
+/**
+ * Which identity a notification is about, in the terms the user knows it by: nobody
+ * recognises an identity by its number.
+ */
+export interface IdentityForNotification {
+  'name' : [] | [string],
+  'anchor_number' : UserNumber,
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
@@ -1367,6 +1423,24 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No browser of this identity is waiting for this caller, or the install it started
+     * has expired.
+     */
+    'NoPendingLink' : null
+  } |
+  {
+    /**
+     * The key is one a browser of this identity already signs with.
+     */
+    'KeyAlreadyInUse' : null
+  };
+export interface LinkNotificationAppRequest {
+  'app_key' : PublicKey,
+  'anchor_number' : UserNumber,
+}
 export type ListApplicationsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
@@ -1471,6 +1545,42 @@ export interface Notification {
    */
   'expires_at' : [] | [Timestamp],
 }
+export interface NotificationAppInfo {
+  /**
+   * When the app last called, which is the only evidence there is that it still
+   * exists: nothing says when a user deletes a web app from their Home Screen.
+   */
+  'last_seen_ns' : bigint,
+  /**
+   * Whether this identity wants it to deliver.
+   */
+  'enabled' : boolean,
+  /**
+   * The probe this browser last sent, while it is still queued and unexpired. Empty
+   * says the entry is no longer there and nothing more: the app may have taken it, a
+   * full queue may have evicted it, or the relay post may have failed. What proves
+   * the app is alive is last_seen_ns. Queued for this browser's entry, so an app on
+   * another device cannot clear it.
+   */
+  'pending_probe' : [] | [NotificationId],
+  /**
+   * Whether the app has registered for Web Push. False means it has been opened and
+   * the permission has not been given yet.
+   */
+  'subscribed' : boolean,
+}
+/**
+ * What a browser has. An install reads as AwaitingInstall only while its key can still be
+ * spent; past that the app holding it can never finish, so it reads as nothing.
+ */
+export type NotificationAppStatus = { 'Linked' : NotificationAppInfo } |
+  { 'NoApp' : null } |
+  {
+    /**
+     * When the key this browser handed its install stops being spendable.
+     */
+    'AwaitingInstall' : bigint
+  };
 export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
@@ -1484,6 +1594,15 @@ export type NotificationDelegationError = {
   } |
   { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string };
+/**
+ * Something Internet Identity has to tell the user about their own identity.
+ */
+export type NotificationEvent = {
+    /**
+     * This device now receives this identity's notifications.
+     */
+    'NotificationsOn' : IdentityForNotification
+  };
 /**
  * Why a notification call was refused.
  */
@@ -1516,6 +1635,15 @@ export interface NotificationToShow {
   'id' : NotificationId,
   'origin' : FrontendHostname,
   'canister_id' : Principal,
+  /**
+   * Set where Internet Identity sent this itself, and what it has to say. An app's
+   * notification carries no text: the service worker fetches it from the app with a
+   * delegation it mints for the purpose, which is what keeps the content off the push
+   * service. One of these carries no text either, for the same reason, but there is
+   * nothing to fetch and nobody to mint for. The words are the frontend's, so this
+   * says what happened rather than what to show.
+   */
+  'event' : [] | [NotificationEvent],
   'account_number' : [] | [AccountNumber],
 }
 export interface OpenIDRegFinishArg {
@@ -1833,6 +1961,38 @@ export interface PrepareMcpRegistrationDelegation {
   'trusted_url' : string,
   'expiration' : Timestamp,
 }
+export type PrepareNotificationAppLinkError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * This browser already points at an app that is delivering for this identity, and
+     * an install takes delivery off it.
+     */
+    'AppAlreadyDelivering' : null
+  };
+/**
+ * Gives a Home Screen app a record of its own, on the authority of a browser that is
+ * signed in. Authorized by the token rather than by the caller being a browser this
+ * identity knows: the app runs in a storage partition of its own and the key it
+ * generated there is one nothing has seen.
+ */
+export interface PrepareNotificationAppLinkRequest {
+  /**
+   * Set where the user has said the app is gone, which is the only thing that can
+   * contradict a record still claiming to deliver.
+   */
+  'replacing_existing' : boolean,
+  /**
+   * The principal of the one-shot key this browser puts in the install URL.
+   */
+  'link_principal' : Principal,
+  'anchor_number' : UserNumber,
+}
 export interface PrepareNotificationDelegationRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
@@ -1861,6 +2021,34 @@ export interface PreparedIdAlias {
   'issuer_id_alias_jwt' : string,
   'canister_sig_pk_der' : PublicKey,
 }
+export type ProbeNotificationAppError = {
+    /**
+     * This browser points at no app, so there is nothing to wake.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing was sent, so there is nothing to watch for: the app has registered
+     * nothing, this identity has it switched off or is signed out on this browser, the
+     * browser counts as gone, or there was no room for another outcall. The browser's
+     * own registration is never woken instead.
+     */
+    'NotReachable' : null
+  };
+/**
+ * Asks the canister to wake the Home Screen app this browser points at, so the browser
+ * can learn whether it is still there. Nothing says when a user deletes a web app, so
+ * the only way to find out is to send it something and see what happens.
+ */
+export interface ProbeNotificationAppRequest { 'anchor_number' : UserNumber }
 export type PublicKey = Uint8Array | number[];
 /**
  * Authentication method using generic signatures
@@ -1928,10 +2116,12 @@ export type RegistrationFlowNextStep = {
 export type RegistrationId = string;
 export type RemoveNotificationError = {
     /**
-     * Also a caller that is no browser of the identity.
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
      */
-    'InternalCanisterError' : string
-  };
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
 export interface RemoveNotificationRequest {
   /**
    * As browser_get_next_notification returned it.
@@ -2017,6 +2207,27 @@ export type SetDefaultAccountError = {
       'anchor_number' : UserNumber,
     }
   };
+export type SetNotificationAppEnabledError = {
+    /**
+     * This browser points at no app.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+/**
+ * Whether this identity wants the app its browser points at to deliver for it. Never a
+ * subscription removal: the subscription is the app's and is shared.
+ */
+export interface SetNotificationAppEnabledRequest {
+  'enabled' : boolean,
+  'anchor_number' : UserNumber,
+}
 export type SetWebPushSubscriptionError = {
     /**
      * The caller signs with no key this identity is signed in from.
@@ -2473,6 +2684,15 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
+  /**
+   * Called by the identity being added, from its own browser on the device, with a
+   * token the identity that has the app signed for it.
+   */
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
+  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],
@@ -2676,6 +2896,14 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the browser, which may hold nothing but its key: the install page is a
+   * tab of its own with no session.
+   */
+  'get_notification_app_status' : ActorMethod<
+    [GetNotificationAppStatusRequest],
+    NotificationAppStatus
+  >,
   'get_notification_delegation' : ActorMethod<
     [GetNotificationDelegationRequest],
     { 'Ok' : GetNotificationDelegationResponse } |
@@ -2762,6 +2990,15 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  /**
+   * Called by the Home Screen app on its first open, signed with that one-shot key.
+   * Creates the app's record where its key has none, and points the browser at it.
+   */
+  'link_notification_app' : ActorMethod<
+    [LinkNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : LinkNotificationAppError }
+  >,
   /**
    * Every app the identity decided a permission for, so the user can change or forget
    * what they decided. Authorized by the identity's own access methods.
@@ -2889,6 +3126,13 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the Home Screen app, signing as itself. The identities whose browsers
+   * point at it, which is the whole of what it can deliver for. Empty in four cases,
+   * which all mean the same thing to the app: it has no record, nothing points at the
+   * record it has, this deployment does not notify, or the caller is not an app.
+   */
+  'notification_app_anchors' : ActorMethod<[], BigUint64Array | bigint[]>,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],
     boolean
@@ -3023,6 +3267,15 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
+   * Called by the browser starting an install, naming the one-shot key it puts in the
+   * install URL as the only caller that may complete the link.
+   */
+  'prepare_notification_app_link' : ActorMethod<
+    [PrepareNotificationAppLinkRequest],
+    { 'Ok' : null } |
+      { 'Err' : PrepareNotificationAppLinkError }
+  >,
+  /**
    * Authorized by the browser key the caller signs with.
    */
   'prepare_notification_delegation' : ActorMethod<
@@ -3034,6 +3287,15 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
+  >,
+  /**
+   * Called by the browser, which watches for the answer leaving its own queue: that
+   * is what says the app this browser points at is still installed.
+   */
+  'probe_notification_app' : ActorMethod<
+    [ProbeNotificationAppRequest],
+    { 'Ok' : NotificationId } |
+      { 'Err' : ProbeNotificationAppError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
@@ -3063,7 +3325,18 @@ export interface _SERVICE {
       { 'Err' : SetDefaultAccountError }
   >,
   /**
-   * Called by the browser itself, signed with the browser key it signs in with.
+   * Called by the identity, from the browser that points at the app.
+   */
+  'set_notification_app_enabled' : ActorMethod<
+    [SetNotificationAppEnabledRequest],
+    { 'Ok' : null } |
+      { 'Err' : SetNotificationAppEnabledError }
+  >,
+  /**
+   * Called by the browser, or by the Home Screen app it points at: what the app
+   * registers belongs to its own record, which every identity pointing at it is
+   * delivered through, so the anchor named here is what authorized the call rather
+   * than where the subscription goes.
    */
   'set_webpush_subscription' : ActorMethod<
     [SetWebPushSubscriptionRequest],
