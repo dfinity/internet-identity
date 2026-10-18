@@ -56,6 +56,21 @@ export const prepareInstallUrl = async ({
 /** The placeholder the new tab holds while the URL is still being minted: this page, told to wait rather than to decide. */
 export const INSTALL_PLACEHOLDER_URL = `${NOTIFICATION_APP_PATH}?installing`;
 
+/** `undefined` where this browser has nothing to send the user to; the reason is logged rather than raised. */
+export const installUrlOrNone = async (
+  identityNumber: bigint,
+): Promise<string | undefined> => {
+  try {
+    return await prepareInstallUrl({
+      identityNumber,
+      replacingExisting: false,
+    });
+  } catch (error) {
+    console.error(error);
+    return undefined;
+  }
+};
+
 /** Must be called straight from the click, which is the only time a browser allows it; the tab is opened on the placeholder and pointed once the URL resolves.
  *  A blocked tab is not an error: the screen shows the link instead. */
 export const openInstallTab = (
@@ -90,4 +105,23 @@ export const openInstallTab = (
     },
   );
   return true;
+};
+
+/** A tab opened inside the press, waiting for somewhere to go. */
+export interface PendingInstallTab {
+  /** Whether the browser allowed the tab; a refused one is not a failure, the screen behind it carries the link. */
+  opened: boolean;
+  /** Points it at the install, or closes it where there is nothing to point it at. */
+  point: (url: string | undefined) => void;
+}
+
+/** Must be called straight from the click: the tab has to open before anything is awaited. */
+export const openPendingInstallTab = (): PendingInstallTab => {
+  let point: (url: string | undefined) => void = () => {};
+  const opened = openInstallTab(
+    new Promise<string | undefined>((resolve) => {
+      point = resolve;
+    }),
+  );
+  return { opened, point };
 };

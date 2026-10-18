@@ -38,14 +38,10 @@ const describe = (error: unknown): string => {
 export const CLAIM_TOKEN_LIFETIME_MS = 5 * 60 * 1000;
 
 /** The token names both anchors and an expiry, so it is good for this pair alone and only for as long as the claim takes. */
-/** What one candidate answered. `refused` is that donor having nothing to hand over;
- *  `unknown` is not having found out, which is not an answer about this device. */
-type DonorOutcome = "claimed" | "refused" | "unknown";
-
 const claimFrom = async (
   identityNumber: bigint,
   offeringIdentityNumber: bigint,
-): Promise<DonorOutcome> => {
+): Promise<boolean> => {
   const expiresAtNs =
     BigInt(Date.now() + CLAIM_TOKEN_LIFETIME_MS) * BigInt(1_000_000);
   try {
@@ -59,7 +55,7 @@ const claimFrom = async (
       console.warn(
         `anchor ${offeringIdentityNumber} is not registered as a browser here`,
       );
-      return "refused";
+      return false;
     }
     const actor = await browserKeyActor(identityNumber);
     await actor
@@ -70,18 +66,12 @@ const claimFrom = async (
         signature,
       })
       .then(throwCanisterError);
-    return "claimed";
+    return true;
   } catch (error) {
     console.warn(
       `the app of anchor ${offeringIdentityNumber} was not claimed: ${describe(error)}`,
     );
-    // Only this refusal is an answer about the donor's app. A key that would not sign, a
-    // token the canister would not take and a call that never arrived all leave the
-    // question open, and an open question must not read as an install being needed.
-    return isCanisterError<ClaimNotificationAppError>(error) &&
-      error.type === "NoNotificationApp"
-      ? "refused"
-      : "unknown";
+    return false;
   }
 };
 
@@ -109,18 +99,10 @@ export const claimDeviceApp = async (
     console.warn("no other identity is signed in here to hand an app over");
     return "no-donor";
   }
-  let anyUnknown = false;
   for (const offeringIdentityNumber of offering) {
-    switch (await claimFrom(identityNumber, offeringIdentityNumber)) {
-      case "claimed":
-        return "claimed";
-      case "unknown":
-        anyUnknown = true;
-        break;
-      case "refused":
-        break;
+    if (await claimFrom(identityNumber, offeringIdentityNumber)) {
+      return "claimed";
     }
   }
-  // One candidate nobody could ask leaves the whole question open: an app may be here.
-  return anyUnknown ? "indeterminate" : "no-donor";
+  return "no-donor";
 };
