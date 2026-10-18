@@ -1302,6 +1302,12 @@ mod browser_queue {
 }
 
 /// A canister that notifies, and two identities signed in from a browser each.
+/// The browser each identity signs in from in these fixtures. Named rather than spelled
+/// at every call site, because `link_app` takes the seed and the token has to be minted
+/// by the same browser the canister will verify it against.
+const FIRST_BROWSER_SEED: u8 = 1;
+const SECOND_BROWSER_SEED: u8 = 2;
+
 fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
     let canister_id =
         install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
@@ -1332,6 +1338,7 @@ fn link_app(
         PrepareNotificationAppLinkRequest {
             anchor_number: anchor,
             link_principal: link.principal(),
+            replacing_existing: false,
         },
     )
     .expect("prepare_notification_app_link rejected")
@@ -1350,6 +1357,149 @@ fn link_app(
     app.principal()
 }
 
+/// Starting an install while this browser already points at an app.
+mod installing_over_an_app {
+    use super::subscriptions::{request, ENDPOINT};
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        set_notification_app_enabled, set_webpush_subscription,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        PrepareNotificationAppLinkError, SetNotificationAppEnabledError,
+        SetNotificationAppEnabledRequest,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// Starts an install on the browser `browser_seed` names, naming the one-shot key
+    /// `link_seed` does.
+    fn prepare(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_seed: u8,
+        link_seed: u8,
+    ) -> Result<Result<(), PrepareNotificationAppLinkError>, RejectResponse> {
+        prepare_with(env, canister_id, anchor, browser_seed, link_seed, false)
+    }
+
+    fn prepare_with(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_seed: u8,
+        link_seed: u8,
+        replacing_existing: bool,
+    ) -> Result<Result<(), PrepareNotificationAppLinkError>, RejectResponse> {
+        prepare_notification_app_link(
+            env,
+            canister_id,
+            // The successor the sign-in announced, the only slot a browser is recognised by.
+            BrowserKey::new(browser_seed).successor().principal(),
+            PrepareNotificationAppLinkRequest {
+                anchor_number: anchor,
+                link_principal: BrowserKey::new(link_seed).principal(),
+                replacing_existing,
+            },
+        )
+    }
+
+    /// The install steps are what a user walks after saying the app is gone, and the
+    /// slot an install takes is the one the working app is reached through.
+    #[test]
+    fn should_refuse_an_install_over_an_app_that_is_delivering() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
+
+        assert_eq!(
+            prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200)?,
+            Err(PrepareNotificationAppLinkError::AppAlreadyDelivering)
+        );
+        Ok(())
+    }
+
+    /// Only the user can see their own Home Screen, and the record cannot: a push service
+    /// that goes on answering for a deleted app leaves it saying it delivers forever.
+    #[test]
+    fn should_install_over_a_delivering_app_the_user_says_is_gone() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
+
+        assert_eq!(
+            prepare_with(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200, true)?,
+            Ok(())
+        );
+        Ok(())
+    }
+
+    /// An install nobody has opened holds the slot but is no app: answering Ok would
+    /// tell the caller the switch moved when the flag it writes does not exist yet.
+    #[test]
+    fn should_refuse_to_switch_an_install_nobody_has_opened() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200)?
+            .expect("prepare_notification_app_link returned Err");
+
+        assert_eq!(
+            set_notification_app_enabled(
+                &env,
+                canister_id,
+                BrowserKey::new(FIRST_BROWSER_SEED).successor().principal(),
+                SetNotificationAppEnabledRequest {
+                    anchor_number: anchor,
+                    enabled: false,
+                },
+            )?,
+            Err(SetNotificationAppEnabledError::NoNotificationApp)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_install_over_an_app_that_never_registered() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+
+        assert_eq!(
+            prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200)?,
+            Ok(())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_install_over_an_app_delivery_is_switched_off_for() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
+        set_notification_app_enabled(
+            &env,
+            canister_id,
+            BrowserKey::new(FIRST_BROWSER_SEED).successor().principal(),
+            SetNotificationAppEnabledRequest {
+                anchor_number: anchor,
+                enabled: false,
+            },
+        )?
+        .expect("set_notification_app_enabled returned Err");
+
+        assert_eq!(
+            prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200)?,
+            Ok(())
+        );
+        Ok(())
+    }
+}
+
 mod app_anchors {
     use super::*;
     use canister_tests::api::internet_identity::notifications::notification_app_anchors;
@@ -1359,8 +1509,11 @@ mod app_anchors {
     fn should_answer_an_app_only_the_identities_that_point_at_it() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let shared = link_app(&env, canister_id, first, 1, 100);
-        assert_eq!(link_app(&env, canister_id, second, 2, 100), shared);
+        let shared = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        assert_eq!(
+            link_app(&env, canister_id, second, SECOND_BROWSER_SEED, 100),
+            shared
+        );
         sign_in_as(&env, canister_id, principal_2(), second, ORIGIN, 3);
         let private = link_app(&env, canister_id, second, 3, 101);
 
@@ -1379,7 +1532,7 @@ mod app_anchors {
     fn should_answer_nothing_to_a_caller_that_is_no_app() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        link_app(&env, canister_id, anchor, 1, 100);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
 
         assert_eq!(
             notification_app_anchors(&env, canister_id, Principal::anonymous())?,
@@ -1389,7 +1542,7 @@ mod app_anchors {
             notification_app_anchors(
                 &env,
                 canister_id,
-                BrowserKey::new(1).successor().principal()
+                BrowserKey::new(FIRST_BROWSER_SEED).successor().principal()
             )?,
             Vec::<AnchorNumber>::new()
         );
@@ -1400,7 +1553,7 @@ mod app_anchors {
     fn should_answer_nothing_while_notifications_are_disabled() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, anchor, 1, 100);
+        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
 
         upgrade_ii_canister_with_arg(
             &env,
@@ -1433,13 +1586,13 @@ mod app_anchors {
     fn should_answer_nothing_once_the_last_reference_is_dropped() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        let first = link_app(&env, canister_id, anchor, 1, 100);
+        let first = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
         assert_eq!(
             notification_app_anchors(&env, canister_id, first)?,
             vec![anchor]
         );
 
-        let second = link_app(&env, canister_id, anchor, 1, 101);
+        let second = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 101);
 
         assert_eq!(
             notification_app_anchors(&env, canister_id, first)?,
@@ -1454,6 +1607,290 @@ mod app_anchors {
 }
 
 /// A second identity on the device pointing at the app the first one installed.
+/// One Home Screen app, several identities pointing at it. What is shared is the record,
+/// its key and its one Web Push registration; what is not is whether each identity wants
+/// it to deliver, which rides on that identity's own browser entry.
+mod shared_app {
+    use super::subscriptions::{request, ENDPOINT};
+    use super::*;
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+    use canister_tests::api::internet_identity::notifications::{
+        claim_notification_app, get_notification_app_status, get_webpush_subscription_status,
+        set_notification_app_enabled, set_webpush_subscription,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        BrowserInfo, ClaimNotificationAppRequest, GetNotificationAppStatusRequest,
+        NotificationAppInfo, NotificationAppStatus, SetNotificationAppEnabledError,
+        SetNotificationAppEnabledRequest, SetWebPushSubscriptionError,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// The key a browser is left holding after the sign-in `browser_seed` names, which is
+    /// the one its own calls arrive signed with.
+    fn browser(browser_seed: u8) -> Principal {
+        BrowserKey::new(browser_seed).successor().principal()
+    }
+
+    /// Two identities on one device pointing at one Home Screen app: the first installed
+    /// it, the second claimed it in a single call. Answers the app's principal.
+    fn install_with_shared_app(
+        env: &PocketIc,
+    ) -> (CanisterId, AnchorNumber, AnchorNumber, Principal) {
+        let (canister_id, first, second) = install_with_two_anchors(env);
+        let app = link_app(env, canister_id, first, FIRST_BROWSER_SEED, 100);
+
+        let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + 3 * 60 * 1_000_000_000;
+        claim_notification_app(
+            env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            ClaimNotificationAppRequest {
+                anchor_number: second,
+                offering_anchor_number: first,
+                expires_at_ns,
+                // Signed by the identity that has the app, which is the whole authority.
+                signature: BrowserKey::new(FIRST_BROWSER_SEED)
+                    .successor()
+                    .sign_claim_token(first, second, expires_at_ns),
+            },
+        )
+        .expect("claim_notification_app rejected")
+        .expect("claim_notification_app returned Err");
+
+        (canister_id, first, second, app)
+    }
+
+    /// What the identity itself is told about its browsers, which is the second of the
+    /// two reads of an installed app.
+    fn browsers_of(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<Vec<BrowserInfo>, RejectResponse> {
+        Ok(identity_info(env, canister_id, sender, anchor)?
+            .expect("identity_info returned Err")
+            .browsers
+            .expect("a signed-in identity lists its browser"))
+    }
+
+    fn status(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<NotificationAppStatus, RejectResponse> {
+        get_notification_app_status(
+            env,
+            canister_id,
+            sender,
+            GetNotificationAppStatusRequest {
+                anchor_number: anchor,
+            },
+        )
+    }
+
+    /// The app this browser points at, for a read that is only meaningful once it does.
+    fn linked(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<NotificationAppInfo, RejectResponse> {
+        match status(env, canister_id, sender, anchor)? {
+            NotificationAppStatus::Linked(info) => Ok(info),
+            other => panic!("expected a browser with an app, got {other:?}"),
+        }
+    }
+
+    /// The app has one service worker registration whatever number of identities point
+    /// at it, so what it registers naming one of them is what every one of them reads.
+    #[test]
+    fn should_register_one_subscription_for_every_identity_pointing_at_the_app(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second, app) = install_with_shared_app(&env);
+
+        // Installed, pointed at, and no permission given yet, which is the whole of what
+        // an unsubscribed record means.
+        for (sender, anchor) in [
+            (browser(FIRST_BROWSER_SEED), first),
+            (browser(SECOND_BROWSER_SEED), second),
+        ] {
+            let info = linked(&env, canister_id, sender, anchor)?;
+            assert!(!info.subscribed);
+            assert!(info.enabled);
+        }
+
+        set_webpush_subscription(&env, canister_id, app, request(first, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
+
+        for anchor in [first, second] {
+            let registered = get_webpush_subscription_status(&env, canister_id, app, anchor)?
+                .expect("the app reads its own registration");
+            assert_eq!(registered.endpoint, ENDPOINT);
+        }
+        for (sender, anchor) in [
+            (browser(FIRST_BROWSER_SEED), first),
+            (browser(SECOND_BROWSER_SEED), second),
+        ] {
+            let info = linked(&env, canister_id, sender, anchor)?;
+            assert!(info.subscribed);
+            assert!(info.enabled);
+        }
+        Ok(())
+    }
+
+    /// An app may act for the identities that point at it and for no others, so naming
+    /// one that does not is refused rather than answered.
+    #[test]
+    fn should_refuse_an_app_an_identity_it_does_not_deliver_for() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+
+        assert_eq!(
+            set_webpush_subscription(&env, canister_id, app, request(second, ENDPOINT))?,
+            Err(SetWebPushSubscriptionError::InvalidBrowserKey)
+        );
+        assert_eq!(
+            get_webpush_subscription_status(&env, canister_id, app, second)?,
+            None
+        );
+        Ok(())
+    }
+
+    /// Turning the app off is one identity's choice about delivery and never a
+    /// subscription removal: the subscription is the app's and shared, so removing it
+    /// would silence everyone else too.
+    #[test]
+    fn should_turn_one_identity_off_and_leave_the_others_delivering() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, first, second, app) = install_with_shared_app(&env);
+        set_webpush_subscription(&env, canister_id, app, request(first, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
+
+        set_notification_app_enabled(
+            &env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            SetNotificationAppEnabledRequest {
+                anchor_number: second,
+                enabled: false,
+            },
+        )?
+        .expect("set_notification_app_enabled returned Err");
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        let turned_off = linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?;
+        assert!(!turned_off.enabled);
+        assert!(turned_off.subscribed, "the app's registration is untouched");
+        let still_on = linked(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?;
+        assert!(still_on.enabled);
+        assert!(still_on.subscribed);
+        assert_eq!(
+            get_webpush_subscription_status(&env, canister_id, app, second)?
+                .expect("the app reads its own registration")
+                .endpoint,
+            ENDPOINT
+        );
+
+        // The identity's own view of its browsers says the same thing.
+        assert_eq!(
+            browsers_of(&env, canister_id, principal_2(), second)?[0].notification_app,
+            Some(turned_off)
+        );
+        Ok(())
+    }
+
+    /// Both entry points are the browser's own, so an app and a stranger are told the
+    /// same thing: the read answers nothing, and the write says the key it was signed
+    /// with is no browser of this identity rather than claiming the browser points at no
+    /// app.
+    #[test]
+    fn should_refuse_a_caller_that_is_no_browser_of_this_identity() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, _, app) = install_with_shared_app(&env);
+
+        for sender in [app, principal_2()] {
+            assert_eq!(
+                status(&env, canister_id, sender, first)?,
+                NotificationAppStatus::NoApp
+            );
+            assert_eq!(
+                set_notification_app_enabled(
+                    &env,
+                    canister_id,
+                    sender,
+                    SetNotificationAppEnabledRequest {
+                        anchor_number: first,
+                        enabled: false,
+                    },
+                )?,
+                Err(SetNotificationAppEnabledError::InvalidBrowserKey)
+            );
+        }
+        Ok(())
+    }
+
+    /// A deployment that does not notify says nothing about an app and changes nothing
+    /// about one, although the entries are there.
+    #[test]
+    fn should_answer_nothing_about_an_app_while_notifications_are_disabled(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, _, _) = install_with_shared_app(&env);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
+
+        assert_eq!(
+            status(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?,
+            NotificationAppStatus::NoApp
+        );
+        assert_eq!(
+            browsers_of(&env, canister_id, principal_1(), first)?[0].notification_app,
+            None,
+            "the identity's own view of its browsers is gated the same way"
+        );
+        assert!(matches!(
+            set_notification_app_enabled(
+                &env,
+                canister_id,
+                browser(FIRST_BROWSER_SEED),
+                SetNotificationAppEnabledRequest {
+                    anchor_number: first,
+                    enabled: false,
+                },
+            )?,
+            Err(SetNotificationAppEnabledError::InternalCanisterError(_))
+        ));
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            arg_with_notifications_enabled(),
+        )?;
+        assert!(matches!(
+            status(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?,
+            NotificationAppStatus::Linked(_)
+        ));
+        assert!(browsers_of(&env, canister_id, principal_1(), first)?[0]
+            .notification_app
+            .is_some());
+        Ok(())
+    }
+}
+
 mod claims {
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
@@ -1504,7 +1941,7 @@ mod claims {
     fn should_deliver_for_a_second_identity_after_one_call() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, first, 1, 100);
+        let app = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
 
         claim(&env, canister_id, (second, 2), (first, 1), expires_at(&env))?
             .expect("claim_notification_app returned Err");
@@ -1651,6 +2088,7 @@ mod app_link {
             PrepareNotificationAppLinkRequest {
                 anchor_number: anchor,
                 link_principal,
+                replacing_existing: false,
             },
         )
     }

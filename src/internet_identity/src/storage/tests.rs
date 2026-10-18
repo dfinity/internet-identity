@@ -7748,3 +7748,62 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
         Some(app)
     );
 }
+
+#[test]
+fn an_apps_subscription_is_the_records_and_not_an_anchors() {
+    use crate::storage::anchor::WebPushSubscription;
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+
+    assert!(
+        storage.set_notification_app_subscription(
+            app.id,
+            Some(WebPushSubscription {
+                endpoint: "https://web.push.apple.com/one".to_string(),
+                created_at_ns: 2_000,
+                vapid_public_key: vec![1; 65],
+                jwt_signatures: vec![vec![2; 64]],
+                jwt_issued_at_ns: 2_000,
+                notifications: Vec::new(),
+                woken_again_at_ns: None,
+            }),
+            2_000,
+        ),
+        "the record is there, so the registration is stored"
+    );
+
+    let stored = storage.notification_app(app.id).expect("the record");
+    assert_eq!(
+        stored
+            .webpush_subscription
+            .map(|subscription| subscription.endpoint),
+        Some("https://web.push.apple.com/one".to_string())
+    );
+    // Stamped by the app's own call, which is the only liveness anything here has.
+    assert_eq!(stored.last_used, 2_000);
+}
+
+/// A caller is told its write landed nowhere rather than reporting a registration the
+/// record it named no longer has: ids are never reissued, so a record that is gone is
+/// gone for good.
+#[test]
+fn registering_against_a_record_that_is_gone_stores_nothing() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .expect("creating the record");
+    let gone = app.id + 1;
+
+    assert!(!storage.set_notification_app_subscription(gone, None, 2_000));
+    assert_eq!(storage.notification_app(gone), None);
+    // The record that is there is left alone by a write naming another.
+    assert_eq!(
+        storage.notification_app(app.id).map(|app| app.last_used),
+        Some(1_000)
+    );
+}

@@ -176,6 +176,39 @@ pub fn check_app_authorization() -> Result<NotificationApp, AuthorizationError> 
         .ok_or(AuthorizationError::from(caller))
 }
 
+/// Which entry of this identity a call about notifications is for: the browser signing
+/// it, or the browser that points at the app signing it.
+///
+/// Notifications belong to an identity, which points at browsers, which may point at an
+/// app. The app is what shows them, so it is what asks for them, acknowledges them and
+/// registers for them, but what it acts on is still the entry: that is where they are
+/// queued and which identity they are for.
+///
+/// Answers which kind the caller turned out to be, because what a write does differs: a
+/// browser's subscription is its entry's, and an app's is its record's, shared with
+/// every identity pointing at it.
+pub fn check_notification_authorization(
+    anchor_number: AnchorNumber,
+) -> Result<(Anchor, BrowserId, NotificationCaller), AuthorizationError> {
+    let caller = caller();
+    let anchor = state::anchor(anchor_number);
+    if let Some(browser_id) = anchor.browser_by_principal(caller) {
+        return Ok((anchor, browser_id, NotificationCaller::Browser));
+    }
+    let app = state::storage_borrow(|storage| storage.notification_app_with_principal(caller))
+        .ok_or(AuthorizationError::from(caller))?;
+    let browser_id = anchor
+        .browser_pointing_at_notification_app(app.id)
+        .ok_or(AuthorizationError::from(caller))?;
+    Ok((anchor, browser_id, NotificationCaller::App(app)))
+}
+
+/// Which kind of caller a notification call turned out to come from.
+pub enum NotificationCaller {
+    Browser,
+    App(NotificationApp),
+}
+
 /// Which of this identity's browsers the caller is signing as.
 ///
 /// A browser key is not an access method: it says which browser a call comes from and
