@@ -59,6 +59,10 @@ const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
 
 /** Must match the domains the canister verifies the two signatures under. */
 const SIGNATURE_DOMAIN = new TextEncoder().encode("ii-session-browser-key");
+/** Must match `NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN` in `browser_key.rs`. */
+const CLAIM_SIGNATURE_DOMAIN = new TextEncoder().encode(
+  "ii-notification-app-claim",
+);
 const SUCCESSOR_SIGNATURE_DOMAIN = new TextEncoder().encode(
   "ii-session-browser-successor",
 );
@@ -331,24 +335,84 @@ export const currentBrowserId = async (
  *
  * A Web Push wake-up says nothing about which identity it is for, so the service
  * worker asks after each of them.
+ *
+ * Raises {@link BrowserKeyUnreadableError} where the store refused to answer, which is
+ * not a browser nothing has signed in on: a caller reading the one as the other takes a
+ * storage hiccup for an identity that has no app to lend and sends the user to install
+ * the one they already have. A key that is not a number is skipped rather than raised,
+ * since that is an answer and not a refusal.
  */
 export const registeredIdentityNumbers = async (): Promise<bigint[]> => {
+  let stored;
   try {
-    const stored = await idbKeys(BROWSER_KEY_STORE);
-    return stored.flatMap((key) => {
-      try {
-        return [BigInt(String(key))];
-      } catch {
-        return [];
-      }
-    });
-  } catch {
-    // A storage failure reads as no identities, so the wake-up it answers asks after
-    // none and the notification goes unshown. Nothing is registered off this either,
-    // and the next wake-up asks again.
-    return [];
+    stored = await idbKeys(BROWSER_KEY_STORE);
+  } catch (error) {
+    throw new BrowserKeyUnreadableError(error);
   }
+  return stored.flatMap((key) => {
+    try {
+      return [BigInt(String(key))];
+    } catch {
+      return [];
+    }
+  });
 };
+
+/** `undefined` before any sign-in has completed, since the id is what says the canister accepted this key.
+ *  Raises {@link BrowserKeyUnreadableError} where storage refused, which a caller must not read as a browser holding no key. */
+const signAsBrowser = async (
+  identityNumber: bigint,
+  message: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array | undefined> => {
+  const stored = await readOrThrow(identityNumber);
+  if (stored?.browserId === undefined) {
+    return undefined;
+  }
+  return new Uint8Array(
+    await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" },
+      stored.keyPair.privateKey,
+      message,
+    ),
+  );
+};
+
+/** Must match `claim_token_message` in `browser_key.rs` byte for byte: the domain, then the offering anchor, the claiming anchor and the expiry as big-endian `u64`s. */
+export const notificationAppClaimMessage = (
+  offeringIdentityNumber: bigint,
+  claimingIdentityNumber: bigint,
+  expiresAtNs: bigint,
+): Uint8Array<ArrayBuffer> => {
+  const message = new Uint8Array(CLAIM_SIGNATURE_DOMAIN.length + 24);
+  message.set(CLAIM_SIGNATURE_DOMAIN);
+  const numbers = new DataView(
+    message.buffer,
+    message.byteOffset + CLAIM_SIGNATURE_DOMAIN.length,
+  );
+  numbers.setBigUint64(0, offeringIdentityNumber, false);
+  numbers.setBigUint64(8, claimingIdentityNumber, false);
+  numbers.setBigUint64(16, expiresAtNs, false);
+  return message;
+};
+
+/** Signed as the offering identity, which is the party the canister verifies it against; `undefined` where no sign-in has registered that identity's browser here. */
+export const signNotificationAppClaim = ({
+  offeringIdentityNumber,
+  claimingIdentityNumber,
+  expiresAtNs,
+}: {
+  offeringIdentityNumber: bigint;
+  claimingIdentityNumber: bigint;
+  expiresAtNs: bigint;
+}): Promise<Uint8Array | undefined> =>
+  signAsBrowser(
+    offeringIdentityNumber,
+    notificationAppClaimMessage(
+      offeringIdentityNumber,
+      claimingIdentityNumber,
+      expiresAtNs,
+    ),
+  );
 
 /** `undefined` before any sign-in has completed, when there is no entry to sign as.
  *  Raises {@link BrowserKeyUnreadableError} where storage refused, which a caller must not read as a browser the canister never registered. */
