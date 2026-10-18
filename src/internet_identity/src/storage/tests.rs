@@ -7867,6 +7867,47 @@ fn forgetting_an_app_takes_every_reference_with_it() {
 }
 
 #[test]
+fn forgetting_an_app_keeps_an_entry_silent_that_had_switched_it_off() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app = storage
+        .notification_app_for_key(&app_key(7), 1_000)
+        .expect("creating the record");
+    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+
+    let mut off = anchor_with_browser(&mut storage);
+    off.point_at_notification_app(0, app.id);
+    off.set_webpush_subscription(0, Some(app_subscription("https://own")));
+    off.set_notification_app_enabled(0, false);
+    storage.write(off).expect("writing the entry that said no");
+
+    let mut on = anchor_with_browser(&mut storage);
+    on.point_at_notification_app(0, app.id);
+    on.set_webpush_subscription(0, Some(app_subscription("https://other")));
+    storage.write(on).expect("writing the entry that said yes");
+
+    assert!(storage.forget_notification_app(app.id));
+
+    // The answer was about this device. The reference carrying it is gone, so keeping it
+    // means silencing the address the entry registered for itself.
+    assert_eq!(
+        storage
+            .read(10_000)
+            .expect("reading the anchor")
+            .webpush_subscription(0),
+        None,
+        "an entry that switched delivery off should not start delivering again"
+    );
+    assert!(
+        storage
+            .read(10_001)
+            .expect("reading the anchor")
+            .webpush_subscription(0)
+            .is_some(),
+        "an entry that never switched it off keeps its own address"
+    );
+}
+
+#[test]
 fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());

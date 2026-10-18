@@ -1677,7 +1677,7 @@ impl<M: Memory + Clone> Storage<M> {
             };
             // The reference goes from every entry that holds one. The queue and the stamp
             // go only from the entries this record's address delivered for.
-            let pointing: Vec<(BrowserId, bool)> = anchor
+            let pointing: Vec<(BrowserId, bool, bool)> = anchor
                 .browsers()
                 .iter()
                 .filter(|browser| points_at_notification_app(browser, app_id))
@@ -1685,11 +1685,19 @@ impl<M: Memory + Clone> Storage<M> {
                     (
                         browser.id,
                         delivered_through_notification_app(browser, app_id),
+                        delivery_switched_off(browser, app_id),
                     )
                 })
                 .collect();
-            for (browser_id, delivered_through_it) in pointing {
+            for (browser_id, delivered_through_it, switched_off) in pointing {
                 anchor.stop_pointing_at_notification_app(browser_id);
+                // The answer was about this device, not about the record that carried it:
+                // the flag goes with the reference, so an entry that registered an address
+                // of its own would start delivering again on a record being forgotten.
+                // Silencing it keeps what the user said, the way `clear_subscription` does.
+                if switched_off {
+                    anchor.set_webpush_subscription(browser_id, None);
+                }
                 if !delivered_through_it {
                     continue;
                 }
@@ -4679,6 +4687,14 @@ pub struct CreateSessionParams {
 
 /// Whether this entry points at `app_id`. Pointing is which app this browser has, not
 /// where its wake-ups went.
+/// Whether this entry points at `app_id` with delivery switched off, which is this
+/// identity's answer about this device rather than about the record carrying it.
+fn delivery_switched_off(browser: &Browser, app_id: NotificationAppId) -> bool {
+    browser.notification_app.is_some_and(|reference| {
+        reference.linked_app() == Some(app_id) && !reference.delivers()
+    })
+}
+
 fn points_at_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {
     browser
         .notification_app
