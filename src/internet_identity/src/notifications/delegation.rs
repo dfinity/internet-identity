@@ -84,7 +84,12 @@ fn check_notification_access(
     browser_id: BrowserId,
     origin: &FrontendHostname,
 ) -> Result<(), NotificationDelegationError> {
-    if anchor.webpush_subscription(browser_id).is_none() {
+    // Whatever delivers for this entry: on a phone that is the Home Screen app it routes
+    // through, and the entry holds no registration of its own.
+    let reachable = storage_borrow(|storage| {
+        crate::notifications::webpush::delivering_subscription(storage, anchor, browser_id)
+    });
+    if reachable.is_none() {
         return Err(NotificationDelegationError::NoNotificationAccess);
     }
     if !consent_granted_for(anchor.anchor_number(), origin) {

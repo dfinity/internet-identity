@@ -131,7 +131,7 @@ fn resolve_recipient(
             || !anchor
                 .browsers()
                 .iter()
-                .any(|browser| dispatch::wake_up_jwt(browser, now_ns).is_some())
+                .any(|browser| dispatch::can_wake(storage, browser, now_ns))
         {
             return Err(NotAcceptedReason::NoChannel);
         }
