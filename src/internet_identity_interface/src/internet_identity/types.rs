@@ -1141,8 +1141,8 @@ pub struct LinkNotificationAppRequest {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum LinkNotificationAppError {
     /// The bytes offered are not a P-256 public key in the single encoding WebCrypto
-    /// emits. A record keyed by anything else is one no app could ever sign as, and the
-    /// install that reached here is spent either way.
+    /// emits. Refused before the pending link is read, so the install is unspent: the
+    /// app may call again with a valid key until that link expires.
     InvalidAppKey,
     /// No browser of this identity is waiting for this caller, or the install it started
     /// has expired.

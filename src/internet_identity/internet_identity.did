@@ -1865,10 +1865,10 @@ type RemoveWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
-// Gives a Home Screen app a record of its own, on the authority of a browser that is
-// signed in. Authorized by the token rather than by the caller being a browser this
-// identity knows: the app runs in a storage partition of its own and the key it
-// generated there is one nothing has seen.
+// Registers the one-shot key a browser is about to hand its install, so the app that
+// spends it is the one this browser sent. Authorized by the caller being a browser this
+// identity is signed in from; the principal named here is what authorizes the
+// link_notification_app call that follows.
 type PrepareNotificationAppLinkRequest = record {
     anchor_number : UserNumber;
     // The principal of the one-shot key this browser puts in the install URL.

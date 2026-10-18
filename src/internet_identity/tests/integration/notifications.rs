@@ -1526,6 +1526,47 @@ mod app_link {
         Ok(())
     }
 
+    /// An app key is minted in a partition no browser can reach, so a key one of this
+    /// identity's browsers already signs with is not an app: it is refused, and the
+    /// install stays spendable.
+    #[test]
+    fn should_refuse_an_app_key_a_browser_already_signs_with() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(100);
+
+        for held in [
+            BrowserKey::new(BROWSER_SEED).public_key(),
+            BrowserKey::new(BROWSER_SEED).successor().public_key(),
+        ] {
+            prepare(
+                &env,
+                canister_id,
+                browser(BROWSER_SEED),
+                anchor,
+                key.principal(),
+            )?
+            .expect("prepare_notification_app_link returned Err");
+            assert_eq!(
+                link(&env, canister_id, key.principal(), anchor, held)?,
+                Err(LinkNotificationAppError::KeyAlreadyInUse)
+            );
+        }
+
+        // Refused before anything is written, so the install the browser started is intact.
+        assert_eq!(
+            link(
+                &env,
+                canister_id,
+                key.principal(),
+                anchor,
+                BrowserKey::new(101).public_key()
+            )?,
+            Ok(())
+        );
+        Ok(())
+    }
+
     #[test]
     fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
         let env = env();
