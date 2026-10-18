@@ -53,12 +53,15 @@ export const prepareInstallUrl = async ({
   })}`;
 };
 
-/** Must be called straight from the click, which is the only time a browser allows it; the tab is opened empty and pointed once the URL resolves.
+/** The placeholder the new tab holds while the URL is still being minted: this page, told to wait rather than to decide. */
+export const INSTALL_PLACEHOLDER_URL = `${NOTIFICATION_APP_PATH}?installing`;
+
+/** Must be called straight from the click, which is the only time a browser allows it; the tab is opened on the placeholder and pointed once the URL resolves.
  *  A blocked tab is not an error: the screen shows the link instead. */
 export const openInstallTab = (
   url: string | Promise<string | undefined>,
 ): boolean => {
-  const opened = window.open("", "_blank");
+  const opened = window.open(INSTALL_PLACEHOLDER_URL, "_blank");
   if (opened === null) {
     // The caller handed its only failure path to this promise, so a tab the browser
     // refused is no reason to leave that failure unhandled.
