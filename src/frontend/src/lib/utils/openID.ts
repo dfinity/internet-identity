@@ -63,6 +63,41 @@ const CallbackFieldsSchema = z
 const isCallbackPayload = (value: unknown): boolean =>
   CallbackPayloadSchema.safeParse(value).success;
 
+const APPLE_ORIGIN = "https://appleid.apple.com";
+const isAppleAuthURL = (url: URL): boolean => url.origin === APPLE_ORIGIN;
+
+/**
+ * Apple's `response_mode=web_message` reply, posted by Apple to the opener.
+ * `user` is only present on the first authorization of the app.
+ */
+const AppleWebMessageSchema = z.object({
+  method: z.literal("oauthDone"),
+  data: z.object({
+    authorization: z.object({ id_token: z.string(), state: z.string() }),
+    user: z
+      .object({
+        email: z.string().optional(),
+        name: z
+          .object({
+            firstName: z.string().optional(),
+            lastName: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+  }),
+});
+
+const parseAppleWebMessage = (data: unknown) => {
+  try {
+    return AppleWebMessageSchema.safeParse(
+      typeof data === "string" ? JSON.parse(data) : data,
+    );
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Open a popup that round-trips through an OAuth provider and resolves with
  * the callback payload delivered by the canister's POST /callback page.
@@ -100,10 +135,27 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
   if (redirectWindow === null) {
     throw new CallbackPopupClosedError();
   }
+  const isApple = typeof url === "string" && isAppleAuthURL(new URL(url));
 
   return new Promise<unknown>((resolve, reject) => {
+    const onAppleMessage = (event: MessageEvent) => {
+      if (event.origin !== APPLE_ORIGIN) {
+        return;
+      }
+      const message = parseAppleWebMessage(event.data);
+      if (message?.success !== true) {
+        return;
+      }
+      const { id_token, state } = message.data.data.authorization;
+      cleanup();
+      resolve({ id_token, state });
+    };
+    if (isApple) {
+      window.addEventListener("message", onAppleMessage);
+    }
     const cleanup = () => {
       clearInterval(closeInterval);
+      window.removeEventListener("message", onAppleMessage);
       channel.close();
       redirectWindow?.close();
       window.focus();
@@ -120,7 +172,10 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
     // arrives in time, the message listener resolves and cleans up.
     let closedSince: number | undefined;
     const closeInterval = setInterval(() => {
-      if (redirectWindow.closed !== true) {
+      // Safari replaces the Apple popup with its native Sign in with Apple
+      // sheet, so the popup can read as closed while Apple's reply is still
+      // to come.
+      if (redirectWindow.closed !== true || isApple) {
         return;
       }
       closedSince ??= Date.now();
@@ -386,6 +441,14 @@ export const requestWithPopup = async (
     return extractIdTokenFromCallback(callback, capturedState);
   }
   const redirectURL = createRedirectURL(configOrPromise, options);
+  if (isAppleAuthURL(redirectURL)) {
+    // Apple posts its reply straight to the opener instead of submitting it
+    // to /callback, which also works under Safari's native sheet.
+    redirectURL.searchParams.set("response_mode", "web_message");
+    redirectURL.search = redirectURL.searchParams
+      .toString()
+      .replace(/\+/g, "%20");
+  }
   const callback = await redirectInPopup(redirectURL.href);
   const expectedState = redirectURL.searchParams.get("state");
   if (expectedState === null) {
