@@ -177,6 +177,13 @@
     // `subscribed` outlives the app it names, so an entry that says it delivers is asked
     // to prove it. Only where the app does not answer is a new install offered.
     if (ownApp?.subscribed === true) {
+      // The answer goes in first, because a probe is dispatched like any other
+      // notification: a reference switched off is skipped when the canister picks who to
+      // send to, so probing before this would find every app unreachable and offer the
+      // steps to a device that has one.
+      if (!ownApp.enabled) {
+        await setAppEnabled({ identityNumber, enabled: true });
+      }
       const checking = toaster.create({
         type: "loading",
         title: $t`Checking this device`,
@@ -188,16 +195,14 @@
         toaster.dismiss(checking);
       }
       if (stillThere) {
-        if (!ownApp.enabled) {
-          await setAppEnabled({ identityNumber, enabled: true });
-        }
         tab.point(undefined);
         return true;
       }
-      // Gone. The record still says it delivers, and nothing but the user can say
-      // otherwise, so the install is minted as the replacement it is: an ordinary one is
-      // refused over a delivering record, and the empty URL would close the tab this
-      // press opened.
+      // Gone, so the answer comes back out: an entry that delivers for nobody must not
+      // read as switched on once the install is offered rather than finished.
+      await setAppEnabled({ identityNumber, enabled: false });
+      // The record still says it delivers, and nothing but the user can say otherwise,
+      // so the install is minted as the replacement it is.
       const replacing = await replacementInstallUrl(identityNumber);
       tab.point(replacing);
       refusedInstallUrl = tab.opened ? undefined : replacing;
