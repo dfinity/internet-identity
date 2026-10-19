@@ -61,7 +61,7 @@ impl TryFrom<GetNextNotificationRequest> for ValidatedGetNextNotificationRequest
     ) -> Result<Self, Self::Error> {
         if !notifications_enabled() {
             return Err(GetNextNotificationError::InternalCanisterError(
-                NOT_ENABLED.to_string(),
+                NOT_ENABLED_MESSAGE.to_string(),
             ));
         }
         Ok(Self {
@@ -88,7 +88,7 @@ impl TryFrom<RemoveNotificationRequest> for ValidatedRemoveNotificationRequest {
     ) -> Result<Self, Self::Error> {
         if !notifications_enabled() {
             return Err(RemoveNotificationError::InternalCanisterError(
-                NOT_ENABLED.to_string(),
+                NOT_ENABLED_MESSAGE.to_string(),
             ));
         }
         Ok(Self {
@@ -100,7 +100,7 @@ impl TryFrom<RemoveNotificationRequest> for ValidatedRemoveNotificationRequest {
 }
 
 /// The message a refusal carries while this deployment does not notify.
-pub(crate) const NOT_ENABLED: &str = "notifications are not enabled";
+pub(crate) const NOT_ENABLED_MESSAGE: &str = "notifications are not enabled";
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {
     type Error = NotificationGrantConsentError;
@@ -250,7 +250,7 @@ impl TryFrom<NotificationConsentGrantedRequest> for ValidatedNotificationConsent
 fn notifying_origin(origin: &str) -> Result<FrontendHostname, String> {
     let origin = remap_to_legacy_domain(&canonical_origin(origin)?);
     if !notifications_enabled() {
-        return Err(NOT_ENABLED.to_string());
+        return Err(NOT_ENABLED_MESSAGE.to_string());
     }
     Ok(origin)
 }

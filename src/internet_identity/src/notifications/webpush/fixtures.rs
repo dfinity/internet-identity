@@ -138,7 +138,7 @@ pub(super) fn app_pointed_at_by(
 ) -> NotificationAppId {
     let app_id = storage_borrow_mut(|storage| {
         storage
-            .notification_app_for_key(&key(key_seed), now_ns)
+            .ensure_notification_app_for_key(&key(key_seed), now_ns)
             .expect("creating the app record")
             .id
     });

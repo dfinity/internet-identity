@@ -7529,10 +7529,10 @@ fn an_app_key_seen_again_keeps_the_record_it_already_had() {
     let key = ByteBuf::from(vec![7u8; 91]);
 
     let first = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let again = storage
-        .notification_app_for_key(&key, 2_000)
+        .ensure_notification_app_for_key(&key, 2_000)
         .expect("reading the record back");
 
     assert_eq!(first.id, again.id);
@@ -7552,7 +7552,7 @@ fn app_ids_are_never_reissued() {
     let ids: Vec<_> = (1u8..=3)
         .map(|seed| {
             storage
-                .notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 1_000)
+                .ensure_notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 1_000)
                 .expect("creating the record")
                 .id
         })
@@ -7579,7 +7579,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     let first_key = ByteBuf::from(vec![1u8; 91]);
     let mut storage = Storage::new((1, 2), memory.clone());
     let before = storage
-        .notification_app_for_key(&first_key, 1_000)
+        .ensure_notification_app_for_key(&first_key, 1_000)
         .expect("creating the record");
 
     let mut reloaded = Storage::from_memory(memory);
@@ -7590,7 +7590,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     );
     assert_eq!(
         reloaded
-            .notification_app_for_key(&ByteBuf::from(vec![2u8; 91]), 2_000)
+            .ensure_notification_app_for_key(&ByteBuf::from(vec![2u8; 91]), 2_000)
             .expect("creating the second record")
             .id,
         1
@@ -7611,7 +7611,7 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
 
     for _ in 0..2 {
@@ -7631,14 +7631,14 @@ fn an_app_nothing_points_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
     storage.write(anchor).expect("pointing at the app");
 
     let replacement = storage
-        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor.point_at_notification_app(0, replacement.id);
@@ -7656,7 +7656,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
@@ -7665,7 +7665,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
     }
 
     let replacement = storage
-        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor.point_at_notification_app(0, replacement.id);
@@ -7682,7 +7682,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
@@ -7717,7 +7717,7 @@ fn an_app_no_anchor_points_at_is_deleted_on_request() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
 
     storage.delete_unreferenced_notification_app(app.id);
@@ -7734,7 +7734,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
@@ -7756,7 +7756,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .ensure_notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
         .expect("creating the record");
 
     assert!(
@@ -7795,7 +7795,7 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
+        .ensure_notification_app_for_key(&ByteBuf::from(vec![7u8; 91]), 1_000)
         .expect("creating the record");
     let gone = app.id + 1;
 
