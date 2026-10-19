@@ -174,12 +174,6 @@
     // only inside the press itself. An app that turns out to be there drops it again.
     const tab = openPendingInstallTab();
 
-    // This identity's say-so is recorded the moment it is given, as turning off records
-    // it: an install started from this press finishes by carrying the flag, so leaving it
-    // until the app links would lose the answer somewhere along the way.
-    if (ownApp !== undefined && !ownApp.enabled) {
-      await setAppEnabled({ identityNumber, enabled: true });
-    }
     // `subscribed` outlives the app it names, so an entry that says it delivers is asked
     // to prove it. Only where the app does not answer is a new install offered.
     if (ownApp?.subscribed === true) {
@@ -187,14 +181,28 @@
         type: "loading",
         title: $t`Checking this device`,
       });
+      let stillThere;
       try {
-        if (await appStillAnswers(identityNumber)) {
-          tab.point(undefined);
-          return true;
-        }
+        stillThere = await appStillAnswers(identityNumber);
       } finally {
         toaster.dismiss(checking);
       }
+      if (stillThere) {
+        if (!ownApp.enabled) {
+          await setAppEnabled({ identityNumber, enabled: true });
+        }
+        tab.point(undefined);
+        return true;
+      }
+      // Gone. The flag stays off on the way to the install: the canister refuses to mint
+      // one over a record that is delivering, so writing the answer here would close the
+      // tab this press opened and leave the switch claiming an app that is not there.
+      // The install carries the answer instead — a fresh record links switched on.
+    } else if (ownApp !== undefined && !ownApp.enabled) {
+      // This identity's say-so is recorded the moment it is given, as turning off records
+      // it: an install started from this press finishes by carrying the flag, so leaving
+      // it until the app links would lose the answer somewhere along the way.
+      await setAppEnabled({ identityNumber, enabled: true });
     }
     const outcome = await turnOnWithApp({ identityNumber, ownApp });
     if (outcome.delivering) {
