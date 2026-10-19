@@ -52,20 +52,45 @@ const MAX_BODY_BYTES: usize = 2 * MAX_ID_TOKEN_BYTES;
 /// The single executable inline script of the landing page. Constant so its
 /// CSP hash is constant; the per-request payload lives in a non-executing
 /// `<script type="application/json">` data block instead.
+///
+/// Routes on the frontend's same-tab markers (see
+/// `src/frontend/src/lib/utils/openIdRedirectMarkers.ts`):
+///
+/// - `ii-openid-return-path`: the frontend navigated this tab to the IdP and
+///   wants the payload back at that in-app path (the wizard's same-tab
+///   sign-in). Only a same-origin path is honoured; sessionStorage is
+///   same-origin, but a value that is not a plain path is still refused.
+/// - `ii-openid-authorize-state`: the authorize page's 1-click flow, which
+///   returns to `/authorize?flow=openid-resume`. Kept as a marker of its own
+///   so a flow started before a deploy still lands.
+/// - Neither: the popup flow. The payload goes to the tab that opened us,
+///   over the `redirect_callback` `BroadcastChannel` and, when there is one,
+///   straight to `window.opener`, and the popup closes.
+///
+/// `window.opener` can't discriminate the flows: in the authorize flow this
+/// tab is itself a popup opened by the relying party.
 const CALLBACK_SCRIPT: &str = r#"(function () {
   var data = JSON.parse(document.getElementById("callback-payload").textContent);
-  if (sessionStorage.getItem("ii-openid-authorize-state") !== null) {
-    // 1-click flow: the authorize page navigated this tab to the IdP after
-    // stashing its state marker; stash the payload and resume in-app.
-    // `window.opener` can't discriminate the flows here — in the authorize
-    // flow this tab is itself a popup opened by the relying party.
+  var returnPath = sessionStorage.getItem("ii-openid-return-path");
+  if (returnPath === null && sessionStorage.getItem("ii-openid-authorize-state") !== null) {
+    returnPath = "/authorize?flow=openid-resume";
+  }
+  if (typeof returnPath === "string" && returnPath.charAt(0) === "/" && returnPath.charAt(1) !== "/" && returnPath.charAt(1) !== "\") {
+    // Same-tab flow: stash the payload and resume in-app.
     sessionStorage.setItem("ii-openid-callback-data", JSON.stringify(data));
-    window.location.replace("/authorize?flow=openid-resume");
+    window.location.replace(returnPath);
   } else {
     // Popup flow: deliver to the tab that opened us and close.
     var channel = new BroadcastChannel("redirect_callback");
     channel.postMessage(data);
     channel.close();
+    if (window.opener !== null) {
+      try {
+        window.opener.postMessage(data, window.location.origin);
+      } catch (e) {
+        // A cross-origin or closed opener; the channel already carried it.
+      }
+    }
     window.close();
   }
 })();"#;
@@ -591,6 +616,19 @@ mod tests {
             .map(|(_, value)| value.as_str())
             .unwrap();
         assert_eq!(cache_control, "no-store");
+    }
+
+    #[test]
+    fn landing_page_script_routes_on_the_frontend_markers() {
+        // The frontend (`openIdRedirectMarkers.ts`, `openID.ts`) and this
+        // script agree on these names; a rename on one side strands the other.
+        assert!(CALLBACK_SCRIPT.contains(r#"sessionStorage.getItem("ii-openid-return-path")"#));
+        assert!(CALLBACK_SCRIPT.contains(r#"sessionStorage.getItem("ii-openid-authorize-state")"#));
+        assert!(CALLBACK_SCRIPT.contains(r#"sessionStorage.setItem("ii-openid-callback-data""#));
+        assert!(CALLBACK_SCRIPT.contains(r#"new BroadcastChannel("redirect_callback")"#));
+        assert!(CALLBACK_SCRIPT.contains("window.opener.postMessage(data, window.location.origin)"));
+        // The 1-click authorize flow keeps its own return path.
+        assert!(CALLBACK_SCRIPT.contains(r#""/authorize?flow=openid-resume""#));
     }
 
     #[test]

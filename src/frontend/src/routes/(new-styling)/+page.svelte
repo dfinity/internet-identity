@@ -31,6 +31,12 @@
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { getMetadataString } from "$lib/utils/openID";
+  import {
+    consumeOpenIdSameTabResume,
+    redirectToOpenIdInSameTab,
+    type OpenIdSameTabResume,
+  } from "$lib/utils/openIdSameTabRedirect";
+  import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
 
   const authLastUsedFlow = new AuthLastUsedFlow();
 
@@ -41,6 +47,36 @@
   let switchingToIdentity = $state<bigint>();
   let authDialogMode = $state<AuthMode>("signin");
   let inlinePickerMode = $state<AuthMode>("signin");
+
+  // --- Same-tab OpenID sign-in (Sign in with Apple on WebKit) ---
+  // The wizard leaves this page for the provider and comes back here with the
+  // callback; see `openIdSameTabRedirect.ts`. Taken before the wizard mounts
+  // (a child mounts before its parent's `onMount`), and only in the browser:
+  // this page is prerendered.
+  let pendingOpenIdResume = $state<OpenIdSameTabResume>();
+  // A callback that can't be resumed (a provider error, a CSRF mismatch) is
+  // reported once the page is up, where the toast can be shown.
+  let pendingOpenIdResumeError: unknown;
+  if (browser) {
+    try {
+      pendingOpenIdResume = consumeOpenIdSameTabResume();
+    } catch (error) {
+      pendingOpenIdResumeError = error;
+    }
+  }
+  // One-shot hand-over to whichever wizard mounts first.
+  const takeOpenIdResume = (): OpenIdSameTabResume | undefined => {
+    const resume = pendingOpenIdResume;
+    pendingOpenIdResume = undefined;
+    return resume;
+  };
+  const startOpenIdInSameTab = (config: OpenIdConfig, mode: AuthMode): void => {
+    void redirectToOpenIdInSameTab({
+      config,
+      mode,
+      returnPath: `${window.location.pathname}${window.location.search}`,
+    });
+  };
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities).sort(
@@ -180,6 +216,20 @@
     // in which case it will be tracked on the destination page.
     if (!rerouted) {
       analytics.pageView();
+    }
+    if (rerouted) {
+      return;
+    }
+    if (pendingOpenIdResumeError !== undefined) {
+      handleError(pendingOpenIdResumeError);
+      pendingOpenIdResumeError = undefined;
+    }
+    // The sign-up state renders the inline wizard, which takes the resume
+    // itself; the welcome-back state (an identity already selected) only has
+    // the wizard in its dialog, so open it to pick the sign-in back up.
+    // After hydration, so the prerendered markup is hydrated as is.
+    if (pendingOpenIdResume !== undefined && selectedIdentity !== undefined) {
+      isAuthDialogOpen = true;
     }
   });
 </script>
@@ -367,6 +417,8 @@
                 passkeyLabel={inlinePickerMode === "signin"
                   ? $t`Select a passkey`
                   : undefined}
+                openIdRedirect={startOpenIdInSameTab}
+                resumeOpenId={takeOpenIdResume}
               >
                 {#snippet children(presenting)}
                   {#if presenting === true && inlinePickerMode === "signup"}
@@ -415,6 +467,8 @@
       passkeyLabel={authDialogMode === "signin"
         ? $t`Select a passkey`
         : undefined}
+      openIdRedirect={startOpenIdInSameTab}
+      resumeOpenId={takeOpenIdResume}
     >
       {#if authDialogMode === "signup"}
         <SignUpHero />

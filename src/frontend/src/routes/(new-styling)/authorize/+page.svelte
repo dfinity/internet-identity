@@ -61,11 +61,8 @@
     DirectOpenIdEvents,
     directOpenIdFunnel,
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
-  import {
-    createRedirectURL,
-    extractIdTokenFromCallback,
-  } from "$lib/utils/openID";
-  import { sessionStore } from "$lib/stores/session.store";
+  import { extractIdTokenFromCallback } from "$lib/utils/openID";
+  import { redirectToOpenIdForAuthorize } from "./openIdRedirect";
   import {
     discoverSsoConfig,
     type SsoDiscoveryResult,
@@ -228,36 +225,7 @@
 
   /** Redirect to the OpenID provider. */
   const initiateOpenId = (config: OpenIdConfig) => {
-    directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToOpenId, {
-      openid_issuer: config.issuer,
-    });
-    const next = createRedirectURL(
-      {
-        clientId: config.client_id,
-        authURL: config.auth_uri,
-        authScope: config.auth_scope.join(" "),
-      },
-      {
-        nonce: $sessionStore.nonce,
-        mediation: "required",
-      },
-    );
-    sessionStorage.setItem(
-      "ii-pending-channel-origin",
-      $establishedChannelStore.origin,
-    );
-    // Stash the established channel's resume token so the transport can prove,
-    // on the return load, that the resume belongs to this flow (see the URL
-    // transport's resume gate).
-    sessionStorage.setItem(
-      "ii-pending-channel-resume-token",
-      $establishedChannelStore.resumeToken,
-    );
-    sessionStorage.setItem(
-      "ii-openid-authorize-state",
-      next.searchParams.get("state")!,
-    );
-    window.location.assign(next);
+    redirectToOpenIdForAuthorize(config);
   };
 
   /**
@@ -713,6 +681,7 @@
   <AuthWizardView
     onSignIn={handleAuthWizardSignIn}
     onSignUp={handleAuthWizardSignUp}
+    openIdRedirect={redirectToOpenIdForAuthorize}
     onError={handleError}
     mode="signin"
   />

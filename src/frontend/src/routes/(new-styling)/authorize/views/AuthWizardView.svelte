@@ -6,12 +6,15 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { t } from "$lib/stores/locale.store";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
+  import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     mode?: AuthMode;
+    // Forwarded to the wizard; see `AuthWizard.svelte`.
+    openIdRedirect?: (config: OpenIdConfig, mode: AuthMode) => void;
   }
 
   let {
@@ -19,6 +22,7 @@
     onSignUp,
     onError,
     mode = $bindable("both"),
+    openIdRedirect,
   }: Props = $props();
 
   // Metadata comes from the origin the identity is derived for (the app's
@@ -41,6 +45,7 @@
   {onError}
   bind:mode
   ssoOrigin={$authorizationStore?.effectiveOrigin}
+  {openIdRedirect}
 >
   <AuthorizeHeader origin={$establishedChannelStore.origin} {metadataOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
