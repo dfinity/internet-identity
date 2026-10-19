@@ -4,7 +4,6 @@
   import ImageIcon from "@lucide/svelte/icons/image";
   import Volume1Icon from "@lucide/svelte/icons/volume-1";
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
   import Logo from "$lib/components/ui/Logo.svelte";
   import IosPanel from "../IosPanel.svelte";
   import Step from "$lib/components/ui/browserMock/Step.svelte";
@@ -23,9 +22,6 @@
 
 <Steps>
   <Step n={1} title={$t`Open Settings`}>
-    {#snippet instruction()}
-      <Trans>Open the <b>Settings</b> app.</Trans>
-    {/snippet}
     <HomeScreenGrid label={$t`Settings`} blanks={4}>
       {#snippet icon()}
         <IosSettingsIcon width="32" height="32" class="shrink-0" />
@@ -34,9 +30,6 @@
   </Step>
 
   <Step n={2} title={$t`Open notifications`}>
-    {#snippet instruction()}
-      <Trans>Tap <b>Notifications</b>.</Trans>
-    {/snippet}
     <IosPanel>
       <div class="px-0.5 pb-2 text-[12px] font-semibold">{$t`Settings`}</div>
       <div class="flex items-center gap-2.5 px-2.5 py-2 opacity-45">
@@ -68,9 +61,6 @@
   </Step>
 
   <Step n={3} title={$t`Find ${appName}`}>
-    {#snippet instruction()}
-      <Trans>Tap <b>{appName}</b>.</Trans>
-    {/snippet}
     <IosPanel>
       <div class="px-0.5 pb-2 text-[12px] font-semibold">
         {$t`Notifications`}
@@ -123,9 +113,6 @@
   </Step>
 
   <Step n={4} title={$t`Allow notifications`}>
-    {#snippet instruction()}
-      <Trans>Turn on <b>Allow Notifications</b>.</Trans>
-    {/snippet}
     <IosPanel>
       <div class="flex items-center justify-between px-0.5 pb-2">
         <span class="text-[12px] font-semibold">{appName}</span>

@@ -2,6 +2,7 @@
   /** iOS gives a standalone web app an in-app browser view, with storage of its own, for any window opened on another origin, so `x-safari-https:` hands the link to Safari instead.
    *  It is honoured for a navigation a page makes and not for a window a service worker opens, and nothing about it is documented, so it is attempted and then offered. */
   import { onMount } from "svelte";
+  import LockIcon from "@lucide/svelte/icons/lock";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { NOTIFICATION_APP_NAME } from "../appName";
@@ -107,21 +108,7 @@
       <p
         class="text-text-tertiary flex items-center justify-center gap-2 text-sm"
       >
-        <svg
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-          class="block shrink-0"
-        >
-          <rect x="5" y="11" width="14" height="10" rx="2"></rect>
-          <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
-        </svg>
+        <LockIcon class="size-3.5 shrink-0" aria-hidden="true" />
         <Trans>Delivered securely through id.ai.</Trans>
       </p>
     </div>

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
-  import BellOffIcon from "@lucide/svelte/icons/bell-off";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
+  import LockIcon from "@lucide/svelte/icons/lock";
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
   import SmartphoneIcon from "@lucide/svelte/icons/smartphone";
   import { t } from "$lib/stores/locale.store";
@@ -117,6 +117,28 @@
     screen = await launch();
   };
 
+  /** iOS keeps a Home Screen app's page alive across a close, so coming back to it runs
+   *  nothing at all: what it decided when it was last opened is what it still shows, and
+   *  only killing the app settles it again. Returning is therefore where it asks the
+   *  canister a second time. The tab in the browser has its own watchers and its own
+   *  meaning for a return, so this is the app's alone. */
+  $effect(() => {
+    if (inTheApp !== true) {
+      return;
+    }
+    const settleAgain = () => {
+      // Mid-prompt there is an answer on its way that this would race.
+      if (document.visibilityState !== "visible" || asking) {
+        return;
+      }
+      void (async () => {
+        screen = await launch();
+      })();
+    };
+    document.addEventListener("visibilitychange", settleAgain);
+    return () => document.removeEventListener("visibilitychange", settleAgain);
+  });
+
   /** Raises the prompt, which only a gesture may do; a prompt dismissed without an answer leaves the permission at `default`. */
   /** The press is answered in the button rather than by swapping the screen: the prompt
    *  stands in front of this page, and a skeleton behind it is a screen rebuilding
@@ -152,10 +174,17 @@
   };
 
   // Only while the tab is waiting for an app to register, and only for the identity whose
-  // token brought the user here. `open-to-finish` waits for the same thing as the steps:
-  // the user has said the app is on their Home Screen and has yet to open it.
+  // token brought the user here. All three screens wait for the same thing: the steps
+  // while they are being walked, `open-to-finish` once the user has said the app is on
+  // their Home Screen, and `open-app` once it is there and the permission is what is
+  // left. Nothing else tells this tab that the app started delivering, so without it the
+  // user is left on a stale screen until they reload.
   $effect(() => {
-    if (screen.kind !== "install" && screen.kind !== "open-to-finish") {
+    if (
+      screen.kind !== "install" &&
+      screen.kind !== "open-to-finish" &&
+      screen.kind !== "open-app"
+    ) {
       return;
     }
     const identityNumber = fragmentIdentity(
@@ -173,39 +202,41 @@
     );
   });
 
-  /** Adding to the Home Screen takes the user out of this tab and brings them back, so a
-   *  return is the one hint there is that the steps have been walked. Nothing tells the
-   *  canister: it hears only when the app is opened and links, which is what the screen
-   *  this moves to asks for. The watcher above keeps running, so an app that was opened
-   *  settles on its own and never reaches this. */
-  const AWAY_LONG_ENOUGH_MS = 1_500;
+  /** Adding to the Home Screen never takes the user out of Safari: the sheet and its
+   *  dialog sit over this page. Leaving the tab and coming back to it therefore means
+   *  they went to the Home Screen and chose not to open the app, which is the one hint
+   *  there is that the steps have been walked. Nothing tells the canister, which hears
+   *  only when the app is opened and links; the watcher above keeps running, so an app
+   *  that was opened settles on its own and never reaches this. How long they were away
+   *  says nothing, so it is not asked. */
+  /** Set by the user saying the guess was wrong, which is the end of guessing: without
+   *  it the next glance at another app would throw them forward again. */
+  let theyAreStillOnTheSteps = $state(false);
 
   $effect(() => {
-    if (screen.kind !== "install") {
+    if (screen.kind !== "install" || theyAreStillOnTheSteps) {
       return;
     }
-    let leftAt: number | undefined;
+    let left = false;
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
-        leftAt = Date.now();
+        left = true;
         return;
       }
-      const away = leftAt === undefined ? 0 : Date.now() - leftAt;
-      leftAt = undefined;
-      // A glance at another app is not the share sheet: only a spell away counts, so
-      // somebody reading the steps is left on them.
-      if (away >= AWAY_LONG_ENOUGH_MS && screen.kind === "install") {
-        screen = { kind: "open-app" };
+      if (left && screen.kind === "install") {
+        screen = { kind: "open-app", guessed: true };
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   });
 
-  /** Whether the app answered the probe, which is as close to "it is there" as anything gets. */
-  let appAnswered = $state(false);
+  const backToTheSteps = () => {
+    theyAreStillOnTheSteps = true;
+    screen = { kind: "install" };
+  };
 
-  /** Taken off this browser's queue means the app is there; a record that disappears means the push service said the endpoint is gone. */
+  /** A record that disappears means the push service said the endpoint is gone. */
   $effect(() => {
     const watchingForTheApp =
       screen.kind === "open-app" ||
@@ -219,8 +250,6 @@
     if (identityNumber === null) {
       return;
     }
-    // Both screens are reachable more than once in one visit, and the last probe says nothing about the app now.
-    appAnswered = false;
     let cancelled = false;
     let stopWatching = () => {};
     void (async () => {
@@ -248,7 +277,9 @@
         case "sent":
           stopWatching = watchProbe(identityNumber, {
             since,
-            onAnswered: () => (appAnswered = true),
+            // An app that answers is still an app the user has to open for the
+            // permission, so both screens here say what they already said.
+            onAnswered: () => {},
             onGone: () => void offerAFreshInstall(),
           });
           return;
@@ -433,38 +464,55 @@
           </div>
         </div>
       {:else if screen.kind === "open-app"}
-        <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
-          <FeaturedIcon size="lg" class="mb-4 self-start">
-            <SmartphoneIcon class="size-6" aria-hidden="true" />
-          </FeaturedIcon>
-          <h1 class="text-text-primary mb-3 text-2xl font-medium">
-            <Trans>Open {NOTIFICATION_APP_NAME}</Trans>
-          </h1>
-          <p class="text-text-tertiary mb-5 text-base">
-            {#if appAnswered}
-              <Trans>
-                It's on your Home Screen and working. Open it once and
-                notifications are on for this identity.
-              </Trans>
-            {:else}
-              <Trans>
-                It's on your Home Screen. Open it once and notifications are on
-                for this identity.
-              </Trans>
-            {/if}
-          </p>
-          <div class={buttonGroup}>
-            <button class="btn btn-tertiary btn-xl" onclick={startOver}>
-              {$t`I don't have the app any more`}
-            </button>
+        <!-- The tile among the apps it was added to, asking to be tapped. What is left
+             to do differs by how this screen was reached: a guess that the steps were
+             walked, or a record that says the app has already linked. -->
+        <div class="flex min-w-0 flex-1 flex-col items-stretch">
+          <div class={centredBlock}>
+            <AppsGridMock tap />
+            <div class={centredText}>
+              <h1 class={centredHeading}>
+                {#if screen.guessed}
+                  <Trans>Open {NOTIFICATION_APP_NAME}</Trans>
+                {:else}
+                  {$t`Allow notifications`}
+                {/if}
+              </h1>
+              <p class={centredBody}>
+                {#if screen.guessed}
+                  <Trans>
+                    Open it from your Home Screen and allow notifications there.
+                  </Trans>
+                {:else}
+                  <Trans>
+                    Open {NOTIFICATION_APP_NAME} and tap Allow when it asks you.
+                  </Trans>
+                {/if}
+              </p>
+            </div>
           </div>
+          {#if screen.guessed}
+            <!-- Only the guess can be wrong, and this is the way out of it. The top
+                 padding is its own, because the block above takes what is left and on a
+                 short viewport that leaves nothing between the two. -->
+            <div class="px-4 pt-11 pb-12">
+              <button
+                class="btn btn-secondary btn-xl w-full"
+                onclick={backToTheSteps}
+              >
+                {$t`Back to the steps`}
+              </button>
+            </div>
+          {:else}
+            <div class="h-[98px]"></div>
+          {/if}
         </div>
       {:else if screen.kind === "ask"}
         <div class="flex min-w-0 flex-1 flex-col items-stretch">
           <div class={centredBlock}>
             <NotificationMock
               title={$t`OISY Wallet · Payment received`}
-              body={$t`You received 12.5 ICP.`}
+              body={$t`Tap to see it in your wallet.`}
             />
             <div class={centredText}>
               <h1 class={centredHeading}>
@@ -491,22 +539,19 @@
                 {$t`Allow notifications`}
               {/if}
             </button>
-            <p class="text-text-tertiary text-center text-sm">
-              <Trans>Only apps you allow on {host} can notify you.</Trans>
+            <p
+              class="text-text-tertiary flex items-center justify-center gap-2 text-sm"
+            >
+              <LockIcon class="size-3.5 shrink-0" aria-hidden="true" />
+              <Trans>Only apps you allow can notify you.</Trans>
             </p>
           </div>
         </div>
       {:else if screen.kind === "blocked"}
         <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
-          <FeaturedIcon size="lg" class="mb-4 self-start">
-            <BellOffIcon class="size-6" aria-hidden="true" />
-          </FeaturedIcon>
-          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+          <h1 class="text-text-primary mb-4 text-2xl font-medium">
             {$t`Notifications are blocked`}
           </h1>
-          <p class="text-text-tertiary mb-5 text-base">
-            <Trans>Follow these steps to turn them back on:</Trans>
-          </p>
           <IosAppSteps appName={NOTIFICATION_APP_NAME} />
           <div class={buttonGroup}>
             <button
@@ -559,7 +604,7 @@
               </p>
             </div>
           </div>
-          <div class="px-6 pb-12">
+          <div class="px-6 pb-6">
             <p
               class="text-text-tertiary flex h-20 items-center justify-center text-sm"
             >

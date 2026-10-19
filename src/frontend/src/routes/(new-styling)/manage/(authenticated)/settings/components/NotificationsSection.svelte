@@ -292,10 +292,7 @@
     </div>
     <p class="text-text-tertiary text-sm">
       {#if needsApp}
-        <Trans>
-          Get notified on this device when your apps need you. They arrive in
-          the app on your Home Screen.
-        </Trans>
+        <Trans>Get notified on this device when your apps need you.</Trans>
       {:else}
         <Trans>Get notified in this browser when your apps need you.</Trans>
       {/if}
