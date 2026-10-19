@@ -24,8 +24,10 @@ export type Screen =
   | { kind: "unlinked" }
   /** A browser tab the user is done with: `window.close()` did nothing, no script opened it. */
   | { kind: "closed" }
-  /** A browser tab where this browser already points at an app; iOS has no link capturing, so nothing here can open it. */
-  | { kind: "open-app" }
+  /** A browser tab where this browser already points at an app; iOS has no link capturing,
+   *  so nothing here can open it. `guessed` is the tab that was left and came back, where
+   *  nothing proves the app was added at all. */
+  | { kind: "open-app"; guessed: boolean }
   /** The app, permission still to ask for; iOS raises the prompt only from a gesture. */
   | { kind: "ask" }
   /** The app, with the permission refused. Only iOS Settings can lift it. */
@@ -102,9 +104,11 @@ const settleTheTab = async (token: LinkToken): Promise<Screen> => {
       // This tab exists to walk the install, so what it answers is about the app being
       // there. Whether this identity wants it to deliver was recorded where the user
       // said so, and nothing here reads or writes it.
+      // The record exists because the app was opened and linked, so it is on the Home
+      // Screen and the permission is what is left.
       return status.app.subscribed
         ? { kind: "ready", inTheApp: false }
-        : { kind: "open-app" };
+        : { kind: "open-app", guessed: false };
   }
 };
 
