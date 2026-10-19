@@ -7529,10 +7529,10 @@ fn an_app_key_seen_again_keeps_the_record_it_already_had() {
     let key = ByteBuf::from(vec![7u8; 91]);
 
     let first = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let again = storage
-        .notification_app_for_key(&key, 2_000)
+        .ensure_notification_app_for_key(&key, 2_000)
         .expect("reading the record back");
 
     assert_eq!(first.id, again.id);
@@ -7552,7 +7552,7 @@ fn app_ids_are_never_reissued() {
     let ids: Vec<_> = (1u8..=3)
         .map(|seed| {
             storage
-                .notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 1_000)
+                .ensure_notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 1_000)
                 .expect("creating the record")
                 .id
         })
@@ -7579,7 +7579,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     let first_key = ByteBuf::from(vec![1u8; 91]);
     let mut storage = Storage::new((1, 2), memory.clone());
     let before = storage
-        .notification_app_for_key(&first_key, 1_000)
+        .ensure_notification_app_for_key(&first_key, 1_000)
         .expect("creating the record");
 
     let mut reloaded = Storage::from_memory(memory);
@@ -7590,7 +7590,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     );
     assert_eq!(
         reloaded
-            .notification_app_for_key(&ByteBuf::from(vec![2u8; 91]), 2_000)
+            .ensure_notification_app_for_key(&ByteBuf::from(vec![2u8; 91]), 2_000)
             .expect("creating the second record")
             .id,
         1
