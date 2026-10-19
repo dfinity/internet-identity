@@ -76,7 +76,7 @@ while IFS= read -r -d '' file; do
             | /\*(?:(?!\*/).)*\*/                        # block comment
             | b?r(\#*)"(?:(?!"\1).)*"\1                  # raw string
             | b?"(?:[^"\\]|\\.)*"                        # string
-            | b?\x27(?:[^\x27\\\n][\x80-\xBF]*|\\x[0-9A-Fa-f]{2}|\\u\{[0-9A-Fa-f_]{1,6}\}|\\.)\x27   # char literal (one UTF-8 char)
+            | b?\x27(?:[^\x27\\\n][\x80-\xBF]*|\\x[0-9A-Fa-f]{2}|\\u\{[0-9A-Fa-f_]+\}|\\.)\x27   # char literal (one UTF-8 char)
         }xs;
         # View for finding attributes: every token blanked, newlines and byte
         # offsets kept.
