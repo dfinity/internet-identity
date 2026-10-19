@@ -490,6 +490,10 @@ fn set_notification_app_enabled(
         return Err(SetNotificationAppEnabledError::NoNotificationApp);
     }
 
+    let now_ns = ic_cdk::api::time();
+    // A probe carries the same event to the same device, so a switch turned on straight
+    // after one would say it twice. The probe is already on its way; this stays quiet.
+    let probe_says_it = anchor.pending_probe(browser_id, now_ns).is_some();
     anchor.set_notification_app_enabled(browser_id, request.enabled);
     let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
@@ -501,13 +505,13 @@ fn set_notification_app_enabled(
     // Only ever on: an app reads who it delivers for from the canister, so switching off
     // needs no announcement, and one posted to an entry that has just stopped delivering
     // would be dropped on its way out anyway.
-    if request.enabled {
+    if request.enabled && !probe_says_it {
         notifications::dispatch::notify_identity(
             request.anchor_number,
             browser_id,
             NotificationEvent::NotificationsOn(identity),
             notifications::dispatch::IdentityNotification::News,
-            ic_cdk::api::time(),
+            now_ns,
         );
     }
     Ok(())
