@@ -30,6 +30,8 @@
 //!
 //! - [`wire`] — RFC-derived field offsets / lengths shared across
 //!   modules. Single-use offsets live next to their function.
+//! - [`name`] — [`DnsName`], the canonical owner / signer name every
+//!   other type carries.
 //! - [`types`] — `DnsProofBundle` and friends; the canister-side
 //!   shape of the verifier's input.
 //! - [`canonical`] — canonical-form serialisation (RFC 4034 §6.2,
@@ -45,6 +47,7 @@
 #![allow(dead_code)]
 
 mod canonical;
+mod name;
 mod signature;
 #[cfg(test)]
 mod test_vectors;
@@ -54,8 +57,8 @@ pub(crate) mod wire;
 
 #[allow(unused_imports)]
 pub use types::{
-    DelegationChain, DelegationLink, DnsName, DnsProofBundle, DnssecError, Rrsig, SignedRRset,
-    VerifiedRecord, ZoneKeysMap, TYPE_DNSKEY, TYPE_DS, TYPE_TXT,
+    DelegationChain, DelegationLink, DnsName, DnsProofBundle, DnssecError, NameError, Rrsig,
+    SignedRRset, VerifiedRecord, ZoneKeysMap, TYPE_DNSKEY, TYPE_DS, TYPE_TXT,
 };
 #[allow(unused_imports)]
 pub use verify::{
