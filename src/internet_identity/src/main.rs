@@ -17,7 +17,7 @@ use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk::call;
 use ic_cdk::spawn;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::set_timer;
+use ic_cdk_timers::{set_timer, TimerId};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -51,6 +51,7 @@ use notifications::{
     ValidatedRemoveNotificationRequest, ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
@@ -1113,6 +1114,114 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
+
+    // TEMPORARY: a read-only check of whether every stored passkey made it into the passkey
+    // indices, in particular the pubkey index the #3659 migration populated. It writes
+    // nothing, and its totals are heap state, so every upgrade starts it over. Remove it
+    // once its totals have been read on mainnet.
+    init_passkey_index_audit_timer();
+}
+
+const PASSKEY_INDEX_AUDIT_BACKOFF: Duration = Duration::from_secs(1);
+
+const PASSKEY_INDEX_AUDIT_BATCH_SIZE: u64 = 2_000;
+
+/// A batch stops early past this many instructions, well below the limit of a timer
+/// execution: every key an anchor shares with another anchor costs a read of that anchor.
+const PASSKEY_INDEX_AUDIT_INSTRUCTION_BUDGET: u64 = 10_000_000_000;
+
+thread_local! {
+    static PASSKEY_INDEX_AUDIT_STATUS: RefCell<PasskeyIndexAuditStatus> = RefCell::new(PasskeyIndexAuditStatus::default());
+    static PASSKEY_INDEX_AUDIT_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Returns the totals of the passkey index audit so far, and whether it has examined every
+/// stored anchor. Only totals are exposed, never which anchors they come from.
+///
+/// The method is hidden, so it is not in `internet_identity.did`. To decode the reply, give
+/// the client this Candid interface:
+///
+/// ```candid
+/// type PasskeyIndexAuditCounts = record {
+///   indexed_to_anchor : nat64;
+///   indexed_to_other_holder : nat64;
+///   indexed_to_non_holder : nat64;
+///   not_indexed : nat64;
+/// };
+/// type PasskeyIndexAuditTotals = record {
+///   anchors : nat64;
+///   passkeys : nat64;
+///   pubkey_index : PasskeyIndexAuditCounts;
+///   credential_id_index : PasskeyIndexAuditCounts;
+///   dummy_credential_ids : nat64;
+/// };
+/// type PasskeyIndexAuditStatus = record {
+///   totals : PasskeyIndexAuditTotals;
+///   next_anchor_number : nat64;
+///   is_done : bool;
+/// };
+/// service : { passkey_index_audit_status : () -> (PasskeyIndexAuditStatus) query };
+/// ```
+#[query(hidden = true)]
+fn passkey_index_audit_status() -> PasskeyIndexAuditStatus {
+    PASSKEY_INDEX_AUDIT_STATUS.with_borrow(|status| *status)
+}
+
+fn run_passkey_index_audit_batch() {
+    let start = match PASSKEY_INDEX_AUDIT_STATUS
+        .with_borrow(|status| (!status.is_done).then_some(status.next_anchor_number))
+    {
+        Some(start) => start,
+        None => {
+            // A timer that fired after the audit finished: stop it rather than let it fire
+            // every second doing nothing.
+            clear_passkey_index_audit_timer();
+            return;
+        }
+    };
+
+    let (batch_totals, next_anchor_number) = state::storage_borrow(|storage| {
+        storage.audit_passkey_indices_batch(start, PASSKEY_INDEX_AUDIT_BATCH_SIZE, || {
+            ic_cdk::api::instruction_counter() > PASSKEY_INDEX_AUDIT_INSTRUCTION_BUDGET
+        })
+    });
+
+    let status = PASSKEY_INDEX_AUDIT_STATUS.with_borrow_mut(|status| {
+        status.totals.add(&batch_totals);
+        match next_anchor_number {
+            Some(next_anchor_number) => status.next_anchor_number = next_anchor_number,
+            None => status.is_done = true,
+        }
+        *status
+    });
+
+    if status.is_done {
+        clear_passkey_index_audit_timer();
+        ic_cdk::println!("Passkey index audit COMPLETED: {:?}", status.totals);
+    }
+}
+
+/// Stops the audit's timer and forgets its id. Does nothing where there is no id.
+fn clear_passkey_index_audit_timer() {
+    PASSKEY_INDEX_AUDIT_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(timer_id) = id_slot.take() {
+            ic_cdk_timers::clear_timer(timer_id);
+        }
+    });
+}
+
+/// Safe to call from both `init` and `post_upgrade`: with no anchors the first batch
+/// reports completion right away.
+fn init_passkey_index_audit_timer() {
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        PASSKEY_INDEX_AUDIT_BACKOFF,
+        run_passkey_index_audit_batch,
+    );
+    PASSKEY_INDEX_AUDIT_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
