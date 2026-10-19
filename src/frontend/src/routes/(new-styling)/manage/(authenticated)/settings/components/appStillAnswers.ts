@@ -16,9 +16,10 @@ const PROBE_WAIT_MS = 2 * POLL_INTERVAL_MS;
  * nothing, so an entry can say it delivers for ever while nothing is there to deliver
  * to. Only the app moving its own stamp answers.
  *
- * Says yes wherever nothing was learned. A probe that never left the canister is no
- * evidence either way, and the cost of guessing wrong is handing a second app to a
- * device that already has one.
+ * A probe the canister could not send says the entry has no wake-up address left, which
+ * is the app being gone rather than a network that might come back: queuing one makes no
+ * outcall, so there is nothing transient to wait out. Only a read that failed outright
+ * leaves the switch as it was.
  */
 export const appStillAnswers = async (
   identityNumber: bigint,
@@ -34,8 +35,10 @@ export const appStillAnswers = async (
     case "no-app":
       return false;
     case "not-sent":
+      // Nowhere to send it: the record names a subscription the push service no longer
+      // has, or none at all. Either way nothing on this device can answer.
       console.error(`the app could not be probed: ${probe.reason}`);
-      return true;
+      return false;
     case "sent":
       break;
   }

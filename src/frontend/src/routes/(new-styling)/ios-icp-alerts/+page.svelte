@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import BellIcon from "@lucide/svelte/icons/bell";
+  import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
   import BellOffIcon from "@lucide/svelte/icons/bell-off";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
@@ -477,11 +478,9 @@
             </div>
           </div>
           <div class="{actionBlock} pb-24">
-            <button
-              class="btn btn-tertiary btn-xl w-full"
-              onclick={openTheHost}
-            >
-              <Trans>Manage apps on {host}</Trans>
+            <button class="btn btn-primary btn-xl w-full" onclick={openTheHost}>
+              {$t`Manage apps`}
+              <ArrowUpRightIcon class="size-5 shrink-0" aria-hidden="true" />
             </button>
           </div>
         </div>
