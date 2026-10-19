@@ -16,6 +16,7 @@ vi.mock("$lib/utils/notifications/appStatus", () => ({
 }));
 vi.mock("./browserActor", () => ({ browserKeyActor: vi.fn() }));
 vi.mock("./turnedOff", () => ({ clearNotificationsOff: vi.fn() }));
+vi.mock("./turnOnAndProve", () => ({ turnOnAndProve: vi.fn() }));
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
   NotificationAppInfo,
@@ -30,6 +31,7 @@ import {
   type BrowserAppStatus,
 } from "$lib/utils/notifications/appStatus";
 import { claimDeviceApp } from "./deviceApp";
+import { turnOnAndProve } from "./turnOnAndProve";
 import { browserKeyActor } from "./browserActor";
 import { clearNotificationsOff } from "./turnedOff";
 
@@ -38,6 +40,7 @@ const permission = vi.mocked(requestNotificationPermission);
 const appStatus = vi.mocked(browserAppStatus);
 const claim = vi.mocked(claimDeviceApp);
 const browserActor = vi.mocked(browserKeyActor);
+const prove = vi.mocked(turnOnAndProve);
 const ORIGIN = "https://app.example";
 const IDENTITY = BigInt(10_000);
 
@@ -271,8 +274,11 @@ describe("turnOnNotifications where a Home Screen app delivers", () => {
     } as unknown as ActorSubclass<_SERVICE>);
   });
 
-  it("turns this identity's flag back on before reporting success", async () => {
+  /// `subscribed` outlives the app it names, so the switch going on is also the app
+  /// being asked to show it is still there, in the one call that does both.
+  it("turns this identity's flag back on by proving the app answers", async () => {
     appStatus.mockResolvedValue(appInfo(false));
+    prove.mockResolvedValue(true);
     const { actor, grant } = actorAnswering(ok);
 
     await expect(
@@ -285,13 +291,28 @@ describe("turnOnNotifications where a Home Screen app delivers", () => {
       }),
     ).resolves.toEqual({ status: "enabled" });
 
-    expect(setEnabled).toHaveBeenCalledWith({
-      anchor_number: IDENTITY,
-      enabled: true,
-    });
+    expect(prove).toHaveBeenCalledWith(IDENTITY);
     expect(grant).toHaveBeenCalledTimes(1);
     expect(permission).not.toHaveBeenCalled();
     expect(register).not.toHaveBeenCalled();
+  });
+
+  it("asks for the install where the app no longer answers", async () => {
+    appStatus.mockResolvedValue(appInfo(false));
+    prove.mockResolvedValue(false);
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "install-required" });
+
+    expect(grant).not.toHaveBeenCalled();
   });
 
   it("writes nothing where the app already delivers for this identity", async () => {

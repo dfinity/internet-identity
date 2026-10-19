@@ -22,6 +22,8 @@
   } from "$lib/utils/notifications/notificationState";
   import { failureMessage } from "$lib/utils/notifications/notificationDiagnostics";
   import { openPendingInstallTab } from "$lib/utils/notifications/installUrl";
+  import { turnOnAndProve } from "$lib/utils/notifications/turnOnAndProve";
+  import { replacementInstallUrl } from "./replacementInstallUrl";
   import { turnOnWithApp } from "./notificationsSwitch";
   import {
     turnOffInBrowser,
@@ -169,41 +171,54 @@
       }
     }
 
-    // Reserved before anything is awaited, because a browser allows `window.open` only
-    // inside the press itself. An app this browser already points at and that is
-    // delivering needs no tab, and that is read off the entry this page rendered rather
-    // than from a call that would have to be awaited first.
-    const tab =
-      ownApp?.subscribed === true ? undefined : openPendingInstallTab();
-    try {
+    // The tab is opened before anything is awaited, because a browser allows `window.open`
+    // only inside the press itself. An app that turns out to be there drops it again.
+    const tab = openPendingInstallTab();
+
+    // `subscribed` outlives the app it names, so an entry that says it delivers is asked
+    // to prove it. Only where the app does not answer is a new install offered.
+    if (ownApp?.subscribed === true) {
+      const checking = toaster.create({
+        type: "loading",
+        title: $t`Checking this device`,
+      });
+      let stillThere;
+      try {
+        stillThere = await turnOnAndProve(identityNumber);
+      } finally {
+        toaster.dismiss(checking);
+      }
+      if (stillThere) {
+        tab.point(undefined);
+        return true;
+      }
+      // Gone. The switch never went on, so nothing has to come back off. The record
+      // still says it delivers and nothing but the user can say otherwise, so the
+      // install is minted as the replacement it is.
+      const replacing = await replacementInstallUrl(identityNumber);
+      tab.point(replacing);
+      refusedInstallUrl = tab.opened ? undefined : replacing;
+      return false;
+    } else if (ownApp !== undefined && !ownApp.enabled) {
       // This identity's say-so is recorded the moment it is given, as turning off records
-      // it: an install started from this press finishes by carrying the flag, so leaving it
-      // until the app links would lose the answer somewhere along the way.
-      if (ownApp !== undefined && !ownApp.enabled) {
+      // it: an install started from this press finishes by carrying the flag, so leaving
+      // it until the app links would lose the answer somewhere along the way.
+      await setAppEnabled({ identityNumber, enabled: true });
+    }
+    const outcome = await turnOnWithApp({ identityNumber, ownApp });
+    if (outcome.delivering) {
+      // An app taken over from another identity links switched off, so this press is
+      // what switches it on. Nothing else on this path has written the flag.
+      if (outcome.claimed) {
         await setAppEnabled({ identityNumber, enabled: true });
       }
-      if (tab === undefined) {
-        return true;
-      }
-      const outcome = await turnOnWithApp({ identityNumber, ownApp });
-      if (outcome.delivering) {
-        tab.point(undefined);
-        // A claim carries whatever answer the browser it came from had given, so a
-        // reference it moves here can arrive switched off. This press is a yes.
-        if (ownApp === undefined) {
-          await setAppEnabled({ identityNumber, enabled: true });
-        }
-        return true;
-      }
-      tab.point(outcome.installUrl);
-      // A tab the browser refused is not a failure: the link goes on the section.
-      refusedInstallUrl = tab.opened ? undefined : outcome.installUrl;
-      return false;
-    } catch (error) {
-      // A tab left on the placeholder is one nothing ever closes.
-      tab?.point(undefined);
-      throw error;
+      tab.point(undefined);
+      return true;
     }
+    tab.point(outcome.installUrl);
+    // A tab the browser refused is not a failure: the link goes on the section.
+    refusedInstallUrl = tab.opened ? undefined : outcome.installUrl;
+    return false;
   };
 
   const handleToggle = (event: Event) => {
@@ -269,10 +284,7 @@
     </div>
     <p class="text-text-tertiary text-sm">
       {#if needsApp}
-        <Trans>
-          Get notified on this device when your apps need you. They arrive in
-          the app on your Home Screen.
-        </Trans>
+        <Trans>Get notified on this device when your apps need you.</Trans>
       {:else}
         <Trans>Get notified in this browser when your apps need you.</Trans>
       {/if}

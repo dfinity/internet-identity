@@ -16,6 +16,9 @@ export interface NotificationConsentContext {
   consented: boolean;
   /** Whether answering sends the user to install the Home Screen app, because this browser has no prompt to raise. */
   installFirst: boolean;
+  /** Whether the resolution pointed this browser at the device's app, which is its own
+   *  evidence that the app is there and so needs no proving. */
+  justClaimed: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();

@@ -177,6 +177,9 @@ export type OptInResolution =
       consented: boolean;
       /** Whether answering installs the Home Screen app rather than asking this browser. */
       installFirst: boolean;
+      /** Whether this browser's entry was pointed at the device's app by this very
+       *  resolution, which is its own evidence that the app is there. */
+      justClaimed: boolean;
     };
 
 /**
@@ -219,7 +222,7 @@ export const resolveOptIn = async ({
   const screen = resolveOptInScreen(state, consented);
   return screen === "skip"
     ? { screen, granted: consented && deliversHere(state) }
-    : { screen, state, consented, installFirst: false };
+    : { screen, state, consented, installFirst: false, justClaimed: false };
 };
 
 /** An app another identity here already has is pointed at rather than installed again, but only where the canister says there is no app. */
@@ -240,14 +243,26 @@ const resolveAppOptIn = async (
       // Nothing was learned, so nothing is decided; an install is offered only once an answer says there is no app.
       console.error(`the app could not be read: ${status.reason}`);
       const state = asAppState(undefined);
-      return { screen: "enable", state, consented, installFirst: false };
+      return {
+        screen: "enable",
+        state,
+        consented,
+        installFirst: false,
+        justClaimed: false,
+      };
     }
     case "no-app": {
       if (claim === "indeterminate") {
         // Nothing was asked of any donor, so this is not an answer that there is no app
         // here: offering the install would hand a second one to a device that has one.
         const state = asAppState(undefined);
-        return { screen: "enable", state, consented, installFirst: false };
+        return {
+          screen: "enable",
+          state,
+          consented,
+          installFirst: false,
+          justClaimed: false,
+        };
       }
       // The canister records which browser points at an app, so a second browser on the same phone finds none of its own and would keep asking.
       if (consented && (await saidAlreadyInstalled(identityNumber))) {
@@ -261,20 +276,33 @@ const resolveAppOptIn = async (
         // Their word is about the app, not about this dapp: somebody who has the app
         // and has not allowed this one still has a question to answer.
         installFirst: !(await saidAlreadyInstalled(identityNumber)),
+        justClaimed: false,
       };
     }
     case "awaiting-install": {
       // An install this browser handed a key to and nobody has opened: nothing delivers
       // yet, and the steps are where the user is told to open it.
       const state = asAppState(undefined);
-      return { screen: "enable", state, consented, installFirst: true };
+      return {
+        screen: "enable",
+        state,
+        consented,
+        installFirst: true,
+        justClaimed: false,
+      };
     }
     case "app": {
       const state = asAppState(status.app);
       const screen = resolveOptInScreen(state, consented);
       return screen === "skip"
         ? { screen, granted: consented && deliversHere(state) }
-        : { screen, state, consented, installFirst: !status.app.subscribed };
+        : {
+            screen,
+            state,
+            consented,
+            installFirst: !status.app.subscribed,
+            justClaimed: claim === "claimed",
+          };
     }
   }
 };
