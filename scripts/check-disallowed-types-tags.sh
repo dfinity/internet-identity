@@ -96,10 +96,16 @@ while IFS= read -r -d '' file; do
             my $hit = 0;
             # Every allow/expect list inside it (parentheses balanced).
             while ($attr =~ /\b(?:r\#)?(?:allow|expect)\s*(\((?:[^()]++|(?1))*\))/gs) {
-                my $list = $1;
-                $hit = 1 if $list =~ /(?<![\w:])(?:(?:r\#)?clippy\s*::\s*)?(?:r\#)?(?:disallowed_types?|style|all)\b/;
-                $hit = 1 if $list =~ /(?<![\w:])(?:r\#)?(?:clippy_(?:style|all)|warnings)\b/;
-                $hit = 1 if $list =~ /\$\w+/;
+                # Each comma-separated item as a whole path, with whitespace
+                # (comments are already blanked) and raw-identifier prefixes
+                # removed, so `rustdoc :: all` is not mistaken for bare `all`.
+                for my $item (split /,/, substr($1, 1, -1)) {
+                    (my $path = $item) =~ s/\s+//g;
+                    $path =~ s/r#//g;
+                    $hit = 1 if $path =~ /^(?:clippy::)?(?:disallowed_types?|style|all)$/;
+                    $hit = 1 if $path =~ /^(?:clippy_(?:style|all)|warnings)$/;
+                    $hit = 1 if $item =~ /\$/;
+                }
             }
             next unless $hit;
             my $line = 1 + (substr($code, 0, $start) =~ tr/\n//);
