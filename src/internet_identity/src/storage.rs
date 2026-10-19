@@ -4740,9 +4740,9 @@ pub struct CreateSessionParams {
 /// Whether this entry points at `app_id` with delivery switched off, which is this
 /// identity's answer about this device rather than about the record carrying it.
 fn delivery_switched_off(browser: &Browser, app_id: NotificationAppId) -> bool {
-    browser.notification_app.is_some_and(|reference| {
-        reference.linked_app() == Some(app_id) && !reference.delivers()
-    })
+    browser
+        .notification_app
+        .is_some_and(|reference| reference.linked_app() == Some(app_id) && !reference.delivers())
 }
 
 fn points_at_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {

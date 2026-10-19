@@ -1004,7 +1004,17 @@ impl Anchor {
     /// Pointing at the record this browser already points at changes nothing, switch
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
-    pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
+    ///
+    /// `delivers_when_new` is what a first link means for this identity. Completing an
+    /// install is the user asking for delivery, so it links on; taking over an app
+    /// another identity installed is not, so it links off and the switch is theirs to
+    /// flip.
+    pub fn point_at_notification_app(
+        &mut self,
+        browser_id: BrowserId,
+        app_id: NotificationAppId,
+        delivers_when_new: bool,
+    ) {
         let Some(index) = self
             .browsers
             .iter()
@@ -1021,7 +1031,7 @@ impl Anchor {
         // Whether this identity wants the app to deliver is the user's answer about the
         // app, not about whichever entry happens to hold the reference, so a rotation
         // that moves it between this identity's browsers carries their answer along. A
-        // first link has nobody to carry it from and starts on.
+        // first link has nobody to carry it from and takes what the caller says it means.
         let enabled = self
             .browsers
             .iter()
@@ -1032,7 +1042,7 @@ impl Anchor {
                 }) if held == app_id => Some(enabled),
                 _ => None,
             })
-            .unwrap_or(true);
+            .unwrap_or(delivers_when_new);
         for browser in &mut self.browsers {
             // Every OTHER entry lets go, never this one: the entry being pointed is what
             // the check above reads, and stripping it here would make re-pointing at the

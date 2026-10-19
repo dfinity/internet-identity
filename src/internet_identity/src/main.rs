@@ -491,11 +491,26 @@ fn set_notification_app_enabled(
     }
 
     anchor.set_notification_app_enabled(browser_id, request.enabled);
+    let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
         storage.write(anchor).map_err(|err| {
             SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))
         })
-    })
+    })?;
+
+    // Only ever on: an app reads who it delivers for from the canister, so switching off
+    // needs no announcement, and one posted to an entry that has just stopped delivering
+    // would be dropped on its way out anyway.
+    if request.enabled {
+        notifications::dispatch::notify_identity(
+            request.anchor_number,
+            browser_id,
+            NotificationEvent::NotificationsOn(identity),
+            notifications::dispatch::IdentityNotification::News,
+            ic_cdk::api::time(),
+        );
+    }
+    Ok(())
 }
 
 /// An empty pending probe says only that the entry is no longer queued; `last_seen_ns` is
@@ -560,7 +575,10 @@ mod claim_token_expiry {
     #[test]
     fn an_expiry_is_claimable_up_to_and_including_the_ceiling() {
         assert!(claim_token_expiry_in_range(NOW + 1, NOW));
-        assert!(claim_token_expiry_in_range(NOW + CLAIM_TOKEN_LIFETIME_NS, NOW));
+        assert!(claim_token_expiry_in_range(
+            NOW + CLAIM_TOKEN_LIFETIME_NS,
+            NOW
+        ));
     }
 
     #[test]
@@ -622,21 +640,16 @@ fn claim_notification_app(
         return Ok(());
     }
 
-    anchor.point_at_notification_app(browser_id, app_id);
-    let identity = identity_for_notification(&anchor);
+    // Taking over an app another identity installed is not this identity asking for
+    // delivery: the switch starts off and the opt-in screen is where they answer. The
+    // app is told when that answer comes, by `set_notification_app_enabled`, because
+    // until then there is no delivery to announce.
+    anchor.point_at_notification_app(browser_id, app_id, false);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
             .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
     })?;
-
-    notifications::dispatch::notify_identity(
-        request.anchor_number,
-        browser_id,
-        NotificationEvent::NotificationsOn(identity),
-        notifications::dispatch::IdentityNotification::News,
-        ic_cdk::api::time(),
-    );
     Ok(())
 }
 
@@ -685,7 +698,7 @@ fn link_notification_app(
         storage.notification_app_for_key(&request.app_key, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
-    anchor.point_at_notification_app(installing_browser, app.id);
+    anchor.point_at_notification_app(installing_browser, app.id, true);
 
     state::storage_borrow_mut(|storage| {
         let Err(err) = storage.write(anchor) else {
