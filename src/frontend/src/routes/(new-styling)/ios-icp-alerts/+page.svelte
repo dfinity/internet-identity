@@ -358,12 +358,9 @@
               </Trans>
             </p>
           {:else}
-            <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            <h1 class="text-text-primary mb-4 text-2xl font-medium">
               <Trans>Set up {NOTIFICATION_APP_NAME}</Trans>
             </h1>
-            <p class="text-text-tertiary mb-5 text-base">
-              <Trans>Follow these steps to get notifications:</Trans>
-            </p>
           {/if}
           <SafariIosSteps {host} />
 
