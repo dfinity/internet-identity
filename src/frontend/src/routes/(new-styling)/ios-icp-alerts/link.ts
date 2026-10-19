@@ -35,7 +35,11 @@ const refusal = (
   switch (error.type) {
     case "NoPendingLink":
       return { status: "token-refused", reason };
+    // Both are this app's own key being one the canister will not take, which only a
+    // fresh install mints another of: a key already spoken for, and one that is not the
+    // single encoding WebCrypto emits.
     case "KeyAlreadyInUse":
+    case "InvalidAppKey":
       return { status: "key-refused", reason };
     case "InternalCanisterError":
       return { status: "failed", reason };
