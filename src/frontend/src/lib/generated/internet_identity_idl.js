@@ -884,6 +884,7 @@ export const idlFactory = ({ IDL }) => {
     'origin' : IDL.Opt(IDL.Text),
     'salt' : Salt,
     'discovery_domain' : IDL.Opt(IDL.Text),
+    'apple_full_name' : IDL.Opt(IDL.Text),
   });
   const OpenIdPrepareDelegationResponse = IDL.Record({
     'user_key' : UserKey,
@@ -1621,7 +1622,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'openid_credential_add' : IDL.Func(
-        [IdentityNumber, JWT, Salt, IDL.Opt(IDL.Text)],
+        [IdentityNumber, JWT, Salt, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
         [
           IDL.Variant({
             'Ok' : IDL.Null,
@@ -1659,7 +1660,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'openid_prepare_delegation' : IDL.Func(
-        [JWT, Salt, SessionKey, IDL.Opt(IDL.Text)],
+        [JWT, Salt, SessionKey, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
         [
           IDL.Variant({
             'Ok' : OpenIdPrepareDelegationResponse,

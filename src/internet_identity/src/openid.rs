@@ -48,6 +48,13 @@ pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
 
+/// Apple's issuer. Apple keeps the user's name out of its ID tokens: it sends
+/// it only with the user's first authorization of II, in the `user` field of
+/// the authorization response, beside the token rather than signed in it.
+///
+/// See https://developer.apple.com/documentation/signinwithapple/request-an-authorization-to-the-sign-in-with-apple-server#Handle-the-response
+const APPLE_ISSUER: &str = "https://appleid.apple.com";
+
 #[derive(PartialEq, Eq, CandidType, Deserialize, Clone, Debug)]
 pub enum OpenIDJWTVerificationError {
     GenericError(String),
@@ -224,6 +231,33 @@ impl OpenIdCredential {
 
     pub fn get_email(&self) -> Option<String> {
         self.read_metadata_string("email")
+    }
+
+    /// Give an Apple credential the user's name, which Apple sends beside its
+    /// ID token instead of in it (see [`APPLE_ISSUER`]). `full_name` is the
+    /// name the client got with this token, or the one stored from an earlier
+    /// sign-in, since Apple sends it only once.
+    ///
+    /// The name is not signed, but it is no less the user's own than Google's
+    /// or Microsoft's: Apple lets the user edit it before sharing it.
+    ///
+    /// Leaves the credential as it is for any other provider, whose name comes
+    /// from the token; when the token has a name after all; and when
+    /// `full_name` is blank or longer than a token's name may be.
+    pub fn set_apple_full_name(&mut self, full_name: Option<String>) {
+        if self.config_issuer().as_deref() != Some(APPLE_ISSUER) || self.get_name().is_some() {
+            return;
+        }
+        let Some(full_name) = full_name
+            .map(|full_name| full_name.trim().to_string())
+            .filter(|full_name| {
+                !full_name.is_empty() && full_name.len() <= verify::MAX_NAME_LENGTH
+            })
+        else {
+            return;
+        };
+        self.metadata
+            .insert("name".into(), MetadataEntryV2::String(full_name));
     }
 
     fn get_google_verified_email(&self) -> Option<String> {
@@ -684,6 +718,110 @@ mod tests {
                 "Failed to decode JWT".to_string()
             ))
         );
+    }
+
+    mod apple_full_name {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        const APPLE_AUD: &str = "ai.id.auth";
+
+        fn setup_providers() {
+            configured::clear_for_test();
+            configured::setup_for_test(google_config(), vec![]);
+            configured::setup_for_test(
+                OpenIdConfig {
+                    name: "Apple".to_string(),
+                    issuer: APPLE_ISSUER.to_string(),
+                    client_id: APPLE_AUD.to_string(),
+                    jwks_uri: "https://appleid.apple.com/auth/keys".to_string(),
+                    auth_uri: "https://appleid.apple.com/auth/authorize".to_string(),
+                    auth_scope: vec!["openid".into(), "email".into(), "name".into()],
+                    fedcm_uri: None,
+                    ..google_config()
+                },
+                vec![],
+            );
+        }
+
+        fn credential(iss: &str, aud: &str, name: Option<&str>) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: iss.to_string(),
+                sub: "user-sub".to_string(),
+                aud: aud.to_string(),
+                last_usage_timestamp: None,
+                metadata: name
+                    .map(|name| {
+                        (
+                            "name".to_string(),
+                            MetadataEntryV2::String(name.to_string()),
+                        )
+                    })
+                    .into_iter()
+                    .collect(),
+                sso_domain: None,
+                sso_name: None,
+                stable_id: None,
+            }
+        }
+
+        fn apple_credential() -> OpenIdCredential {
+            credential(APPLE_ISSUER, APPLE_AUD, None)
+        }
+
+        #[test]
+        fn should_give_an_apple_credential_the_full_name() {
+            setup_providers();
+            let mut credential = apple_credential();
+            credential.set_apple_full_name(Some("  Jane Appleseed ".to_string()));
+            assert_eq!(credential.get_name(), Some("Jane Appleseed".to_string()));
+        }
+
+        #[test]
+        fn should_ignore_the_full_name_for_other_providers() {
+            setup_providers();
+            let mut google = credential("https://accounts.google.com", TEST_AUD, None);
+            google.set_apple_full_name(Some("Jane Appleseed".to_string()));
+            assert_eq!(google.get_name(), None);
+
+            // An SSO credential never takes it either, even with Apple's issuer.
+            let mut sso = OpenIdCredential {
+                sso_domain: Some(Domain::try_from("example.org").unwrap()),
+                ..apple_credential()
+            };
+            sso.set_apple_full_name(Some("Jane Appleseed".to_string()));
+            assert_eq!(sso.get_name(), None);
+        }
+
+        #[test]
+        fn should_keep_a_name_from_the_token() {
+            setup_providers();
+            let mut credential = credential(APPLE_ISSUER, APPLE_AUD, Some("Signed Name"));
+            credential.set_apple_full_name(Some("Jane Appleseed".to_string()));
+            assert_eq!(credential.get_name(), Some("Signed Name".to_string()));
+        }
+
+        #[test]
+        fn should_ignore_a_blank_or_too_long_full_name() {
+            setup_providers();
+            for full_name in [
+                None,
+                Some(String::new()),
+                Some(" \t".to_string()),
+                Some("a".repeat(verify::MAX_NAME_LENGTH + 1)),
+            ] {
+                let mut credential = apple_credential();
+                credential.set_apple_full_name(full_name.clone());
+                assert_eq!(credential.get_name(), None, "for {full_name:?}");
+            }
+
+            let mut credential = apple_credential();
+            credential.set_apple_full_name(Some("a".repeat(verify::MAX_NAME_LENGTH)));
+            assert_eq!(
+                credential.get_name(),
+                Some("a".repeat(verify::MAX_NAME_LENGTH))
+            );
+        }
     }
 
     #[test]
