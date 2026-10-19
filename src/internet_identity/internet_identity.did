@@ -2135,6 +2135,26 @@ type ProbeNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
+// Switches delivery on for this identity and asks the app to prove it is still there,
+// in one call. A reference that is off is skipped when the canister picks who to send
+// to, so the two cannot be separated: probing first would find nothing to wake, and
+// switching on first would announce it and then say the same thing again on the probe.
+// The probe is the announcement. Where nothing can be woken the switch does not stay on.
+type TurnOnNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type TurnOnNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app.
+    NoNotificationApp;
+    // Nothing could be woken, so nothing was switched on: the app has registered
+    // nothing, the browser counts as gone, or there was no room for another outcall.
+    NotReachable;
+    InternalCanisterError : text;
+};
+
 // Null once nothing is left to show.
 type GetNextNotificationResponse = record {
     notification : opt NotificationToShow;
@@ -2704,6 +2724,7 @@ service : (opt InternetIdentityInit) -> {
     // Called by the browser, which watches for the answer leaving its own queue: that
     // is what says the app this browser points at is still installed.
     probe_notification_app : (ProbeNotificationAppRequest) -> (variant { Ok : NotificationId; Err : ProbeNotificationAppError });
+    turn_on_notification_app : (TurnOnNotificationAppRequest) -> (variant { Ok : NotificationId; Err : TurnOnNotificationAppError });
 
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 

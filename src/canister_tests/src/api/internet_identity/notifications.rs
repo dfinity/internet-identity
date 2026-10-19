@@ -15,7 +15,8 @@ use internet_identity_interface::internet_identity::types::{
     RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
     RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
     SetNotificationAppEnabledError, SetNotificationAppEnabledRequest, SetWebPushSubscriptionError,
-    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    SetWebPushSubscriptionRequest, TurnOnNotificationAppError, TurnOnNotificationAppRequest,
+    WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -310,6 +311,23 @@ pub fn set_notification_app_enabled(
         RawEffectivePrincipal::None,
         sender,
         "set_notification_app_enabled",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn turn_on_notification_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: TurnOnNotificationAppRequest,
+) -> Result<Result<NotificationId, TurnOnNotificationAppError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "turn_on_notification_app",
         (request,),
     )
     .map(|(x,)| x)
