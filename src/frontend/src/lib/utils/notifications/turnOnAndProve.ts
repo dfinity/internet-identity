@@ -3,6 +3,7 @@ import {
   browserAppStatus,
   turnOnApp,
 } from "$lib/utils/notifications/appStatus";
+import { setAppEnabled } from "./appEnabled";
 import { watchProbe } from "../../../routes/(new-styling)/ios-icp-alerts/watchInstall";
 
 /** Two polls. Nothing tells a canister that a Home Screen app was deleted, so the only
@@ -21,8 +22,10 @@ const PROBE_WAIT_MS = 2 * POLL_INTERVAL_MS;
  *
  * A probe the canister could not send says the entry has no wake-up address left, which
  * is the app being gone rather than a network that might come back: queuing one makes no
- * outcall, so there is nothing transient to wait out. The switch is left off in that
- * case, so a false answer needs nothing undone.
+ * outcall, so there is nothing transient to wait out, and the canister leaves the switch
+ * off. A probe it did send and nothing answered is the other way an app turns out to be
+ * gone, and there the switch did go on: it comes back off here, because an entry that
+ * delivers for nobody must not read as delivering.
  */
 export const turnOnAndProve = async (
   identityNumber: bigint,
@@ -46,7 +49,7 @@ export const turnOnAndProve = async (
       break;
   }
 
-  return new Promise<boolean>((resolve) => {
+  const answered = await new Promise<boolean>((resolve) => {
     const settle = (answer: boolean) => {
       clearTimeout(timer);
       stop();
@@ -59,4 +62,9 @@ export const turnOnAndProve = async (
     });
     const timer = setTimeout(() => settle(false), PROBE_WAIT_MS);
   });
+
+  if (!answered) {
+    await setAppEnabled({ identityNumber, enabled: false });
+  }
+  return answered;
 };

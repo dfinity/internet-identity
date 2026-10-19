@@ -236,12 +236,17 @@
     screen = { kind: "install" };
   };
 
+  /** A probe is a notification the device shows, so this tab sends at most one. Finishing
+   *  an install walks both of the screens below, as the app links and then registers, and
+   *  a probe on each says the same thing to the same device twice. */
+  let probedAlready = false;
+
   /** A record that disappears means the push service said the endpoint is gone. */
   $effect(() => {
     const watchingForTheApp =
       screen.kind === "open-app" ||
       (screen.kind === "ready" && !screen.inTheApp);
-    if (!watchingForTheApp) {
+    if (!watchingForTheApp || probedAlready) {
       return;
     }
     const identityNumber = fragmentIdentity(
@@ -250,6 +255,7 @@
     if (identityNumber === null) {
       return;
     }
+    probedAlready = true;
     let cancelled = false;
     let stopWatching = () => {};
     void (async () => {

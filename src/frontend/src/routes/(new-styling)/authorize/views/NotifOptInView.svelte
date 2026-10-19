@@ -6,7 +6,6 @@
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
-  import NotifInstallHandoff from "./NotifInstallHandoff.svelte";
   import { startAppInstall } from "./notifInstall";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import {
@@ -67,21 +66,24 @@
   // Always opens on the ask, so the unblock guidance is only ever reached by asking
   // and being refused, with the reason for the question already on screen. A new
   // request arrives as a new context, which remounts this component.
-  let variant = $state<"enable" | "blocked" | "handoff">("enable");
+  let variant = $state<"enable" | "blocked">("enable");
 
   /** Whether answering installs the app rather than claiming the one this device has. Moves only one way: a claim that finds nothing published leaves the install as what is left. */
   let needsInstall = $state(installFirst);
 
-  /** Where the install lives, for the handoff behind a tab the browser would not open. */
-  let installUrl = $state<string | undefined>(undefined);
-
-  /** The consent this press records, which the handoff waits on before it settles sign-in. */
+  /** The consent this press records, awaited before sign-in hands back so a grant still in flight would not have the app told no. */
   let granting = $state<Promise<void> | undefined>(undefined);
 
   /** True while a press is still doing what it started. */
   let busy = $state(false);
 
-  /** Sign-in settles when the user leaves the handoff rather than here: this screen is rendered only while sign-in is unsettled. */
+  /** The steps are walked in a tab of their own and this one settles sign-in behind
+   *  them, so the press leaves nothing else on screen.
+   *
+   *  Settling is what hands sign-in back, which takes this page with it, and the tab
+   *  that was opened is pointed at the install from here: settling first would tear the
+   *  page down with the URL still being minted and leave that tab on its placeholder for
+   *  good. So the mint is waited for, and only the handing back comes after it. */
   const startInstall = () => {
     if (busy) {
       return;
@@ -94,17 +96,10 @@
       consented,
     });
     granting = started.granted;
-    variant = "handoff";
-    // The button is held until the token settles, which is also when the handoff has a link to offer.
+    // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
     void started.url.then(
-      (signed) => {
-        installUrl = signed;
-        busy = false;
-      },
-      (error: unknown) => {
-        console.error(error);
-        busy = false;
-      },
+      () => settleSignIn(),
+      () => settleSignIn(),
     );
   };
 
@@ -130,11 +125,7 @@
   };
 
   /** The app is told whether it may notify this identity as sign-in hands back, so a grant still in flight would have it told no. */
-  const finishInstall = async (): Promise<void> => {
-    if (busy) {
-      return;
-    }
-    busy = true;
+  const settleSignIn = async (): Promise<void> => {
     try {
       await granting;
       clearFailure();
@@ -252,8 +243,6 @@
     onEnable={needsInstall ? startInstall : () => void runEnable(device)}
     onSkip={() => onDone()}
   />
-{:else if variant === "handoff"}
-  <NotifInstallHandoff url={installUrl} onDone={() => void finishInstall()} />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
        app that asked, and the design gives it the panel to itself. -->

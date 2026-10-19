@@ -8,7 +8,7 @@ import {
 
 /** What pressing Allow on the install screen started. */
 export interface StartedInstall {
-  /** The consent this press records, held rather than awaited because sign-in is settled on the screen after this one. */
+  /** The consent this press records, held rather than awaited because the steps are walked in a tab of their own. */
   granted: Promise<void>;
   /** Where the install lives, once there is a token to point at it. */
   url: Promise<string | undefined>;
@@ -33,7 +33,7 @@ export const startAppInstall = ({
   const granted = consented
     ? Promise.resolve()
     : allowApp({ identityNumber, origin, actor });
-  // Nothing awaits this until the user leaves the handoff, and an unattached rejection in between is an unhandled rejection.
+  // Nothing awaits this until sign-in settles, and an unattached rejection in between is an unhandled rejection.
   void granted.catch(() => undefined);
 
   const url = installUrlOrNone(identityNumber);

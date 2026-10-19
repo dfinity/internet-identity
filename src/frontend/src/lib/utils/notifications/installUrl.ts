@@ -1,7 +1,10 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { throwCanisterError } from "$lib/utils/utils";
+import type {
+  _SERVICE,
+  PrepareNotificationAppLinkError,
+} from "$lib/generated/internet_identity_types";
+import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
@@ -66,6 +69,24 @@ export const installUrlOrNone = async (
       replacingExisting: false,
     });
   } catch (error) {
+    // A record that says it delivers refuses an ordinary install, which is what keeps a
+    // second app off a device that already has one. Reaching this screen means the app
+    // it names did not answer, so the record outlived the app and the install that
+    // replaces it is the one to mint.
+    if (
+      isCanisterError<PrepareNotificationAppLinkError>(error) &&
+      error.type === "AppAlreadyDelivering"
+    ) {
+      try {
+        return await prepareInstallUrl({
+          identityNumber,
+          replacingExisting: true,
+        });
+      } catch (replacing) {
+        console.error(replacing);
+        return undefined;
+      }
+    }
     console.error(error);
     return undefined;
   }
