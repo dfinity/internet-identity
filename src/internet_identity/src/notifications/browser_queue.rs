@@ -463,7 +463,7 @@ mod tests {
             .id;
         let app_id = storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&ByteBuf::from(vec![9u8; 91]), 0)
+                .ensure_notification_app_for_key(&ByteBuf::from(vec![9u8; 91]), 0)
                 .expect("creating the app record");
             storage.set_notification_app_subscription(
                 app.id,
@@ -534,18 +534,22 @@ mod tests {
         let (anchor_number, browser_id, left_behind) = routed_through_an_app();
         // Another identity keeps the record alive after this entry moves off it.
         storage_borrow_mut(|storage| {
-            let other = storage.allocate_anchor(0).expect("allocating a second anchor");
+            let other = storage
+                .allocate_anchor(0)
+                .expect("allocating a second anchor");
             let other_number = other.anchor_number();
             storage.write(other).expect("writing the second anchor");
             storage.sign_in_for_testing(other_number, &ORIGIN.to_string());
             let mut stored = storage.read(other_number).expect("reading it back");
             let other_browser = stored.browsers().first().expect("a browser").id;
             stored.point_at_notification_app(other_browser, left_behind);
-            storage.write(stored).expect("pointing the second identity at the app");
+            storage
+                .write(stored)
+                .expect("pointing the second identity at the app");
         });
         let moved_to = storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 0)
+                .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 0)
                 .expect("creating the second app record");
             storage.set_notification_app_subscription(
                 app.id,
