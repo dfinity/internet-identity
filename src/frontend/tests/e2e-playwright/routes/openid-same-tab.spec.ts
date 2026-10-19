@@ -95,40 +95,6 @@ test.describe("OpenID sign-in in the same tab", () => {
   });
 });
 
-test.describe("Authorize with OpenID in the same tab", () => {
-  const name = "Same Tab";
-
-  test.use({
-    openIdConfig: {
-      createUsers: [
-        {
-          claims: { name },
-        },
-      ],
-    },
-    authorizeConfig: {
-      protocol: "icrc25",
-    },
-  });
-
-  test.beforeEach(async ({ page }) => {
-    await forceSameTabRedirect(page);
-  });
-
-  test.afterEach(({ authorizedPrincipal }) => {
-    expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-  });
-
-  test("the wizard's provider button takes the 1-click round trip", async ({
-    authorizePage,
-    signInWithOpenId,
-    openIdUsers,
-  }) => {
-    // The II page itself goes to the IdP and comes back through the 1-click
-    // resume, which signs up a fresh OpenID user and authorizes the dapp.
-    await authorizePage.page
-      .getByRole("button", { name: openIdUsers[0].issuer.name })
-      .click();
-    await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-  });
-});
+// The dapp-authorize surface still uses the popup for OpenID, so same-tab in
+// that flow is out of scope for this change and covered by a follow-up. The
+// 1-click `?openid=` redirect flow keeps its own e2e coverage elsewhere.

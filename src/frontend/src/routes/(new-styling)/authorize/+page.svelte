@@ -681,7 +681,6 @@
   <AuthWizardView
     onSignIn={handleAuthWizardSignIn}
     onSignUp={handleAuthWizardSignUp}
-    openIdRedirect={redirectToOpenIdForAuthorize}
     onError={handleError}
     mode="signin"
   />

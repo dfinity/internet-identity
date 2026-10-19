@@ -224,11 +224,13 @@
       handleError(pendingOpenIdResumeError);
       pendingOpenIdResumeError = undefined;
     }
-    // The sign-up state renders the inline wizard, which takes the resume
-    // itself; the welcome-back state (an identity already selected) only has
-    // the wizard in its dialog, so open it to pick the sign-in back up.
-    // After hydration, so the prerendered markup is hydrated as is.
-    if (pendingOpenIdResume !== undefined && selectedIdentity !== undefined) {
+    // A same-tab sign-in coming back is always resumed in the dialog, never
+    // the inline picker: completing it registers the identity, which flips
+    // the page from the sign-up layout to the welcome-back one and would
+    // unmount an inline wizard mid-flight (stranding the user on "/" instead
+    // of reaching /manage). The dialog stays mounted across that change.
+    // Opened after hydration so the prerendered markup is hydrated as is.
+    if (pendingOpenIdResume !== undefined) {
       isAuthDialogOpen = true;
     }
   });
@@ -418,7 +420,6 @@
                   ? $t`Select a passkey`
                   : undefined}
                 openIdRedirect={startOpenIdInSameTab}
-                resumeOpenId={takeOpenIdResume}
               >
                 {#snippet children(presenting)}
                   {#if presenting === true && inlinePickerMode === "signup"}

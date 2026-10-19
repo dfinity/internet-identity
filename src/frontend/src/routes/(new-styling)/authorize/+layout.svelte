@@ -30,7 +30,6 @@
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
-  import { redirectToOpenIdForAuthorize } from "./openIdRedirect";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
@@ -372,7 +371,6 @@
                 passkeyLabel={authDialogMode === "signin"
                   ? $t`Select a passkey`
                   : undefined}
-                openIdRedirect={redirectToOpenIdForAuthorize}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
