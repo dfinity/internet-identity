@@ -969,6 +969,10 @@ type OpenIDRegFinishArg = record {
     discovery_domain : opt text;
     // Target dapp origin, set only for a first gated SSO login.
     origin : opt text;
+    // The user's name that Apple sent beside the JWT, in the authorization
+    // response of the user's first sign-in; Apple keeps it out of the JWT.
+    // Ignored for any other provider.
+    apple_full_name : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -2136,14 +2140,20 @@ service : (opt InternetIdentityInit) -> {
     // OpenID credentials protocol
     // ===========================
     openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Pending; Err : IdRegFinishError });
-    // The trailing `opt text` is the SSO discovery domain (null for a direct
-    // provider). For SSO sign-ins a cold discovery/JWKS cache yields the
-    // `Pending` result arm — a retry signal, not an error: the caller re-calls
-    // the method (and for delegations, polls `openid_get_delegation`, re-calling
-    // `openid_prepare_delegation` on a `Pending` poll result).
-    openid_credential_add : (IdentityNumber, JWT, Salt, opt text) -> (variant { Ok; Pending; Err : OpenIdCredentialAddError });
+    // The first `opt text` of each method below is the SSO discovery domain
+    // (null for a direct provider). For SSO sign-ins a cold discovery/JWKS
+    // cache yields the `Pending` result arm — a retry signal, not an error: the
+    // caller re-calls the method (and for delegations, polls
+    // `openid_get_delegation`, re-calling `openid_prepare_delegation` on a
+    // `Pending` poll result).
+    //
+    // The second `opt text` of `openid_credential_add` and
+    // `openid_prepare_delegation` is the user's name that Apple sent beside the
+    // JWT, as in `OpenIDRegFinishArg.apple_full_name`. Apple sends it only once,
+    // so a sign-in without it keeps the name already stored.
+    openid_credential_add : (IdentityNumber, JWT, Salt, opt text, opt text) -> (variant { Ok; Pending; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
-    openid_prepare_delegation : (JWT, Salt, SessionKey, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
+    openid_prepare_delegation : (JWT, Salt, SessionKey, opt text, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
     // SSO discovery for the sign-in initiation flow. The frontend calls

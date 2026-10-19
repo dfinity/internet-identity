@@ -1741,3 +1741,235 @@ mod apple_verified_email {
         assert_no_apple_email(&verified_emails, &attributes);
     }
 }
+
+/// Apple keeps the user's name out of its ID tokens: it sends it beside the
+/// token, with the user's first authorization only, and the frontend passes it
+/// on to the canister.
+mod apple_full_name {
+    use super::*;
+    use crate::v2_api::authn_method_test_helpers::{
+        create_identity_with_authn_method, test_authn_method,
+    };
+    use canister_tests::api::internet_identity::api_v2;
+    use internet_identity_interface::internet_identity::types::{
+        IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep,
+    };
+    use pretty_assertions::assert_eq;
+
+    const APPLE_ISSUER: &str = "https://appleid.apple.com";
+    const GOOGLE_ISSUER: &str = "https://accounts.google.com";
+    const CLIENT_ID: &str = "ai.id.auth";
+    const JWKS_URI: &str = "https://provider.example/keys";
+    const TEST_TIME_MS: u64 = 1_800_000_000_000;
+    const SALT: [u8; 32] = [7u8; 32];
+
+    struct Setup {
+        env: PocketIc,
+        canister_id: Principal,
+        principal: Principal,
+        jwt: String,
+    }
+
+    /// Installs II with `issuer` as its only provider, and signs a JWT from it
+    /// for `principal` that carries no name, as Apple's never do.
+    fn setup(issuer: &str, principal: Principal) -> Setup {
+        let env = env();
+        let iat_secs = TEST_TIME_MS / 1_000 - 300;
+        let (jwt, jwks_json) = build_fake_google_jwt_and_jwks(FakeJwtInput {
+            salt: &SALT,
+            principal: &principal,
+            issuer,
+            aud: CLIENT_ID,
+            sub: "001234.0123456789abcdef0123456789abcdef.0789",
+            email: "jane@example.com",
+            name: "",
+            email_verified: true,
+            iat_secs,
+            exp_secs: iat_secs + 3_600,
+            extra_claims: &[],
+        });
+
+        let mut init_args = arg_with_wasm_hash(ARCHIVE_WASM.clone()).unwrap();
+        init_args.openid_configs = Some(vec![OpenIdConfig {
+            name: "Provider".into(),
+            logo: "logo".into(),
+            issuer: issuer.into(),
+            client_id: CLIENT_ID.into(),
+            jwks_uri: JWKS_URI.into(),
+            auth_uri: "https://provider.example/authorize".into(),
+            auth_scope: vec!["openid".into(), "email".into(), "name".into()],
+            fedcm_uri: None,
+            email_verification: None,
+            seed_jwks: None,
+        }]);
+        let canister_id = install_ii_canister_with_arg_and_cycles(
+            &env,
+            II_WASM.clone(),
+            Some(init_args),
+            1_000_000_000_000_000,
+        );
+        crate::openid::mock_certs_response(&env, JWKS_URI, &jwks_json);
+        deploy_archive_via_ii(&env, canister_id);
+
+        Setup {
+            env,
+            canister_id,
+            principal,
+            jwt,
+        }
+    }
+
+    impl Setup {
+        /// Moves the clock to the JWT's validity window.
+        fn advance_to_jwt_time(&self) {
+            self.env.advance_time(
+                Duration::from_millis(TEST_TIME_MS) - Duration::from_nanos(time(&self.env)),
+            );
+        }
+
+        /// The `name` attributes the identity can share, as listed for `caller`.
+        fn names_for(
+            &self,
+            caller: Principal,
+            identity_number: IdentityNumber,
+        ) -> Vec<(String, String)> {
+            api::list_available_attributes(
+                &self.env,
+                self.canister_id,
+                caller,
+                ListAvailableAttributesRequest {
+                    identity_number,
+                    attributes: None,
+                },
+            )
+            .expect("failed to call list_available_attributes")
+            .expect("list_available_attributes error")
+            .into_iter()
+            .filter(|(key, _)| key.ends_with(":name"))
+            .map(|(key, value)| (key, String::from_utf8(value).expect("attribute is text")))
+            .collect()
+        }
+
+        fn names(&self, identity_number: IdentityNumber) -> Vec<(String, String)> {
+            self.names_for(self.principal, identity_number)
+        }
+
+        /// Signs in with the JWT and returns the principal it signs in as.
+        fn sign_in(&self, apple_full_name: Option<&str>) -> Principal {
+            let prepared = api::openid_prepare_delegation_with_apple_full_name(
+                &self.env,
+                self.canister_id,
+                self.principal,
+                &self.jwt,
+                &SALT,
+                &ByteBuf::from("session public key"),
+                apple_full_name,
+            )
+            .expect("failed to call openid_prepare_delegation")
+            .expect("openid_prepare_delegation error");
+            Principal::self_authenticating(&prepared.user_key)
+        }
+    }
+
+    fn apple_name(name: &str) -> Vec<(String, String)> {
+        vec![(format!("openid:{APPLE_ISSUER}:name"), name.to_string())]
+    }
+
+    #[test]
+    fn should_keep_the_name_apple_sent_when_linking() {
+        let authn_method = test_authn_method();
+        let setup = setup(APPLE_ISSUER, authn_method.principal());
+        let identity_number =
+            create_identity_with_authn_method(&setup.env, setup.canister_id, &authn_method);
+        setup.advance_to_jwt_time();
+
+        api::openid_credential_add_with_apple_full_name(
+            &setup.env,
+            setup.canister_id,
+            setup.principal,
+            identity_number,
+            &setup.jwt,
+            &SALT,
+            Some(" Jane Appleseed "),
+        )
+        .expect("failed to add openid credential")
+        .expect("openid_credential_add error");
+        assert_eq!(setup.names(identity_number), apple_name("Jane Appleseed"));
+
+        // Apple sends the name only once: a later sign-in brings none and
+        // keeps it.
+        setup.sign_in(None);
+        assert_eq!(setup.names(identity_number), apple_name("Jane Appleseed"));
+
+        // After the user revokes II at Apple, the next sign-in brings the name
+        // again, and replaces it.
+        setup.sign_in(Some("Jane Doe"));
+        assert_eq!(setup.names(identity_number), apple_name("Jane Doe"));
+    }
+
+    #[test]
+    fn should_keep_the_name_apple_sent_when_signing_up() {
+        let flow_principal = Principal::self_authenticating("apple sign-up");
+        let setup = setup(APPLE_ISSUER, flow_principal);
+        setup.advance_to_jwt_time();
+
+        let next_step =
+            api_v2::identity_registration_start(&setup.env, setup.canister_id, flow_principal)
+                .expect("API call failed")
+                .expect("registration start failed")
+                .next_step;
+        if let RegistrationFlowNextStep::CheckCaptcha { .. } = next_step {
+            api_v2::check_captcha(&setup.env, setup.canister_id, flow_principal, "a".into())
+                .expect("API call failed")
+                .expect("check_captcha failed");
+        }
+        let identity_number = api_v2::openid_identity_registration_finish(
+            &setup.env,
+            setup.canister_id,
+            flow_principal,
+            &OpenIDRegFinishArg {
+                jwt: setup.jwt.clone(),
+                salt: SALT,
+                name: "Jane".into(),
+                discovery_domain: None,
+                origin: None,
+                apple_full_name: Some("Jane Appleseed".into()),
+            },
+        )
+        .expect("API call failed")
+        .expect("registration finish failed")
+        .identity_number;
+
+        // The identity has no other access method to list attributes with.
+        let openid_principal = setup.sign_in(None);
+        assert_eq!(
+            setup.names_for(openid_principal, identity_number),
+            apple_name("Jane Appleseed")
+        );
+    }
+
+    #[test]
+    fn should_ignore_the_apple_full_name_for_other_providers() {
+        let authn_method = test_authn_method();
+        let setup = setup(GOOGLE_ISSUER, authn_method.principal());
+        let identity_number =
+            create_identity_with_authn_method(&setup.env, setup.canister_id, &authn_method);
+        setup.advance_to_jwt_time();
+
+        api::openid_credential_add_with_apple_full_name(
+            &setup.env,
+            setup.canister_id,
+            setup.principal,
+            identity_number,
+            &setup.jwt,
+            &SALT,
+            Some("Jane Appleseed"),
+        )
+        .expect("failed to add openid credential")
+        .expect("openid_credential_add error");
+
+        // The token's empty name is dropped too, rather than listed as an
+        // empty `name`.
+        assert_eq!(setup.names(identity_number), vec![]);
+    }
+}

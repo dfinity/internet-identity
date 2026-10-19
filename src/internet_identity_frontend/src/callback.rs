@@ -1,7 +1,8 @@
 //! OAuth `response_mode=form_post` callback translator.
 //!
 //! The IdP POSTs `{id_token, state}` (or `{error, error_description, state}`
-//! per RFC 6749 §4.1.2.1) as a form body to `/callback`. The POST arrives
+//! per RFC 6749 §4.1.2.1) as a form body to `/callback`, Apple with a `user`
+//! field beside the token on the user's first authorization. The POST arrives
 //! anonymously — the IdP submits the form, not the user's session — so this
 //! handler cannot redeem the JWT itself: the salt + nonce + `caller()`
 //! binding requires a signed ingress message from the user's session. It is
@@ -18,7 +19,7 @@ use crate::dynamic_response_headers;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use ic_http_certification::{HttpRequest, HttpResponse, Method, StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::borrow::Cow;
 
@@ -38,10 +39,17 @@ const CALLBACK_ERROR_PATH: &str = "/callback-error";
 ///   [`is_state_charset`]); 64 bytes covers our own value with margin.
 /// - `error` / `error_description`: RFC 6749 §4.1.2.1 text. 256 / 1024 bytes
 ///   hold any realistic provider message.
+/// - `user`: Apple's JSON with the user's name and email. 1024 bytes hold
+///   both, each within the bounds the II canister puts on them.
 const MAX_ID_TOKEN_BYTES: usize = 8192;
 const MAX_STATE_BYTES: usize = 64;
 const MAX_ERROR_BYTES: usize = 256;
 const MAX_ERROR_DESCRIPTION_BYTES: usize = 1024;
+const MAX_USER_BYTES: usize = 1024;
+
+/// The longest full name forwarded from Apple's `user` field: the bound the II
+/// canister puts on a name.
+const MAX_FULL_NAME_BYTES: usize = 128;
 
 /// Upper bound on the whole form body, checked before parsing. A legitimate
 /// body is dominated by the `id_token`; doubling [`MAX_ID_TOKEN_BYTES`] leaves
@@ -77,15 +85,18 @@ const CALLBACK_SCRIPT: &str = r#"(function () {
 /// surfaces them as `OAuthProviderError` after its CSRF state check.
 #[derive(Debug, PartialEq, Eq, Serialize)]
 // Untagged so each variant serializes to a flat object of just its fields —
-// `{id_token, state}` or `{error, error_description, state}` — which is the
-// shape the frontend's `CallbackPayloadSchema` expects. `error_description`
-// is serialized as JSON `null` when absent (not omitted), which that schema
-// accepts and normalizes to `undefined`.
+// `{id_token, state, full_name}` or `{error, error_description, state}` —
+// which is the shape the frontend's `CallbackPayloadSchema` expects.
+// `full_name` and `error_description` are serialized as JSON `null` when
+// absent (not omitted), which that schema accepts and normalizes to
+// `undefined`.
 #[serde(untagged)]
 pub enum CallbackPayload {
     Token {
         id_token: String,
         state: String,
+        /// The user's name from Apple's `user` field, see [`apple_full_name`].
+        full_name: Option<String>,
     },
     ProviderError {
         error: String,
@@ -112,7 +123,8 @@ pub fn handle_form_post_callback(body: &[u8]) -> HttpResponse<'static> {
 /// Parse an `application/x-www-form-urlencoded` body into a
 /// [`CallbackPayload`]. Unknown fields (e.g. the `code` that accompanies our
 /// `response_type=code id_token` request) are ignored; for duplicate keys the
-/// first occurrence wins.
+/// first occurrence wins. Apple's `user` field only ever adds a name to the
+/// token (see [`apple_full_name`]); it never fails the callback.
 ///
 /// This endpoint is reachable anonymously by anyone (the IdP submits the form
 /// without the user's session), so the body is untrusted and the parsed values
@@ -123,7 +135,9 @@ pub fn handle_form_post_callback(body: &[u8]) -> HttpResponse<'static> {
 ///   [`render_callback_landing`]). A value containing `</script>` or angle
 ///   brackets could close that block early and inject markup. Restricting each
 ///   field to its OAuth/JWT charset rejects `<`, `>`, `"` and `\` outright;
-///   [`payload_json`] then escapes them again as defence in depth.
+///   [`payload_json`] then escapes them again as defence in depth. The full
+///   name from Apple's `user` field is free text, so like the error fields it
+///   relies on [`payload_json`]'s escaping alone.
 /// - Unbounded work: every field has a length cap and the whole body is
 ///   size-checked before parsing, so a hostile client can't force large
 ///   allocations on this free-to-call endpoint.
@@ -138,12 +152,14 @@ fn parse_form_post(body: &[u8]) -> Result<CallbackPayload, String> {
     let mut state: Option<Cow<str>> = None;
     let mut error: Option<Cow<str>> = None;
     let mut error_description: Option<Cow<str>> = None;
+    let mut user: Option<Cow<str>> = None;
     for (key, value) in form_urlencoded::parse(body) {
         let slot = match key.as_ref() {
             "id_token" => &mut id_token,
             "state" => &mut state,
             "error" => &mut error,
             "error_description" => &mut error_description,
+            "user" => &mut user,
             _ => continue,
         };
         if slot.is_none() {
@@ -175,6 +191,7 @@ fn parse_form_post(body: &[u8]) -> Result<CallbackPayload, String> {
         return Ok(CallbackPayload::Token {
             id_token: id_token.into_owned(),
             state,
+            full_name: user.as_deref().and_then(apple_full_name),
         });
     }
 
@@ -216,6 +233,43 @@ fn parse_form_post(body: &[u8]) -> Result<CallbackPayload, String> {
         error_description,
         state,
     })
+}
+
+/// Apple's `user` field: the user's name and email, which Apple sends only
+/// with the user's first authorization of II, beside the `id_token` rather
+/// than in it. Only the name is read; the token carries the email.
+///
+/// See https://developer.apple.com/documentation/signinwithapple/request-an-authorization-to-the-sign-in-with-apple-server#Handle-the-response
+#[derive(Deserialize)]
+struct AppleUser {
+    name: Option<AppleUserName>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppleUserName {
+    first_name: Option<String>,
+    last_name: Option<String>,
+}
+
+/// The user's full name from Apple's `user` field: the first and last names,
+/// trimmed and joined by a space. `None` when the field is too large, isn't
+/// Apple's JSON, or holds no name, or when the name is longer than the II
+/// canister keeps. The token signs the user in on its own, so none of these
+/// fails the callback.
+fn apple_full_name(user: &str) -> Option<String> {
+    if user.len() > MAX_USER_BYTES {
+        return None;
+    }
+    let name = serde_json::from_str::<AppleUser>(user).ok()?.name?;
+    let full_name = [name.first_name, name.last_name]
+        .iter()
+        .flatten()
+        .map(|part| part.trim())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    (!full_name.is_empty() && full_name.len() <= MAX_FULL_NAME_BYTES).then_some(full_name)
 }
 
 /// Error string for a field that exceeds its byte cap, naming the observed
@@ -367,6 +421,94 @@ mod tests {
             CallbackPayload::Token {
                 id_token: ID_TOKEN.to_string(),
                 state: STATE.to_string(),
+                full_name: None,
+            }
+        );
+    }
+
+    // What Apple posts with the user's first authorization of II.
+    const APPLE_USER: &str =
+        r#"{"name":{"firstName":"Jane","lastName":"Appleseed"},"email":"jane@example.com"}"#;
+
+    #[test]
+    fn parses_apple_full_name_beside_token() {
+        let body = encode_form(&[
+            ("state", STATE),
+            ("code", "c0de"),
+            ("id_token", ID_TOKEN),
+            ("user", APPLE_USER),
+        ]);
+        assert_eq!(
+            parse_form_post(&body).unwrap(),
+            CallbackPayload::Token {
+                id_token: ID_TOKEN.to_string(),
+                state: STATE.to_string(),
+                full_name: Some("Jane Appleseed".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn apple_full_name_joins_the_parts_present() {
+        for (user, expected) in [
+            (APPLE_USER, Some("Jane Appleseed")),
+            (
+                r#"{"name":{"firstName":" Jane ","lastName":""}}"#,
+                Some("Jane"),
+            ),
+            (r#"{"name":{"lastName":"Appleseed"}}"#, Some("Appleseed")),
+            (
+                r#"{"name":{"firstName":null,"lastName":"Appleseed"}}"#,
+                Some("Appleseed"),
+            ),
+            (
+                r#"{"name":{"firstName":"李","lastName":"小龙"}}"#,
+                Some("李 小龙"),
+            ),
+        ] {
+            assert_eq!(apple_full_name(user).as_deref(), expected, "for {user}");
+        }
+    }
+
+    #[test]
+    fn apple_full_name_is_none_without_a_usable_name() {
+        let too_long = format!(
+            r#"{{"name":{{"firstName":"{}","lastName":"Appleseed"}}}}"#,
+            "a".repeat(MAX_FULL_NAME_BYTES)
+        );
+        let too_large = format!(
+            r#"{{"name":{{"firstName":"Jane"}},"email":"{}@example.com"}}"#,
+            "a".repeat(MAX_USER_BYTES)
+        );
+        for user in [
+            "",
+            "not json",
+            r#"{"email":"jane@example.com"}"#,
+            r#"{"name":null}"#,
+            r#"{"name":{}}"#,
+            r#"{"name":{"firstName":" ","lastName":""}}"#,
+            r#"{"name":{"firstName":42}}"#,
+            r#"["Jane","Appleseed"]"#,
+            &too_long,
+            &too_large,
+        ] {
+            assert_eq!(apple_full_name(user), None, "for {user}");
+        }
+    }
+
+    #[test]
+    fn unusable_apple_user_field_keeps_the_token() {
+        let body = encode_form(&[
+            ("id_token", ID_TOKEN),
+            ("state", STATE),
+            ("user", "</script>not json"),
+        ]);
+        assert_eq!(
+            parse_form_post(&body).unwrap(),
+            CallbackPayload::Token {
+                id_token: ID_TOKEN.to_string(),
+                state: STATE.to_string(),
+                full_name: None,
             }
         );
     }
@@ -433,6 +575,7 @@ mod tests {
             CallbackPayload::Token {
                 id_token: ID_TOKEN.to_string(),
                 state: STATE.to_string(),
+                full_name: None,
             }
         );
     }
@@ -555,6 +698,7 @@ mod tests {
         let payload = CallbackPayload::Token {
             id_token: ID_TOKEN.to_string(),
             state: STATE.to_string(),
+            full_name: None,
         };
         let parsed: serde_json::Value =
             serde_json::from_str(&payload_json(&payload).unwrap()).unwrap();
@@ -640,6 +784,28 @@ mod tests {
             if is_rfc6749_charset(&value) {
                 prop_assert!(!value.contains(['"', '\\']));
                 prop_assert!(value.bytes().all(|byte| (0x20..=0x7e).contains(&byte)));
+            }
+        }
+
+        // The same for the full name from Apple's `user` field, which is free
+        // text with no charset check at all.
+        #[test]
+        fn token_json_is_embedding_safe_and_round_trips(
+            full_name in proptest::option::of(".*"),
+        ) {
+            let payload = CallbackPayload::Token {
+                id_token: ID_TOKEN.to_string(),
+                state: STATE.to_string(),
+                full_name: full_name.clone(),
+            };
+            let json = payload_json(&payload).unwrap();
+            prop_assert!(!json.contains(['<', '>', '&']));
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            match full_name {
+                Some(full_name) => {
+                    prop_assert_eq!(parsed["full_name"].as_str().unwrap(), &full_name)
+                }
+                None => prop_assert!(parsed["full_name"].is_null()),
             }
         }
 
