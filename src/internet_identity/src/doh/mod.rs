@@ -440,6 +440,8 @@ mod tests {
     use super::*;
     use crate::single_flight_cache::run_detached;
     use crate::state::{persistent_state_mut, PersistentState};
+    // disallowed-types: removed by C1
+    #[allow(clippy::disallowed_types)]
     use internet_identity_interface::internet_identity::types::DohConfig;
 
     /// Drive `fetch_txt` to a settled result: a cold key returns `Pending`
