@@ -1367,6 +1367,30 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No browser of this identity is waiting for this caller, or the install it started
+     * has expired.
+     */
+    'NoPendingLink' : null
+  } |
+  {
+    /**
+     * Not a P-256 public key in the single encoding WebCrypto emits.
+     */
+    'InvalidAppKey' : null
+  } |
+  {
+    /**
+     * The key is one a browser of this identity already signs with.
+     */
+    'KeyAlreadyInUse' : null
+  };
+export interface LinkNotificationAppRequest {
+  'app_key' : PublicKey,
+  'anchor_number' : UserNumber,
+}
 export type ListApplicationsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
@@ -1832,6 +1856,32 @@ export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
   'trusted_url' : string,
   'expiration' : Timestamp,
+}
+export type PrepareNotificationAppLinkError = {
+    /**
+     * The principal named is not one a key can sign as, so no app could ever present it.
+     */
+    'LinkPrincipalIsNotAKey' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+/**
+ * Registers the one-shot key a browser is about to hand its install, so the app that
+ * spends it is the one this browser sent. Authorized by the caller being a browser this
+ * identity is signed in from; the principal named here is what authorizes the
+ * link_notification_app call that follows.
+ */
+export interface PrepareNotificationAppLinkRequest {
+  /**
+   * The principal of the one-shot key this browser puts in the install URL.
+   */
+  'link_principal' : Principal,
+  'anchor_number' : UserNumber,
 }
 export interface PrepareNotificationDelegationRequest {
   'session_key' : SessionKey,
@@ -2763,6 +2813,15 @@ export interface _SERVICE {
    */
   'init_salt' : ActorMethod<[], undefined>,
   /**
+   * Called by the Home Screen app on its first open, signed with that one-shot key.
+   * Creates the app's record where its key has none, and points the browser at it.
+   */
+  'link_notification_app' : ActorMethod<
+    [LinkNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : LinkNotificationAppError }
+  >,
+  /**
    * Every app the identity decided a permission for, so the user can change or forget
    * what they decided. Authorized by the identity's own access methods.
    */
@@ -3021,6 +3080,15 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
     { 'Ok' : PrepareMcpRegistrationDelegation } |
       { 'Err' : string }
+  >,
+  /**
+   * Called by the browser starting an install, naming the one-shot key it puts in the
+   * install URL as the only caller that may complete the link.
+   */
+  'prepare_notification_app_link' : ActorMethod<
+    [PrepareNotificationAppLinkRequest],
+    { 'Ok' : null } |
+      { 'Err' : PrepareNotificationAppLinkError }
   >,
   /**
    * Authorized by the browser key the caller signs with.
