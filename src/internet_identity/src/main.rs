@@ -1137,6 +1137,31 @@ thread_local! {
 
 /// Returns the totals of the passkey index audit so far, and whether it has examined every
 /// stored anchor. Only totals are exposed, never which anchors they come from.
+///
+/// The method is hidden, so it is not in `internet_identity.did`. To decode the reply, give
+/// the client this Candid interface:
+///
+/// ```candid
+/// type PasskeyIndexAuditCounts = record {
+///   indexed_to_anchor : nat64;
+///   indexed_to_other_holder : nat64;
+///   indexed_to_non_holder : nat64;
+///   not_indexed : nat64;
+/// };
+/// type PasskeyIndexAuditTotals = record {
+///   anchors : nat64;
+///   passkeys : nat64;
+///   pubkey_index : PasskeyIndexAuditCounts;
+///   credential_id_index : PasskeyIndexAuditCounts;
+///   dummy_credential_ids : nat64;
+/// };
+/// type PasskeyIndexAuditStatus = record {
+///   totals : PasskeyIndexAuditTotals;
+///   next_anchor_number : nat64;
+///   is_done : bool;
+/// };
+/// service : { passkey_index_audit_status : () -> (PasskeyIndexAuditStatus) query };
+/// ```
 #[query(hidden = true)]
 fn passkey_index_audit_status() -> PasskeyIndexAuditStatus {
     PASSKEY_INDEX_AUDIT_STATUS.with_borrow(|status| *status)

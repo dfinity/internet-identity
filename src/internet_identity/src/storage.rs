@@ -161,11 +161,13 @@ const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
-/// The credential id that legacy pin-flow devices are stored with (see the conversion of
-/// `Anchor` into `StorableAnchor`). Many anchors share it by design.
+/// TEMPORARY, used only by the passkey index audit: the credential id that legacy pin-flow
+/// devices are stored with (see the conversion of `Anchor` into `StorableAnchor`). Many
+/// anchors share it by design.
 const DUMMY_PASSKEY_CREDENTIAL_ID: [u8; 4] = [0xde, 0xad, 0xbe, 0xef];
 
-/// Counts one distinct key of `anchor_number` that the index maps to `indexed_anchor`.
+/// TEMPORARY, used only by the passkey index audit: counts one distinct key of
+/// `anchor_number` that the index maps to `indexed_anchor`.
 /// `other_holds_key` is only asked when the index names another anchor.
 fn count_passkey_index_audit_key(
     counts: &mut PasskeyIndexAuditCounts,
@@ -1630,8 +1632,8 @@ impl<M: Memory + Clone> Storage<M> {
     /// TEMPORARY: one batch of a read-only check of the passkey pubkey and credential-id
     /// indices against the passkeys stored in the anchors. Examines the stored anchors in
     /// ascending order from `start`, at most `max_anchors` of them, and stops early once
-    /// `out_of_budget` returns true. At least one anchor is examined per batch, so every
-    /// batch makes progress.
+    /// `out_of_budget` returns true. At least one anchor is examined per batch, whatever
+    /// `max_anchors` and `out_of_budget` say, so every batch makes progress.
     ///
     /// Returns the totals of this batch and the anchor number the next batch starts from,
     /// or `None` once every stored anchor has been examined.
@@ -1647,7 +1649,7 @@ impl<M: Memory + Clone> Storage<M> {
         let mut totals = PasskeyIndexAuditTotals::default();
 
         for (anchor_number, storable_anchor) in self.stable_anchor_memory.range(start..) {
-            if totals.anchors >= max_anchors || (totals.anchors > 0 && out_of_budget()) {
+            if totals.anchors > 0 && (totals.anchors >= max_anchors || out_of_budget()) {
                 return (totals, Some(anchor_number));
             }
             totals.anchors += 1;
@@ -1675,15 +1677,12 @@ impl<M: Memory + Clone> Storage<M> {
                 );
             }
 
-            let credential_ids = passkeys
+            let (dummy_credential_ids, credential_ids): (Vec<_>, Vec<_>) = passkeys
                 .iter()
                 .map(|passkey| passkey.credential_id.as_slice())
-                .collect::<BTreeSet<_>>();
-            for credential_id in credential_ids {
-                if credential_id == DUMMY_PASSKEY_CREDENTIAL_ID {
-                    totals.dummy_credential_ids += 1;
-                    continue;
-                }
+                .partition(|credential_id| *credential_id == DUMMY_PASSKEY_CREDENTIAL_ID);
+            totals.dummy_credential_ids += dummy_credential_ids.len() as u64;
+            for credential_id in credential_ids.into_iter().collect::<BTreeSet<_>>() {
                 let indexed_anchor = self.lookup_anchor_with_passkey_credential_memory.get(
                     &StorableCredentialId::from_bytes(Cow::Borrowed(credential_id)),
                 );

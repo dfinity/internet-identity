@@ -1310,6 +1310,8 @@ pub enum RemoveNotificationError {
     InternalCanisterError(String),
 }
 
+/// TEMPORARY: remove together with the passkey index audit.
+///
 /// How the keys of the examined passkeys stand in one passkey index. Each distinct key of an
 /// anchor counts once for that anchor, so a key shared by two anchors counts twice.
 #[derive(Clone, Copy, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
@@ -1339,18 +1341,21 @@ impl PasskeyIndexAuditCounts {
     }
 }
 
+/// TEMPORARY: remove together with the passkey index audit.
+///
 /// Totals of the passkey index audit over the anchors examined so far.
 #[derive(Clone, Copy, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PasskeyIndexAuditTotals {
     pub anchors: u64,
+    /// Stored passkey credentials, pin-flow devices included.
     pub passkeys: u64,
     /// The passkey pubkey index (`Principal::self_authenticating(pubkey)` to anchor).
     pub pubkey_index: PasskeyIndexAuditCounts,
     /// The passkey credential-id index (credential id to anchor), not counting
     /// `dummy_credential_ids`.
     pub credential_id_index: PasskeyIndexAuditCounts,
-    /// Legacy pin-flow devices are stored with a shared dummy credential id, which is
-    /// left out of `credential_id_index`.
+    /// Passkeys with the dummy credential id that legacy pin-flow devices are stored with.
+    /// Many anchors share it by design, so it is left out of `credential_id_index`.
     pub dummy_credential_ids: u64,
 }
 
@@ -1366,6 +1371,8 @@ impl PasskeyIndexAuditTotals {
     }
 }
 
+/// TEMPORARY: remove together with the passkey index audit.
+///
 /// Progress and totals of the read-only passkey index audit.
 #[derive(Clone, Copy, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PasskeyIndexAuditStatus {

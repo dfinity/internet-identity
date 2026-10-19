@@ -7529,10 +7529,32 @@ mod passkey_index_audit_tests {
     };
     use pretty_assertions::assert_eq;
 
+    /// The credential id differs from the pubkey, so that mixing up the two indices shows.
     fn passkey(n: u8) -> Device {
         Device {
             pubkey: ByteBuf::from(vec![n]),
-            credential_id: Some(ByteBuf::from(vec![n])),
+            credential_id: Some(ByteBuf::from(vec![n, 0xc1])),
+            ..sample_device()
+        }
+    }
+
+    /// A legacy pin-flow device, which is stored with the dummy credential id.
+    fn pin_flow_device(n: u8) -> Device {
+        Device {
+            pubkey: ByteBuf::from(vec![n]),
+            credential_id: None,
+            key_type: KeyType::BrowserStorageKey,
+            ..sample_device()
+        }
+    }
+
+    fn recovery_phrase(n: u8) -> Device {
+        Device {
+            pubkey: ByteBuf::from(vec![n]),
+            credential_id: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::SeedPhrase,
+            origin: None,
             ..sample_device()
         }
     }
@@ -7545,6 +7567,33 @@ mod passkey_index_audit_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         anchor_number
+    }
+
+    /// Points both index entries of `device` at `anchor_number`.
+    fn misattribute(
+        storage: &mut Storage<VectorMemory>,
+        device: &Device,
+        anchor_number: AnchorNumber,
+    ) {
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .insert(
+                Principal::self_authenticating(&device.pubkey),
+                anchor_number,
+            );
+        storage
+            .lookup_anchor_with_passkey_credential_memory
+            .insert(device.credential_id.clone().unwrap().into(), anchor_number);
+    }
+
+    /// Removes both index entries of `device`.
+    fn unindex(storage: &mut Storage<VectorMemory>, device: &Device) {
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .remove(&Principal::self_authenticating(&device.pubkey));
+        storage
+            .lookup_anchor_with_passkey_credential_memory
+            .remove(&device.credential_id.clone().unwrap().into());
     }
 
     fn audit_all(storage: &Storage<VectorMemory>) -> PasskeyIndexAuditTotals {
@@ -7569,15 +7618,27 @@ mod passkey_index_audit_tests {
     }
 
     #[test]
+    fn should_report_nothing_for_empty_storage() {
+        let storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+
+        assert_eq!(
+            storage.audit_passkey_indices_batch(0, 2_000, || false),
+            (PasskeyIndexAuditTotals::default(), None)
+        );
+    }
+
+    #[test]
     fn should_count_passkeys_indexed_to_their_anchor() {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         write_anchor(&mut storage, &[passkey(0), passkey(1)]);
         write_anchor(&mut storage, &[passkey(2)]);
+        // A recovery phrase is not a passkey.
+        write_anchor(&mut storage, &[recovery_phrase(3)]);
 
         assert_eq!(
             audit_all(&storage),
             PasskeyIndexAuditTotals {
-                anchors: 2,
+                anchors: 3,
                 passkeys: 3,
                 pubkey_index: counts(3, 0, 0, 0),
                 credential_id_index: counts(3, 0, 0, 0),
@@ -7602,6 +7663,27 @@ mod passkey_index_audit_tests {
         assert_eq!(totals.credential_id_index, counts(0, 0, 0, 1));
     }
 
+    /// The pubkey index only takes keys that are new to an anchor, while the credential-id
+    /// index takes all of them, so rewriting an anchor repairs only the latter.
+    #[test]
+    fn should_count_each_index_on_its_own() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let anchor_number = write_anchor(&mut storage, &[passkey(0)]);
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .clear_new();
+        storage
+            .lookup_anchor_with_passkey_credential_memory
+            .clear_new();
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.add_device(passkey(1)).unwrap();
+        storage.write(anchor).unwrap();
+
+        let totals = audit_all(&storage);
+        assert_eq!(totals.pubkey_index, counts(1, 0, 0, 1));
+        assert_eq!(totals.credential_id_index, counts(2, 0, 0, 0));
+    }
+
     #[test]
     fn should_count_shared_and_misattributed_keys() {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
@@ -7610,13 +7692,7 @@ mod passkey_index_audit_tests {
         write_anchor(&mut storage, &[passkey(0)]);
         // A key indexed to an anchor that does not hold it.
         write_anchor(&mut storage, &[passkey(5)]);
-        let misattributed = passkey(5);
-        storage
-            .lookup_anchor_with_passkey_pubkey_hash_memory
-            .insert(Principal::self_authenticating(&misattributed.pubkey), first);
-        storage
-            .lookup_anchor_with_passkey_credential_memory
-            .insert(misattributed.credential_id.unwrap().into(), first);
+        misattribute(&mut storage, &passkey(5), first);
 
         let totals = audit_all(&storage);
         assert_eq!(totals.pubkey_index, counts(1, 1, 1, 0));
@@ -7624,21 +7700,16 @@ mod passkey_index_audit_tests {
     }
 
     #[test]
-    fn should_count_the_dummy_credential_id_separately() {
+    fn should_count_every_dummy_credential_id_separately() {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
-        let pin_flow_device = |n: u8| Device {
-            pubkey: ByteBuf::from(vec![n]),
-            credential_id: None,
-            key_type: KeyType::BrowserStorageKey,
-            ..sample_device()
-        };
-        write_anchor(&mut storage, &[pin_flow_device(0)]);
-        write_anchor(&mut storage, &[pin_flow_device(1)]);
+        write_anchor(&mut storage, &[pin_flow_device(0), pin_flow_device(1)]);
+        write_anchor(&mut storage, &[pin_flow_device(2)]);
 
         let totals = audit_all(&storage);
-        assert_eq!(totals.dummy_credential_ids, 2);
+        assert_eq!(totals.passkeys, 3);
+        assert_eq!(totals.dummy_credential_ids, 3);
         assert_eq!(totals.credential_id_index, counts(0, 0, 0, 0));
-        assert_eq!(totals.pubkey_index, counts(2, 0, 0, 0));
+        assert_eq!(totals.pubkey_index, counts(3, 0, 0, 0));
     }
 
     #[test]
@@ -7648,7 +7719,10 @@ mod passkey_index_audit_tests {
             write_anchor(&mut storage, &[passkey(0)]),
             write_anchor(&mut storage, &[passkey(1), passkey(2)]),
             write_anchor(&mut storage, &[passkey(0)]),
+            write_anchor(&mut storage, &[pin_flow_device(9)]),
         ];
+        unindex(&mut storage, &passkey(2));
+        misattribute(&mut storage, &passkey(1), anchors[3]);
 
         // One anchor per batch, as when every batch runs out of budget straight away.
         let mut totals = PasskeyIndexAuditTotals::default();
@@ -7669,9 +7743,19 @@ mod passkey_index_audit_tests {
             }
         }
 
-        assert_eq!(batches, 3);
+        assert_eq!(batches, 4);
+        // Every counter is non-zero, so the sum checks every field of `add`.
+        assert_eq!(
+            totals,
+            PasskeyIndexAuditTotals {
+                anchors: 4,
+                passkeys: 5,
+                pubkey_index: counts(2, 1, 1, 1),
+                credential_id_index: counts(1, 1, 1, 1),
+                dummy_credential_ids: 1,
+            }
+        );
         assert_eq!(totals, audit_all(&storage));
-        assert_eq!(totals.pubkey_index, counts(3, 1, 0, 0));
     }
 
     #[test]
@@ -7684,7 +7768,8 @@ mod passkey_index_audit_tests {
         assert_eq!(batch.anchors, 1);
         assert_eq!(next_anchor_number, Some(second));
 
-        let (batch, next_anchor_number) = storage.audit_passkey_indices_batch(second, 1, || false);
+        // Even a batch asked for no anchors examines one, so it makes progress.
+        let (batch, next_anchor_number) = storage.audit_passkey_indices_batch(second, 0, || false);
         assert_eq!(batch.anchors, 1);
         assert_eq!(next_anchor_number, None);
     }
