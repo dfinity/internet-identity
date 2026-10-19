@@ -49,26 +49,17 @@ const MAX_ERROR_DESCRIPTION_BYTES: usize = 1024;
 /// body.
 const MAX_BODY_BYTES: usize = 2 * MAX_ID_TOKEN_BYTES;
 
-/// The single executable inline script of the landing page. Constant so its
-/// CSP hash is constant; the per-request payload lives in a non-executing
-/// `<script type="application/json">` data block instead.
-const CALLBACK_SCRIPT: &str = r#"(function () {
-  var data = JSON.parse(document.getElementById("callback-payload").textContent);
-  if (sessionStorage.getItem("ii-openid-authorize-state") !== null) {
-    // 1-click flow: the authorize page navigated this tab to the IdP after
-    // stashing its state marker; stash the payload and resume in-app.
-    // `window.opener` can't discriminate the flows here — in the authorize
-    // flow this tab is itself a popup opened by the relying party.
-    sessionStorage.setItem("ii-openid-callback-data", JSON.stringify(data));
-    window.location.replace("/authorize?flow=openid-resume");
-  } else {
-    // Popup flow: deliver to the tab that opened us and close.
-    var channel = new BroadcastChannel("redirect_callback");
-    channel.postMessage(data);
-    channel.close();
-    window.close();
-  }
-})();"#;
+/// The single executable inline script of the landing page, embedded
+/// verbatim from the frontend so it has its own unit tests
+/// (`src/frontend/src/lib/callback/callback_script.{js,test.ts}`). Constant,
+/// so its CSP hash is constant; the per-request payload lives in a
+/// non-executing `<script type="application/json">` data block instead.
+///
+/// It routes on the frontend's same-tab markers (`ii-openid-return-path`,
+/// `ii-openid-authorize-state`) to resume in-app, else delivers the payload
+/// to the opener (the popup flow); see the source file for the details.
+const CALLBACK_SCRIPT: &str =
+    include_str!("../../frontend/src/lib/callback/callback_script.js");
 
 /// Payload delivered to the frontend: either the token or the IdP's error
 /// report, plus the CSRF `state` in both cases. The error variant exists
@@ -591,6 +582,29 @@ mod tests {
             .map(|(_, value)| value.as_str())
             .unwrap();
         assert_eq!(cache_control, "no-store");
+    }
+
+    #[test]
+    fn landing_page_script_has_no_closing_script_tag() {
+        // The script is embedded verbatim inside `<script>…</script>`. A
+        // `</script` anywhere in it (even a comment) would end the element
+        // early, truncating the script so its bytes no longer match the
+        // hash pinned in the CSP, and the browser would refuse to run it.
+        // Matched case-insensitively, like the HTML parser.
+        assert!(!CALLBACK_SCRIPT.to_ascii_lowercase().contains("</script"));
+    }
+
+    #[test]
+    fn landing_page_script_routes_on_the_frontend_markers() {
+        // The frontend (`openIdRedirectMarkers.ts`, `openID.ts`) and this
+        // script agree on these names; a rename on one side strands the other.
+        assert!(CALLBACK_SCRIPT.contains(r#"sessionStorage.getItem("ii-openid-return-path")"#));
+        assert!(CALLBACK_SCRIPT.contains(r#"sessionStorage.getItem("ii-openid-authorize-state")"#));
+        assert!(CALLBACK_SCRIPT.contains(r#"sessionStorage.setItem("ii-openid-callback-data""#));
+        assert!(CALLBACK_SCRIPT.contains(r#"new BroadcastChannel("redirect_callback")"#));
+        assert!(CALLBACK_SCRIPT.contains("window.opener.postMessage(data, window.location.origin)"));
+        // The 1-click authorize flow keeps its own return path.
+        assert!(CALLBACK_SCRIPT.contains(r#""/authorize?flow=openid-resume""#));
     }
 
     #[test]

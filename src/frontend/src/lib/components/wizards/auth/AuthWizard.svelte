@@ -4,7 +4,7 @@
     type AuthMode,
     type MethodTag,
   } from "$lib/flows/authFlow.svelte";
-  import { type Snippet, untrack } from "svelte";
+  import { onMount, type Snippet, untrack } from "svelte";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
   import Dialog, { isInsideDialog } from "$lib/components/ui/Dialog.svelte";
@@ -39,6 +39,12 @@
     shouldRequestMethodSwitch,
     type MethodDescriptor,
   } from "$lib/components/wizards/auth/AuthWizard.switch";
+  import {
+    shouldRedirectInSameTab,
+    type OpenIdSameTabResume,
+  } from "$lib/utils/openIdSameTabRedirect";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { t } from "$lib/stores/locale.store";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
@@ -54,6 +60,14 @@
     switchModeAction?: string;
     // The target dapp origin; set only in the authorize (dapp sign-in) flow.
     ssoOrigin?: string;
+    // Same-tab alternative to the OpenID popup, taken when
+    // `shouldRedirectInSameTab` says the popup won't work here (Sign in with
+    // Apple on WebKit). It leaves the page; the page it comes back to hands
+    // the JWT to a fresh wizard through `resumeOpenId`. Without it the wizard
+    // always uses the popup.
+    openIdRedirect?: (config: OpenIdConfig, mode: AuthMode) => void;
+    // One-shot: the same-tab OpenID sign-in to pick back up on mount, if any.
+    resumeOpenId?: () => OpenIdSameTabResume | undefined;
     children?: Snippet<[boolean?]>;
   }
 
@@ -66,6 +80,8 @@
     switchModeTitle,
     switchModeAction,
     ssoOrigin,
+    openIdRedirect,
+    resumeOpenId,
     children,
   }: Props = $props();
 
@@ -84,7 +100,23 @@
   let isElevated = $state(false);
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isAuthenticating = $state(false);
+  // A same-tab OpenID sign-in is being picked back up: the picker gives way
+  // to a busy state until the resumed sign-in settles.
+  let isResumingOpenId = $state(false);
   let pendingSsoRegistration = false;
+
+  onMount(() => {
+    const resume = resumeOpenId?.();
+    if (resume === undefined) {
+      return;
+    }
+    // The redirect was started from this mode; the sign-in continues in it.
+    mode = resume.mode;
+    isResumingOpenId = true;
+    void handleContinueWithOpenId(resume.config, resume.jwt).finally(() => {
+      isResumingOpenId = false;
+    });
+  });
 
   // The SSO discovery result of the in-flight gated login, kept so the
   // normal-login dialog can bridge + replay it after a normal sign-in.
@@ -328,11 +360,38 @@
 
   const handleContinueWithOpenId = async (
     config: OpenIdConfig,
+    // The JWT a same-tab round trip brought back (see `resumeOpenId`); the
+    // popup fetches it here otherwise.
+    existingJwt?: string,
   ): Promise<void | "cancelled"> => {
+    if (
+      existingJwt === undefined &&
+      openIdRedirect !== undefined &&
+      shouldRedirectInSameTab(config.auth_uri)
+    ) {
+      try {
+        isAuthenticating = true;
+        openIdRedirect(config, mode);
+      } catch (error) {
+        isAuthenticating = false;
+        onError(error);
+        return;
+      }
+      // The document is on its way out; stay busy until it is gone.
+      await new Promise<never>(() => {});
+      return;
+    }
     try {
       isAuthenticating = true;
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
-      const result = await authFlow.continueWithOpenId(config, undefined, mode);
+      const result = await authFlow.continueWithOpenId(
+        config,
+        existingJwt,
+        mode,
+        undefined,
+        undefined,
+        { interactive: true },
+      );
       if (result === undefined) {
         // Disambiguation took over — AuthFlow set the view, dialog
         // will render. Wizard exits the in-flight state.
@@ -606,24 +665,36 @@
 
 {#snippet pickerBlock()}
   {@render children?.(inDialog || isElevated)}
-  <PickAuthenticationMethod
-    setupOrUseExistingPasskey={mode === "signin"
-      ? handleContinueWithExistingPasskey
-      : mode === "signup"
-        ? authFlow.setupNewPasskey
-        : authFlow.setupOrUseExistingPasskey}
-    continueWithOpenId={handleContinueWithOpenId}
-    signInWithSso={authFlow.signInWithSso}
-    continueOnAnotherDevice={mode === "signup"
-      ? undefined
-      : () => (isContinueFromAnotherDeviceVisible = true)}
-    {mode}
-    {passkeyLabel}
-    {switchModeTitle}
-    {switchModeAction}
-    onSwitchMode={switchModeAvailable ? toggleMode : undefined}
-    withinDialog={inDialog || isElevated || inAuthPanel}
-  />
+  {#if isResumingOpenId}
+    <div
+      role="status"
+      class="flex flex-col items-center gap-3 py-8 text-center"
+    >
+      <ProgressRing class="size-8" />
+      <span class="text-text-primary text-base font-medium">
+        {$t`Authenticating...`}
+      </span>
+    </div>
+  {:else}
+    <PickAuthenticationMethod
+      setupOrUseExistingPasskey={mode === "signin"
+        ? handleContinueWithExistingPasskey
+        : mode === "signup"
+          ? authFlow.setupNewPasskey
+          : authFlow.setupOrUseExistingPasskey}
+      continueWithOpenId={handleContinueWithOpenId}
+      signInWithSso={authFlow.signInWithSso}
+      continueOnAnotherDevice={mode === "signup"
+        ? undefined
+        : () => (isContinueFromAnotherDeviceVisible = true)}
+      {mode}
+      {passkeyLabel}
+      {switchModeTitle}
+      {switchModeAction}
+      onSwitchMode={switchModeAvailable ? toggleMode : undefined}
+      withinDialog={inDialog || isElevated || inAuthPanel}
+    />
+  {/if}
 {/snippet}
 
 <!-- Single persistent Dialog instance — content swaps reactively as the

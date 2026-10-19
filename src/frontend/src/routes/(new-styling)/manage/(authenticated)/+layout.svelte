@@ -51,6 +51,7 @@
   import ReauthPrompt from "$lib/components/ui/ReauthPrompt.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
+  import { redirectToOpenIdInSameTab } from "$lib/utils/openIdSameTabRedirect";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
 
   // --- Props & state ---
@@ -539,6 +540,10 @@
       passkeyLabel={authDialogMode === "signin"
         ? $t`Select a passkey`
         : undefined}
+      openIdRedirect={(config, mode) =>
+        // The landing page picks the sign-in back up: its `onSignIn` brings
+        // the identity to /manage, like this dialog's own would.
+        void redirectToOpenIdInSameTab({ config, mode, returnPath: "/" })}
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
         {authDialogMode === "signup"

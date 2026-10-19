@@ -44,6 +44,9 @@ export const AuthenticationV2Events = {
   ContinueAsOpenID: "continue-as-openid",
   SelectMethodScreen: "select-method-screen",
   ContinueWithOpenID: "continue-with-openid",
+  // The OpenID popup ended without delivering the callback; carries a
+  // `reason` of "blocked" or "closed".
+  OpenIDCallbackLost: "openid-callback-lost",
   RegisterWithOpenID: "register-with-openid",
   SuccessfulOpenIDRegistration: "successful-openid-registration",
   LoginWithOpenID: "login-with-openid",

@@ -36,6 +36,7 @@ import {
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
 import {
+  CallbackPopupClosedError,
   requestJWT,
   RequestConfig,
   decodeJWT,
@@ -501,6 +502,14 @@ export class AuthFlow {
     discoveryDomain?: string,
     // Dapp SSO context; routes the 1-click resume through the SSO gate path.
     sso?: { origin: string },
+    options?: {
+      // Whether the user is driving this sign-in through the wizard. Implied
+      // when the JWT is fetched here; a caller-supplied JWT is the
+      // non-interactive 1-click resume unless it says otherwise (the wizard's
+      // own same-tab redirect brings its JWT back the same way, but the user
+      // is still in the wizard — see `openIdSameTabRedirect.ts`).
+      interactive?: boolean;
+    },
   ): Promise<
     | {
         identityNumber: bigint;
@@ -517,6 +526,7 @@ export class AuthFlow {
     | undefined
   > => {
     authenticationV2Funnel.addProperties({ provider: config.name });
+    const interactive = options?.interactive ?? existingJwt === undefined;
     const result = await this.#openIdJwtSignIn(
       {
         clientId: config.client_id,
@@ -527,6 +537,8 @@ export class AuthFlow {
       existingJwt,
       discoveryDomain,
       sso,
+      undefined,
+      interactive,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -575,13 +587,12 @@ export class AuthFlow {
         this.#view = "openIdAlreadyLinked";
         return undefined;
       }
-      // A caller-supplied JWT means this is the non-interactive 1-click
-      // resume flow: there is no method-switch disambiguation to gate the
-      // write, so AuthFlow persists the last-used entry itself rather than
-      // handing it back. The interactive AuthWizard fetches the JWT itself
-      // (`existingJwt === undefined`) and commits the returned entry once any
-      // disambiguation clears — see `AuthWizard.commitLastUsedEntry`.
-      if (existingJwt !== undefined && lastUsedEntry !== undefined) {
+      // The non-interactive 1-click resume flow has no method-switch
+      // disambiguation to gate the write, so AuthFlow persists the last-used
+      // entry itself rather than handing it back. The interactive AuthWizard
+      // commits the returned entry once any disambiguation clears — see
+      // `AuthWizard.commitLastUsedEntry`.
+      if (!interactive && lastUsedEntry !== undefined) {
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedEntry);
       }
       const { name: jwtName, email } = decodeJWT(result.jwt);
@@ -589,8 +600,7 @@ export class AuthFlow {
         identityNumber: result.identityNumber,
         name: result.info.name[0] ?? jwtName,
         email,
-        pendingLastUsedEntry:
-          existingJwt === undefined ? lastUsedEntry : undefined,
+        pendingLastUsedEntry: interactive ? lastUsedEntry : undefined,
         type: "signIn",
       };
     }
@@ -636,6 +646,8 @@ export class AuthFlow {
     // authenticated session so the delegation handler can cap the account
     // delegation it requests.
     ssoSessionMaxAgeNs?: bigint,
+    // See `continueWithOpenId`. Defaults to "the JWT is fetched here".
+    interactive: boolean = existingJwt === undefined,
   ): Promise<
     | {
         type: "signIn";
@@ -673,6 +685,14 @@ export class AuthFlow {
         });
       } catch (error) {
         this.#view = "chooseMethod";
+        if (error instanceof CallbackPopupClosedError) {
+          // Reported to tell a blocked popup from a dismissed one in
+          // production; both reach the user as a cancelled interaction.
+          authenticationV2Funnel.trigger(
+            AuthenticationV2Events.OpenIDCallbackLost,
+            { reason: error.reason },
+          );
+        }
         throw error;
       } finally {
         this.#systemOverlay = false;
@@ -731,11 +751,11 @@ export class AuthFlow {
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "SsoDomainMismatch" &&
         // Only the interactive wizard flows get the guided view: there the
-        // user typed the domain themselves. A caller-supplied JWT is the
-        // non-interactive 1-click resume, where the *dapp* chose the domain, so
-        // guiding the user (or offering recovery) there would let a malicious
-        // dapp script the "fix". Those callers get the plain error instead.
-        existingJwt === undefined
+        // user typed the domain themselves. The non-interactive 1-click
+        // resume is where the *dapp* chose the domain, so guiding the user
+        // (or offering recovery) there would let a malicious dapp script the
+        // "fix". Those callers get the plain error instead.
+        interactive
       ) {
         return {
           type: "domainMismatch",
