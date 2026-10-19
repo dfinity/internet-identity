@@ -408,6 +408,19 @@ export class UrlChannel implements Channel {
     return this.#closed;
   }
 
+  // Empty: this transport carries an in-flight request across an II-internal
+  // redirect through its own persisted flow (see {@link readStoredFlow} /
+  // {@link UrlTransport.#rehydrate}), not through the channel-seeding path the
+  // post-message transport uses.
+  get pendingRequests(): JsonRequest[] {
+    return [];
+  }
+
+  // No-op: a redirect transport keeps no live peer connection to hold open.
+  markPending(): Promise<void> {
+    return Promise.resolve();
+  }
+
   addEventListener(
     ...[event, listener]:
       | [event: "close", listener: () => void]

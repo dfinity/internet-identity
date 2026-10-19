@@ -182,6 +182,8 @@ const channelWith = () => {
       origin: ORIGIN,
       closed: false,
       resumeToken: "token",
+      pendingRequests: [],
+      markPending: () => Promise.resolve(),
       addEventListener: () => () => {},
       send: (response: unknown) => {
         sent.push(response);

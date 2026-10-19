@@ -33,6 +33,14 @@ export const OPENID_AUTHORIZE_STATE_KEY = "ii-openid-authorize-state";
 export const OPENID_WIZARD_RESUME_KEY = "ii-openid-wizard-resume";
 
 /**
+ * The relying-party request(s) in flight when the authorize wizard left for the
+ * IdP in the same tab, stashed so the channel re-established on return can
+ * replay them (the RP's client does not re-send them). Set by
+ * `redirectToOpenIdForAuthorize`, consumed by the authorize layout's resume.
+ */
+export const OPENID_PENDING_REQUESTS_KEY = "ii-pending-authorize-requests";
+
+/**
  * Remove every same-tab marker from this tab's sessionStorage.
  *
  * Called before a flow starts, popup or same-tab, so the landing page only
@@ -48,6 +56,7 @@ export const clearOpenIdRedirectMarkers = (): void => {
     sessionStorage.removeItem(OPENID_AUTHORIZE_STATE_KEY);
     sessionStorage.removeItem(OPENID_WIZARD_RESUME_KEY);
     sessionStorage.removeItem(OPENID_CALLBACK_DATA_KEY);
+    sessionStorage.removeItem(OPENID_PENDING_REQUESTS_KEY);
   } catch {
     // sessionStorage can be unavailable (e.g. storage access denied); the
     // markers can't have been written either, so there is nothing to clear.

@@ -30,6 +30,10 @@
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
+  import {
+    consumePendingAuthorizeRequests,
+    redirectToOpenIdForAuthorize,
+  } from "./openIdRedirect";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
@@ -94,7 +98,15 @@
       const resumeToken =
         sessionStorage.getItem("ii-pending-channel-resume-token") ?? undefined;
       if (pendingOrigin !== null) {
-        channelStore.establish({ allowedOrigin: pendingOrigin, resumeToken });
+        // Seed the re-established channel with any request the wizard left in
+        // flight when it redirected (empty for the 1-click entry, where the
+        // client still holds the request to send on return). The handlers
+        // replay it and answer once `resumeOpenId` has signed in and authorized.
+        channelStore.establish({
+          allowedOrigin: pendingOrigin,
+          resumeToken,
+          pendingRequests: consumePendingAuthorizeRequests(),
+        });
       } else {
         channelErrorStore.set("connection-closed");
       }
@@ -371,6 +383,7 @@
                 passkeyLabel={authDialogMode === "signin"
                   ? $t`Select a passkey`
                   : undefined}
+                openIdRedirect={redirectToOpenIdForAuthorize}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"

@@ -95,6 +95,45 @@ test.describe("OpenID sign-in in the same tab", () => {
   });
 });
 
-// The dapp-authorize surface still uses the popup for OpenID, so same-tab in
-// that flow is out of scope for this change and covered by a follow-up. The
-// 1-click `?openid=` redirect flow keeps its own e2e coverage elsewhere.
+test.describe("Authorize with OpenID in the same tab", () => {
+  const name = "Same Tab";
+
+  test.use({
+    openIdConfig: {
+      createUsers: [
+        {
+          claims: { name },
+        },
+      ],
+    },
+    authorizeConfig: {
+      protocol: "icrc25",
+    },
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await forceSameTabRedirect(page);
+  });
+
+  test.afterEach(({ authorizedPrincipal }) => {
+    expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+  });
+
+  test("the wizard's provider button takes the 1-click round trip", async ({
+    authorizePage,
+    signInWithOpenId,
+    openIdUsers,
+  }) => {
+    // The dapp opened II in a popup and its client is waiting on the delegation
+    // request it already sent. The wizard's provider button navigates that
+    // popup itself to the IdP (no inner popup, which is what fails on WebKit)
+    // and comes back through the 1-click resume: II holds the client open across
+    // the round trip, replays the request on the re-established channel, signs
+    // up a fresh OpenID user, and authorizes the dapp — so the popup delivers
+    // the delegation and closes (which the `authorizePage` fixture waits for).
+    await authorizePage.page
+      .getByRole("button", { name: openIdUsers[0].issuer.name })
+      .click();
+    await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+  });
+});

@@ -225,7 +225,10 @@
 
   /** Redirect to the OpenID provider. */
   const initiateOpenId = (config: OpenIdConfig) => {
-    redirectToOpenIdForAuthorize(config);
+    // 1-click entry: no request is in flight, so this navigates synchronously;
+    // the returned promise only matters for the wizard entry (see
+    // `redirectToOpenIdForAuthorize`), so there is nothing to await here.
+    void redirectToOpenIdForAuthorize(config);
   };
 
   /**
@@ -681,6 +684,7 @@
   <AuthWizardView
     onSignIn={handleAuthWizardSignIn}
     onSignUp={handleAuthWizardSignUp}
+    openIdRedirect={redirectToOpenIdForAuthorize}
     onError={handleError}
     mode="signin"
   />
