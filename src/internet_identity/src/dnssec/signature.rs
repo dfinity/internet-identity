@@ -31,6 +31,7 @@
 //! RRSIGs this verifier can check) — keep the two in sync.
 
 use super::canonical::ds_digest_input;
+use super::types::DnsName;
 use super::types::DnssecError;
 use super::wire::{DNSKEY_RDATA_HEADER_LEN, DS_DIGEST_TYPE_SHA256, DS_RDATA_HEADER_LEN};
 // The `verify(...)` calls below resolve to inherent methods on the
@@ -306,7 +307,7 @@ fn verify_ed25519(
 ///   construction per RFC 8624 §3.3,
 /// - and `digest(canonical_owner_name || dnskey_rdata)` matches the
 ///   digest field of the DS RDATA (RFC 4034 §5.1.4).
-pub fn ds_matches_dnskey(child_zone_name: &[u8], dnskey_rdata: &[u8], ds_rdata: &[u8]) -> bool {
+pub fn ds_matches_dnskey(child_zone_name: &DnsName, dnskey_rdata: &[u8], ds_rdata: &[u8]) -> bool {
     /// Offset of the Digest Type field in DS RDATA: 2-byte Key Tag
     /// + 1-byte Algorithm (RFC 4034 §5.1).
     const DIGEST_TYPE_OFFSET: usize = 3;

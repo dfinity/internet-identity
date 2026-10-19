@@ -923,9 +923,31 @@ fn dnssec_flow_until_need_dkim_leaf(
     env: &PocketIc,
     allowed_domains: Vec<String>,
 ) -> (candid::Principal, u64, candid::Principal, String, Vec<u8>) {
+    let flow = dnssec_flow_until_need_dkim_leaf_signed_as(env, allowed_domains, TEST_SELECTOR);
+    (flow.canister_id, flow.id, flow.p, flow.nonce, flow.dkim_txt)
+}
+
+/// What [`dnssec_flow_until_need_dkim_leaf_signed_as`] hands back.
+struct DnssecFlow {
+    canister_id: candid::Principal,
+    id: u64,
+    p: candid::Principal,
+    nonce: String,
+    dkim_txt: Vec<u8>,
+}
+
+/// [`dnssec_flow_until_need_dkim_leaf`] with the email's
+/// `DKIM-Signature` carrying `email_selector` as `s=`, so the status
+/// ends as `NeedDkimLeaf { selector: email_selector }`. The DNSSEC
+/// chain is still built for `TEST_SELECTOR`.
+fn dnssec_flow_until_need_dkim_leaf_signed_as(
+    env: &PocketIc,
+    allowed_domains: Vec<String>,
+    email_selector: &str,
+) -> DnssecFlow {
     use internet_identity_interface::internet_identity::types::DnssecConfig;
 
-    let dkim = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let dkim = dkim_signer::TestSigner::new(TEST_DOMAIN, email_selector);
     let dkim_txt = dkim.public_txt_record();
     let now_secs: u32 = (time(env) / 1_000_000_000)
         .try_into()
@@ -947,7 +969,7 @@ fn dnssec_flow_until_need_dkim_leaf(
             max_cache_age_secs: Some(3600),
         })),
         dnssec_config: Some(Some(DnssecConfig {
-            root_anchors: vec![chain.anchor],
+            root_anchors: vec![chain.anchor.clone()],
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
@@ -1005,12 +1027,174 @@ fn dnssec_flow_until_need_dkim_leaf(
         .expect("status call failed");
     match status {
         EmailChallengeStatus::NeedDkimLeaf { ref selector } => {
-            assert_eq!(selector, TEST_SELECTOR)
+            assert_eq!(selector, email_selector)
         }
         other => panic!("expected NeedDkimLeaf, got {other:?}"),
     };
 
-    (canister_id, id, p, challenge.nonce, dkim_txt)
+    DnssecFlow {
+        canister_id,
+        id,
+        p,
+        nonce: challenge.nonce,
+        dkim_txt,
+    }
+}
+
+// ===================================================================
+// DNSSEC path: names are admitted at the Candid boundary
+// ===================================================================
+
+#[test]
+fn dnssec_prepare_rejects_hop_name_with_compression_pointer() {
+    use internet_identity_interface::internet_identity::types::DnssecConfig;
+
+    let env = env();
+    let dkim = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC initial time fits in u32");
+    let chain = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        &dkim.public_txt_record(),
+        Some(b"v=DMARC1; p=none;"),
+        now_secs,
+    );
+    let args = InternetIdentityInit {
+        dnssec_config: Some(Some(DnssecConfig {
+            root_anchors: vec![chain.anchor],
+        })),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(args),
+        10_000_000_000_000,
+    );
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    // The DMARC leaf's owner name is a compression pointer (RFC 1035
+    // §4.1.4), which no admitted name may carry.
+    let mut dmarc_leaf = chain
+        .dmarc_leaf
+        .clone()
+        .expect("chain carries a DMARC leaf");
+    dmarc_leaf.name = ByteBuf::from(b"\xc0\x0c".to_vec());
+    let input = EmailChallengeDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(DnsProofBundle {
+            hops: vec![dmarc_leaf],
+            ..chain.skeleton.clone()
+        }),
+    };
+    let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("prepare_add call failed")
+        .expect_err("a hop name with a compression pointer must be rejected");
+    assert!(
+        matches!(err, EmailChallengeError::EmailVerificationFailed(_)),
+        "expected EmailVerificationFailed, got {err:?}",
+    );
+}
+
+#[test]
+fn dnssec_submit_rejects_hop_name_with_compression_pointer() {
+    use internet_identity_interface::internet_identity::types::dnssec::{Rrsig, SignedRRset};
+    use internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeSubmitDkimLeafArg;
+
+    let env = env();
+    let (canister_id, _id, _p, nonce, _dkim_txt) = dnssec_flow_until_need_dkim_leaf(&env, vec![]);
+
+    // A TXT hop whose owner name is a compression pointer. It never
+    // reaches the hop walk: admission at the boundary fails first.
+    let hop = SignedRRset {
+        name: ByteBuf::from(b"\xc0\x0c".to_vec()),
+        rtype: 16,
+        rdata: vec![ByteBuf::from(b"\x09v=DKIM1;k=rsa;p=AAAA".to_vec())],
+        ttl: 3600,
+        rrsig: Rrsig {
+            type_covered: 16,
+            algorithm: 8,
+            labels: 3,
+            original_ttl: 3600,
+            expiration: 4_000_000_000,
+            inception: 0,
+            key_tag: 1,
+            signer_name: ByteBuf::from(vec![0u8]),
+            signature: ByteBuf::from(vec![0u8; 256]),
+        },
+    };
+    api::email_challenge_submit_dkim_leaf(
+        &env,
+        canister_id,
+        EmailChallengeSubmitDkimLeafArg {
+            nonce: nonce.clone(),
+            hops: vec![hop],
+            extra_chains: vec![],
+        },
+    )
+    .expect("submit_dkim_leaf call failed")
+    .expect("submit_dkim_leaf accepts; the verdict is on the polled status");
+
+    let status =
+        api::email_challenge_status(&env, canister_id, &nonce).expect("status call failed");
+    assert!(
+        matches!(
+            status,
+            EmailChallengeStatus::Failed(EmailChallengeError::DkimLeafMismatch)
+        ),
+        "expected Failed(DkimLeafMismatch), got {status:?}",
+    );
+}
+
+#[test]
+fn dnssec_submit_rejects_empty_selector_as_leaf_mismatch() {
+    use internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeSubmitDkimLeafArg;
+
+    // The email's `DKIM-Signature` carries `s=` with no value, so the
+    // expected key name `._domainkey.<domain>` has an empty label and is
+    // not a DNS name at all. The submitted leaf is otherwise valid: it
+    // sits at the collapsed `_domainkey.<domain>`, is signed by the zone
+    // whose keys the canister cached at prepare, and carries the key the
+    // email was signed with. An encoder that dropped the empty label would
+    // match it and complete the challenge; only the empty-label rejection
+    // keeps the verdict at `DkimLeafMismatch`.
+    let env = env();
+    let flow = dnssec_flow_until_need_dkim_leaf_signed_as(&env, vec![], "");
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let collapsed_leaf = dnssec_signer::sign_txt_leaf(
+        TEST_DOMAIN,
+        &format!("_domainkey.{TEST_DOMAIN}"),
+        &flow.dkim_txt,
+        now_secs,
+    );
+
+    api::email_challenge_submit_dkim_leaf(
+        &env,
+        flow.canister_id,
+        EmailChallengeSubmitDkimLeafArg {
+            nonce: flow.nonce.clone(),
+            hops: vec![collapsed_leaf],
+            extra_chains: vec![],
+        },
+    )
+    .expect("submit_dkim_leaf call failed")
+    .expect("submit_dkim_leaf accepts; the verdict is on the polled status");
+
+    let status = api::email_challenge_status(&env, flow.canister_id, &flow.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(
+            status,
+            EmailChallengeStatus::Failed(EmailChallengeError::DkimLeafMismatch)
+        ),
+        "expected Failed(DkimLeafMismatch), got {status:?}",
+    );
 }
 
 #[test]
@@ -2814,6 +2998,26 @@ pub(crate) mod dnssec_signer {
             dkim_leaf,
             dmarc_leaf,
         }
+    }
+
+    /// A TXT leaf at `owner` (text form), signed under the same zone key
+    /// [`build_chain`] derives for `domain`, with the same validity window,
+    /// so a test can place an otherwise valid leaf at a name the email did
+    /// not ask for.
+    pub fn sign_txt_leaf(domain: &str, owner: &str, txt: &[u8], now_secs: u32) -> SignedRRset {
+        let inception = now_secs.saturating_sub(60);
+        let expiration = now_secs.saturating_add(7 * 24 * 3600);
+        let zone_key = ZoneKey::new(encode_dns_name(domain), [2u8; 32]);
+        let owner_wire = encode_dns_name(owner);
+        sign_rrset(
+            &zone_key,
+            &owner_wire,
+            TYPE_TXT,
+            vec![pack_txt_rdata(txt)],
+            count_labels(&owner_wire),
+            inception,
+            expiration,
+        )
     }
 
     struct ZoneKey {
