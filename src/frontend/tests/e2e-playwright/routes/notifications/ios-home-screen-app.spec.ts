@@ -67,9 +67,8 @@ const takeTheInstall = async (authPage: Page): Promise<string> => {
   ).toBeVisible();
   const url = installPage.url();
   await installPage.close();
-  // Sign-in settles when the user leaves the handoff, not when they answer: the screen
-  // stays up carrying the link, for a browser that opened no tab.
-  await authPage.getByRole("button", { name: "Continue", exact: true }).click();
+  // Nothing more to press: the steps are walked in the tab that just opened, and the
+  // page that opened it settles sign-in behind them once it has pointed that tab.
   return url;
 };
 
@@ -586,6 +585,112 @@ test.describe("notifications on a Home Screen app", () => {
     await relay.close();
   });
 
+  /**
+   * Signing in to an app that asks for notifications, on a phone whose Home Screen app
+   * has been deleted and whose switch is off.
+   *
+   * `subscribed` outlives the app it names, so this used to report success and hand
+   * sign-in straight back: the dapp was told it may notify a device with nothing to
+   * notify, and the steps were never offered. The press now asks the app to answer for
+   * itself, and the steps are what is left when it does not.
+   */
+  test("offer the install from sign-in once the app has been deleted", async ({
+    browser,
+    context,
+    testApp,
+    identities,
+    signInWithIdentity,
+  }) => {
+    const { relay, app } = await installOnThePhone({
+      browser,
+      context,
+      testApp,
+      identityNumber: identities[0].identityNumber,
+      signInWithIdentity,
+    });
+
+    // Switched off where the user switches it off. The proof only runs for a switch that
+    // is off, since an app already delivering has nothing to prove and a probe for every
+    // consent would be a notification nobody asked for.
+    const settings = await context.newPage();
+    await settings.goto(`${II_URL}/manage/settings`);
+    await signInWithIdentity(settings, identities[0].identityNumber);
+    const notifications = settings.getByRole("switch", {
+      name: "Allow notifications",
+    });
+    await expect(notifications).toBeVisible({ timeout: 30_000 });
+    await notifications.click();
+    await expect(notifications).toBeEnabled({ timeout: 30_000 });
+    await expect(notifications).not.toBeChecked({ timeout: 30_000 });
+
+    // Deleted from the Home Screen, which tells the canister nothing: the relay answers
+    // for that endpoint exactly as before, so the record goes on saying it delivers.
+    await app.delete();
+
+    // Back to the app, which asks again. Nothing is delivered by hand from here, so the
+    // probe this press sends goes unanswered and times out, which is the app being gone.
+    await testApp.signOut();
+    const again = continueAs(identities[0].identityNumber, signInWithIdentity);
+    await testApp.signIn(again);
+    await testApp.waitUntilSignedIn();
+
+    await askToNotify(testApp.page, async (authPage: Page) => {
+      await again(authPage);
+      const allow = authPage.getByRole("button", {
+        name: "Allow",
+        exact: true,
+      });
+
+      // The first press is what discovers the app is gone: it asks the app to answer,
+      // the probe goes unanswered, and the screen becomes the one that installs. The
+      // button says so while it waits, and comes back when the answer is in.
+      await allow.click();
+      await expect(
+        authPage.getByRole("button", { name: /Setting up/ }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(allow).toBeVisible({ timeout: 60_000 });
+
+      // Armed around the second press: the tab is opened inside the gesture, before
+      // anything is awaited, which is the only time a browser allows one.
+      const steps = authPage
+        .context()
+        .waitForEvent("page", { timeout: 60_000 });
+      await allow.click();
+
+      // The tab reaches the steps rather than closing on an install that was refused:
+      // an ordinary one is refused over a record that still says it delivers, so the
+      // replacement is what this press has to mint. Reaching them also proves the tab
+      // was pointed before sign-in handed back and took the page that points it.
+      const offered = await steps;
+      await expect(
+        offered.getByRole("heading", { name: "Set up ICP Alerts" }),
+      ).toBeVisible({ timeout: 60_000 });
+      await offered.close();
+    });
+
+    // Sign-in still settles, with nothing left on screen to press: a second screen
+    // between the press and the handback would leave this waiting for ever. What the app
+    // is told is read from the canister rather than from the press, and it is told this
+    // identity allowed it *and* this browser delivers. The consent is recorded, but the
+    // steps have only been offered, so until they are walked this device delivers
+    // nothing and the answer is no.
+    await testApp.expectMayNotNotify();
+
+    // An entry that delivers for nobody must not read as delivering once the steps are
+    // offered rather than finished. Read on a page of its own: the session lives in
+    // memory, so reloading the one from earlier drops it and lands on the picker.
+    const afterwards = await context.newPage();
+    await afterwards.goto(`${II_URL}/manage/settings`);
+    await signInWithIdentity(afterwards, identities[0].identityNumber);
+    const stillOff = afterwards.getByRole("switch", {
+      name: "Allow notifications",
+    });
+    await expect(stillOff).toBeVisible({ timeout: 30_000 });
+    await expect(stillOff).not.toBeChecked({ timeout: 30_000 });
+
+    await relay.close();
+  });
+
   test("keep the install steps up until a new app delivers", async ({
     browser,
     context,
@@ -800,9 +905,6 @@ test.describe("notifications on a Home Screen app", () => {
       ).toBeVisible({ timeout: 30_000 });
 
       await installPage.close();
-      await authPage
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
     });
 
     await relay.close();
