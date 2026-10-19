@@ -2153,6 +2153,8 @@ mod openid_api {
 mod email_challenge_api {
     use super::*;
     use crate::email_inbound;
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     use internet_identity_interface::internet_identity::types::email_challenge::{
         EmailChallengeDiagnostics, EmailChallengeError, EmailChallengeResolveViaDohArg,
         EmailChallengeStatus, EmailChallengeSubmitDkimLeafArg,
@@ -2182,6 +2184,8 @@ mod email_challenge_api {
     /// matches the full `user@domain` against `related_origins`,
     /// defense-in-depth against a direct caller spoofing just the
     /// user-part.
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     #[update]
     fn smtp_request(
         request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
@@ -2202,6 +2206,8 @@ mod email_challenge_api {
     /// with — which on the existing II gateway is the postbox PoC's
     /// "user-part must be a numeric anchor number" rule, rejecting
     /// `register@id.ai` and `recover@id.ai` outright.
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     #[query]
     fn smtp_request_validate(
         request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
@@ -2267,6 +2273,8 @@ mod email_challenge_api {
     /// canister-issued secret that lives only inside one pending
     /// entry, and the leaf submission is a no-op against any other
     /// entry.
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     #[update]
     async fn email_challenge_submit_dkim_leaf(
         arg: EmailChallengeSubmitDkimLeafArg,
@@ -2339,6 +2347,8 @@ mod email_challenge_api {
         email_inbound::pending_diagnostics(&nonce, now_secs)
     }
 
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     #[update]
     async fn email_recovery_submit_dkim_leaf(
         arg: EmailChallengeSubmitDkimLeafArg,
@@ -2363,6 +2373,8 @@ mod email_recovery_api {
     use ic_canister_sig_creation::delegation_signature_msg;
     use ic_canister_sig_creation::signature_map::CanisterSigInputs;
     use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     use internet_identity_interface::internet_identity::types::email_challenge::{
         EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
     };
@@ -2382,6 +2394,8 @@ mod email_recovery_api {
     /// is bounded by the 10 k pending-map cap (see
     /// `email_inbound::MAX_PENDING_CHALLENGES`) with 30-minute TTL
     /// and oldest-first eviction.
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     #[update]
     async fn email_recovery_credential_prepare_add(
         identity_number: IdentityNumber,
@@ -2420,6 +2434,8 @@ mod email_recovery_api {
     /// DKIM-verified email itself is the credential. The
     /// nonce-rotation + Subject-visibility defenses (design §3.2)
     /// stand in for caller authentication.
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     #[update]
     async fn email_recovery_prepare_delegation(
         dns_input: EmailChallengeDnsInput,
@@ -2508,10 +2524,14 @@ mod email_recovery_api {
 mod verified_email_api {
     use super::*;
     use crate::authz_utils::check_authorization;
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     use internet_identity_interface::internet_identity::types::email_challenge::{
         EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
     };
 
+    // disallowed-types: permanent, Candid entry point
+    #[allow(clippy::disallowed_types)]
     #[update]
     async fn verified_email_prepare_add(
         identity_number: IdentityNumber,
@@ -2767,11 +2787,19 @@ mod attribute_sharing_old_vc {
 fn main() {}
 
 // Order dependent: do not move above any exposed canister method!
-candid::export_service!();
+// Only the unit test below reads the generated interface; the generated
+// `__export_service` was equally test-only before being wrapped here.
+// disallowed-types: permanent, Candid entry point
+#[allow(clippy::disallowed_types)]
+#[cfg_attr(not(test), allow(dead_code))]
+fn export_candid_interface() -> String {
+    candid::export_service!();
+    __export_service()
+}
 
 #[cfg(test)]
 mod test {
-    use crate::__export_service;
+    use crate::export_candid_interface;
     use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
 
@@ -2779,7 +2807,7 @@ mod test {
     /// a subtype of the generated interface and vice versa.
     #[test]
     fn check_candid_interface_compatibility() {
-        let canister_interface = __export_service();
+        let canister_interface = export_candid_interface();
         service_equal(
             CandidSource::Text(&canister_interface),
             CandidSource::File(Path::new("internet_identity.did")),

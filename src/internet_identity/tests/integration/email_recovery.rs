@@ -2687,7 +2687,7 @@ pub(crate) mod dkim_signer {
 // keeps the signer compact while still exercising every verifier
 // branch that matters for happy-path validation.
 
-mod dnssec_signer {
+pub(crate) mod dnssec_signer {
     use ed25519_dalek::{Signer, SigningKey};
     use internet_identity_interface::internet_identity::types::dnssec::{
         DelegationChain, DelegationLink, DnsProofBundle, Rrsig, SignedRRset,

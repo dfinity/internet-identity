@@ -1,3 +1,11 @@
+// The persisted install-arg `DohConfig` is named by the Candid and serde
+// derives in generated code that no item-level attribute reaches. The allow
+// is file-scoped: `StorablePersistentState` is the only item here that names
+// the type, and its private fields keep the struct, its conversions and its
+// tests in this one file.
+// disallowed-types: removed by C1
+#![allow(clippy::disallowed_types)]
+
 use crate::archive::ArchiveState;
 use crate::state::{PersistentState, DEFAULT_CAPTCHA_CONFIG};
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;

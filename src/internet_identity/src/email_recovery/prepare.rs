@@ -25,6 +25,8 @@
 
 use crate::email_inbound::prepare::prepare_common;
 use crate::email_inbound::{PendingKind, MAX_SESSION_KEY_BYTES, NONCE_PREFIX};
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
@@ -49,6 +51,8 @@ use internet_identity_interface::internet_identity::types::{
 ///
 /// `now_secs` is `ic_cdk::api::time() / 1_000_000_000`, hoisted out
 /// for testability.
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 pub async fn prepare_add(
     anchor: AnchorNumber,
     dns_input: EmailChallengeDnsInput,
@@ -74,6 +78,8 @@ pub async fn prepare_add(
 /// bound to it. The pending challenge holds it until
 /// `submit_dkim_leaf` succeeds, at which point the canister stamps a
 /// delegation seed and adds the matching canister-signature.
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 pub async fn prepare_delegation(
     dns_input: EmailChallengeDnsInput,
     session_pk: SessionKey,
@@ -103,6 +109,8 @@ pub async fn prepare_delegation(
 #[cfg(test)]
 mod tests {
     use super::*;
+    // disallowed-types: removed by C1
+    #[allow(clippy::disallowed_types)]
     use internet_identity_interface::internet_identity::types::doh::DohConfig;
 
     fn install_doh_allowlist(domains: &[&str]) {
@@ -114,6 +122,8 @@ mod tests {
         });
     }
 
+    // disallowed-types: removed by C3
+    #[allow(clippy::disallowed_types)]
     fn doh_input(addr: &str) -> EmailChallengeDnsInput {
         EmailChallengeDnsInput {
             address: addr.to_string(),
@@ -125,6 +135,8 @@ mod tests {
     /// bundle. With the flag off the bundle is dropped before any
     /// validation runs, so its contents don't matter; with the flag on it
     /// reaches `verify_dnssec_skeleton` and fails there.
+    // disallowed-types: removed by C3
+    #[allow(clippy::disallowed_types)]
     fn dnssec_input(addr: &str) -> EmailChallengeDnsInput {
         use internet_identity_interface::internet_identity::types::dnssec::{
             DnsProofBundle, Rrsig, SignedRRset,

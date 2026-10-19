@@ -52,9 +52,13 @@ use super::pending::{self, PendingKind, PendingStatus};
 use crate::authz_utils::{authorization_key_is_valid, unauthorized_principal_for_key};
 use crate::doh::{DohError, DohRecord};
 use crate::single_flight_cache::Cached;
+// disallowed-types: removed by A2.3
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallengeError, EmailChallengeSubmitDkimLeafArg,
 };
+// disallowed-types: removed by A2.3
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, AuthorizationKey, DelegationChain, SessionKey, SignedRRset,
 };
@@ -77,6 +81,8 @@ type DkimAndDmarc = (Vec<u8>, Option<Vec<u8>>);
 /// can't walk DNSSEC at all (the `outlook.com` ->
 /// `outbound.protection.outlook.com` / `live.com` case); it then calls
 /// the sibling `resolve_via_doh` instead of this method.
+// disallowed-types: removed by A2.3
+#[allow(clippy::disallowed_types)]
 pub async fn submit_dkim_leaf(
     arg: EmailChallengeSubmitDkimLeafArg,
     now_secs: u64,
@@ -450,6 +456,8 @@ impl Snapshot {
 
 /// The leaf-validation + signature-verification + alignment-check
 /// pipeline. Returns `Ok(())` on full success.
+// disallowed-types: removed by A2.3
+#[allow(clippy::disallowed_types)]
 fn run_submit(
     hops: &[SignedRRset],
     extra_chains: &[DelegationChain],
