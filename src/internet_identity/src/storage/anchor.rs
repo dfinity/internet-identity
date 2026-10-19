@@ -885,6 +885,11 @@ impl Anchor {
     /// Records that `browser_id` has started an install, naming the only caller that may
     /// complete it. Replaces any earlier pending install of that browser, so minting a
     /// second install URL retires the first.
+    ///
+    /// `link_principal` is the principal of the one-shot key the browser generated and
+    /// put in the install URL's fragment. The app added from that URL signs as it to
+    /// link, once: nothing else is stored between the two halves, so that signature is
+    /// the whole of the authority.
     pub fn start_notification_app_link(
         &mut self,
         browser_id: BrowserId,

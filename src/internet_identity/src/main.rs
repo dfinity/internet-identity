@@ -398,7 +398,7 @@ fn prepare_notification_app_link(
 ) -> Result<(), PrepareNotificationAppLinkError> {
     if !notifications::notifications_enabled() {
         return Err(PrepareNotificationAppLinkError::InternalCanisterError(
-            notifications::NOT_ENABLED.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     // The whole authority of an install URL is the key behind this principal, so a
@@ -446,7 +446,7 @@ fn link_notification_app(
 ) -> Result<(), LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     // Checked before the slot is spent: a record keyed by something no app can sign as
@@ -466,7 +466,7 @@ fn link_notification_app(
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.notification_app_for_key(&request.app_key, now)
+        storage.ensure_notification_app_for_key(&request.app_key, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id);
