@@ -20,6 +20,12 @@
 #     #[allow(clippy::all)]              (likewise)
 #     #[allow(clippy :: disallowed_types)]
 #     #[allow(clippy::disallowed_types, reason = "legacy [B2]")]
+#     #[allow(clippy::r#disallowed_types)]
+#     #[allow(clippy::disallowed_type)]  (the lint's pre-1.62 name, still honoured)
+#     #[allow(warnings)]                 (silences it whenever clippy runs without
+#                                         `-D clippy::all`, e.g. a plain `cargo clippy`)
+#     # [allow(clippy::disallowed_types)]
+#     # /* note */ [allow(clippy::disallowed_types)]
 #     #[cfg_attr(test, allow(clippy::disallowed_types))]
 #     #[cfg_attr(test, allow(dead_code), allow(clippy::disallowed_types))]
 #     #[allow(
@@ -27,7 +33,9 @@
 #         clippy::disallowed_types,
 #     )]
 # and an attribute quoted inside a comment or a string is not an attribute.
-# Known limit: nested block comments (`/* /* */ */`) are not understood.
+# `warn`/`deny`/`forbid` never need a tag. Known limits: nested block comments
+# (`/* /* */ */`) are not understood, and attributes produced by a macro are
+# not visible to a source scan.
 # `scripts/check-disallowed-types-tags.test.sh` pins these cases.
 #
 # Usage: check-disallowed-types-tags.sh [DIR]   (DIR defaults to src/)
@@ -50,19 +58,26 @@ while IFS= read -r -d '' file; do
             | b?"(?:[^"\\]|\\.)*"                        # string
             | b?\x27(?:[^\x27\\\n]|\\.)\x27              # char literal
         }{ (my $blank = $&) =~ s/[^\n]/ /g; $blank }gsex;
-        # Each attribute, outer or inner, as a whole (brackets balanced).
-        while ($code =~ /#!?\[((?:[^\[\]]++|\[(?1)\])*)\]/gs) {
+        # Each attribute, outer or inner, as a whole (brackets balanced);
+        # `#`, `!` and `[` are separate tokens, so whitespace (or a comment,
+        # already blanked) may separate them.
+        while ($code =~ /#\s*!?\s*\[((?:[^\[\]]++|\[(?1)\])*)\]/gs) {
             my ($attr, $start) = ($1, $-[0]);
             my $hit = 0;
-            # Every allow/expect list inside it (parentheses balanced).
-            while ($attr =~ /\b(?:allow|expect)\s*(\((?:[^()]++|(?1))*\))/gs) {
-                $hit = 1 if $1 =~ /\bclippy\s*::\s*(?:disallowed_types|style|all)\b/;
+            # Every allow/expect list inside it (parentheses balanced), the
+            # lint named plainly, by its old name or as a raw identifier, alone
+            # or through a group that contains it (`clippy::style`,
+            # `clippy::all`, bare `warnings`).
+            while ($attr =~ /\b(?:r\#)?(?:allow|expect)\s*(\((?:[^()]++|(?1))*\))/gs) {
+                my $list = $1;
+                $hit = 1 if $list =~ /\b(?:r\#)?clippy\s*::\s*(?:r\#)?(?:disallowed_types?|style|all)\b/;
+                $hit = 1 if $list =~ /(?<![\w:])(?:r\#)?warnings\b/;
             }
             next unless $hit;
             my $line = 1 + (substr($code, 0, $start) =~ tr/\n//);
             my $prev = $line > 1 ? $lines[$line - 2] : "";
             next if $prev =~ m{^\s*// disallowed-types: (?:removed by [A-Za-z0-9.-]+|permanent, .+)$};
-            print STDERR "$ARGV:$line: allow/expect of clippy::disallowed_types (or a lint group containing it) without a \x27// disallowed-types: ...\x27 tag on the line above\n";
+            print STDERR "$ARGV:$line: allow/expect of clippy::disallowed_types (or a lint group containing it: clippy::style, clippy::all, warnings) without a \x27// disallowed-types: ...\x27 tag on the line above\n";
             $bad = 1;
         }
         exit $bad;
