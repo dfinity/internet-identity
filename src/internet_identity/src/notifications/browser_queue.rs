@@ -463,7 +463,7 @@ mod tests {
             .id;
         let app_id = storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&ByteBuf::from(vec![9u8; 91]), 0)
+                .ensure_notification_app_for_key(&ByteBuf::from(vec![9u8; 91]), 0)
                 .expect("creating the app record");
             storage.set_notification_app_subscription(
                 app.id,
@@ -549,7 +549,7 @@ mod tests {
         });
         let moved_to = storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 0)
+                .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 0)
                 .expect("creating the second app record");
             storage.set_notification_app_subscription(
                 app.id,

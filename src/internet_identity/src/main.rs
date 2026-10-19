@@ -41,7 +41,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use notifications::app::NotificationAppRef;
 use notifications::senders::Senders;
-use notifications::validation::NOT_ENABLED;
+use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
@@ -404,7 +404,7 @@ fn prepare_notification_app_link(
 ) -> Result<(), PrepareNotificationAppLinkError> {
     if !notifications::notifications_enabled() {
         return Err(PrepareNotificationAppLinkError::InternalCanisterError(
-            notifications::NOT_ENABLED.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     // The whole authority of an install URL is the key behind this principal, so a
@@ -480,7 +480,7 @@ fn turn_on_notification_app(
 ) -> Result<NotificationId, TurnOnNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(TurnOnNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
@@ -541,7 +541,7 @@ fn set_notification_app_enabled(
 ) -> Result<(), SetNotificationAppEnabledError> {
     if !notifications::notifications_enabled() {
         return Err(SetNotificationAppEnabledError::InternalCanisterError(
-            notifications::NOT_ENABLED.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
@@ -591,7 +591,7 @@ fn probe_notification_app(
 ) -> Result<NotificationId, ProbeNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(ProbeNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
@@ -674,7 +674,7 @@ fn claim_notification_app(
 ) -> Result<(), ClaimNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(ClaimNotificationAppError::InternalCanisterError(
-            NOT_ENABLED.to_string(),
+            NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     let now = ic_cdk::api::time();
@@ -745,7 +745,7 @@ fn link_notification_app(
 ) -> Result<(), LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     // Checked before the slot is spent: a record keyed by something no app can sign as
@@ -765,7 +765,7 @@ fn link_notification_app(
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.notification_app_for_key(&request.app_key, now)
+        storage.ensure_notification_app_for_key(&request.app_key, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id, true);

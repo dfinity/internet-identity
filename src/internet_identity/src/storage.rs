@@ -3558,24 +3558,27 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(app_id)
     }
 
-    /// The record of the app signing as `principal`, if there is one.
-    pub fn notification_app_with_principal(&self, principal: Principal) -> Option<NotificationApp> {
+    /// The record of the app signing as `app_principal`, if there is one.
+    pub fn notification_app_with_principal(
+        &self,
+        app_principal: Principal,
+    ) -> Option<NotificationApp> {
         let app_id = self
             .lookup_notification_app_with_principal_memory
-            .get(&principal)?;
+            .get(&app_principal)?;
         self.notification_app_memory
             .get(&app_id)
             .map(NotificationApp::from)
     }
 
-    /// The record for `key`, creating one where this key has never been seen. Reused rather
-    /// than replaced, and stamped either way.
-    pub fn notification_app_for_key(
+    /// The record for `public_key`, creating one where this key has never been seen.
+    /// Reused rather than replaced, and stamped either way, so this writes on every call.
+    pub fn ensure_notification_app_for_key(
         &mut self,
-        key: &PublicKey,
+        public_key: &PublicKey,
         now: Timestamp,
     ) -> Result<NotificationApp, StorageError> {
-        let principal = Principal::self_authenticating(key);
+        let principal = Principal::self_authenticating(public_key);
         if let Some(app) = self.notification_app_with_principal(principal) {
             let app = NotificationApp {
                 last_used: now,
@@ -3587,7 +3590,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
         let app = NotificationApp {
             id: self.allocate_notification_app_id()?,
-            key: key.clone(),
+            key: public_key.clone(),
             created_at: now,
             last_used: now,
             webpush_subscription: None,
