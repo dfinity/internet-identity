@@ -272,19 +272,22 @@ pub fn remove_openid_credential(
 
 /// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
 /// Apple sends the user's name only once, so an Apple credential keeps the name it has unless
-/// `apple_full_name` brings a new one (see `OpenIdCredential::set_apple_full_name`).
+/// `apple_full_name` brings a new one it can take (see `OpenIdCredential::set_apple_full_name`).
 /// Return an error if the `OpenIdCredential` to be updated does not exist.
 pub fn update_openid_credential(
     anchor: &mut Anchor,
     mut openid_credential: OpenIdCredential,
     apple_full_name: Option<String>,
 ) -> Result<(), AnchorError> {
-    let stored_name = anchor
-        .openid_credentials()
-        .iter()
-        .find(|stored| stored.key() == openid_credential.key())
-        .and_then(OpenIdCredential::get_name);
-    openid_credential.set_apple_full_name(apple_full_name.or(stored_name));
+    openid_credential.set_apple_full_name(apple_full_name);
+    if openid_credential.get_name().is_none() {
+        let stored_name = anchor
+            .openid_credentials()
+            .iter()
+            .find(|stored| stored.key() == openid_credential.key())
+            .and_then(OpenIdCredential::get_name);
+        openid_credential.set_apple_full_name(stored_name);
+    }
     anchor.update_openid_credential(openid_credential)
 }
 
@@ -438,6 +441,12 @@ fn should_keep_the_apple_name_across_sign_ins() {
     // A later sign-in brings no name: the stored one stays.
     update_openid_credential(&mut anchor, from_token.clone(), None).unwrap();
     assert_eq!(stored_name(&anchor), Some("Jane Appleseed".into()));
+
+    // A name the credential can't take counts as none: the stored one stays.
+    for unusable in [String::new(), " \t".into(), "a".repeat(129)] {
+        update_openid_credential(&mut anchor, from_token.clone(), Some(unusable)).unwrap();
+        assert_eq!(stored_name(&anchor), Some("Jane Appleseed".into()));
+    }
 
     // A sign-in that brings one (after the user revoked II at Apple) replaces it.
     update_openid_credential(&mut anchor, from_token.clone(), Some("Jane Doe".into())).unwrap();
