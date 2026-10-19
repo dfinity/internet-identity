@@ -39,8 +39,20 @@ export interface HeartbeatServerOptions {
   window?: Window;
 }
 
+/**
+ * Upper bound on how long {@link HeartbeatServer.setPending} waits for the
+ * client to poll and observe the new `pending` status before resolving anyway.
+ * The ICRC-29 client polls a few times a second, so a pending response normally
+ * reaches it well inside this; the cap only keeps the caller's redirect from
+ * hanging if the client has stopped polling (e.g. it already disconnected).
+ */
+const PENDING_ACK_TIMEOUT_MS = 1000;
+
 export class HeartbeatServer {
   readonly #options: Required<HeartbeatServerOptions>;
+  // Resolver for a {@link setPending} awaiting the client to observe `pending`;
+  // run (and cleared) the next time a status response is sent while pending.
+  #pendingAck?: () => void;
 
   constructor(options: HeartbeatServerOptions) {
     this.#options = {
@@ -57,6 +69,35 @@ export class HeartbeatServer {
 
   changeStatus(status: "pending" | "ready"): void {
     this.#options.status = status;
+  }
+
+  /**
+   * Switch the channel to `pending` and resolve once the client has been
+   * answered with it at least once — i.e. once the client knows to wait rather
+   * than give up. The ICRC-29 client holds a `pending` channel open far longer
+   * than a `ready` one, so this is what lets II navigate away for an internal
+   * redirect (an OpenID/SSO hop) without the client's short ready-timeout
+   * closing the window mid-flow. Resolves on a {@link PENDING_ACK_TIMEOUT_MS}
+   * fallback if no poll arrives, so a redirect is never blocked indefinitely.
+   */
+  setPending(): Promise<void> {
+    this.#options.status = "pending";
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        if (this.#pendingAck === done) {
+          this.#pendingAck = undefined;
+        }
+        resolve();
+      };
+      this.#pendingAck = done;
+      const timer = setTimeout(done, PENDING_ACK_TIMEOUT_MS);
+    });
   }
 
   #establish(): void {
@@ -158,5 +199,11 @@ export class HeartbeatServer {
       { jsonrpc: "2.0", id, result: this.#options.status },
       origin,
     );
+    // A `setPending` caller waits for the client to have been told to wait; this
+    // response is that moment. Only `pending` counts: a later `ready` response
+    // must not resolve a wait meant to confirm the client saw `pending`.
+    if (this.#options.status === "pending") {
+      this.#pendingAck?.();
+    }
   }
 }

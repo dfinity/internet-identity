@@ -21,6 +21,14 @@ export interface ChannelOptions {
   // initiated the II-internal redirect, stashed before it and passed back here.
   // A transport that persists a resumable flow requires it to match.
   resumeToken?: string;
+  // In-flight relying-party requests to seed a resumed channel with, so a
+  // request received before an II-internal redirect (the authorize wizard's
+  // same-tab OpenID sign-in) is still answered after the round trip even though
+  // the RP's client, having already sent it over a now-superseded channel, will
+  // not send it again. Only a transport that keeps a live post-message channel
+  // to the opener replays them (see {@link Channel.pendingRequests} and
+  // `PostMessageChannel`); transports that persist their own flow ignore them.
+  pendingRequests?: JsonRequest[];
 }
 
 export interface Channel {
@@ -32,6 +40,13 @@ export interface Channel {
   // `ChannelOptions.resumeToken`, so a transport can prove a resume belongs to
   // the channel that started the flow rather than inferring it from the origin.
   resumeToken: string;
+  // Requests received on this channel that have not been answered yet. A
+  // transport whose live channel must hand its in-flight work to a resumed
+  // channel across an II-internal redirect exposes them here, so the authorize
+  // page can stash them before leaving and {@link ChannelOptions.pendingRequests}
+  // can replay them on return. A transport that persists its own flow, or keeps
+  // no such state, returns an empty list.
+  readonly pendingRequests: JsonRequest[];
   addEventListener(event: "close", listener: () => void): () => void;
   addEventListener(
     event: "request",
@@ -39,6 +54,12 @@ export interface Channel {
   ): () => void;
   send(response: JsonResponse): Promise<void>;
   close(): Promise<void>;
+  // Ask the relying party to wait (ICRC-29 `pending`) while II leaves for an
+  // internal redirect, resolving once the peer has observed it — so the caller
+  // can navigate away without the peer's client tearing the channel down for
+  // lack of a heartbeat. A no-op (resolves immediately) for transports that
+  // keep no live connection to poll.
+  markPending(): Promise<void>;
 }
 
 export interface Transport {

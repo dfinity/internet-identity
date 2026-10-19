@@ -13,6 +13,17 @@ const DISCONNECT_TIMEOUT_MS = 10000;
 
 export class PostMessageUnsupportedError extends Error {}
 
+interface PostMessageChannelOptions {
+  // In-flight requests to seed the channel with, replayed to each `request`
+  // listener as it subscribes (as a live request would be). Used to resume an
+  // authorize request that arrived before an II-internal redirect, on the
+  // channel re-established on return.
+  pendingRequests?: JsonRequest[];
+  // Switches the underlying heartbeat to `pending` and resolves once the client
+  // has observed it; see {@link HeartbeatServer.setPending}.
+  markPending?: () => Promise<void>;
+}
+
 class PostMessageChannel implements Channel {
   // Carried so the authorize page can stash it before a 1-click redirect, but
   // not gated on here: this transport re-handshakes with the opener (scoped by
@@ -23,13 +34,22 @@ class PostMessageChannel implements Channel {
   #source: WindowProxy;
   #windowListener: (event: MessageEvent) => void;
   #closed = false;
-  #requests: JsonRequest[] = [];
+  #requests: JsonRequest[];
   #requestListeners = new Set<(request: JsonRequest) => void>();
   #closeListeners = new Set<() => void>();
+  #markPending?: () => Promise<void>;
 
-  constructor(origin: string, source: WindowProxy) {
+  constructor(
+    origin: string,
+    source: WindowProxy,
+    options: PostMessageChannelOptions = {},
+  ) {
     this.#origin = origin;
     this.#source = source;
+    // Seed with any carried-over requests so a `request` listener subscribing
+    // after a redirect-resume replays them, exactly as it would a live one.
+    this.#requests = [...(options.pendingRequests ?? [])];
+    this.#markPending = options.markPending;
     this.#windowListener = (event: MessageEvent) => {
       const { data, success } = JsonRequestSchema.safeParse(event.data);
       if (
@@ -53,6 +73,14 @@ class PostMessageChannel implements Channel {
 
   get closed() {
     return this.#closed;
+  }
+
+  get pendingRequests(): JsonRequest[] {
+    return [...this.#requests];
+  }
+
+  markPending(): Promise<void> {
+    return this.#markPending?.() ?? Promise.resolve();
   }
 
   addEventListener(
@@ -110,13 +138,18 @@ export class PostMessageTransport implements Transport {
 
     return new Promise((resolve, reject) => {
       let channel: PostMessageChannel;
-      new HeartbeatServer({
+      const heartbeat = new HeartbeatServer({
         status: options?.pending === true ? "pending" : "ready",
         allowedOrigin: options?.allowedOrigin,
         establishTimeout: ESTABLISH_TIMEOUT_MS,
         disconnectTimeout: DISCONNECT_TIMEOUT_MS,
         onEstablish: (origin, source) => {
-          channel = new PostMessageChannel(origin, source);
+          channel = new PostMessageChannel(origin, source, {
+            pendingRequests: options?.pendingRequests,
+            // Lets the authorize page hold the RP open across an OpenID/SSO hop
+            // by switching this channel to `pending` before it navigates away.
+            markPending: () => heartbeat.setPending(),
+          });
           resolve(channel);
         },
         onEstablishTimeout(): void {

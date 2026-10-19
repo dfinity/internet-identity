@@ -237,6 +237,18 @@ class LegacyChannel implements Channel {
     return this.#closed;
   }
 
+  // Empty: the legacy transport carries its request across a related-origin
+  // redirect through its own mechanism, not the channel-seeding path the
+  // post-message transport uses.
+  get pendingRequests(): JsonRequest[] {
+    return [];
+  }
+
+  // No-op: a redirect transport keeps no live peer connection to hold open.
+  markPending(): Promise<void> {
+    return Promise.resolve();
+  }
+
   addEventListener(
     ...[event, listener]:
       | [event: "close", listener: () => void]
