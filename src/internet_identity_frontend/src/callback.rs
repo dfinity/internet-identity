@@ -585,6 +585,16 @@ mod tests {
     }
 
     #[test]
+    fn landing_page_script_has_no_closing_script_tag() {
+        // The script is embedded verbatim inside `<script>…</script>`. A
+        // `</script` anywhere in it (even a comment) would end the element
+        // early, truncating the script so its bytes no longer match the
+        // hash pinned in the CSP, and the browser would refuse to run it.
+        // Matched case-insensitively, like the HTML parser.
+        assert!(!CALLBACK_SCRIPT.to_ascii_lowercase().contains("</script"));
+    }
+
+    #[test]
     fn landing_page_script_routes_on_the_frontend_markers() {
         // The frontend (`openIdRedirectMarkers.ts`, `openID.ts`) and this
         // script agree on these names; a rename on one side strands the other.

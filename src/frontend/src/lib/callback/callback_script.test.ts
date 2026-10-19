@@ -89,6 +89,14 @@ describe("callback_script", () => {
     expect(callbackScript).toContain('BroadcastChannel("redirect_callback")');
   });
 
+  it("contains no closing-script-tag sequence that would end the element early", () => {
+    // The script is embedded verbatim in `<script>…</script>`; a `</script`
+    // anywhere (even in a comment) would terminate the element at that point,
+    // truncating the script and breaking its CSP hash. Case-insensitive, since
+    // the HTML parser matches the tag name case-insensitively.
+    expect(callbackScript.toLowerCase()).not.toContain("</script");
+  });
+
   it("parses without a syntax error", () => {
     // Guards the escaped-backslash footgun: a malformed guard string makes
     // `new Function` throw at construction.

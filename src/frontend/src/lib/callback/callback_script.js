@@ -1,26 +1,19 @@
-// The single executable inline script of the canister's POST /callback landing
-// page. The frontend canister embeds this file verbatim
-// (`include_str!` in `src/internet_identity_frontend/src/callback.rs`), serves
-// it inside `<script>…</script>`, and pins its sha384 in the response CSP, so
-// the bytes here are exactly what runs in the browser and what is hashed.
+// Served verbatim by the canister's POST /callback landing page (embedded with
+// include_str! in src/internet_identity_frontend/src/callback.rs) and pinned by
+// its sha384 in the response CSP, so these exact bytes are what the browser
+// runs and what is hashed. It must stay a self-contained classic script: no
+// module syntax, and never a literal closing-script-tag sequence, which would
+// end the element early and break the hash. Behaviour is unit-tested in
+// callback_script.test.ts.
 //
-// It must stay a self-contained classic script: no `import`/`export`, no
-// module syntax — the canister serves it as-is and the hash must be stable.
-// Its behaviour is unit-tested in `callback_script.test.ts`, which executes
-// this exact source with injected globals.
-//
-// Routing (keys shared with `openIdRedirectMarkers.ts`):
-//   - `ii-openid-return-path`: the frontend navigated this tab to the IdP and
-//     wants the payload back at that in-app path (the wizard's same-tab
-//     sign-in). Only a same-origin path is honoured.
-//   - `ii-openid-authorize-state`: the authorize page's 1-click flow, which
-//     returns to `/authorize?flow=openid-resume`.
-//   - neither: the popup flow. The payload goes to the tab that opened us,
-//     over the `redirect_callback` BroadcastChannel and, when there is one,
-//     straight to `window.opener`, and the popup closes.
-//
-// `window.opener` can't discriminate the flows: in the authorize flow this tab
-// is itself a popup opened by the relying party.
+// Routing (keys shared with openIdRedirectMarkers.ts):
+//   - ii-openid-return-path: the frontend wants the payload back at that in-app
+//     path (the wizard's same-tab sign-in). Only a same-origin path is honoured.
+//   - ii-openid-authorize-state: the authorize page's 1-click flow, which
+//     returns to /authorize?flow=openid-resume.
+//   - neither: the popup flow. The payload goes to the opener over the
+//     redirect_callback BroadcastChannel and, when there is one, straight to
+//     window.opener, and the popup closes.
 (function () {
   var data = JSON.parse(
     document.getElementById("callback-payload").textContent,
