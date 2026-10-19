@@ -29,7 +29,7 @@
 //! cache a validated [`ZoneKeysMap`] between calls and only validate
 //! any *new* chains a follow-up submission needs.
 
-use super::canonical::{self, build_signed_data};
+use super::canonical::build_signed_data;
 use super::signature::{ds_matches_dnskey, verify_signature_for_alg};
 use super::types::{
     DelegationChain, DelegationLink, DnsName, DnsProofBundle, DnssecError, SignedRRset,
@@ -199,9 +199,9 @@ pub fn verify_hops_with_clock(
 
     // Per-hop signature + zone-membership check.
     for hop in hops {
-        let signer = DnsName(canonical::canonicalize_name(&hop.rrsig.signer_name.0));
-        let zone_dnskey = zones.get(&signer).ok_or(DnssecError::UnknownSigningZone)?;
-        if !name_is_subdomain_of(&hop.name.0, &signer.0) {
+        let signer = &hop.rrsig.signer_name;
+        let zone_dnskey = zones.get(signer).ok_or(DnssecError::UnknownSigningZone)?;
+        if !hop.name.is_subdomain_of(signer) {
             return Err(DnssecError::HopOwnerOutsideZone);
         }
         verify_rrsig_under_dnskey_rrset(hop, zone_dnskey)?;
@@ -211,15 +211,13 @@ pub fn verify_hops_with_clock(
     // Sequence coherence: first hop owner == requested_name; each
     // intermediate hop is a CNAME chaining to the next; final hop
     // type == requested_type; no owner appears twice.
-    let canon_requested = canonical::canonicalize_name(&requested_name.0);
-    let canon_first = canonical::canonicalize_name(&hops[0].name.0);
-    if canon_first != canon_requested {
+    if hops[0].name != *requested_name {
         return Err(DnssecError::BadCnameChain(
             "first hop owner does not match requested name",
         ));
     }
-    let mut seen: Vec<Vec<u8>> = Vec::with_capacity(hops.len());
-    seen.push(canon_first);
+    let mut seen: Vec<&DnsName> = Vec::with_capacity(hops.len());
+    seen.push(&hops[0].name);
 
     for window in hops.windows(2) {
         let cur = &window[0];
@@ -234,17 +232,19 @@ pub fn verify_hops_with_clock(
                 "CNAME RRset must contain exactly one record",
             ));
         }
-        let target = canonical::canonicalize_name(&cur.rdata[0]);
-        let next_owner = canonical::canonicalize_name(&next.name.0);
-        if target != next_owner {
+        // CNAME RDATA is one name (RFC 1035 §3.3.1); it is signed as
+        // supplied, so only the comparison uses the admitted form.
+        let target = DnsName::from_wire(&cur.rdata[0])
+            .map_err(|_| DnssecError::BadCnameChain("CNAME target is not a valid name"))?;
+        if target != next.name {
             return Err(DnssecError::BadCnameChain(
                 "CNAME target does not equal next hop owner",
             ));
         }
-        if seen.iter().any(|n| n == &target) {
+        if seen.contains(&&next.name) {
             return Err(DnssecError::BadCnameChain("CNAME chain has a loop"));
         }
-        seen.push(target);
+        seen.push(&next.name);
     }
 
     let last = hops.last().expect("hops non-empty: checked above");
@@ -314,7 +314,7 @@ fn verify_root_dnskey(
             if anchor.digest_type != DS_DIGEST_TYPE_SHA256 {
                 continue;
             }
-            if !anchor_matches_dnskey(anchor, &root_dnskey.name.0, dnskey_rdata) {
+            if !anchor_matches_dnskey(anchor, &root_dnskey.name, dnskey_rdata) {
                 continue;
             }
             had_digest_match = true;
@@ -347,7 +347,7 @@ fn verify_root_dnskey(
 /// implementation of the DS-vs-DNSKEY digest comparison.
 fn anchor_matches_dnskey(
     anchor: &DnssecRootAnchor,
-    owner_name: &[u8],
+    owner_name: &DnsName,
     dnskey_rdata: &[u8],
 ) -> bool {
     // Cheap pre-filter on algorithm + key_tag before computing the
@@ -434,7 +434,7 @@ fn matching_ksks<'a>(
         }
         let pinned = parent_ds_rdata.iter().any(|ds| {
             ds.len() >= DS_RDATA_HEADER_LEN
-                && ds_matches_dnskey(&child_dnskey_rrset.name.0, dnskey, ds)
+                && ds_matches_dnskey(&child_dnskey_rrset.name, dnskey, ds)
         });
         if pinned {
             matches.push(dnskey);
@@ -570,46 +570,6 @@ fn check_freshness(rrset: &SignedRRset, now: u64) -> Result<(), DnssecError> {
         return Err(DnssecError::StaleOrFutureSignature);
     }
     Ok(())
-}
-
-/// Wire-format subdomain check. `owner` lies under `zone` if its
-/// canonical bytes end with the canonical bytes of `zone` *and* the
-/// boundary lands on a label start — so `evilexample.com.` does NOT
-/// pass as a subdomain of `example.com.`. The root zone
-/// (`zone == "\x00"`) is treated as the parent of every name.
-fn name_is_subdomain_of(owner: &[u8], zone: &[u8]) -> bool {
-    /// Top two bits of a label length octet — `11` is a compression
-    /// pointer (RFC 1035 §4.1.4), `10` / `01` are reserved. None are
-    /// valid in canonical form (RFC 4034 §6.2); seeing one means the
-    /// caller passed a malformed name.
-    const TOP_BITS_MASK: u8 = 0xC0;
-    /// Wire-format encoding of the root label (zero-length).
-    const ROOT_LABEL: &[u8] = &[0u8];
-
-    let canon_owner = canonical::canonicalize_name(owner);
-    let canon_zone = canonical::canonicalize_name(zone);
-    if canon_zone.as_slice() == ROOT_LABEL {
-        return true;
-    }
-    if canon_owner.len() < canon_zone.len() {
-        return false;
-    }
-    if canon_owner == canon_zone {
-        return true;
-    }
-    // Walk labels of `owner` until the suffix equals `zone`.
-    let mut i = 0;
-    while i < canon_owner.len() {
-        if &canon_owner[i..] == canon_zone.as_slice() {
-            return true;
-        }
-        let len = canon_owner[i] as usize;
-        if len == 0 || (canon_owner[i] & TOP_BITS_MASK) != 0 || i + 1 + len > canon_owner.len() {
-            return false;
-        }
-        i += 1 + len;
-    }
-    false
 }
 
 #[cfg(test)]
@@ -898,7 +858,7 @@ mod tests {
         let anchors = load_anchors(IANA_ROOT_ANCHORS_JSON);
         // Ask for a different name than the leaf the bundle
         // actually proves.
-        let wrong = DnsName(b"\x07example\x03com\x00".to_vec());
+        let wrong = DnsName::from_wire(b"\x07example\x03com\x00").unwrap();
         match verify_bundle_with_clock(
             &bundle,
             &anchors,
@@ -928,34 +888,6 @@ mod tests {
             other => panic!("expected BadCnameChain, got {:?}", other),
         }
     }
-
-    #[test]
-    fn name_is_subdomain_of_handles_label_boundaries() {
-        // example.com under com → yes
-        assert!(name_is_subdomain_of(
-            b"\x07example\x03com\x00",
-            b"\x03com\x00"
-        ));
-        // sub.example.com under example.com → yes
-        assert!(name_is_subdomain_of(
-            b"\x03sub\x07example\x03com\x00",
-            b"\x07example\x03com\x00"
-        ));
-        // evilexample.com is NOT under example.com (different label)
-        assert!(!name_is_subdomain_of(
-            b"\x0bevilexample\x03com\x00",
-            b"\x07example\x03com\x00"
-        ));
-        // unrelated.org is NOT under example.com
-        assert!(!name_is_subdomain_of(
-            b"\x09unrelated\x03org\x00",
-            b"\x07example\x03com\x00"
-        ));
-        // Anything is under the root
-        assert!(name_is_subdomain_of(b"\x07example\x03com\x00", b"\x00"));
-        // Self under self
-        assert!(name_is_subdomain_of(b"\x03com\x00", b"\x03com\x00"));
-    }
 }
 
 /// Regression coverage for the `verify_link` step-2c fix: a child
@@ -967,8 +899,7 @@ mod tests {
 /// captured fixture, so the malicious case can be constructed exactly.
 #[cfg(test)]
 mod ds_pin_regression {
-    use super::super::canonical;
-    use super::super::types::{Rrsig, TYPE_DNSKEY, TYPE_DS};
+    use super::super::types::{Rrsig, TYPE_DNSKEY, TYPE_DS, TYPE_TXT};
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
     use sha2::{Digest, Sha256};
@@ -1012,38 +943,14 @@ mod ds_pin_regression {
         }
     }
 
-    fn wire(name: &str) -> Vec<u8> {
-        let mut out = Vec::new();
-        for label in name
-            .trim_end_matches('.')
-            .split('.')
-            .filter(|l| !l.is_empty())
-        {
-            out.push(label.len() as u8);
-            out.extend_from_slice(label.as_bytes());
-        }
-        out.push(0);
-        out
-    }
-
-    fn label_count(wire: &[u8]) -> u8 {
-        let mut i = 0;
-        let mut n = 0u8;
-        while i < wire.len() {
-            let l = wire[i] as usize;
-            if l == 0 {
-                break;
-            }
-            n += 1;
-            i += 1 + l;
-        }
-        n
+    fn name(text: &str) -> DnsName {
+        DnsName::from_text(text).unwrap()
     }
 
     /// DS RDATA committing to `key` as a child KSK (RFC 4034 §5.1):
     /// `key_tag | algorithm | digest_type | SHA-256(owner | dnskey)`.
-    fn ds_for(owner: &[u8], key: &Key) -> Vec<u8> {
-        let mut input = canonical::canonicalize_name(owner);
+    fn ds_for(owner: &DnsName, key: &Key) -> Vec<u8> {
+        let mut input = owner.as_wire().to_vec();
         input.extend_from_slice(&key.rdata);
         let digest = Sha256::digest(&input);
         let mut out = Vec::with_capacity(4 + digest.len());
@@ -1057,31 +964,31 @@ mod ds_pin_regression {
     /// Build an RRset for `owner`/`rtype` carrying `rdata`, signed by
     /// `signer` whose zone is `signer_name`.
     fn signed(
-        owner: &[u8],
+        owner: &DnsName,
         rtype: u16,
         rdata: Vec<Vec<u8>>,
         signer: &Key,
-        signer_name: &[u8],
+        signer_name: &DnsName,
         now: u32,
     ) -> SignedRRset {
         let mut rr = SignedRRset {
-            name: DnsName(owner.to_vec()),
+            name: owner.clone(),
             rtype,
             rdata,
             ttl: 3600,
             rrsig: Rrsig {
                 type_covered: rtype,
                 algorithm: ALG_ED25519,
-                labels: label_count(owner),
+                labels: owner.label_count() as u8,
                 original_ttl: 3600,
                 expiration: now + 3600,
                 inception: now.saturating_sub(3600),
                 key_tag: signer.key_tag(),
-                signer_name: DnsName(signer_name.to_vec()),
+                signer_name: signer_name.clone(),
                 signature: Vec::new(),
             },
         };
-        let signed_data = canonical::build_signed_data(&rr);
+        let signed_data = build_signed_data(&rr);
         rr.rrsig.signature = signer.sk.sign(&signed_data).to_bytes().to_vec();
         rr
     }
@@ -1097,8 +1004,8 @@ mod ds_pin_regression {
         dnskey_signer: &Key,
         now: u32,
     ) -> (SignedRRset, DelegationLink) {
-        let root_name = wire(".");
-        let zone = wire("example.com.");
+        let root_name = name(".");
+        let zone = name("example.com.");
         let root_dnskey = signed(
             &root_name,
             TYPE_DNSKEY,
@@ -1217,5 +1124,62 @@ mod ds_pin_regression {
             NOW,
         );
         assert_eq!(verify_link(&link, &root_dnskey, NOW as u64), Ok(()));
+    }
+
+    /// A two-hop resolution `alias.example.com. CNAME target.example.com.`
+    /// then `target.example.com. TXT`, both signed by the root key,
+    /// with the CNAME RDATA as given.
+    fn cname_then_txt(cname_rdata: Vec<u8>) -> (ZoneKeysMap, Vec<SignedRRset>, DnsName) {
+        let root = Key::ksk(1);
+        let root_name = name(".");
+        let root_dnskey = signed(
+            &root_name,
+            TYPE_DNSKEY,
+            vec![root.rdata.clone()],
+            &root,
+            &root_name,
+            NOW,
+        );
+        let mut zones = ZoneKeysMap::new();
+        zones.insert(root_name.clone(), root_dnskey).unwrap();
+        let alias = name("alias.example.com.");
+        let target = name("target.example.com.");
+        let hops = vec![
+            signed(
+                &alias,
+                TYPE_CNAME,
+                vec![cname_rdata],
+                &root,
+                &root_name,
+                NOW,
+            ),
+            signed(
+                &target,
+                TYPE_TXT,
+                vec![b"\x05hello".to_vec()],
+                &root,
+                &root_name,
+                NOW,
+            ),
+        ];
+        (zones, hops, alias)
+    }
+
+    #[test]
+    fn cname_target_equal_to_next_owner_chains() {
+        let target = name("target.example.com.");
+        let (zones, hops, alias) = cname_then_txt(target.as_wire().to_vec());
+        let verified = verify_hops_with_clock(&hops, &zones, &alias, TYPE_TXT, NOW as u64).unwrap();
+        assert_eq!(verified.name, target);
+    }
+
+    #[test]
+    fn cname_target_that_is_not_one_name_is_rejected() {
+        let target = name("target.example.com.");
+        let (zones, hops, alias) = cname_then_txt([target.as_wire(), b"\x00"].concat());
+        assert!(matches!(
+            verify_hops_with_clock(&hops, &zones, &alias, TYPE_TXT, NOW as u64),
+            Err(DnssecError::BadCnameChain(_))
+        ));
     }
 }
