@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import BellIcon from "@lucide/svelte/icons/bell";
   import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
   import BellOffIcon from "@lucide/svelte/icons/bell-off";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
@@ -9,6 +8,7 @@
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import { isStandalone } from "./standalone";
   import {
@@ -33,6 +33,7 @@
   import { openInSafari } from "./openInSafari";
   import { watchForInstall, watchProbe } from "./watchInstall";
   import { NOTIFICATION_APP_NAME } from "./appName";
+  import AppsGridMock from "./AppsGridMock.svelte";
   import NotificationMock from "./NotificationMock.svelte";
   import ReinstallSteps from "./ReinstallSteps.svelte";
   import SafariIosSteps from "./installSteps/SafariIosSteps.svelte";
@@ -42,16 +43,20 @@
   /** Read on mount, because this page is rendered at build time where there is no document to ask. */
   let host = $state("");
   /** Read on mount for the same reason, and only to shape the screen that waits for the launch. */
-  let inTheApp = $state(false);
+  /** Unknown until mount, because the page prerenders and the answer is `window`'s.
+   *  Guessing one shape and correcting it shows the wrong skeleton first. */
+  let inTheApp = $state<boolean | undefined>(undefined);
 
   const buttonGroup = "mt-7 flex flex-col gap-2.5";
   /** The two screens the Home Screen app opens on centre their one illustration and read from the middle out. */
   const centredBlock =
     "flex min-h-0 flex-1 flex-col items-center justify-center gap-11";
-  const centredText = "flex flex-col items-center px-8 text-center";
+  /** The heading reads best unbroken, so the side room is its own; the body keeps the
+   *  32px measure the design gives it by adding back what this takes away. */
+  const centredText = "flex flex-col items-center px-5 text-center";
   const centredHeading =
     "text-text-primary text-[28px]/[34px] font-medium tracking-[-0.02em] text-balance";
-  const centredBody = "text-text-tertiary mt-3 text-base text-balance";
+  const centredBody = "text-text-tertiary mt-3 px-3 text-base text-balance";
   const actionBlock = "flex flex-col gap-3.5 px-4 pt-8 pb-16";
 
   const openTheHost = () => openInSafari(`https://${host}`);
@@ -79,13 +84,17 @@
   onMount(() => {
     void (async () => {
       host = window.location.host;
-      inTheApp = isStandalone();
+      const standalone = isStandalone();
+      inTheApp = standalone;
       // The tab opened for an install holds this placeholder only until the minted URL
       // replaces it, so it waits instead of deciding on a URL that carries no token.
       // A Home Screen entry added from it is not waiting for anything, so it launches
       // and is told what it is rather than sitting on the skeleton for good.
       if (
-        holdsTheInstallPlaceholder({ inTheApp, search: window.location.search })
+        holdsTheInstallPlaceholder({
+          inTheApp: standalone,
+          search: window.location.search,
+        })
       ) {
         return;
       }
@@ -109,18 +118,26 @@
   };
 
   /** Raises the prompt, which only a gesture may do; a prompt dismissed without an answer leaves the permission at `default`. */
+  /** The press is answered in the button rather than by swapping the screen: the prompt
+   *  stands in front of this page, and a skeleton behind it is a screen rebuilding
+   *  itself for a transition nobody is waiting on. */
+  let asking = $state(false);
+
   const askForPermission = async () => {
-    const asking = screen;
-    screen = { kind: "working" };
+    asking = true;
     let permission: NotificationPermission;
     try {
       permission = await Notification.requestPermission();
     } catch (error) {
       console.error(error);
-      screen = asking;
+      asking = false;
       return;
     }
-    screen = await settleWithTheApp(permission).catch(failed);
+    try {
+      screen = await settleWithTheApp(permission).catch(failed);
+    } finally {
+      asking = false;
+    }
   };
 
   /** Settings is the only place a refusal can be lifted. */
@@ -154,6 +171,35 @@
       },
       { replacedLastSeen },
     );
+  });
+
+  /** Adding to the Home Screen takes the user out of this tab and brings them back, so a
+   *  return is the one hint there is that the steps have been walked. Nothing tells the
+   *  canister: it hears only when the app is opened and links, which is what the screen
+   *  this moves to asks for. The watcher above keeps running, so an app that was opened
+   *  settles on its own and never reaches this. */
+  const AWAY_LONG_ENOUGH_MS = 1_500;
+
+  $effect(() => {
+    if (screen.kind !== "install") {
+      return;
+    }
+    let leftAt: number | undefined;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        leftAt = Date.now();
+        return;
+      }
+      const away = leftAt === undefined ? 0 : Date.now() - leftAt;
+      leftAt = undefined;
+      // A glance at another app is not the share sheet: only a spell away counts, so
+      // somebody reading the steps is left on them.
+      if (away >= AWAY_LONG_ENOUGH_MS && screen.kind === "install") {
+        screen = { kind: "open-app" };
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   });
 
   /** Whether the app answered the probe, which is as close to "it is there" as anything gets. */
@@ -319,7 +365,7 @@
         <!-- `elsewhere` is on its way out of the page, so it waits here too.
              Shaped like the screen it is about to become, so settling moves nothing:
              centred around the notification in the app, bottom-aligned steps in a tab. -->
-        {#if inTheApp}
+        {#if inTheApp === true}
           <div class="flex min-w-0 flex-1 flex-col items-stretch">
             <div class={centredBlock}>
               <div class="flex h-[396px] w-[330px] items-center justify-center">
@@ -334,14 +380,20 @@
               <div class="skeleton h-12 w-full rounded-md"></div>
             </div>
           </div>
-        {:else}
+        {:else if inTheApp === false}
           <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
-            <div class="skeleton mb-3 h-8 w-3/4 rounded"></div>
-            <div class="skeleton mb-5 h-6 w-full rounded"></div>
+            <!-- The install screen's own shape: one heading, four step cards, then the
+                 two buttons. A card is a 32px badge row over a mock panel, which is what
+                 the 128px comes to. -->
+            <div class="skeleton mb-4 h-8 w-3/4 rounded"></div>
             <div class="flex flex-col gap-3">
               {#each [0, 1, 2, 3] as step (step)}
-                <div class="skeleton h-24 w-full rounded-xl"></div>
+                <div class="skeleton h-32 w-full rounded-xl"></div>
               {/each}
+            </div>
+            <div class={buttonGroup}>
+              <div class="skeleton h-12 w-full rounded-md"></div>
+              <div class="skeleton h-12 w-full rounded-md"></div>
             </div>
           </div>
         {/if}
@@ -430,8 +482,14 @@
             <button
               class="btn btn-primary btn-xl w-full"
               onclick={() => void askForPermission()}
+              disabled={asking}
             >
-              {$t`Allow notifications`}
+              {#if asking}
+                <ProgressRing />
+                {$t`Waiting for permission`}
+              {:else}
+                {$t`Allow notifications`}
+              {/if}
             </button>
             <p class="text-text-tertiary text-center text-sm">
               <Trans>Only apps you allow on {host} can notify you.</Trans>
@@ -485,23 +543,28 @@
           </div>
         </div>
       {:else if screen.kind === "ready"}
-        <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
-          <FeaturedIcon size="lg" class="mb-4 self-start">
-            <BellIcon class="size-6" aria-hidden="true" />
-          </FeaturedIcon>
-          <h1 class="text-text-primary mb-3 text-2xl font-medium">
-            {$t`You're all set`}
-          </h1>
-          <p class="text-text-tertiary text-base">
-            <Trans>
-              Notifications from your apps will show up on this device.
-            </Trans>
-          </p>
-          <!-- The probe cannot answer for a browser that is signed out or past the window the canister still wakes it in. -->
-          <div class={buttonGroup}>
-            <button class="btn btn-tertiary btn-xl" onclick={startOver}>
-              {$t`I don't have the app any more`}
-            </button>
+        <!-- The tab the install was walked in, once the app answers. Nothing to do here:
+             the app is on the Home Screen and this page has finished its job. -->
+        <div class="flex min-w-0 flex-1 flex-col items-stretch">
+          <div class={centredBlock}>
+            <AppsGridMock />
+            <div class={centredText}>
+              <h1 class={centredHeading}>
+                {$t`You're all set`}
+              </h1>
+              <p class={centredBody}>
+                <Trans>
+                  Notifications from your apps will show up on this device.
+                </Trans>
+              </p>
+            </div>
+          </div>
+          <div class="px-6 pb-12">
+            <p
+              class="text-text-tertiary flex h-20 items-center justify-center text-sm"
+            >
+              <Trans>You can close this page.</Trans>
+            </p>
           </div>
         </div>
       {:else if screen.kind === "unlinked"}

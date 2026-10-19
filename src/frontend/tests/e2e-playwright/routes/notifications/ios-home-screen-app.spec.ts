@@ -593,7 +593,7 @@ test.describe("notifications on a Home Screen app", () => {
     identities,
     signInWithIdentity,
   }) => {
-    const { relay, app, installUrl } = await installOnThePhone({
+    const { relay, app } = await installOnThePhone({
       browser,
       context,
       testApp,
@@ -606,22 +606,28 @@ test.describe("notifications on a Home Screen app", () => {
     // bounces, because the relay answers for that endpoint exactly as before.
     await app.delete();
 
-    // Back in the browser, which reads that record and believes it.
-    const installPage = await context.newPage();
-    const asked = queriesSent(installPage);
-    await installPage.goto(installUrl);
-    await expect(
-      installPage.getByRole("heading", { name: "You're all set" }),
-    ).toBeVisible({ timeout: 60_000 });
+    // Back in the browser, in settings, which is where a device that lost its app says
+    // so. The tab the install was walked in only ever reports what the record says.
+    const settings = await context.newPage();
+    await settings.goto(`${II_URL}/manage/settings`);
+    await signInWithIdentity(settings, identities[0].identityNumber);
+    const notifications = settings.getByRole("switch", {
+      name: "Allow notifications",
+    });
+    await expect(notifications).toBeVisible({ timeout: 30_000 });
+    await notifications.click();
+    await expect(notifications).toBeEnabled({ timeout: 30_000 });
+    await expect(notifications).not.toBeChecked({ timeout: 30_000 });
 
-    // The user is the only party who can see their own Home Screen, and what they say
-    // is the only thing that moves this on.
-    await installPage
-      .getByRole("button", { name: "I don't have the app any more" })
-      .click();
+    // The press asks the app to prove it is there. Nothing answers, so the steps are
+    // offered in a tab of their own.
+    const steps = settings.context().waitForEvent("page", { timeout: 60_000 });
+    await notifications.click();
+    const installPage = await steps;
+    const asked = queriesSent(installPage);
     await expect(
-      installPage.getByRole("heading", { name: "Add ICP Alerts again" }),
-    ).toBeVisible({ timeout: 30_000 });
+      installPage.getByRole("heading", { name: "Set up ICP Alerts" }),
+    ).toBeVisible({ timeout: 60_000 });
 
     // The window this scenario exists for. The old record is still there, still
     // subscribed and still enabled, so a watcher that settled against it would call the
@@ -636,7 +642,7 @@ test.describe("notifications on a Home Screen app", () => {
       })
       .toBeGreaterThanOrEqual(askedSoFar + QUERIES_TO_OUTLAST);
     await expect(
-      installPage.getByRole("heading", { name: "Add ICP Alerts again" }),
+      installPage.getByRole("heading", { name: "Set up ICP Alerts" }),
     ).toBeVisible();
     await expect(
       installPage.getByRole("heading", { name: "You're all set" }),
