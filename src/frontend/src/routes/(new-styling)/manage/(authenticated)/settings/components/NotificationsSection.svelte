@@ -22,6 +22,7 @@
   } from "$lib/utils/notifications/notificationState";
   import { failureMessage } from "$lib/utils/notifications/notificationDiagnostics";
   import { openPendingInstallTab } from "$lib/utils/notifications/installUrl";
+  import { appStillAnswers } from "./appStillAnswers";
   import { turnOnWithApp } from "./notificationsSwitch";
   import {
     turnOffInBrowser,
@@ -169,20 +170,39 @@
       }
     }
 
+    // The tab is opened before anything is awaited, because a browser allows `window.open`
+    // only inside the press itself. An app that turns out to be there drops it again.
+    const tab = openPendingInstallTab();
+
     // This identity's say-so is recorded the moment it is given, as turning off records
     // it: an install started from this press finishes by carrying the flag, so leaving it
     // until the app links would lose the answer somewhere along the way.
     if (ownApp !== undefined && !ownApp.enabled) {
       await setAppEnabled({ identityNumber, enabled: true });
     }
-    // An app this browser already points at and that is delivering needs nothing more.
+    // `subscribed` outlives the app it names, so an entry that says it delivers is asked
+    // to prove it. Only where the app does not answer is a new install offered.
     if (ownApp?.subscribed === true) {
-      return true;
+      const checking = toaster.create({
+        type: "loading",
+        title: $t`Checking this device`,
+      });
+      try {
+        if (await appStillAnswers(identityNumber)) {
+          tab.point(undefined);
+          return true;
+        }
+      } finally {
+        toaster.dismiss(checking);
+      }
     }
-    // The tab is opened before anything is awaited, because a browser allows `window.open` only inside the press itself.
-    const tab = openPendingInstallTab();
     const outcome = await turnOnWithApp({ identityNumber, ownApp });
     if (outcome.delivering) {
+      // An app taken over from another identity links switched off, so this press is
+      // what switches it on. Nothing else on this path has written the flag.
+      if (outcome.claimed) {
+        await setAppEnabled({ identityNumber, enabled: true });
+      }
       tab.point(undefined);
       return true;
     }

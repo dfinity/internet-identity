@@ -169,6 +169,23 @@ const expectTheAppToShow = async (
 };
 
 /**
+ * Lets the app answer the probe the switch sends when it is turned on.
+ *
+ * Turning delivery on asks the app to prove it is still on the device, and only the app
+ * moving its own stamp answers. On a phone the push arrives by itself; here the relay
+ * holds wake-ups until a test delivers them, so a probe nobody delivers goes unanswered
+ * and the switch offers an install for an app that is sitting right there.
+ */
+const answerTheProbe = async (
+  app: HomeScreenApp,
+  relay: PushRelay,
+  sentBefore: number,
+): Promise<void> => {
+  await relay.waitForWakeUps(sentBefore + 1);
+  await deliverPush(app.page, II_URL);
+};
+
+/**
  * Somebody writes to the room, and the app ends up showing it.
  *
  * The wake-ups are counted from just before the send, because the relay counts every
@@ -498,7 +515,10 @@ test.describe("notifications on a Home Screen app", () => {
     ).not.toContain("while it was off");
 
     // And on again, which needs no install: the app is still there and still registered.
+    // The press asks it to say so, and the app answering is what keeps the switch on.
+    const beforeTheProbe = relay.received();
     await notifications.click();
+    await answerTheProbe(app, relay, beforeTheProbe);
     await expect(notifications).toBeEnabled({ timeout: 30_000 });
     await expect(notifications).toBeChecked({ timeout: 30_000 });
 
@@ -518,6 +538,51 @@ test.describe("notifications on a Home Screen app", () => {
     await expectOneMoreShown(before);
 
     await app.delete();
+    await relay.close();
+  });
+
+  test("offer the install from settings once the app has been deleted", async ({
+    browser,
+    context,
+    testApp,
+    identities,
+    signInWithIdentity,
+  }) => {
+    const { relay, app } = await installOnThePhone({
+      browser,
+      context,
+      testApp,
+      identityNumber: identities[0].identityNumber,
+      signInWithIdentity,
+    });
+
+    // Deleted from the Home Screen, and nothing tells the canister: the relay answers
+    // for that endpoint exactly as before, so the record goes on saying it delivers.
+    // That record is what the switch used to believe.
+    await app.delete();
+
+    const settings = await context.newPage();
+    await settings.goto(`${II_URL}/manage/settings`);
+    await signInWithIdentity(settings, identities[0].identityNumber);
+    const notifications = settings.getByRole("switch", {
+      name: "Allow notifications",
+    });
+    await expect(notifications).toBeVisible({ timeout: 30_000 });
+
+    await notifications.click();
+    await expect(notifications).toBeEnabled({ timeout: 30_000 });
+    await expect(notifications).not.toBeChecked({ timeout: 30_000 });
+
+    // On again is where it used to end: the entry still said subscribed, so the switch
+    // reported delivery and offered nothing. Now the press asks the app to prove it is
+    // there, nothing answers, and the install is what is left.
+    const steps = settings.context().waitForEvent("page", { timeout: 60_000 });
+    await notifications.click();
+    const offered = await steps;
+    await expect(
+      offered.getByRole("heading", { name: "Set up ICP Alerts" }),
+    ).toBeVisible({ timeout: 60_000 });
+
     await relay.close();
   });
 
