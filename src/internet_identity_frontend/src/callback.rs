@@ -49,51 +49,17 @@ const MAX_ERROR_DESCRIPTION_BYTES: usize = 1024;
 /// body.
 const MAX_BODY_BYTES: usize = 2 * MAX_ID_TOKEN_BYTES;
 
-/// The single executable inline script of the landing page. Constant so its
-/// CSP hash is constant; the per-request payload lives in a non-executing
-/// `<script type="application/json">` data block instead.
+/// The single executable inline script of the landing page, embedded
+/// verbatim from the frontend so it has its own unit tests
+/// (`src/frontend/src/lib/callback/callback_script.{js,test.ts}`). Constant,
+/// so its CSP hash is constant; the per-request payload lives in a
+/// non-executing `<script type="application/json">` data block instead.
 ///
-/// Routes on the frontend's same-tab markers (see
-/// `src/frontend/src/lib/utils/openIdRedirectMarkers.ts`):
-///
-/// - `ii-openid-return-path`: the frontend navigated this tab to the IdP and
-///   wants the payload back at that in-app path (the wizard's same-tab
-///   sign-in). Only a same-origin path is honoured; sessionStorage is
-///   same-origin, but a value that is not a plain path is still refused.
-/// - `ii-openid-authorize-state`: the authorize page's 1-click flow, which
-///   returns to `/authorize?flow=openid-resume`. Kept as a marker of its own
-///   so a flow started before a deploy still lands.
-/// - Neither: the popup flow. The payload goes to the tab that opened us,
-///   over the `redirect_callback` `BroadcastChannel` and, when there is one,
-///   straight to `window.opener`, and the popup closes.
-///
-/// `window.opener` can't discriminate the flows: in the authorize flow this
-/// tab is itself a popup opened by the relying party.
-const CALLBACK_SCRIPT: &str = r#"(function () {
-  var data = JSON.parse(document.getElementById("callback-payload").textContent);
-  var returnPath = sessionStorage.getItem("ii-openid-return-path");
-  if (returnPath === null && sessionStorage.getItem("ii-openid-authorize-state") !== null) {
-    returnPath = "/authorize?flow=openid-resume";
-  }
-  if (typeof returnPath === "string" && returnPath.charAt(0) === "/" && returnPath.charAt(1) !== "/" && returnPath.charAt(1) !== "\") {
-    // Same-tab flow: stash the payload and resume in-app.
-    sessionStorage.setItem("ii-openid-callback-data", JSON.stringify(data));
-    window.location.replace(returnPath);
-  } else {
-    // Popup flow: deliver to the tab that opened us and close.
-    var channel = new BroadcastChannel("redirect_callback");
-    channel.postMessage(data);
-    channel.close();
-    if (window.opener !== null) {
-      try {
-        window.opener.postMessage(data, window.location.origin);
-      } catch (e) {
-        // A cross-origin or closed opener; the channel already carried it.
-      }
-    }
-    window.close();
-  }
-})();"#;
+/// It routes on the frontend's same-tab markers (`ii-openid-return-path`,
+/// `ii-openid-authorize-state`) to resume in-app, else delivers the payload
+/// to the opener (the popup flow); see the source file for the details.
+const CALLBACK_SCRIPT: &str =
+    include_str!("../../frontend/src/lib/callback/callback_script.js");
 
 /// Payload delivered to the frontend: either the token or the IdP's error
 /// report, plus the CSRF `state` in both cases. The error variant exists
