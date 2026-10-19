@@ -1176,6 +1176,27 @@ pub enum SetNotificationAppEnabledError {
     InternalCanisterError(String),
 }
 
+/// Switches delivery on for this identity and asks the app to prove it is still there,
+/// in one call. A reference that is off is skipped when the canister picks who to send
+/// to, so the two cannot be separated: probing first would find nothing to wake, and
+/// switching on first would announce it and then say the same thing again on the probe.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct TurnOnNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum TurnOnNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app.
+    NoNotificationApp,
+    /// Nothing could be woken, so nothing was switched on: the app has registered
+    /// nothing, the browser counts as gone, or there was no room for another outcall.
+    NotReachable,
+    InternalCanisterError(String),
+}
+
 /// Asks what this browser's entry says about the app it points at, with no session.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetNotificationAppStatusRequest {
