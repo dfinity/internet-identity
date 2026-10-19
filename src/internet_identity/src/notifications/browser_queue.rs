@@ -368,7 +368,7 @@ mod tests {
             .id;
         let app_id = storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&app_key(9), 0)
+                .ensure_notification_app_for_key(&app_key(9), 0)
                 .expect("creating the app record");
             storage.set_notification_app_subscription(
                 app.id,

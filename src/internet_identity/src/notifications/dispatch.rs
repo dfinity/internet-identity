@@ -740,7 +740,7 @@ mod tests {
 
         storage_borrow_mut(|storage| {
             let app = storage
-                .notification_app_for_key(&app_key(seed), 0)
+                .ensure_notification_app_for_key(&app_key(seed), 0)
                 .expect("creating the app record");
             if let Some(endpoint) = endpoint {
                 storage.set_notification_app_subscription(

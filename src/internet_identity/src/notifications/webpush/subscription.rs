@@ -293,7 +293,7 @@ mod tests {
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let app = storage_borrow_mut(|storage| {
             storage
-                .notification_app_for_key(&app_key(9), 0)
+                .ensure_notification_app_for_key(&app_key(9), 0)
                 .expect("creating the app record")
         });
         let mut stored = anchor(anchor_number);
