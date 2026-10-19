@@ -1309,3 +1309,69 @@ pub enum RemoveNotificationError {
     /// Also a caller that is no browser of the identity.
     InternalCanisterError(String),
 }
+
+/// How the keys of the examined passkeys stand in one passkey index. Each distinct key of an
+/// anchor counts once for that anchor, so a key shared by two anchors counts twice.
+#[derive(Clone, Copy, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PasskeyIndexAuditCounts {
+    /// Indexed to the anchor that holds it.
+    pub indexed_to_anchor: u64,
+    /// Indexed to another anchor that holds it too: the key is shared between anchors.
+    pub indexed_to_other_holder: u64,
+    /// Indexed to another anchor that does not hold it.
+    pub indexed_to_non_holder: u64,
+    /// Not indexed at all.
+    pub not_indexed: u64,
+}
+
+impl PasskeyIndexAuditCounts {
+    pub fn add(&mut self, other: &Self) {
+        self.indexed_to_anchor = self
+            .indexed_to_anchor
+            .saturating_add(other.indexed_to_anchor);
+        self.indexed_to_other_holder = self
+            .indexed_to_other_holder
+            .saturating_add(other.indexed_to_other_holder);
+        self.indexed_to_non_holder = self
+            .indexed_to_non_holder
+            .saturating_add(other.indexed_to_non_holder);
+        self.not_indexed = self.not_indexed.saturating_add(other.not_indexed);
+    }
+}
+
+/// Totals of the passkey index audit over the anchors examined so far.
+#[derive(Clone, Copy, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PasskeyIndexAuditTotals {
+    pub anchors: u64,
+    pub passkeys: u64,
+    /// The passkey pubkey index (`Principal::self_authenticating(pubkey)` to anchor).
+    pub pubkey_index: PasskeyIndexAuditCounts,
+    /// The passkey credential-id index (credential id to anchor), not counting
+    /// `dummy_credential_ids`.
+    pub credential_id_index: PasskeyIndexAuditCounts,
+    /// Legacy pin-flow devices are stored with a shared dummy credential id, which is
+    /// left out of `credential_id_index`.
+    pub dummy_credential_ids: u64,
+}
+
+impl PasskeyIndexAuditTotals {
+    pub fn add(&mut self, other: &Self) {
+        self.anchors = self.anchors.saturating_add(other.anchors);
+        self.passkeys = self.passkeys.saturating_add(other.passkeys);
+        self.pubkey_index.add(&other.pubkey_index);
+        self.credential_id_index.add(&other.credential_id_index);
+        self.dummy_credential_ids = self
+            .dummy_credential_ids
+            .saturating_add(other.dummy_credential_ids);
+    }
+}
+
+/// Progress and totals of the read-only passkey index audit.
+#[derive(Clone, Copy, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PasskeyIndexAuditStatus {
+    pub totals: PasskeyIndexAuditTotals,
+    /// The anchor number the next batch starts from.
+    pub next_anchor_number: AnchorNumber,
+    /// Whether every stored anchor has been examined.
+    pub is_done: bool,
+}
