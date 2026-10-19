@@ -139,6 +139,7 @@ beforeEach(async () => {
     state: {} as never,
     consented: false,
     installFirst: false,
+    justClaimed: false,
   });
   vi.mocked(readGranted).mockResolvedValue(true);
   notificationConsentStore.clear();
@@ -367,6 +368,7 @@ describe("handleNotificationConsentRequest", () => {
       state,
       consented: false,
       installFirst: false,
+      justClaimed: false,
     });
     let opened: NotificationConsentContext | undefined;
     const unsubscribe = notificationConsentStore.subscribe((context) => {

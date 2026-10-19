@@ -844,6 +844,7 @@ export const idlFactory = ({ IDL }) => {
   const LinkNotificationAppError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'NoPendingLink' : IDL.Null,
+    'InvalidAppKey' : IDL.Null,
     'KeyAlreadyInUse' : IDL.Null,
   });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
@@ -1024,6 +1025,7 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
   });
   const PrepareNotificationAppLinkError = IDL.Variant({
+    'LinkPrincipalIsNotAKey' : IDL.Null,
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'AppAlreadyDelivering' : IDL.Null,
@@ -1172,6 +1174,15 @@ export const idlFactory = ({ IDL }) => {
     'event_aggregations' : IDL.Vec(
       IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)))
     ),
+  });
+  const TurnOnNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const TurnOnNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NotReachable' : IDL.Null,
   });
   const AccountUpdate = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
   const UpdateAccountError = IDL.Variant({
@@ -1938,6 +1949,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
+    'turn_on_notification_app' : IDL.Func(
+        [TurnOnNotificationAppRequest],
+        [
+          IDL.Variant({
+            'Ok' : NotificationId,
+            'Err' : TurnOnNotificationAppError,
+          }),
+        ],
+        [],
+      ),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],

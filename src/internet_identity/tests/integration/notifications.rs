@@ -2758,3 +2758,166 @@ mod app_link {
         Ok(())
     }
 }
+
+/// Switching delivery on and proving the app is there, which is one call because the
+/// flag and the probe cannot be separated.
+mod turning_on {
+    use super::subscriptions::{request, ENDPOINT};
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        get_notification_app_status, set_webpush_subscription, turn_on_notification_app,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        GetNotificationAppStatusRequest, NotificationAppInfo, NotificationAppStatus,
+        NotificationId, SetWebPushSubscriptionRequest, TurnOnNotificationAppError,
+        TurnOnNotificationAppRequest,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// The key a browser is left holding after the sign-in `browser_seed` names.
+    fn browser(browser_seed: u8) -> Principal {
+        BrowserKey::new(browser_seed).successor().principal()
+    }
+
+    /// A pool whose first window covers the time the test runs at. The pool is spent by
+    /// elapsed time, so one issued at a fixed instant signs nothing.
+    fn pool_issued_now(
+        env: &PocketIc,
+        anchor: AnchorNumber,
+        endpoint: &str,
+    ) -> SetWebPushSubscriptionRequest {
+        SetWebPushSubscriptionRequest {
+            jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
+            ..request(anchor, endpoint)
+        }
+    }
+
+    fn turn_on(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<Result<NotificationId, TurnOnNotificationAppError>, RejectResponse> {
+        turn_on_notification_app(
+            env,
+            canister_id,
+            sender,
+            TurnOnNotificationAppRequest {
+                anchor_number: anchor,
+            },
+        )
+    }
+
+    fn app_info(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+    ) -> Result<Option<NotificationAppInfo>, RejectResponse> {
+        Ok(
+            match get_notification_app_status(
+                env,
+                canister_id,
+                sender,
+                GetNotificationAppStatusRequest {
+                    anchor_number: anchor,
+                },
+            )? {
+                NotificationAppStatus::Linked(info) => Some(info),
+                NotificationAppStatus::AwaitingInstall(_) | NotificationAppStatus::NoApp => None,
+            },
+        )
+    }
+
+    #[test]
+    fn should_switch_delivery_on_and_answer_the_probe_it_queued() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            app,
+            pool_issued_now(&env, anchor, ENDPOINT),
+        )?
+        .expect("set_webpush_subscription returned Err");
+
+        let probe = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
+            .expect("turn_on_notification_app returned Err");
+
+        let info = app_info(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
+            .expect("this browser points at no app");
+        assert!(info.enabled);
+        // The probe it answered is the one it queued, which is also what tells the
+        // device: nothing else is announced for this call.
+        assert_eq!(info.pending_probe, Some(probe));
+        Ok(())
+    }
+
+    #[test]
+    fn should_leave_delivery_off_where_nothing_can_be_woken() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        // Linked and never registered for push, so there is no address to wake.
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+
+        assert_eq!(
+            turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?,
+            Err(TurnOnNotificationAppError::NotReachable)
+        );
+
+        let info = app_info(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
+            .expect("this browser points at no app");
+        // An entry that delivers for nobody must not read as switched on.
+        assert!(!info.enabled);
+        assert_eq!(info.pending_probe, None);
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_the_probe_already_on_its_way() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            app,
+            pool_issued_now(&env, anchor, ENDPOINT),
+        )?
+        .expect("set_webpush_subscription returned Err");
+
+        let first = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
+            .expect("turn_on_notification_app returned Err");
+        // A second press while the first is still out reaches the same device with the
+        // same thing to say, so it is told about the one already on its way.
+        assert_eq!(
+            turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?,
+            Ok(first)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_an_install_nobody_has_opened() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        prepare_notification_app_link(
+            &env,
+            canister_id,
+            browser(FIRST_BROWSER_SEED),
+            PrepareNotificationAppLinkRequest {
+                anchor_number: anchor,
+                link_principal: BrowserKey::new(200).principal(),
+                replacing_existing: false,
+            },
+        )?
+        .expect("prepare_notification_app_link returned Err");
+
+        assert_eq!(
+            turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?,
+            Err(TurnOnNotificationAppError::NoNotificationApp)
+        );
+        Ok(())
+    }
+}

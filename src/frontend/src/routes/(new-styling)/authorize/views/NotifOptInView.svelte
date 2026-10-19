@@ -44,6 +44,9 @@
     consented: boolean;
     /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
     installFirst: boolean;
+    /** Whether this browser was pointed at the device's app by the resolution, which is
+     *  its own evidence that the app is there. */
+    justClaimed: boolean;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
@@ -57,6 +60,7 @@
     device,
     consented,
     installFirst,
+    justClaimed,
     onDone,
   }: Props = $props();
 
@@ -179,6 +183,7 @@
         actor,
         device: current,
         consented,
+        justClaimed,
       });
       if (!enabledBy(result)) {
         return;

@@ -1,7 +1,9 @@
 import { POLL_INTERVAL_MS } from "$lib/constants/polling.constants";
-import { browserAppStatus, probeApp } from "$lib/utils/notifications/appStatus";
-import { prepareInstallUrl } from "$lib/utils/notifications/installUrl";
-import { watchProbe } from "../../../../ios-icp-alerts/watchInstall";
+import {
+  browserAppStatus,
+  turnOnApp,
+} from "$lib/utils/notifications/appStatus";
+import { watchProbe } from "../../../routes/(new-styling)/ios-icp-alerts/watchInstall";
 
 /** Two polls. Nothing tells a canister that a Home Screen app was deleted, so the only
  *  answer is the app's own: one interval would call a live app dead whenever the worker
@@ -10,18 +12,19 @@ import { watchProbe } from "../../../../ios-icp-alerts/watchInstall";
 const PROBE_WAIT_MS = 2 * POLL_INTERVAL_MS;
 
 /**
- * Whether the app this browser points at is still on the device.
+ * Switches delivery on, and answers whether the app this browser points at took it.
  *
  * `subscribed` outlives the app: deleting it from the Home Screen tells the canister
  * nothing, so an entry can say it delivers for ever while nothing is there to deliver
- * to. Only the app moving its own stamp answers.
+ * to. Only the app moving its own stamp answers. The switch and the probe go in one
+ * call, which is also the one notification the device gets for the press.
  *
  * A probe the canister could not send says the entry has no wake-up address left, which
  * is the app being gone rather than a network that might come back: queuing one makes no
- * outcall, so there is nothing transient to wait out. Only a read that failed outright
- * leaves the switch as it was.
+ * outcall, so there is nothing transient to wait out. The switch is left off in that
+ * case, so a false answer needs nothing undone.
  */
-export const appStillAnswers = async (
+export const turnOnAndProve = async (
   identityNumber: bigint,
 ): Promise<boolean> => {
   const before = await browserAppStatus(identityNumber);
@@ -30,7 +33,7 @@ export const appStillAnswers = async (
   }
   const since = before.app.last_seen_ns;
 
-  const probe = await probeApp(identityNumber);
+  const probe = await turnOnApp(identityNumber);
   switch (probe.kind) {
     case "no-app":
       return false;
@@ -56,22 +59,4 @@ export const appStillAnswers = async (
     });
     const timer = setTimeout(() => settle(false), PROBE_WAIT_MS);
   });
-};
-
-/**
- * The install URL for an app the user's device no longer has.
- *
- * A record that says it delivers refuses an ordinary install, which is what keeps a
- * second app off a device that already has one. Only the user can say the app is gone,
- * and the probe above is them saying it, so this is the install that replaces it.
- */
-export const replacementInstallUrl = async (
-  identityNumber: bigint,
-): Promise<string | undefined> => {
-  try {
-    return await prepareInstallUrl({ identityNumber, replacingExisting: true });
-  } catch (error) {
-    console.error(error);
-    return undefined;
-  }
 };

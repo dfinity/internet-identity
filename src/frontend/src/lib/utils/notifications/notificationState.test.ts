@@ -305,6 +305,7 @@ describe("resolveOptIn", () => {
       state: ready,
       consented: false,
       installFirst: false,
+      justClaimed: false,
     });
   });
 
@@ -669,6 +670,7 @@ describe("where a Home Screen app delivers", () => {
         state: { source: "app", subscribed: false, enabled: false },
         consented: false,
         installFirst: false,
+        justClaimed: false,
       });
       expect(claim).not.toHaveBeenCalled();
       expect(saidSo).not.toHaveBeenCalled();
@@ -680,6 +682,7 @@ describe("where a Home Screen app delivers", () => {
       await expect(resolve(false)).resolves.toMatchObject({
         screen: "enable",
         installFirst: true,
+        justClaimed: false,
       });
       expect(claim).toHaveBeenCalledTimes(1);
     });
@@ -718,6 +721,7 @@ describe("where a Home Screen app delivers", () => {
         state: { source: "app", subscribed: false, enabled: false },
         consented: false,
         installFirst: false,
+        justClaimed: false,
       });
     });
 
@@ -733,6 +737,7 @@ describe("where a Home Screen app delivers", () => {
         state: { source: "app", subscribed: false, enabled: false },
         consented: false,
         installFirst: false,
+        justClaimed: false,
       });
     });
 
@@ -745,6 +750,7 @@ describe("where a Home Screen app delivers", () => {
       await expect(resolve(true)).resolves.toMatchObject({
         screen: "enable",
         installFirst: false,
+        justClaimed: false,
       });
     });
 
@@ -757,6 +763,7 @@ describe("where a Home Screen app delivers", () => {
       await expect(resolve(true)).resolves.toMatchObject({
         screen: "enable",
         installFirst: true,
+        justClaimed: false,
       });
     });
 
@@ -803,6 +810,7 @@ describe("where a Home Screen app delivers", () => {
       await expect(resolve(false)).resolves.toMatchObject({
         screen: "enable",
         installFirst: false,
+        justClaimed: false,
       });
       expect(saidSo).not.toHaveBeenCalled();
     });
