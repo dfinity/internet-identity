@@ -159,6 +159,7 @@ fn parse_form_post(body: &[u8]) -> Result<CallbackPayload, String> {
             "state" => &mut state,
             "error" => &mut error,
             "error_description" => &mut error_description,
+            // Special key used by Apple; others put the user name into id_token
             "user" => &mut user,
             _ => continue,
         };
