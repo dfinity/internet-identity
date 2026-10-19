@@ -468,6 +468,72 @@ fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> Noti
     })
 }
 
+/// Switches delivery on and proves the app is there in one call, because the two cannot
+/// be separated: a reference that is off is skipped when the canister picks who to send
+/// to, so a probe sent first finds nothing to wake, and a switch thrown first announces
+/// itself and then has the probe say the same thing to the same device. The probe is the
+/// announcement here. Where nothing can be woken the switch does not stay on: an entry
+/// that delivers for nobody must not read as on while the caller offers the install.
+#[update]
+fn turn_on_notification_app(
+    request: TurnOnNotificationAppRequest,
+) -> Result<NotificationId, TurnOnNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(TurnOnNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| TurnOnNotificationAppError::InvalidBrowserKey)?;
+    // An install nobody has opened is not an app to switch on, as for the flag alone.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(TurnOnNotificationAppError::NoNotificationApp);
+    }
+
+    let now_ns = ic_cdk::api::time();
+    // One already on its way is asking what this call asks, and a second would reach the
+    // same device with the same thing to say.
+    let outstanding = anchor.pending_probe(browser_id, now_ns);
+    anchor.set_notification_app_enabled(browser_id, true);
+    let identity = identity_for_notification(&anchor);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| TurnOnNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })?;
+    if let Some(probe) = outstanding {
+        return Ok(probe);
+    }
+
+    match notifications::dispatch::notify_identity(
+        request.anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity),
+        notifications::dispatch::IdentityNotification::Probe,
+        now_ns,
+    ) {
+        Some(probe) => Ok(probe),
+        None => {
+            // Read again rather than reusing what was written above: the dispatch owns the
+            // anchor while it runs, and the queue it may have touched is on it.
+            state::storage_borrow_mut(|storage| {
+                let mut anchor = storage.read(request.anchor_number).map_err(|err| {
+                    TurnOnNotificationAppError::InternalCanisterError(format!("{err:?}"))
+                })?;
+                anchor.set_notification_app_enabled(browser_id, false);
+                storage.write(anchor).map_err(|err| {
+                    TurnOnNotificationAppError::InternalCanisterError(format!("{err:?}"))
+                })
+            })?;
+            Err(TurnOnNotificationAppError::NotReachable)
+        }
+    }
+}
+
 /// The reference stays either way: this flips delivery, it does not install anything.
 #[update]
 fn set_notification_app_enabled(
