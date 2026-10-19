@@ -2420,6 +2420,34 @@ export type StreamingStrategy = {
 export type Sub = string;
 export type Timestamp = bigint;
 export type Token = {};
+export type TurnOnNotificationAppError = {
+    /**
+     * This browser points at no app.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing could be woken, so nothing was switched on: the app has registered
+     * nothing, the browser counts as gone, or there was no room for another outcall.
+     */
+    'NotReachable' : null
+  };
+/**
+ * Switches delivery on for this identity and asks the app to prove it is still there,
+ * in one call. A reference that is off is skipped when the canister picks who to send
+ * to, so the two cannot be separated: probing first would find nothing to wake, and
+ * switching on first would announce it and then say the same thing again on the probe.
+ * The probe is the announcement. Where nothing can be woken the switch does not stay on.
+ */
+export interface TurnOnNotificationAppRequest { 'anchor_number' : UserNumber }
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -3386,6 +3414,11 @@ export interface _SERVICE {
       { 'Pending' : null }
   >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
+  'turn_on_notification_app' : ActorMethod<
+    [TurnOnNotificationAppRequest],
+    { 'Ok' : NotificationId } |
+      { 'Err' : TurnOnNotificationAppError }
+  >,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
