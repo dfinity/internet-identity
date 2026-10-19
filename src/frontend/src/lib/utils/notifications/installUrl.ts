@@ -1,7 +1,10 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { throwCanisterError } from "$lib/utils/utils";
+import type {
+  _SERVICE,
+  PrepareNotificationAppLinkError,
+} from "$lib/generated/internet_identity_types";
+import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
@@ -53,12 +56,48 @@ export const prepareInstallUrl = async ({
   })}`;
 };
 
-/** Must be called straight from the click, which is the only time a browser allows it; the tab is opened empty and pointed once the URL resolves.
+/** The placeholder the new tab holds while the URL is still being minted: this page, told to wait rather than to decide. */
+export const INSTALL_PLACEHOLDER_URL = `${NOTIFICATION_APP_PATH}?installing`;
+
+/** `undefined` where this browser has nothing to send the user to; the reason is logged rather than raised. */
+export const installUrlOrNone = async (
+  identityNumber: bigint,
+): Promise<string | undefined> => {
+  try {
+    return await prepareInstallUrl({
+      identityNumber,
+      replacingExisting: false,
+    });
+  } catch (error) {
+    // A record that says it delivers refuses an ordinary install, which is what keeps a
+    // second app off a device that already has one. Reaching this screen means the app
+    // it names did not answer, so the record outlived the app and the install that
+    // replaces it is the one to mint.
+    if (
+      isCanisterError<PrepareNotificationAppLinkError>(error) &&
+      error.type === "AppAlreadyDelivering"
+    ) {
+      try {
+        return await prepareInstallUrl({
+          identityNumber,
+          replacingExisting: true,
+        });
+      } catch (replacing) {
+        console.error(replacing);
+        return undefined;
+      }
+    }
+    console.error(error);
+    return undefined;
+  }
+};
+
+/** Must be called straight from the click, which is the only time a browser allows it; the tab is opened on the placeholder and pointed once the URL resolves.
  *  A blocked tab is not an error: the screen shows the link instead. */
 export const openInstallTab = (
   url: string | Promise<string | undefined>,
 ): boolean => {
-  const opened = window.open("", "_blank");
+  const opened = window.open(INSTALL_PLACEHOLDER_URL, "_blank");
   if (opened === null) {
     // The caller handed its only failure path to this promise, so a tab the browser
     // refused is no reason to leave that failure unhandled.
@@ -87,4 +126,23 @@ export const openInstallTab = (
     },
   );
   return true;
+};
+
+/** A tab opened inside the press, waiting for somewhere to go. */
+export interface PendingInstallTab {
+  /** Whether the browser allowed the tab; a refused one is not a failure, the screen behind it carries the link. */
+  opened: boolean;
+  /** Points it at the install, or closes it where there is nothing to point it at. */
+  point: (url: string | undefined) => void;
+}
+
+/** Must be called straight from the click: the tab has to open before anything is awaited. */
+export const openPendingInstallTab = (): PendingInstallTab => {
+  let point: (url: string | undefined) => void = () => {};
+  const opened = openInstallTab(
+    new Promise<string | undefined>((resolve) => {
+      point = resolve;
+    }),
+  );
+  return { opened, point };
 };
