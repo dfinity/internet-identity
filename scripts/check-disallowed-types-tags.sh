@@ -19,6 +19,9 @@
 # - Tags are looked up in a second view in which line comments are kept but
 #   strings, char literals and block comments are still blanked, so a string
 #   or block comment whose last line looks like a tag does not count as one.
+#   A reason-string tag counts only when the `reason` identifier is live code
+#   in the attribute and its value is a string literal, so the same text in a
+#   comment or inside another string does not count either.
 # - The five non-ASCII characters rustc treats as whitespace (U+0085, U+200E,
 #   U+200F, U+2028, U+2029) are normalised to spaces first.
 # - `#`, `!` and `[` are separate tokens and may be separated by whitespace or
@@ -83,6 +86,9 @@ while IFS= read -r -d '' file; do
         # View for finding tags: line comments kept, every other token blanked.
         (my $tags = $_) =~ s{$tokens}{ substr($&, 0, 2) eq "//" ? $& : do { (my $blank = $&) =~ s/[^\n]/ /g; $blank } }ge;
         my @lines = split /\n/, $tags, -1;
+        # View for reading reason strings: string literals kept, comments and
+        # char literals blanked.
+        (my $strs = $_) =~ s{$tokens}{ my $m = $&; $m =~ /^b?(?:r\#*)?"/ ? $m : do { (my $blank = $m) =~ s/[^\n]/ /g; $blank } }ge;
         my $pr = qr{[A-Za-z0-9.#/:-]+};
         # Each attribute, outer or inner, as a whole (brackets balanced).
         while ($code =~ /#\s*!?\s*\[((?:[^\[\]]++|\[(?1)\])*)\]/gs) {
@@ -100,9 +106,17 @@ while IFS= read -r -d '' file; do
             my $prev = $line > 1 ? $lines[$line - 2] : "";
             $prev =~ s/\r$//;
             next if $prev =~ m{^\s*//\s*disallowed-types: (?:removed by $pr|permanent, \S.*?)\s*$};
-            # The reason-string form, read from the raw source (strings are
-            # blanked in $code; the offsets coincide).
-            next if substr($_, $start, $end - $start) =~ m{\breason\s*=\s*"disallowed-types: (?:removed by $pr|permanent, [^"]*\S[^"]*)"};
+            # The reason-string form: `reason` must be live code in the
+            # attribute (not comment or string contents) and its value a
+            # string literal, plain or raw.
+            my ($live, $withstrs) = (substr($code, $start, $end - $start), substr($strs, $start, $end - $start));
+            my $tagged = 0;
+            while ($withstrs =~ /\breason\s*=\s*(?:r(\#*)"((?:(?!"\1).)*)"\1|"((?:[^"\\]|\\.)*)")/gs) {
+                next unless substr($live, $-[0], 6) eq "reason";
+                my $text = defined $2 ? $2 : $3;
+                $tagged = 1 if $text =~ m{^disallowed-types: (?:removed by $pr|permanent, \S.*?)\s*$};
+            }
+            next if $tagged;
             print STDERR "$ARGV:$line: allow/expect of clippy::disallowed_types (or a lint group containing it: clippy::style, clippy::all, warnings) without a \x27// disallowed-types: ...\x27 tag on the line above or a reason = \"disallowed-types: ...\" string\n";
             $bad = 1;
         }
