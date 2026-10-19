@@ -46,6 +46,8 @@ expect_fail after-raw-string    $'const S: &str = r#"x " y"#;\n#[allow(clippy::d
 expect_fail after-hex-char-escape $'const CHARS: [char; 2] = [\'\\x41\', \'"\'];\n#[allow(clippy::disallowed_types)]\nfn f() {}\nconst S: &str = "later";'
 expect_fail after-unicode-char-escape $'const CHARS: [char; 2] = [\'\\u{41}\', \'"\'];\n#[allow(clippy::disallowed_types)]\nfn f() {}\nconst S: &str = "later";'
 expect_fail after-byte-hex-escape $'const B: [u8; 2] = [b\'\\x41\', b\'"\'];\n#[allow(clippy::disallowed_types)]\nfn f() {}\nconst S: &str = "later";'
+expect_fail after-multibyte-char $'const CHARS: [char; 2] = [\'\xc3\xa9\', \'"\'];\n#[allow(clippy::disallowed_types)]\nfn f() {}\nconst S: &str = "later";'
+expect_fail after-four-byte-char $'const CHARS: [char; 2] = [\'\xf0\x9f\x98\x80\', \'"\'];\n#[allow(clippy::disallowed_types)]\nfn f() {}\nconst S: &str = "later";'
 expect_fail after-escaped-quote $'const S: &str = "a\\" b";\n#[allow(clippy::disallowed_types)]\nfn f() {}'
 expect_fail after-quote-in-comment $'/* " */\n#[allow(clippy::disallowed_types)]\nfn f() {}'
 expect_fail space-before-bracket $'# [allow(clippy::disallowed_types)]\nfn f() {}'
