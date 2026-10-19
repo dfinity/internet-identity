@@ -1,0 +1,28 @@
+# Staged ban on the email-verification Candid boundary types inside the
+# canister crate: rule 1 of the type-ladder design note, which lands with the
+# stack as docs/ongoing/email-verification-type-ladder.md. Business logic
+# takes the admitted type named in each `reason`; a remaining raw use carries
+# `#[allow(clippy::disallowed_types)]` tagged on the line above with
+# `// disallowed-types: removed by <PR>` (or `permanent, ...`), checked by
+# `scripts/check-disallowed-types-tags.sh`.
+#
+# Location: clippy resolves its config from `CARGO_MANIFEST_DIR` upwards, so
+# this file in the package root applies to the `internet_identity` package
+# (bin, unit tests and the integration test crate) and not to the interface
+# crate that defines the types, whichever directory `cargo clippy` runs from.
+disallowed-types = [
+  { path = "internet_identity_interface::internet_identity::types::smtp::SmtpRequest", reason = "admitted as `BoundedRequest` (B2)" },
+  { path = "internet_identity_interface::internet_identity::types::smtp::SmtpEnvelope", reason = "admitted as `ValidEnvelope` (B2)" },
+  { path = "internet_identity_interface::internet_identity::types::smtp::SmtpAddress", reason = "admitted as `RecognisedRecipient` (B2) or `EmailAddress` (B1)" },
+  { path = "internet_identity_interface::internet_identity::types::smtp::SmtpMessage", reason = "admitted as `WellFormedMessage` (B2)" },
+  { path = "internet_identity_interface::internet_identity::types::smtp::SmtpHeader", reason = "admitted as `RawHeader` (B2)" },
+  { path = "internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeDnsInput", reason = "admitted as `PrepareRequest` (C3)" },
+  { path = "internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeSubmitDkimLeafArg", reason = "admitted as `UnverifiedLeafSubmission` (A2.3)" },
+  { path = "internet_identity_interface::internet_identity::types::dnssec::DnsProofBundle", reason = "admitted as `UnverifiedBundle` (A2.3)" },
+  { path = "internet_identity_interface::internet_identity::types::dnssec::DelegationChain", reason = "admitted as `UnverifiedChain` (A2.3)" },
+  { path = "internet_identity_interface::internet_identity::types::dnssec::DelegationLink", reason = "admitted inside `UnverifiedChain` (A2.3)" },
+  { path = "internet_identity_interface::internet_identity::types::dnssec::SignedRRset", reason = "admitted as `UnverifiedRRset` (A2.1)" },
+  { path = "internet_identity_interface::internet_identity::types::dnssec::Rrsig", reason = "admitted inside `UnverifiedRRset` (A2.1)" },
+  { path = "internet_identity_interface::internet_identity::types::dnssec::DnssecRootAnchor", reason = "admitted as `TrustAnchorSet` (A3)" },
+  { path = "internet_identity_interface::internet_identity::types::doh::DohConfig", reason = "admitted as `DohAllowlist` (C1)" },
+]

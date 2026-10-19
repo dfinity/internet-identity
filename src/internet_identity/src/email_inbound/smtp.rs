@@ -63,6 +63,8 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
     DohFailureReason, EmailChallengeError,
 };
 use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_header_values, validate_smtp_request, SmtpRequest, SmtpResponse,
     SMTP_ERR_MAILBOX_UNAVAILABLE, SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
@@ -87,6 +89,8 @@ use super::{RECOVERY_RECIPIENT_USER, SETUP_RECIPIENT_USER};
 /// `SmtpRequest` with `to.user="register"` but a different domain
 /// to bypass recipient dispatch — only domains the deploy arg
 /// authorised count.
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 fn recipient_matches(
     to: &internet_identity_interface::internet_identity::types::smtp::SmtpAddress,
     expected_user: &str,
@@ -125,6 +129,8 @@ fn recipient_matches(
 /// The query is open — anyone can call it — but it has no side
 /// effects and leaks nothing beyond the deploy arg, which is already
 /// public.
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
     if let Err(e) = validate_smtp_request(&request) {
         return e;
@@ -156,6 +162,8 @@ pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
 /// or `None` if the envelope is empty or carries more than one
 /// recipient. Multi-recipient envelopes don't fit the recovery flows
 /// (see [`handle_smtp_request_validate`] for the threat-model note).
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 fn single_recipient(
     envelope: &internet_identity_interface::internet_identity::types::smtp::SmtpEnvelope,
 ) -> Option<&internet_identity_interface::internet_identity::types::smtp::SmtpAddress> {
@@ -172,6 +180,8 @@ fn single_recipient(
 /// malformed request shape, and `Ok` for *verification* outcomes —
 /// see the module-level note on why we don't surface per-message
 /// verification failures.
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // Bound-check up front so a malformed gateway-side payload
     // returns a clean syntax error instead of trapping somewhere
@@ -455,6 +465,8 @@ enum RecipientFlow {
 /// Returns the nonce in **canonical** form (the prefix as the
 /// canister emits it, plus the suffix lowercased), so the caller
 /// can hand it directly to the pending map without re-normalising.
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 fn extract_nonce_from_subject(
     message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
 ) -> Option<String> {
@@ -534,6 +546,8 @@ fn find_nonce_with_prefix(haystack: &str, prefix: &str) -> Option<String> {
 /// resulting `PartialVerification` record is enough for
 /// `submit_dkim_leaf` to finish the signature check once the FE
 /// supplies the DKIM TXT.
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 fn prepare_partial_verification(
     request: &SmtpRequest,
     snapshot: &PendingSnapshot,
@@ -669,6 +683,8 @@ fn prepare_partial_verification(
 /// From header is malformed in some way the verifier didn't catch
 /// here, treating it as "doesn't match" gives the same observable
 /// behaviour to the user.
+// disallowed-types: removed by B2
+#[allow(clippy::disallowed_types)]
 pub(super) fn extract_from_address(
     message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
 ) -> Result<String, EmailChallengeError> {
@@ -1083,6 +1099,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn extract_from_addrspec_form() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpHeader, SmtpMessage,
@@ -1099,6 +1117,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn extract_from_name_addr_form() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpHeader, SmtpMessage,
@@ -1115,6 +1135,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn extract_from_single_mailbox() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpHeader, SmtpMessage,
@@ -1138,6 +1160,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn extract_from_rejects_crlf_spliced_header() {
         // A `From:` value carrying a second mailbox smuggled behind an
         // embedded CRLF must not resolve to that second mailbox — it is
@@ -1162,6 +1186,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn crlf_splice_preserves_dkim_signed_bytes() {
         // Documents *why* the forgery kept a valid signature: relocating
         // the `To:` header's canonical bytes into the `From:` value (via
@@ -1239,6 +1265,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn extract_from_rejects_second_at() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpHeader, SmtpMessage,
@@ -1268,10 +1296,14 @@ mod tests {
         ));
     }
 
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {
         smtp_envelope_with_recipients(&[(user, domain)])
     }
 
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn smtp_envelope_with_recipients(recipients: &[(&str, &str)]) -> SmtpRequest {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope,
@@ -1462,6 +1494,8 @@ mod tests {
     /// whose tag content is `dkim_value`. `From:` is set to the same
     /// address every test uses, the body is `b"hi"`, and the envelope
     /// is shaped like a register-flow delivery.
+    // disallowed-types: removed by B2
+    #[allow(clippy::disallowed_types)]
     fn smtp_with_dkim(dkim_value: &str) -> SmtpRequest {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage,

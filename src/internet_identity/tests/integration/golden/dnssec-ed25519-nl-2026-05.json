@@ -1,0 +1,17 @@
+{
+  "fixture": "ed25519-nl-2026-05.json",
+  "route": "Dnssec",
+  "now_unix": 1778508967,
+  "domain": "ed25519.nl",
+  "leaf_name": "ed25519.nl",
+  "prepare_add_as_captured": "Err(EmailVerificationFailed: DNSSEC leaf: BadCnameChain(\"final hop type does not match requested type\"))",
+  "prepare_add_skeleton": "Ok",
+  "polled": {
+    "status": "Pending",
+    "diagnostics": {
+      "message_id": null,
+      "reason_code": "Pending",
+      "verification_path": "Dnssec"
+    }
+  }
+}

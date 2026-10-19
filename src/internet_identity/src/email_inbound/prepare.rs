@@ -5,6 +5,8 @@
 use super::pending::{insert_with_eviction, PendingChallenge, PendingKind, PendingStatus};
 use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce_with_prefix};
 use crate::state;
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
@@ -28,6 +30,8 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
 /// path from authz → insert does not yield, so a concurrent
 /// remove/replace cannot race while the pending map is still empty
 /// (`drop_challenges_for_anchor` would have had nothing to drop).
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 pub(crate) async fn prepare_common(
     dns_input: EmailChallengeDnsInput,
     now_secs: u64,
@@ -166,6 +170,8 @@ struct DnssecExtracted {
 /// prepare bundle, and an attacker who got a different TXT
 /// validated under the same chain shouldn't be able to smuggle it
 /// through here.
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 fn verify_dnssec_skeleton(
     proof: internet_identity_interface::internet_identity::types::DnsProofBundle,
     registered_domain: &str,

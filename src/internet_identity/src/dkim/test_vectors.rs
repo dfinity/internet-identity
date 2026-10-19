@@ -16,6 +16,8 @@
 
 use super::types::{DkimVerifyResult, VerificationFailReason};
 use super::verify::verify;
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest,
 };
@@ -34,6 +36,8 @@ const SYNTH_RSA_TXT: &str =
 /// produces. Continuation lines (those starting with WSP) are unfolded
 /// into the previous header's value, with the leading WSP preserved per
 /// RFC 5322 §2.2.3 so DKIM relaxed canonicalisation can collapse it.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 fn parse_eml(raw: &[u8]) -> SmtpRequest {
     // Find the first \r\n\r\n that separates headers from body.
     let mut header_end = 0;
@@ -88,6 +92,8 @@ fn parse_eml(raw: &[u8]) -> SmtpRequest {
 
 /// Walk the header section, splitting into `(name, value)` pairs with
 /// continuation lines unfolded.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 fn parse_headers(bytes: &[u8]) -> Vec<SmtpHeader> {
     let mut headers: Vec<SmtpHeader> = Vec::new();
     let mut i = 0;
@@ -151,6 +157,8 @@ fn parse_headers(bytes: &[u8]) -> Vec<SmtpHeader> {
 /// Extract `user@domain` from an address like `alice@example.com`. We
 /// ignore RFC 5322 display-name complications because the test fixtures
 /// don't include them.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 fn extract_address(value: &str) -> SmtpAddress {
     let trimmed = value.trim();
     if let Some((user, domain)) = trimmed.split_once('@') {
