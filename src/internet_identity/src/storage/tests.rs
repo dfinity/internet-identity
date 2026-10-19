@@ -7553,10 +7553,10 @@ fn an_app_key_seen_again_keeps_the_record_it_already_had() {
     let key = app_key(7);
 
     let first = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let again = storage
-        .notification_app_for_key(&key, 2_000)
+        .ensure_notification_app_for_key(&key, 2_000)
         .expect("reading the record back");
 
     assert_eq!(first.id, again.id);
@@ -7576,7 +7576,7 @@ fn app_ids_are_never_reissued() {
     let ids: Vec<_> = (1u8..=3)
         .map(|seed| {
             storage
-                .notification_app_for_key(&app_key(seed), 1_000)
+                .ensure_notification_app_for_key(&app_key(seed), 1_000)
                 .expect("creating the record")
                 .id
         })
@@ -7603,7 +7603,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     let first_key = app_key(1);
     let mut storage = Storage::new((1, 2), memory.clone());
     let before = storage
-        .notification_app_for_key(&first_key, 1_000)
+        .ensure_notification_app_for_key(&first_key, 1_000)
         .expect("creating the record");
 
     let mut reloaded = Storage::from_memory(memory);
@@ -7614,7 +7614,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
     );
     assert_eq!(
         reloaded
-            .notification_app_for_key(&app_key(2), 2_000)
+            .ensure_notification_app_for_key(&app_key(2), 2_000)
             .expect("creating the second record")
             .id,
         1
@@ -7636,7 +7636,7 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let key = app_key(7);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
 
     for _ in 0..2 {
@@ -7657,14 +7657,14 @@ fn an_app_nothing_points_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let key = app_key(7);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
     storage.write(anchor).expect("pointing at the app");
 
     let replacement = storage
-        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor.point_at_notification_app(0, replacement.id);
@@ -7683,7 +7683,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let key = app_key(7);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
@@ -7692,7 +7692,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
     }
 
     let replacement = storage
-        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor.point_at_notification_app(0, replacement.id);
@@ -7709,7 +7709,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
@@ -7744,7 +7744,7 @@ fn an_app_no_anchor_points_at_is_deleted_on_request() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
 
     storage.delete_unreferenced_notification_app(app.id);
@@ -7761,7 +7761,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let key = ByteBuf::from(vec![7u8; 91]);
     let app = storage
-        .notification_app_for_key(&key, 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id);
@@ -7783,7 +7783,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
 
     assert!(
@@ -7820,7 +7820,7 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     let gone = app.id + 1;
 
@@ -7838,7 +7838,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
@@ -7871,7 +7871,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
 fn forgetting_an_app_keeps_an_entry_silent_that_had_switched_it_off() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
@@ -7913,7 +7913,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
@@ -8005,7 +8005,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
     let mut anchor = anchor_with_browser(&mut storage);
@@ -8049,7 +8049,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
@@ -8111,7 +8111,7 @@ fn an_entry_delivers_through_the_app_it_points_at() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(
         app.id,
@@ -8145,7 +8145,7 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(
         app.id,
@@ -8194,7 +8194,7 @@ fn an_apps_new_address_strands_the_probe_of_an_entry_with_its_own() {
     };
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(
         app.id,
@@ -8260,10 +8260,10 @@ fn moving_to_another_app_takes_the_probe_and_leaves_the_rest() {
 
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let app = storage
-        .notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     let replacement = storage
-        .notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 1_000)
+        .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 1_000)
         .expect("creating the record the entry moves to");
     let mut anchor = anchor_with_browser(&mut storage);
     // An address of its own, which is what keeps the rest of the queue showable.

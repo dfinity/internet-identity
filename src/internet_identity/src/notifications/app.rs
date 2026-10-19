@@ -7,6 +7,14 @@ use internet_identity_interface::internet_identity::types::{PublicKey, Timestamp
 
 /// Numbers a notification app record. Never reissued, so a browser pointing at a deleted
 /// record cannot reach another app.
+///
+/// The record carries both this and the key below because they do different jobs: the
+/// key is the credential the app authenticates with, this is the handle everything else
+/// holds. A reference is `Copy` and eight bytes wide, where the DER-encoded key it names
+/// is about ninety, and references are held per browser and per queued notification.
+/// Keying by the public key instead would also lose what never reissuing buys: a
+/// reinstall mints a new key in a storage partition of its own, so an old reference
+/// would dangle with no way to tell a deleted record from one that never existed.
 pub type NotificationAppId = u64;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
