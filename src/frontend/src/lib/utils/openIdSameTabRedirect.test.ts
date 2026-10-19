@@ -30,14 +30,28 @@ vi.mock("$lib/globals", () => ({
   notificationsEnabled: () => false,
 }));
 
-vi.mock("$lib/stores/session.store", () => ({
-  sessionStore: {
-    subscribe: (run: (value: { nonce: string }) => void) => {
-      run({ nonce: "test-nonce" });
-      return () => {};
+// A stateful session mock: `reset()` swaps the "stale" nonce for a "fresh"
+// one, so a URL built with the fresh nonce proves the redirect reset the
+// session before reading it (the fix for the 5-minute session expiry).
+const { sessionMock, restoreStaleNonce } = vi.hoisted(() => {
+  let nonce = "stale-nonce";
+  return {
+    restoreStaleNonce: () => {
+      nonce = "stale-nonce";
     },
-  },
-}));
+    sessionMock: {
+      reset: vi.fn(() => {
+        nonce = "fresh-nonce";
+      }),
+      subscribe: (run: (value: { nonce: string }) => void) => {
+        run({ nonce });
+        return () => {};
+      },
+    },
+  };
+});
+
+vi.mock("$lib/stores/session.store", () => ({ sessionStore: sessionMock }));
 
 const APPLE_AUTH_URL = "https://appleid.apple.com/auth/authorize";
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -181,6 +195,8 @@ describe("same-tab redirect round trip", () => {
   beforeEach(() => {
     sessionStorage.clear();
     backendCanisterConfig.openid_configs = [[appleConfig]];
+    sessionMock.reset.mockClear();
+    restoreStaleNonce();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-19T10:00:00Z"));
   });
@@ -215,7 +231,9 @@ describe("same-tab redirect round trip", () => {
   it("navigates to the provider with the session nonce and a return path", () => {
     const { url } = startRedirect({ returnPath: "/?from=test" });
     expect(url.origin).toBe("https://appleid.apple.com");
-    expect(url.searchParams.get("nonce")).toBe("test-nonce");
+    // The fresh nonce proves the session was reset before the URL was built.
+    expect(sessionMock.reset).toHaveBeenCalledTimes(1);
+    expect(url.searchParams.get("nonce")).toBe("fresh-nonce");
     expect(url.searchParams.get("client_id")).toBe("ai.id.auth");
     expect(url.searchParams.get("response_mode")).toBe("form_post");
     expect(sessionStorage.getItem(OPENID_RETURN_PATH_KEY)).toBe("/?from=test");
@@ -266,6 +284,18 @@ describe("same-tab redirect round trip", () => {
     expect(sessionStorage.getItem(OPENID_RETURN_PATH_KEY)).toBeNull();
     expect(sessionStorage.getItem(OPENID_WIZARD_RESUME_KEY)).toBeNull();
     expect(sessionStorage.getItem(OPENID_CALLBACK_DATA_KEY)).toBeNull();
+  });
+
+  it("carries the post-sign-in destination across the round trip", () => {
+    const { state } = startRedirect({ next: "/manage?from=dapp" });
+    deliverCallback({ id_token: "token", state });
+    expect(consumeOpenIdSameTabResume()?.next).toBe("/manage?from=dapp");
+  });
+
+  it("has no destination when the redirect started without one", () => {
+    const { state } = startRedirect();
+    deliverCallback({ id_token: "token", state });
+    expect(consumeOpenIdSameTabResume()?.next).toBeUndefined();
   });
 
   it("resolves the provider by issuer when the client id was rotated", () => {

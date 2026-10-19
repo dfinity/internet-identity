@@ -122,6 +122,9 @@ const ResumeRecordSchema = z.object({
   clientId: z.string(),
   mode: z.enum(["signin", "signup", "both"]),
   startedAt: z.number(),
+  // Where to go once the sign-in completes (the landing page's `next`, e.g. a
+  // dapp deep link). Older records predate it, so it's optional.
+  next: z.string().optional(),
 });
 type ResumeRecord = z.infer<typeof ResumeRecordSchema>;
 
@@ -130,6 +133,8 @@ export interface OpenIdSameTabResume {
   config: OpenIdConfig;
   jwt: string;
   mode: AuthMode;
+  /** The post-sign-in destination the redirect was started with, if any. */
+  next?: string;
 }
 
 export interface RedirectToOpenIdInSameTabOptions {
@@ -137,6 +142,8 @@ export interface RedirectToOpenIdInSameTabOptions {
   mode: AuthMode;
   /** In-app path (with query, if any) to come back to. Defaults to "/". */
   returnPath?: string;
+  /** Where to send the user once the resumed sign-in completes. */
+  next?: string;
   /** Injected for tests; defaults to navigating this tab. */
   navigate?: (url: URL) => void;
 }
@@ -152,8 +159,17 @@ export const redirectToOpenIdInSameTab = ({
   config,
   mode,
   returnPath = "/",
+  next,
   navigate = (url) => window.location.assign(url),
 }: RedirectToOpenIdInSameTabOptions): Promise<never> => {
+  // The JWT is bound to the session nonce, and the session is only valid for
+  // 5 minutes after it's created. A same-tab sign-in spends that whole budget
+  // off-site at the IdP, so a session that was already part-way through its
+  // life when the user clicked could expire before the callback returns.
+  // Reset it here to start the round trip with a full lifetime; the fresh
+  // session (and its nonce) is persisted to sessionStorage and so survives
+  // the navigation.
+  sessionStore.reset();
   const url = createRedirectURL(
     {
       clientId: config.client_id,
@@ -173,6 +189,7 @@ export const redirectToOpenIdInSameTab = ({
     clientId: config.client_id,
     mode,
     startedAt: Date.now(),
+    next,
   };
   // One flow at a time: whatever another flow left behind would otherwise
   // misroute this one's callback.
@@ -229,7 +246,7 @@ export const consumeOpenIdSameTabResume = ():
     return undefined;
   }
   const jwt = extractIdTokenFromCallback(payload, record.state);
-  return { config, jwt, mode: record.mode };
+  return { config, jwt, mode: record.mode, next: record.next };
 };
 
 /**

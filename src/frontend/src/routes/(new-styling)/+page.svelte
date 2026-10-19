@@ -60,6 +60,13 @@
   if (browser) {
     try {
       pendingOpenIdResume = consumeOpenIdSameTabResume();
+      // Restore the post-sign-in destination that was captured before the
+      // redirect. The full-page round trip drops `page.state.login`, so
+      // without this a deep-linked sign-in would land on the default
+      // "/manage" instead of where the user was headed.
+      if (pendingOpenIdResume?.next !== undefined) {
+        next = pendingOpenIdResume.next;
+      }
     } catch (error) {
       pendingOpenIdResumeError = error;
     }
@@ -75,6 +82,9 @@
       config,
       mode,
       returnPath: `${window.location.pathname}${window.location.search}`,
+      // Carry the post-sign-in destination across the round trip, so a
+      // deep-linked sign-in still lands where the user was headed.
+      next,
     });
   };
 
