@@ -65,7 +65,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check disallowed-types allow tags
-        run: ./scripts/check-disallowed-types-tags.sh
+        run: |
+          ./scripts/check-disallowed-types-tags.test.sh
+          ./scripts/check-disallowed-types-tags.sh
 
   check-lockfile:
     runs-on: ubuntu-latest

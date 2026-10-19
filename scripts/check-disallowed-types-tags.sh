@@ -1,36 +1,52 @@
 #!/usr/bin/env bash
 # Every `allow`/`expect` of `clippy::disallowed_types` under `src/` must carry,
-# on the line directly above it, a tag that either names the type-ladder PR
-# retiring that raw use of a Candid boundary type
+# on the line directly above the attribute's opening `#[` line, a tag that
+# either names the type-ladder PR retiring that raw use of a Candid boundary
+# type
 #     // disallowed-types: removed by <PR>
 # or declares the use permanent with a reason
 #     // disallowed-types: permanent, <why>
 # The banned types are listed in `src/internet_identity/clippy.toml`.
 #
-# The match covers every attribute that would silence the lint, so an
-# untagged allow written in any of these forms is rejected too:
+# Whole attributes are scanned, not lines, so an untagged allow written in any
+# of these forms is rejected too, including when rustfmt wraps it over several
+# lines:
 #     #[allow(dead_code, clippy::disallowed_types)]
 #     #[allow(clippy::disallowed_types, dead_code)]
 #     #[expect(clippy::disallowed_types)]
 #     #[allow(clippy::style)]            (a lint group containing it)
 #     #[allow(clippy::all)]              (likewise)
 #     #[cfg_attr(test, allow(clippy::disallowed_types))]
+#     #[allow(
+#         clippy::disallowed_types,
+#     )]
+# `scripts/check-disallowed-types-tags.test.sh` pins these cases.
+#
+# Usage: check-disallowed-types-tags.sh [DIR]   (DIR defaults to src/)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+dir="${1:-src}"
 
-allow_pattern='(allow|expect)\([^)]*clippy::(disallowed_types|style|all)([[:space:],)]|$)'
-tag_pattern='^[[:space:]]*// disallowed-types: (removed by [A-Za-z0-9.-]+|permanent, .+)$'
 status=0
-while IFS=: read -r file line _; do
-    prev=""
-    if [ "$line" -gt 1 ]; then
-        prev=$(sed -n "$((line - 1))p" "$file")
-    fi
-    if ! printf '%s\n' "$prev" | grep -Eq "$tag_pattern"; then
-        echo "$file:$line: allow/expect of clippy::disallowed_types (or a lint group containing it) without a '// disallowed-types: ...' tag on the line above" >&2
+while IFS= read -r -d '' file; do
+    if ! perl -0777 -ne '
+        my $bad = 0;
+        while (/#!?\[[^\]]*?\b(?:allow|expect)\s*\(([^)]*)\)/gs) {
+            my $body = $1;
+            my $start = $-[0];
+            next unless $body =~ /clippy::(?:disallowed_types|style|all)(?=[\s,)]|$)/;
+            my $line = 1 + (substr($_, 0, $start) =~ tr/\n//);
+            my @lines = split /\n/, $_, -1;
+            my $prev = $line > 1 ? $lines[$line - 2] : "";
+            next if $prev =~ m{^\s*// disallowed-types: (?:removed by [A-Za-z0-9.-]+|permanent, .+)$};
+            print STDERR "$ARGV:$line: allow/expect of clippy::disallowed_types (or a lint group containing it) without a \x27// disallowed-types: ...\x27 tag on the line above\n";
+            $bad = 1;
+        }
+        exit $bad;
+    ' "$file"; then
         status=1
     fi
-done < <(grep -rnE --include='*.rs' "$allow_pattern" src)
+done < <(find "$dir" -name '*.rs' -type f -print0 | sort -z)
 
 if [ "$status" -eq 0 ]; then
     echo "disallowed-types allow tags: ok"
