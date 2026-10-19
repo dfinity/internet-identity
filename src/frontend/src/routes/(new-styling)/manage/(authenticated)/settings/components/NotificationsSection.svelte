@@ -22,7 +22,7 @@
   } from "$lib/utils/notifications/notificationState";
   import { failureMessage } from "$lib/utils/notifications/notificationDiagnostics";
   import { openPendingInstallTab } from "$lib/utils/notifications/installUrl";
-  import { appStillAnswers } from "./appStillAnswers";
+  import { appStillAnswers, replacementInstallUrl } from "./appStillAnswers";
   import { turnOnWithApp } from "./notificationsSwitch";
   import {
     turnOffInBrowser,
@@ -194,10 +194,14 @@
         tab.point(undefined);
         return true;
       }
-      // Gone. The flag stays off on the way to the install: the canister refuses to mint
-      // one over a record that is delivering, so writing the answer here would close the
-      // tab this press opened and leave the switch claiming an app that is not there.
-      // The install carries the answer instead — a fresh record links switched on.
+      // Gone. The record still says it delivers, and nothing but the user can say
+      // otherwise, so the install is minted as the replacement it is: an ordinary one is
+      // refused over a delivering record, and the empty URL would close the tab this
+      // press opened.
+      const replacing = await replacementInstallUrl(identityNumber);
+      tab.point(replacing);
+      refusedInstallUrl = tab.opened ? undefined : replacing;
+      return false;
     } else if (ownApp !== undefined && !ownApp.enabled) {
       // This identity's say-so is recorded the moment it is given, as turning off records
       // it: an install started from this press finishes by carrying the flag, so leaving
