@@ -1,7 +1,10 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { throwCanisterError } from "$lib/utils/utils";
+import type {
+  _SERVICE,
+  PrepareNotificationAppLinkError,
+} from "$lib/generated/internet_identity_types";
+import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
@@ -90,4 +93,23 @@ export const openInstallTab = (
     },
   );
   return true;
+};
+
+/** A tab opened inside the press, waiting for somewhere to go. */
+export interface PendingInstallTab {
+  /** Whether the browser allowed the tab; a refused one is not a failure, the screen behind it carries the link. */
+  opened: boolean;
+  /** Points it at the install, or closes it where there is nothing to point it at. */
+  point: (url: string | undefined) => void;
+}
+
+/** Must be called straight from the click: the tab has to open before anything is awaited. */
+export const openPendingInstallTab = (): PendingInstallTab => {
+  let point: (url: string | undefined) => void = () => {};
+  const opened = openInstallTab(
+    new Promise<string | undefined>((resolve) => {
+      point = resolve;
+    }),
+  );
+  return { opened, point };
 };
