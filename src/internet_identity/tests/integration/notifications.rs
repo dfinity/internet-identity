@@ -1849,21 +1849,6 @@ mod shared_app {
         .expect("claim_notification_app rejected")
         .expect("claim_notification_app returned Err");
 
-        // Taking the app over does not switch delivery on for the identity that took it,
-        // so the fixture says what its name promises: both of them deliver through it.
-        // The default a claim leaves behind is pinned by its own test rather than here.
-        set_notification_app_enabled(
-            env,
-            canister_id,
-            browser(SECOND_BROWSER_SEED),
-            SetNotificationAppEnabledRequest {
-                anchor_number: second,
-                enabled: true,
-            },
-        )
-        .expect("set_notification_app_enabled rejected")
-        .expect("set_notification_app_enabled returned Err");
-
         (canister_id, first, second, app)
     }
 
@@ -1957,62 +1942,6 @@ mod shared_app {
             NotificationAppStatus::Linked(info) => Ok(info),
             other => panic!("expected a browser with an app, got {other:?}"),
         }
-    }
-
-    /// Taking over the app another identity installed is not this identity asking for
-    /// delivery. Nothing on the device says a second identity wants notifications, so
-    /// the reference it ends up holding starts switched off and the user's own answer on
-    /// the opt-in screen is what switches it on. Getting this wrong delivers to an
-    /// identity that was never asked.
-    #[test]
-    fn should_leave_a_claimed_app_switched_off_until_the_claimer_asks() -> Result<(), RejectResponse>
-    {
-        let env = env();
-        let (canister_id, first, second) = install_with_two_anchors(&env);
-        link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
-        let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + 3 * 60 * 1_000_000_000;
-
-        claim_notification_app(
-            &env,
-            canister_id,
-            browser(SECOND_BROWSER_SEED),
-            ClaimNotificationAppRequest {
-                anchor_number: second,
-                offering_anchor_number: first,
-                expires_at_ns,
-                signature: BrowserKey::new(FIRST_BROWSER_SEED)
-                    .successor()
-                    .sign_claim_token(first, second, expires_at_ns),
-            },
-        )?
-        .expect("claim_notification_app returned Err");
-
-        assert!(
-            !linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?.enabled,
-            "the identity that took the app over was switched on without being asked"
-        );
-        // The identity that installed it is untouched: it asked, and its answer stands.
-        assert!(
-            linked(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?.enabled,
-            "the claim switched the installing identity off"
-        );
-
-        set_notification_app_enabled(
-            &env,
-            canister_id,
-            browser(SECOND_BROWSER_SEED),
-            SetNotificationAppEnabledRequest {
-                anchor_number: second,
-                enabled: true,
-            },
-        )?
-        .expect("set_notification_app_enabled returned Err");
-
-        assert!(
-            linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?.enabled,
-            "answering the opt-in screen did not switch delivery on"
-        );
-        Ok(())
     }
 
     /// The app has one service worker registration whatever number of identities point
@@ -2205,18 +2134,67 @@ mod shared_app {
             .is_some());
         Ok(())
     }
+
+    #[test]
+    fn should_leave_a_claimed_app_switched_off_until_the_claimer_asks() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + 3 * 60 * 1_000_000_000;
+
+        claim_notification_app(
+            &env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            ClaimNotificationAppRequest {
+                anchor_number: second,
+                offering_anchor_number: first,
+                expires_at_ns,
+                signature: BrowserKey::new(FIRST_BROWSER_SEED)
+                    .successor()
+                    .sign_claim_token(first, second, expires_at_ns),
+            },
+        )?
+        .expect("claim_notification_app returned Err");
+
+        assert!(
+            !linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?.enabled,
+            "the identity that took the app over was switched on without being asked"
+        );
+        // The identity that installed it is untouched: it asked, and its answer stands.
+        assert!(
+            linked(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?.enabled,
+            "the claim switched the installing identity off"
+        );
+
+        set_notification_app_enabled(
+            &env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            SetNotificationAppEnabledRequest {
+                anchor_number: second,
+                enabled: true,
+            },
+        )?
+        .expect("set_notification_app_enabled returned Err");
+
+        assert!(
+            linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?.enabled,
+            "answering the opt-in screen did not switch delivery on"
+        );
+        Ok(())
+    }
 }
 
 mod claims {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        claim_notification_app, notification_app_anchors, set_notification_app_enabled,
-        set_webpush_subscription,
+        claim_notification_app, notification_app_anchors, set_webpush_subscription,
     };
     use internet_identity_interface::internet_identity::types::{
-        ClaimNotificationAppError, ClaimNotificationAppRequest, SetNotificationAppEnabledRequest,
-        SetWebPushSubscriptionRequest,
+        ClaimNotificationAppError, ClaimNotificationAppRequest, SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -2340,11 +2318,9 @@ mod claims {
         Ok(())
     }
 
-    /// Switching delivery on queues a notification saying so, and the claim that came
-    /// before it queues nothing: it starts no delivery to announce. A token stays
-    /// claimable for its half hour, so a replay must not queue anything either — every
-    /// one of those is a paid wake-up, and past the queue's limit each evicts a real
-    /// notification.
+    /// The claim queues a notification saying delivery is on. A token stays claimable
+    /// for its half hour, so a replay must not queue a second one: every one of those is
+    /// a paid wake-up, and past the queue's limit each evicts a real notification.
     #[test]
     fn should_queue_one_notification_however_often_a_token_is_spent() -> Result<(), RejectResponse>
     {
@@ -2372,29 +2348,11 @@ mod claims {
                 .expect("claim_notification_app returned Err");
         }
 
-        // Nothing yet: taking the app over is not asking it to deliver.
-        assert_eq!(
-            browser_get_next_notification(&env, canister_id, claiming, next_request(second))?,
-            Ok(GetNextNotificationResponse { notification: None }),
-            "the claim queued a notification for an identity that is not delivering"
-        );
-
-        set_notification_app_enabled(
-            &env,
-            canister_id,
-            claiming,
-            SetNotificationAppEnabledRequest {
-                anchor_number: second,
-                enabled: true,
-            },
-        )?
-        .expect("set_notification_app_enabled returned Err");
-
         let shown =
             browser_get_next_notification(&env, canister_id, claiming, next_request(second))?
                 .expect("browser_get_next_notification returned Err")
                 .notification
-                .expect("switching delivery on queued one");
+                .expect("the claim queued one");
         browser_remove_notification(
             &env,
             canister_id,
@@ -2409,7 +2367,7 @@ mod claims {
         assert_eq!(
             browser_get_next_notification(&env, canister_id, claiming, next_request(second))?,
             Ok(GetNextNotificationResponse { notification: None }),
-            "switching on twice over, or a replayed claim, queued another"
+            "a replay queued another"
         );
         Ok(())
     }
