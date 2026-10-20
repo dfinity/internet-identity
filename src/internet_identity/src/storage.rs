@@ -464,7 +464,6 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the notification app id allocator.
     next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
-    /// Memory wrapper used to report the size of the anchors-per-app index.
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -1012,7 +1011,7 @@ impl<M: Memory + Clone> Storage<M> {
             &current_passkey_credentials,
         );
 
-        self.sync_anchor_with_notification_app_index(
+        self.sync_notification_apps_with_anchor(
             anchor_number,
             &previous_browsers,
             storable_anchor.browsers.as_deref().unwrap_or_default(),
@@ -1477,7 +1476,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// Keeps each app record's anchor list in step with the apps this anchor's browsers
     /// point at, and deletes a record the last browser has just stopped pointing at. The
     /// list is also the reference count.
-    fn sync_anchor_with_notification_app_index(
+    fn sync_notification_apps_with_anchor(
         &mut self,
         anchor_number: AnchorNumber,
         previous_browsers: &[StorableBrowser],
