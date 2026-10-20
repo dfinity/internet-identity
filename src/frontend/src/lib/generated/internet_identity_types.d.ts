@@ -1433,6 +1433,12 @@ export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
   } |
   {
     /**
+     * Not a P-256 public key in the single encoding WebCrypto emits.
+     */
+    'InvalidAppKey' : null
+  } |
+  {
+    /**
      * The key is one a browser of this identity already signs with.
      */
     'KeyAlreadyInUse' : null
@@ -1963,6 +1969,12 @@ export interface PrepareMcpRegistrationDelegation {
 }
 export type PrepareNotificationAppLinkError = {
     /**
+     * The principal named is not one a key can sign as, so no app could ever present it.
+     */
+    'LinkPrincipalIsNotAKey' : null
+  } |
+  {
+    /**
      * The caller signs with no key this identity is signed in from.
      */
     'InvalidBrowserKey' : null
@@ -1976,10 +1988,10 @@ export type PrepareNotificationAppLinkError = {
     'AppAlreadyDelivering' : null
   };
 /**
- * Gives a Home Screen app a record of its own, on the authority of a browser that is
- * signed in. Authorized by the token rather than by the caller being a browser this
- * identity knows: the app runs in a storage partition of its own and the key it
- * generated there is one nothing has seen.
+ * Registers the one-shot key a browser is about to hand its install, so the app that
+ * spends it is the one this browser sent. Authorized by the caller being a browser this
+ * identity is signed in from; the principal named here is what authorizes the
+ * link_notification_app call that follows.
  */
 export interface PrepareNotificationAppLinkRequest {
   /**

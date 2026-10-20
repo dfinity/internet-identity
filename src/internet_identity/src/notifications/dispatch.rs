@@ -863,7 +863,7 @@ mod tests {
                 );
             }
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id);
+            stored.point_at_notification_app(browser_id, app.id, true);
             stored.move_browser_session_counts(&BTreeMap::from([(browser_id, 1)]));
             storage.write(stored).expect("pointing at the app");
             app.id

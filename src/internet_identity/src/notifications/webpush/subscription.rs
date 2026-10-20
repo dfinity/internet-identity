@@ -293,7 +293,7 @@ mod tests {
                 .expect("creating the app record")
         });
         let mut stored = anchor(anchor_number);
-        stored.point_at_notification_app(browsers[0], app.id);
+        stored.point_at_notification_app(browsers[0], app.id, true);
         storage_borrow_mut(|storage| storage.write(stored)).expect("pointing at the app");
 
         remove(anchor_number, browsers[0]);
