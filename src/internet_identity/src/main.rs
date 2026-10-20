@@ -574,7 +574,9 @@ fn claim_notification_app(
         .and_then(|reference| reference.linked_app())
         .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
 
-    anchor.point_at_notification_app(browser_id, app_id, true);
+    // Taking over an app another identity installed is not this identity asking for
+    // delivery: the switch starts off and the opt-in screen is where they answer.
+    anchor.point_at_notification_app(browser_id, app_id, false);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
