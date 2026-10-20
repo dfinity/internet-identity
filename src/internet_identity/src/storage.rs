@@ -1509,7 +1509,7 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             };
-            app.anchors.retain(|number| *number != anchor_number);
+            app.anchors.remove(&anchor_number);
             if app.anchors.is_empty() {
                 self.delete_notification_app(*app_id);
                 continue;
@@ -1527,10 +1527,9 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             };
-            if app.anchors.contains(&anchor_number) {
+            if !app.anchors.insert(anchor_number) {
                 continue;
             }
-            app.anchors.push(anchor_number);
             self.notification_app_memory.insert(*app_id, app);
         }
     }
@@ -1620,12 +1619,11 @@ impl<M: Memory + Clone> Storage<M> {
             .map(NotificationApp::from)
     }
 
-    /// The anchors pointing at `app_id`, in the order they began pointing, oldest first,
-    /// and stable across calls.
+    /// The anchors pointing at `app_id`, in ascending order and stable across calls.
     pub fn anchors_with_notification_app(&self, app_id: NotificationAppId) -> Vec<AnchorNumber> {
         self.notification_app_memory
             .get(&app_id)
-            .map(|app| app.anchors)
+            .map(|app| app.anchors.into_iter().collect())
             .unwrap_or_default()
     }
 
@@ -1695,7 +1693,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Forgets a record no anchor points at. The record is committed with the reply even
     /// where that reply is an `Err`.
-    pub(crate) fn delete_unreferenced_notification_app(&mut self, app_id: NotificationAppId) {
+    pub(crate) fn delete_notification_app_if_unreferenced(&mut self, app_id: NotificationAppId) {
         if !self.anchors_with_notification_app(app_id).is_empty() {
             return;
         }
@@ -3515,7 +3513,7 @@ impl<M: Memory + Clone> Storage<M> {
             created_at: now,
             last_used: now,
             // The anchor pointing at it is added by the write that points it.
-            anchors: Vec::new(),
+            anchors: BTreeSet::new(),
             // Registered by the app once it has permission.
             webpush_subscription: None,
         };

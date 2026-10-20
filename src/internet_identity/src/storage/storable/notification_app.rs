@@ -7,6 +7,7 @@ use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 
 pub type StorableNotificationAppId = NotificationAppId;
 
@@ -22,7 +23,7 @@ pub struct StorableNotificationApp {
     #[n(3)]
     pub last_used: Timestamp,
     #[n(4)]
-    pub anchors: Vec<AnchorNumber>,
+    pub anchors: BTreeSet<AnchorNumber>,
     #[n(5)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
 }

@@ -7757,7 +7757,7 @@ fn an_app_no_anchor_points_at_is_deleted_on_request() {
         .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
 
-    storage.delete_unreferenced_notification_app(app.id);
+    storage.delete_notification_app_if_unreferenced(app.id);
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
     assert_eq!(storage.notification_app_of(app.id, app_principal), None);
@@ -7774,14 +7774,14 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
-    storage.delete_unreferenced_notification_app(app.id);
+    storage.delete_notification_app_if_unreferenced(app.id);
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_000]);
     // The record now carries the anchor that kept it alive.
     assert_eq!(
         storage.notification_app_of(app.id, app_principal),
         Some(crate::notifications::app::NotificationApp {
-            anchors: vec![10_000],
+            anchors: std::collections::BTreeSet::from([10_000]),
             ..app
         })
     );

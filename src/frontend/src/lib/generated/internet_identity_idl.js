@@ -841,7 +841,7 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'PrincipalAlreadyInUse' : IDL.Null,
     'NoPendingLink' : IDL.Null,
-    'AppPrincipalIsNotAKey' : IDL.Null,
+    'AppPrincipalIsAnonymous' : IDL.Null,
   });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
   const ApplicationInfo = IDL.Record({
@@ -1021,9 +1021,9 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
   });
   const PrepareNotificationAppLinkError = IDL.Variant({
-    'LinkPrincipalIsNotAKey' : IDL.Null,
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'LinkPrincipalIsAnonymous' : IDL.Null,
     'AppAlreadyDelivering' : IDL.Null,
   });
   const PrepareNotificationDelegationRequest = IDL.Record({

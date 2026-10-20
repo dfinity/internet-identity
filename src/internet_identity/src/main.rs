@@ -407,11 +407,11 @@ fn prepare_notification_app_link(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
-    // The whole authority of an install URL is the key behind this principal, so a
-    // principal no key can sign as is an install nothing could ever complete, and an
-    // anonymous one is an install anybody could.
-    if !authz_utils::is_self_authenticating(request.link_principal) {
-        return Err(PrepareNotificationAppLinkError::LinkPrincipalIsNotAKey);
+    // The whole authority of an install URL is the key behind this principal, and the
+    // anonymous principal is held by everyone, so an install offered to it is one
+    // anybody could complete.
+    if request.link_principal == Principal::anonymous() {
+        return Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous);
     }
     let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
         .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
@@ -460,7 +460,7 @@ fn notification_app_anchors(app_id: NotificationAppId) -> Vec<AnchorNumber> {
     let Ok(app) = check_app_authorization(app_id) else {
         return vec![];
     };
-    app.anchors
+    app.anchors.into_iter().collect()
 }
 
 /// Called by the Home Screen app, signed with the one-shot key its installing browser put
@@ -475,10 +475,10 @@ fn link_notification_app(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
-    // Checked before the slot is spent: a record no app can sign as leaves this browser
-    // pointing at an app that can never call, and the one-shot key is gone.
-    if !authz_utils::is_self_authenticating(request.app_principal) {
-        return Err(LinkNotificationAppError::AppPrincipalIsNotAKey);
+    // The record is keyed by this principal, and the anonymous one is held by everyone,
+    // so a record keyed by it is one any caller at all would resolve to.
+    if request.app_principal == Principal::anonymous() {
+        return Err(LinkNotificationAppError::AppPrincipalIsAnonymous);
     }
     let now = ic_cdk::api::time();
     let mut anchor = state::anchor(request.anchor_number);
@@ -502,7 +502,7 @@ fn link_notification_app(
         };
         // The record is already written, and this reply commits it whether it carries
         // `Ok` or `Err`.
-        storage.delete_unreferenced_notification_app(app.id);
+        storage.delete_notification_app_if_unreferenced(app.id);
         Err(LinkNotificationAppError::InternalCanisterError(format!(
             "{err:?}"
         )))
