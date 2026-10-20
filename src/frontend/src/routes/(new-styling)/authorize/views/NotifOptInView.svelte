@@ -160,6 +160,7 @@
         return false;
       case "dismissed":
         // The permission is still `default`, so the prompt can be raised again.
+        // Stay where the user is, with Allow still in front of them.
         return false;
     }
   };
@@ -176,14 +177,7 @@
         consented,
         justClaimed,
       });
-      if (result.status === "denied") {
-        recordFailure("permission-denied");
-        variant = "blocked";
-        return;
-      }
-      if (result.status === "dismissed") {
-        // The permission is still `default`, so the prompt can be raised again.
-        // Stay where the user is, with Allow still in front of them.
+      if (!enabledBy(result)) {
         return;
       }
       clearFailure();
