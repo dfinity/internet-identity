@@ -1009,7 +1009,12 @@ impl Anchor {
     /// Pointing at the record this browser already points at changes nothing, switch
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
-    pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
+    pub fn point_at_notification_app(
+        &mut self,
+        browser_id: BrowserId,
+        app_id: NotificationAppId,
+        delivers_when_new: bool,
+    ) {
         let Some(index) = self
             .browsers
             .iter()
@@ -1037,7 +1042,7 @@ impl Anchor {
                 }) if held == app_id => Some(enabled),
                 _ => None,
             })
-            .unwrap_or(true);
+            .unwrap_or(delivers_when_new);
         for browser in &mut self.browsers {
             // Every OTHER entry lets go, never this one: the entry being pointed is what
             // the check above reads, and stripping it here would make re-pointing at the
