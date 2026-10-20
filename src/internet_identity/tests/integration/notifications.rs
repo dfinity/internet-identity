@@ -2134,6 +2134,57 @@ mod shared_app {
             .is_some());
         Ok(())
     }
+
+    #[test]
+    fn should_leave_a_claimed_app_switched_off_until_the_claimer_asks() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + 3 * 60 * 1_000_000_000;
+
+        claim_notification_app(
+            &env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            ClaimNotificationAppRequest {
+                anchor_number: second,
+                offering_anchor_number: first,
+                expires_at_ns,
+                signature: BrowserKey::new(FIRST_BROWSER_SEED)
+                    .successor()
+                    .sign_claim_token(first, second, expires_at_ns),
+            },
+        )?
+        .expect("claim_notification_app returned Err");
+
+        assert!(
+            !linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?.enabled,
+            "the identity that took the app over was switched on without being asked"
+        );
+        // The identity that installed it is untouched: it asked, and its answer stands.
+        assert!(
+            linked(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?.enabled,
+            "the claim switched the installing identity off"
+        );
+
+        set_notification_app_enabled(
+            &env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            SetNotificationAppEnabledRequest {
+                anchor_number: second,
+                enabled: true,
+            },
+        )?
+        .expect("set_notification_app_enabled returned Err");
+
+        assert!(
+            linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?.enabled,
+            "answering the opt-in screen did not switch delivery on"
+        );
+        Ok(())
+    }
 }
 
 mod claims {
