@@ -1918,8 +1918,9 @@ type PrepareNotificationAppLinkRequest = record {
 type PrepareNotificationAppLinkError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
-    // The principal named is not one a key can sign as, so no app could ever present it.
-    LinkPrincipalIsNotAKey;
+    // The anonymous principal is held by everyone, so an install offered to it is one
+    // anybody could complete.
+    LinkPrincipalIsAnonymous;
     // This browser already points at an app that is delivering for this identity, and
     // an install takes delivery off it.
     AppAlreadyDelivering;
@@ -1945,8 +1946,9 @@ type LinkNotificationAppResponse = record {
 };
 
 type LinkNotificationAppError = variant {
-    // Not a principal any key can sign as, so no app could ever present it.
-    AppPrincipalIsNotAKey;
+    // The record is keyed by this principal, and the anonymous one is held by everyone,
+    // so any caller at all would resolve to that record.
+    AppPrincipalIsAnonymous;
     // No browser of this identity is waiting for this caller, or the install it started
     // has expired.
     NoPendingLink;

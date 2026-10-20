@@ -39,9 +39,9 @@ const refusal = (
       return { status: "token-refused", reason };
     // Both are this app's own principal being one the canister will not take, which only
     // a fresh install mints another of: one a browser of the identity already signs as,
-    // and one no key could have produced.
+    // and the anonymous one.
     case "PrincipalAlreadyInUse":
-    case "AppPrincipalIsNotAKey":
+    case "AppPrincipalIsAnonymous":
       return { status: "key-refused", reason };
     case "InternalCanisterError":
       return { status: "failed", reason };
