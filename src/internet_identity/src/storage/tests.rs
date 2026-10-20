@@ -7616,7 +7616,7 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
 
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
-        anchor.point_at_notification_app(0, app.id);
+        anchor.point_at_notification_app(0, app.id, true);
         storage.write(anchor).expect("writing the anchor");
     }
 
@@ -7634,14 +7634,14 @@ fn an_app_nothing_points_at_is_deleted() {
         .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
     let replacement = storage
         .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.point_at_notification_app(0, replacement.id);
+    anchor.point_at_notification_app(0, replacement.id, true);
     storage.write(anchor).expect("dropping the reference");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
@@ -7660,7 +7660,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
-        anchor.point_at_notification_app(0, app.id);
+        anchor.point_at_notification_app(0, app.id, true);
         storage.write(anchor).expect("writing the anchor");
     }
 
@@ -7668,7 +7668,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.point_at_notification_app(0, replacement.id);
+    anchor.point_at_notification_app(0, replacement.id, true);
     storage.write(anchor).expect("dropping one reference");
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
@@ -7685,7 +7685,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
         .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
     // The victim is the entry with the lowest `(last_used, id)`.
@@ -7737,7 +7737,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
         .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
     storage.delete_unreferenced_notification_app(app.id);
