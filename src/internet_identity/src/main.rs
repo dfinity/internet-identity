@@ -424,17 +424,17 @@ fn prepare_notification_app_link(
     })
 }
 
-/// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
-/// nobody to deliver for, and those cases cannot be told apart.
+/// Authorized as the app the record belongs to, which is in no anchor's browser list.
+/// Empty wherever there is nobody to deliver for, and those cases cannot be told apart.
 #[query]
-fn notification_app_anchors() -> Vec<AnchorNumber> {
+fn notification_app_anchors(app_id: NotificationAppId) -> Vec<AnchorNumber> {
     if !notifications::notifications_enabled() {
         return vec![];
     }
-    let Ok(app) = check_app_authorization() else {
+    let Ok(app) = check_app_authorization(app_id) else {
         return vec![];
     };
-    state::storage_borrow(|storage| storage.anchors_with_notification_app(app.id))
+    app.anchors
 }
 
 /// Called by the Home Screen app, signed with the one-shot key its installing browser put
@@ -443,40 +443,39 @@ fn notification_app_anchors() -> Vec<AnchorNumber> {
 #[update]
 fn link_notification_app(
     request: LinkNotificationAppRequest,
-) -> Result<(), LinkNotificationAppError> {
+) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
-    // Checked before the slot is spent: a record keyed by something no app can sign as
-    // leaves this browser pointing at an app that can never call, and the one-shot key
-    // is gone. The record is also keyed by these bytes and kept for as long as an
-    // identity points at it, so nothing unbounded is written either.
-    if !browser_key::is_one_key(&request.app_key) {
-        return Err(LinkNotificationAppError::InvalidAppKey);
+    // Checked before the slot is spent: a record no app can sign as leaves this browser
+    // pointing at an app that can never call, and the one-shot key is gone.
+    if !authz_utils::is_self_authenticating(request.app_principal) {
+        return Err(LinkNotificationAppError::AppPrincipalIsNotAKey);
     }
     let now = ic_cdk::api::time();
     let mut anchor = state::anchor(request.anchor_number);
     let installing_browser = anchor
         .browser_awaiting_link(caller(), now)
         .ok_or(LinkNotificationAppError::NoPendingLink)?;
-    if anchor.browser_holds_key(&request.app_key) {
-        return Err(LinkNotificationAppError::KeyAlreadyInUse);
+    if anchor.browser_signs_as(request.app_principal) {
+        return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app_for_key(&request.app_key, now)
+        storage.ensure_notification_app(request.app_principal, request.app_id, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id, true);
 
     state::storage_borrow_mut(|storage| {
         let Err(err) = storage.write(anchor) else {
-            return Ok(());
+            // The app keeps this so a later link names the record it already has.
+            return Ok(LinkNotificationAppResponse { app_id: app.id });
         };
-        // The record and the principal that resolves to it are already written, and this
-        // reply commits them whether it carries `Ok` or `Err`.
+        // The record is already written, and this reply commits it whether it carries
+        // `Ok` or `Err`.
         storage.delete_unreferenced_notification_app(app.id);
         Err(LinkNotificationAppError::InternalCanisterError(format!(
             "{err:?}"
