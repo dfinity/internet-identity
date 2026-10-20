@@ -556,12 +556,31 @@ fn set_notification_app_enabled(
         return Err(SetNotificationAppEnabledError::NoNotificationApp);
     }
 
+    let now_ns = ic_cdk::api::time();
+    // A probe carries the same event to the same device, so a switch turned on straight
+    // after one would say it twice. The probe is already on its way; this stays quiet.
+    let probe_says_it = anchor.pending_probe(browser_id, now_ns).is_some();
     anchor.set_notification_app_enabled(browser_id, request.enabled);
+    let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
         storage.write(anchor).map_err(|err| {
             SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))
         })
-    })
+    })?;
+
+    // Only ever on: an app reads who it delivers for from the canister, so switching off
+    // needs no announcement, and one posted to an entry that has just stopped delivering
+    // would be dropped on its way out anyway.
+    if request.enabled && !probe_says_it {
+        notifications::dispatch::notify_identity(
+            request.anchor_number,
+            browser_id,
+            NotificationEvent::NotificationsOn(identity),
+            notifications::dispatch::IdentityNotification::News,
+            now_ns,
+        );
+    }
+    Ok(())
 }
 
 /// An empty pending probe says only that the entry is no longer queued; `last_seen_ns` is
@@ -680,32 +699,15 @@ fn claim_notification_app(
         .and_then(|reference| reference.linked_app())
         .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
 
-    // A token stays claimable for its half hour, so the same one arriving twice is
-    // ordinary. The first spend did everything; a second would queue and pay for another
-    // wake-up saying the same thing, and past the queue's limit evict a real one.
-    if anchor
-        .notification_app(browser_id)
-        .and_then(|reference| reference.linked_app())
-        == Some(app_id)
-    {
-        return Ok(());
-    }
-
-    anchor.point_at_notification_app(browser_id, app_id, true);
-    let identity = identity_for_notification(&anchor);
+    // Taking over an app another identity installed is not this identity asking for
+    // delivery: the switch starts off and the opt-in screen is where they answer.
+    anchor.point_at_notification_app(browser_id, app_id, false);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
             .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
     })?;
 
-    notifications::dispatch::notify_identity(
-        request.anchor_number,
-        browser_id,
-        NotificationEvent::NotificationsOn(identity),
-        notifications::dispatch::IdentityNotification::News,
-        ic_cdk::api::time(),
-    );
     Ok(())
 }
 
