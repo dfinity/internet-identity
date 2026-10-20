@@ -1009,11 +1009,6 @@ impl Anchor {
     /// Pointing at the record this browser already points at changes nothing, switch
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
-    ///
-    /// `delivers_when_new` is what a first link means for this identity. Completing an
-    /// install is the user asking for delivery, so it links on; taking over an app
-    /// another identity installed is not, so it links off and the switch is theirs to
-    /// flip.
     pub fn point_at_notification_app(
         &mut self,
         browser_id: BrowserId,

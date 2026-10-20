@@ -710,11 +710,8 @@ fn claim_notification_app(
         return Ok(());
     }
 
-    // Taking over an app another identity installed is not this identity asking for
-    // delivery: the switch starts off and the opt-in screen is where they answer. The
-    // app is told when that answer comes, by `set_notification_app_enabled`, because
-    // until then there is no delivery to announce.
-    anchor.point_at_notification_app(browser_id, app_id, false);
+    anchor.point_at_notification_app(browser_id, app_id, true);
+    let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
