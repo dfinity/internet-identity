@@ -176,7 +176,14 @@
         consented,
         justClaimed,
       });
-      if (!enabledBy(result)) {
+      if (result.status === "denied") {
+        recordFailure("permission-denied");
+        variant = "blocked";
+        return;
+      }
+      if (result.status === "dismissed") {
+        // The permission is still `default`, so the prompt can be raised again.
+        // Stay where the user is, with Allow still in front of them.
         return;
       }
       clearFailure();
