@@ -691,7 +691,7 @@ fn claim_notification_app(
         return Ok(());
     }
 
-    anchor.point_at_notification_app(browser_id, app_id);
+    anchor.point_at_notification_app(browser_id, app_id, true);
     let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
         storage
@@ -754,7 +754,7 @@ fn link_notification_app(
         storage.ensure_notification_app_for_key(&request.app_key, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
-    anchor.point_at_notification_app(installing_browser, app.id);
+    anchor.point_at_notification_app(installing_browser, app.id, true);
 
     state::storage_borrow_mut(|storage| {
         let Err(err) = storage.write(anchor) else {
