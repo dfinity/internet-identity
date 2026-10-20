@@ -699,24 +699,15 @@ fn claim_notification_app(
         .and_then(|reference| reference.linked_app())
         .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
 
-    // A token stays claimable for its half hour, so the same one arriving twice is
-    // ordinary. The first spend did everything; a second would queue and pay for another
-    // wake-up saying the same thing, and past the queue's limit evict a real one.
-    if anchor
-        .notification_app(browser_id)
-        .and_then(|reference| reference.linked_app())
-        == Some(app_id)
-    {
-        return Ok(());
-    }
-
-    anchor.point_at_notification_app(browser_id, app_id, true);
-    let identity = identity_for_notification(&anchor);
+    // Taking over an app another identity installed is not this identity asking for
+    // delivery: the switch starts off and the opt-in screen is where they answer.
+    anchor.point_at_notification_app(browser_id, app_id, false);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
             .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
     })?;
+
     Ok(())
 }
 
