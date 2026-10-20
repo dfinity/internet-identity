@@ -1657,6 +1657,20 @@ mod shared_app {
         .expect("claim_notification_app rejected")
         .expect("claim_notification_app returned Err");
 
+        // Taking the app over is not asking for delivery: the identity that claimed it
+        // answers the opt-in screen, which is what these tests mean by sharing an app.
+        set_notification_app_enabled(
+            env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            SetNotificationAppEnabledRequest {
+                anchor_number: second,
+                enabled: true,
+            },
+        )
+        .expect("set_notification_app_enabled rejected")
+        .expect("set_notification_app_enabled returned Err");
+
         (canister_id, first, second, app)
     }
 
