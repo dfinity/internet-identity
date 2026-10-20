@@ -1336,9 +1336,10 @@ mod browser_tests {
     fn record(app_id: NotificationAppId, last_used: Timestamp) -> NotificationApp {
         NotificationApp {
             id: app_id,
-            key: ByteBuf::from(vec![app_id as u8; 91]),
+            principal: Principal::self_authenticating(vec![app_id as u8; 91]),
             created_at: 1_000,
             last_used,
+            anchors: vec![],
             webpush_subscription: None,
         }
     }
@@ -1659,9 +1660,9 @@ mod browser_tests {
             )
             .unwrap();
 
-        assert!(anchor.browser_holds_key(&browser_key(1)));
-        assert!(anchor.browser_holds_key(&successor_key(1)));
-        assert!(!anchor.browser_holds_key(&browser_key(2)));
+        assert!(anchor.browser_signs_as(Principal::self_authenticating(browser_key(1))));
+        assert!(anchor.browser_signs_as(Principal::self_authenticating(successor_key(1))));
+        assert!(!anchor.browser_signs_as(Principal::self_authenticating(browser_key(2))));
     }
 
     #[test]

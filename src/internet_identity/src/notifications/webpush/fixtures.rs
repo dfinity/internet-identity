@@ -5,6 +5,7 @@ use crate::authz_utils::NotificationCaller;
 use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
+use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, BrowserId, FormFactor, OperatingSystem,
     PublicKey, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, Timestamp,
@@ -138,7 +139,7 @@ pub(super) fn app_pointed_at_by(
 ) -> NotificationAppId {
     let app_id = storage_borrow_mut(|storage| {
         storage
-            .ensure_notification_app_for_key(&key(key_seed), now_ns)
+            .ensure_notification_app(Principal::self_authenticating(key(key_seed)), None, now_ns)
             .expect("creating the app record")
             .id
     });
@@ -164,7 +165,7 @@ pub(super) fn app(app_id: NotificationAppId) -> NotificationApp {
 
 /// The caller an app's own call arrives as.
 pub(super) fn app_caller(app_id: NotificationAppId) -> NotificationCaller {
-    NotificationCaller::App(app(app_id))
+    NotificationCaller::App(Box::new(app(app_id)))
 }
 
 pub(crate) fn subscribe(

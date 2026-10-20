@@ -3,29 +3,22 @@
 
 use crate::storage::anchor::WebPushSubscription;
 use candid::Principal;
-use internet_identity_interface::internet_identity::types::{PublicKey, Timestamp};
+use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
-/// Numbers a notification app record. Never reissued, so a browser pointing at a deleted
-/// record cannot reach another app.
-///
-/// The record carries both this and the key below because they do different jobs: the
-/// key is the credential the app authenticates with, this is the handle everything else
-/// holds. A reference is `Copy` and eight bytes wide, where the DER-encoded key it names
-/// is about ninety, and references are held per browser and per queued notification.
-/// Keying by the public key instead would also lose what never reissuing buys: a
-/// reinstall mints a new key in a storage partition of its own, so an old reference
-/// would dangle with no way to tell a deleted record from one that never existed.
-pub type NotificationAppId = u64;
+pub use internet_identity_interface::internet_identity::types::NotificationAppId;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NotificationApp {
     pub id: NotificationAppId,
-    /// The key the app generated in its own partition, DER-encoded. The record is looked
-    /// up by it.
-    pub key: PublicKey,
+    /// The principal the app signs as, self-authenticating over the key it generated in
+    /// its own partition. What an app-facing caller is matched against.
+    pub principal: Principal,
     pub created_at: Timestamp,
     /// Stamped by the app's own update calls only, so a query leaves it where it was.
     pub last_used: Timestamp,
+    /// The identities whose browsers point at this app, oldest first. Also the reference
+    /// count: a record with none left is deleted.
+    pub anchors: Vec<AnchorNumber>,
     /// One subscription for the whole record, absent until the app has permission.
     pub webpush_subscription: Option<WebPushSubscription>,
 }

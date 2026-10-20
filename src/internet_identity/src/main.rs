@@ -42,7 +42,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use notifications::app::NotificationAppRef;
 use notifications::senders::Senders;
-use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
@@ -451,49 +450,62 @@ fn prepare_notification_app_link(
     })
 }
 
-/// Authorized by the browser key alone, so the install page can ask without a session, and
-/// only about the caller's own entry. A deployment with notifications off and a caller we
-/// do not recognise both read as `NoApp`, which is what they have in common.
+/// Authorized as the app the record belongs to, which is in no anchor's browser list.
+/// Empty wherever there is nobody to deliver for, and those cases cannot be told apart.
 #[query]
-fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> NotificationAppStatus {
+fn notification_app_anchors(app_id: NotificationAppId) -> Vec<AnchorNumber> {
     if !notifications::notifications_enabled() {
-        return NotificationAppStatus::NoApp;
+        return vec![];
     }
-    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
-        return NotificationAppStatus::NoApp;
+    let Ok(app) = check_app_authorization(app_id) else {
+        return vec![];
     };
-    anchor.notification_app_status(browser_id, ic_cdk::api::time(), |app_id| {
-        state::storage_borrow(|storage| storage.notification_app(app_id))
-    })
+    app.anchors
 }
 
-/// The reference stays either way: this flips delivery, it does not install anything.
+/// Called by the Home Screen app, signed with the one-shot key its installing browser put
+/// in the URL fragment. The signature covers this call and nothing else, so it cannot be
+/// lifted onto a call naming another key, and the slot it spends is cleared here.
 #[update]
-fn set_notification_app_enabled(
-    request: SetNotificationAppEnabledRequest,
-) -> Result<(), SetNotificationAppEnabledError> {
+fn link_notification_app(
+    request: LinkNotificationAppRequest,
+) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
-        return Err(SetNotificationAppEnabledError::InternalCanisterError(
+        return Err(LinkNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
-    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| SetNotificationAppEnabledError::InvalidBrowserKey)?;
-    // An install nobody has opened is not an app to switch: the flag lives on the
-    // reference the app writes, so flipping it here would answer Ok and change nothing.
-    if anchor
-        .notification_app(browser_id)
-        .and_then(|reference| reference.linked_app())
-        .is_none()
-    {
-        return Err(SetNotificationAppEnabledError::NoNotificationApp);
+    // Checked before the slot is spent: a record no app can sign as leaves this browser
+    // pointing at an app that can never call, and the one-shot key is gone.
+    if !authz_utils::is_self_authenticating(request.app_principal) {
+        return Err(LinkNotificationAppError::AppPrincipalIsNotAKey);
+    }
+    let now = ic_cdk::api::time();
+    let mut anchor = state::anchor(request.anchor_number);
+    let installing_browser = anchor
+        .browser_awaiting_link(caller(), now)
+        .ok_or(LinkNotificationAppError::NoPendingLink)?;
+    if anchor.browser_signs_as(request.app_principal) {
+        return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
     }
 
-    anchor.set_notification_app_enabled(browser_id, request.enabled);
+    let app = state::storage_borrow_mut(|storage| {
+        storage.ensure_notification_app(request.app_principal, request.app_id, now)
+    })
+    .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
+    anchor.point_at_notification_app(installing_browser, app.id, true);
+
     state::storage_borrow_mut(|storage| {
-        storage.write(anchor).map_err(|err| {
-            SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))
-        })
+        let Err(err) = storage.write(anchor) else {
+            // The app keeps this so a later link names the record it already has.
+            return Ok(LinkNotificationAppResponse { app_id: app.id });
+        };
+        // The record is already written, and this reply commits it whether it carries
+        // `Ok` or `Err`.
+        storage.delete_unreferenced_notification_app(app.id);
+        Err(LinkNotificationAppError::InternalCanisterError(format!(
+            "{err:?}"
+        )))
     })
 }
 
@@ -540,6 +552,52 @@ mod claim_token_expiry {
     }
 }
 
+/// Authorized by the browser key alone, so the install page can ask without a session, and
+/// only about the caller's own entry. A deployment with notifications off and a caller we
+/// do not recognise both read as `NoApp`, which is what they have in common.
+#[query]
+fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> NotificationAppStatus {
+    if !notifications::notifications_enabled() {
+        return NotificationAppStatus::NoApp;
+    }
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return NotificationAppStatus::NoApp;
+    };
+    anchor.notification_app_status(browser_id, ic_cdk::api::time(), |app_id| {
+        state::storage_borrow(|storage| storage.notification_app(app_id))
+    })
+}
+
+/// The reference stays either way: this flips delivery, it does not install anything.
+#[update]
+fn set_notification_app_enabled(
+    request: SetNotificationAppEnabledRequest,
+) -> Result<(), SetNotificationAppEnabledError> {
+    if !notifications::notifications_enabled() {
+        return Err(SetNotificationAppEnabledError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| SetNotificationAppEnabledError::InvalidBrowserKey)?;
+    // An install nobody has opened is not an app to switch: the flag lives on the
+    // reference the app writes, so flipping it here would answer Ok and change nothing.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(SetNotificationAppEnabledError::NoNotificationApp);
+    }
+
+    anchor.set_notification_app_enabled(browser_id, request.enabled);
+    state::storage_borrow_mut(|storage| {
+        storage.write(anchor).map_err(|err| {
+            SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))
+        })
+    })
+}
+
 /// Points this browser at the app another identity on it offered.
 /// Authorized twice: the caller is a browser of the claiming identity, and the token is
 /// signed by a browser of the offering one. Spending it twice changes nothing the second time.
@@ -549,7 +607,7 @@ fn claim_notification_app(
 ) -> Result<(), ClaimNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(ClaimNotificationAppError::InternalCanisterError(
-            NOT_ENABLED_MESSAGE.to_string(),
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     let now = ic_cdk::api::time();
@@ -581,66 +639,6 @@ fn claim_notification_app(
         storage
             .write(anchor)
             .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
-}
-
-/// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
-/// nobody to deliver for, and those cases cannot be told apart.
-#[query]
-fn notification_app_anchors() -> Vec<AnchorNumber> {
-    if !notifications::notifications_enabled() {
-        return vec![];
-    }
-    let Ok(app) = check_app_authorization() else {
-        return vec![];
-    };
-    state::storage_borrow(|storage| storage.anchors_with_notification_app(app.id))
-}
-
-/// Called by the Home Screen app, signed with the one-shot key its installing browser put
-/// in the URL fragment. The signature covers this call and nothing else, so it cannot be
-/// lifted onto a call naming another key, and the slot it spends is cleared here.
-#[update]
-fn link_notification_app(
-    request: LinkNotificationAppRequest,
-) -> Result<(), LinkNotificationAppError> {
-    if !notifications::notifications_enabled() {
-        return Err(LinkNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED_MESSAGE.to_string(),
-        ));
-    }
-    // Checked before the slot is spent: a record keyed by something no app can sign as
-    // leaves this browser pointing at an app that can never call, and the one-shot key
-    // is gone. The record is also keyed by these bytes and kept for as long as an
-    // identity points at it, so nothing unbounded is written either.
-    if !browser_key::is_one_key(&request.app_key) {
-        return Err(LinkNotificationAppError::InvalidAppKey);
-    }
-    let now = ic_cdk::api::time();
-    let mut anchor = state::anchor(request.anchor_number);
-    let installing_browser = anchor
-        .browser_awaiting_link(caller(), now)
-        .ok_or(LinkNotificationAppError::NoPendingLink)?;
-    if anchor.browser_holds_key(&request.app_key) {
-        return Err(LinkNotificationAppError::KeyAlreadyInUse);
-    }
-
-    let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app_for_key(&request.app_key, now)
-    })
-    .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
-    anchor.point_at_notification_app(installing_browser, app.id, true);
-
-    state::storage_borrow_mut(|storage| {
-        let Err(err) = storage.write(anchor) else {
-            return Ok(());
-        };
-        // The record and the principal that resolves to it are already written, and this
-        // reply commits them whether it carries `Ok` or `Err`.
-        storage.delete_unreferenced_notification_app(app.id);
-        Err(LinkNotificationAppError::InternalCanisterError(format!(
-            "{err:?}"
-        )))
     })
 }
 

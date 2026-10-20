@@ -27,7 +27,7 @@ pub fn set_subscription(
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
     if let NotificationCaller::App(app) = caller {
-        return set_app_subscription(app, request, now_ns);
+        return set_app_subscription(*app, request, now_ns);
     }
 
     let ValidatedSetWebPushSubscriptionRequest {
