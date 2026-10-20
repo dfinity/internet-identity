@@ -162,7 +162,7 @@ pub(super) fn point_at_app(
     app_id: NotificationAppId,
 ) {
     let mut anchor = anchor(anchor_number);
-    anchor.point_at_notification_app(browser_id, app_id);
+    anchor.point_at_notification_app(browser_id, app_id, true);
     storage_borrow_mut(|storage| storage.write(anchor)).expect("pointing at the app");
 }
 

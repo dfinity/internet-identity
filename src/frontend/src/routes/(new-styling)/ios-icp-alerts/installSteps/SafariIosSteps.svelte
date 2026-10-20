@@ -7,7 +7,6 @@
   import ShareIcon from "@lucide/svelte/icons/share";
   import SquarePlusIcon from "@lucide/svelte/icons/square-plus";
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
   import ControlCircle from "$lib/components/ui/browserMock/ControlCircle.svelte";
   import IosPanel from "../IosPanel.svelte";
   import Step from "$lib/components/ui/browserMock/Step.svelte";
@@ -22,9 +21,6 @@
 
 <Steps>
   <Step n={1} title={$t`Open the menu`}>
-    {#snippet instruction()}
-      <Trans>Tap the highlighted <b>more</b> button.</Trans>
-    {/snippet}
     <IosPanel>
       <div class="flex items-center gap-2">
         <div class="relative shrink-0">
@@ -50,9 +46,6 @@
   </Step>
 
   <Step n={2} title={$t`Tap Share`}>
-    {#snippet instruction()}
-      <Trans>Tap <b>Share</b>.</Trans>
-    {/snippet}
     <IosPanel>
       <ToolbarHighlight class="mt-1.5 mb-1">
         <div
@@ -74,16 +67,10 @@
   </Step>
 
   <Step n={3} title={$t`Tap View More`}>
-    {#snippet instruction()}
-      <Trans>Tap <b>View More</b>.</Trans>
-    {/snippet}
     <ViewMoreSheet />
   </Step>
 
   <Step n={4} title={$t`Tap Add to Home Screen`}>
-    {#snippet instruction()}
-      <Trans>Tap <b>Add to Home Screen</b>.</Trans>
-    {/snippet}
     <IosPanel>
       <div class="flex items-center gap-2.5 px-2.5 py-2 opacity-45">
         <SearchIcon class="size-[13px] shrink-0" />
