@@ -2672,6 +2672,15 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
+  /**
+   * Called by the identity being added, from its own browser on the device, with a
+   * token the identity that has the app signed for it.
+   */
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
+  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],
@@ -2874,6 +2883,14 @@ export interface _SERVICE {
     [UserNumber, SessionKey, PublicKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
+  >,
+  /**
+   * Called by the browser, which may hold nothing but its key: the install page is a
+   * tab of its own with no session.
+   */
+  'get_notification_app_status' : ActorMethod<
+    [GetNotificationAppStatusRequest],
+    NotificationAppStatus
   >,
   'get_notification_delegation' : ActorMethod<
     [GetNotificationDelegationRequest],
@@ -3289,6 +3306,14 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, [] | [AccountNumber]],
     { 'Ok' : AccountInfo } |
       { 'Err' : SetDefaultAccountError }
+  >,
+  /**
+   * Called by the identity, from the browser that points at the app.
+   */
+  'set_notification_app_enabled' : ActorMethod<
+    [SetNotificationAppEnabledRequest],
+    { 'Ok' : null } |
+      { 'Err' : SetNotificationAppEnabledError }
   >,
   /**
    * Called by the browser, or by the Home Screen app it points at: what the app

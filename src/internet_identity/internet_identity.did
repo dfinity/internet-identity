@@ -2676,4 +2676,15 @@ service : (opt InternetIdentityInit) -> {
 
     // Called by an app's backend canister for the origin it names.
     app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });
+
+    // Called by the identity being added, from its own browser on the device, with a
+    // token the identity that has the app signed for it.
+    claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+
+    // Called by the browser, which may hold nothing but its key: the install page is a
+    // tab of its own with no session.
+    get_notification_app_status : (GetNotificationAppStatusRequest) -> (NotificationAppStatus) query;
+
+    // Called by the identity, from the browser that points at the app.
+    set_notification_app_enabled : (SetNotificationAppEnabledRequest) -> (variant { Ok; Err : SetNotificationAppEnabledError });
 };
