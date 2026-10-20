@@ -460,7 +460,6 @@ pub struct Storage<M: Memory> {
     notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     notification_app_memory:
         StableBTreeMap<StorableNotificationAppId, StorableNotificationApp, ManagedMemory<M>>,
-    /// Memory wrapper used to report the size of the notification app principal index.
     /// Memory wrapper used to report the size of the notification app id allocator.
     next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
