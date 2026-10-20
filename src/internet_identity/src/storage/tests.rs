@@ -7546,24 +7546,45 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
 }
 
 #[test]
-fn an_app_key_seen_again_keeps_the_record_it_already_had() {
+fn an_app_naming_its_record_keeps_the_one_it_already_had() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((1, 2), memory.clone());
-    let key = app_key(7);
+    let principal = Principal::self_authenticating(vec![7u8; 91]);
 
     let first = storage
-        .ensure_notification_app_for_key(&key, 1_000)
+        .ensure_notification_app(principal, None, 1_000)
         .expect("creating the record");
     let again = storage
-        .ensure_notification_app_for_key(&key, 2_000)
+        .ensure_notification_app(principal, Some(first.id), 2_000)
         .expect("reading the record back");
 
     assert_eq!(first.id, again.id);
     assert_eq!(again.created_at, 1_000);
     assert_eq!(again.last_used, 2_000);
     assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
+        storage.notification_app_of(first.id, principal),
         Some(again)
+    );
+}
+
+#[test]
+fn an_app_naming_a_record_that_is_not_its_own_takes_a_fresh_one() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((1, 2), memory.clone());
+    let mine = Principal::self_authenticating(vec![7u8; 91]);
+    let someone_else = Principal::self_authenticating(vec![8u8; 91]);
+
+    let theirs = storage
+        .ensure_notification_app(someone_else, None, 1_000)
+        .expect("creating the record");
+    let ours = storage
+        .ensure_notification_app(mine, Some(theirs.id), 2_000)
+        .expect("creating a record of our own");
+
+    assert_ne!(ours.id, theirs.id);
+    assert_eq!(
+        storage.notification_app_of(theirs.id, someone_else),
+        Some(theirs)
     );
 }
 
@@ -7575,7 +7596,11 @@ fn app_ids_are_never_reissued() {
     let ids: Vec<_> = (1u8..=3)
         .map(|seed| {
             storage
-                .ensure_notification_app_for_key(&app_key(seed), 1_000)
+                .ensure_notification_app(
+                    Principal::self_authenticating(vec![seed; 91]),
+                    None,
+                    1_000,
+                )
                 .expect("creating the record")
                 .id
         })
@@ -7585,12 +7610,12 @@ fn app_ids_are_never_reissued() {
 }
 
 #[test]
-fn an_unseen_caller_has_no_app_record() {
+fn an_id_that_names_nothing_has_no_app_record() {
     let memory = VectorMemory::default();
     let storage = Storage::new((1, 2), memory.clone());
 
     assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(app_key(9))),
+        storage.notification_app_of(7, Principal::self_authenticating([9u8; 91])),
         None
     );
 }
@@ -7599,21 +7624,18 @@ fn an_unseen_caller_has_no_app_record() {
 #[test]
 fn app_records_and_their_counter_survive_an_upgrade() {
     let memory = VectorMemory::default();
-    let first_key = app_key(1);
+    let first = Principal::self_authenticating(vec![1u8; 91]);
     let mut storage = Storage::new((1, 2), memory.clone());
     let before = storage
-        .ensure_notification_app_for_key(&first_key, 1_000)
+        .ensure_notification_app(first, None, 1_000)
         .expect("creating the record");
 
     let mut reloaded = Storage::from_memory(memory);
 
-    assert_eq!(
-        reloaded.notification_app_with_principal(Principal::self_authenticating(&first_key)),
-        Some(before)
-    );
+    assert_eq!(reloaded.notification_app_of(before.id, first), Some(before));
     assert_eq!(
         reloaded
-            .ensure_notification_app_for_key(&app_key(2), 2_000)
+            .ensure_notification_app(Principal::self_authenticating(vec![2u8; 91]), None, 2_000)
             .expect("creating the second record")
             .id,
         1
@@ -7631,11 +7653,10 @@ fn anchor_with_browser(storage: &mut Storage<VectorMemory>) -> Anchor {
 
 #[test]
 fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 20_000), memory.clone());
-    let key = app_key(7);
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
     let app = storage
-        .ensure_notification_app_for_key(&key, 1_000)
+        .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
 
     for _ in 0..2 {
@@ -7652,37 +7673,32 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
 
 #[test]
 fn an_app_nothing_points_at_is_deleted() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 20_000), memory.clone());
-    let key = app_key(7);
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
     let app = storage
-        .ensure_notification_app_for_key(&key, 1_000)
+        .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
     let replacement = storage
-        .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .ensure_notification_app(Principal::self_authenticating(vec![8u8; 91]), None, 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor.point_at_notification_app(0, replacement.id, true);
     storage.write(anchor).expect("dropping the reference");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
-    assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
-        None
-    );
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
 }
 
 #[test]
 fn an_app_outlives_one_identity_letting_go_of_it() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 20_000), memory.clone());
-    let key = app_key(7);
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
     let app = storage
-        .ensure_notification_app_for_key(&key, 1_000)
+        .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
@@ -7691,24 +7707,22 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
     }
 
     let replacement = storage
-        .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
+        .ensure_notification_app(Principal::self_authenticating(vec![8u8; 91]), None, 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor.point_at_notification_app(0, replacement.id, true);
     storage.write(anchor).expect("dropping one reference");
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
-    assert!(storage
-        .notification_app_with_principal(Principal::self_authenticating(&key))
-        .is_some());
+    assert!(storage.notification_app_of(app.id, app_principal).is_some());
 }
 
 #[test]
 fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id, true);
@@ -7732,35 +7746,29 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     storage.write(anchor).expect("writing the evicted list");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
-    assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
-        None
-    );
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
 }
 
 #[test]
 fn an_app_no_anchor_points_at_is_deleted_on_request() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
     let app = storage
-        .ensure_notification_app_for_key(&key, 1_000)
+        .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
 
     storage.delete_unreferenced_notification_app(app.id);
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
-    assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
-        None
-    );
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
 }
 
 #[test]
 fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id, true);
@@ -7769,9 +7777,13 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     storage.delete_unreferenced_notification_app(app.id);
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_000]);
+    // The record now carries the anchor that kept it alive.
     assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
-        Some(app)
+        storage.notification_app_of(app.id, app_principal),
+        Some(crate::notifications::app::NotificationApp {
+            anchors: vec![10_000],
+            ..app
+        })
     );
 }
 
@@ -7782,7 +7794,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(vec![7u8; 91]), None, 1_000)
         .expect("creating the record");
 
     assert!(
@@ -7819,7 +7831,7 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(vec![7u8; 91]), None, 1_000)
         .expect("creating the record");
     let gone = app.id + 1;
 
@@ -7837,7 +7849,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
@@ -7870,7 +7882,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
 fn forgetting_an_app_keeps_an_entry_silent_that_had_switched_it_off() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
@@ -7912,7 +7924,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
@@ -8003,7 +8015,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
     let mut anchor = anchor_with_browser(&mut storage);
@@ -8047,7 +8059,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
@@ -8109,7 +8121,7 @@ fn an_entry_delivers_through_the_app_it_points_at() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(
         app.id,
@@ -8143,7 +8155,7 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
-        .ensure_notification_app_for_key(&app_key(7), 1_000)
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
     storage.set_notification_app_subscription(
         app.id,

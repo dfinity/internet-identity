@@ -16,10 +16,10 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
     GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
-    LinkNotificationAppRequest, NotificationGrantConsentError, NotificationRevokeConsentError,
-    NotificationToShow, OperatingSystem, PrepareAccountSessionRequest,
-    PrepareNotificationAppLinkRequest, RemoveNotificationError, RemoveNotificationRequest,
-    RemoveNotificationResponse,
+    LinkNotificationAppRequest, NotificationAppId, NotificationGrantConsentError,
+    NotificationRevokeConsentError, NotificationToShow, OperatingSystem,
+    PrepareAccountSessionRequest, PrepareNotificationAppLinkRequest, RemoveNotificationError,
+    RemoveNotificationRequest, RemoveNotificationResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -1327,7 +1327,7 @@ fn link_app(
     anchor: AnchorNumber,
     browser_seed: u8,
     app_seed: u8,
-) -> Principal {
+) -> (Principal, NotificationAppId) {
     let app = BrowserKey::new(app_seed);
     let link = BrowserKey::new(app_seed.wrapping_add(1));
     prepare_notification_app_link(
@@ -1343,18 +1343,19 @@ fn link_app(
     )
     .expect("prepare_notification_app_link rejected")
     .expect("prepare_notification_app_link returned Err");
-    link_notification_app(
+    let linked = link_notification_app(
         env,
         canister_id,
         link.principal(),
         LinkNotificationAppRequest {
             anchor_number: anchor,
-            app_key: app.public_key(),
+            app_principal: app.principal(),
+            app_id: None,
         },
     )
     .expect("link_notification_app rejected")
     .expect("link_notification_app returned Err");
-    app.principal()
+    (app.principal(), linked.app_id)
 }
 
 /// Starting an install while this browser already points at an app.
@@ -1409,7 +1410,7 @@ mod installing_over_an_app {
     fn should_refuse_an_install_over_an_app_that_is_delivering() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
-        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
         set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
             .expect("set_webpush_subscription returned Err");
 
@@ -1426,7 +1427,7 @@ mod installing_over_an_app {
     fn should_install_over_a_delivering_app_the_user_says_is_gone() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
-        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
         set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
             .expect("set_webpush_subscription returned Err");
 
@@ -1478,7 +1479,7 @@ mod installing_over_an_app {
     fn should_install_over_an_app_delivery_is_switched_off_for() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
-        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
         set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
             .expect("set_webpush_subscription returned Err");
         set_notification_app_enabled(
@@ -1502,27 +1503,88 @@ mod installing_over_an_app {
 
 mod app_anchors {
     use super::*;
-    use canister_tests::api::internet_identity::notifications::notification_app_anchors;
+    use canister_tests::api::internet_identity::notifications::{
+        link_notification_app, notification_app_anchors, prepare_notification_app_link,
+    };
+    use canister_tests::framework::device_data_2;
+    use internet_identity_interface::internet_identity::types::{
+        LinkNotificationAppRequest, PrepareNotificationAppLinkRequest,
+    };
     use pretty_assertions::assert_eq;
+
+    /// A canister that notifies, and two identities signed in from a browser each:
+    /// `principal_1` on the first, `principal_2` on the second.
+    fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, AnchorNumber) {
+        let canister_id =
+            install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
+        let first = flows::register_anchor(env, canister_id);
+        sign_in_at(env, canister_id, first, ORIGIN, 1);
+        let second = flows::register_anchor_with_device(env, canister_id, &device_data_2());
+        sign_in_as(env, canister_id, principal_2(), second, ORIGIN, 2);
+        (canister_id, first, second)
+    }
+
+    /// Installs the Home Screen app `app_seed` names on `anchor`: the browser `browser_seed`
+    /// names registers the one-shot key, and the app links as it. `known` is the record the
+    /// app already has, which is what a second identity linking the same app names. Answers
+    /// the principal the app signs as and the record it ends up with.
+    fn link_app(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_seed: u8,
+        app_seed: u8,
+        known: Option<NotificationAppId>,
+    ) -> (Principal, NotificationAppId) {
+        let app = BrowserKey::new(app_seed);
+        let link = BrowserKey::new(app_seed.wrapping_add(1));
+        prepare_notification_app_link(
+            env,
+            canister_id,
+            BrowserKey::new(browser_seed).successor().principal(),
+            PrepareNotificationAppLinkRequest {
+                anchor_number: anchor,
+                link_principal: link.principal(),
+                replacing_existing: false,
+            },
+        )
+        .expect("prepare_notification_app_link rejected")
+        .expect("prepare_notification_app_link returned Err");
+        let linked = link_notification_app(
+            env,
+            canister_id,
+            link.principal(),
+            LinkNotificationAppRequest {
+                anchor_number: anchor,
+                app_principal: app.principal(),
+                app_id: known,
+            },
+        )
+        .expect("link_notification_app rejected")
+        .expect("link_notification_app returned Err");
+        (app.principal(), linked.app_id)
+    }
 
     #[test]
     fn should_answer_an_app_only_the_identities_that_point_at_it() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let shared = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        let (shared, shared_id) = link_app(&env, canister_id, first, 1, 100, None);
+        // The app names the record it already has, so the second identity joins it.
         assert_eq!(
-            link_app(&env, canister_id, second, SECOND_BROWSER_SEED, 100),
-            shared
+            link_app(&env, canister_id, second, 2, 100, Some(shared_id)),
+            (shared, shared_id)
         );
         sign_in_as(&env, canister_id, principal_2(), second, ORIGIN, 3);
-        let private = link_app(&env, canister_id, second, 3, 101);
+        let (private, private_id) = link_app(&env, canister_id, second, 3, 101, None);
+        assert_ne!(private_id, shared_id);
 
         assert_eq!(
-            notification_app_anchors(&env, canister_id, shared)?,
+            notification_app_anchors(&env, canister_id, shared, shared_id)?,
             vec![first, second]
         );
         assert_eq!(
-            notification_app_anchors(&env, canister_id, private)?,
+            notification_app_anchors(&env, canister_id, private, private_id)?,
             vec![second]
         );
         Ok(())
@@ -1532,17 +1594,19 @@ mod app_anchors {
     fn should_answer_nothing_to_a_caller_that_is_no_app() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        let (_, app_id) = link_app(&env, canister_id, anchor, 1, 100, None);
 
+        // The id is public, so naming it is not evidence of being the app it belongs to.
         assert_eq!(
-            notification_app_anchors(&env, canister_id, Principal::anonymous())?,
+            notification_app_anchors(&env, canister_id, Principal::anonymous(), app_id)?,
             Vec::<AnchorNumber>::new()
         );
         assert_eq!(
             notification_app_anchors(
                 &env,
                 canister_id,
-                BrowserKey::new(FIRST_BROWSER_SEED).successor().principal()
+                BrowserKey::new(1).successor().principal(),
+                app_id
             )?,
             Vec::<AnchorNumber>::new()
         );
@@ -1553,7 +1617,7 @@ mod app_anchors {
     fn should_answer_nothing_while_notifications_are_disabled() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        let (app, app_id) = link_app(&env, canister_id, anchor, 1, 100, None);
 
         upgrade_ii_canister_with_arg(
             &env,
@@ -1565,7 +1629,7 @@ mod app_anchors {
             }),
         )?;
         assert_eq!(
-            notification_app_anchors(&env, canister_id, app)?,
+            notification_app_anchors(&env, canister_id, app, app_id)?,
             Vec::<AnchorNumber>::new()
         );
 
@@ -1576,7 +1640,7 @@ mod app_anchors {
             arg_with_notifications_enabled(),
         )?;
         assert_eq!(
-            notification_app_anchors(&env, canister_id, app)?,
+            notification_app_anchors(&env, canister_id, app, app_id)?,
             vec![anchor]
         );
         Ok(())
@@ -1586,20 +1650,21 @@ mod app_anchors {
     fn should_answer_nothing_once_the_last_reference_is_dropped() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        let first = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        let (first, first_id) = link_app(&env, canister_id, anchor, 1, 100, None);
         assert_eq!(
-            notification_app_anchors(&env, canister_id, first)?,
+            notification_app_anchors(&env, canister_id, first, first_id)?,
             vec![anchor]
         );
 
-        let second = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 101);
+        let (second, second_id) = link_app(&env, canister_id, anchor, 1, 101, None);
 
+        // The record the browser let go of is deleted, so its id names nothing.
         assert_eq!(
-            notification_app_anchors(&env, canister_id, first)?,
+            notification_app_anchors(&env, canister_id, first, first_id)?,
             Vec::<AnchorNumber>::new()
         );
         assert_eq!(
-            notification_app_anchors(&env, canister_id, second)?,
+            notification_app_anchors(&env, canister_id, second, second_id)?,
             vec![anchor]
         );
         Ok(())
@@ -1637,7 +1702,7 @@ mod shared_app {
         env: &PocketIc,
     ) -> (CanisterId, AnchorNumber, AnchorNumber, Principal) {
         let (canister_id, first, second) = install_with_two_anchors(env);
-        let app = link_app(env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        let (app, _) = link_app(env, canister_id, first, FIRST_BROWSER_SEED, 100);
 
         let expires_at_ns = env.get_time().as_nanos_since_unix_epoch() + 3 * 60 * 1_000_000_000;
         claim_notification_app(
@@ -1810,7 +1875,7 @@ mod shared_app {
     fn should_refuse_an_app_an_identity_it_does_not_deliver_for() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        let (app, _) = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
 
         assert_eq!(
             set_webpush_subscription(&env, canister_id, app, request(second, ENDPOINT))?,
@@ -2059,13 +2124,13 @@ mod claims {
     fn should_deliver_for_a_second_identity_after_one_call() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
+        let (app, app_id) = link_app(&env, canister_id, first, 1, 100);
 
         claim(&env, canister_id, (second, 2), (first, 1), expires_at(&env))?
             .expect("claim_notification_app returned Err");
 
         assert_eq!(
-            notification_app_anchors(&env, canister_id, app)?,
+            notification_app_anchors(&env, canister_id, app, app_id)?,
             vec![first, second]
         );
         Ok(())
@@ -2076,7 +2141,7 @@ mod claims {
     ) -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, first, 1, 100);
+        let (app, app_id) = link_app(&env, canister_id, first, 1, 100);
 
         // Everything the offering identity signed, presented by its own browser.
         assert_eq!(
@@ -2084,7 +2149,7 @@ mod claims {
             Err(ClaimNotificationAppError::InvalidBrowserKey)
         );
         assert_eq!(
-            notification_app_anchors(&env, canister_id, app)?,
+            notification_app_anchors(&env, canister_id, app, app_id)?,
             vec![first]
         );
         Ok(())
@@ -2107,7 +2172,7 @@ mod claims {
     fn should_refuse_an_expired_claim_token() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, first, 1, 100);
+        let (app, app_id) = link_app(&env, canister_id, first, 1, 100);
 
         let now = env.get_time().as_nanos_since_unix_epoch();
         assert_eq!(
@@ -2115,7 +2180,7 @@ mod claims {
             Err(ClaimNotificationAppError::ClaimTokenExpired)
         );
         assert_eq!(
-            notification_app_anchors(&env, canister_id, app)?,
+            notification_app_anchors(&env, canister_id, app, app_id)?,
             vec![first]
         );
         Ok(())
@@ -2125,14 +2190,14 @@ mod claims {
     fn should_accept_the_same_claim_token_twice() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, second) = install_with_two_anchors(&env);
-        let app = link_app(&env, canister_id, first, 1, 100);
+        let (app, app_id) = link_app(&env, canister_id, first, 1, 100);
         let expires_at_ns = expires_at(&env);
 
         for _ in 0..2 {
             claim(&env, canister_id, (second, 2), (first, 1), expires_at_ns)?
                 .expect("claim_notification_app returned Err");
             assert_eq!(
-                notification_app_anchors(&env, canister_id, app)?,
+                notification_app_anchors(&env, canister_id, app, app_id)?,
                 vec![first, second]
             );
         }
@@ -2165,10 +2230,9 @@ mod app_link {
     use canister_tests::api::internet_identity::notifications::{
         link_notification_app, prepare_notification_app_link,
     };
-    use internet_identity_interface::internet_identity::types::PublicKey;
     use internet_identity_interface::internet_identity::types::{
-        LinkNotificationAppError, LinkNotificationAppRequest, PrepareNotificationAppLinkError,
-        PrepareNotificationAppLinkRequest,
+        LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
+        PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -2212,15 +2276,16 @@ mod app_link {
         canister_id: CanisterId,
         sender: Principal,
         anchor: AnchorNumber,
-        app_key: PublicKey,
-    ) -> Result<Result<(), LinkNotificationAppError>, RejectResponse> {
+        app_principal: Principal,
+    ) -> Result<Result<LinkNotificationAppResponse, LinkNotificationAppError>, RejectResponse> {
         link_notification_app(
             env,
             canister_id,
             sender,
             LinkNotificationAppRequest {
                 anchor_number: anchor,
-                app_key,
+                app_principal,
+                app_id: None,
             },
         )
     }
@@ -2243,8 +2308,8 @@ mod app_link {
             Ok(())
         );
         assert_eq!(
-            link(&env, canister_id, key.principal(), anchor, app.public_key())?,
-            Ok(())
+            link(&env, canister_id, key.principal(), anchor, app.principal())?,
+            Ok(LinkNotificationAppResponse { app_id: 0 })
         );
         Ok(())
     }
@@ -2273,7 +2338,7 @@ mod app_link {
                 canister_id,
                 BrowserKey::new(102).principal(),
                 anchor,
-                app.public_key()
+                app.principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
         );
@@ -2301,7 +2366,7 @@ mod app_link {
             canister_id,
             key.principal(),
             anchor,
-            BrowserKey::new(101).public_key(),
+            BrowserKey::new(101).principal(),
         )?
         .expect("link_notification_app returned Err");
 
@@ -2311,7 +2376,7 @@ mod app_link {
                 canister_id,
                 key.principal(),
                 anchor,
-                BrowserKey::new(103).public_key()
+                BrowserKey::new(103).principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
         );
@@ -2338,7 +2403,7 @@ mod app_link {
                 canister_id,
                 Principal::anonymous(),
                 anchor,
-                BrowserKey::new(101).public_key()
+                BrowserKey::new(101).principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
         );
@@ -2353,11 +2418,7 @@ mod app_link {
         let (canister_id, anchor) = install_with_browser(&env);
         let key = BrowserKey::new(100);
 
-        for offered in [
-            PublicKey::from(vec![]),
-            PublicKey::from(vec![4; 65]),
-            PublicKey::from(vec![0; 2_000]),
-        ] {
+        for offered in [Principal::anonymous(), Principal::management_canister()] {
             prepare(
                 &env,
                 canister_id,
@@ -2368,7 +2429,7 @@ mod app_link {
             .expect("prepare_notification_app_link returned Err");
             assert_eq!(
                 link(&env, canister_id, key.principal(), anchor, offered)?,
-                Err(LinkNotificationAppError::InvalidAppKey)
+                Err(LinkNotificationAppError::AppPrincipalIsNotAKey)
             );
         }
 
@@ -2379,9 +2440,10 @@ mod app_link {
                 canister_id,
                 key.principal(),
                 anchor,
-                BrowserKey::new(101).public_key()
-            )?,
-            Ok(())
+                BrowserKey::new(101).principal()
+            )?
+            .is_ok(),
+            true
         );
         Ok(())
     }
@@ -2396,8 +2458,8 @@ mod app_link {
         let key = BrowserKey::new(100);
 
         for held in [
-            BrowserKey::new(BROWSER_SEED).public_key(),
-            BrowserKey::new(BROWSER_SEED).successor().public_key(),
+            BrowserKey::new(BROWSER_SEED).principal(),
+            BrowserKey::new(BROWSER_SEED).successor().principal(),
         ] {
             prepare(
                 &env,
@@ -2409,7 +2471,7 @@ mod app_link {
             .expect("prepare_notification_app_link returned Err");
             assert_eq!(
                 link(&env, canister_id, key.principal(), anchor, held)?,
-                Err(LinkNotificationAppError::KeyAlreadyInUse)
+                Err(LinkNotificationAppError::PrincipalAlreadyInUse)
             );
         }
 
@@ -2420,9 +2482,10 @@ mod app_link {
                 canister_id,
                 key.principal(),
                 anchor,
-                BrowserKey::new(101).public_key()
-            )?,
-            Ok(())
+                BrowserKey::new(101).principal()
+            )?
+            .is_ok(),
+            true
         );
         Ok(())
     }
@@ -2475,7 +2538,7 @@ mod app_link {
                 canister_id,
                 BrowserKey::new(100).principal(),
                 anchor,
-                BrowserKey::new(101).public_key()
+                BrowserKey::new(101).principal()
             )?,
             Err(LinkNotificationAppError::InternalCanisterError(_))
         ));

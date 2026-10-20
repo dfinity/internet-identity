@@ -630,8 +630,8 @@ mod tests {
     use super::*;
     use crate::notifications::backlog::NOTIFICATION_BACKLOG;
     use crate::notifications::webpush::fixtures::{
-        anchor, anchor_with_browsers, app_key, setup, stored_subscription, subscribe, APP_RELAY,
-        OTHER_APP_RELAY,
+        anchor, anchor_with_browsers, app_for_key, app_key, setup, stored_subscription, subscribe,
+        APP_RELAY, OTHER_APP_RELAY,
     };
     use crate::state::storage_borrow;
     use candid::Principal;
@@ -738,10 +738,9 @@ mod tests {
         use crate::notifications::webpush::fixtures::valid_vapid_key;
         use std::collections::BTreeMap;
 
+        // Outside the borrow below: it takes one of its own.
+        let app = app_for_key(app_key(seed), 0);
         storage_borrow_mut(|storage| {
-            let app = storage
-                .ensure_notification_app_for_key(&app_key(seed), 0)
-                .expect("creating the app record");
             if let Some(endpoint) = endpoint {
                 storage.set_notification_app_subscription(
                     app.id,

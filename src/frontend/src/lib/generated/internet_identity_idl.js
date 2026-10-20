@@ -828,15 +828,20 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const NotificationAppId = IDL.Nat64;
   const LinkNotificationAppRequest = IDL.Record({
-    'app_key' : PublicKey,
+    'app_principal' : IDL.Principal,
+    'app_id' : IDL.Opt(NotificationAppId),
     'anchor_number' : UserNumber,
+  });
+  const LinkNotificationAppResponse = IDL.Record({
+    'app_id' : NotificationAppId,
   });
   const LinkNotificationAppError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
+    'PrincipalAlreadyInUse' : IDL.Null,
     'NoPendingLink' : IDL.Null,
-    'InvalidAppKey' : IDL.Null,
-    'KeyAlreadyInUse' : IDL.Null,
+    'AppPrincipalIsNotAKey' : IDL.Null,
   });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
   const ApplicationInfo = IDL.Record({
@@ -1584,7 +1589,12 @@ export const idlFactory = ({ IDL }) => {
     'init_salt' : IDL.Func([], [], []),
     'link_notification_app' : IDL.Func(
         [LinkNotificationAppRequest],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : LinkNotificationAppError })],
+        [
+          IDL.Variant({
+            'Ok' : LinkNotificationAppResponse,
+            'Err' : LinkNotificationAppError,
+          }),
+        ],
         [],
       ),
     'list_applications' : IDL.Func(
@@ -1669,7 +1679,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
-    'notification_app_anchors' : IDL.Func([], [IDL.Vec(UserNumber)], ['query']),
+    'notification_app_anchors' : IDL.Func(
+        [NotificationAppId],
+        [IDL.Vec(UserNumber)],
+        ['query'],
+      ),
     'notification_consent_granted' : IDL.Func(
         [NotificationConsentGrantedRequest],
         [IDL.Bool],

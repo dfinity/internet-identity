@@ -30,7 +30,7 @@ pub fn set_subscription(
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
     if let NotificationCaller::App(app) = caller {
-        return set_app_subscription(app, request, now_ns);
+        return set_app_subscription(*app, request, now_ns);
     }
 
     let ValidatedSetWebPushSubscriptionRequest {
@@ -242,6 +242,7 @@ mod tests {
     use super::super::fixtures::*;
     use super::*;
     use crate::notifications::app::NotificationAppRef;
+    use candid::Principal;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use internet_identity_interface::internet_identity::types::RemoveWebPushSubscriptionRequest;
 
@@ -293,7 +294,7 @@ mod tests {
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let app = storage_borrow_mut(|storage| {
             storage
-                .ensure_notification_app_for_key(&app_key(9), 0)
+                .ensure_notification_app(Principal::self_authenticating(app_key(9)), None, 0)
                 .expect("creating the app record")
         });
         let mut stored = anchor(anchor_number);
