@@ -573,7 +573,7 @@ fn claim_notification_app(
         .and_then(|reference| reference.linked_app())
         .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
 
-    anchor.point_at_notification_app(browser_id, app_id);
+    anchor.point_at_notification_app(browser_id, app_id, true);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
@@ -626,7 +626,7 @@ fn link_notification_app(
         storage.ensure_notification_app_for_key(&request.app_key, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
-    anchor.point_at_notification_app(installing_browser, app.id);
+    anchor.point_at_notification_app(installing_browser, app.id, true);
 
     state::storage_borrow_mut(|storage| {
         let Err(err) = storage.write(anchor) else {

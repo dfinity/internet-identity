@@ -382,7 +382,7 @@ mod tests {
                 0,
             );
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id);
+            stored.point_at_notification_app(browser_id, app.id, true);
             storage.write(stored).expect("pointing at the app");
             app.id
         });

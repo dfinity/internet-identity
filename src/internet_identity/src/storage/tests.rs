@@ -7640,7 +7640,7 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
 
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
-        anchor.point_at_notification_app(0, app.id);
+        anchor.point_at_notification_app(0, app.id, true);
         storage.write(anchor).expect("writing the anchor");
     }
 
@@ -7659,14 +7659,14 @@ fn an_app_nothing_points_at_is_deleted() {
         .ensure_notification_app_for_key(&key, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
     let replacement = storage
         .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.point_at_notification_app(0, replacement.id);
+    anchor.point_at_notification_app(0, replacement.id, true);
     storage.write(anchor).expect("dropping the reference");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
@@ -7686,7 +7686,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
-        anchor.point_at_notification_app(0, app.id);
+        anchor.point_at_notification_app(0, app.id, true);
         storage.write(anchor).expect("writing the anchor");
     }
 
@@ -7694,7 +7694,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.point_at_notification_app(0, replacement.id);
+    anchor.point_at_notification_app(0, replacement.id, true);
     storage.write(anchor).expect("dropping one reference");
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
@@ -7711,7 +7711,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
         .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
     // The victim is the entry with the lowest `(last_used, id)`.
@@ -7763,7 +7763,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
         .ensure_notification_app_for_key(&app_key(7), 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
 
     storage.delete_unreferenced_notification_app(app.id);
@@ -7841,7 +7841,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
-        anchor.point_at_notification_app(0, app.id);
+        anchor.point_at_notification_app(0, app.id, true);
         storage.write(anchor).expect("writing the anchor");
     }
 
@@ -7875,13 +7875,13 @@ fn forgetting_an_app_keeps_an_entry_silent_that_had_switched_it_off() {
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
     let mut off = anchor_with_browser(&mut storage);
-    off.point_at_notification_app(0, app.id);
+    off.point_at_notification_app(0, app.id, true);
     off.set_webpush_subscription(0, Some(app_subscription("https://own")));
     off.set_notification_app_enabled(0, false);
     storage.write(off).expect("writing the entry that said no");
 
     let mut on = anchor_with_browser(&mut storage);
-    on.point_at_notification_app(0, app.id);
+    on.point_at_notification_app(0, app.id, true);
     on.set_webpush_subscription(0, Some(app_subscription("https://other")));
     storage.write(on).expect("writing the entry that said yes");
 
@@ -7917,7 +7917,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
     let mut own = anchor_with_browser(&mut storage);
-    own.point_at_notification_app(0, app.id);
+    own.point_at_notification_app(0, app.id, true);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));
     own.notifications_mut(0)
         .expect("a listed browser")
@@ -7928,7 +7928,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         .expect("writing the entry with its own address");
 
     let mut routed = anchor_with_browser(&mut storage);
-    routed.point_at_notification_app(0, app.id);
+    routed.point_at_notification_app(0, app.id, true);
     routed
         .notifications_mut(0)
         .expect("a listed browser")
@@ -8007,7 +8007,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         .expect("creating the record");
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor
@@ -8052,7 +8052,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
 
     let mut own = anchor_with_browser(&mut storage);
-    own.point_at_notification_app(0, app.id);
+    own.point_at_notification_app(0, app.id, true);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));
     own.notifications_mut(0)
         .expect("a listed browser")
@@ -8063,7 +8063,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
         .expect("writing the entry with its own address");
 
     let mut routed = anchor_with_browser(&mut storage);
-    routed.point_at_notification_app(0, app.id);
+    routed.point_at_notification_app(0, app.id, true);
     routed
         .notifications_mut(0)
         .expect("a listed browser")
@@ -8123,7 +8123,7 @@ fn an_entry_delivers_through_the_app_it_points_at() {
         1_000,
     );
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
     storage.write(anchor).expect("pointing at the app");
 
@@ -8157,7 +8157,7 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
         1_000,
     );
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id);
+    anchor.point_at_notification_app(0, app.id, true);
     anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
     anchor.set_notification_app_enabled(0, false);
     storage.write(anchor).expect("pointing at the app");

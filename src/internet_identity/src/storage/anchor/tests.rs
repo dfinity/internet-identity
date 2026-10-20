@@ -1437,7 +1437,7 @@ mod browser_tests {
     fn linking_points_the_browser_at_the_app_with_delivery_on() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.start_notification_app_link(id, link_principal(1), 5_000);
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
         assert_eq!(
             anchor.notification_app(id),
@@ -1452,7 +1452,7 @@ mod browser_tests {
     fn linking_spends_the_pending_install() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.start_notification_app_link(id, link_principal(1), 5_000);
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
         assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
     }
@@ -1463,8 +1463,8 @@ mod browser_tests {
     #[test]
     fn a_browser_points_at_one_app_at_a_time() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
-        anchor.point_at_notification_app(id, 8);
+        anchor.point_at_notification_app(id, 7, true);
+        anchor.point_at_notification_app(id, 8, true);
 
         assert_eq!(
             anchor.notification_app(id).and_then(|app| app.linked_app()),
@@ -1475,9 +1475,9 @@ mod browser_tests {
     #[test]
     fn pointing_at_the_same_app_twice_leaves_it_pointed_there() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         assert_eq!(
             anchor.notification_app(id).and_then(|app| app.linked_app()),
             Some(7)
@@ -1487,10 +1487,10 @@ mod browser_tests {
     #[test]
     fn pointing_at_the_same_app_again_keeps_it_switched_off() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         anchor.set_notification_app_enabled(id, false);
 
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         assert_eq!(
             anchor.notification_app(id),
             Some(NotificationAppRef::Linked {
@@ -1503,10 +1503,10 @@ mod browser_tests {
     #[test]
     fn pointing_at_another_app_starts_enabled() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         anchor.set_notification_app_enabled(id, false);
 
-        anchor.point_at_notification_app(id, 8);
+        anchor.point_at_notification_app(id, 8, true);
         assert_eq!(
             anchor.notification_app(id),
             Some(NotificationAppRef::Linked {
@@ -1530,10 +1530,10 @@ mod browser_tests {
                 2_000,
             )
             .unwrap();
-        anchor.point_at_notification_app(first, 7);
+        anchor.point_at_notification_app(first, 7, true);
         anchor.set_notification_app_enabled(first, false);
 
-        anchor.point_at_notification_app(second, 7);
+        anchor.point_at_notification_app(second, 7, true);
 
         assert_eq!(
             anchor.notification_app(second),
@@ -1549,7 +1549,7 @@ mod browser_tests {
     fn pointing_at_an_app_this_identity_has_never_had_starts_it_on() {
         let (mut anchor, id) = anchor_with_browser();
 
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
         assert_eq!(
             anchor.notification_app(id),
@@ -1571,9 +1571,9 @@ mod browser_tests {
                 2_000,
             )
             .unwrap();
-        anchor.point_at_notification_app(first, 7);
+        anchor.point_at_notification_app(first, 7, true);
 
-        anchor.point_at_notification_app(second, 7);
+        anchor.point_at_notification_app(second, 7, true);
         assert_eq!(anchor.notification_app(first), None);
         assert_eq!(
             anchor
@@ -1602,7 +1602,7 @@ mod browser_tests {
                 2_000,
             )
             .unwrap();
-        anchor.point_at_notification_app(first, 7);
+        anchor.point_at_notification_app(first, 7, true);
         anchor
             .notifications_mut(first)
             .expect("a listed browser")
@@ -1615,7 +1615,7 @@ mod browser_tests {
             });
         anchor.set_woken_again(first, Some(1_000));
 
-        anchor.point_at_notification_app(second, 7);
+        anchor.point_at_notification_app(second, 7, true);
 
         assert!(anchor.notifications(first).is_empty());
         assert_eq!(
@@ -1634,7 +1634,7 @@ mod browser_tests {
     #[test]
     fn repointing_a_browser_with_its_own_address_keeps_what_it_was_sent() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         anchor.set_webpush_subscription(
             id,
             Some(WebPushSubscription {
@@ -1656,7 +1656,7 @@ mod browser_tests {
                 account_number: None,
             });
 
-        anchor.point_at_notification_app(id, 8);
+        anchor.point_at_notification_app(id, 8, true);
 
         assert_eq!(anchor.notifications(id).len(), 1);
     }
@@ -1666,7 +1666,7 @@ mod browser_tests {
     #[test]
     fn finishing_an_install_over_an_old_app_drops_what_that_app_was_sent() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         anchor
             .notifications_mut(id)
             .expect("a listed browser")
@@ -1680,7 +1680,7 @@ mod browser_tests {
         anchor.set_woken_again(id, Some(1_000));
         anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
 
-        anchor.point_at_notification_app(id, 8);
+        anchor.point_at_notification_app(id, 8, true);
 
         assert!(anchor.notifications(id).is_empty());
         assert_eq!(
@@ -1704,7 +1704,7 @@ mod browser_tests {
                 1_000,
             )
             .unwrap();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         anchor
             .notifications_mut(id)
             .expect("a listed browser")
@@ -1717,10 +1717,10 @@ mod browser_tests {
             });
         anchor.set_woken_again(id, Some(1_000));
 
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
         assert_eq!(anchor.notifications(id).len(), 1);
 
-        anchor.point_at_notification_app(id, 8);
+        anchor.point_at_notification_app(id, 8, true);
 
         assert!(anchor.notifications(id).is_empty());
         assert_eq!(
@@ -1739,7 +1739,7 @@ mod browser_tests {
     #[test]
     fn a_reference_whose_record_is_gone_reads_as_no_app() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
         assert_eq!(
             anchor.notification_app_status(id, 1_000, |app_id| Some(record(app_id, 2_000))),
@@ -1766,7 +1766,7 @@ mod browser_tests {
     #[test]
     fn a_browsers_entry_reads_as_no_app_where_the_record_is_gone() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
         assert_eq!(
             anchor
@@ -1790,7 +1790,7 @@ mod browser_tests {
         let mut anchor = anchor();
 
         anchor.start_notification_app_link(42, link_principal(1), 5_000);
-        anchor.point_at_notification_app(42, 7);
+        anchor.point_at_notification_app(42, 7, true);
 
         assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
         assert_eq!(anchor.notification_app(42), None);
