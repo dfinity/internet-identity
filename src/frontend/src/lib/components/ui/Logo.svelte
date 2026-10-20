@@ -12,11 +12,3 @@
     class="fill-current"
   />
 </svg>
-
-<style>
-  /* The mark runs tangent to the viewBox top and bottom, so a rendered height
-     that is not a whole number of device pixels clips that whole span. */
-  svg {
-    overflow: visible;
-  }
-</style>
