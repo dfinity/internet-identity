@@ -1020,7 +1020,7 @@ impl Anchor {
         // Whether this identity wants the app to deliver is the user's answer about the
         // app, not about whichever entry happens to hold the reference, so a rotation
         // that moves it between this identity's browsers carries their answer along. A
-        // first link has nobody to carry it from and starts on.
+        // first link has nobody to carry it from and takes what the caller says it means.
         let enabled = self
             .browsers
             .iter()

@@ -2415,4 +2415,43 @@ mod browser_tests {
         assert_eq!(anchor.browsers()[0].current_browser_key, browser_key(1));
         assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(1));
     }
+
+    #[test]
+    fn taking_over_an_app_this_identity_has_never_had_starts_it_off() {
+        let (mut anchor, id) = anchor_with_browser();
+
+        anchor.point_at_notification_app(id, 7, false);
+
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: false
+            })
+        );
+    }
+
+    #[test]
+    fn taking_over_an_app_this_identity_already_switched_on_keeps_it_on() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7, true);
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        anchor.point_at_notification_app(second, 7, false);
+
+        assert_eq!(
+            anchor.notification_app(second),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: true
+            })
+        );
+    }
 }
