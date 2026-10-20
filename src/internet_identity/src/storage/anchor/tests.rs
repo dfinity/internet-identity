@@ -1339,7 +1339,7 @@ mod browser_tests {
             principal: Principal::self_authenticating(vec![app_id as u8; 91]),
             created_at: 1_000,
             last_used,
-            anchors: vec![],
+            anchors: std::collections::BTreeSet::new(),
             webpush_subscription: None,
         }
     }

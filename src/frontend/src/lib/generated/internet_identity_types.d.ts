@@ -1439,9 +1439,10 @@ export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
   } |
   {
     /**
-     * Not a principal any key can sign as, so no app could ever present it.
+     * The record is keyed by this principal, and the anonymous one is held by everyone,
+     * so any caller at all would resolve to that record.
      */
-    'AppPrincipalIsNotAKey' : null
+    'AppPrincipalIsAnonymous' : null
   };
 export interface LinkNotificationAppRequest {
   /**
@@ -1988,17 +1989,18 @@ export interface PrepareMcpRegistrationDelegation {
 }
 export type PrepareNotificationAppLinkError = {
     /**
-     * The principal named is not one a key can sign as, so no app could ever present it.
-     */
-    'LinkPrincipalIsNotAKey' : null
-  } |
-  {
-    /**
      * The caller signs with no key this identity is signed in from.
      */
     'InvalidBrowserKey' : null
   } |
   { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The anonymous principal is held by everyone, so an install offered to it is one
+     * anybody could complete.
+     */
+    'LinkPrincipalIsAnonymous' : null
+  } |
   {
     /**
      * This browser already points at an app that is delivering for this identity, and
