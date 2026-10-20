@@ -2574,6 +2574,15 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
+  /**
+   * Called by the identity being added, from its own browser on the device, with a
+   * token the identity that has the app signed for it.
+   */
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
+  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],

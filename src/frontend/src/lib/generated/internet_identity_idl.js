@@ -340,6 +340,19 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'WrongSolution' : IDL.Record({ 'new_captcha_png_base64' : IDL.Text }),
   });
+  const ClaimNotificationAppRequest = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'offering_anchor_number' : UserNumber,
+    'anchor_number' : UserNumber,
+    'expires_at_ns' : IDL.Nat64,
+  });
+  const ClaimNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'InvalidClaimToken' : IDL.Null,
+    'ClaimTokenExpired' : IDL.Null,
+  });
   const AccountInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
     'origin' : IDL.Text,
@@ -1300,6 +1313,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'check_session' : IDL.Func([], [IDL.Bool], ['query']),
+    'claim_notification_app' : IDL.Func(
+        [ClaimNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ClaimNotificationAppError })],
+        [],
+      ),
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
     'create_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Text],
