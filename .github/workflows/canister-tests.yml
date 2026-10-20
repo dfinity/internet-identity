@@ -573,7 +573,7 @@ jobs:
             configs+=("record { name = \\\"Test OpenID $port\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$port/jwks\\\"; auth_uri = \\\"http://localhost:$port/auth\\\"; auth_scope = vec { \\\"openid\\\"; \\\"profile\\\"; \\\"email\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Google }; }")
           done
           apple_port=${{ env.apple_openid_provider }}
-          configs+=("record { name = \\\"Apple\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$apple_port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$apple_port/jwks\\\"; auth_uri = \\\"https://appleid.apple.com/auth/authorize\\\"; auth_scope = vec { \\\"openid\\\"; \\\"profile\\\"; \\\"email\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Apple }; }")
+          configs+=("record { name = \\\"Apple\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$apple_port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$apple_port/jwks\\\"; auth_uri = \\\"https://appleid.apple.com/auth/authorize\\\"; auth_scope = vec { \\\"openid\\\"; \\\"email\\\"; \\\"name\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Apple }; }")
           openid_configs="$(IFS='; '; echo "${configs[*]}")"
           echo "OPENID_CONFIGS=$openid_configs" >> "$GITHUB_OUTPUT"
 
