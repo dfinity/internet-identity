@@ -31,7 +31,10 @@ export type AppleUser = {
 };
 
 export type FakeAppleConfig = {
-  /** Sent beside the token when the user signs in. */
+  /**
+   * Sent beside the token when the user signs in, if the authorization asked
+   * for the `name` scope, as Apple does.
+   */
   user?: AppleUser;
   /**
    * Take a page's navigation to Apple the way Safari's native sheet does: the
@@ -110,7 +113,7 @@ const installFakeApple = async (
   const authorizeRequests: URL[] = [];
   const replyTo = new Map<
     string,
-    { redirectUri: string; responseMode: string }
+    { redirectUri: string; responseMode: string; sendsUser: boolean }
   >();
   let heldAuthorization: URL | undefined;
   let released: { href: string; delayMs: number } | undefined;
@@ -121,14 +124,22 @@ const installFakeApple = async (
 
   const sendToProvider = (route: Route, authorization: URL) => {
     const state = authorization.searchParams.get("state") ?? "";
+    const scopes = (authorization.searchParams.get("scope") ?? "").split(" ");
     replyTo.set(state, {
       redirectUri: authorization.searchParams.get("redirect_uri") ?? "",
       responseMode: authorization.searchParams.get("response_mode") ?? "",
+      sendsUser: config.user !== undefined && scopes.includes("name"),
     });
     const provider = new URL(`${APPLE_ISSUER}/auth`);
     provider.search = authorization.search;
     provider.searchParams.set("response_mode", "form_post");
     provider.searchParams.set("redirect_uri", APPLE_REDIRECT_URI);
+    // `name` is Apple's own scope, which the provider doesn't know. Apple
+    // keeps the name out of the token and sends it beside it instead.
+    provider.searchParams.set(
+      "scope",
+      scopes.filter((scope) => scope !== "name").join(" "),
+    );
     return route.fulfill({
       status: 302,
       headers: { location: provider.href },
@@ -184,7 +195,7 @@ const installFakeApple = async (
       await route.fulfill(
         webMessagePage(new URL(reply.redirectUri).origin, {
           authorization,
-          ...(config.user !== undefined ? { user: config.user } : {}),
+          ...(reply.sendsUser ? { user: config.user } : {}),
         }),
       );
       return;
@@ -192,9 +203,7 @@ const installFakeApple = async (
     await route.fulfill(
       formPostPage(reply.redirectUri, {
         ...authorization,
-        ...(config.user !== undefined
-          ? { user: JSON.stringify(config.user) }
-          : {}),
+        ...(reply.sendsUser ? { user: JSON.stringify(config.user) } : {}),
       }),
     );
   };

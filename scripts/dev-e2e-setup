@@ -346,7 +346,7 @@ write_install_args() {
   for port in "${DIRECT_OPENID_PORTS[@]}"; do
     configs+=("record { name = \"Test OpenID $port\"; logo = \"$svg\"; issuer = \"http://localhost:$port\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$port/jwks\"; auth_uri = \"http://localhost:$port/auth\"; auth_scope = vec { \"openid\"; \"profile\"; \"email\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Google }; }")
   done
-  configs+=("record { name = \"Apple\"; logo = \"$svg\"; issuer = \"http://localhost:$APPLE_OPENID_PORT\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$APPLE_OPENID_PORT/jwks\"; auth_uri = \"https://appleid.apple.com/auth/authorize\"; auth_scope = vec { \"openid\"; \"profile\"; \"email\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Apple }; }")
+  configs+=("record { name = \"Apple\"; logo = \"$svg\"; issuer = \"http://localhost:$APPLE_OPENID_PORT\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$APPLE_OPENID_PORT/jwks\"; auth_uri = \"https://appleid.apple.com/auth/authorize\"; auth_scope = vec { \"openid\"; \"email\"; \"name\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Apple }; }")
   local openid_configs dnssec_config
   openid_configs="$(IFS='; '; echo "${configs[*]}")"
   dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
