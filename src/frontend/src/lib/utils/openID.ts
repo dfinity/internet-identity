@@ -162,18 +162,65 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
   });
 };
 
+/**
+ * Names that IdPs sent beside an ID token instead of in it, keyed by the
+ * account the token is for (`iss` and `sub`). Apple does this: it keeps the
+ * user's name out of its ID tokens and sends it once, with the user's first
+ * authorization of II.
+ *
+ * {@link decodeJWT} reads the name from here, so it reaches every flow that
+ * passes a token for that account on (sign-up, sign-in, linking) without
+ * each of them carrying it along.
+ */
+const fullNamesByAccount = new Map<string, string>();
+
+const accountKey = (iss: string, sub: string): string => `${iss} ${sub}`;
+
+/** The longest name kept from beside a token: the bound the II canister puts on a name. */
+const MAX_FULL_NAME_BYTES = 128;
+
+/**
+ * A full name from its parts, trimmed and joined by a space, or `undefined`
+ * when no part is left or the name is longer than the canister keeps.
+ */
+const joinFullName = (
+  ...parts: (string | null | undefined)[]
+): string | undefined => {
+  const fullName = parts
+    .map((part) => part?.trim())
+    .filter((part) => part !== undefined && part.length > 0)
+    .join(" ");
+  return fullName.length > 0 &&
+    new TextEncoder().encode(fullName).length <= MAX_FULL_NAME_BYTES
+    ? fullName
+    : undefined;
+};
+
 const APPLE_ORIGIN = "https://appleid.apple.com";
 
 /**
  * Apple's reply to a `response_mode=web_message` authorization, which Apple
  * posts to the window that opened the popup as a JSON string: the token
- * when the user completed the sheet, an error when they didn't.
+ * when the user completed the sheet, an error when they didn't. `user` comes
+ * only with the user's first authorization of II, and only when the `name`
+ * scope was requested.
  */
 const AppleReplySchema = z.object({
   method: z.literal("oauthDone"),
   data: z.union([
     z.object({
       authorization: z.object({ id_token: z.string(), state: z.string() }),
+      user: z
+        .object({
+          name: z
+            .object({
+              firstName: z.string().nullish(),
+              lastName: z.string().nullish(),
+            })
+            .nullish(),
+        })
+        .nullish()
+        .catch(undefined),
     }),
     z.object({ error: z.string() }),
   ]),
@@ -250,7 +297,14 @@ const requestWithAppleSheet = (redirectURL: URL): Promise<string> => {
         reject(new Error("Invalid state"));
         return;
       }
-      resolve(reply.authorization.id_token);
+      const { id_token } = reply.authorization;
+      const name = reply.user?.name;
+      const fullName = joinFullName(name?.firstName, name?.lastName);
+      if (fullName !== undefined) {
+        const { iss, sub } = decodeJWT(id_token);
+        fullNamesByAccount.set(accountKey(iss, sub), fullName);
+      }
+      resolve(id_token);
     };
     const onFocus = () => {
       clearTimeout(canceledTimer);
@@ -718,6 +772,10 @@ export const requestJWT = async (
 
 /**
  * Decode a JWT token so it can be compared with others
+ *
+ * `name` falls back to the name the IdP sent beside the token (see
+ * {@link fullNamesByAccount}), so an Apple user's name reads like a Google
+ * user's.
  * @param token to decode
  * @returns common claims
  */
@@ -746,7 +804,7 @@ export const decodeJWT = (
     // Login hint is usually preferred_username else fall back to email or even sub
     loginHint: preferred_username ?? email ?? sub,
     // Additional optional metadata claims
-    name,
+    name: name ?? fullNamesByAccount.get(accountKey(iss, sub)),
     email,
     ...rest,
   };
