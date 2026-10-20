@@ -2948,6 +2948,13 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the Home Screen app, signing as itself. The identities whose browsers
+   * point at it, which is the whole of what it can deliver for. Empty in four cases,
+   * which all mean the same thing to the app: it has no record, nothing points at the
+   * record it has, this deployment does not notify, or the caller is not an app.
+   */
+  'notification_app_anchors' : ActorMethod<[], BigUint64Array | bigint[]>,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],
     boolean
