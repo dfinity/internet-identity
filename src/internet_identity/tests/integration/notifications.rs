@@ -1306,10 +1306,9 @@ mod app_link {
     use canister_tests::api::internet_identity::notifications::{
         link_notification_app, prepare_notification_app_link,
     };
-    use internet_identity_interface::internet_identity::types::PublicKey;
     use internet_identity_interface::internet_identity::types::{
-        LinkNotificationAppError, LinkNotificationAppRequest, PrepareNotificationAppLinkError,
-        PrepareNotificationAppLinkRequest,
+        LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
+        PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -1352,15 +1351,16 @@ mod app_link {
         canister_id: CanisterId,
         sender: Principal,
         anchor: AnchorNumber,
-        app_key: PublicKey,
-    ) -> Result<Result<(), LinkNotificationAppError>, RejectResponse> {
+        app_principal: Principal,
+    ) -> Result<Result<LinkNotificationAppResponse, LinkNotificationAppError>, RejectResponse> {
         link_notification_app(
             env,
             canister_id,
             sender,
             LinkNotificationAppRequest {
                 anchor_number: anchor,
-                app_key,
+                app_principal,
+                app_id: None,
             },
         )
     }
@@ -1383,8 +1383,8 @@ mod app_link {
             Ok(())
         );
         assert_eq!(
-            link(&env, canister_id, key.principal(), anchor, app.public_key())?,
-            Ok(())
+            link(&env, canister_id, key.principal(), anchor, app.principal())?,
+            Ok(LinkNotificationAppResponse { app_id: 0 })
         );
         Ok(())
     }
@@ -1413,7 +1413,7 @@ mod app_link {
                 canister_id,
                 BrowserKey::new(102).principal(),
                 anchor,
-                app.public_key()
+                app.principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
         );
@@ -1441,7 +1441,7 @@ mod app_link {
             canister_id,
             key.principal(),
             anchor,
-            BrowserKey::new(101).public_key(),
+            BrowserKey::new(101).principal(),
         )?
         .expect("link_notification_app returned Err");
 
@@ -1451,7 +1451,7 @@ mod app_link {
                 canister_id,
                 key.principal(),
                 anchor,
-                BrowserKey::new(103).public_key()
+                BrowserKey::new(103).principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
         );
@@ -1478,7 +1478,7 @@ mod app_link {
                 canister_id,
                 Principal::anonymous(),
                 anchor,
-                BrowserKey::new(101).public_key()
+                BrowserKey::new(101).principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
         );
@@ -1493,11 +1493,7 @@ mod app_link {
         let (canister_id, anchor) = install_with_browser(&env);
         let key = BrowserKey::new(100);
 
-        for offered in [
-            PublicKey::from(vec![]),
-            PublicKey::from(vec![4; 65]),
-            PublicKey::from(vec![0; 2_000]),
-        ] {
+        for offered in [Principal::anonymous(), Principal::management_canister()] {
             prepare(
                 &env,
                 canister_id,
@@ -1508,7 +1504,7 @@ mod app_link {
             .expect("prepare_notification_app_link returned Err");
             assert_eq!(
                 link(&env, canister_id, key.principal(), anchor, offered)?,
-                Err(LinkNotificationAppError::InvalidAppKey)
+                Err(LinkNotificationAppError::AppPrincipalIsNotAKey)
             );
         }
 
@@ -1519,9 +1515,10 @@ mod app_link {
                 canister_id,
                 key.principal(),
                 anchor,
-                BrowserKey::new(101).public_key()
-            )?,
-            Ok(())
+                BrowserKey::new(101).principal()
+            )?
+            .is_ok(),
+            true
         );
         Ok(())
     }
@@ -1536,8 +1533,8 @@ mod app_link {
         let key = BrowserKey::new(100);
 
         for held in [
-            BrowserKey::new(BROWSER_SEED).public_key(),
-            BrowserKey::new(BROWSER_SEED).successor().public_key(),
+            BrowserKey::new(BROWSER_SEED).principal(),
+            BrowserKey::new(BROWSER_SEED).successor().principal(),
         ] {
             prepare(
                 &env,
@@ -1549,7 +1546,7 @@ mod app_link {
             .expect("prepare_notification_app_link returned Err");
             assert_eq!(
                 link(&env, canister_id, key.principal(), anchor, held)?,
-                Err(LinkNotificationAppError::KeyAlreadyInUse)
+                Err(LinkNotificationAppError::PrincipalAlreadyInUse)
             );
         }
 
@@ -1560,9 +1557,10 @@ mod app_link {
                 canister_id,
                 key.principal(),
                 anchor,
-                BrowserKey::new(101).public_key()
-            )?,
-            Ok(())
+                BrowserKey::new(101).principal()
+            )?
+            .is_ok(),
+            true
         );
         Ok(())
     }
@@ -1615,7 +1613,7 @@ mod app_link {
                 canister_id,
                 BrowserKey::new(100).principal(),
                 anchor,
-                BrowserKey::new(101).public_key()
+                BrowserKey::new(101).principal()
             )?,
             Err(LinkNotificationAppError::InternalCanisterError(_))
         ));

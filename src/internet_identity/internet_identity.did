@@ -1883,19 +1883,32 @@ type PrepareNotificationAppLinkError = variant {
     InternalCanisterError : text;
 };
 
+// Numbers a Home Screen app's record. Public, so every call naming one is checked
+// against the principal the record belongs to.
+type NotificationAppId = nat64;
+
 type LinkNotificationAppRequest = record {
     anchor_number : UserNumber;
-    app_key : PublicKey;               // the app's own key; the record is looked up by it
+    // The principal the app signs as, over the key it generated in its own partition.
+    app_principal : principal;
+    // The record this app already has, where it is linking a second identity to the app
+    // it is running as. Null is a first install and takes a record of its own.
+    app_id : opt NotificationAppId;
+};
+
+type LinkNotificationAppResponse = record {
+    // Kept by the app, so a later link names the record it already has.
+    app_id : NotificationAppId;
 };
 
 type LinkNotificationAppError = variant {
-    // Not a P-256 public key in the single encoding WebCrypto emits.
-    InvalidAppKey;
+    // Not a principal any key can sign as, so no app could ever present it.
+    AppPrincipalIsNotAKey;
     // No browser of this identity is waiting for this caller, or the install it started
     // has expired.
     NoPendingLink;
-    // The key is one a browser of this identity already signs with.
-    KeyAlreadyInUse;
+    // A browser of this identity already signs as that principal.
+    PrincipalAlreadyInUse;
     InternalCanisterError : text;
 };
 
@@ -2555,7 +2568,7 @@ service : (opt InternetIdentityInit) -> {
     prepare_notification_app_link : (PrepareNotificationAppLinkRequest) -> (variant { Ok; Err : PrepareNotificationAppLinkError });
     // Called by the Home Screen app on its first open, signed with that one-shot key.
     // Creates the app's record where its key has none, and points the browser at it.
-    link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
+    link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok : LinkNotificationAppResponse; Err : LinkNotificationAppError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.

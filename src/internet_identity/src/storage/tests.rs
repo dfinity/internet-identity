@@ -7523,24 +7523,45 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
 }
 
 #[test]
-fn an_app_key_seen_again_keeps_the_record_it_already_had() {
+fn an_app_naming_its_record_keeps_the_one_it_already_had() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((1, 2), memory.clone());
-    let key = ByteBuf::from(vec![7u8; 91]);
+    let principal = Principal::self_authenticating(vec![7u8; 91]);
 
     let first = storage
-        .ensure_notification_app_for_key(&key, 1_000)
+        .ensure_notification_app(principal, None, 1_000)
         .expect("creating the record");
     let again = storage
-        .ensure_notification_app_for_key(&key, 2_000)
+        .ensure_notification_app(principal, Some(first.id), 2_000)
         .expect("reading the record back");
 
     assert_eq!(first.id, again.id);
     assert_eq!(again.created_at, 1_000);
     assert_eq!(again.last_used, 2_000);
     assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating(&key)),
+        storage.notification_app_of(first.id, principal),
         Some(again)
+    );
+}
+
+#[test]
+fn an_app_naming_a_record_that_is_not_its_own_takes_a_fresh_one() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((1, 2), memory.clone());
+    let mine = Principal::self_authenticating(vec![7u8; 91]);
+    let someone_else = Principal::self_authenticating(vec![8u8; 91]);
+
+    let theirs = storage
+        .ensure_notification_app(someone_else, None, 1_000)
+        .expect("creating the record");
+    let ours = storage
+        .ensure_notification_app(mine, Some(theirs.id), 2_000)
+        .expect("creating a record of our own");
+
+    assert_ne!(ours.id, theirs.id);
+    assert_eq!(
+        storage.notification_app_of(theirs.id, someone_else),
+        Some(theirs)
     );
 }
 
@@ -7552,7 +7573,11 @@ fn app_ids_are_never_reissued() {
     let ids: Vec<_> = (1u8..=3)
         .map(|seed| {
             storage
-                .ensure_notification_app_for_key(&ByteBuf::from(vec![seed; 91]), 1_000)
+                .ensure_notification_app(
+                    Principal::self_authenticating(vec![seed; 91]),
+                    None,
+                    1_000,
+                )
                 .expect("creating the record")
                 .id
         })
@@ -7562,12 +7587,12 @@ fn app_ids_are_never_reissued() {
 }
 
 #[test]
-fn an_unseen_caller_has_no_app_record() {
+fn an_id_that_names_nothing_has_no_app_record() {
     let memory = VectorMemory::default();
     let storage = Storage::new((1, 2), memory.clone());
 
     assert_eq!(
-        storage.notification_app_with_principal(Principal::self_authenticating([9u8; 91])),
+        storage.notification_app_of(7, Principal::self_authenticating([9u8; 91])),
         None
     );
 }
@@ -7576,21 +7601,18 @@ fn an_unseen_caller_has_no_app_record() {
 #[test]
 fn app_records_and_their_counter_survive_an_upgrade() {
     let memory = VectorMemory::default();
-    let first_key = ByteBuf::from(vec![1u8; 91]);
+    let first = Principal::self_authenticating(vec![1u8; 91]);
     let mut storage = Storage::new((1, 2), memory.clone());
     let before = storage
-        .ensure_notification_app_for_key(&first_key, 1_000)
+        .ensure_notification_app(first, None, 1_000)
         .expect("creating the record");
 
     let mut reloaded = Storage::from_memory(memory);
 
-    assert_eq!(
-        reloaded.notification_app_with_principal(Principal::self_authenticating(&first_key)),
-        Some(before)
-    );
+    assert_eq!(reloaded.notification_app_of(before.id, first), Some(before));
     assert_eq!(
         reloaded
-            .ensure_notification_app_for_key(&ByteBuf::from(vec![2u8; 91]), 2_000)
+            .ensure_notification_app(Principal::self_authenticating(vec![2u8; 91]), None, 2_000)
             .expect("creating the second record")
             .id,
         1

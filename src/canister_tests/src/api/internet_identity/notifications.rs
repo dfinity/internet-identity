@@ -5,14 +5,14 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, FrontendHostname, GetNextNotificationError,
     GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
-    LinkNotificationAppError, LinkNotificationAppRequest, NotificationConsentGrantedRequest,
-    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
-    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
-    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
-    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
-    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
+    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
+    NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
+    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
+    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -39,7 +39,7 @@ pub fn link_notification_app(
     canister_id: CanisterId,
     sender: Principal,
     request: LinkNotificationAppRequest,
-) -> Result<Result<(), LinkNotificationAppError>, RejectResponse> {
+) -> Result<Result<LinkNotificationAppResponse, LinkNotificationAppError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,

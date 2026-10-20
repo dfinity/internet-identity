@@ -220,8 +220,7 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
-const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 38u8;
-const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 39u8;
+const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -319,8 +318,6 @@ const NOTIFICATION_APP_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATION_APP_MEMO
 
 /// Reverse index from the principal an app signs as to its record, which is how a call it
 /// makes is resolved.
-const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
-    MemoryId::new(LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX);
 
 /// Monotonic [`NotificationAppId`] allocator: an id is retired with its record, never reissued.
 const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
@@ -467,9 +464,6 @@ pub struct Storage<M: Memory> {
     notification_app_memory:
         StableBTreeMap<StorableNotificationAppId, StorableNotificationApp, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the notification app principal index.
-    lookup_notification_app_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    lookup_notification_app_with_principal_memory:
-        StableBTreeMap<Principal, StorableNotificationAppId, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the notification app id allocator.
     next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
@@ -618,8 +612,6 @@ impl<M: Memory + Clone> Storage<M> {
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
         let notification_app_memory = memory_manager.get(NOTIFICATION_APP_MEMORY_ID);
-        let lookup_notification_app_with_principal_memory =
-            memory_manager.get(LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_ID);
         let next_notification_app_id_memory =
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
         let lookup_account_with_principal_memory =
@@ -716,12 +708,6 @@ impl<M: Memory + Clone> Storage<M> {
                 .expect("next_session_id_memory"),
             notification_app_memory_wrapper: MemoryWrapper::new(notification_app_memory.clone()),
             notification_app_memory: StableBTreeMap::init(notification_app_memory),
-            lookup_notification_app_with_principal_memory_wrapper: MemoryWrapper::new(
-                lookup_notification_app_with_principal_memory.clone(),
-            ),
-            lookup_notification_app_with_principal_memory: StableBTreeMap::init(
-                lookup_notification_app_with_principal_memory,
-            ),
             next_notification_app_id_memory_wrapper: MemoryWrapper::new(
                 next_notification_app_id_memory.clone(),
             ),
@@ -3254,27 +3240,40 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// The record of the app signing as `app_principal`, if there is one.
-    pub fn notification_app_with_principal(
-        &self,
-        app_principal: Principal,
-    ) -> Option<NotificationApp> {
-        let app_id = self
-            .lookup_notification_app_with_principal_memory
-            .get(&app_principal)?;
+    /// The record `app_id` names, where it still exists.
+    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
         self.notification_app_memory
             .get(&app_id)
             .map(NotificationApp::from)
     }
 
-    /// The record for `public_key`, creating one where this key has never been seen.
-    /// Reused rather than replaced, and stamped either way, so this writes on every call.
-    pub fn ensure_notification_app_for_key(
+    /// The record `app_id` names, but only where `app_principal` is the caller it belongs
+    /// to. An id is public and allocated in sequence, so every caller naming one is
+    /// checked against the principal the record was created for.
+    pub fn notification_app_of(
+        &self,
+        app_id: NotificationAppId,
+        app_principal: Principal,
+    ) -> Option<NotificationApp> {
+        self.notification_app(app_id)
+            .filter(|app| app.principal == app_principal)
+    }
+
+    /// The record `app_principal` links with: the one `known` names where the app still
+    /// holds its id and the record is its own, a fresh one otherwise. Stamped either way,
+    /// so this writes on every call.
+    ///
+    /// An app that lost its id links as a new one rather than taking over a record it can
+    /// no longer name, which costs it the anchors already pointing at the old record. The
+    /// alternative, finding the record from the principal, is the index this replaces.
+    pub fn ensure_notification_app(
         &mut self,
-        public_key: &PublicKey,
+        app_principal: Principal,
+        known: Option<NotificationAppId>,
         now: Timestamp,
     ) -> Result<NotificationApp, StorageError> {
-        let principal = Principal::self_authenticating(public_key);
-        if let Some(app) = self.notification_app_with_principal(principal) {
+        if let Some(app) = known.and_then(|app_id| self.notification_app_of(app_id, app_principal))
+        {
             let app = NotificationApp {
                 last_used: now,
                 ..app
@@ -3285,14 +3284,12 @@ impl<M: Memory + Clone> Storage<M> {
         }
         let app = NotificationApp {
             id: self.allocate_notification_app_id()?,
-            key: public_key.clone(),
+            principal: app_principal,
             created_at: now,
             last_used: now,
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
-        self.lookup_notification_app_with_principal_memory
-            .insert(principal, app.id);
         Ok(app)
     }
 
@@ -4336,11 +4333,6 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "notification_app".to_string(),
                 self.notification_app_memory_wrapper.size(),
-            ),
-            (
-                "lookup_notification_app_with_principal".to_string(),
-                self.lookup_notification_app_with_principal_memory_wrapper
-                    .size(),
             ),
             (
                 "next_notification_app_id".to_string(),

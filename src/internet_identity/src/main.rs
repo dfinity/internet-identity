@@ -430,30 +430,28 @@ fn prepare_notification_app_link(
 #[update]
 fn link_notification_app(
     request: LinkNotificationAppRequest,
-) -> Result<(), LinkNotificationAppError> {
+) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
-    // Checked before the slot is spent: a record keyed by something no app can sign as
-    // leaves this browser pointing at an app that can never call, and the one-shot key
-    // is gone. The record is also keyed by these bytes and kept for as long as an
-    // identity points at it, so nothing unbounded is written either.
-    if !browser_key::is_one_key(&request.app_key) {
-        return Err(LinkNotificationAppError::InvalidAppKey);
+    // Checked before the slot is spent: a record no app can sign as leaves this browser
+    // pointing at an app that can never call, and the one-shot key is gone.
+    if !authz_utils::is_self_authenticating(request.app_principal) {
+        return Err(LinkNotificationAppError::AppPrincipalIsNotAKey);
     }
     let now = ic_cdk::api::time();
     let mut anchor = state::anchor(request.anchor_number);
     let installing_browser = anchor
         .browser_awaiting_link(caller(), now)
         .ok_or(LinkNotificationAppError::NoPendingLink)?;
-    if anchor.browser_holds_key(&request.app_key) {
-        return Err(LinkNotificationAppError::KeyAlreadyInUse);
+    if anchor.browser_signs_as(request.app_principal) {
+        return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app_for_key(&request.app_key, now)
+        storage.ensure_notification_app(request.app_principal, request.app_id, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id, true);
@@ -462,7 +460,9 @@ fn link_notification_app(
         storage
             .write(anchor)
             .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
+    })?;
+    // The app keeps this so a later link names the record it already has.
+    Ok(LinkNotificationAppResponse { app_id: app.id })
 }
 
 /// Authorized by the browser key the caller signs with.
