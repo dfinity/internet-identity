@@ -40,7 +40,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
-use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
@@ -425,105 +424,17 @@ fn prepare_notification_app_link(
     })
 }
 
-/// Authorized twice: the caller is a browser of the claiming identity, and the token is
-/// signed by a browser of the offering one. Spending it twice changes nothing the second time.
-/// The ceiling on a claimed expiry, which keeps a token signed by a since-retired
-/// browser key worthless years later. A caller asks for less than this on purpose: the
-/// expiry is read off the device's own clock and checked against the canister's, so a
-/// phone running fast would be refused every time if it asked for the whole window.
-const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
-
-fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
-    expires_at_ns > now && expires_at_ns <= now.saturating_add(CLAIM_TOKEN_LIFETIME_NS)
-}
-
-#[cfg(test)]
-mod claim_token_expiry {
-    use super::{claim_token_expiry_in_range, CLAIM_TOKEN_LIFETIME_NS};
-
-    const NOW: u64 = 1_700_000_000_000_000_000;
-
-    #[test]
-    fn an_expiry_that_has_arrived_is_no_longer_claimable() {
-        assert!(!claim_token_expiry_in_range(NOW, NOW));
-        assert!(!claim_token_expiry_in_range(NOW - 1, NOW));
-    }
-
-    #[test]
-    fn an_expiry_is_claimable_up_to_and_including_the_ceiling() {
-        assert!(claim_token_expiry_in_range(NOW + 1, NOW));
-        assert!(claim_token_expiry_in_range(
-            NOW + CLAIM_TOKEN_LIFETIME_NS,
-            NOW
-        ));
-    }
-
-    #[test]
-    fn an_expiry_beyond_the_ceiling_is_refused() {
-        assert!(!claim_token_expiry_in_range(
-            NOW + CLAIM_TOKEN_LIFETIME_NS + 1,
-            NOW
-        ));
-    }
-
-    #[test]
-    fn a_ceiling_that_would_overflow_still_accepts_what_is_under_it() {
-        assert!(claim_token_expiry_in_range(u64::MAX, u64::MAX - 1));
-    }
-}
-
-#[update]
-fn claim_notification_app(
-    request: ClaimNotificationAppRequest,
-) -> Result<(), ClaimNotificationAppError> {
-    if !notifications::notifications_enabled() {
-        return Err(ClaimNotificationAppError::InternalCanisterError(
-            NOT_ENABLED_MESSAGE.to_string(),
-        ));
-    }
-    let now = ic_cdk::api::time();
-    if !claim_token_expiry_in_range(request.expires_at_ns, now) {
-        return Err(ClaimNotificationAppError::ClaimTokenExpired);
-    }
-    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
-
-    let offering_anchor = state::anchor(request.offering_anchor_number);
-    let offering_browser = offering_anchor
-        .browser_that_signed_claim(
-            &request.signature,
-            request.anchor_number,
-            request.expires_at_ns,
-        )
-        .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
-    // Taken from the offering browser's own reference, so the claiming identity is never
-    // told which record it reached.
-    let app_id = offering_anchor
-        .notification_app(offering_browser)
-        .and_then(|reference| reference.linked_app())
-        .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
-
-    // Taking over an app another identity installed is not this identity asking for
-    // delivery: the switch starts off and the opt-in screen is where they answer.
-    anchor.point_at_notification_app(browser_id, app_id, false);
-    state::storage_borrow_mut(|storage| {
-        storage
-            .write(anchor)
-            .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
-}
-
-/// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
-/// nobody to deliver for, and those cases cannot be told apart.
+/// Authorized as the app the record belongs to, which is in no anchor's browser list.
+/// Empty wherever there is nobody to deliver for, and those cases cannot be told apart.
 #[query]
-fn notification_app_anchors() -> Vec<AnchorNumber> {
+fn notification_app_anchors(app_id: NotificationAppId) -> Vec<AnchorNumber> {
     if !notifications::notifications_enabled() {
         return vec![];
     }
-    let Ok(app) = check_app_authorization() else {
+    let Ok(app) = check_app_authorization(app_id) else {
         return vec![];
     };
-    state::storage_borrow(|storage| storage.anchors_with_notification_app(app.id))
+    app.anchors
 }
 
 /// Called by the Home Screen app, signed with the one-shot key its installing browser put
@@ -532,40 +443,39 @@ fn notification_app_anchors() -> Vec<AnchorNumber> {
 #[update]
 fn link_notification_app(
     request: LinkNotificationAppRequest,
-) -> Result<(), LinkNotificationAppError> {
+) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
-    // Checked before the slot is spent: a record keyed by something no app can sign as
-    // leaves this browser pointing at an app that can never call, and the one-shot key
-    // is gone. The record is also keyed by these bytes and kept for as long as an
-    // identity points at it, so nothing unbounded is written either.
-    if !browser_key::is_one_key(&request.app_key) {
-        return Err(LinkNotificationAppError::InvalidAppKey);
+    // Checked before the slot is spent: a record no app can sign as leaves this browser
+    // pointing at an app that can never call, and the one-shot key is gone.
+    if !authz_utils::is_self_authenticating(request.app_principal) {
+        return Err(LinkNotificationAppError::AppPrincipalIsNotAKey);
     }
     let now = ic_cdk::api::time();
     let mut anchor = state::anchor(request.anchor_number);
     let installing_browser = anchor
         .browser_awaiting_link(caller(), now)
         .ok_or(LinkNotificationAppError::NoPendingLink)?;
-    if anchor.browser_holds_key(&request.app_key) {
-        return Err(LinkNotificationAppError::KeyAlreadyInUse);
+    if anchor.browser_signs_as(request.app_principal) {
+        return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app_for_key(&request.app_key, now)
+        storage.ensure_notification_app(request.app_principal, request.app_id, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id, true);
 
     state::storage_borrow_mut(|storage| {
         let Err(err) = storage.write(anchor) else {
-            return Ok(());
+            // The app keeps this so a later link names the record it already has.
+            return Ok(LinkNotificationAppResponse { app_id: app.id });
         };
-        // The record and the principal that resolves to it are already written, and this
-        // reply commits them whether it carries `Ok` or `Err`.
+        // The record is already written, and this reply commits it whether it carries
+        // `Ok` or `Err`.
         storage.delete_unreferenced_notification_app(app.id);
         Err(LinkNotificationAppError::InternalCanisterError(format!(
             "{err:?}"

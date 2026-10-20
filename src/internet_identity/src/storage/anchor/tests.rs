@@ -1441,9 +1441,9 @@ mod browser_tests {
             )
             .unwrap();
 
-        assert!(anchor.browser_holds_key(&browser_key(1)));
-        assert!(anchor.browser_holds_key(&successor_key(1)));
-        assert!(!anchor.browser_holds_key(&browser_key(2)));
+        assert!(anchor.browser_signs_as(Principal::self_authenticating(browser_key(1))));
+        assert!(anchor.browser_signs_as(Principal::self_authenticating(successor_key(1))));
+        assert!(!anchor.browser_signs_as(Principal::self_authenticating(browser_key(2))));
     }
 
     #[test]

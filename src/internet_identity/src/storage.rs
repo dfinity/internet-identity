@@ -221,10 +221,7 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
-const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 38u8;
-const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 39u8;
-const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX: u8 = 40u8;
-// Indexes 41 and 42 are unused: the numbering skips them.
+const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -320,18 +317,9 @@ const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY
 /// The Home Screen apps installed from this canister's browsers, one record per app.
 const NOTIFICATION_APP_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATION_APP_MEMORY_INDEX);
 
-/// Reverse index from the principal an app signs as to its record, which is how a call it
-/// makes is resolved.
-const LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
-    MemoryId::new(LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_INDEX);
-
 /// Monotonic [`NotificationAppId`] allocator: an id is retired with its record, never reissued.
 const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
     MemoryId::new(NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX);
-
-/// Which anchors point at an app; its emptiness says a record has no one left to deliver for.
-const LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID: MemoryId =
-    MemoryId::new(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -474,16 +462,10 @@ pub struct Storage<M: Memory> {
     notification_app_memory:
         StableBTreeMap<StorableNotificationAppId, StorableNotificationApp, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the notification app principal index.
-    lookup_notification_app_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    lookup_notification_app_with_principal_memory:
-        StableBTreeMap<Principal, StorableNotificationAppId, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the notification app id allocator.
     next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the anchors-per-app index.
-    lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    lookup_anchors_with_notification_app_memory:
-        StableBTreeMap<StorableNotificationAppId, StorableAnchorNumberList, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -629,12 +611,8 @@ impl<M: Memory + Clone> Storage<M> {
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
         let notification_app_memory = memory_manager.get(NOTIFICATION_APP_MEMORY_ID);
-        let lookup_notification_app_with_principal_memory =
-            memory_manager.get(LOOKUP_NOTIFICATION_APP_WITH_PRINCIPAL_MEMORY_ID);
         let next_notification_app_id_memory =
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
-        let lookup_anchors_with_notification_app_memory =
-            memory_manager.get(LOOKUP_ANCHORS_WITH_NOTIFICATION_APP_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -729,23 +707,11 @@ impl<M: Memory + Clone> Storage<M> {
                 .expect("next_session_id_memory"),
             notification_app_memory_wrapper: MemoryWrapper::new(notification_app_memory.clone()),
             notification_app_memory: StableBTreeMap::init(notification_app_memory),
-            lookup_notification_app_with_principal_memory_wrapper: MemoryWrapper::new(
-                lookup_notification_app_with_principal_memory.clone(),
-            ),
-            lookup_notification_app_with_principal_memory: StableBTreeMap::init(
-                lookup_notification_app_with_principal_memory,
-            ),
             next_notification_app_id_memory_wrapper: MemoryWrapper::new(
                 next_notification_app_id_memory.clone(),
             ),
             next_notification_app_id_memory: StableCell::init(next_notification_app_id_memory, 0)
                 .expect("next_notification_app_id_memory"),
-            lookup_anchors_with_notification_app_memory_wrapper: MemoryWrapper::new(
-                lookup_anchors_with_notification_app_memory.clone(),
-            ),
-            lookup_anchors_with_notification_app_memory: StableBTreeMap::init(
-                lookup_anchors_with_notification_app_memory,
-            ),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -1509,9 +1475,9 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Keeps the anchors-per-app index in step with the apps this anchor's browsers point
-    /// at, and deletes a record the last browser has just stopped pointing at. The index is
-    /// also the reference count.
+    /// Keeps each app record's anchor list in step with the apps this anchor's browsers
+    /// point at, and deletes a record the last browser has just stopped pointing at. The
+    /// list is also the reference count.
     fn sync_anchor_with_notification_app_index(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1531,73 +1497,67 @@ impl<M: Memory + Clone> Storage<M> {
         let current = apps_of(current_browsers);
 
         for app_id in previous.difference(&current) {
-            let Some(anchors) = self.lookup_anchors_with_notification_app_memory.get(app_id) else {
+            let Some(mut app) = self.notification_app_memory.get(app_id) else {
                 // There is no reference left to count down and nothing here can rebuild
                 // one, so the write carries on: an anchor must not fail over bookkeeping
                 // it cannot fix.
                 ic_cdk::println!(
                     "ERROR: Anchor number {} stopped pointing at notification app {}, which has \
-                     no index entry.",
+                     no record.",
                     anchor_number,
                     app_id,
                 );
                 continue;
             };
-            let remaining: Vec<AnchorNumber> = Vec::from(anchors)
-                .into_iter()
-                .filter(|number| *number != anchor_number)
-                .collect();
-            if remaining.is_empty() {
-                self.lookup_anchors_with_notification_app_memory
-                    .remove(app_id);
+            app.anchors.retain(|number| *number != anchor_number);
+            if app.anchors.is_empty() {
                 self.delete_notification_app(*app_id);
                 continue;
             }
-            self.lookup_anchors_with_notification_app_memory
-                .insert(*app_id, StorableAnchorNumberList::from(remaining));
+            self.notification_app_memory.insert(*app_id, app);
         }
 
         for app_id in current.difference(&previous) {
-            let mut anchors = self
-                .lookup_anchors_with_notification_app_memory
-                .get(app_id)
-                .map(Vec::from)
-                .unwrap_or_default();
-            if anchors.contains(&anchor_number) {
+            let Some(mut app) = self.notification_app_memory.get(app_id) else {
+                ic_cdk::println!(
+                    "ERROR: Anchor number {} began pointing at notification app {}, which has \
+                     no record.",
+                    anchor_number,
+                    app_id,
+                );
+                continue;
+            };
+            if app.anchors.contains(&anchor_number) {
                 continue;
             }
-            anchors.push(anchor_number);
-            self.lookup_anchors_with_notification_app_memory
-                .insert(*app_id, StorableAnchorNumberList::from(anchors));
+            app.anchors.push(anchor_number);
+            self.notification_app_memory.insert(*app_id, app);
         }
     }
 
     /// The anchors pointing at `app_id`, in the order they began pointing, oldest first,
     /// and stable across calls.
     pub fn anchors_with_notification_app(&self, app_id: NotificationAppId) -> Vec<AnchorNumber> {
-        self.lookup_anchors_with_notification_app_memory
+        self.notification_app_memory
             .get(&app_id)
-            .map(Vec::from)
+            .map(|app| app.anchors)
             .unwrap_or_default()
     }
 
-    /// Forgets a record and the principal that resolved to it. Its id is retired with it.
+    /// Forgets a record. Its id is retired with it.
     fn delete_notification_app(&mut self, app_id: NotificationAppId) {
-        let Some(app) = self.notification_app_memory.remove(&app_id) else {
+        if self.notification_app_memory.remove(&app_id).is_none() {
             // An id is handed out with the record it names and retired with it, so an id
             // reaching here names a record.
             ic_cdk::println!(
                 "ERROR: Notification app {} has no record to forget.",
                 app_id,
             );
-            return;
-        };
-        self.lookup_notification_app_with_principal_memory
-            .remove(&Principal::self_authenticating(&app.key));
+        }
     }
 
-    /// Forgets a record no anchor points at. The record and the principal that resolves to
-    /// it are committed with the reply even where that reply is an `Err`.
+    /// Forgets a record no anchor points at. The record is committed with the reply even
+    /// where that reply is an `Err`.
     pub(crate) fn delete_unreferenced_notification_app(&mut self, app_id: NotificationAppId) {
         if !self.anchors_with_notification_app(app_id).is_empty() {
             return;
@@ -3378,27 +3338,40 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// The record of the app signing as `app_principal`, if there is one.
-    pub fn notification_app_with_principal(
-        &self,
-        app_principal: Principal,
-    ) -> Option<NotificationApp> {
-        let app_id = self
-            .lookup_notification_app_with_principal_memory
-            .get(&app_principal)?;
+    /// The record `app_id` names, where it still exists.
+    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
         self.notification_app_memory
             .get(&app_id)
             .map(NotificationApp::from)
     }
 
-    /// The record for `public_key`, creating one where this key has never been seen.
-    /// Reused rather than replaced, and stamped either way, so this writes on every call.
-    pub fn ensure_notification_app_for_key(
+    /// The record `app_id` names, but only where `app_principal` is the caller it belongs
+    /// to. An id is public and allocated in sequence, so every caller naming one is
+    /// checked against the principal the record was created for.
+    pub fn notification_app_of(
+        &self,
+        app_id: NotificationAppId,
+        app_principal: Principal,
+    ) -> Option<NotificationApp> {
+        self.notification_app(app_id)
+            .filter(|app| app.principal == app_principal)
+    }
+
+    /// The record `app_principal` links with: the one `known` names where the app still
+    /// holds its id and the record is its own, a fresh one otherwise. Stamped either way,
+    /// so this writes on every call.
+    ///
+    /// An app that lost its id links as a new one rather than taking over a record it can
+    /// no longer name, which costs it the anchors already pointing at the old record. The
+    /// alternative, finding the record from the principal, is the index this replaces.
+    pub fn ensure_notification_app(
         &mut self,
-        public_key: &PublicKey,
+        app_principal: Principal,
+        known: Option<NotificationAppId>,
         now: Timestamp,
     ) -> Result<NotificationApp, StorageError> {
-        let principal = Principal::self_authenticating(public_key);
-        if let Some(app) = self.notification_app_with_principal(principal) {
+        if let Some(app) = known.and_then(|app_id| self.notification_app_of(app_id, app_principal))
+        {
             let app = NotificationApp {
                 last_used: now,
                 ..app
@@ -3409,14 +3382,14 @@ impl<M: Memory + Clone> Storage<M> {
         }
         let app = NotificationApp {
             id: self.allocate_notification_app_id()?,
-            key: public_key.clone(),
+            principal: app_principal,
             created_at: now,
             last_used: now,
+            // The anchor pointing at it is added by the write that points it.
+            anchors: Vec::new(),
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
-        self.lookup_notification_app_with_principal_memory
-            .insert(principal, app.id);
         Ok(app)
     }
 
@@ -4462,18 +4435,8 @@ impl<M: Memory + Clone> Storage<M> {
                 self.notification_app_memory_wrapper.size(),
             ),
             (
-                "lookup_notification_app_with_principal".to_string(),
-                self.lookup_notification_app_with_principal_memory_wrapper
-                    .size(),
-            ),
-            (
                 "next_notification_app_id".to_string(),
                 self.next_notification_app_id_memory_wrapper.size(),
-            ),
-            (
-                "lookup_anchors_with_notification_app".to_string(),
-                self.lookup_anchors_with_notification_app_memory_wrapper
-                    .size(),
             ),
             (
                 "lookup_session_with_principal".to_string(),

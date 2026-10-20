@@ -6,14 +6,14 @@ use internet_identity_interface::internet_identity::types::{
     FrontendHostname, GetNextNotificationError, GetNextNotificationRequest,
     GetNextNotificationResponse, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
-    LinkNotificationAppError, LinkNotificationAppRequest, NotificationConsentGrantedRequest,
-    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
-    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
-    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
-    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
-    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
+    NotificationAppId, NotificationConsentGrantedRequest, NotificationDelegationError,
+    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
+    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
+    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -40,7 +40,7 @@ pub fn link_notification_app(
     canister_id: CanisterId,
     sender: Principal,
     request: LinkNotificationAppRequest,
-) -> Result<Result<(), LinkNotificationAppError>, RejectResponse> {
+) -> Result<Result<LinkNotificationAppResponse, LinkNotificationAppError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -242,8 +242,16 @@ pub fn notification_app_anchors(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
+    app_id: NotificationAppId,
 ) -> Result<Vec<AnchorNumber>, RejectResponse> {
-    query_candid_as(env, canister_id, sender, "notification_app_anchors", ()).map(|(x,)| x)
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "notification_app_anchors",
+        (app_id,),
+    )
+    .map(|(x,)| x)
 }
 
 pub fn claim_notification_app(

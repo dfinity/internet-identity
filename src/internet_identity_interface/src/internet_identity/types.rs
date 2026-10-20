@@ -1131,24 +1131,39 @@ pub enum PrepareNotificationAppLinkError {
     InternalCanisterError(String),
 }
 
+/// Numbers a Home Screen app's record. Public, so every call naming one is checked
+/// against the principal the record belongs to.
+pub type NotificationAppId = u64;
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct LinkNotificationAppRequest {
     pub anchor_number: AnchorNumber,
-    /// The app's own public key, DER-encoded. The record is looked up by it.
-    pub app_key: PublicKey,
+    /// The principal the app signs as, self-authenticating over the key it generated in
+    /// its own partition.
+    pub app_principal: Principal,
+    /// The record this app already has, where it is linking a second identity to the app
+    /// it is running as. Absent is a first install and takes a record of its own.
+    pub app_id: Option<NotificationAppId>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppResponse {
+    /// Kept by the app, so a later link names the record it already has rather than
+    /// taking a second one and leaving the anchors on the first.
+    pub app_id: NotificationAppId,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum LinkNotificationAppError {
-    /// The bytes offered are not a P-256 public key in the single encoding WebCrypto
-    /// emits. Refused before the pending link is read, so the install is unspent: the
-    /// app may call again with a valid key until that link expires.
-    InvalidAppKey,
+    /// The principal offered is not one a key can sign as, so no app could ever present
+    /// it. Refused before the pending link is read, so the install is unspent and the app
+    /// may call again until that link expires.
+    AppPrincipalIsNotAKey,
     /// No browser of this identity is waiting for this caller, or the install it started
     /// has expired.
     NoPendingLink,
-    /// The key is one a browser of this identity already signs with.
-    KeyAlreadyInUse,
+    /// A browser of this identity already signs as that principal.
+    PrincipalAlreadyInUse,
     InternalCanisterError(String),
 }
 

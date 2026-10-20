@@ -1,6 +1,6 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
-use crate::notifications::app::NotificationApp;
+use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::session_delegation::expected_session_principal;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
@@ -169,10 +169,13 @@ pub fn check_authorization(
     Err(AuthorizationError::from(caller))
 }
 
-/// The notification app the caller is signing as, if it is one.
-pub fn check_app_authorization() -> Result<NotificationApp, AuthorizationError> {
+/// The record `app_id` names, where the caller is the app it belongs to. An id is public
+/// and allocated in sequence, so naming one is not evidence of anything by itself.
+pub fn check_app_authorization(
+    app_id: NotificationAppId,
+) -> Result<NotificationApp, AuthorizationError> {
     let caller = caller();
-    state::storage_borrow(|storage| storage.notification_app_with_principal(caller))
+    state::storage_borrow(|storage| storage.notification_app_of(app_id, caller))
         .ok_or(AuthorizationError::from(caller))
 }
 

@@ -898,10 +898,13 @@ impl Anchor {
 
     /// Whether a browser of this anchor already signs with `key`. An app key comes from a
     /// partition no browser can reach, so a collision here is not a reinstall.
-    pub fn browser_holds_key(&self, key: &PublicKey) -> bool {
-        self.browsers
-            .iter()
-            .any(|browser| browser.current_browser_key == *key || browser.next_browser_key == *key)
+    /// Whether a browser of this identity already signs as `principal`, which an app may
+    /// not take over: the record would answer for an entry that is not its own.
+    pub fn browser_signs_as(&self, principal: Principal) -> bool {
+        self.browsers.iter().any(|browser| {
+            principal == Principal::self_authenticating(&browser.current_browser_key)
+                || principal == Principal::self_authenticating(&browser.next_browser_key)
+        })
     }
 
     /// Records that `browser_id` has started an install, naming the only caller that may

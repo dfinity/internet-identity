@@ -2,9 +2,8 @@ use crate::notifications::app::{NotificationApp, NotificationAppId, Notification
 use candid::Principal;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
-use internet_identity_interface::internet_identity::types::Timestamp;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 use minicbor::{Decode, Encode};
-use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 
 pub type StorableNotificationAppId = NotificationAppId;
@@ -15,20 +14,23 @@ pub struct StorableNotificationApp {
     #[n(0)]
     pub id: StorableNotificationAppId,
     #[cbor(n(1), with = "minicbor::bytes")]
-    pub key: Vec<u8>,
+    pub principal: Vec<u8>,
     #[n(2)]
     pub created_at: Timestamp,
     #[n(3)]
     pub last_used: Timestamp,
+    #[n(4)]
+    pub anchors: Vec<AnchorNumber>,
 }
 
 impl From<NotificationApp> for StorableNotificationApp {
     fn from(value: NotificationApp) -> Self {
         StorableNotificationApp {
             id: value.id,
-            key: value.key.into_vec(),
+            principal: value.principal.as_slice().to_vec(),
             created_at: value.created_at,
             last_used: value.last_used,
+            anchors: value.anchors,
         }
     }
 }
@@ -37,9 +39,10 @@ impl From<StorableNotificationApp> for NotificationApp {
     fn from(value: StorableNotificationApp) -> Self {
         NotificationApp {
             id: value.id,
-            key: ByteBuf::from(value.key),
+            principal: Principal::from_slice(&value.principal),
             created_at: value.created_at,
             last_used: value.last_used,
+            anchors: value.anchors,
         }
     }
 }
