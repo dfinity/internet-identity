@@ -294,9 +294,20 @@
           return;
         }
         canReturnToApp = true;
-        window.close();
+        returnToApp();
       }, 500);
     });
+  };
+
+  /**
+   * Close this window when the app opened it; in a tab the app navigated to
+   * II instead (the URL transport), closing does nothing, so go back to it.
+   */
+  const returnToApp = () => {
+    window.close();
+    if (!window.closed) {
+      window.history.back();
+    }
   };
 
   /**
@@ -680,7 +691,7 @@
         {$t`Connecting to Apple`}
       </p>
       {#if canReturnToApp}
-        <button class="btn btn-tertiary mt-3" onclick={() => window.close()}>
+        <button class="btn btn-tertiary mt-3" onclick={returnToApp}>
           {$t`Return to app`}
         </button>
       {/if}
