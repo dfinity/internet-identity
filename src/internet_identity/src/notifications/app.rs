@@ -4,6 +4,7 @@
 use crate::storage::anchor::WebPushSubscription;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
+use std::collections::BTreeSet;
 
 pub use internet_identity_interface::internet_identity::types::NotificationAppId;
 
@@ -16,9 +17,9 @@ pub struct NotificationApp {
     pub created_at: Timestamp,
     /// Stamped by the app's own update calls only, so a query leaves it where it was.
     pub last_used: Timestamp,
-    /// The identities whose browsers point at this app, oldest first. Also the reference
-    /// count: a record with none left is deleted.
-    pub anchors: Vec<AnchorNumber>,
+    /// The identities whose browsers point at this app. Also the reference count: a
+    /// record with none left is deleted.
+    pub anchors: BTreeSet<AnchorNumber>,
     /// One subscription for the whole record, absent until the app has permission.
     pub webpush_subscription: Option<WebPushSubscription>,
 }
