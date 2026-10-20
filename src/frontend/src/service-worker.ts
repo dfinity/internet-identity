@@ -18,6 +18,7 @@ import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/worker/shownNotification";
 import { openable } from "$lib/utils/notifications/worker/openTarget";
+import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 
@@ -55,6 +56,42 @@ worker.addEventListener("push", (event) => {
   );
 });
 
+/** The app's own window, which is the only one reused: a page on this origin that is not
+ *  the app belongs to the user and is left where they put it. */
+const appWindow = async (): Promise<WindowClient | undefined> => {
+  const clients = await worker.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  return clients.find((client) => {
+    try {
+      return new URL(client.url).pathname.startsWith(NOTIFICATION_APP_PATH);
+    } catch {
+      return false;
+    }
+  });
+};
+
+/**
+ * Takes a window to `url`.
+ *
+ * iOS gives a standalone app one window and surfaces it for a URL in its own scope
+ * rather than taking it there, so the running window is pointed by hand. Only a
+ * destination inside the app reuses one; anything else opens its own.
+ */
+const pointAt = async (url: string): Promise<void> => {
+  const reuse = url.startsWith(NOTIFICATION_APP_PATH)
+    ? await appWindow()
+    : undefined;
+  if (reuse === undefined) {
+    await worker.clients.openWindow(url);
+    return;
+  }
+  // Refused in some app views, where the page's own `hashchange` is what is left.
+  await reuse.navigate(url).catch(() => undefined);
+  await reuse.focus();
+};
+
 worker.addEventListener("notificationclick", (event) => {
   // A click does not take the notification off the screen by itself.
   event.notification.close();
@@ -70,15 +107,12 @@ worker.addEventListener("notificationclick", (event) => {
       // app's window cannot be focused instead, because `matchAll` sees this origin
       // only and the link is the app's.
       if (target !== undefined && url !== undefined) {
+        const destination = await openable(url, {
+          title: event.notification.title,
+          body: event.notification.body,
+        });
         // A refused window must not cost the app its report.
-        await worker.clients
-          .openWindow(
-            await openable(url, {
-              title: event.notification.title,
-              body: event.notification.body,
-            }),
-          )
-          .catch(() => undefined);
+        await pointAt(destination).catch(() => undefined);
       } else {
         const clients = await worker.clients.matchAll({
           type: "window",
