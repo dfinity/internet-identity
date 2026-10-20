@@ -1386,7 +1386,7 @@ mod browser_tests {
     fn linking_points_the_browser_at_the_app_with_delivery_on() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.start_notification_app_link(id, link_principal(1), 5_000);
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
         assert_eq!(
             anchor.notification_app(id),
@@ -1401,7 +1401,7 @@ mod browser_tests {
     fn linking_spends_the_pending_install() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.start_notification_app_link(id, link_principal(1), 5_000);
-        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 7, true);
 
         assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
     }
@@ -1409,8 +1409,8 @@ mod browser_tests {
     #[test]
     fn a_browser_points_at_one_app_at_a_time() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
-        anchor.point_at_notification_app(id, 8);
+        anchor.point_at_notification_app(id, 7, true);
+        anchor.point_at_notification_app(id, 8, true);
 
         assert_eq!(
             anchor.notification_app(id).and_then(|app| app.linked_app()),
@@ -1423,7 +1423,7 @@ mod browser_tests {
         let mut anchor = anchor();
 
         anchor.start_notification_app_link(42, link_principal(1), 5_000);
-        anchor.point_at_notification_app(42, 7);
+        anchor.point_at_notification_app(42, 7, true);
 
         assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
         assert_eq!(anchor.notification_app(42), None);

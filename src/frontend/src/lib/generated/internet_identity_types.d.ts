@@ -521,6 +521,38 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
+export type ClaimNotificationAppError = {
+    /**
+     * The offering identity's browser points at no app to hand over.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The key the caller signed with is no browser key of the identity it named.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No browser of the offering identity signed this, or the one that did has
+     * rotated its key past it since.
+     */
+    'InvalidClaimToken' : null
+  } |
+  { 'ClaimTokenExpired' : null };
+/**
+ * Points this browser at the Home Screen app another identity on the device has, on
+ * the authority of a token that identity signed. Nothing is stored between the two
+ * halves: the signature is the whole of the authority.
+ */
+export interface ClaimNotificationAppRequest {
+  'signature' : Uint8Array | number[],
+  'offering_anchor_number' : UserNumber,
+  'anchor_number' : UserNumber,
+  'expires_at_ns' : bigint,
+}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -2523,6 +2555,15 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
+  /**
+   * Called by the identity being added, from its own browser on the device, with a
+   * token the identity that has the app signed for it.
+   */
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
+  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],
@@ -2948,6 +2989,13 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the Home Screen app, signing as itself. The identities whose browsers
+   * point at it, which is the whole of what it can deliver for. Empty in four cases,
+   * which all mean the same thing to the app: it has no record, nothing points at the
+   * record it has, this deployment does not notify, or the caller is not an app.
+   */
+  'notification_app_anchors' : ActorMethod<[], BigUint64Array | bigint[]>,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],
     boolean

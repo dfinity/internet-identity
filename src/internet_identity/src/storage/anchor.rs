@@ -948,13 +948,21 @@ impl Anchor {
     /// One app per browser. Refusing a second instead would leave a user who deleted the
     /// app from their Home Screen unable to set one up again: iOS destroys its storage and
     /// the key with it, while a reference here would survive naming a record nothing holds.
-    pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
+    pub fn point_at_notification_app(
+        &mut self,
+        browser_id: BrowserId,
+        app_id: NotificationAppId,
+        delivers_when_new: bool,
+    ) {
         let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
             return;
         };
+        // Whether this identity wants the app to deliver is the caller's to say: an
+        // install is this identity asking for one, and taking over an app another
+        // identity put here is not.
         browser.notification_app = Some(NotificationAppRef::Linked {
             app_id,
-            enabled: true,
+            enabled: delivers_when_new,
         });
     }
 
