@@ -4,7 +4,8 @@ import {
   throwCanisterError,
 } from "$lib/utils/utils";
 import {
-  appPublicKey,
+  appPrincipal,
+  rememberAppId,
   type AppKeyRecord,
 } from "$lib/utils/notifications/notificationAppKey";
 import type { LinkNotificationAppError } from "$lib/generated/internet_identity_types";
@@ -12,10 +13,11 @@ import type { LinkToken } from "$lib/utils/notifications/linkToken";
 import { linkKeyActor } from "./appKeyActor";
 
 export type LinkOutcome =
-  | { status: "linked" }
+  /** Carries the record the canister allocated, since the stored one is a launch behind. */
+  | { status: "linked"; appId: bigint }
   /** The install URL is spent or unusable, which a fresh one fixes. */
   | { status: "token-refused"; reason: string }
-  /** The canister refused the key this app signs with: a key is minted once per storage partition, so only a fresh install mints another. */
+  /** The canister refused the principal this app signs as: a key is minted once per storage partition, so only a fresh install mints another. */
   | { status: "key-refused"; reason: string }
   | { status: "failed"; reason: string };
 
@@ -35,11 +37,11 @@ const refusal = (
   switch (error.type) {
     case "NoPendingLink":
       return { status: "token-refused", reason };
-    // Both are this app's own key being one the canister will not take, which only a
-    // fresh install mints another of: a key already spoken for, and one that is not the
-    // single encoding WebCrypto emits.
-    case "KeyAlreadyInUse":
-    case "InvalidAppKey":
+    // Both are this app's own principal being one the canister will not take, which only
+    // a fresh install mints another of: one a browser of the identity already signs as,
+    // and one no key could have produced.
+    case "PrincipalAlreadyInUse":
+    case "AppPrincipalIsNotAKey":
       return { status: "key-refused", reason };
     case "InternalCanisterError":
       return { status: "failed", reason };
@@ -58,13 +60,15 @@ export const linkWithToken = async (
     return { status: "token-refused", reason: describe(error) };
   }
   try {
-    await actor
+    const linked = await actor
       .link_notification_app({
         anchor_number: token.identityNumber,
-        app_key: await appPublicKey(record),
+        app_principal: await appPrincipal(record),
+        app_id: record.appId === undefined ? [] : [record.appId],
       })
       .then(throwCanisterError);
-    return { status: "linked" };
+    await rememberAppId(record, linked.app_id);
+    return { status: "linked", appId: linked.app_id };
   } catch (error) {
     const reason = describe(error);
     return isCanisterError<LinkNotificationAppError>(error)

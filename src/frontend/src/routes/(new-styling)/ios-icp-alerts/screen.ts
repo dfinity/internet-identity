@@ -149,7 +149,10 @@ export const insideTheApp = async (
     onTokenSpent();
   }
 
-  const anchors = await appAnchors(actor);
+  // The link that just ran is ahead of what the store held when this launch began.
+  const appId = outcome?.status === "linked" ? outcome.appId : record.appId;
+  // No record means nothing has ever linked this app, which reads as no anchors.
+  const anchors = appId === undefined ? [] : await appAnchors(actor, appId);
   if (anchors.length === 0 && outcome?.status === "token-refused") {
     return { kind: "stale-link" };
   }
@@ -186,7 +189,9 @@ export const settleWithTheApp = async (
 ): Promise<Screen> => {
   const record = await ensureAppKey();
   const actor = await appKeyActor(record);
-  return await settle(permission, actor, await appAnchors(actor));
+  const anchors =
+    record.appId === undefined ? [] : await appAnchors(actor, record.appId);
+  return await settle(permission, actor, anchors);
 };
 
 /** iOS Settings is the only place a refused permission can be lifted. */
