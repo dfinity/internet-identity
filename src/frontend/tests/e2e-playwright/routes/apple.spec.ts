@@ -95,6 +95,45 @@ test.describe("Sign in with Apple", () => {
         await expect(page).toHaveURL(II_URL + "/");
       });
     });
+
+    test.describe("canceling without a reply", () => {
+      test.use({ fakeAppleConfig: { silentCancel: true } });
+
+      test("returns to the sign-in methods when Apple's sheet closes without a reply", async ({
+        page,
+        fakeApple,
+      }) => {
+        await page.goto(II_URL);
+        const popupPromise = page.context().waitForEvent("page");
+        const appleButton = page.getByRole("button", {
+          name: APPLE_PROVIDER_NAME,
+        });
+        await appleButton.click();
+        const popup = await popupPromise;
+        await expect.poll(() => fakeApple?.authorizeRequests.length).toBe(1);
+
+        // The sheet goes away: the page gets its focus back, and nothing
+        // arrives from Apple.
+        await page.evaluate(() => {
+          window.dispatchEvent(new FocusEvent("blur"));
+          window.dispatchEvent(new FocusEvent("focus"));
+        });
+
+        await expect(
+          page.getByRole("tooltip", {
+            name: "Interaction canceled. Please try again.",
+          }),
+        ).toBeVisible();
+        await expect(appleButton).toBeEnabled();
+        await expect.poll(() => popup.isClosed()).toBe(true);
+        expect(
+          fakeApple?.authorizeRequests.map((request) =>
+            request.searchParams.get("response_mode"),
+          ),
+        ).toEqual(["web_message"]);
+        await expect(page).toHaveURL(II_URL + "/");
+      });
+    });
   });
 
   test.describe("outside Safari", () => {
