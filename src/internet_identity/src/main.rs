@@ -434,7 +434,7 @@ fn notification_app_anchors(app_id: NotificationAppId) -> Vec<AnchorNumber> {
     let Ok(app) = check_app_authorization(app_id) else {
         return vec![];
     };
-    app.anchors
+    app.anchors.into_iter().collect()
 }
 
 /// Called by the Home Screen app, signed with the one-shot key its installing browser put
@@ -476,7 +476,7 @@ fn link_notification_app(
         };
         // The record is already written, and this reply commits it whether it carries
         // `Ok` or `Err`.
-        storage.delete_unreferenced_notification_app(app.id);
+        storage.delete_notification_app_if_unreferenced(app.id);
         Err(LinkNotificationAppError::InternalCanisterError(format!(
             "{err:?}"
         )))
