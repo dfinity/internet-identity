@@ -316,9 +316,6 @@ const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY
 /// The Home Screen apps installed from this canister's browsers, one record per app.
 const NOTIFICATION_APP_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATION_APP_MEMORY_INDEX);
 
-/// Reverse index from the principal an app signs as to its record, which is how a call it
-/// makes is resolved.
-
 /// Monotonic [`NotificationAppId`] allocator: an id is retired with its record, never reissued.
 const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
     MemoryId::new(NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX);
