@@ -483,6 +483,93 @@ fn link_notification_app(
     })
 }
 
+/// Matches `CLAIM_TOKEN_LIFETIME_MS` in the frontend. Bounding a claimed expiry from above
+/// keeps a token signed by a since-retired browser key worthless years later.
+const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
+    expires_at_ns > now && expires_at_ns <= now.saturating_add(CLAIM_TOKEN_LIFETIME_NS)
+}
+
+#[cfg(test)]
+mod claim_token_expiry {
+    use super::{claim_token_expiry_in_range, CLAIM_TOKEN_LIFETIME_NS};
+
+    const NOW: u64 = 1_700_000_000_000_000_000;
+
+    #[test]
+    fn an_expiry_that_has_arrived_is_no_longer_claimable() {
+        assert!(!claim_token_expiry_in_range(NOW, NOW));
+        assert!(!claim_token_expiry_in_range(NOW - 1, NOW));
+    }
+
+    #[test]
+    fn an_expiry_is_claimable_up_to_and_including_the_ceiling() {
+        assert!(claim_token_expiry_in_range(NOW + 1, NOW));
+        assert!(claim_token_expiry_in_range(
+            NOW + CLAIM_TOKEN_LIFETIME_NS,
+            NOW
+        ));
+    }
+
+    #[test]
+    fn an_expiry_beyond_the_ceiling_is_refused() {
+        assert!(!claim_token_expiry_in_range(
+            NOW + CLAIM_TOKEN_LIFETIME_NS + 1,
+            NOW
+        ));
+    }
+
+    #[test]
+    fn a_ceiling_that_would_overflow_still_accepts_what_is_under_it() {
+        assert!(claim_token_expiry_in_range(u64::MAX, u64::MAX - 1));
+    }
+}
+
+/// Points this browser at the app another identity on it offered.
+/// Authorized twice: the caller is a browser of the claiming identity, and the token is
+/// signed by a browser of the offering one. Spending it twice changes nothing the second time.
+#[update]
+fn claim_notification_app(
+    request: ClaimNotificationAppRequest,
+) -> Result<(), ClaimNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(ClaimNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let now = ic_cdk::api::time();
+    if !claim_token_expiry_in_range(request.expires_at_ns, now) {
+        return Err(ClaimNotificationAppError::ClaimTokenExpired);
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
+
+    let offering_anchor = state::anchor(request.offering_anchor_number);
+    let offering_browser = offering_anchor
+        .browser_that_signed_claim(
+            &request.signature,
+            request.anchor_number,
+            request.expires_at_ns,
+        )
+        .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
+    // Taken from the offering browser's own reference, so the claiming identity is never
+    // told which record it reached.
+    let app_id = offering_anchor
+        .notification_app(offering_browser)
+        .and_then(|reference| reference.linked_app())
+        .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
+
+    // Taking over an app another identity installed is not this identity asking for
+    // delivery: the switch starts off and the opt-in screen is where they answer.
+    anchor.point_at_notification_app(browser_id, app_id, false);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
 /// Authorized by the browser key the caller signs with.
 #[update]
 fn prepare_notification_delegation(
