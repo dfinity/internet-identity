@@ -69,6 +69,24 @@ export const installUrlOrNone = async (
       replacingExisting: false,
     });
   } catch (error) {
+    // A record that says it delivers refuses an ordinary install, which is what keeps a
+    // second app off a device that already has one. Reaching this screen means the app
+    // it names did not answer, so the record outlived the app and the install that
+    // replaces it is the one to mint.
+    if (
+      isCanisterError<PrepareNotificationAppLinkError>(error) &&
+      error.type === "AppAlreadyDelivering"
+    ) {
+      try {
+        return await prepareInstallUrl({
+          identityNumber,
+          replacingExisting: true,
+        });
+      } catch (replacing) {
+        console.error(replacing);
+        return undefined;
+      }
+    }
     console.error(error);
     return undefined;
   }
