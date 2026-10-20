@@ -2574,15 +2574,6 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
-  /**
-   * Called by the identity being added, from its own browser on the device, with a
-   * token the identity that has the app signed for it.
-   */
-  'claim_notification_app' : ActorMethod<
-    [ClaimNotificationAppRequest],
-    { 'Ok' : null } |
-      { 'Err' : ClaimNotificationAppError }
-  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],
@@ -3007,17 +2998,6 @@ export interface _SERVICE {
     [UserNumber, McpConfig],
     { 'Ok' : null } |
       { 'Err' : string }
-  >,
-  /**
-   * Called by the Home Screen app, naming the record it holds and signing as the
-   * principal that record belongs to. The identities whose browsers point at it, which
-   * is the whole of what it can deliver for. Empty in four cases, which all mean the
-   * same thing to the app: the id names nothing, nothing points at it, this deployment
-   * does not notify, or the caller is not the app that record belongs to.
-   */
-  'notification_app_anchors' : ActorMethod<
-    [NotificationAppId],
-    BigUint64Array | bigint[]
   >,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],
