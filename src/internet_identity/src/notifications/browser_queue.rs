@@ -477,7 +477,7 @@ mod tests {
                 0,
             );
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id);
+            stored.point_at_notification_app(browser_id, app.id, true);
             storage.write(stored).expect("pointing at the app");
             app.id
         });
@@ -542,7 +542,7 @@ mod tests {
             storage.sign_in_for_testing(other_number, &ORIGIN.to_string());
             let mut stored = storage.read(other_number).expect("reading it back");
             let other_browser = stored.browsers().first().expect("a browser").id;
-            stored.point_at_notification_app(other_browser, left_behind);
+            stored.point_at_notification_app(other_browser, left_behind, true);
             storage
                 .write(stored)
                 .expect("pointing the second identity at the app");
@@ -563,7 +563,7 @@ mod tests {
                 0,
             );
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id);
+            stored.point_at_notification_app(browser_id, app.id, true);
             storage.write(stored).expect("pointing at the second app");
             app.id
         });

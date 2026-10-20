@@ -72,7 +72,12 @@ worker.addEventListener("notificationclick", (event) => {
       if (target !== undefined && url !== undefined) {
         // A refused window must not cost the app its report.
         await worker.clients
-          .openWindow(await openable(url))
+          .openWindow(
+            await openable(url, {
+              title: event.notification.title,
+              body: event.notification.body,
+            }),
+          )
           .catch(() => undefined);
       } else {
         const clients = await worker.clients.matchAll({

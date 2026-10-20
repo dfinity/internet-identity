@@ -20,7 +20,18 @@ const isTheApp = async (): Promise<boolean> => {
   }
 };
 
-export const openable = async (url: string): Promise<string> =>
-  url.startsWith("https:") && (await isTheApp())
-    ? `${DOORWAY}#${encodeURIComponent(url)}`
-    : url;
+/** What the doorway shows and where it sends them. The fragment never leaves the device, so the notification's own words travel in it. */
+export const openable = async (
+  url: string,
+  shown?: { title: string; body: string },
+): Promise<string> => {
+  if (!url.startsWith("https:") || !(await isTheApp())) {
+    return url;
+  }
+  const carried = new URLSearchParams({ url });
+  if (shown !== undefined) {
+    carried.set("title", shown.title);
+    carried.set("body", shown.body);
+  }
+  return `${DOORWAY}#${carried.toString()}`;
+};
