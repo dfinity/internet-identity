@@ -2716,30 +2716,6 @@ service : (opt InternetIdentityInit) -> {
     // Called by the Home Screen app on its first open, signed with that one-shot key.
     // Creates the app's record where its key has none, and points the browser at it.
     link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok : LinkNotificationAppResponse; Err : LinkNotificationAppError });
-
-    // Called by the Home Screen app, naming the record it holds and signing as the
-    // principal that record belongs to. The identities whose browsers point at it, which
-    // is the whole of what it can deliver for. Empty in four cases, which all mean the
-    // same thing to the app: the id names nothing, nothing points at it, this deployment
-    // does not notify, or the caller is not the app that record belongs to.
-    notification_app_anchors : (NotificationAppId) -> (vec UserNumber) query;
-
-    // Called by the identity being added, from its own browser on the device, with a
-    // token the identity that has the app signed for it.
-    claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
-
-    // Called by the identity, from the browser that points at the app.
-    set_notification_app_enabled : (SetNotificationAppEnabledRequest) -> (variant { Ok; Err : SetNotificationAppEnabledError });
-
-    // Called by the browser, which may hold nothing but its key: the install page is a
-    // tab of its own with no session.
-    get_notification_app_status : (GetNotificationAppStatusRequest) -> (NotificationAppStatus) query;
-
-    // Called by the browser, which watches for the answer leaving its own queue: that
-    // is what says the app this browser points at is still installed.
-    probe_notification_app : (ProbeNotificationAppRequest) -> (variant { Ok : NotificationId; Err : ProbeNotificationAppError });
-    turn_on_notification_app : (TurnOnNotificationAppRequest) -> (variant { Ok : NotificationId; Err : TurnOnNotificationAppError });
-
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.

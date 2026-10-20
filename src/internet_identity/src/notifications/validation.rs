@@ -15,6 +15,9 @@ use internet_identity_interface::internet_identity::types::{
 use std::collections::HashMap;
 use url::Url;
 
+/// The message a refusal carries while this deployment does not notify.
+pub(crate) const NOT_ENABLED_MESSAGE: &str = "notifications are not enabled";
+
 /// Held by every validated request below. Private to this module, so the `TryFrom`
 /// impls are the only way to build one and holding a request is proof its origin has
 /// been through them.
@@ -98,9 +101,6 @@ impl TryFrom<RemoveNotificationRequest> for ValidatedRemoveNotificationRequest {
         })
     }
 }
-
-/// The message a refusal carries while this deployment does not notify.
-pub(crate) const NOT_ENABLED_MESSAGE: &str = "notifications are not enabled";
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {
     type Error = NotificationGrantConsentError;
