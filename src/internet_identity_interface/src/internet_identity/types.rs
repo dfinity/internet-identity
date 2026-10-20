@@ -1127,7 +1127,7 @@ pub enum PrepareNotificationAppLinkError {
     InvalidBrowserKey,
     /// The principal named is not one a key can sign as, so no app could ever present
     /// it: the install URL's authority is the key behind this principal and nothing else.
-    LinkPrincipalIsNotAKey,
+    LinkPrincipalIsAnonymous,
     InternalCanisterError(String),
 }
 
@@ -1158,7 +1158,7 @@ pub enum LinkNotificationAppError {
     /// The principal offered is not one a key can sign as, so no app could ever present
     /// it. Refused before the pending link is read, so the install is unspent and the app
     /// may call again until that link expires.
-    AppPrincipalIsNotAKey,
+    AppPrincipalIsAnonymous,
     /// No browser of this identity is waiting for this caller, or the install it started
     /// has expired.
     NoPendingLink,
