@@ -254,11 +254,12 @@ const showQueued = async (
   });
 
   // Minting is an update call, raced against a deadline rather than waited for: a worker that shows nothing is one the browser answers for.
-  // It goes into `pending` as well as into the race, since past the deadline the delegation still has to be cached or the next wake-up mints again.
+  // The promise is kept so the placeholder path can go on waiting for this same mint rather than starting a second one.
+  let minting: Promise<Identity | undefined> | undefined;
   const mintWithin = (): Promise<Identity | undefined> => {
-    const mint = mintPullIdentity({ actor, identityNumber, target });
-    sendAndForget(pending, mint);
-    return withDeadline(mint, MINT_DEADLINE_MS).catch((error: unknown) => {
+    minting = mintPullIdentity({ actor, identityNumber, target });
+    sendAndForget(pending, minting);
+    return withDeadline(minting, MINT_DEADLINE_MS).catch((error: unknown) => {
       console.error(
         error instanceof DeadlineError
           ? `the delegation for ${target.origin} was still being minted after ${MINT_DEADLINE_MS}ms`
@@ -269,24 +270,8 @@ const showQueued = async (
   };
   const minted = held ?? (await mintWithin());
 
-  if (minted === undefined) {
-    await show(context, ref, {
-      title: PLACEHOLDER_TITLE,
-      body: PLACEHOLDER_BODY,
-      url: notification.origin,
-    });
-    return true;
-  }
-
-  const content = await fetchNotificationContent({
-    appCanisterId: notification.canister_id,
-    id: notification.id,
-    identity: minted,
-  });
-  if (content === undefined) {
-    // The app dismissed it, or it expired: there is nothing to show and nothing left
-    // for the canister to hold.
-    await closeShown(context, ref);
+  /** Spends the entry this wake-up was for. */
+  const forget = (): void =>
     sendAndForget(
       pending,
       actor.browser_remove_notification({
@@ -294,43 +279,80 @@ const showQueued = async (
         notification,
       }),
     );
-    return false;
-  }
 
-  const [sender, alternativeOrigins] = await Promise.all([
-    senderOf(notification.origin),
-    fetchAlternativeOrigins(notification.origin),
-  ]);
-  await show(context, ref, {
-    // The sender leads the title: an app's own title and body are its text to
-    // write, so the one line naming who sent it has to be somewhere the app
-    // cannot claim and a platform showing a single body line cannot drop.
-    title: `${sender.name} · ${content.title}`,
-    body: content.body,
-    icon: sender.icon,
-    url: allowedLink({
-      url: content.url,
-      origin: notification.origin,
-      alternativeOrigins,
-    }),
-  });
-
-  sendAndForget(
-    pending,
-    reportNotificationReceived({
+  /** Shows what the app published under this entry, or closes what it has dropped. */
+  const showFromApp = async (identity: Identity): Promise<boolean> => {
+    const content = await fetchNotificationContent({
       appCanisterId: notification.canister_id,
       id: notification.id,
-      identity: minted,
-    }),
-  );
-  sendAndForget(
-    pending,
-    actor.browser_remove_notification({
-      anchor_number: identityNumber,
-      notification,
-    }),
-  );
-  return true;
+      identity,
+    });
+    if (content === undefined) {
+      // The app dismissed it, or it expired: there is nothing to show and nothing left
+      // for the canister to hold.
+      await closeShown(context, ref);
+      forget();
+      return false;
+    }
+
+    const [sender, alternativeOrigins] = await Promise.all([
+      senderOf(notification.origin),
+      fetchAlternativeOrigins(notification.origin),
+    ]);
+    await show(context, ref, {
+      // The sender leads the title: an app's own title and body are its text to
+      // write, so the one line naming who sent it has to be somewhere the app
+      // cannot claim and a platform showing a single body line cannot drop.
+      title: `${sender.name} · ${content.title}`,
+      body: content.body,
+      icon: sender.icon,
+      url: allowedLink({
+        url: content.url,
+        origin: notification.origin,
+        alternativeOrigins,
+      }),
+    });
+
+    sendAndForget(
+      pending,
+      reportNotificationReceived({
+        appCanisterId: notification.canister_id,
+        id: notification.id,
+        identity,
+      }),
+    );
+    forget();
+    return true;
+  };
+
+  if (minted === undefined) {
+    // What the subscription owes the user, now rather than whenever the mint lands.
+    await show(context, ref, {
+      title: PLACEHOLDER_TITLE,
+      body: PLACEHOLDER_BODY,
+      url: notification.origin,
+    });
+    // The mint is still in flight, and `waitUntil` keeps this worker alive for it, so
+    // the rest of the work happens here under the same wake-up. The canister does post
+    // one more wake-up when a delegation is minted, but a browser gets only one of
+    // those per delegation lifetime and it is not returned when its post fails, so
+    // resting correctness on it is what leaves the queue behind the wake-ups.
+    const late = await (minting ?? Promise.resolve(undefined)).catch(
+      () => undefined,
+    );
+    if (late === undefined) {
+      // A wake-up that leaves its entry queued puts the queue permanently one behind,
+      // which costs every notification after this one. One banner carrying no more
+      // than the placeholder is the cheaper loss.
+      forget();
+      return true;
+    }
+    // Replaces the placeholder: `show` closes this entry's own tag first.
+    await showFromApp(late);
+    return true;
+  }
+
+  return await showFromApp(minted);
 };
 
 /** Signs a fresh pool of wake-up authorizations where the stored one is running out.
