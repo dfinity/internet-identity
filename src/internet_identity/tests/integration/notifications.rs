@@ -1849,6 +1849,20 @@ mod shared_app {
         .expect("claim_notification_app rejected")
         .expect("claim_notification_app returned Err");
 
+        // Taking the app over is not asking for delivery: the identity that claimed it
+        // answers the opt-in screen, which is what these tests mean by sharing an app.
+        set_notification_app_enabled(
+            env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            SetNotificationAppEnabledRequest {
+                anchor_number: second,
+                enabled: true,
+            },
+        )
+        .expect("set_notification_app_enabled rejected")
+        .expect("set_notification_app_enabled returned Err");
+
         (canister_id, first, second, app)
     }
 
@@ -2191,10 +2205,12 @@ mod claims {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        claim_notification_app, notification_app_anchors, set_webpush_subscription,
+        claim_notification_app, notification_app_anchors, set_notification_app_enabled,
+        set_webpush_subscription,
     };
     use internet_identity_interface::internet_identity::types::{
-        ClaimNotificationAppError, ClaimNotificationAppRequest, SetWebPushSubscriptionRequest,
+        ClaimNotificationAppError, ClaimNotificationAppRequest, SetNotificationAppEnabledRequest,
+        SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -2318,9 +2334,10 @@ mod claims {
         Ok(())
     }
 
-    /// The claim queues a notification saying delivery is on. A token stays claimable
-    /// for its half hour, so a replay must not queue a second one: every one of those is
-    /// a paid wake-up, and past the queue's limit each evicts a real notification.
+    /// Taking an app over queues nothing: the identity that claimed it has not asked for
+    /// delivery, and its own answer on the opt-in screen is what says so. A token stays
+    /// claimable for its half hour, so a replay must not queue a second one: every one of
+    /// those is a paid wake-up, and past the queue's limit each evicts a real notification.
     #[test]
     fn should_queue_one_notification_however_often_a_token_is_spent() -> Result<(), RejectResponse>
     {
@@ -2348,11 +2365,28 @@ mod claims {
                 .expect("claim_notification_app returned Err");
         }
 
+        assert_eq!(
+            browser_get_next_notification(&env, canister_id, claiming, next_request(second))?,
+            Ok(GetNextNotificationResponse { notification: None }),
+            "a claim queued a wake-up for an identity that never asked for delivery"
+        );
+
+        set_notification_app_enabled(
+            &env,
+            canister_id,
+            claiming,
+            SetNotificationAppEnabledRequest {
+                anchor_number: second,
+                enabled: true,
+            },
+        )?
+        .expect("set_notification_app_enabled returned Err");
+
         let shown =
             browser_get_next_notification(&env, canister_id, claiming, next_request(second))?
                 .expect("browser_get_next_notification returned Err")
                 .notification
-                .expect("the claim queued one");
+                .expect("switching delivery on queued one");
         browser_remove_notification(
             &env,
             canister_id,
@@ -2363,6 +2397,9 @@ mod claims {
             },
         )?
         .expect("browser_remove_notification returned Err");
+
+        claim(&env, canister_id, (second, 2), (first, 1), expires_at_ns)?
+            .expect("claim_notification_app returned Err");
 
         assert_eq!(
             browser_get_next_notification(&env, canister_id, claiming, next_request(second))?,
