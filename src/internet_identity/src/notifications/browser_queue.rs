@@ -242,7 +242,9 @@ pub(crate) fn remove_shown(
 mod tests {
     use super::*;
     use crate::notifications::app::NotificationAppId;
-    use crate::notifications::webpush::fixtures::{anchor, setup, subscribe, APP_RELAY};
+    use crate::notifications::webpush::fixtures::{
+        anchor, app_for_key, app_key, setup, subscribe, APP_RELAY,
+    };
     use crate::notifications::write_notifications_decision;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{
@@ -371,9 +373,9 @@ mod tests {
 
     /// What the Home Screen app signing as `app_id` reads and acknowledges.
     fn as_app(app_id: NotificationAppId) -> NotificationCaller {
-        NotificationCaller::App(
+        NotificationCaller::App(Box::new(
             storage_borrow(|storage| storage.notification_app(app_id)).expect("a stored app"),
-        )
+        ))
     }
 
     fn next_as(
@@ -446,7 +448,6 @@ mod tests {
     /// the app it points at.
     fn routed_through_an_app() -> (AnchorNumber, BrowserId, NotificationAppId) {
         use crate::storage::anchor::WebPushSubscription;
-        use serde_bytes::ByteBuf;
 
         setup();
         let anchor_number = storage_borrow_mut(|storage| {
@@ -461,10 +462,9 @@ mod tests {
             .first()
             .expect("signing in registers the browser")
             .id;
+        // Outside the borrow below: it takes one of its own.
+        let app = app_for_key(app_key(9), 0);
         let app_id = storage_borrow_mut(|storage| {
-            let app = storage
-                .ensure_notification_app_for_key(&ByteBuf::from(vec![9u8; 91]), 0)
-                .expect("creating the app record");
             storage.set_notification_app_subscription(
                 app.id,
                 Some(WebPushSubscription {
@@ -547,10 +547,9 @@ mod tests {
                 .write(stored)
                 .expect("pointing the second identity at the app");
         });
+        // Outside the borrow below: it takes one of its own.
+        let app = app_for_key(ByteBuf::from(vec![8u8; 91]), 0);
         let moved_to = storage_borrow_mut(|storage| {
-            let app = storage
-                .ensure_notification_app_for_key(&ByteBuf::from(vec![8u8; 91]), 0)
-                .expect("creating the second app record");
             storage.set_notification_app_subscription(
                 app.id,
                 Some(WebPushSubscription {

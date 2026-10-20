@@ -30,13 +30,18 @@ const fromBrowserKeys = async (): Promise<SigningIdentity[]> => {
   return entries.flat();
 };
 
-/** The identities pointing at this app, which only the canister can name. Rejects where it could not be reached, or where the worker was told nothing to reach. */
+/** The identities pointing at this app, which only the canister can name. Empty for an app
+ *  that has never linked, since it has no record to ask about. Rejects where the canister
+ *  could not be reached, or where the worker was told nothing to reach. */
 const claimedAnchors = async (record: AppKeyRecord): Promise<bigint[]> => {
+  if (record.appId === undefined) {
+    return [];
+  }
   const actor = await appKeyActorWith(record, {
     agentOptions: config.agentOptions,
     canisterId: Principal.fromText(config.canisterId),
   });
-  return appAnchors(actor);
+  return appAnchors(actor, record.appId);
 };
 
 const fromAppKey = async (): Promise<SigningIdentity[]> => {
