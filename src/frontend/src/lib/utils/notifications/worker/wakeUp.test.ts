@@ -265,7 +265,41 @@ describe("onWakeUp", () => {
     expect(returned).toBe(true);
 
     expect(fetchNotificationContent).not.toHaveBeenCalled();
-    expect(ii.removed).toHaveLength(0);
+    // A wake-up that left its entry queued would put the queue one behind every
+    // wake-up after it, so the entry is spent even though only the placeholder
+    // could be shown for it.
+    expect(ii.removed).toHaveLength(1);
+  }, 15_000);
+
+  it("replaces the placeholder with the app's own text when the mint lands late", async () => {
+    const shown = registration();
+    const ii = internetIdentity([notification]);
+    loadPullIdentity.mockResolvedValue(undefined);
+    let finishMint = (_identity: Identity | undefined) => undefined as void;
+    mintPullIdentity.mockImplementation(
+      () =>
+        new Promise<Identity | undefined>((resolve) => {
+          finishMint = resolve;
+        }),
+    );
+
+    const wakeUp = onWakeUp({
+      registration: shown,
+      internetIdentity: ii.factory,
+    });
+    await vi.waitFor(
+      () => expect(shown.shown[0]?.title).toBe("Internet Identity"),
+      { timeout: 10_000, interval: 100 },
+    );
+
+    finishMint(identity);
+    await wakeUp;
+
+    // The placeholder carries this entry's own tag, so the app's text closes it.
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Example App · New message",
+    ]);
+    expect(ii.removed).toHaveLength(1);
   }, 15_000);
 
   it("says the deadline ran out rather than that the mint failed", async () => {
