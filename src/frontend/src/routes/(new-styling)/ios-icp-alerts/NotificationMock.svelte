@@ -49,7 +49,7 @@
     <span
       class="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-linear-to-b from-[#2a2a2d] to-[#1a1a1c] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.14),inset_0_1px_0_rgba(255,255,255,.12)]"
     >
-      <Logo class="block h-[10.5px] w-[22px]" />
+      <Logo class="block h-[11px] w-[23px]" />
     </span>
     <div class="flex min-w-0 flex-1 flex-col">
       <div class="flex items-baseline justify-between gap-2">
