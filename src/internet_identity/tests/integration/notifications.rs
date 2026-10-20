@@ -2334,19 +2334,23 @@ mod app_link {
         Ok(())
     }
 
-    /// A principal no key can sign as is an install nothing could complete, and the
-    /// anonymous one is an install anybody could: neither may be written to the slot.
+    /// The anonymous principal is held by everyone, so an install offered to it is one
+    /// anybody could complete: it may not be written to the slot.
     #[test]
-    fn should_refuse_a_link_principal_no_key_can_sign_as() -> Result<(), RejectResponse> {
+    fn should_refuse_an_anonymous_link_principal() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_browser(&env);
 
-        for named in [Principal::anonymous(), canister_id] {
-            assert_eq!(
-                prepare(&env, canister_id, browser(BROWSER_SEED), anchor, named)?,
-                Err(PrepareNotificationAppLinkError::LinkPrincipalIsNotAKey)
-            );
-        }
+        assert_eq!(
+            prepare(
+                &env,
+                canister_id,
+                browser(BROWSER_SEED),
+                anchor,
+                Principal::anonymous()
+            )?,
+            Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous)
+        );
         // And nothing was written: the app the anonymous caller would have been is refused.
         assert_eq!(
             link(
@@ -2361,28 +2365,32 @@ mod app_link {
         Ok(())
     }
 
-    /// The record is keyed by these bytes, so anything that is not a key leaves this
-    /// browser pointing at an app nobody can sign as, with its one-shot key spent.
+    /// The record is keyed by this principal, and the anonymous one is held by everyone,
+    /// so a record keyed by it is one any caller at all would resolve to.
     #[test]
-    fn should_refuse_an_app_key_that_is_not_a_key() -> Result<(), RejectResponse> {
+    fn should_refuse_an_anonymous_app_principal() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_browser(&env);
         let key = BrowserKey::new(100);
 
-        for offered in [Principal::anonymous(), Principal::management_canister()] {
-            prepare(
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+        assert_eq!(
+            link(
                 &env,
                 canister_id,
-                browser(BROWSER_SEED),
-                anchor,
                 key.principal(),
-            )?
-            .expect("prepare_notification_app_link returned Err");
-            assert_eq!(
-                link(&env, canister_id, key.principal(), anchor, offered)?,
-                Err(LinkNotificationAppError::AppPrincipalIsNotAKey)
-            );
-        }
+                anchor,
+                Principal::anonymous()
+            )?,
+            Err(LinkNotificationAppError::AppPrincipalIsAnonymous)
+        );
 
         // Refused before the slot is read, so the install the browser started is intact.
         assert_eq!(
