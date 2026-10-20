@@ -1639,6 +1639,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
+    'notification_app_anchors' : IDL.Func(
+        [NotificationAppId],
+        [IDL.Vec(UserNumber)],
+        ['query'],
+      ),
     'notification_consent_granted' : IDL.Func(
         [NotificationConsentGrantedRequest],
         [IDL.Bool],

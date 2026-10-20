@@ -3097,6 +3097,17 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the Home Screen app, naming the record it holds and signing as the
+   * principal that record belongs to. The identities whose browsers point at it, which
+   * is the whole of what it can deliver for. Empty in four cases, which all mean the
+   * same thing to the app: the id names nothing, nothing points at it, this deployment
+   * does not notify, or the caller is not the app that record belongs to.
+   */
+  'notification_app_anchors' : ActorMethod<
+    [NotificationAppId],
+    BigUint64Array | bigint[]
+  >,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],
     boolean
