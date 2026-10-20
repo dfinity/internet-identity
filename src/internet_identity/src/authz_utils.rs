@@ -1,7 +1,6 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
-use crate::notifications::app::NotificationApp;
-use crate::notifications::dispatch;
+use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::session_delegation::expected_session_principal;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
@@ -170,10 +169,13 @@ pub fn check_authorization(
     Err(AuthorizationError::from(caller))
 }
 
-/// The notification app the caller is signing as, if it is one.
-pub fn check_app_authorization() -> Result<NotificationApp, AuthorizationError> {
+/// The record `app_id` names, where the caller is the app it belongs to. An id is public
+/// and allocated in sequence, so naming one is not evidence of anything by itself.
+pub fn check_app_authorization(
+    app_id: NotificationAppId,
+) -> Result<NotificationApp, AuthorizationError> {
     let caller = caller();
-    state::storage_borrow(|storage| storage.notification_app_with_principal(caller))
+    state::storage_borrow(|storage| storage.notification_app_of(app_id, caller))
         .ok_or(AuthorizationError::from(caller))
 }
 
@@ -187,21 +189,29 @@ pub fn check_notification_authorization(
     if let Some(browser_id) = anchor.browser_by_principal(caller) {
         return Ok((anchor, browser_id, NotificationCaller::Browser));
     }
-    let routed = state::storage_borrow(|storage| {
-        let app = storage.notification_app_with_principal(caller)?;
-        let browser = anchor.browsers().iter().find(|browser| {
-            dispatch::routed_app(storage, browser).is_some_and(|routed| routed.id == app.id)
-        })?;
-        Some((browser.id, app))
-    });
-    let (browser_id, app) = routed.ok_or(AuthorizationError::from(caller))?;
-    Ok((anchor, browser_id, NotificationCaller::App(app)))
+    // The anchor is already loaded and holds a handful of entries, so the app is found
+    // by asking which of them routes through a record this caller belongs to.
+    let (browser_id, app) = state::storage_borrow(|storage| {
+        anchor.browsers().iter().find_map(|browser| {
+            let reference = browser.notification_app?;
+            // Switching delivery off is this identity saying the app does not act for it,
+            // so the app stops being a caller this entry recognises.
+            if !reference.delivers() {
+                return None;
+            }
+            let app = storage.notification_app_of(reference.linked_app()?, caller)?;
+            Some((browser.id, app))
+        })
+    })
+    .ok_or(AuthorizationError::from(caller))?;
+    Ok((anchor, browser_id, NotificationCaller::App(Box::new(app))))
 }
 
 /// Which kind of caller a notification call turned out to come from.
 pub enum NotificationCaller {
     Browser,
-    App(NotificationApp),
+    /// Boxed: the record dwarfs the other variant, and this is returned by value.
+    App(Box<NotificationApp>),
 }
 
 /// Which of this identity's browsers the caller is signing as.
