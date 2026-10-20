@@ -179,21 +179,6 @@ fn verify(key: &PublicKey, signature: &[u8], message: &[u8]) -> bool {
     key.verify(message, &signature).is_ok()
 }
 
-/// Whether these bytes are a key at all, by the rule [`verifying_key`] sets out.
-///
-/// One encoding of a key, so one key is one browser.
-///
-/// `from_public_key_der` accepts the compressed SEC1 point as readily as the uncompressed
-/// one, and both are valid DER — so a single private key has two spellings, and
-/// [`crate::storage::anchor::Anchor::resolve_browser`], which compares the bytes it was
-/// given, would see two browsers. Only the uncompressed form is accepted, which is the
-/// only one WebCrypto can emit: `exportKey("spki")` on a P-256 key writes `0x04 || X || Y`
-/// and the API offers no alternative, so nothing legitimate is turned away and nothing
-/// stored today needs migrating.
-pub fn is_one_key(key: &PublicKey) -> bool {
-    verifying_key(key).is_some()
-}
-
 fn verifying_key(key: &PublicKey) -> Option<VerifyingKey> {
     let verifying = VerifyingKey::from_public_key_der(key).ok()?;
     let uncompressed = verifying.to_encoded_point(false);

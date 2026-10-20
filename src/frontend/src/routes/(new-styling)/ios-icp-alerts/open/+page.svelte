@@ -6,6 +6,7 @@
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { NOTIFICATION_APP_NAME } from "../appName";
+  import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
   import NotificationMock from "../NotificationMock.svelte";
 
   let target = $state<string | undefined>(undefined);
@@ -40,13 +41,18 @@
 
   onMount(() => {
     let waited: ReturnType<typeof setTimeout> | undefined;
+    let handedOver = false;
+    let wentAway = false;
+    let returning: ReturnType<typeof setTimeout> | undefined;
 
     // iOS gives the app one window, so a second notification reaches this page as a
     // change of fragment rather than a fresh load, and mounting once would hand Safari
     // the previous notification's destination.
     const handOver = () => {
       clearTimeout(waited);
+      clearTimeout(returning);
       stillHere = false;
+      wentAway = false;
       const carrying = carried(window.location.hash);
       target = carrying?.url;
       shown =
@@ -56,16 +62,48 @@
       if (target === undefined) {
         return;
       }
+      handedOver = true;
       window.location.href = viaSafari(target);
       // Long enough that a handover which worked has already taken the page away.
       waited = setTimeout(() => (stillHere = true), 1_200);
     };
 
+    /**
+     * Puts the window back on the app's own page once this one has done its job.
+     *
+     * iOS does not take a resumed app back to `start_url`, so whatever this window was
+     * left on is what the Home Screen icon shows. Going away and coming back is what
+     * says Safari took the link; a window that never went has nothing to go back from
+     * and keeps its offer.
+     */
+    const settleBack = () => {
+      if (!handedOver) {
+        return;
+      }
+      if (document.visibilityState === "hidden") {
+        wentAway = true;
+        return;
+      }
+      if (!wentAway) {
+        return;
+      }
+      // A notification clicked while this window is surfaced arrives as a change of
+      // fragment; letting that land first keeps it from being replaced away.
+      returning = setTimeout(() => {
+        if (wentAway) {
+          window.location.replace(NOTIFICATION_APP_PATH);
+        }
+      }, 250);
+    };
+
     handOver();
     window.addEventListener("hashchange", handOver);
+    document.addEventListener("visibilitychange", settleBack);
     return () => {
       clearTimeout(waited);
+      clearTimeout(returning);
       window.removeEventListener("hashchange", handOver);
+      document.removeEventListener("visibilitychange", settleBack);
     };
   });
 </script>

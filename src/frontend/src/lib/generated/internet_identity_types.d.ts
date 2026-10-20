@@ -1426,6 +1426,12 @@ export type KeyType = { 'platform' : null } |
 export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
   {
     /**
+     * A browser of this identity already signs as that principal.
+     */
+    'PrincipalAlreadyInUse' : null
+  } |
+  {
+    /**
      * No browser of this identity is waiting for this caller, or the install it started
      * has expired.
      */
@@ -1433,19 +1439,27 @@ export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
   } |
   {
     /**
-     * Not a P-256 public key in the single encoding WebCrypto emits.
+     * Not a principal any key can sign as, so no app could ever present it.
      */
-    'InvalidAppKey' : null
-  } |
-  {
-    /**
-     * The key is one a browser of this identity already signs with.
-     */
-    'KeyAlreadyInUse' : null
+    'AppPrincipalIsNotAKey' : null
   };
 export interface LinkNotificationAppRequest {
-  'app_key' : PublicKey,
+  /**
+   * The principal the app signs as, over the key it generated in its own partition.
+   */
+  'app_principal' : Principal,
+  /**
+   * The record this app already has, where it is linking a second identity to the app
+   * it is running as. Null is a first install and takes a record of its own.
+   */
+  'app_id' : [] | [NotificationAppId],
   'anchor_number' : UserNumber,
+}
+export interface LinkNotificationAppResponse {
+  /**
+   * Kept by the app, so a later link names the record it already has.
+   */
+  'app_id' : NotificationAppId,
 }
 export type ListApplicationsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -1551,6 +1565,11 @@ export interface Notification {
    */
   'expires_at' : [] | [Timestamp],
 }
+/**
+ * Numbers a Home Screen app's record. Public, so every call naming one is checked
+ * against the principal the record belongs to.
+ */
+export type NotificationAppId = bigint;
 export interface NotificationAppInfo {
   /**
    * When the app last called, which is the only evidence there is that it still
@@ -3036,7 +3055,7 @@ export interface _SERVICE {
    */
   'link_notification_app' : ActorMethod<
     [LinkNotificationAppRequest],
-    { 'Ok' : null } |
+    { 'Ok' : LinkNotificationAppResponse } |
       { 'Err' : LinkNotificationAppError }
   >,
   /**
@@ -3167,12 +3186,16 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
-   * Called by the Home Screen app, signing as itself. The identities whose browsers
-   * point at it, which is the whole of what it can deliver for. Empty in four cases,
-   * which all mean the same thing to the app: it has no record, nothing points at the
-   * record it has, this deployment does not notify, or the caller is not an app.
+   * Called by the Home Screen app, naming the record it holds and signing as the
+   * principal that record belongs to. The identities whose browsers point at it, which
+   * is the whole of what it can deliver for. Empty in four cases, which all mean the
+   * same thing to the app: the id names nothing, nothing points at it, this deployment
+   * does not notify, or the caller is not the app that record belongs to.
    */
-  'notification_app_anchors' : ActorMethod<[], BigUint64Array | bigint[]>,
+  'notification_app_anchors' : ActorMethod<
+    [NotificationAppId],
+    BigUint64Array | bigint[]
+  >,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],
     boolean

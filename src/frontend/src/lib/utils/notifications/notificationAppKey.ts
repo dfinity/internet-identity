@@ -1,6 +1,7 @@
 /** This key never signs in and never rotates, unlike the one in `browser-key.store.ts`, and a Home Screen app's storage partition could not reach that store anyway.
  * Storage only: a worker reaching `$lib/globals` from here would pull the page's DOM-bound modules into a context that has no `document`. */
 import { createStore, get as idbGet, set as idbSet } from "idb-keyval";
+import { Principal } from "@icp-sdk/core/principal";
 
 /** Exported so a test wipes the store this writes to rather than naming it a second time. */
 export const APP_KEY_STORE = createStore("ii-notification-app", "key");
@@ -8,6 +9,9 @@ const RECORD_KEY = "key";
 
 export interface AppKeyRecord {
   keyPair: CryptoKeyPair;
+  /** The record the canister gave this app, absent until it has linked once. Naming it on
+   *  a later link joins the record it already has rather than taking a second one. */
+  appId?: bigint;
 }
 
 /** `unreadable` is not `no-key`: this key is the app's only name to the canister, so each caller has to say what it does when it cannot tell. */
@@ -54,3 +58,20 @@ export const appPublicKey = (record: AppKeyRecord): Promise<Uint8Array> =>
   crypto.subtle
     .exportKey("spki", record.keyPair.publicKey)
     .then((spki) => new Uint8Array(spki));
+
+/** What the canister knows this app as, and what it matches an app-facing caller against. */
+export const appPrincipal = async (record: AppKeyRecord): Promise<Principal> =>
+  Principal.selfAuthenticating(await appPublicKey(record));
+
+/** Keeps the record the canister allocated, so a later link names it. A failure here costs
+ *  this app the record on its next link, never the link it has just completed. */
+export const rememberAppId = async (
+  record: AppKeyRecord,
+  appId: bigint,
+): Promise<void> => {
+  try {
+    await idbSet(RECORD_KEY, { ...record, appId }, APP_KEY_STORE);
+  } catch (error) {
+    console.error(error);
+  }
+};
