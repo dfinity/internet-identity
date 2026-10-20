@@ -5,18 +5,18 @@ import { installUrlOrNone } from "$lib/utils/notifications/installUrl";
 
 /** Notifications reach this identity on this device now, or the install is what is left and this is where it lives. */
 export type AppSwitchOutcome =
-  { delivering: true } | { delivering: false; installUrl: string | undefined };
+  | {
+      delivering: true;
+      /** An app taken over from another identity links switched off, so the press that took it is what switches it on. */
+      claimed: boolean;
+    }
+  | { delivering: false; installUrl: string | undefined };
 
 /** A handle is offered on the strength of the donor browser pointing at an app, which does not mean the app has a subscription, so what the canister says after the claim is what answers. */
 const claimedAppDelivers = async (identityNumber: bigint): Promise<boolean> => {
-  const claim = await claimDeviceApp(identityNumber);
-  if (claim === "indeterminate") {
-    // Nothing was asked of any donor, so this says nothing about this device: offering
-    // the install on it would hand a second app to a phone that already has one.
-    throw new Error("the apps on this device could not be read");
-  }
-  // Only a claim that happened says this device has an app.
-  if (claim !== "claimed") {
+  // Only a claim that happened says this device has an app: "no donor" and "nothing was
+  // asked" both leave the switch with nothing to report.
+  if ((await claimDeviceApp(identityNumber)) !== "claimed") {
     return false;
   }
   const status = await browserAppStatus(identityNumber);
@@ -34,7 +34,7 @@ export const turnOnWithApp = async ({
 }): Promise<AppSwitchOutcome> => {
   // An app another identity on this browser can hand over is pointed at instead of installed again, and only where this browser points at nothing.
   if (ownApp === undefined && (await claimedAppDelivers(identityNumber))) {
-    return { delivering: true };
+    return { delivering: true, claimed: true };
   }
   return {
     delivering: false,
