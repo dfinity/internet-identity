@@ -672,6 +672,25 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
+export type DisableNotificationAppError = {
+    /**
+     * This browser points at no app.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+/**
+ * This identity asking the app its browser points at to stop delivering for it. Never a
+ * subscription removal: the subscription is the app's and is shared with every other
+ * identity pointing at it.
+ */
+export interface DisableNotificationAppRequest { 'anchor_number' : UserNumber }
 export interface DnsProofBundle {
   'root_dnskey' : SignedRRset,
   /**
@@ -866,6 +885,37 @@ export interface EmailRecoveryGetDelegationArgs {
   'expiration' : Timestamp,
   'nonce' : string,
 }
+export type EnableNotificationAppError = {
+    /**
+     * This browser points at no app.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing could be woken, so nothing was switched on: the app has registered
+     * nothing, the browser counts as gone, or there was no room for another outcall.
+     */
+    'NotReachable' : null
+  };
+/**
+ * This identity asking the app its browser points at to deliver for it, which is also
+ * what asks the app to prove it is still there: a reference that is off is skipped when
+ * the canister picks who to send to, so the two cannot be separated. Probing first would
+ * find nothing to wake, and switching on first would announce it and then say the same
+ * thing again on the probe. The probe is the announcement. Where nothing can be woken the
+ * switch does not stay on.
+ * 
+ * Never a subscription write: the subscription is the app's and is shared.
+ */
+export interface EnableNotificationAppRequest { 'anchor_number' : UserNumber }
 export type ForgetApplicationsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface ForgetApplicationsRequest {
@@ -1572,6 +1622,10 @@ export interface Notification {
   'expires_at' : [] | [Timestamp],
 }
 /**
+ * Asks which identities a Home Screen app delivers for, named by the app's own record.
+ */
+export interface NotificationAppAnchorsRequest { 'app_id' : NotificationAppId }
+/**
  * Numbers a Home Screen app's record. Public, so every call naming one is checked
  * against the principal the record belongs to.
  */
@@ -1677,6 +1731,25 @@ export interface NotificationToShow {
   'event' : [] | [NotificationEvent],
   'account_number' : [] | [AccountNumber],
 }
+export type OfferNotificationAppError = {
+    /**
+     * This browser has no app to offer.
+     */
+    'NoNotificationApp' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The caller is no browser of this identity.
+     */
+    'Unauthorized' : Principal
+  };
+/**
+ * Offers the Home Screen app this browser has to another identity signed in on the
+ * same browser, which is the only party that can reach both. The handle says nothing
+ * about which app it is.
+ */
+export interface OfferNotificationAppRequest { 'anchor_number' : UserNumber }
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -2021,11 +2094,6 @@ export type PrepareNotificationAppLinkError = {
  */
 export interface PrepareNotificationAppLinkRequest {
   /**
-   * Set where the user has said the app is gone, which is the only thing that can
-   * contradict a record still claiming to deliver.
-   */
-  'replacing_existing' : boolean,
-  /**
    * The principal of the one-shot key this browser puts in the install URL.
    */
   'link_principal' : Principal,
@@ -2245,27 +2313,6 @@ export type SetDefaultAccountError = {
       'anchor_number' : UserNumber,
     }
   };
-export type SetNotificationAppEnabledError = {
-    /**
-     * This browser points at no app.
-     */
-    'NoNotificationApp' : null
-  } |
-  {
-    /**
-     * The caller signs with no key this identity is signed in from.
-     */
-    'InvalidBrowserKey' : null
-  } |
-  { 'InternalCanisterError' : string };
-/**
- * Whether this identity wants the app its browser points at to deliver for it. Never a
- * subscription removal: the subscription is the app's and is shared.
- */
-export interface SetNotificationAppEnabledRequest {
-  'enabled' : boolean,
-  'anchor_number' : UserNumber,
-}
 export type SetWebPushSubscriptionError = {
     /**
      * The caller signs with no key this identity is signed in from.
@@ -2458,34 +2505,6 @@ export type StreamingStrategy = {
 export type Sub = string;
 export type Timestamp = bigint;
 export type Token = {};
-export type TurnOnNotificationAppError = {
-    /**
-     * This browser points at no app.
-     */
-    'NoNotificationApp' : null
-  } |
-  {
-    /**
-     * The caller signs with no key this identity is signed in from.
-     */
-    'InvalidBrowserKey' : null
-  } |
-  { 'InternalCanisterError' : string } |
-  {
-    /**
-     * Nothing could be woken, so nothing was switched on: the app has registered
-     * nothing, the browser counts as gone, or there was no room for another outcall.
-     */
-    'NotReachable' : null
-  };
-/**
- * Switches delivery on for this identity and asks the app to prove it is still there,
- * in one call. A reference that is off is skipped when the canister picks who to send
- * to, so the two cannot be separated: probing first would find nothing to wake, and
- * switching on first would announce it and then say the same thing again on the probe.
- * The probe is the announcement. Where nothing can be woken the switch does not stay on.
- */
-export interface TurnOnNotificationAppRequest { 'anchor_number' : UserNumber }
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -2771,6 +2790,11 @@ export interface _SERVICE {
    */
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
+  'disable_notification_app' : ActorMethod<
+    [DisableNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : DisableNotificationAppError }
+  >,
   /**
    * SSO discovery for the sign-in initiation flow. The frontend calls
    * `discover_sso` (update) once, which starts the two-hop discovery fetch and
@@ -2880,6 +2904,14 @@ export interface _SERVICE {
     [EmailChallengeSubmitDkimLeafArg],
     { 'Ok' : null } |
       { 'Err' : EmailChallengeError }
+  >,
+  /**
+   * Called by the identity, from the browser that points at the app.
+   */
+  'enable_notification_app' : ActorMethod<
+    [EnableNotificationAppRequest],
+    { 'Ok' : NotificationId } |
+      { 'Err' : EnableNotificationAppError }
   >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
@@ -3200,7 +3232,7 @@ export interface _SERVICE {
    * does not notify, or the caller is not the app that record belongs to.
    */
   'notification_app_anchors' : ActorMethod<
-    [NotificationAppId],
+    [NotificationAppAnchorsRequest],
     BigUint64Array | bigint[]
   >,
   'notification_consent_granted' : ActorMethod<
@@ -3395,14 +3427,6 @@ export interface _SERVICE {
       { 'Err' : SetDefaultAccountError }
   >,
   /**
-   * Called by the identity, from the browser that points at the app.
-   */
-  'set_notification_app_enabled' : ActorMethod<
-    [SetNotificationAppEnabledRequest],
-    { 'Ok' : null } |
-      { 'Err' : SetNotificationAppEnabledError }
-  >,
-  /**
    * Called by the browser, or by the Home Screen app it points at: what the app
    * registers belongs to its own record, which every identity pointing at it is
    * delivered through, so the anchor named here is what authorized the call rather
@@ -3456,11 +3480,6 @@ export interface _SERVICE {
       { 'Pending' : null }
   >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
-  'turn_on_notification_app' : ActorMethod<
-    [TurnOnNotificationAppRequest],
-    { 'Ok' : NotificationId } |
-      { 'Err' : TurnOnNotificationAppError }
-  >,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],

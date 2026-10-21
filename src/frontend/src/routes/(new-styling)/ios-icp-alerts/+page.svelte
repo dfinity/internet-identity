@@ -318,15 +318,14 @@
     const replaced = await browserAppStatus(identityNumber);
     replacedLastSeen =
       replaced.kind === "app" ? replaced.app.last_seen_ns : undefined;
-    void probeApp(identityNumber);
     screen = { kind: "working" };
     try {
+      // Awaited, not fired: the canister refuses an install over a record that is still
+      // answering, and an outstanding probe is the evidence that this one is not.
+      await probeApp(identityNumber);
       // iOS bookmarks whatever the address bar holds when the page is added, and the key
       // in this one was spent by the app the user has just said is gone.
-      const url = await prepareInstallUrl({
-        identityNumber,
-        replacingExisting: true,
-      });
+      const url = await prepareInstallUrl({ identityNumber });
       if (url === undefined) {
         screen = { kind: "unlinked" };
         return;
@@ -353,12 +352,10 @@
     }
     screen = { kind: "working" };
     try {
-      // `replacing_existing`, because a record that still claims to deliver is exactly
-      // what this path has just found is gone.
-      const url = await prepareInstallUrl({
-        identityNumber,
-        replacingExisting: true,
-      });
+      // The record this browser points at may still claim to deliver, and the canister
+      // takes an unanswered probe of its own as the evidence that it does not.
+      await probeApp(identityNumber);
+      const url = await prepareInstallUrl({ identityNumber });
       if (url === undefined) {
         screen = { kind: "unlinked" };
         return;
