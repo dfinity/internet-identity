@@ -412,23 +412,26 @@ fn prepare_notification_app_link(
     }
     let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
+    let now = ic_cdk::api::time();
     // The install slot replaces the reference this entry holds, so starting one takes
-    // delivery off an app that is working. What decides that is the canister's own
-    // record of the app rather than anything the caller asserts; an app switched off or
-    // without a subscription is replaced freely.
+    // delivery off an app that is working. What decides whether it is working is what the
+    // canister stores about it, never anything the caller asserts: an app switched off or
+    // with no registration of its own is replaced freely, and so is one that was asked to
+    // prove itself, had its window, and never called.
     if let Some(NotificationAppRef::Linked {
         app_id,
         enabled: true,
     }) = anchor.notification_app(browser_id)
     {
-        let delivering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .is_some_and(|app| app.webpush_subscription.is_some());
-        if delivering {
+        let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
+            .is_some_and(|app| {
+                app.webpush_subscription.is_some() && !app.probe_went_unanswered(now)
+            });
+        if still_answering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
         }
     }
 
-    let now = ic_cdk::api::time();
     anchor.start_notification_app_link(
         browser_id,
         link_principal,
@@ -453,9 +456,7 @@ fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> Noti
     let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
         return NotificationAppStatus::NoApp;
     };
-    let now = ic_cdk::api::time();
-    let pending_probe = anchor.pending_probe(browser_id, now);
-    anchor.notification_app_status(browser_id, pending_probe, now, notifications::app::record)
+    anchor.notification_app_status(browser_id, ic_cdk::api::time(), notifications::app::record)
 }
 
 /// Switches delivery on and proves the app is there in one call, because the two cannot
@@ -488,8 +489,9 @@ fn enable_notification_app(
 
     let now_ns = ic_cdk::api::time();
     // One already on its way is asking what this call asks, and a second would reach the
-    // same device with the same thing to say.
-    let outstanding = anchor.pending_probe(browser_id, now_ns);
+    // same address with the same thing to say. The ask is the record's, so another
+    // identity pointing at this app may be the one that made it.
+    let outstanding = outstanding_probe_of(&anchor, browser_id, now_ns);
     anchor.enable_notification_app(browser_id);
     let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
@@ -561,8 +563,23 @@ fn disable_notification_app(
     })
 }
 
-/// An empty pending probe says only that the entry is no longer queued; `last_seen_ns` is
-/// what proves the app alive. A browser with a probe outstanding is given that one back.
+/// The probe still inside its window on the record this entry points at.
+///
+/// The ask is kept on the record because the answer lands there, so every identity
+/// pointing at one app shares the ask: one of them probing is the whole device probing.
+fn outstanding_probe_of(
+    anchor: &storage::anchor::Anchor,
+    browser_id: BrowserId,
+    now_ns: Timestamp,
+) -> Option<NotificationId> {
+    let app_id = anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())?;
+    notifications::app::record(app_id)?.outstanding_probe(now_ns)
+}
+
+/// Nothing says when a user deletes a web app, so the app proving itself is the only
+/// evidence. A browser whose record has a probe outstanding is given that one back.
 #[update]
 fn probe_notification_app(
     request: ProbeNotificationAppRequest,
@@ -578,7 +595,7 @@ fn probe_notification_app(
         return Err(ProbeNotificationAppError::NoNotificationApp);
     }
     let now_ns = ic_cdk::api::time();
-    if let Some(outstanding) = anchor.pending_probe(browser_id, now_ns) {
+    if let Some(outstanding) = outstanding_probe_of(&anchor, browser_id, now_ns) {
         return Ok(outstanding);
     }
 
@@ -822,7 +839,6 @@ fn browser_get_next_notification(
         notification: notifications::browser_queue::next_to_show(
             &anchor,
             browser_id,
-            key,
             ic_cdk::api::time(),
         ),
     })
@@ -847,15 +863,9 @@ fn browser_remove_notification(
         });
     }
 
-    notifications::browser_queue::remove_shown(
-        anchor,
-        browser_id,
-        key,
-        &request.notification,
-        now_ns,
-    )
-    .map(|()| RemoveNotificationResponse {})
-    .map_err(RemoveNotificationError::InternalCanisterError)
+    notifications::browser_queue::remove_shown(anchor, browser_id, &request.notification, now_ns)
+        .map(|()| RemoveNotificationResponse {})
+        .map_err(RemoveNotificationError::InternalCanisterError)
 }
 
 #[update]
@@ -1797,7 +1807,7 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let browsers = anchor.browsers_info(notifications::app::record);
+        let browsers = anchor.browsers_info(ic_cdk::api::time(), notifications::app::record);
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

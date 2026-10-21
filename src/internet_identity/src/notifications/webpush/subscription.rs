@@ -190,7 +190,6 @@ fn write_subscription(
         if let Some(queue) = anchor.notifications_mut(browser_id) {
             queue.clear();
         }
-        anchor.clear_pending_probe_if_gone(browser_id);
     }
     anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))

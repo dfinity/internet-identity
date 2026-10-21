@@ -1233,8 +1233,8 @@ pub struct NotificationAppInfo {
     pub enabled: bool,
     /// When the app last called, which is the only evidence there is that it still exists.
     pub last_seen_ns: Timestamp,
-    /// The probe this browser last sent, while it is still queued and unexpired. Empty says
-    /// only that the entry is no longer queued; `last_seen_ns` is what proves the app alive.
+    /// A probe this app has been asked and has not yet had time to answer. Empty once its
+    /// window is up, answered or not; `last_seen_ns` is what says it answered.
     pub pending_probe: Option<NotificationId>,
 }
 

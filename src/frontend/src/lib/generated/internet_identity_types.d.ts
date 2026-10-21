@@ -1641,11 +1641,9 @@ export interface NotificationAppInfo {
    */
   'enabled' : boolean,
   /**
-   * The probe this browser last sent, while it is still queued and unexpired. Empty
-   * says the entry is no longer there and nothing more: the app may have taken it, a
-   * full queue may have evicted it, or the relay post may have failed. What proves
-   * the app is alive is last_seen_ns. Queued for this browser's entry, so an app on
-   * another device cannot clear it.
+   * A probe this app has been asked and has not yet had time to answer. Null once its
+   * window is up, answered or not: what says it answered is last_seen_ns moving. Held
+   * on the app's own record, so every identity pointing at it shares one ask.
    */
   'pending_probe' : [] | [NotificationId],
   /**
