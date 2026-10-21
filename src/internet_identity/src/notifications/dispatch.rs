@@ -9,7 +9,7 @@ use crate::notifications::browser_queue::{self, Added};
 use crate::notifications::identity_backlog::PendingIdentityNotification;
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
-use crate::state::{self, storage_borrow, storage_borrow_mut};
+use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, QueuedNotification, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::Storage;
@@ -287,14 +287,16 @@ fn fan_out_to_destinations(
     now_ns: Timestamp,
     deliveries: &mut Vec<Delivery>,
 ) {
-    storage_borrow(|storage| {
-        let Ok(anchor) = storage.read(pending.anchor_number) else {
+    storage_borrow_mut(|storage| {
+        let Ok(mut anchor) = storage.read(pending.anchor_number) else {
             return;
         };
         let destinations: Vec<BrowserId> = match &pending.destination {
             Some(named) => named.clone(),
             None => anchor.browsers().iter().map(|browser| browser.id).collect(),
         };
+        let expires_at_ns = now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS);
+        let mut planned = Vec::new();
         for browser_id in destinations {
             let Some(browser) = anchor
                 .browsers()
@@ -313,22 +315,53 @@ fn fan_out_to_destinations(
             let Some((subscription, jwt, target)) = address else {
                 continue;
             };
-            deliveries.push(Delivery {
-                anchor_number: pending.anchor_number,
-                browser_id,
-                target,
-                notification: pending.queued.clone(),
-                endpoint: subscription.endpoint.clone(),
-                vapid_public_key: subscription.vapid_public_key.clone(),
-                jwt,
-                urgency: pending.urgency.clone(),
-                ttl_seconds: pending
-                    .queued
-                    .as_ref()
-                    .map_or(IDENTITY_NOTIFICATION_TTL_NS / SECOND_NS, |queued| {
-                        queued.expires_at_ns.saturating_sub(now_ns) / SECOND_NS
-                    }),
+            // Absent where the wake-up announces nothing new, which is a worker being
+            // asked to come back for what its entry already holds.
+            let queued = pending.event.clone().map(|event| QueuedNotification {
+                application_number: None,
+                // Ours, so the worker signs to us for it rather than fetching it from an app.
+                sender: crate::storage::canister_id(),
+                notification_id: pending.notification_id,
+                expires_at_ns,
+                account_number: None,
+                event: Some(event),
             });
+            planned.push((
+                browser_id,
+                queued,
+                Delivery {
+                    anchor_number: pending.anchor_number,
+                    browser_id,
+                    target,
+                    notification: None,
+                    endpoint: subscription.endpoint.clone(),
+                    vapid_public_key: subscription.vapid_public_key.clone(),
+                    jwt,
+                    urgency: pending.urgency.clone(),
+                    ttl_seconds: IDENTITY_NOTIFICATION_TTL_NS / SECOND_NS,
+                },
+            ));
+        }
+
+        let mut wrote = false;
+        for (browser_id, queued, mut delivery) in planned {
+            let Some(queued) = queued else {
+                deliveries.push(delivery);
+                continue;
+            };
+            let Some(queue) = anchor.notifications_mut(browser_id) else {
+                continue;
+            };
+            wrote = true;
+            if browser_queue::add(queue, queued.clone(), now_ns) == Added::Queued {
+                delivery.notification = Some(queued);
+                deliveries.push(delivery);
+            }
+        }
+        if wrote {
+            if let Err(err) = storage.write(anchor) {
+                ic_cdk::println!("Failed to queue what Internet Identity has to say: {err}");
+            }
         }
     });
 }
@@ -425,8 +458,6 @@ fn fan_out_to_browsers(
             if browser_queue::add(queue, queued.clone(), now_ns) == Added::Queued {
                 to_post.push(delivery);
             }
-            // A full queue makes way by dropping its oldest, which may be the probe.
-            anchor.clear_pending_probe_if_gone(browser_id);
         }
         match storage.write(anchor) {
             Ok(()) => {
@@ -457,12 +488,12 @@ pub(crate) enum IdentityNotification {
     Probe,
 }
 
-/// Queues Internet Identity's own notification for one entry and submits a wake-up for
-/// it. Silent where the entry cannot be woken or the identity's own share of the backlog
-/// is full.
+/// Submits one of Internet Identity's own wake-ups for one entry. Silent where the entry
+/// cannot be woken or the identity's own share of the backlog is full.
 ///
-/// Queued here rather than when the wake-up is posted, because the page that asked for a
-/// probe watches the entry for it and must see it the moment this answers.
+/// What the entry is given to show is written when the pass expands this, as it is for
+/// an app's notifications. A probe's own record of having been asked is written here,
+/// because that is what the caller is answered with.
 pub(crate) fn notify_identity(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
@@ -474,7 +505,7 @@ pub(crate) fn notify_identity(
         return None;
     }
     storage_borrow_mut(|storage| {
-        let mut anchor = storage.read(anchor_number).ok()?;
+        let anchor = storage.read(anchor_number).ok()?;
         let browser = anchor
             .browsers()
             .iter()
@@ -489,40 +520,28 @@ pub(crate) fn notify_identity(
             IdentityNotification::Probe => app_wake_up_address(&browser, app.as_ref()?, now_ns)?,
         };
 
-        let queued = QueuedNotification {
-            application_number: None,
-            // Ours, so the worker signs to us for it rather than fetching it from an app.
-            sender: crate::storage::canister_id(),
-            notification_id: storage.allocate_identity_notification_id(),
-            expires_at_ns: now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS),
-            account_number: None,
-            event: Some(event),
-        };
-        let notification_id = queued.notification_id;
+        let notification_id = storage.allocate_identity_notification_id();
         if !submit_identity_wake_up(
             PendingIdentityNotification {
                 anchor_number,
                 destination: Some(vec![browser_id]),
                 notification_id,
-                queued: Some(queued.clone()),
+                event: Some(event),
                 kind,
                 urgency: Urgency::Normal,
-                expires_at_ns: Some(queued.expires_at_ns),
+                expires_at_ns: Some(now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS)),
             },
             now_ns,
         ) {
             return None;
         }
 
-        let queue = anchor.notifications_mut(browser_id)?;
-        browser_queue::add(queue, queued, now_ns);
-        // A full queue drops its oldest to make way, which may be the probe this replaces.
-        anchor.clear_pending_probe_if_gone(browser_id);
-        match kind {
-            IdentityNotification::News => {}
-            IdentityNotification::Probe => anchor.set_pending_probe(browser_id, notification_id),
+        // The ask goes on the record the answer lands on, now rather than when the pass
+        // posts it: a second ask inside the window is handed this one back instead of
+        // sending another to the same address.
+        if kind == IdentityNotification::Probe {
+            storage.set_notification_app_probe(app?.id, notification_id, now_ns);
         }
-        storage.write(anchor).ok()?;
         Some(notification_id)
     })
 }
@@ -583,7 +602,7 @@ fn rewake_item(
             anchor_number,
             destination: Some(vec![browser_id]),
             notification_id: storage.allocate_identity_notification_id(),
-            queued: None,
+            event: None,
             // Wherever this entry is delivered: what it is coming back for is already on
             // the entry, and the entry is reached at its own address where it has one.
             kind: IdentityNotification::News,

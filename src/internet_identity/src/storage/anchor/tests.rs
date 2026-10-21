@@ -1341,6 +1341,7 @@ mod browser_tests {
             last_used,
             anchors: std::collections::BTreeSet::new(),
             webpush_subscription: None,
+            pending_probe: None,
         }
     }
 
@@ -1404,7 +1405,7 @@ mod browser_tests {
         anchor.start_notification_app_link(id, link_principal(1), 5_000);
 
         assert_eq!(
-            anchor.notification_app_status(id, None, 4_999, |app_id| Some(record(app_id, 2_000))),
+            anchor.notification_app_status(id, 4_999, |app_id| Some(record(app_id, 2_000))),
             NotificationAppStatus::AwaitingInstall(5_000)
         );
     }
@@ -1417,7 +1418,7 @@ mod browser_tests {
         anchor.start_notification_app_link(id, link_principal(1), 5_000);
 
         assert_eq!(
-            anchor.notification_app_status(id, None, 5_000, |app_id| Some(record(app_id, 2_000))),
+            anchor.notification_app_status(id, 5_000, |app_id| Some(record(app_id, 2_000))),
             NotificationAppStatus::NoApp
         );
     }
@@ -1664,7 +1665,7 @@ mod browser_tests {
         anchor.point_at_notification_app(id, 7);
 
         assert_eq!(
-            anchor.notification_app_status(id, None, 1_000, |app_id| Some(record(app_id, 2_000))),
+            anchor.notification_app_status(id, 1_000, |app_id| Some(record(app_id, 2_000))),
             NotificationAppStatus::Linked(NotificationAppInfo {
                 subscribed: false,
                 enabled: true,
@@ -1673,7 +1674,7 @@ mod browser_tests {
             })
         );
         assert_eq!(
-            anchor.notification_app_status(id, None, 1_000, |_| None),
+            anchor.notification_app_status(id, 1_000, |_| None),
             NotificationAppStatus::NoApp
         );
         // What is gone is the record. The reference stays, because the only thing that
@@ -1693,7 +1694,7 @@ mod browser_tests {
 
         assert_eq!(
             anchor
-                .browsers_info(|app_id| Some(record(app_id, 2_000)))
+                .browsers_info(0, |app_id| Some(record(app_id, 2_000)))
                 .expect("one browser")[0]
                 .notification_app,
             Some(NotificationAppInfo {
@@ -1704,7 +1705,7 @@ mod browser_tests {
             })
         );
         assert_eq!(
-            anchor.browsers_info(|_| None).expect("one browser")[0].notification_app,
+            anchor.browsers_info(0, |_| None).expect("one browser")[0].notification_app,
             None
         );
     }

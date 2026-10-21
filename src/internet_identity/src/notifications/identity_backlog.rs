@@ -8,9 +8,8 @@
 
 use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use super::dispatch::{self, IdentityNotification};
-use crate::storage::anchor::QueuedNotification;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, NotificationId, Timestamp, Urgency,
+    AnchorNumber, BrowserId, NotificationEvent, NotificationId, Timestamp, Urgency,
 };
 
 /// One of Internet Identity's own wake-ups, waiting for a pass to post it.
@@ -25,9 +24,10 @@ pub(crate) struct PendingIdentityNotification {
     /// already waiting. A wake-up carrying nothing new takes one of its own, which is
     /// what keeps the key uniform.
     pub(crate) notification_id: NotificationId,
-    /// What the destinations were given to show, already on their entries. Absent where
-    /// the wake-up only asks a worker to come back for what it already holds.
-    pub(crate) queued: Option<QueuedNotification>,
+    /// What the destinations are given to show, written onto their entries when the pass
+    /// expands this. Absent where the wake-up announces nothing new, which is a worker
+    /// being asked to come back for what its entry already holds.
+    pub(crate) event: Option<NotificationEvent>,
     /// Decides the address each entry is reached at when a pass expands this.
     pub(crate) kind: IdentityNotification,
     pub(crate) urgency: Urgency,
