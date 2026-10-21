@@ -483,8 +483,8 @@ fn link_notification_app(
     })
 }
 
-/// Matches `CLAIM_TOKEN_LIFETIME_MS` in the frontend. Bounding a claimed expiry from above
-/// keeps a token signed by a since-retired browser key worthless years later.
+/// Thirty minutes. Bounding a claimed expiry from above keeps a signature made by a
+/// since-retired browser key worthless years later. The frontend asks for less.
 const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 
 fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
@@ -526,32 +526,38 @@ mod claim_token_expiry {
     }
 }
 
-/// Points this browser at the app another identity on it offered.
-/// Authorized twice: the caller is a browser of the claiming identity, and the token is
-/// signed by a browser of the offering one. Spending it twice changes nothing the second time.
+/// Points a browser of `anchor_number` at the Home Screen app that
+/// `offering_anchor_number` already has on the same device.
+///
+/// Authorized twice over: the caller must be a browser of the identity being added, and
+/// `request.signature` must be one a browser of the offering identity made over both
+/// anchor numbers and the expiry. Nothing is stored between the two halves, and spending
+/// the same signature twice changes nothing.
 #[update]
 fn claim_notification_app(
     request: ClaimNotificationAppRequest,
 ) -> Result<(), ClaimNotificationAppError> {
+    let ClaimNotificationAppRequest {
+        anchor_number,
+        offering_anchor_number,
+        expires_at_ns,
+        signature,
+    } = request;
     if !notifications::notifications_enabled() {
         return Err(ClaimNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     let now = ic_cdk::api::time();
-    if !claim_token_expiry_in_range(request.expires_at_ns, now) {
+    if !claim_token_expiry_in_range(expires_at_ns, now) {
         return Err(ClaimNotificationAppError::ClaimTokenExpired);
     }
-    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
 
-    let offering_anchor = state::anchor(request.offering_anchor_number);
+    let offering_anchor = state::anchor(offering_anchor_number);
     let offering_browser = offering_anchor
-        .browser_that_signed_claim(
-            &request.signature,
-            request.anchor_number,
-            request.expires_at_ns,
-        )
+        .browser_that_signed_claim(&signature, anchor_number, expires_at_ns)
         .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
     // Taken from the offering browser's own reference, so the claiming identity is never
     // told which record it reached.
