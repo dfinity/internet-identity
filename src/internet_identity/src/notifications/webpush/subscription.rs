@@ -4,7 +4,7 @@
 use super::validation::{
     ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
-use crate::authz_utils::NotificationCaller;
+use crate::authz_utils::NotificationAuthorization;
 use crate::notifications::app::NotificationApp;
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -20,13 +20,13 @@ use internet_identity_interface::internet_identity::types::{
 pub fn set_subscription(
     anchor: Anchor,
     browser_id: BrowserId,
-    caller: NotificationCaller,
+    authorization: NotificationAuthorization,
     request: ValidatedSetWebPushSubscriptionRequest,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
-    if let NotificationCaller::App(app) = caller {
+    if let NotificationAuthorization::App(app) = authorization {
         return set_app_subscription(*app, request, now_ns);
     }
 
@@ -115,17 +115,24 @@ pub(crate) fn clear_gone_subscription(
 pub fn subscription_status(
     anchor: &Anchor,
     browser_id: BrowserId,
-    caller: NotificationCaller,
+    authorization: NotificationAuthorization,
 ) -> Option<WebPushSubscriptionStatus> {
-    let registered = match caller {
-        NotificationCaller::App(app) => app.webpush_subscription,
-        NotificationCaller::Browser => anchor.webpush_subscription(browser_id).cloned(),
+    let subscription = match authorization {
+        NotificationAuthorization::App(app) => app.webpush_subscription,
+        NotificationAuthorization::Browser => anchor.webpush_subscription(browser_id).cloned(),
     };
-    registered.map(|registered| WebPushSubscriptionStatus {
-        endpoint: registered.endpoint.clone(),
-        pool_len: registered.jwt_signatures.len() as u32,
-        issued_at_ns: registered.jwt_issued_at_ns,
-    })
+    subscription.map(
+        |WebPushSubscription {
+             endpoint,
+             jwt_signatures,
+             jwt_issued_at_ns,
+             ..
+         }| WebPushSubscriptionStatus {
+            endpoint,
+            pool_len: jwt_signatures.len() as u32,
+            issued_at_ns: jwt_issued_at_ns,
+        },
+    )
 }
 
 fn write_subscription(
@@ -151,20 +158,38 @@ fn set_app_subscription(
         jwt_issued_at_ns,
         ..
     } = request;
+    let NotificationApp {
+        id: app_id,
+        webpush_subscription: registered,
+        ..
+    } = app;
 
-    let (created_at_ns, notifications) = match app.webpush_subscription.as_ref() {
-        Some(registered) if registered.endpoint == endpoint => {
-            if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
+    let (created_at_ns, notifications) = match registered {
+        // A pool that is running out is replaced at the same address, so the registration
+        // keeps its age and whatever is queued against it, and the new pool has to be
+        // newer: one signature covers one elapsed window.
+        Some(WebPushSubscription {
+            endpoint: registered_endpoint,
+            created_at_ns: registered_created_at_ns,
+            jwt_issued_at_ns: registered_jwt_issued_at_ns,
+            notifications: registered_notifications,
+            ..
+        }) if registered_endpoint == endpoint => {
+            if jwt_issued_at_ns <= registered_jwt_issued_at_ns {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            (registered.created_at_ns, registered.notifications.clone())
+            (registered_created_at_ns, registered_notifications)
         }
-        _ => (now_ns, Vec::new()),
+        // Another address is another registration: nothing queued for the one it leaves
+        // can be delivered to the one it arrives at.
+        Some(_) => (now_ns, Vec::new()),
+        // Never registered.
+        None => (now_ns, Vec::new()),
     };
 
-    let stored = state::storage_borrow_mut(|storage| {
+    state::storage_borrow_mut(|storage| {
         storage.set_notification_app_subscription(
-            app.id,
+            app_id,
             Some(WebPushSubscription {
                 endpoint,
                 created_at_ns,
@@ -176,12 +201,8 @@ fn set_app_subscription(
             }),
             now_ns,
         )
-    });
-    if !stored {
-        return Err(SetWebPushSubscriptionError::InternalCanisterError(
-            "no notification app record".to_string(),
-        ));
-    }
+    })
+    .map_err(|err| SetWebPushSubscriptionError::InternalCanisterError(format!("{err}")))?;
     Ok(())
 }
 
@@ -202,7 +223,7 @@ mod tests {
         subscription_status(
             &anchor(anchor_number),
             browser_id,
-            NotificationCaller::Browser,
+            NotificationAuthorization::Browser,
         )
     }
 
@@ -458,7 +479,7 @@ mod tests {
         let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
 
         try_subscribe_as(
-            app_caller(app_id),
+            app_authorization(app_id),
             anchor_number,
             browsers[0],
             ENDPOINT,
@@ -472,7 +493,11 @@ mod tests {
         );
         assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
         assert_eq!(
-            subscription_status(&anchor(anchor_number), browsers[0], app_caller(app_id)),
+            subscription_status(
+                &anchor(anchor_number),
+                browsers[0],
+                app_authorization(app_id)
+            ),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
                 pool_len: 3,
@@ -489,7 +514,7 @@ mod tests {
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
         try_subscribe_as(
-            app_caller(app_id),
+            app_authorization(app_id),
             anchor_number,
             browsers[0],
             ENDPOINT,
@@ -500,7 +525,7 @@ mod tests {
         for stale in [4_999, 5_000] {
             assert_eq!(
                 try_subscribe_as(
-                    app_caller(app_id),
+                    app_authorization(app_id),
                     anchor_number,
                     browsers[0],
                     ENDPOINT,
@@ -522,7 +547,7 @@ mod tests {
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
         try_subscribe_as(
-            app_caller(app_id),
+            app_authorization(app_id),
             anchor_number,
             browsers[0],
             ENDPOINT,
@@ -531,7 +556,7 @@ mod tests {
         .expect("an app registers its subscription");
 
         try_subscribe_as(
-            app_caller(app_id),
+            app_authorization(app_id),
             anchor_number,
             browsers[0],
             ROTATED,
@@ -554,7 +579,7 @@ mod tests {
         subscribe(second, second_browsers[0], ROTATED, 1_000);
 
         try_subscribe_as(
-            app_caller(app_id),
+            app_authorization(app_id),
             first,
             first_browsers[0],
             ENDPOINT,
@@ -564,8 +589,12 @@ mod tests {
 
         for (anchor_number, browsers) in [(first, &first_browsers), (second, &second_browsers)] {
             assert_eq!(
-                subscription_status(&anchor(anchor_number), browsers[0], app_caller(app_id))
-                    .map(|s| s.endpoint),
+                subscription_status(
+                    &anchor(anchor_number),
+                    browsers[0],
+                    app_authorization(app_id)
+                )
+                .map(|s| s.endpoint),
                 Some(ENDPOINT.to_string()),
                 "every identity pointing at the app reads its one registration"
             );

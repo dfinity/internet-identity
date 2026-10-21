@@ -7774,8 +7774,8 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
         .ensure_notification_app(Principal::self_authenticating(vec![7u8; 91]), None, 1_000)
         .expect("creating the record");
 
-    assert!(
-        storage.set_notification_app_subscription(
+    storage
+        .set_notification_app_subscription(
             app.id,
             Some(WebPushSubscription {
                 endpoint: "https://web.push.apple.com/one".to_string(),
@@ -7787,9 +7787,8 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
                 woken_again_at_ns: None,
             }),
             2_000,
-        ),
-        "the record is there, so the registration is stored"
-    );
+        )
+        .expect("the record is there, so the registration is stored");
 
     let stored = storage.notification_app(app.id).expect("the record");
     assert_eq!(
@@ -7814,7 +7813,10 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
         .expect("creating the record");
     let gone = app.id + 1;
 
-    assert!(!storage.set_notification_app_subscription(gone, None, 2_000));
+    assert!(matches!(
+        storage.set_notification_app_subscription(gone, None, 2_000),
+        Err(StorageError::NotificationAppNotFound { app_id }) if app_id == gone
+    ));
     assert_eq!(storage.notification_app(gone), None);
     // The record that is there is left alone by a write naming another.
     assert_eq!(

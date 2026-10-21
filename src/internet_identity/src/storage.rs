@@ -1539,23 +1539,24 @@ impl<M: Memory + Clone> Storage<M> {
     /// `Anchor::set_notification_app_enabled`, never by clearing this: the subscription
     /// belongs to the app and every other identity delivers through it.
     ///
-    /// False where `app_id` names no record, so a caller never reports a registration
+    /// Errors where `app_id` names no record, so a caller never reports a registration
     /// that was dropped.
     pub fn set_notification_app_subscription(
         &mut self,
         app_id: NotificationAppId,
         subscription: Option<WebPushSubscription>,
         now: Timestamp,
-    ) -> bool {
-        let Some(stored) = self.notification_app_memory.get(&app_id) else {
-            return false;
-        };
+    ) -> Result<(), StorageError> {
+        let stored = self
+            .notification_app_memory
+            .get(&app_id)
+            .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         let mut app = NotificationApp::from(stored);
         app.webpush_subscription = subscription;
         app.last_used = now;
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
-        true
+        Ok(())
     }
 
     /// The record `app_id` names, if it is still there.
@@ -4918,6 +4919,11 @@ pub enum StorageError {
     /// identity.
     SessionIdOverflow,
     ErrorUpdatingSessionIdAllocator,
+    /// No record under the id a write named. Its ids are never reissued, so a record
+    /// that is gone is gone for good.
+    NotificationAppNotFound {
+        app_id: NotificationAppId,
+    },
     /// Refused rather than saturated, so an id is never reissued.
     NotificationAppIdOverflow,
     ErrorUpdatingNotificationAppIdAllocator,
@@ -5040,6 +5046,9 @@ impl fmt::Display for StorageError {
             Self::SessionIdOverflow => write!(f, "No session ids left to allocate"),
             Self::ErrorUpdatingSessionIdAllocator => {
                 write!(f, "Error updating the session id allocator")
+            }
+            Self::NotificationAppNotFound { app_id } => {
+                write!(f, "no notification app record {app_id}")
             }
             Self::NotificationAppIdOverflow => {
                 write!(f, "No notification app ids left to allocate")

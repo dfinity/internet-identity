@@ -347,13 +347,14 @@ fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
 ) -> Result<(), SetWebPushSubscriptionError> {
     let validated: ValidatedSetWebPushSubscriptionRequest = request.try_into()?;
-    let (anchor, browser_id, caller) = check_notification_authorization(validated.anchor_number)
-        .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
+    let (anchor, browser_id, authorization) =
+        check_notification_authorization(validated.anchor_number)
+            .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
     notifications::webpush::set_subscription(
         anchor,
         browser_id,
-        caller,
+        authorization,
         validated,
         ic_cdk::api::time(),
     )
@@ -368,13 +369,13 @@ fn get_webpush_subscription_status(
     let Ok(validated) = ValidatedGetWebPushSubscriptionStatusRequest::try_from(request) else {
         return None;
     };
-    let Ok((anchor, browser_id, caller)) =
+    let Ok((anchor, browser_id, authorization)) =
         check_notification_authorization(validated.anchor_number)
     else {
         return None;
     };
 
-    notifications::webpush::subscription_status(&anchor, browser_id, caller)
+    notifications::webpush::subscription_status(&anchor, browser_id, authorization)
 }
 
 /// Authorized by the identity rather than by the browser, so a browser that is lost or
@@ -573,12 +574,16 @@ fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> Noti
 fn set_notification_app_enabled(
     request: SetNotificationAppEnabledRequest,
 ) -> Result<(), SetNotificationAppEnabledError> {
+    let SetNotificationAppEnabledRequest {
+        anchor_number,
+        enabled,
+    } = request;
     if !notifications::notifications_enabled() {
         return Err(SetNotificationAppEnabledError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
-    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| SetNotificationAppEnabledError::InvalidBrowserKey)?;
     // An install nobody has opened is not an app to switch: the flag lives on the
     // reference the app writes, so flipping it here would answer Ok and change nothing.
@@ -590,7 +595,7 @@ fn set_notification_app_enabled(
         return Err(SetNotificationAppEnabledError::NoNotificationApp);
     }
 
-    anchor.set_notification_app_enabled(browser_id, request.enabled);
+    anchor.set_notification_app_enabled(browser_id, enabled);
     state::storage_borrow_mut(|storage| {
         storage.write(anchor).map_err(|err| {
             SetNotificationAppEnabledError::InternalCanisterError(format!("{err:?}"))

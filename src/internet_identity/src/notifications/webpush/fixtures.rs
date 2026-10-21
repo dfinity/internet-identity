@@ -1,7 +1,7 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
 use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
-use crate::authz_utils::NotificationCaller;
+use crate::authz_utils::NotificationAuthorization;
 use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
@@ -105,7 +105,7 @@ pub(super) fn try_subscribe(
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     try_subscribe_as(
-        NotificationCaller::Browser,
+        NotificationAuthorization::Browser,
         anchor_number,
         browser_id,
         endpoint,
@@ -113,9 +113,9 @@ pub(super) fn try_subscribe(
     )
 }
 
-/// As [`try_subscribe`], for a caller that may be the Home Screen app.
+/// As [`try_subscribe`], for a call that may authorize as the Home Screen app.
 pub(super) fn try_subscribe_as(
-    caller: NotificationCaller,
+    authorization: NotificationAuthorization,
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     endpoint: &str,
@@ -124,7 +124,7 @@ pub(super) fn try_subscribe_as(
     super::set_subscription(
         anchor(anchor_number),
         browser_id,
-        caller,
+        authorization,
         validated(anchor_number, endpoint, now_ns),
         now_ns,
     )
@@ -163,9 +163,9 @@ pub(super) fn app(app_id: NotificationAppId) -> NotificationApp {
     storage_borrow(|storage| storage.notification_app(app_id)).expect("reading the app record")
 }
 
-/// The caller an app's own call arrives as.
-pub(super) fn app_caller(app_id: NotificationAppId) -> NotificationCaller {
-    NotificationCaller::App(Box::new(app(app_id)))
+/// What an app's own call authorizes as.
+pub(super) fn app_authorization(app_id: NotificationAppId) -> NotificationAuthorization {
+    NotificationAuthorization::App(Box::new(app(app_id)))
 }
 
 pub(crate) fn subscribe(
