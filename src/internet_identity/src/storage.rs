@@ -1552,19 +1552,25 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// Stores what the app has registered for Web Push, and stamps its liveness. The only
-    /// writer is the app itself; a browser turns its own delivery off through
-    /// `Anchor::set_notification_app_enabled`, never by clearing this. False where
-    /// `app_id` names no record.
+    /// Stores what the app has registered for Web Push, and stamps its liveness.
+    ///
+    /// The only writer is the app itself. A browser pointing at it turns its own
+    /// delivery off by clearing the `enabled` flag on its reference, through
+    /// `Anchor::set_notification_app_enabled`, never by clearing this: the subscription
+    /// belongs to the app and every other identity delivers through it.
+    ///
+    /// Errors where `app_id` names no record, so a caller never reports a registration
+    /// that was dropped.
     pub fn set_notification_app_subscription(
         &mut self,
         app_id: NotificationAppId,
         subscription: Option<WebPushSubscription>,
         now: Timestamp,
-    ) -> bool {
-        let Some(stored) = self.notification_app_memory.get(&app_id) else {
-            return false;
-        };
+    ) -> Result<(), StorageError> {
+        let stored = self
+            .notification_app_memory
+            .get(&app_id)
+            .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         let mut app = NotificationApp::from(stored);
         let endpoint_kept =
             keeps_endpoint(app.webpush_subscription.as_ref(), subscription.as_ref());
@@ -1575,7 +1581,7 @@ impl<M: Memory + Clone> Storage<M> {
         if !endpoint_kept {
             self.clear_queues_routed_through(app_id);
         }
-        true
+        Ok(())
     }
 
     /// Drops what every browser routing through `app_id` had waiting, and its re-wake stamp.
@@ -5102,6 +5108,11 @@ pub enum StorageError {
     /// identity.
     SessionIdOverflow,
     ErrorUpdatingSessionIdAllocator,
+    /// No record under the id a write named. Its ids are never reissued, so a record
+    /// that is gone is gone for good.
+    NotificationAppNotFound {
+        app_id: NotificationAppId,
+    },
     /// Refused rather than saturated, so an id is never reissued.
     NotificationAppIdOverflow,
     ErrorUpdatingNotificationAppIdAllocator,
@@ -5224,6 +5235,9 @@ impl fmt::Display for StorageError {
             Self::SessionIdOverflow => write!(f, "No session ids left to allocate"),
             Self::ErrorUpdatingSessionIdAllocator => {
                 write!(f, "Error updating the session id allocator")
+            }
+            Self::NotificationAppNotFound { app_id } => {
+                write!(f, "no notification app record {app_id}")
             }
             Self::NotificationAppIdOverflow => {
                 write!(f, "No notification app ids left to allocate")

@@ -158,11 +158,19 @@ fn claim_token_message(
     claiming_anchor_number: u64,
     expires_at_ns: u64,
 ) -> Vec<u8> {
-    let mut message = Vec::with_capacity(NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN.len() + 24);
+    let offering = offering_anchor_number.to_be_bytes();
+    let claiming = claiming_anchor_number.to_be_bytes();
+    let expires = expires_at_ns.to_be_bytes();
+    let mut message = Vec::with_capacity(
+        NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN.len()
+            + offering.len()
+            + claiming.len()
+            + expires.len(),
+    );
     message.extend_from_slice(NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN);
-    message.extend_from_slice(&offering_anchor_number.to_be_bytes());
-    message.extend_from_slice(&claiming_anchor_number.to_be_bytes());
-    message.extend_from_slice(&expires_at_ns.to_be_bytes());
+    message.extend_from_slice(&offering);
+    message.extend_from_slice(&claiming);
+    message.extend_from_slice(&expires);
     message
 }
 

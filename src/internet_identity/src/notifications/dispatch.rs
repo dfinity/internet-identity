@@ -848,17 +848,19 @@ mod tests {
         let app = app_for_key(app_key(seed), 0);
         storage_borrow_mut(|storage| {
             if let Some(endpoint) = endpoint {
-                storage.set_notification_app_subscription(
-                    app.id,
-                    Some(WebPushSubscription {
-                        endpoint: endpoint.to_string(),
-                        created_at_ns: 0,
-                        vapid_public_key: valid_vapid_key(),
-                        jwt_signatures: vec![vec![3u8; 64]],
-                        jwt_issued_at_ns: 0,
-                    }),
-                    0,
-                );
+                storage
+                    .set_notification_app_subscription(
+                        app.id,
+                        Some(WebPushSubscription {
+                            endpoint: endpoint.to_string(),
+                            created_at_ns: 0,
+                            vapid_public_key: valid_vapid_key(),
+                            jwt_signatures: vec![vec![3u8; 64]],
+                            jwt_issued_at_ns: 0,
+                        }),
+                        0,
+                    )
+                    .expect("the record is there");
             }
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
             stored.point_at_notification_app(browser_id, app.id, true);

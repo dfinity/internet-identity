@@ -3,7 +3,7 @@
 //! one it shows on every wake-up, so wake-ups and shown notifications stay one to one.
 //! The queue lives on the browser's entry, and is cleared when its wake-up address changes.
 
-use crate::authz_utils::NotificationCaller;
+use crate::authz_utils::NotificationAuthorization;
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, QueuedNotification};
@@ -143,12 +143,12 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
 fn probe_only_the_app_may_answer(
     anchor: &Anchor,
     browser_id: BrowserId,
-    caller: &NotificationCaller,
+    authorization: &NotificationAuthorization,
     now_ns: Timestamp,
 ) -> Option<NotificationId> {
-    match caller {
-        NotificationCaller::App(_) => None,
-        NotificationCaller::Browser => anchor.pending_probe(browser_id, now_ns),
+    match authorization {
+        NotificationAuthorization::App(_) => None,
+        NotificationAuthorization::Browser => anchor.pending_probe(browser_id, now_ns),
     }
 }
 
@@ -162,11 +162,11 @@ fn is_the_probe(queued: &QueuedNotification, probe: Option<NotificationId>) -> b
 pub(crate) fn next_to_show(
     anchor: &Anchor,
     browser_id: BrowserId,
-    caller: &NotificationCaller,
+    authorization: &NotificationAuthorization,
     now_ns: Timestamp,
 ) -> Option<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
-    let probe = probe_only_the_app_may_answer(anchor, browser_id, caller, now_ns);
+    let probe = probe_only_the_app_may_answer(anchor, browser_id, authorization, now_ns);
     storage_borrow(|storage| {
         anchor
             .notifications(browser_id)
@@ -205,11 +205,11 @@ pub(crate) fn next_to_show(
 pub(crate) fn remove_shown(
     mut anchor: Anchor,
     browser_id: BrowserId,
-    caller: &NotificationCaller,
+    authorization: &NotificationAuthorization,
     shown: &NotificationToShow,
     now_ns: Timestamp,
 ) -> Result<(), String> {
-    let probe = probe_only_the_app_may_answer(&anchor, browser_id, caller, now_ns);
+    let probe = probe_only_the_app_may_answer(&anchor, browser_id, authorization, now_ns);
     storage_borrow_mut(|storage| {
         // Every part of what identifies an entry, origin included: a sender may queue
         // the same id for two applications, and one that is expired or belongs to
@@ -372,8 +372,8 @@ mod tests {
     }
 
     /// What the Home Screen app signing as `app_id` reads and acknowledges.
-    fn as_app(app_id: NotificationAppId) -> NotificationCaller {
-        NotificationCaller::App(Box::new(
+    fn as_app(app_id: NotificationAppId) -> NotificationAuthorization {
+        NotificationAuthorization::App(Box::new(
             storage_borrow(|storage| storage.notification_app(app_id)).expect("a stored app"),
         ))
     }
@@ -381,10 +381,10 @@ mod tests {
     fn next_as(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
-        caller: &NotificationCaller,
+        authorization: &NotificationAuthorization,
         now_ns: Timestamp,
     ) -> Option<NotificationToShow> {
-        next_to_show(&anchor(anchor_number), browser_id, caller, now_ns)
+        next_to_show(&anchor(anchor_number), browser_id, authorization, now_ns)
     }
 
     fn next(
@@ -395,7 +395,7 @@ mod tests {
         next_as(
             anchor_number,
             browser_id,
-            &NotificationCaller::Browser,
+            &NotificationAuthorization::Browser,
             now_ns,
         )
     }
@@ -411,14 +411,14 @@ mod tests {
     fn remove_as(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
-        caller: &NotificationCaller,
+        authorization: &NotificationAuthorization,
         notification: &NotificationToShow,
         now_ns: Timestamp,
     ) {
         remove_shown(
             anchor(anchor_number),
             browser_id,
-            caller,
+            authorization,
             notification,
             now_ns,
         )
@@ -434,7 +434,7 @@ mod tests {
         remove_as(
             anchor_number,
             browser_id,
-            &NotificationCaller::Browser,
+            &NotificationAuthorization::Browser,
             notification,
             now_ns,
         );
@@ -465,17 +465,19 @@ mod tests {
         // Outside the borrow below: it takes one of its own.
         let app = app_for_key(app_key(9), 0);
         let app_id = storage_borrow_mut(|storage| {
-            storage.set_notification_app_subscription(
-                app.id,
-                Some(WebPushSubscription {
-                    endpoint: APP_RELAY.to_string(),
-                    created_at_ns: 0,
-                    vapid_public_key: vec![1; 65],
-                    jwt_signatures: vec![vec![2; 64]],
-                    jwt_issued_at_ns: 0,
-                }),
-                0,
-            );
+            storage
+                .set_notification_app_subscription(
+                    app.id,
+                    Some(WebPushSubscription {
+                        endpoint: APP_RELAY.to_string(),
+                        created_at_ns: 0,
+                        vapid_public_key: vec![1; 65],
+                        jwt_signatures: vec![vec![2; 64]],
+                        jwt_issued_at_ns: 0,
+                    }),
+                    0,
+                )
+                .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
             stored.point_at_notification_app(browser_id, app.id, true);
             storage.write(stored).expect("pointing at the app");
@@ -550,17 +552,19 @@ mod tests {
         // Outside the borrow below: it takes one of its own.
         let app = app_for_key(ByteBuf::from(vec![8u8; 91]), 0);
         let moved_to = storage_borrow_mut(|storage| {
-            storage.set_notification_app_subscription(
-                app.id,
-                Some(WebPushSubscription {
-                    endpoint: "https://web.push.apple.com/second".to_string(),
-                    created_at_ns: 0,
-                    vapid_public_key: vec![1; 65],
-                    jwt_signatures: vec![vec![2; 64]],
-                    jwt_issued_at_ns: 0,
-                }),
-                0,
-            );
+            storage
+                .set_notification_app_subscription(
+                    app.id,
+                    Some(WebPushSubscription {
+                        endpoint: "https://web.push.apple.com/second".to_string(),
+                        created_at_ns: 0,
+                        vapid_public_key: vec![1; 65],
+                        jwt_signatures: vec![vec![2; 64]],
+                        jwt_issued_at_ns: 0,
+                    }),
+                    0,
+                )
+                .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
             stored.point_at_notification_app(browser_id, app.id, true);
             storage.write(stored).expect("pointing at the second app");
@@ -761,7 +765,7 @@ mod tests {
         remove_as(
             anchor_number,
             browser_id,
-            &NotificationCaller::Browser,
+            &NotificationAuthorization::Browser,
             &shown,
             2 * SECOND_NS,
         );
