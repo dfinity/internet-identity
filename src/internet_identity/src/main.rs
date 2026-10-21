@@ -403,6 +403,11 @@ const PENDING_LINK_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 fn prepare_notification_app_link(
     request: PrepareNotificationAppLinkRequest,
 ) -> Result<(), PrepareNotificationAppLinkError> {
+    let PrepareNotificationAppLinkRequest {
+        anchor_number,
+        link_principal,
+        replacing_existing,
+    } = request;
     if !notifications::notifications_enabled() {
         return Err(PrepareNotificationAppLinkError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
@@ -411,10 +416,10 @@ fn prepare_notification_app_link(
     // The whole authority of an install URL is the key behind this principal, and the
     // anonymous principal is held by everyone, so an install offered to it is one
     // anybody could complete.
-    if request.link_principal == Principal::anonymous() {
+    if link_principal == Principal::anonymous() {
         return Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous);
     }
-    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
     // The install slot replaces the reference this entry holds, so starting one takes
     // delivery off an app that is working. Only the user can see their own Home Screen,
@@ -426,10 +431,8 @@ fn prepare_notification_app_link(
             app_id,
             enabled: true,
         }),
-    ) = (
-        request.replacing_existing,
-        anchor.notification_app(browser_id),
-    ) {
+    ) = (replacing_existing, anchor.notification_app(browser_id))
+    {
         let delivering = state::storage_borrow(|storage| storage.notification_app(app_id))
             .is_some_and(|app| app.webpush_subscription.is_some());
         if delivering {
@@ -440,7 +443,7 @@ fn prepare_notification_app_link(
     let now = ic_cdk::api::time();
     anchor.start_notification_app_link(
         browser_id,
-        request.link_principal,
+        link_principal,
         now.saturating_add(PENDING_LINK_LIFETIME_NS),
     );
 
@@ -471,6 +474,11 @@ fn notification_app_anchors(app_id: NotificationAppId) -> Vec<AnchorNumber> {
 fn link_notification_app(
     request: LinkNotificationAppRequest,
 ) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
+    let LinkNotificationAppRequest {
+        anchor_number,
+        app_principal,
+        app_id,
+    } = request;
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
@@ -478,20 +486,20 @@ fn link_notification_app(
     }
     // The record is keyed by this principal, and the anonymous one is held by everyone,
     // so a record keyed by it is one any caller at all would resolve to.
-    if request.app_principal == Principal::anonymous() {
+    if app_principal == Principal::anonymous() {
         return Err(LinkNotificationAppError::AppPrincipalIsAnonymous);
     }
     let now = ic_cdk::api::time();
-    let mut anchor = state::anchor(request.anchor_number);
+    let mut anchor = state::anchor(anchor_number);
     let installing_browser = anchor
         .browser_awaiting_link(caller(), now)
         .ok_or(LinkNotificationAppError::NoPendingLink)?;
-    if anchor.browser_signs_as(request.app_principal) {
+    if anchor.browser_signs_as(app_principal) {
         return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app(request.app_principal, request.app_id, now)
+        storage.ensure_notification_app(app_principal, app_id, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id, true);
@@ -510,8 +518,8 @@ fn link_notification_app(
     })
 }
 
-/// Matches `CLAIM_TOKEN_LIFETIME_MS` in the frontend. Bounding a claimed expiry from above
-/// keeps a token signed by a since-retired browser key worthless years later.
+/// Thirty minutes. Bounding a claimed expiry from above keeps a signature made by a
+/// since-retired browser key worthless years later. The frontend asks for less.
 const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 
 fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
@@ -603,32 +611,38 @@ fn set_notification_app_enabled(
     })
 }
 
-/// Points this browser at the app another identity on it offered.
-/// Authorized twice: the caller is a browser of the claiming identity, and the token is
-/// signed by a browser of the offering one. Spending it twice changes nothing the second time.
+/// Points a browser of `anchor_number` at the Home Screen app that
+/// `offering_anchor_number` already has on the same device.
+///
+/// Authorized twice over: the caller must be a browser of the identity being added, and
+/// `request.signature` must be one a browser of the offering identity made over both
+/// anchor numbers and the expiry. Nothing is stored between the two halves, and spending
+/// the same signature twice changes nothing.
 #[update]
 fn claim_notification_app(
     request: ClaimNotificationAppRequest,
 ) -> Result<(), ClaimNotificationAppError> {
+    let ClaimNotificationAppRequest {
+        anchor_number,
+        offering_anchor_number,
+        expires_at_ns,
+        signature,
+    } = request;
     if !notifications::notifications_enabled() {
         return Err(ClaimNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
         ));
     }
     let now = ic_cdk::api::time();
-    if !claim_token_expiry_in_range(request.expires_at_ns, now) {
+    if !claim_token_expiry_in_range(expires_at_ns, now) {
         return Err(ClaimNotificationAppError::ClaimTokenExpired);
     }
-    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
 
-    let offering_anchor = state::anchor(request.offering_anchor_number);
+    let offering_anchor = state::anchor(offering_anchor_number);
     let offering_browser = offering_anchor
-        .browser_that_signed_claim(
-            &request.signature,
-            request.anchor_number,
-            request.expires_at_ns,
-        )
+        .browser_that_signed_claim(&signature, anchor_number, expires_at_ns)
         .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
     // Taken from the offering browser's own reference, so the claiming identity is never
     // told which record it reached.
