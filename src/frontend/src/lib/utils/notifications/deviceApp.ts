@@ -80,6 +80,24 @@ const claimFrom = async (
  *  install on it sends a user who already has the app through a second install. */
 export type ClaimOutcome = "claimed" | "no-donor" | "indeterminate";
 
+/** Whether another identity signed in here has an app a claim could take over, which is
+ *  the same list the claim walks without writing anything.
+ *
+ *  `undefined` where the store would not open: nothing was asked, so nothing was learned,
+ *  and that is not an answer that this device has no app. */
+export const deviceHasDonorIdentity = async (
+  identityNumber: bigint,
+): Promise<boolean | undefined> => {
+  try {
+    return (await registeredIdentityNumbers()).some(
+      (other) => other !== identityNumber,
+    );
+  } catch (error) {
+    console.error(error);
+    return undefined;
+  }
+};
+
 /** One call per candidate and no more: asking the same one again would get the same answer. */
 export const claimDeviceApp = async (
   identityNumber: bigint,

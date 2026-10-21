@@ -1,9 +1,9 @@
 import { POLL_INTERVAL_MS } from "$lib/constants/polling.constants";
 import {
   browserAppStatus,
-  turnOnApp,
+  enableApp,
 } from "$lib/utils/notifications/appStatus";
-import { setAppEnabled } from "./appEnabled";
+import { disableApp } from "./appEnabled";
 import { watchProbe } from "../../../routes/(new-styling)/ios-icp-alerts/watchInstall";
 
 /** Two polls. Nothing tells a canister that a Home Screen app was deleted, so the only
@@ -36,7 +36,7 @@ export const turnOnAndProve = async (
   }
   const since = before.app.last_seen_ns;
 
-  const probe = await turnOnApp(identityNumber);
+  const probe = await enableApp(identityNumber);
   switch (probe.kind) {
     case "no-app":
       return false;
@@ -64,7 +64,7 @@ export const turnOnAndProve = async (
   });
 
   if (!answered) {
-    await setAppEnabled({ identityNumber, enabled: false });
+    await disableApp(identityNumber);
   }
   return answered;
 };

@@ -12,8 +12,7 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
-import { claimDeviceApp, type ClaimOutcome } from "./deviceApp";
-import { setAppEnabled } from "./appEnabled";
+import { claimDeviceApp } from "./deviceApp";
 import { clearNotificationsOff } from "./turnedOff";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
 import { turnOnAndProve } from "./turnOnAndProve";
@@ -43,14 +42,12 @@ export const turnOnNotifications = async ({
   actor,
   device,
   consented,
-  justClaimed = false,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
   /** Whether the resolution pointed this browser at the device's app. That is evidence
    *  the app is there, so this press has nothing left to prove. */
-  justClaimed?: boolean;
   /** This browser as the opt-in resolved it, which is what each step reads to know
    *  whether it has anything to do. */
   device: DeviceNotificationState;
@@ -63,7 +60,6 @@ export const turnOnNotifications = async ({
       origin,
       actor,
       consented,
-      justClaimed,
     });
   }
 
@@ -96,16 +92,16 @@ const turnOnInApp = async ({
   origin,
   actor,
   consented,
-  justClaimed,
 }: GrantArgs & {
   consented: boolean;
-  justClaimed: boolean;
 }): Promise<EnableNotificationsResult> => {
   let status = await browserAppStatus(identityNumber);
-  let claim: ClaimOutcome = "no-donor";
   if (status.kind === "no-app") {
-    // The claim is written before its reply arrives, so a lost reply must not deny an app this browser already points at.
-    claim = await claimDeviceApp(identityNumber);
+    // The press is what takes the device's app over: the resolution that put this
+    // question on screen only asked whether there was one to take. The claim is written
+    // before its reply arrives, so a lost reply must not deny an app this browser
+    // already points at.
+    await claimDeviceApp(identityNumber);
     status = await browserAppStatus(identityNumber);
   }
 
@@ -119,30 +115,18 @@ const turnOnInApp = async ({
       return { status: "install-required" };
     case "app": {
       const { subscribed, enabled } = status.app;
-      // A record without a subscription is an app that has not been opened and allowed yet.
+      // A record without a subscription is an app that has not been opened and allowed
+      // yet. Nothing is written here: the link the install finishes with starts the
+      // entry delivering, which is this press carried through to the end of the steps.
       if (!subscribed) {
-        if (!enabled) {
-          // Written here, where the user asked, and not left to whatever happens next: an
-          // install walked from this press finishes by carrying the flag this entry holds,
-          // so a flag still saying off would quietly outlive the answer they just gave.
-          await setAppEnabled({ identityNumber, enabled: true });
-        }
         return { status: "install-required" };
       }
-      if (!enabled) {
-        if (justClaimed || claim === "claimed") {
-          // Another identity on this device has just handed the app over, here or in
-          // the resolution that put this question on screen. That is this browser's own
-          // evidence the app is there, and proving it again would stall the ceremony on
-          // a probe whose answer is already known.
-          await setAppEnabled({ identityNumber, enabled: true });
-        } else if (!(await turnOnAndProve(identityNumber))) {
-          // `subscribed` outlives the app it names: deleting it from the Home Screen
-          // tells the canister nothing, so an entry says it delivers while nothing is
-          // there to deliver to. The switch goes on only where the app answers for
-          // itself, and the steps are what is left to offer where it does not.
-          return { status: "install-required" };
-        }
+      if (!enabled && !(await turnOnAndProve(identityNumber))) {
+        // `subscribed` outlives the app it names: deleting it from the Home Screen
+        // tells the canister nothing, so an entry says it delivers while nothing is
+        // there to deliver to. The switch goes on only where the app answers for
+        // itself, and the steps are what is left to offer where it does not.
+        return { status: "install-required" };
       }
       if (!consented) {
         await grantConsent({ identityNumber, origin, actor });

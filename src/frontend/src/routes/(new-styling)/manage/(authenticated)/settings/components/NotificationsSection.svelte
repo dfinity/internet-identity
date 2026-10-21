@@ -10,7 +10,7 @@
   import { isCanisterError } from "$lib/utils/utils";
   import type { BrowserInfo } from "$lib/generated/internet_identity_types";
   import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { setAppEnabled } from "$lib/utils/notifications/appEnabled";
+  import { disableApp } from "$lib/utils/notifications/appEnabled";
   import {
     forgetAlreadyInstalled,
     saidAlreadyInstalled,
@@ -141,7 +141,7 @@
   const turnOff = async () => {
     if (needsApp) {
       if (ownApp !== undefined) {
-        await setAppEnabled({ identityNumber, enabled: false });
+        await disableApp(identityNumber);
       }
       // Their word that the device already had one goes too, which is the way out of having said it by mistake.
       await forgetAlreadyInstalled(identityNumber);
@@ -199,19 +199,9 @@
       tab.point(replacing);
       refusedInstallUrl = tab.opened ? undefined : replacing;
       return false;
-    } else if (ownApp !== undefined && !ownApp.enabled) {
-      // This identity's say-so is recorded the moment it is given, as turning off records
-      // it: an install started from this press finishes by carrying the flag, so leaving
-      // it until the app links would lose the answer somewhere along the way.
-      await setAppEnabled({ identityNumber, enabled: true });
     }
     const outcome = await turnOnWithApp({ identityNumber, ownApp });
     if (outcome.delivering) {
-      // An app taken over from another identity links switched off, so this press is
-      // what switches it on. Nothing else on this path has written the flag.
-      if (outcome.claimed) {
-        await setAppEnabled({ identityNumber, enabled: true });
-      }
       tab.point(undefined);
       return true;
     }

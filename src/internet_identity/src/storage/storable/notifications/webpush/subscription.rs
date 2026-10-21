@@ -25,7 +25,4 @@ pub struct StorableWebPushSubscription {
     /// A queue some records carry here. The entry holds the queue, so this is read only.
     #[n(4)]
     pub notifications: Option<Vec<StorableQueuedNotification>>,
-    /// A re-wake stamp some records carry here, read and never written.
-    #[n(5)]
-    pub woken_again_at_ns: Option<StorableTimestamp>,
 }
