@@ -1694,7 +1694,7 @@ mod shared_app {
         BrowserInfo, ClaimNotificationAppRequest, DisableNotificationAppError,
         DisableNotificationAppRequest, EnableNotificationAppRequest,
         GetNotificationAppStatusRequest, NotificationAppInfo, NotificationAppStatus,
-        SetWebPushSubscriptionError,
+        SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -1889,8 +1889,18 @@ mod shared_app {
     {
         let env = env();
         let (canister_id, first, second, app) = install_with_shared_app(&env);
-        set_webpush_subscription(&env, canister_id, app, request(first, ENDPOINT))?
-            .expect("set_webpush_subscription returned Err");
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            app,
+            SetWebPushSubscriptionRequest {
+                // The pool is spent by elapsed time, so one issued at a fixed instant
+                // signs nothing and switching back on would find no wake-up address.
+                jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
+                ..request(first, ENDPOINT)
+            },
+        )?
+        .expect("set_webpush_subscription returned Err");
 
         disable_notification_app(
             &env,
