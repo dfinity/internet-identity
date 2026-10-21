@@ -1972,14 +1972,19 @@ type SetNotificationAppEnabledError = variant {
     InternalCanisterError : text;
 };
 
-// Points this browser at the Home Screen app another identity on the device has, on
-// the authority of a token that identity signed. Nothing is stored between the two
-// halves: the signature is the whole of the authority.
+// Points a browser of the identity being added at the Home Screen app another identity on
+// the same device already has. One device has one such app, so a second identity joins the
+// existing one rather than installing its own.
+//
+// The signature is the whole authority and nothing is stored between the two halves: a
+// browser of the offering identity signs over both anchor numbers and the expiry, and this
+// call spends it. Only a key that identity still holds verifies, and the expiry is bounded
+// from above, so an old signature is worthless.
 type ClaimNotificationAppRequest = record {
-    anchor_number : UserNumber;            // the claiming identity; the caller is a browser of it
+    anchor_number : UserNumber;            // the identity being added; the caller is a browser of it
     offering_anchor_number : UserNumber;   // the identity that has the app
-    expires_at_ns : nat64;                 // when the offering browser's signature stops counting
-    signature : blob;                      // over both anchor numbers and that expiry
+    expires_at_ns : nat64;                 // no more than 30 minutes ahead of canister time
+    signature : blob;                      // made by a browser of the offering identity
 };
 
 type ClaimNotificationAppError = variant {
