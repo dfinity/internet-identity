@@ -370,17 +370,19 @@ mod tests {
             let app = storage
                 .ensure_notification_app(Principal::self_authenticating(app_key(9)), None, 0)
                 .expect("creating the app record");
-            storage.set_notification_app_subscription(
-                app.id,
-                Some(WebPushSubscription {
-                    endpoint: APP_RELAY.to_string(),
-                    created_at_ns: 0,
-                    vapid_public_key: vec![1; 65],
-                    jwt_signatures: vec![vec![2; 64]],
-                    jwt_issued_at_ns: 0,
-                }),
-                0,
-            );
+            storage
+                .set_notification_app_subscription(
+                    app.id,
+                    Some(WebPushSubscription {
+                        endpoint: APP_RELAY.to_string(),
+                        created_at_ns: 0,
+                        vapid_public_key: vec![1; 65],
+                        jwt_signatures: vec![vec![2; 64]],
+                        jwt_issued_at_ns: 0,
+                    }),
+                    0,
+                )
+                .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
             stored.point_at_notification_app(browser_id, app.id, true);
             storage.write(stored).expect("pointing at the app");
