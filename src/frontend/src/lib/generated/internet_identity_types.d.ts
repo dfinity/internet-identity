@@ -543,9 +543,14 @@ export type ClaimNotificationAppError = {
   } |
   { 'ClaimTokenExpired' : null };
 /**
- * Points this browser at the Home Screen app another identity on the device has, on
- * the authority of a token that identity signed. Nothing is stored between the two
- * halves: the signature is the whole of the authority.
+ * Points a browser of the identity being added at the Home Screen app another identity on
+ * the same device already has. One device has one such app, so a second identity joins the
+ * existing one rather than installing its own.
+ * 
+ * The signature is the whole authority and nothing is stored between the two halves: a
+ * browser of the offering identity signs over both anchor numbers and the expiry, and this
+ * call spends it. Only a key that identity still holds verifies, and the expiry is bounded
+ * from above, so an old signature is worthless.
  */
 export interface ClaimNotificationAppRequest {
   'signature' : Uint8Array | number[],
