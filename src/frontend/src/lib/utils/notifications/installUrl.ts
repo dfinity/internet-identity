@@ -21,14 +21,12 @@ const registeredBrowserActor = async (
   }
 };
 
-/** `undefined` where this browser is not registered; rejects where its key could not be read or the canister refused the install. */
+/** `undefined` where this browser is not registered; rejects where its key could not be read or the canister refused the install.
+ *  The canister refuses while the app it would replace is still answering, so a caller that offers an install asks the app to prove itself first. */
 export const prepareInstallUrl = async ({
   identityNumber,
-  replacingExisting,
 }: {
   identityNumber: bigint;
-  /** The user has said the app is gone, which the canister takes as leave to replace a record that still claims to deliver. */
-  replacingExisting: boolean;
 }): Promise<string | undefined> => {
   const actor = await registeredBrowserActor(identityNumber);
   if (actor === undefined) {
@@ -44,7 +42,6 @@ export const prepareInstallUrl = async ({
     .prepare_notification_app_link({
       anchor_number: identityNumber,
       link_principal: identity.getPrincipal(),
-      replacing_existing: replacingExisting,
     })
     .then(throwCanisterError);
   return `${NOTIFICATION_APP_PATH}#${encodeLinkToken({

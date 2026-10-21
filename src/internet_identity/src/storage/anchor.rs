@@ -108,13 +108,34 @@ pub struct Browser {
     pub webpush_subscription: Option<WebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
     pub notifications: Vec<QueuedNotification>,
-    /// When this entry was last woken again for something it could not show yet.
-    pub woken_again_at_ns: Option<Timestamp>,
     /// The probe this entry last sent to the app it points at.
     pub pending_probe: Option<NotificationId>,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
+}
+
+impl Browser {
+    /// Whether this entry points at `app_id`. Pointing is which app this browser has,
+    /// not where its wake-ups went.
+    pub fn is_pointing_at(&self, app_id: NotificationAppId) -> bool {
+        self.notification_app
+            .is_some_and(|reference| reference.linked_app() == Some(app_id))
+    }
+
+    /// Whether this entry's wake-ups were posted to `app_id`'s address, which is what
+    /// says that address going away takes this entry's queue with it.
+    pub fn is_delivered_through(&self, app_id: NotificationAppId) -> bool {
+        self.webpush_subscription.is_none() && self.is_pointing_at(app_id)
+    }
+
+    /// Whether this entry points at `app_id` with delivery switched off, which is this
+    /// identity's answer about this device rather than about the record carrying it.
+    pub fn is_delivery_disabled_for(&self, app_id: NotificationAppId) -> bool {
+        self.notification_app.is_some_and(|reference| {
+            reference.linked_app() == Some(app_id) && !reference.is_delivering()
+        })
+    }
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -198,9 +219,8 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
                 issued_at_ns: value.jwt_issued_at_ns,
             },
-            // The entry holds both, so they are read here and never written.
+            // The entry holds it, so it is read here and never written.
             notifications: None,
-            woken_again_at_ns: None,
         }
     }
 }
@@ -241,12 +261,6 @@ impl From<StorableBrowser> for Browser {
                     })
                 })
                 .collect(),
-            woken_again_at_ns: value.woken_again_at_ns.or_else(|| {
-                value
-                    .webpush_subscription
-                    .as_ref()
-                    .and_then(|subscription| subscription.woken_again_at_ns)
-            }),
             notification_app: value.notification_app.map(NotificationAppRef::from),
             pending_probe: value.pending_probe,
         }
@@ -274,7 +288,6 @@ impl From<Browser> for StorableBrowser {
                     .map(StorableQueuedNotification::from)
                     .collect()
             }),
-            woken_again_at_ns: value.woken_again_at_ns,
             pending_probe: value.pending_probe,
         }
     }
@@ -1012,12 +1025,7 @@ impl Anchor {
     /// Pointing at the record this browser already points at changes nothing, switch
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
-    pub fn point_at_notification_app(
-        &mut self,
-        browser_id: BrowserId,
-        app_id: NotificationAppId,
-        delivers_when_new: bool,
-    ) {
+    pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
         let Some(index) = self
             .browsers
             .iter()
@@ -1034,7 +1042,8 @@ impl Anchor {
         // Whether this identity wants the app to deliver is the user's answer about the
         // app, not about whichever entry happens to hold the reference, so a rotation
         // that moves it between this identity's browsers carries their answer along. A
-        // first link has nobody to carry it from and takes what the caller says it means.
+        // first link has nobody to carry it from and starts delivering, because every
+        // caller that makes one is the user asking for this app.
         let enabled = self
             .browsers
             .iter()
@@ -1045,7 +1054,7 @@ impl Anchor {
                 }) if held == app_id => Some(enabled),
                 _ => None,
             })
-            .unwrap_or(delivers_when_new);
+            .unwrap_or(true);
         for browser in &mut self.browsers {
             // Every OTHER entry lets go, never this one: the entry being pointed is what
             // the check above reads, and stripping it here would make re-pointing at the
@@ -1066,7 +1075,6 @@ impl Anchor {
                 // was posted to at that address and can still show it.
                 if browser.webpush_subscription.is_none() {
                     browser.notifications.clear();
-                    browser.woken_again_at_ns = None;
                 }
             }
         }
@@ -1084,14 +1092,24 @@ impl Anchor {
             drop_probe_of(&mut self.browsers[index]);
             if self.browsers[index].webpush_subscription.is_none() {
                 self.browsers[index].notifications.clear();
-                self.browsers[index].woken_again_at_ns = None;
             }
         }
     }
 
-    /// Whether this identity wants the app it points at to deliver for it. Never a
-    /// subscription removal: the subscription is the app's and is shared.
-    pub fn set_notification_app_enabled(&mut self, browser_id: BrowserId, enabled: bool) {
+    /// This identity asking the app it points at to deliver for it. Never a subscription
+    /// write: the subscription is the app's and is shared.
+    pub fn enable_notification_app(&mut self, browser_id: BrowserId) {
+        self.set_notification_app_delivery(browser_id, true);
+    }
+
+    /// This identity asking the app it points at to stop delivering for it. Never a
+    /// subscription removal: the subscription is the app's and is shared with every other
+    /// identity pointing at it.
+    pub fn disable_notification_app(&mut self, browser_id: BrowserId) {
+        self.set_notification_app_delivery(browser_id, false);
+    }
+
+    fn set_notification_app_delivery(&mut self, browser_id: BrowserId, enabled: bool) {
         let Some(browser) = self
             .browsers
             .iter_mut()
@@ -1130,6 +1148,17 @@ impl Anchor {
             .notification_app
             .take()
             .and_then(|reference| reference.linked_app())
+    }
+
+    /// The entry of this identity whose calls an app signing as `app_id` acts on.
+    ///
+    /// At most one: pointing an entry at a record takes that record off every other entry
+    /// of the identity, which is what lets an app resolve its calls to a single entry.
+    pub fn browser_routing_through(&self, app_id: NotificationAppId) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| browser.is_pointing_at(app_id))
+            .map(|browser| browser.id)
     }
 
     /// Drops the probe this entry sent to the app, whether or not it has been taken.
@@ -1187,17 +1216,17 @@ impl Anchor {
         now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> NotificationAppStatus {
-        if let Some(NotificationAppRef::Pending { expires_at_ns, .. }) =
-            self.notification_app(browser_id)
-        {
-            return if expires_at_ns > now_ns {
+        match self.notification_app(browser_id) {
+            Some(NotificationAppRef::Pending { expires_at_ns, .. }) if expires_at_ns > now_ns => {
                 NotificationAppStatus::AwaitingInstall(expires_at_ns)
-            } else {
-                NotificationAppStatus::NoApp
-            };
-        }
-        match self.linked_app_info(browser_id, pending_probe, app) {
-            Some(info) => NotificationAppStatus::Linked(info),
+            }
+            Some(NotificationAppRef::Pending { .. }) => NotificationAppStatus::NoApp,
+            Some(NotificationAppRef::Linked { .. }) => {
+                match self.linked_app_info(browser_id, pending_probe, app) {
+                    Some(info) => NotificationAppStatus::Linked(info),
+                    None => NotificationAppStatus::NoApp,
+                }
+            }
             None => NotificationAppStatus::NoApp,
         }
     }
@@ -1238,13 +1267,6 @@ impl Anchor {
             .iter_mut()
             .find(|browser| browser.id == browser_id)
             .map(|browser| &mut browser.notifications)
-    }
-
-    /// Stamps that this entry has been woken again for something still waiting.
-    pub fn set_woken_again(&mut self, browser_id: BrowserId, at_ns: Option<Timestamp>) {
-        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
-            browser.woken_again_at_ns = at_ns;
-        }
     }
 
     /// Records the probe this entry has just sent to the app it points at.
@@ -1435,7 +1457,6 @@ impl Anchor {
             session_count: 0,
             webpush_subscription: None,
             notifications: Vec::new(),
-            woken_again_at_ns: None,
             pending_probe: None,
             notification_app: None,
         });

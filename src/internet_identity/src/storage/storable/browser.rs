@@ -3,7 +3,6 @@ use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
-use crate::storage::storable::timestamp::StorableTimestamp;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
 
@@ -38,12 +37,8 @@ pub struct StorableBrowser {
     /// What this identity's service worker has yet to show on this device, oldest first.
     #[n(9)]
     pub notifications: Option<Vec<StorableQueuedNotification>>,
-    /// When this entry was last woken a second time for a notification it could not show
-    /// yet. Allowed again only once the delegation it was for has expired.
-    #[n(10)]
-    pub woken_again_at_ns: Option<StorableTimestamp>,
     /// The probe this entry last sent to the Home Screen app it points at. Whether it is
     /// still pending is read off the queue, so this id outliving the entry says nothing.
-    #[n(11)]
+    #[n(10)]
     pub pending_probe: Option<u64>,
 }

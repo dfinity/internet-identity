@@ -1,6 +1,7 @@
 use crate::anchor_management::tentative_device_registration::ValidatedRegistrationId;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::notifications::backlog::{NotificationBacklog, NOTIFICATION_BACKLOG};
+use crate::notifications::identity_backlog::{IdentityBacklog, IDENTITY_NOTIFICATION_BACKLOG};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -264,6 +265,9 @@ struct State {
     // until the first one arrives, so the queue's clocks start from canister time
     // rather than the epoch. An upgrade drops what is still here.
     notification_backlog: RefCell<Option<NotificationBacklog>>,
+    // Internet Identity's own wake-ups the dispatcher has not posted yet, taking turns
+    // across identities. Absent and dropped on upgrade for the same reasons as above.
+    identity_backlog: RefCell<Option<IdentityBacklog>>,
 }
 
 /// Gives the canister a salt where it has none, and does nothing where it already has one.
@@ -430,6 +434,15 @@ pub fn notification_backlog_mut<R>(
     STATE.with(|s| {
         let mut backlog = s.notification_backlog.borrow_mut();
         f(backlog.get_or_insert_with(|| NotificationBacklog::new(NOTIFICATION_BACKLOG, now_ns)))
+    })
+}
+
+/// Initialize the identity backlog at `now_ns` on first use.
+pub fn identity_backlog_mut<R>(now_ns: Timestamp, f: impl FnOnce(&mut IdentityBacklog) -> R) -> R {
+    STATE.with(|s| {
+        let mut backlog = s.identity_backlog.borrow_mut();
+        f(backlog
+            .get_or_insert_with(|| IdentityBacklog::new(IDENTITY_NOTIFICATION_BACKLOG, now_ns)))
     })
 }
 
