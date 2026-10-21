@@ -108,8 +108,6 @@ pub struct Browser {
     pub webpush_subscription: Option<WebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
     pub notifications: Vec<QueuedNotification>,
-    /// The probe this entry last sent to the app it points at.
-    pub pending_probe: Option<NotificationId>,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
@@ -262,7 +260,6 @@ impl From<StorableBrowser> for Browser {
                 })
                 .collect(),
             notification_app: value.notification_app.map(NotificationAppRef::from),
-            pending_probe: value.pending_probe,
         }
     }
 }
@@ -288,7 +285,6 @@ impl From<Browser> for StorableBrowser {
                     .map(StorableQueuedNotification::from)
                     .collect()
             }),
-            pending_probe: value.pending_probe,
         }
     }
 }
@@ -1066,16 +1062,7 @@ impl Anchor {
                     .is_some_and(|reference| reference.linked_app() == Some(app_id))
             {
                 browser.notification_app = None;
-                // A probe only ever goes to the app, so it goes with the reference, and
-                // the entry it named goes too: the rest of this queue may have been
-                // posted to this entry's own address, but the probe never was.
-                drop_probe_of(browser);
-                // The address belongs to another entry now, so nothing here can show
-                // what it had waiting. An entry that registered an address of its own
-                // was posted to at that address and can still show it.
-                if browser.webpush_subscription.is_none() {
-                    browser.notifications.clear();
-                }
+                drop_what_went_to_the_app(browser);
             }
         }
         // Anything other than this same app: another app, or an install this entry
@@ -1085,14 +1072,7 @@ impl Anchor {
         self.browsers[index].notification_app =
             Some(NotificationAppRef::Linked { app_id, enabled });
         if followed_another_route {
-            // Outstanding for the app this entry has just stopped pointing at, and the
-            // app answering now must not be able to take it. The queued entry goes with
-            // the marker: the rest of this queue may have gone to the entry's own
-            // address, but the probe went to the app.
-            drop_probe_of(&mut self.browsers[index]);
-            if self.browsers[index].webpush_subscription.is_none() {
-                self.browsers[index].notifications.clear();
-            }
+            drop_what_went_to_the_app(&mut self.browsers[index]);
         }
     }
 
@@ -1141,9 +1121,6 @@ impl Anchor {
             .browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)?;
-        // The app's address is what the probe went to, so it goes with the reference,
-        // whatever address this entry registered for itself.
-        drop_probe_of(browser);
         browser
             .notification_app
             .take()
@@ -1161,13 +1138,19 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
-    /// Drops the probe this entry sent to the app, whether or not it has been taken.
-    /// `true` where there was one to drop.
-    pub fn drop_pending_probe(&mut self, browser_id: BrowserId) -> bool {
-        self.browsers
+    /// Drops what this entry was sent at the address of the app it points at, leaving
+    /// what was posted to its own. `true` where anything went.
+    pub fn drop_what_the_app_was_sent(&mut self, browser_id: BrowserId) -> bool {
+        let Some(browser) = self
+            .browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)
-            .is_some_and(drop_probe_of)
+        else {
+            return false;
+        };
+        let before = browser.notifications.len();
+        drop_what_went_to_the_app(browser);
+        browser.notifications.len() != before
     }
 
     /// The app this browser points at, where it has one.
@@ -1189,7 +1172,7 @@ impl Anchor {
     fn linked_app_info(
         &self,
         browser_id: BrowserId,
-        pending_probe: Option<NotificationId>,
+        now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> Option<NotificationAppInfo> {
         let NotificationAppRef::Linked { app_id, enabled } = self.notification_app(browser_id)?
@@ -1201,7 +1184,7 @@ impl Anchor {
             subscribed: app.webpush_subscription.is_some(),
             enabled,
             last_seen_ns: app.last_used,
-            pending_probe,
+            pending_probe: app.outstanding_probe(now_ns),
         })
     }
 
@@ -1212,7 +1195,6 @@ impl Anchor {
     pub fn notification_app_status(
         &self,
         browser_id: BrowserId,
-        pending_probe: Option<NotificationId>,
         now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> NotificationAppStatus {
@@ -1222,7 +1204,7 @@ impl Anchor {
             }
             Some(NotificationAppRef::Pending { .. }) => NotificationAppStatus::NoApp,
             Some(NotificationAppRef::Linked { .. }) => {
-                match self.linked_app_info(browser_id, pending_probe, app) {
+                match self.linked_app_info(browser_id, now_ns, app) {
                     Some(info) => NotificationAppStatus::Linked(info),
                     None => NotificationAppStatus::NoApp,
                 }
@@ -1267,51 +1249,6 @@ impl Anchor {
             .iter_mut()
             .find(|browser| browser.id == browser_id)
             .map(|browser| &mut browser.notifications)
-    }
-
-    /// Records the probe this entry has just sent to the app it points at.
-    pub fn set_pending_probe(&mut self, browser_id: BrowserId, notification_id: NotificationId) {
-        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
-            browser.pending_probe = Some(notification_id);
-        }
-    }
-
-    /// Forgets a probe whose notification has left the queue. An entry still queued but
-    /// past its expiry is left named, because only the next write to this queue prunes it.
-    pub fn clear_pending_probe_if_gone(&mut self, browser_id: BrowserId) {
-        let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) else {
-            return;
-        };
-        let Some(probe) = browser.pending_probe else {
-            return;
-        };
-        let queued = browser
-            .notifications
-            .iter()
-            .any(|queued| queued.notification_id == probe && queued.event.is_some());
-        if !queued {
-            browser.pending_probe = None;
-        }
-    }
-
-    /// The probe this entry sent that is still queued for the app to take. An entry past
-    /// its expiry is not pending, and `None` says only that the entry is no longer queued.
-    pub fn pending_probe(
-        &self,
-        browser_id: BrowserId,
-        now_ns: Timestamp,
-    ) -> Option<NotificationId> {
-        let browser = self.browsers.iter().find(|one| one.id == browser_id)?;
-        let probe = browser.pending_probe?;
-        browser
-            .notifications
-            .iter()
-            .any(|queued| {
-                queued.notification_id == probe
-                    && queued.event.is_some()
-                    && queued.expires_at_ns > now_ns
-            })
-            .then_some(probe)
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1361,6 +1298,7 @@ impl Anchor {
     /// installed app answering the same thing.
     pub fn browsers_info(
         &self,
+        now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> Option<Vec<BrowserInfo>> {
         if self.browsers.is_empty() {
@@ -1376,7 +1314,7 @@ impl Anchor {
                     last_used: browser.last_used,
                     session_count: browser.session_count,
                     // A probe is read where it was sent, not off the identity's app list.
-                    notification_app: self.linked_app_info(browser.id, None, &app),
+                    notification_app: self.linked_app_info(browser.id, now_ns, &app),
                 })
                 .collect(),
         )
@@ -1457,7 +1395,6 @@ impl Anchor {
             session_count: 0,
             webpush_subscription: None,
             notifications: Vec::new(),
-            pending_probe: None,
             notification_app: None,
         });
 
@@ -1831,19 +1768,20 @@ impl Anchor {
     }
 }
 
-/// Takes the probe this entry sent, marker and queued entry both, and leaves the rest of
-/// the queue alone. A probe is addressed to the app whatever address the entry registered
-/// for itself, so a reference that is replaced or dropped takes the probe with it while
-/// notifications posted to the entry's own address stay showable. `true` where there was
-/// a probe to take.
-fn drop_probe_of(browser: &mut Browser) -> bool {
-    let Some(probe) = browser.pending_probe.take() else {
-        return false;
-    };
+/// Drops what this entry can no longer show now that it points elsewhere.
+///
+/// An entry with no address of its own was posted to at the app's, so none of its queue
+/// survives. An entry that registered an address of its own keeps what was posted there,
+/// which is every notification an application sent: Internet Identity's own go to the app
+/// whatever the entry registered, so they go with the reference.
+fn drop_what_went_to_the_app(browser: &mut Browser) {
+    if browser.webpush_subscription.is_none() {
+        browser.notifications.clear();
+        return;
+    }
     browser
         .notifications
-        .retain(|queued| !(queued.notification_id == probe && queued.event.is_some()));
-    true
+        .retain(|queued| queued.application_number.is_some());
 }
 
 /// Possible outcomes of domain bound activity for an anchor since a specific timestamp.

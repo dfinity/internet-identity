@@ -37,8 +37,4 @@ pub struct StorableBrowser {
     /// What this identity's service worker has yet to show on this device, oldest first.
     #[n(9)]
     pub notifications: Option<Vec<StorableQueuedNotification>>,
-    /// The probe this entry last sent to the Home Screen app it points at. Whether it is
-    /// still pending is read off the queue, so this id outliving the entry says nothing.
-    #[n(10)]
-    pub pending_probe: Option<u64>,
 }

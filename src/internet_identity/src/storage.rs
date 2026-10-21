@@ -104,7 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
-use crate::notifications::app::{NotificationApp, NotificationAppId};
+use crate::notifications::app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -1594,26 +1594,19 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             };
-            // Every entry pointing at the record, not only those it delivered for: a probe
-            // goes to the app's address whatever the entry registered for itself, so it
-            // dies with that address even where the rest of the queue does not.
-            let pointing: Vec<(BrowserId, bool)> = anchor
+            // Every entry pointing at the record, not only those it delivered for:
+            // Internet Identity's own go to the app's address whatever the entry
+            // registered for itself, so they die with that address even where the rest
+            // of the queue does not.
+            let pointing: Vec<BrowserId> = anchor
                 .browsers()
                 .iter()
                 .filter(|browser| browser.is_pointing_at(app_id))
-                .map(|browser| (browser.id, browser.is_delivered_through(app_id)))
+                .map(|browser| browser.id)
                 .collect();
             let mut cleared = false;
-            for (browser_id, delivered_through_it) in pointing {
-                cleared |= anchor.drop_pending_probe(browser_id);
-                // The rest went to this entry's own address and can still be shown.
-                if !delivered_through_it {
-                    continue;
-                }
-                if let Some(queue) = anchor.notifications_mut(browser_id) {
-                    cleared |= !queue.is_empty();
-                    queue.clear();
-                }
+            for browser_id in pointing {
+                cleared |= anchor.drop_what_the_app_was_sent(browser_id);
             }
             if !cleared {
                 continue;
@@ -1650,6 +1643,29 @@ impl<M: Memory + Clone> Storage<M> {
             .next_identity_notification_id_memory
             .set(id.saturating_add(1));
         id
+    }
+
+    /// Records that an entry has just asked `app_id` to prove it is still installed.
+    ///
+    /// Kept on the record rather than on the entry that asked, because the answer lands
+    /// here: an app answers by calling, which moves `last_used`. One ask at a time serves
+    /// every identity pointing at it, which is also what stops a device with many
+    /// identities buying one outcall per entry.
+    pub fn set_notification_app_probe(
+        &mut self,
+        app_id: NotificationAppId,
+        notification_id: NotificationId,
+        now: Timestamp,
+    ) {
+        let Some(mut app) = self.notification_app(app_id) else {
+            return;
+        };
+        app.pending_probe = Some(PendingProbe {
+            notification_id,
+            asked_at_ns: now,
+        });
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
     }
 
     /// The record `app_id` names, if it is still there.
@@ -3573,6 +3589,8 @@ impl<M: Memory + Clone> Storage<M> {
             anchors: BTreeSet::new(),
             // Registered by the app once it has permission.
             webpush_subscription: None,
+            // Written the first time an entry asks it to prove it is still installed.
+            pending_probe: None,
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
