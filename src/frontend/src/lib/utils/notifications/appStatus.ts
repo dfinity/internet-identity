@@ -1,8 +1,8 @@
 import type {
   _SERVICE,
   NotificationAppInfo,
+  EnableNotificationAppError,
   ProbeNotificationAppError,
-  TurnOnNotificationAppError,
 } from "$lib/generated/internet_identity_types";
 import {
   browserKeyActor,
@@ -82,28 +82,28 @@ export const probeApp = async (
 };
 
 /**
- * Switches delivery on for this identity and probes the app in one call.
+ * Switches delivery on for this identity, which is also what proves the app is there.
  *
- * The flag and the probe cannot be separated: a reference that is off is skipped when
+ * The switch and the probe cannot be separated: a reference that is off is skipped when
  * the canister picks who to send to, so a probe sent first finds nothing to wake, and a
- * flag written first has the canister announce it and then say the same thing again on
+ * switch thrown first has the canister announce it and then say the same thing again on
  * the probe. `not-sent` is the switch left off, which is what it means for a device
  * whose app has gone: nothing here has to be undone.
  */
-export const turnOnApp = async (
+export const enableApp = async (
   identityNumber: bigint,
 ): Promise<ProbeOutcome> => {
   try {
     const actor = await browserKeyActor(identityNumber);
     const probeId = await actor
-      .turn_on_notification_app({ anchor_number: identityNumber })
+      .enable_notification_app({ anchor_number: identityNumber })
       .then(throwCanisterError);
     return { kind: "sent", probeId };
   } catch (error) {
     if (error instanceof UnregisteredBrowserError) {
       return { kind: "no-app" };
     }
-    if (isCanisterError<TurnOnNotificationAppError>(error)) {
+    if (isCanisterError<EnableNotificationAppError>(error)) {
       switch (error.type) {
         case "NoNotificationApp":
           return { kind: "no-app" };

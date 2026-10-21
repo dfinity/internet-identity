@@ -43,6 +43,15 @@ pub enum NotificationAppRef {
     },
 }
 
+/// The record `app_id` names, or `None` where the deployment does not notify, so a
+/// deployment with notifications off never reports an app however its anchors read.
+pub fn record(app_id: NotificationAppId) -> Option<NotificationApp> {
+    if !super::notifications_enabled() {
+        return None;
+    }
+    crate::state::storage_borrow(|storage| storage.notification_app(app_id))
+}
+
 impl NotificationAppRef {
     /// The record this browser points at, where the install has completed.
     pub fn linked_app(&self) -> Option<NotificationAppId> {
@@ -54,7 +63,7 @@ impl NotificationAppRef {
 
     /// Whether this identity wants the app to deliver for it on this device. An install
     /// that has not completed delivers nothing either.
-    pub fn delivers(&self) -> bool {
+    pub fn is_delivering(&self) -> bool {
         match self {
             NotificationAppRef::Pending { .. } => false,
             NotificationAppRef::Linked { enabled, .. } => *enabled,
