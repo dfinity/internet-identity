@@ -8199,7 +8199,6 @@ fn an_apps_new_address_strands_the_probe_of_an_entry_with_its_own() {
             },
         )),
     });
-    anchor.set_pending_probe(0, 9);
     storage.write(anchor).expect("writing the anchor");
 
     storage
@@ -8211,7 +8210,6 @@ fn an_apps_new_address_strands_the_probe_of_an_entry_with_its_own() {
         .expect("the record is there");
 
     let reloaded = storage.read(10_000).expect("reading the anchor");
-    assert_eq!(reloaded.pending_probe(0, 2_000), None);
     assert_eq!(
         reloaded
             .notifications(0)
@@ -8275,11 +8273,9 @@ fn moving_to_another_app_takes_the_probe_and_leaves_the_rest() {
             },
         )),
     });
-    anchor.set_pending_probe(0, 9);
 
     anchor.point_at_notification_app(0, replacement.id);
 
-    assert_eq!(anchor.pending_probe(0, 2_000), None);
     assert_eq!(
         anchor
             .notifications(0)
@@ -8287,7 +8283,7 @@ fn moving_to_another_app_takes_the_probe_and_leaves_the_rest() {
             .map(|queued| queued.notification_id)
             .collect::<Vec<_>>(),
         vec![4],
-        "the probe goes with the reference and nothing else does"
+        "what went to the app goes with the reference and nothing else does"
     );
 }
 

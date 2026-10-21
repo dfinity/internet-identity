@@ -1,4 +1,6 @@
-use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::notifications::app::{
+    NotificationApp, NotificationAppId, NotificationAppRef, PendingProbe,
+};
 use crate::storage::anchor::WebPushSubscription;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use candid::Principal;
@@ -26,6 +28,19 @@ pub struct StorableNotificationApp {
     pub anchors: BTreeSet<AnchorNumber>,
     #[n(5)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
+    /// The last time an entry asked this app to prove it is still installed.
+    #[n(6)]
+    pub pending_probe: Option<StorablePendingProbe>,
+}
+
+/// A probe an entry sent to this record, and when it sent it.
+#[derive(Encode, Decode, Clone, Copy, Debug, Eq, PartialEq)]
+#[cbor(map)]
+pub struct StorablePendingProbe {
+    #[n(0)]
+    pub notification_id: u64,
+    #[n(1)]
+    pub asked_at_ns: Timestamp,
 }
 
 impl From<NotificationApp> for StorableNotificationApp {
@@ -39,6 +54,10 @@ impl From<NotificationApp> for StorableNotificationApp {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
+            pending_probe: value.pending_probe.map(|probe| StorablePendingProbe {
+                notification_id: probe.notification_id,
+                asked_at_ns: probe.asked_at_ns,
+            }),
         }
     }
 }
@@ -52,6 +71,10 @@ impl From<StorableNotificationApp> for NotificationApp {
             last_used: value.last_used,
             anchors: value.anchors,
             webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            pending_probe: value.pending_probe.map(|probe| PendingProbe {
+                notification_id: probe.notification_id,
+                asked_at_ns: probe.asked_at_ns,
+            }),
         }
     }
 }
