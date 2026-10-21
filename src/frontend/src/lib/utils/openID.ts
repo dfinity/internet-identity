@@ -21,14 +21,22 @@ export class CallbackPopupClosedError extends Error {}
  * frontend — via `BroadcastChannel` in the popup flow, via the
  * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
  * Carries either the token or the IdP's RFC 6749 error report, plus the
- * CSRF `state` in both cases.
+ * CSRF `state` in both cases. With the token comes the user's `full_name`
+ * when the IdP sent it beside the token, as Apple does in its `user` field.
  *
- * The canister serializes an absent `error_description` as JSON `null`
- * rather than omitting the key, so the schema accepts `null` and normalizes
- * it to `undefined`.
+ * The canister serializes an absent `full_name` or `error_description` as
+ * JSON `null` rather than omitting the key, so the schema accepts `null` and
+ * normalizes it to `undefined`.
  */
 const CallbackPayloadSchema = z.union([
-  z.object({ id_token: z.string(), state: z.string() }),
+  z.object({
+    id_token: z.string(),
+    state: z.string(),
+    full_name: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? undefined),
+  }),
   z.object({
     error: z.string(),
     error_description: z
@@ -51,6 +59,7 @@ const CallbackFieldsSchema = z
   .object({
     state: z.string().optional().catch(undefined),
     id_token: z.string().optional().catch(undefined),
+    full_name: z.string().nullish().catch(undefined),
     error: z.string().optional().catch(undefined),
     error_description: z.string().nullish().catch(undefined),
   })
@@ -499,7 +508,7 @@ export const extractIdTokenFromCallback = (
   callback: unknown,
   expectedState: string,
 ): string => {
-  const { state, id_token, error, error_description } =
+  const { state, id_token, full_name, error, error_description } =
     CallbackFieldsSchema.parse(callback);
   if (state !== expectedState) {
     throw new Error("Invalid state");
@@ -509,6 +518,10 @@ export const extractIdTokenFromCallback = (
   }
   if (id_token === undefined) {
     throw new Error("No token received");
+  }
+  if (full_name !== undefined && full_name !== null) {
+    const { iss, sub } = decodeJWT(id_token);
+    fullNamesByAccount.set(accountKey(iss, sub), full_name);
   }
   return id_token;
 };
