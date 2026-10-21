@@ -183,11 +183,11 @@ pub fn check_app_authorization(
 /// the app it points at. An app speaks for an entry only while the entry routes through it.
 pub fn check_notification_authorization(
     anchor_number: AnchorNumber,
-) -> Result<(Anchor, BrowserId, NotificationCaller), AuthorizationError> {
+) -> Result<(Anchor, BrowserId, NotificationAuthorization), AuthorizationError> {
     let caller = caller();
     let anchor = state::anchor(anchor_number);
     if let Some(browser_id) = anchor.browser_by_principal(caller) {
-        return Ok((anchor, browser_id, NotificationCaller::Browser));
+        return Ok((anchor, browser_id, NotificationAuthorization::Browser));
     }
     // The anchor is already loaded and holds a handful of entries, so the app is found
     // by asking which of them routes through a record this caller belongs to.
@@ -204,11 +204,15 @@ pub fn check_notification_authorization(
         })
     })
     .ok_or(AuthorizationError::from(caller))?;
-    Ok((anchor, browser_id, NotificationCaller::App(Box::new(app))))
+    Ok((
+        anchor,
+        browser_id,
+        NotificationAuthorization::App(Box::new(app)),
+    ))
 }
 
-/// Which kind of caller a notification call turned out to come from.
-pub enum NotificationCaller {
+/// What authorizing a notification call established the caller to be.
+pub enum NotificationAuthorization {
     Browser,
     /// Boxed: the record dwarfs the other variant, and this is returned by value.
     App(Box<NotificationApp>),
