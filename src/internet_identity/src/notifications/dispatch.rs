@@ -6,10 +6,9 @@ use crate::notifications::admission_queue::Taken;
 use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::backlog::PendingNotification;
 use crate::notifications::browser_queue::{self, Added};
-use crate::notifications::delegation::NOTIFICATION_DELEGATION_TTL_NS;
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
-use crate::state::{self, storage_borrow_mut};
+use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, Browser, QueuedNotification, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::Storage;
@@ -341,46 +340,34 @@ fn fan_out_to_browsers(
 /// its service worker could not show it yet. Nothing is queued and nothing is taken:
 /// the entry is already there, so this only asks the worker to come back.
 pub(crate) fn wake_again(anchor_number: AnchorNumber, browser_id: BrowserId, now_ns: Timestamp) {
-    // Claiming spends the browser's one wake-up per delegation lifetime, so a browser
-    // that finds the outcall budget full keeps its claim for when there is room.
+    // A wake-up refused a slot is one that never leaves, so a browser that finds the
+    // budget full is left to ask again rather than told it was woken.
     if post_capacity() == 0 {
         return;
     }
-    if let Some(delivery) = claim_rewake(anchor_number, browser_id, now_ns) {
+    if let Some(delivery) = rewake(anchor_number, browser_id, now_ns) {
         outcalls::spawn_post(delivery);
     }
 }
 
-/// Takes the browser's one second wake-up per delegation lifetime, or `None` where it
-/// has nothing to come back for or has already had it.
+/// The second wake-up to post for an entry that already holds something to show, or
+/// `None` where it has nothing to come back for.
 ///
-/// The wake-up is posted at the browser's own asking, so it is rationed: without this, a
-/// browser asking for delegations in a loop would take outcall slots out of the pool
-/// every other delivery shares. One per [`NOTIFICATION_DELEGATION_TTL_NS`] is all a
-/// worker can need, since that is how long the delegation it just minted lasts.
-pub(crate) fn claim_rewake(
+/// Reads and writes nothing: the entry is already there, so this only works out where to
+/// reach it.
+pub(crate) fn rewake(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     now_ns: Timestamp,
 ) -> Option<Delivery> {
-    storage_borrow_mut(|storage| {
-        let mut anchor = storage.read(anchor_number).ok()?;
+    storage_borrow(|storage| {
+        let anchor = storage.read(anchor_number).ok()?;
         let browser = anchor
             .browsers()
             .iter()
             .find(|browser| browser.id == browser_id)?;
-        if browser
-            .woken_again_at_ns
-            .is_some_and(|last| now_ns.saturating_sub(last) < NOTIFICATION_DELEGATION_TTL_NS)
-        {
-            return None;
-        }
-
         let app = routed_app(storage, browser);
-        let delivery = rewake_delivery(&anchor, browser_id, app.as_ref(), now_ns)?;
-        anchor.set_woken_again(browser_id, Some(now_ns));
-        storage.write(anchor).ok()?;
-        Some(delivery)
+        rewake_delivery(&anchor, browser_id, app.as_ref(), now_ns)
     })
 }
 
@@ -633,7 +620,6 @@ mod tests {
         anchor, anchor_with_browsers, app_for_key, app_key, setup, stored_subscription, subscribe,
         APP_RELAY, OTHER_APP_RELAY,
     };
-    use crate::state::storage_borrow;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{
         AnchorNumber, ApplicationNumber, BrowserId,
@@ -910,8 +896,7 @@ mod tests {
         submit(recipient, 7, 10 * SECOND_NS);
         assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 1);
 
-        let again =
-            claim_rewake(recipient, browsers[0], SECOND_NS).expect("the entry is still queued");
+        let again = rewake(recipient, browsers[0], SECOND_NS).expect("the entry is still queued");
 
         assert_eq!(again.endpoint, RELAY);
         assert_eq!(
@@ -926,12 +911,12 @@ mod tests {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
 
-        assert!(claim_rewake(recipient, browsers[0], SECOND_NS).is_none());
+        assert!(rewake(recipient, browsers[0], SECOND_NS).is_none());
 
         submit(recipient, 7, 10 * SECOND_NS);
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
         assert!(
-            claim_rewake(recipient, browsers[0], 20 * SECOND_NS).is_none(),
+            rewake(recipient, browsers[0], 20 * SECOND_NS).is_none(),
             "what expired is nothing to come back for"
         );
     }
@@ -944,7 +929,7 @@ mod tests {
         let first = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS)
             .pop()
             .expect("a wake-up");
-        let again = claim_rewake(recipient, browsers[0], SECOND_NS).expect("a second");
+        let again = rewake(recipient, browsers[0], SECOND_NS).expect("a second");
 
         settle(&again, PostOutcome::Rejected, 2 * SECOND_NS);
 
@@ -957,36 +942,6 @@ mod tests {
         settle(&first, PostOutcome::Rejected, 2 * SECOND_NS);
 
         assert!(queued(recipient, browsers[0]).is_empty());
-    }
-
-    #[test]
-    fn a_browser_is_woken_again_once_per_delegation_lifetime() {
-        setup();
-        let (recipient, browsers) = subscribed_recipient(1);
-        let queue_one = |at: Timestamp| {
-            submit_at(recipient, 7, at + 10 * SECOND_NS, at);
-            plan_pass(MAX_POSTS_PER_PASS, at);
-        };
-
-        queue_one(SECOND_NS);
-        assert!(claim_rewake(recipient, browsers[0], SECOND_NS).is_some());
-        assert!(
-            claim_rewake(recipient, browsers[0], 2 * SECOND_NS).is_none(),
-            "the wake-up is posted at the browser's own asking, so it is rationed"
-        );
-
-        // A later notification of its own is no second wake-up either, while the
-        // delegation the first one earned still holds.
-        let almost = SECOND_NS + NOTIFICATION_DELEGATION_TTL_NS - SECOND_NS;
-        queue_one(almost);
-        assert!(claim_rewake(recipient, browsers[0], almost).is_none());
-
-        let after = SECOND_NS + NOTIFICATION_DELEGATION_TTL_NS;
-        queue_one(after);
-        assert!(
-            claim_rewake(recipient, browsers[0], after).is_some(),
-            "the delegation it was for has expired, so the next one earns a wake-up"
-        );
     }
 
     #[test]
@@ -1055,8 +1010,10 @@ mod tests {
         assert_eq!(still_in_backlog(SECOND_NS), 80 - 10);
     }
 
+    /// A full budget decides when a wake-up is posted, never whether it was asked for:
+    /// nothing is spent by an ask that finds no room.
     #[test]
-    fn a_browser_keeps_its_rewake_claim_while_the_outcall_budget_is_full() {
+    fn a_wake_up_refused_a_slot_may_be_asked_for_again() {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
         submit(recipient, 7, 10 * SECOND_NS);
@@ -1067,8 +1024,8 @@ mod tests {
 
         drop(held);
         assert!(
-            claim_rewake(recipient, browsers[0], SECOND_NS).is_some(),
-            "the claim is spent on a wake-up that goes out, not on one refused a slot"
+            rewake(recipient, browsers[0], SECOND_NS).is_some(),
+            "the entry is still waiting, so there is still something to come back for"
         );
     }
 

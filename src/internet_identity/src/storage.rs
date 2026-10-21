@@ -1576,20 +1576,18 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             };
-            let pointing: Vec<(BrowserId, bool)> = anchor
+            let pointing: Vec<BrowserId> = anchor
                 .browsers()
                 .iter()
                 .filter(|browser| browser.is_delivered_through(app_id))
-                .map(|browser| (browser.id, browser.woken_again_at_ns.is_some()))
+                .map(|browser| browser.id)
                 .collect();
             let mut cleared = false;
-            for (browser_id, was_woken_again) in pointing {
+            for browser_id in pointing {
                 if let Some(queue) = anchor.notifications_mut(browser_id) {
                     cleared |= !queue.is_empty();
                     queue.clear();
                 }
-                cleared |= was_woken_again;
-                anchor.set_woken_again(browser_id, None);
             }
             if !cleared {
                 continue;
@@ -1696,7 +1694,6 @@ impl<M: Memory + Clone> Storage<M> {
                 if let Some(queue) = anchor.notifications_mut(browser_id) {
                     queue.clear();
                 }
-                anchor.set_woken_again(browser_id, None);
             }
             if let Err(err) = self.write(anchor) {
                 ic_cdk::println!(
@@ -3736,9 +3733,6 @@ impl<M: Memory + Clone> Storage<M> {
         if let Some(queue) = anchor.notifications_mut(browser_id) {
             queue.clear();
         }
-        // The stamp rations a second wake-up for an entry still waiting, and this entry
-        // is waiting for nothing.
-        anchor.set_woken_again(browser_id, None);
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;

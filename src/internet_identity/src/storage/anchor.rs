@@ -106,8 +106,6 @@ pub struct Browser {
     pub webpush_subscription: Option<WebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
     pub notifications: Vec<QueuedNotification>,
-    /// When this entry was last woken again for something it could not show yet.
-    pub woken_again_at_ns: Option<Timestamp>,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
@@ -213,9 +211,8 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
                 issued_at_ns: value.jwt_issued_at_ns,
             },
-            // The entry holds both, so they are read here and never written.
+            // The entry holds it, so it is read here and never written.
             notifications: None,
-            woken_again_at_ns: None,
         }
     }
 }
@@ -255,12 +252,6 @@ impl From<StorableBrowser> for Browser {
                     })
                 })
                 .collect(),
-            woken_again_at_ns: value.woken_again_at_ns.or_else(|| {
-                value
-                    .webpush_subscription
-                    .as_ref()
-                    .and_then(|subscription| subscription.woken_again_at_ns)
-            }),
             notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
@@ -287,7 +278,6 @@ impl From<Browser> for StorableBrowser {
                     .map(StorableQueuedNotification::from)
                     .collect()
             }),
-            woken_again_at_ns: value.woken_again_at_ns,
         }
     }
 }
@@ -1070,7 +1060,6 @@ impl Anchor {
                 // was posted to at that address and can still show it.
                 if browser.webpush_subscription.is_none() {
                     browser.notifications.clear();
-                    browser.woken_again_at_ns = None;
                 }
             }
         }
@@ -1082,7 +1071,6 @@ impl Anchor {
             Some(NotificationAppRef::Linked { app_id, enabled });
         if followed_another_route && self.browsers[index].webpush_subscription.is_none() {
             self.browsers[index].notifications.clear();
-            self.browsers[index].woken_again_at_ns = None;
         }
     }
 
@@ -1249,13 +1237,6 @@ impl Anchor {
             .map(|browser| &mut browser.notifications)
     }
 
-    /// Stamps that this entry has been woken again for something still waiting.
-    pub fn set_woken_again(&mut self, browser_id: BrowserId, at_ns: Option<Timestamp>) {
-        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
-            browser.woken_again_at_ns = at_ns;
-        }
-    }
-
     /// Moves each browser's session count by what a write added to or took from it.
     ///
     /// A delta against a browser no entry holds is dropped: the cap can retire an entry
@@ -1398,7 +1379,6 @@ impl Anchor {
             session_count: 0,
             webpush_subscription: None,
             notifications: Vec::new(),
-            woken_again_at_ns: None,
             notification_app: None,
         });
 

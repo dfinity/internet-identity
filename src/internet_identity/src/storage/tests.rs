@@ -6971,30 +6971,6 @@ mod session_revocation_tests {
     }
 
     #[test]
-    fn signing_a_browser_out_clears_its_re_wake_stamp() {
-        let (mut storage, anchor_number) = storage_with_anchor();
-        create(&mut storage, anchor_number, "https://a.com", 1, 0, 1_000);
-        let mut anchor = storage.read(anchor_number).unwrap();
-        anchor.set_woken_again(0, Some(1_000));
-        storage.write(anchor).unwrap();
-
-        storage
-            .revoke_browser_sessions(anchor_number, 0, TEST_NOW)
-            .unwrap();
-
-        assert_eq!(
-            storage
-                .read(anchor_number)
-                .unwrap()
-                .browsers()
-                .iter()
-                .find(|browser| browser.id == 0)
-                .and_then(|browser| browser.woken_again_at_ns),
-            None
-        );
-    }
-
-    #[test]
     fn signing_out_a_browser_with_nothing_to_revoke_writes_nothing() {
         let (mut storage, anchor_number) = storage_with_anchor();
         create(&mut storage, anchor_number, "https://a.com", 1, 0, 1_000);
@@ -7944,7 +7920,6 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     own.notifications_mut(0)
         .expect("a listed browser")
         .push(queued_notification(7));
-    own.set_woken_again(0, Some(1_000));
     storage
         .write(own)
         .expect("writing the entry with its own address");
@@ -7955,7 +7930,6 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         .notifications_mut(0)
         .expect("a listed browser")
         .push(queued_notification(8));
-    routed.set_woken_again(0, Some(1_000));
     storage.write(routed).expect("writing the routed entry");
 
     storage
@@ -7975,13 +7949,6 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
             .collect::<Vec<_>>(),
         vec![7]
     );
-    assert_eq!(
-        own.browsers()
-            .iter()
-            .find(|browser| browser.id == 0)
-            .and_then(|browser| browser.woken_again_at_ns),
-        Some(1_000)
-    );
 
     let routed = storage.read(10_001).expect("reading the anchor");
     assert_eq!(
@@ -7990,14 +7957,6 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         "the reference goes either way"
     );
     assert!(routed.notifications(0).is_empty());
-    assert_eq!(
-        routed
-            .browsers()
-            .iter()
-            .find(|browser| browser.id == 0)
-            .and_then(|browser| browser.woken_again_at_ns),
-        None
-    );
 
     assert_eq!(storage.notification_app(app.id), None);
 }
@@ -8040,7 +7999,6 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         .notifications_mut(0)
         .expect("a listed browser")
         .push(queued_notification(7));
-    anchor.set_woken_again(0, Some(1_000));
     storage.write(anchor).expect("queueing");
 
     // The same address is a pool replacement, which keeps what is waiting.
@@ -8062,14 +8020,6 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
 
     let anchor = storage.read(10_000).expect("reading the anchor");
     assert!(anchor.notifications(0).is_empty());
-    assert_eq!(
-        anchor
-            .browsers()
-            .iter()
-            .find(|browser| browser.id == 0)
-            .and_then(|browser| browser.woken_again_at_ns),
-        None
-    );
 }
 
 #[test]
@@ -8089,7 +8039,6 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     own.notifications_mut(0)
         .expect("a listed browser")
         .push(queued_notification(7));
-    own.set_woken_again(0, Some(1_000));
     storage
         .write(own)
         .expect("writing the entry with its own address");
@@ -8100,7 +8049,6 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
         .notifications_mut(0)
         .expect("a listed browser")
         .push(queued_notification(8));
-    routed.set_woken_again(0, Some(1_000));
     storage.write(routed).expect("writing the routed entry");
 
     storage
@@ -8115,24 +8063,9 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
             .collect::<Vec<_>>(),
         vec![7]
     );
-    assert_eq!(
-        own.browsers()
-            .iter()
-            .find(|browser| browser.id == 0)
-            .and_then(|browser| browser.woken_again_at_ns),
-        Some(1_000)
-    );
 
     let routed = storage.read(10_001).expect("reading the anchor");
     assert!(routed.notifications(0).is_empty());
-    assert_eq!(
-        routed
-            .browsers()
-            .iter()
-            .find(|browser| browser.id == 0)
-            .and_then(|browser| browser.woken_again_at_ns),
-        None
-    );
 }
 
 #[test]

@@ -196,7 +196,6 @@ fn write_subscription(
         if let Some(queue) = anchor.notifications_mut(browser_id) {
             queue.clear();
         }
-        anchor.set_woken_again(browser_id, None);
     }
     anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
@@ -332,27 +331,6 @@ mod tests {
                 app_id: app.id,
                 enabled: false,
             })
-        );
-    }
-
-    #[test]
-    fn a_new_endpoint_clears_the_re_wake_stamp() {
-        setup();
-        let (anchor_number, browsers) = anchor_with_browsers(1);
-        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
-        let mut stored = anchor(anchor_number);
-        stored.set_woken_again(browsers[0], Some(1_000));
-        storage_borrow_mut(|storage| storage.write(stored)).expect("stamping");
-
-        subscribe(anchor_number, browsers[0], ROTATED, 2_000);
-
-        assert_eq!(
-            anchor(anchor_number)
-                .browsers()
-                .iter()
-                .find(|browser| browser.id == browsers[0])
-                .and_then(|browser| browser.woken_again_at_ns),
-            None
         );
     }
 

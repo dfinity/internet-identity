@@ -1614,19 +1614,10 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
             });
-        anchor.set_woken_again(first, Some(1_000));
 
         anchor.point_at_notification_app(second, 7);
 
         assert!(anchor.notifications(first).is_empty());
-        assert_eq!(
-            anchor
-                .browsers()
-                .iter()
-                .find(|browser| browser.id == first)
-                .and_then(|browser| browser.woken_again_at_ns),
-            None
-        );
     }
 
     /// A queue is cleared because what is in it was posted to an address this entry can
@@ -1678,20 +1669,11 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
             });
-        anchor.set_woken_again(id, Some(1_000));
         anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
 
         anchor.point_at_notification_app(id, 8);
 
         assert!(anchor.notifications(id).is_empty());
-        assert_eq!(
-            anchor
-                .browsers()
-                .iter()
-                .find(|browser| browser.id == id)
-                .and_then(|browser| browser.woken_again_at_ns),
-            None
-        );
     }
 
     #[test]
@@ -1716,7 +1698,6 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
             });
-        anchor.set_woken_again(id, Some(1_000));
 
         anchor.point_at_notification_app(id, 7);
         assert_eq!(anchor.notifications(id).len(), 1);
@@ -1724,14 +1705,6 @@ mod browser_tests {
         anchor.point_at_notification_app(id, 8);
 
         assert!(anchor.notifications(id).is_empty());
-        assert_eq!(
-            anchor
-                .browsers()
-                .iter()
-                .find(|browser| browser.id == id)
-                .and_then(|browser| browser.woken_again_at_ns),
-            None
-        );
     }
 
     /// A reference naming a record that is gone is no app this identity has. The record
