@@ -113,7 +113,7 @@ use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
 use crate::storage::anchor::{
-    keeps_endpoint, Anchor, Browser, BrowserError, WebPushSubscription, MAX_BROWSERS,
+    keeps_endpoint, Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS,
 };
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -1579,7 +1579,7 @@ impl<M: Memory + Clone> Storage<M> {
             let pointing: Vec<(BrowserId, bool)> = anchor
                 .browsers()
                 .iter()
-                .filter(|browser| delivered_through_notification_app(browser, app_id))
+                .filter(|browser| browser.is_delivered_through(app_id))
                 .map(|browser| (browser.id, browser.woken_again_at_ns.is_some()))
                 .collect();
             let mut cleared = false;
@@ -1645,28 +1645,39 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// False where a reference survived, so the record is still held by something.
-    pub fn forget_notification_app(&mut self, app_id: NotificationAppId) -> bool {
-        let mut all_dropped = true;
+    /// Drops every reference to `app_id`, and with it what that record's address was
+    /// carrying for the entries it delivered to.
+    ///
+    /// `Err` where an anchor could not be read or written, naming the first that failed.
+    /// Every other anchor is still attempted, so a failure here is a partial one and the
+    /// references that were dropped stay dropped.
+    pub fn forget_notification_app(
+        &mut self,
+        app_id: NotificationAppId,
+    ) -> Result<(), StorageError> {
+        let mut failure = None;
         for anchor_number in self.anchors_with_notification_app(app_id) {
-            let Ok(mut anchor) = self.read(anchor_number) else {
-                ic_cdk::println!(
-                    "Failed to read anchor {anchor_number} to drop notification app {app_id}"
-                );
-                all_dropped = false;
-                continue;
+            let mut anchor = match self.read(anchor_number) {
+                Ok(anchor) => anchor,
+                Err(err) => {
+                    ic_cdk::println!(
+                        "Failed to read anchor {anchor_number} to drop notification app {app_id}"
+                    );
+                    failure = failure.or(Some(err));
+                    continue;
+                }
             };
             // The reference goes from every entry that holds one. The queue and the stamp
             // go only from the entries this record's address delivered for.
             let pointing: Vec<(BrowserId, bool, bool)> = anchor
                 .browsers()
                 .iter()
-                .filter(|browser| points_at_notification_app(browser, app_id))
+                .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| {
                     (
                         browser.id,
-                        delivered_through_notification_app(browser, app_id),
-                        delivery_switched_off(browser, app_id),
+                        browser.is_delivered_through(app_id),
+                        browser.is_delivery_disabled_for(app_id),
                     )
                 })
                 .collect();
@@ -1691,10 +1702,13 @@ impl<M: Memory + Clone> Storage<M> {
                 ic_cdk::println!(
                     "Failed to drop notification app {app_id} from anchor {anchor_number}: {err}"
                 );
-                all_dropped = false;
+                failure = failure.or(Some(err));
             }
         }
-        all_dropped
+        match failure {
+            Some(err) => Err(err),
+            None => Ok(()),
+        }
     }
 
     /// Forgets a record no anchor points at. The record is committed with the reply even
@@ -4648,28 +4662,6 @@ pub struct CreateSessionParams {
     pub max_idle_ns: Option<u64>,
     pub read_only: bool,
     pub now_ns: Timestamp,
-}
-
-/// Whether this entry points at `app_id`. Pointing is which app this browser has, not
-/// where its wake-ups went.
-/// Whether this entry points at `app_id` with delivery switched off, which is this
-/// identity's answer about this device rather than about the record carrying it.
-fn delivery_switched_off(browser: &Browser, app_id: NotificationAppId) -> bool {
-    browser
-        .notification_app
-        .is_some_and(|reference| reference.linked_app() == Some(app_id) && !reference.delivers())
-}
-
-fn points_at_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {
-    browser
-        .notification_app
-        .is_some_and(|reference| reference.linked_app() == Some(app_id))
-}
-
-/// Whether this entry's wake-ups were posted to `app_id`'s address, which is what says that
-/// address going away takes this entry's queue and re-wake stamp with it.
-fn delivered_through_notification_app(browser: &Browser, app_id: NotificationAppId) -> bool {
-    browser.webpush_subscription.is_none() && points_at_notification_app(browser, app_id)
 }
 
 #[cfg(not(test))]

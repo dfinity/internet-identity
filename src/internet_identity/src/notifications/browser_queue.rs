@@ -384,7 +384,7 @@ mod tests {
                 )
                 .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id, true);
+            stored.point_at_notification_app(browser_id, app.id);
             storage.write(stored).expect("pointing at the app");
             app.id
         });
@@ -415,7 +415,7 @@ mod tests {
         let (anchor_number, browser_id, app_id) = routed_through_an_app();
         enqueue(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
         let mut stored = anchor(anchor_number);
-        stored.set_notification_app_enabled(browser_id, false);
+        stored.disable_notification_app(browser_id);
         storage_borrow_mut(|storage| storage.write(stored)).expect("switching delivery off");
 
         remove_after_failed_wake_up(

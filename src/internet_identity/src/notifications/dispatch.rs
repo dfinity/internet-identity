@@ -354,10 +354,10 @@ pub(crate) fn wake_again(anchor_number: AnchorNumber, browser_id: BrowserId, now
 /// Takes the browser's one second wake-up per delegation lifetime, or `None` where it
 /// has nothing to come back for or has already had it.
 ///
-/// The wake-up is posted at the browser's own asking, so it is rationed: without this,
-/// a browser asking for delegations in a loop would spend the canister's cycles on
-/// outcalls. One per [`NOTIFICATION_DELEGATION_TTL_NS`] is all a worker can need,
-/// since that is how long the delegation it just minted lasts.
+/// The wake-up is posted at the browser's own asking, so it is rationed: without this, a
+/// browser asking for delegations in a loop would take outcall slots out of the pool
+/// every other delivery shares. One per [`NOTIFICATION_DELEGATION_TTL_NS`] is all a
+/// worker can need, since that is how long the delegation it just minted lasts.
 pub(crate) fn claim_rewake(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
@@ -757,7 +757,7 @@ mod tests {
                     .expect("the record is there");
             }
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id, true);
+            stored.point_at_notification_app(browser_id, app.id);
             stored.move_browser_session_counts(&BTreeMap::from([(browser_id, 1)]));
             storage.write(stored).expect("pointing at the app");
             app.id
@@ -783,7 +783,7 @@ mod tests {
         let (recipient, browsers) = subscribed_recipient(1);
         route_through_an_app(recipient, browsers[0], 9, Some(APP_RELAY));
         let mut stored = anchor(recipient);
-        stored.set_notification_app_enabled(browsers[0], false);
+        stored.disable_notification_app(browsers[0]);
         storage_borrow_mut(|storage| storage.write(stored)).expect("switching off");
 
         submit(recipient, 7, 10 * SECOND_NS);
