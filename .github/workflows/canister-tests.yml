@@ -435,13 +435,19 @@ jobs:
       # Entra-style provider (pairwise `sub` + stable `oid`) for the non-`sub`
       # gating tests; 11109 only serves a well-known pointing at the 11107 IdP,
       # a second SSO discovery domain for the same accounts (domain-mismatch
-      # tests).
-      openid_providers: "11105 11106 11107 11108 11109"
+      # tests); 11110 issues the tokens of the "Apple" provider.
+      openid_providers: "11105 11106 11107 11108 11109 11110"
       # The Entra-style provider port — started with pairwise env below.
       pairwise_openid_provider: "11108"
       # The alias discovery-domain port and the IdP it points at.
       alias_openid_provider: "11109"
       alias_openid_target: "11107"
+      # The "Apple" provider: configured with Apple's real authorize URL so the
+      # frontend takes its Sign in with Apple paths, while its tokens come from
+      # this port. The tests route https://appleid.apple.com to it and back (see
+      # fixtures/apple.ts), the only redirect URI it accepts.
+      apple_openid_provider: "11110"
+      apple_redirect_uri: "https://appleid.apple.com/e2e/callback"
       # Direct OpenID provider ports — only these get an `openid_configs`
       # entry on the canister. 11107 is intentionally excluded: it's
       # registered exclusively as an SSO `DiscoverableOidcConfig`, so the
@@ -508,6 +514,9 @@ jobs:
               # origin is https://id.ai, so restrict to that one callback.
               OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" OIDC_REDIRECT_URIS="https://id.ai/callback" \
                 npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
+            elif [ "$port" = "${{ env.apple_openid_provider }}" ]; then
+              OIDC_REDIRECT_URIS="${{ env.apple_redirect_uri }}" \
+                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
             elif [ "$port" = "${{ env.alias_openid_provider }}" ]; then
               # Alias discovery domain: its well-known hands II the target
               # provider's OIDC configuration, so sign-ins through it hit the
@@ -563,6 +572,8 @@ jobs:
           for port in ${{ env.direct_openid_providers }}; do
             configs+=("record { name = \\\"Test OpenID $port\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$port/jwks\\\"; auth_uri = \\\"http://localhost:$port/auth\\\"; auth_scope = vec { \\\"openid\\\"; \\\"profile\\\"; \\\"email\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Google }; }")
           done
+          apple_port=${{ env.apple_openid_provider }}
+          configs+=("record { name = \\\"Apple\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$apple_port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$apple_port/jwks\\\"; auth_uri = \\\"https://appleid.apple.com/auth/authorize\\\"; auth_scope = vec { \\\"openid\\\"; \\\"email\\\"; \\\"name\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Apple }; }")
           openid_configs="$(IFS='; '; echo "${configs[*]}")"
           echo "OPENID_CONFIGS=$openid_configs" >> "$GITHUB_OUTPUT"
 

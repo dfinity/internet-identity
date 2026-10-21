@@ -17,7 +17,7 @@ REPO_ROOT="$PWD"
 
 # Match the e2e job in .github/workflows/canister-tests.yml
 LAUNCHER_TAG="v12.0.0-2026-04-16-04-20"
-OPENID_PORTS=(11105 11106 11107 11108 11109)
+OPENID_PORTS=(11105 11106 11107 11108 11109 11110)
 DIRECT_OPENID_PORTS=(11105 11106)
 # 11108 is an Entra-style provider: pairwise `sub` (per client) + a stable `oid`,
 # for the non-`sub` gating tests (see fixtures/sso.ts SSO_ENTRA_DISCOVERY_DOMAIN).
@@ -29,6 +29,12 @@ PAIRWISE_OPENID_PORT=11108
 # tests (see fixtures/sso.ts SSO_ALIAS_DISCOVERY_DOMAIN). Never gated.
 ALIAS_OPENID_PORT=11109
 ALIAS_OPENID_TARGET_PORT=11107
+# 11110 issues the tokens of the "Apple" provider, configured with Apple's real
+# authorize URL so the frontend takes its Sign in with Apple paths. The e2e tests
+# route https://appleid.apple.com to this provider and back (see
+# fixtures/apple.ts), the only redirect URI it accepts.
+APPLE_OPENID_PORT=11110
+APPLE_REDIRECT_URI="https://appleid.apple.com/e2e/callback"
 
 STATE_DIR=".icp/cache/dev-e2e"
 LAUNCHER_DIR="$STATE_DIR/launcher-$LAUNCHER_TAG"
@@ -265,6 +271,10 @@ start_openid_providers() {
         OIDC_REDIRECT_URIS="https://id.ai/callback" \
         npm start --silent --prefix ./src/test_openid_provider -- "$port" \
         > "$LOG_DIR/openid-$port.log" 2>&1 &
+    elif [[ "$port" == "$APPLE_OPENID_PORT" ]]; then
+      OIDC_REDIRECT_URIS="$APPLE_REDIRECT_URI" \
+        npm start --silent --prefix ./src/test_openid_provider -- "$port" \
+        > "$LOG_DIR/openid-$port.log" 2>&1 &
     elif [[ "$port" == "$ALIAS_OPENID_PORT" ]]; then
       # Alias discovery domain: its well-known hands II the 11107 provider's
       # OIDC configuration, so sign-ins through it hit the same IdP and accounts.
@@ -336,6 +346,7 @@ write_install_args() {
   for port in "${DIRECT_OPENID_PORTS[@]}"; do
     configs+=("record { name = \"Test OpenID $port\"; logo = \"$svg\"; issuer = \"http://localhost:$port\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$port/jwks\"; auth_uri = \"http://localhost:$port/auth\"; auth_scope = vec { \"openid\"; \"profile\"; \"email\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Google }; }")
   done
+  configs+=("record { name = \"Apple\"; logo = \"$svg\"; issuer = \"http://localhost:$APPLE_OPENID_PORT\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$APPLE_OPENID_PORT/jwks\"; auth_uri = \"https://appleid.apple.com/auth/authorize\"; auth_scope = vec { \"openid\"; \"email\"; \"name\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Apple }; }")
   local openid_configs dnssec_config
   openid_configs="$(IFS='; '; echo "${configs[*]}")"
   dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
