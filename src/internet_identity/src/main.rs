@@ -396,6 +396,10 @@ const PENDING_LINK_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 fn prepare_notification_app_link(
     request: PrepareNotificationAppLinkRequest,
 ) -> Result<(), PrepareNotificationAppLinkError> {
+    let PrepareNotificationAppLinkRequest {
+        anchor_number,
+        link_principal,
+    } = request;
     if !notifications::notifications_enabled() {
         return Err(PrepareNotificationAppLinkError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
@@ -404,16 +408,16 @@ fn prepare_notification_app_link(
     // The whole authority of an install URL is the key behind this principal, and the
     // anonymous principal is held by everyone, so an install offered to it is one
     // anybody could complete.
-    if request.link_principal == Principal::anonymous() {
+    if link_principal == Principal::anonymous() {
         return Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous);
     }
-    let (mut anchor, browser_id) = check_browser_authorization(request.anchor_number)
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
 
     let now = ic_cdk::api::time();
     anchor.start_notification_app_link(
         browser_id,
-        request.link_principal,
+        link_principal,
         now.saturating_add(PENDING_LINK_LIFETIME_NS),
     );
 
@@ -431,6 +435,11 @@ fn prepare_notification_app_link(
 fn link_notification_app(
     request: LinkNotificationAppRequest,
 ) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
+    let LinkNotificationAppRequest {
+        anchor_number,
+        app_principal,
+        app_id,
+    } = request;
     if !notifications::notifications_enabled() {
         return Err(LinkNotificationAppError::InternalCanisterError(
             notifications::NOT_ENABLED_MESSAGE.to_string(),
@@ -438,20 +447,20 @@ fn link_notification_app(
     }
     // The record is keyed by this principal, and the anonymous one is held by everyone,
     // so a record keyed by it is one any caller at all would resolve to.
-    if request.app_principal == Principal::anonymous() {
+    if app_principal == Principal::anonymous() {
         return Err(LinkNotificationAppError::AppPrincipalIsAnonymous);
     }
     let now = ic_cdk::api::time();
-    let mut anchor = state::anchor(request.anchor_number);
+    let mut anchor = state::anchor(anchor_number);
     let installing_browser = anchor
         .browser_awaiting_link(caller(), now)
         .ok_or(LinkNotificationAppError::NoPendingLink)?;
-    if anchor.browser_signs_as(request.app_principal) {
+    if anchor.browser_signs_as(app_principal) {
         return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app(request.app_principal, request.app_id, now)
+        storage.ensure_notification_app(app_principal, app_id, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id, true);
