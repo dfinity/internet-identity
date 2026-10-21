@@ -3,7 +3,7 @@
 //! one it shows on every wake-up, so wake-ups and shown notifications stay one to one.
 //! The queue lives on the browser's entry, and is cleared when its wake-up address changes.
 
-use crate::authz_utils::NotificationAuthorization;
+use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, QueuedNotification};
@@ -143,12 +143,12 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
 fn probe_only_the_app_may_answer(
     anchor: &Anchor,
     browser_id: BrowserId,
-    authorization: &NotificationAuthorization,
+    key: NotificationKey,
     now_ns: Timestamp,
 ) -> Option<NotificationId> {
-    match authorization {
-        NotificationAuthorization::App(_) => None,
-        NotificationAuthorization::Browser => anchor.pending_probe(browser_id, now_ns),
+    match key {
+        NotificationKey::App(_) => None,
+        NotificationKey::Browser(_) => anchor.pending_probe(browser_id, now_ns),
     }
 }
 
@@ -162,11 +162,11 @@ fn is_the_probe(queued: &QueuedNotification, probe: Option<NotificationId>) -> b
 pub(crate) fn next_to_show(
     anchor: &Anchor,
     browser_id: BrowserId,
-    authorization: &NotificationAuthorization,
+    key: NotificationKey,
     now_ns: Timestamp,
 ) -> Option<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
-    let probe = probe_only_the_app_may_answer(anchor, browser_id, authorization, now_ns);
+    let probe = probe_only_the_app_may_answer(anchor, browser_id, key, now_ns);
     storage_borrow(|storage| {
         anchor
             .notifications(browser_id)
@@ -205,11 +205,11 @@ pub(crate) fn next_to_show(
 pub(crate) fn remove_shown(
     mut anchor: Anchor,
     browser_id: BrowserId,
-    authorization: &NotificationAuthorization,
+    key: NotificationKey,
     shown: &NotificationToShow,
     now_ns: Timestamp,
 ) -> Result<(), String> {
-    let probe = probe_only_the_app_may_answer(&anchor, browser_id, authorization, now_ns);
+    let probe = probe_only_the_app_may_answer(&anchor, browser_id, key, now_ns);
     storage_borrow_mut(|storage| {
         // Every part of what identifies an entry, origin included: a sender may queue
         // the same id for two applications, and one that is expired or belongs to
@@ -372,19 +372,17 @@ mod tests {
     }
 
     /// What the Home Screen app signing as `app_id` reads and acknowledges.
-    fn as_app(app_id: NotificationAppId) -> NotificationAuthorization {
-        NotificationAuthorization::App(Box::new(
-            storage_borrow(|storage| storage.notification_app(app_id)).expect("a stored app"),
-        ))
+    fn as_app(app_id: NotificationAppId) -> NotificationKey {
+        NotificationKey::App(app_id)
     }
 
     fn next_as(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
-        authorization: &NotificationAuthorization,
+        key: NotificationKey,
         now_ns: Timestamp,
     ) -> Option<NotificationToShow> {
-        next_to_show(&anchor(anchor_number), browser_id, authorization, now_ns)
+        next_to_show(&anchor(anchor_number), browser_id, key, now_ns)
     }
 
     fn next(
@@ -395,7 +393,7 @@ mod tests {
         next_as(
             anchor_number,
             browser_id,
-            &NotificationAuthorization::Browser,
+            NotificationKey::Browser(browser_id),
             now_ns,
         )
     }
@@ -411,18 +409,12 @@ mod tests {
     fn remove_as(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
-        authorization: &NotificationAuthorization,
+        key: NotificationKey,
         notification: &NotificationToShow,
         now_ns: Timestamp,
     ) {
-        remove_shown(
-            anchor(anchor_number),
-            browser_id,
-            authorization,
-            notification,
-            now_ns,
-        )
-        .expect("removing");
+        remove_shown(anchor(anchor_number), browser_id, key, notification, now_ns)
+            .expect("removing");
     }
 
     fn remove(
@@ -434,7 +426,7 @@ mod tests {
         remove_as(
             anchor_number,
             browser_id,
-            &NotificationAuthorization::Browser,
+            NotificationKey::Browser(browser_id),
             notification,
             now_ns,
         );
@@ -479,7 +471,7 @@ mod tests {
                 )
                 .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id, true);
+            stored.point_at_notification_app(browser_id, app.id);
             storage.write(stored).expect("pointing at the app");
             app.id
         });
@@ -510,7 +502,7 @@ mod tests {
         let (anchor_number, browser_id, app_id) = routed_through_an_app();
         enqueue(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
         let mut stored = anchor(anchor_number);
-        stored.set_notification_app_enabled(browser_id, false);
+        stored.disable_notification_app(browser_id);
         storage_borrow_mut(|storage| storage.write(stored)).expect("switching delivery off");
 
         remove_after_failed_wake_up(
@@ -544,7 +536,7 @@ mod tests {
             storage.sign_in_for_testing(other_number, &ORIGIN.to_string());
             let mut stored = storage.read(other_number).expect("reading it back");
             let other_browser = stored.browsers().first().expect("a browser").id;
-            stored.point_at_notification_app(other_browser, left_behind, true);
+            stored.point_at_notification_app(other_browser, left_behind);
             storage
                 .write(stored)
                 .expect("pointing the second identity at the app");
@@ -566,7 +558,7 @@ mod tests {
                 )
                 .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
-            stored.point_at_notification_app(browser_id, app.id, true);
+            stored.point_at_notification_app(browser_id, app.id);
             storage.write(stored).expect("pointing at the second app");
             app.id
         });
@@ -654,7 +646,7 @@ mod tests {
 
         assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
         assert_eq!(
-            next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS).map(|one| one.id),
+            next_as(anchor_number, browser_id, as_app(app_id), 2 * SECOND_NS).map(|one| one.id),
             Some(1)
         );
     }
@@ -691,7 +683,7 @@ mod tests {
 
         assert_eq!(left_for(anchor_number, browser_id), vec![1]);
         assert_eq!(
-            next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS).map(|one| one.id),
+            next_as(anchor_number, browser_id, as_app(app_id), 2 * SECOND_NS).map(|one| one.id),
             Some(1)
         );
     }
@@ -743,12 +735,12 @@ mod tests {
         remove(anchor_number, browser_id, &crafted, 2 * SECOND_NS);
 
         assert_eq!(left_for(anchor_number, browser_id), vec![1]);
-        let shown = next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS)
+        let shown = next_as(anchor_number, browser_id, as_app(app_id), 2 * SECOND_NS)
             .expect("the app is still shown the probe");
         remove_as(
             anchor_number,
             browser_id,
-            &as_app(app_id),
+            as_app(app_id),
             &shown,
             2 * SECOND_NS,
         );
@@ -759,13 +751,13 @@ mod tests {
     fn only_the_app_may_acknowledge_the_probe_it_was_sent() {
         let (anchor_number, browser_id, app_id) = routed_through_an_app();
         probe(anchor_number, browser_id, 1);
-        let shown = next_as(anchor_number, browser_id, &as_app(app_id), 2 * SECOND_NS)
+        let shown = next_as(anchor_number, browser_id, as_app(app_id), 2 * SECOND_NS)
             .expect("the app is shown the probe");
 
         remove_as(
             anchor_number,
             browser_id,
-            &NotificationAuthorization::Browser,
+            NotificationKey::Browser(browser_id),
             &shown,
             2 * SECOND_NS,
         );
@@ -774,7 +766,7 @@ mod tests {
         remove_as(
             anchor_number,
             browser_id,
-            &as_app(app_id),
+            as_app(app_id),
             &shown,
             2 * SECOND_NS,
         );
