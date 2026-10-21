@@ -5,8 +5,7 @@ import { installUrlOrNone } from "$lib/utils/notifications/installUrl";
 
 /** Notifications reach this identity on this device now, or the install is what is left and this is where it lives. */
 export type AppSwitchOutcome =
-  | { delivering: true }
-  | { delivering: false; installUrl: string | undefined };
+  { delivering: true } | { delivering: false; installUrl: string | undefined };
 
 /** A handle is offered on the strength of the donor browser pointing at an app, which does not mean the app has a subscription, so what the canister says after the claim is what answers. */
 const claimedAppDelivers = async (identityNumber: bigint): Promise<boolean> => {
