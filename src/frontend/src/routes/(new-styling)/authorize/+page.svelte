@@ -691,7 +691,6 @@
         device={$notificationConsentStore.device}
         consented={$notificationConsentStore.consented}
         installFirst={$notificationConsentStore.installFirst}
-        justClaimed={$notificationConsentStore.justClaimed}
         onDone={() => notificationConsentStore.settle()}
       />
     {/key}

@@ -5,11 +5,7 @@ import { installUrlOrNone } from "$lib/utils/notifications/installUrl";
 
 /** Notifications reach this identity on this device now, or the install is what is left and this is where it lives. */
 export type AppSwitchOutcome =
-  | {
-      delivering: true;
-      /** An app taken over from another identity links switched off, so the press that took it is what switches it on. */
-      claimed: boolean;
-    }
+  | { delivering: true }
   | { delivering: false; installUrl: string | undefined };
 
 /** A handle is offered on the strength of the donor browser pointing at an app, which does not mean the app has a subscription, so what the canister says after the claim is what answers. */
@@ -34,7 +30,7 @@ export const turnOnWithApp = async ({
 }): Promise<AppSwitchOutcome> => {
   // An app another identity on this browser can hand over is pointed at instead of installed again, and only where this browser points at nothing.
   if (ownApp === undefined && (await claimedAppDelivers(identityNumber))) {
-    return { delivering: true, claimed: true };
+    return { delivering: true };
   }
   return {
     delivering: false,

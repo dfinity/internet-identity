@@ -1,10 +1,7 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import type {
-  _SERVICE,
-  PrepareNotificationAppLinkError,
-} from "$lib/generated/internet_identity_types";
-import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import { throwCanisterError } from "$lib/utils/utils";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
@@ -24,14 +21,12 @@ const registeredBrowserActor = async (
   }
 };
 
-/** `undefined` where this browser is not registered; rejects where its key could not be read or the canister refused the install. */
+/** `undefined` where this browser is not registered; rejects where its key could not be read or the canister refused the install.
+ *  The canister refuses while the app it would replace is still answering, so a caller that offers an install asks the app to prove itself first. */
 export const prepareInstallUrl = async ({
   identityNumber,
-  replacingExisting,
 }: {
   identityNumber: bigint;
-  /** The user has said the app is gone, which the canister takes as leave to replace a record that still claims to deliver. */
-  replacingExisting: boolean;
 }): Promise<string | undefined> => {
   const actor = await registeredBrowserActor(identityNumber);
   if (actor === undefined) {
@@ -47,7 +42,6 @@ export const prepareInstallUrl = async ({
     .prepare_notification_app_link({
       anchor_number: identityNumber,
       link_principal: identity.getPrincipal(),
-      replacing_existing: replacingExisting,
     })
     .then(throwCanisterError);
   return `${NOTIFICATION_APP_PATH}#${encodeLinkToken({
@@ -59,34 +53,15 @@ export const prepareInstallUrl = async ({
 /** The placeholder the new tab holds while the URL is still being minted: this page, told to wait rather than to decide. */
 export const INSTALL_PLACEHOLDER_URL = `${NOTIFICATION_APP_PATH}?installing`;
 
-/** `undefined` where this browser has nothing to send the user to; the reason is logged rather than raised. */
+/** `undefined` where this browser has nothing to send the user to; the reason is logged rather than raised.
+ *  A record that still answers refuses an install, which is what keeps a second app off a device that already has one.
+ *  That refusal is not worked around here: the caller that means to replace an app probes it first, and the screen says so where it is still there. */
 export const installUrlOrNone = async (
   identityNumber: bigint,
 ): Promise<string | undefined> => {
   try {
-    return await prepareInstallUrl({
-      identityNumber,
-      replacingExisting: false,
-    });
+    return await prepareInstallUrl({ identityNumber });
   } catch (error) {
-    // A record that says it delivers refuses an ordinary install, which is what keeps a
-    // second app off a device that already has one. Reaching this screen means the app
-    // it names did not answer, so the record outlived the app and the install that
-    // replaces it is the one to mint.
-    if (
-      isCanisterError<PrepareNotificationAppLinkError>(error) &&
-      error.type === "AppAlreadyDelivering"
-    ) {
-      try {
-        return await prepareInstallUrl({
-          identityNumber,
-          replacingExisting: true,
-        });
-      } catch (replacing) {
-        console.error(replacing);
-        return undefined;
-      }
-    }
     console.error(error);
     return undefined;
   }

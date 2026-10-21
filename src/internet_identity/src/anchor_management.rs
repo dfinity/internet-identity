@@ -21,7 +21,13 @@ pub mod registration;
 pub mod tentative_device_registration;
 
 pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    let anchor = state::anchor(anchor_number);
+    anchor_info(&state::anchor(anchor_number))
+}
+
+/// As [`get_anchor_info`], for a caller that has already read the anchor. Reading one is
+/// a full stable-memory read and deserialise, so a caller assembling several answers
+/// about the same identity reads it once and passes it.
+pub fn anchor_info(anchor: &Anchor) -> IdentityAnchorInfo {
     let devices = anchor
         .devices()
         .clone()
@@ -39,7 +45,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let name = anchor.name();
 
     let device_registration =
-        tentative_device_registration::get_tentative_registration(anchor_number);
+        tentative_device_registration::get_tentative_registration(anchor.anchor_number());
 
     let created_at = anchor.created_at();
 

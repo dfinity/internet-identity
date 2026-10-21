@@ -8,4 +8,4 @@ export const appAnchors = async (
   appId: bigint,
 ): Promise<bigint[]> =>
   // Candid's `vec nat64` binds as a typed array or a plain one, and a typed array's `map` answers another typed array.
-  Array.from(await actor.notification_app_anchors(appId));
+  Array.from(await actor.notification_app_anchors({ app_id: appId }));

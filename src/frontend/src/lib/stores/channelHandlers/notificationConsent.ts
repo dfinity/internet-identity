@@ -291,7 +291,6 @@ const askUntilSettled = async (
       device: resolution.state,
       consented: resolution.consented,
       installFirst: resolution.installFirst,
-      justClaimed: resolution.justClaimed,
     });
 
     // The header keeps the identity switcher up for this screen, and switching

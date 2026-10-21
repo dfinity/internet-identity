@@ -179,43 +179,52 @@ pub fn check_app_authorization(
         .ok_or(AuthorizationError::from(caller))
 }
 
-/// Which entry this notification call is for, and whether the caller is the browser or
-/// the app it points at. An app speaks for an entry only while the entry routes through it.
+/// Which key a call about notifications was signed with: a browser of this identity, or
+/// an app one of its browsers points at. An app speaks for an entry only while the entry
+/// routes through it.
+///
+/// Notifications belong to an identity, which points at browsers, which may point at an
+/// app. The app is what shows them, so it is what asks for them, acknowledges them and
+/// registers for them, but what it acts on is still the entry: that is where they are
+/// queued and which identity they are for.
+///
+/// Answers which key it was and nothing more. Which entry that key acts on, and what is
+/// stored against it, are lookups the caller makes for itself against a read of its own,
+/// so nothing here is carried past the point where it was true.
 pub fn check_notification_authorization(
     anchor_number: AnchorNumber,
-) -> Result<(Anchor, BrowserId, NotificationAuthorization), AuthorizationError> {
+) -> Result<NotificationKey, AuthorizationError> {
     let caller = caller();
     let anchor = state::anchor(anchor_number);
     if let Some(browser_id) = anchor.browser_by_principal(caller) {
-        return Ok((anchor, browser_id, NotificationAuthorization::Browser));
+        return Ok(NotificationKey::Browser(browser_id));
     }
     // The anchor is already loaded and holds a handful of entries, so the app is found
     // by asking which of them routes through a record this caller belongs to.
-    let (browser_id, app) = state::storage_borrow(|storage| {
+    state::storage_borrow(|storage| {
         anchor.browsers().iter().find_map(|browser| {
             let reference = browser.notification_app?;
             // Switching delivery off is this identity saying the app does not act for it,
             // so the app stops being a caller this entry recognises.
-            if !reference.delivers() {
+            if !reference.is_delivering() {
                 return None;
             }
-            let app = storage.notification_app_of(reference.linked_app()?, caller)?;
-            Some((browser.id, app))
+            let app_id = reference.linked_app()?;
+            storage
+                .notification_app_of(app_id, caller)
+                .is_some()
+                .then_some(app_id)
         })
     })
-    .ok_or(AuthorizationError::from(caller))?;
-    Ok((
-        anchor,
-        browser_id,
-        NotificationAuthorization::App(Box::new(app)),
-    ))
+    .map(NotificationKey::App)
+    .ok_or(AuthorizationError::from(caller))
 }
 
-/// What authorizing a notification call established the caller to be.
-pub enum NotificationAuthorization {
-    Browser,
-    /// Boxed: the record dwarfs the other variant, and this is returned by value.
-    App(Box<NotificationApp>),
+/// The key a notification call was signed with, which is what authorizing it established.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NotificationKey {
+    Browser(BrowserId),
+    App(NotificationAppId),
 }
 
 /// Which of this identity's browsers the caller is signing as.

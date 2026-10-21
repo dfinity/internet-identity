@@ -333,10 +333,10 @@ describe("turnOnNotifications where a Home Screen app delivers", () => {
     expect(grant).not.toHaveBeenCalled();
   });
 
-  /// The press is the answer. An install walked from here finishes by carrying whatever
-  /// flag the entry holds, so a flag left saying off would outlive the answer and the
-  /// user would walk the whole install to arrive with notifications still off.
-  it("records the answer before sending them to install", async () => {
+  /// Nothing is written on the way to the install: the link the install finishes with
+  /// starts the entry delivering, so the answer given here is carried by the link rather
+  /// than by a flag written ahead of it.
+  it("writes nothing on the way to the install", async () => {
     appStatus.mockResolvedValue(appInfo(false, { subscribed: false }));
     const { actor } = actorAnswering(ok);
 
@@ -350,10 +350,7 @@ describe("turnOnNotifications where a Home Screen app delivers", () => {
       }),
     ).resolves.toEqual({ status: "install-required" });
 
-    expect(setEnabled).toHaveBeenCalledWith({
-      anchor_number: IDENTITY,
-      enabled: true,
-    });
+    expect(setEnabled).not.toHaveBeenCalled();
   });
 
   it("asks for the install where no app can be claimed", async () => {
