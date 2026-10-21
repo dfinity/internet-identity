@@ -1910,9 +1910,6 @@ type PrepareNotificationAppLinkRequest = record {
     anchor_number : UserNumber;
     // The principal of the one-shot key this browser puts in the install URL.
     link_principal : principal;
-    // Set where the user has said the app is gone, which is the only thing that can
-    // contradict a record still claiming to deliver.
-    replacing_existing : bool;
 };
 
 type PrepareNotificationAppLinkError = variant {
@@ -1957,17 +1954,60 @@ type LinkNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
-// Whether this identity wants the app its browser points at to deliver for it. Never a
-// subscription removal: the subscription is the app's and is shared.
-type SetNotificationAppEnabledRequest = record {
+// This identity asking the app its browser points at to deliver for it, which is also
+// what asks the app to prove it is still there: a reference that is off is skipped when
+// the canister picks who to send to, so the two cannot be separated. Probing first would
+// find nothing to wake, and switching on first would announce it and then say the same
+// thing again on the probe. The probe is the announcement. Where nothing can be woken the
+// switch does not stay on.
+//
+// Never a subscription write: the subscription is the app's and is shared.
+type EnableNotificationAppRequest = record {
     anchor_number : UserNumber;
-    enabled : bool;
 };
 
-type SetNotificationAppEnabledError = variant {
+type EnableNotificationAppError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
     // This browser points at no app.
+    NoNotificationApp;
+    // Nothing could be woken, so nothing was switched on: the app has registered
+    // nothing, the browser counts as gone, or there was no room for another outcall.
+    NotReachable;
+    InternalCanisterError : text;
+};
+
+// This identity asking the app its browser points at to stop delivering for it. Never a
+// subscription removal: the subscription is the app's and is shared with every other
+// identity pointing at it.
+type DisableNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type DisableNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+// Asks which identities a Home Screen app delivers for, named by the app's own record.
+type NotificationAppAnchorsRequest = record {
+    app_id : NotificationAppId;
+};
+
+// Offers the Home Screen app this browser has to another identity signed in on the
+// same browser, which is the only party that can reach both. The handle says nothing
+// about which app it is.
+type OfferNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type OfferNotificationAppError = variant {
+    // The caller is no browser of this identity.
+    Unauthorized : principal;
+    // This browser has no app to offer.
     NoNotificationApp;
     InternalCanisterError : text;
 };
@@ -2151,26 +2191,6 @@ type ProbeNotificationAppError = variant {
     // nothing, this identity has it switched off or is signed out on this browser, the
     // browser counts as gone, or there was no room for another outcall. The browser's
     // own registration is never woken instead.
-    NotReachable;
-    InternalCanisterError : text;
-};
-
-// Switches delivery on for this identity and asks the app to prove it is still there,
-// in one call. A reference that is off is skipped when the canister picks who to send
-// to, so the two cannot be separated: probing first would find nothing to wake, and
-// switching on first would announce it and then say the same thing again on the probe.
-// The probe is the announcement. Where nothing can be woken the switch does not stay on.
-type TurnOnNotificationAppRequest = record {
-    anchor_number : UserNumber;
-};
-
-type TurnOnNotificationAppError = variant {
-    // The caller signs with no key this identity is signed in from.
-    InvalidBrowserKey;
-    // This browser points at no app.
-    NoNotificationApp;
-    // Nothing could be woken, so nothing was switched on: the app has registered
-    // nothing, the browser counts as gone, or there was no room for another outcall.
     NotReachable;
     InternalCanisterError : text;
 };
@@ -2729,7 +2749,7 @@ service : (opt InternetIdentityInit) -> {
     // is the whole of what it can deliver for. Empty in four cases, which all mean the
     // same thing to the app: the id names nothing, nothing points at it, this deployment
     // does not notify, or the caller is not the app that record belongs to.
-    notification_app_anchors : (NotificationAppId) -> (vec UserNumber) query;
+    notification_app_anchors : (NotificationAppAnchorsRequest) -> (vec UserNumber) query;
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.
@@ -2744,11 +2764,10 @@ service : (opt InternetIdentityInit) -> {
     get_notification_app_status : (GetNotificationAppStatusRequest) -> (NotificationAppStatus) query;
 
     // Called by the identity, from the browser that points at the app.
-    set_notification_app_enabled : (SetNotificationAppEnabledRequest) -> (variant { Ok; Err : SetNotificationAppEnabledError });
+    enable_notification_app : (EnableNotificationAppRequest) -> (variant { Ok : NotificationId; Err : EnableNotificationAppError });
+    disable_notification_app : (DisableNotificationAppRequest) -> (variant { Ok; Err : DisableNotificationAppError });
 
     // Called by the browser, which watches for the answer leaving its own queue: that
     // is what says the app this browser points at is still installed.
     probe_notification_app : (ProbeNotificationAppRequest) -> (variant { Ok : NotificationId; Err : ProbeNotificationAppError });
-
-    turn_on_notification_app : (TurnOnNotificationAppRequest) -> (variant { Ok : NotificationId; Err : TurnOnNotificationAppError });
 };

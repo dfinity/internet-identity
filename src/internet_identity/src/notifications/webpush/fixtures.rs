@@ -1,7 +1,7 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
 use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
-use crate::authz_utils::NotificationAuthorization;
+use crate::authz_utils::NotificationKey;
 use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
@@ -140,9 +140,8 @@ pub(super) fn try_subscribe(
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     try_subscribe_as(
-        NotificationAuthorization::Browser,
+        NotificationKey::Browser(browser_id),
         anchor_number,
-        browser_id,
         endpoint,
         now_ns,
     )
@@ -150,19 +149,12 @@ pub(super) fn try_subscribe(
 
 /// As [`try_subscribe`], for a call that may authorize as the Home Screen app.
 pub(super) fn try_subscribe_as(
-    authorization: NotificationAuthorization,
+    key: NotificationKey,
     anchor_number: AnchorNumber,
-    browser_id: BrowserId,
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    super::set_subscription(
-        anchor(anchor_number),
-        browser_id,
-        authorization,
-        validated(anchor_number, endpoint, now_ns),
-        now_ns,
-    )
+    super::set_subscription(key, validated(anchor_number, endpoint, now_ns), now_ns)
 }
 
 /// A Home Screen app record, with `anchor`'s browser `browser_id` pointing at it.
@@ -184,7 +176,7 @@ pub(super) fn point_at_app(
     app_id: NotificationAppId,
 ) {
     let mut anchor = anchor(anchor_number);
-    anchor.point_at_notification_app(browser_id, app_id, true);
+    anchor.point_at_notification_app(browser_id, app_id);
     storage_borrow_mut(|storage| storage.write(anchor)).expect("pointing at the app");
 }
 
@@ -194,8 +186,8 @@ pub(super) fn app(app_id: NotificationAppId) -> NotificationApp {
 }
 
 /// What an app's own call authorizes as.
-pub(super) fn app_authorization(app_id: NotificationAppId) -> NotificationAuthorization {
-    NotificationAuthorization::App(Box::new(app(app_id)))
+pub(super) fn app_authorization(app_id: NotificationAppId) -> NotificationKey {
+    NotificationKey::App(app_id)
 }
 
 pub(crate) fn subscribe(

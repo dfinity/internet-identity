@@ -3,20 +3,20 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, ClaimNotificationAppError, ClaimNotificationAppRequest,
-    FrontendHostname, GetNextNotificationError, GetNextNotificationRequest,
-    GetNextNotificationResponse, GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
-    GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
-    LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
-    NotificationAppId, NotificationAppStatus, NotificationConsentGrantedRequest,
-    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
-    NotificationId, NotificationRevokeConsentError, NotificationRevokeConsentRequest,
-    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, SetNotificationAppEnabledError,
-    SetNotificationAppEnabledRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    TurnOnNotificationAppError, TurnOnNotificationAppRequest, WebPushSubscriptionStatus,
+    DisableNotificationAppError, DisableNotificationAppRequest, EnableNotificationAppError,
+    EnableNotificationAppRequest, FrontendHostname, GetNextNotificationError,
+    GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationAppStatusRequest,
+    GetNotificationDelegationRequest, GetNotificationDelegationResponse,
+    GetWebPushSubscriptionStatusRequest, LinkNotificationAppError, LinkNotificationAppRequest,
+    LinkNotificationAppResponse, NotificationAppAnchorsRequest, NotificationAppStatus,
+    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
+    NotificationGrantConsentRequest, NotificationId, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
+    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, ProbeNotificationAppError, ProbeNotificationAppRequest,
+    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
+    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -245,14 +245,14 @@ pub fn notification_app_anchors(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    app_id: NotificationAppId,
+    request: NotificationAppAnchorsRequest,
 ) -> Result<Vec<AnchorNumber>, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
         sender,
         "notification_app_anchors",
-        (app_id,),
+        (request,),
     )
     .map(|(x,)| x)
 }
@@ -307,35 +307,35 @@ pub fn probe_notification_app(
     .map(|(x,)| x)
 }
 
-pub fn set_notification_app_enabled(
+pub fn enable_notification_app(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: SetNotificationAppEnabledRequest,
-) -> Result<Result<(), SetNotificationAppEnabledError>, RejectResponse> {
+    request: EnableNotificationAppRequest,
+) -> Result<Result<NotificationId, EnableNotificationAppError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "set_notification_app_enabled",
+        "enable_notification_app",
         (request,),
     )
     .map(|(x,)| x)
 }
 
-pub fn turn_on_notification_app(
+pub fn disable_notification_app(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: TurnOnNotificationAppRequest,
-) -> Result<Result<NotificationId, TurnOnNotificationAppError>, RejectResponse> {
+    request: DisableNotificationAppRequest,
+) -> Result<Result<(), DisableNotificationAppError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "turn_on_notification_app",
+        "disable_notification_app",
         (request,),
     )
     .map(|(x,)| x)
