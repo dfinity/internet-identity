@@ -90,13 +90,10 @@ export const watchProbe = (
         onGone();
         return;
       case "app":
-        // An empty `pending_probe` says only that the entry left the queue, which a rate
-        // limit, a relay error or a rejected push also does. `last_seen_ns` moves on the
-        // app's own update calls, so that is the one thing only the app can have done.
-        if (
-          status.app.pending_probe.length === 0 &&
-          status.app.last_seen_ns > since
-        ) {
+        // `last_seen_ns` moves on the app's own update calls and on nothing else, so it
+        // is the whole of the answer. An empty `pending_probe` says only that the ask
+        // has had its window, which it gets whether or not anybody called.
+        if (status.app.last_seen_ns > since) {
           stop();
           onAnswered();
           return;
