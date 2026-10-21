@@ -22,6 +22,7 @@
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import SsoConnectErrorView from "./views/SsoConnectErrorView.svelte";
@@ -53,6 +54,7 @@
   import {
     decodeJWT,
     findConfig,
+    isAppleSignInSheetBrowser,
     isOpenIdCancelError,
     selectAuthScopes,
   } from "$lib/utils/openID";
@@ -92,6 +94,9 @@
   // channel. The early exits below (and a failure in `resumeOpenId`) set this
   // back to `false`, which is what surfaces the regular fall-back UI.
   let openIdResumeProcessing = $state(data.flow === "openid-resume");
+  // The redirect to Apple is waiting behind the native Sign in with Apple
+  // sheet, which keeps this page on screen.
+  let isBehindAppleSheet = $state(false);
   let ssoInitError = $state<{ cause: unknown }>();
   // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
   // Holds everything the dialog needs to run one normal (primary-client)
@@ -257,7 +262,49 @@
       "ii-openid-authorize-state",
       next.searchParams.get("state")!,
     );
+    if (
+      next.origin === "https://appleid.apple.com" &&
+      isAppleSignInSheetBrowser(navigator.userAgent)
+    ) {
+      isBehindAppleSheet = true;
+      closeWhenAppleSheetIsCanceled();
+    }
     window.location.assign(next);
+  };
+
+  /**
+   * Canceling the sheet drops the redirect without telling this page: the
+   * window only gets its focus back. A completed sheet gives focus back too,
+   * but the redirect then goes on and `beforeunload` follows within
+   * milliseconds, so focus that stays without one is a cancel.
+   */
+  const closeWhenAppleSheetIsCanceled = () => {
+    let sheetOpened = false;
+    let leaving = false;
+    window.addEventListener("blur", () => (sheetOpened = true));
+    window.addEventListener("beforeunload", () => (leaving = true));
+    window.addEventListener("focus", () => {
+      if (!sheetOpened) {
+        return;
+      }
+      setTimeout(() => {
+        if (leaving) {
+          return;
+        }
+        returnToApp();
+      }, 500);
+    });
+  };
+
+  /**
+   * Close this window when the app opened it; in a tab the app navigated to
+   * II instead (the URL transport), closing does nothing, so go back to it.
+   */
+  const returnToApp = () => {
+    window.close();
+    if (!window.closed) {
+      window.history.back();
+    }
   };
 
   /**
@@ -630,7 +677,18 @@
 {/snippet}
 
 {#if data.flow === "openid-init"}
-  <!-- OpenID init — nothing to render, onMount redirects to provider. -->
+  <!-- OpenID init — onMount redirects to the provider; only Apple's native sheet keeps this page on screen. -->
+  {#if isBehindAppleSheet}
+    <div
+      role="status"
+      class="flex flex-col items-center gap-3 px-8 text-center"
+    >
+      <ProgressRing class="size-8" />
+      <p class="text-text-primary text-base font-medium">
+        {$t`Connecting to Apple`}
+      </p>
+    </div>
+  {/if}
 {:else if data.flow === "sso-init"}
   {#if ssoInitError !== undefined}
     <SsoConnectErrorView
