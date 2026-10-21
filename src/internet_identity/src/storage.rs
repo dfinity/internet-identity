@@ -1556,7 +1556,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// The only writer is the app itself. A browser pointing at it turns its own
     /// delivery off by clearing the `enabled` flag on its reference, through
-    /// `Anchor::set_notification_app_enabled`, never by clearing this: the subscription
+    /// `Anchor::disable_notification_app`, never by clearing this: the subscription
     /// belongs to the app and every other identity delivers through it.
     ///
     /// Errors where `app_id` names no record, so a caller never reports a registration
