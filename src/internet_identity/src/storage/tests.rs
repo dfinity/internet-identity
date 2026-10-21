@@ -7798,8 +7798,8 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
         .ensure_notification_app(Principal::self_authenticating(vec![7u8; 91]), None, 1_000)
         .expect("creating the record");
 
-    assert!(
-        storage.set_notification_app_subscription(
+    storage
+        .set_notification_app_subscription(
             app.id,
             Some(WebPushSubscription {
                 endpoint: "https://web.push.apple.com/one".to_string(),
@@ -7809,9 +7809,8 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
                 jwt_issued_at_ns: 2_000,
             }),
             2_000,
-        ),
-        "the record is there, so the registration is stored"
-    );
+        )
+        .expect("the record is there, so the registration is stored");
 
     let stored = storage.notification_app(app.id).expect("the record");
     assert_eq!(
@@ -7836,7 +7835,10 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
         .expect("creating the record");
     let gone = app.id + 1;
 
-    assert!(!storage.set_notification_app_subscription(gone, None, 2_000));
+    assert!(matches!(
+        storage.set_notification_app_subscription(gone, None, 2_000),
+        Err(StorageError::NotificationAppNotFound { app_id }) if app_id == gone
+    ));
     assert_eq!(storage.notification_app(gone), None);
     // The record that is there is left alone by a write naming another.
     assert_eq!(
@@ -7885,7 +7887,9 @@ fn forgetting_an_app_keeps_an_entry_silent_that_had_switched_it_off() {
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
-    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
 
     let mut off = anchor_with_browser(&mut storage);
     off.point_at_notification_app(0, app.id, true);
@@ -7927,7 +7931,9 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
-    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
 
     let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id, true);
@@ -8019,7 +8025,9 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
-    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id, true);
     storage.write(anchor).expect("pointing at the app");
@@ -8032,7 +8040,9 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
     storage.write(anchor).expect("queueing");
 
     // The same address is a pool replacement, which keeps what is waiting.
-    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 2_000);
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 2_000)
+        .expect("the record is there");
     assert_eq!(
         storage
             .read(10_000)
@@ -8042,7 +8052,9 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         1
     );
 
-    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000);
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000)
+        .expect("the record is there");
 
     let anchor = storage.read(10_000).expect("reading the anchor");
     assert!(anchor.notifications(0).is_empty());
@@ -8063,7 +8075,9 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
-    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000);
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
 
     let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id, true);
@@ -8085,7 +8099,9 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     routed.set_woken_again(0, Some(1_000));
     storage.write(routed).expect("writing the routed entry");
 
-    storage.set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000);
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000)
+        .expect("the record is there");
 
     let own = storage.read(10_000).expect("reading the anchor");
     assert_eq!(
@@ -8125,17 +8141,19 @@ fn an_entry_delivers_through_the_app_it_points_at() {
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
-    storage.set_notification_app_subscription(
-        app.id,
-        Some(WebPushSubscription {
-            endpoint: "https://web.push.apple.com/one".to_string(),
-            created_at_ns: 1_000,
-            vapid_public_key: vec![1; 65],
-            jwt_signatures: vec![vec![2; 64]],
-            jwt_issued_at_ns: 1_000,
-        }),
-        1_000,
-    );
+    storage
+        .set_notification_app_subscription(
+            app.id,
+            Some(WebPushSubscription {
+                endpoint: "https://web.push.apple.com/one".to_string(),
+                created_at_ns: 1_000,
+                vapid_public_key: vec![1; 65],
+                jwt_signatures: vec![vec![2; 64]],
+                jwt_issued_at_ns: 1_000,
+            }),
+            1_000,
+        )
+        .expect("the record is there");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id, true);
     anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
@@ -8159,17 +8177,19 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
-    storage.set_notification_app_subscription(
-        app.id,
-        Some(WebPushSubscription {
-            endpoint: "https://web.push.apple.com/one".to_string(),
-            created_at_ns: 1_000,
-            vapid_public_key: vec![1; 65],
-            jwt_signatures: vec![vec![2; 64]],
-            jwt_issued_at_ns: 1_000,
-        }),
-        1_000,
-    );
+    storage
+        .set_notification_app_subscription(
+            app.id,
+            Some(WebPushSubscription {
+                endpoint: "https://web.push.apple.com/one".to_string(),
+                created_at_ns: 1_000,
+                vapid_public_key: vec![1; 65],
+                jwt_signatures: vec![vec![2; 64]],
+                jwt_issued_at_ns: 1_000,
+            }),
+            1_000,
+        )
+        .expect("the record is there");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.point_at_notification_app(0, app.id, true);
     anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
@@ -8208,11 +8228,13 @@ fn an_apps_new_address_strands_the_probe_of_an_entry_with_its_own() {
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
         .expect("creating the record");
-    storage.set_notification_app_subscription(
-        app.id,
-        Some(subscription("https://web.push.apple.com/app")),
-        1_000,
-    );
+    storage
+        .set_notification_app_subscription(
+            app.id,
+            Some(subscription("https://web.push.apple.com/app")),
+            1_000,
+        )
+        .expect("the record is there");
     let mut anchor = anchor_with_browser(&mut storage);
     anchor.set_webpush_subscription(0, Some(subscription("https://web.push.apple.com/own")));
     anchor.point_at_notification_app(0, app.id, true);
@@ -8241,11 +8263,13 @@ fn an_apps_new_address_strands_the_probe_of_an_entry_with_its_own() {
     anchor.set_pending_probe(0, 9);
     storage.write(anchor).expect("writing the anchor");
 
-    storage.set_notification_app_subscription(
-        app.id,
-        Some(subscription("https://web.push.apple.com/moved")),
-        2_000,
-    );
+    storage
+        .set_notification_app_subscription(
+            app.id,
+            Some(subscription("https://web.push.apple.com/moved")),
+            2_000,
+        )
+        .expect("the record is there");
 
     let reloaded = storage.read(10_000).expect("reading the anchor");
     assert_eq!(reloaded.pending_probe(0, 2_000), None);
