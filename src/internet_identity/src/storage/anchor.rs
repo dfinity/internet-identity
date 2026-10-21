@@ -972,12 +972,7 @@ impl Anchor {
     /// Pointing at the record this browser already points at changes nothing, switch
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
-    pub fn point_at_notification_app(
-        &mut self,
-        browser_id: BrowserId,
-        app_id: NotificationAppId,
-        delivers_when_new: bool,
-    ) {
+    pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
         let Some(index) = self
             .browsers
             .iter()
@@ -994,7 +989,8 @@ impl Anchor {
         // Whether this identity wants the app to deliver is the user's answer about the
         // app, not about whichever entry happens to hold the reference, so a rotation
         // that moves it between this identity's browsers carries their answer along. A
-        // first link has nobody to carry it from and takes what the caller says it means.
+        // first link has nobody to carry it from and starts delivering, because every
+        // caller that makes one is the user asking for this app.
         let enabled = self
             .browsers
             .iter()
@@ -1005,7 +1001,7 @@ impl Anchor {
                 }) if held == app_id => Some(enabled),
                 _ => None,
             })
-            .unwrap_or(delivers_when_new);
+            .unwrap_or(true);
         for browser in &mut self.browsers {
             // Every OTHER entry lets go, never this one: the entry being pointed is what
             // the check above reads, and stripping it here would make re-pointing at the
@@ -1023,9 +1019,20 @@ impl Anchor {
             Some(NotificationAppRef::Linked { app_id, enabled });
     }
 
-    /// Whether this identity wants the app it points at to deliver for it. Never a
-    /// subscription removal: the subscription is the app's and is shared.
-    pub fn set_notification_app_enabled(&mut self, browser_id: BrowserId, enabled: bool) {
+    /// This identity asking the app it points at to deliver for it. Never a subscription
+    /// write: the subscription is the app's and is shared.
+    pub fn enable_notification_app(&mut self, browser_id: BrowserId) {
+        self.set_notification_app_delivery(browser_id, true);
+    }
+
+    /// This identity asking the app it points at to stop delivering for it. Never a
+    /// subscription removal: the subscription is the app's and is shared with every other
+    /// identity pointing at it.
+    pub fn disable_notification_app(&mut self, browser_id: BrowserId) {
+        self.set_notification_app_delivery(browser_id, false);
+    }
+
+    fn set_notification_app_delivery(&mut self, browser_id: BrowserId, enabled: bool) {
         let Some(browser) = self
             .browsers
             .iter_mut()
@@ -1086,17 +1093,17 @@ impl Anchor {
         now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> NotificationAppStatus {
-        if let Some(NotificationAppRef::Pending { expires_at_ns, .. }) =
-            self.notification_app(browser_id)
-        {
-            return if expires_at_ns > now_ns {
+        match self.notification_app(browser_id) {
+            Some(NotificationAppRef::Pending { expires_at_ns, .. }) if expires_at_ns > now_ns => {
                 NotificationAppStatus::AwaitingInstall(expires_at_ns)
-            } else {
-                NotificationAppStatus::NoApp
-            };
-        }
-        match self.linked_app_info(browser_id, app) {
-            Some(info) => NotificationAppStatus::Linked(info),
+            }
+            Some(NotificationAppRef::Pending { .. }) => NotificationAppStatus::NoApp,
+            Some(NotificationAppRef::Linked { .. }) => {
+                match self.linked_app_info(browser_id, app) {
+                    Some(info) => NotificationAppStatus::Linked(info),
+                    None => NotificationAppStatus::NoApp,
+                }
+            }
             None => NotificationAppStatus::NoApp,
         }
     }

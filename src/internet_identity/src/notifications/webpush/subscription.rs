@@ -4,8 +4,8 @@
 use super::validation::{
     ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
-use crate::authz_utils::NotificationAuthorization;
-use crate::notifications::app::NotificationApp;
+use crate::authz_utils::NotificationKey;
+use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
@@ -18,17 +18,17 @@ use internet_identity_interface::internet_identity::types::{
 /// running out. Idempotent: a browser that re-subscribes overwrites what it registered
 /// before, endpoint included.
 pub fn set_subscription(
-    anchor: Anchor,
-    browser_id: BrowserId,
-    authorization: NotificationAuthorization,
+    key: NotificationKey,
     request: ValidatedSetWebPushSubscriptionRequest,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
-    if let NotificationAuthorization::App(app) = authorization {
-        return set_app_subscription(*app, request, now_ns);
-    }
+    let browser_id = match key {
+        NotificationKey::App(app_id) => return set_app_subscription(app_id, request, now_ns),
+        NotificationKey::Browser(browser_id) => browser_id,
+    };
+    let anchor = state::anchor(request.anchor_number);
 
     let ValidatedSetWebPushSubscriptionRequest {
         anchor_number: _,
@@ -113,13 +113,16 @@ pub(crate) fn clear_gone_subscription(
 /// What this browser is registered with, and how much of the pool it signed is left
 /// to cover.
 pub fn subscription_status(
-    anchor: &Anchor,
-    browser_id: BrowserId,
-    authorization: NotificationAuthorization,
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
 ) -> Option<WebPushSubscriptionStatus> {
-    let subscription = match authorization {
-        NotificationAuthorization::App(app) => app.webpush_subscription,
-        NotificationAuthorization::Browser => anchor.webpush_subscription(browser_id).cloned(),
+    let subscription = match key {
+        NotificationKey::App(app_id) => {
+            storage_borrow(|storage| storage.notification_app(app_id))?.webpush_subscription
+        }
+        NotificationKey::Browser(browser_id) => state::anchor(anchor_number)
+            .webpush_subscription(browser_id)
+            .cloned(),
     };
     subscription.map(
         |WebPushSubscription {
@@ -146,7 +149,7 @@ fn write_subscription(
 
 /// What the Home Screen app registered, which is its record's and not any anchor's.
 fn set_app_subscription(
-    app: NotificationApp,
+    app_id: NotificationAppId,
     request: ValidatedSetWebPushSubscriptionRequest,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
@@ -158,11 +161,14 @@ fn set_app_subscription(
         jwt_issued_at_ns,
         ..
     } = request;
+    // Read now rather than taking what authorizing the call happened to see: this decides
+    // whether the pool is being replaced at the same address, which the record owns.
     let NotificationApp {
-        id: app_id,
         webpush_subscription: registered,
         ..
-    } = app;
+    } = storage_borrow(|storage| storage.notification_app(app_id)).ok_or_else(|| {
+        SetWebPushSubscriptionError::InternalCanisterError(format!("no notification app {app_id}"))
+    })?;
 
     let (created_at_ns, notifications) = match registered {
         // A pool that is running out is replaced at the same address, so the registration
@@ -220,11 +226,7 @@ mod tests {
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> Option<WebPushSubscriptionStatus> {
-        subscription_status(
-            &anchor(anchor_number),
-            browser_id,
-            NotificationAuthorization::Browser,
-        )
+        subscription_status(anchor_number, NotificationKey::Browser(browser_id))
     }
 
     fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
@@ -478,14 +480,8 @@ mod tests {
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
 
-        try_subscribe_as(
-            app_authorization(app_id),
-            anchor_number,
-            browsers[0],
-            ENDPOINT,
-            1_000,
-        )
-        .expect("an app registers its subscription");
+        try_subscribe_as(app_authorization(app_id), anchor_number, ENDPOINT, 1_000)
+            .expect("an app registers its subscription");
 
         assert_eq!(
             app(app_id).webpush_subscription.map(|s| s.endpoint),
@@ -493,11 +489,7 @@ mod tests {
         );
         assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
         assert_eq!(
-            subscription_status(
-                &anchor(anchor_number),
-                browsers[0],
-                app_authorization(app_id)
-            ),
+            subscription_status(anchor_number, app_authorization(app_id)),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
                 pool_len: 3,
@@ -513,24 +505,12 @@ mod tests {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
-        try_subscribe_as(
-            app_authorization(app_id),
-            anchor_number,
-            browsers[0],
-            ENDPOINT,
-            5_000,
-        )
-        .expect("an app registers its subscription");
+        try_subscribe_as(app_authorization(app_id), anchor_number, ENDPOINT, 5_000)
+            .expect("an app registers its subscription");
 
         for stale in [4_999, 5_000] {
             assert_eq!(
-                try_subscribe_as(
-                    app_authorization(app_id),
-                    anchor_number,
-                    browsers[0],
-                    ENDPOINT,
-                    stale
-                ),
+                try_subscribe_as(app_authorization(app_id), anchor_number, ENDPOINT, stale),
                 Err(SetWebPushSubscriptionError::StaleJwtPool),
                 "{stale} must not replace the pool minted at 5000"
             );
@@ -546,23 +526,11 @@ mod tests {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
-        try_subscribe_as(
-            app_authorization(app_id),
-            anchor_number,
-            browsers[0],
-            ENDPOINT,
-            5_000,
-        )
-        .expect("an app registers its subscription");
+        try_subscribe_as(app_authorization(app_id), anchor_number, ENDPOINT, 5_000)
+            .expect("an app registers its subscription");
 
-        try_subscribe_as(
-            app_authorization(app_id),
-            anchor_number,
-            browsers[0],
-            ROTATED,
-            1_000,
-        )
-        .expect("a rotated endpoint is not a pool replacement");
+        try_subscribe_as(app_authorization(app_id), anchor_number, ROTATED, 1_000)
+            .expect("a rotated endpoint is not a pool replacement");
 
         let stored = app(app_id).webpush_subscription.expect("a subscription");
         assert_eq!(stored.endpoint, ROTATED);
@@ -578,23 +546,12 @@ mod tests {
         point_at_app(second, second_browsers[0], app_id);
         subscribe(second, second_browsers[0], ROTATED, 1_000);
 
-        try_subscribe_as(
-            app_authorization(app_id),
-            first,
-            first_browsers[0],
-            ENDPOINT,
-            2_000,
-        )
-        .expect("an app registers its subscription");
+        try_subscribe_as(app_authorization(app_id), first, ENDPOINT, 2_000)
+            .expect("an app registers its subscription");
 
-        for (anchor_number, browsers) in [(first, &first_browsers), (second, &second_browsers)] {
+        for anchor_number in [first, second] {
             assert_eq!(
-                subscription_status(
-                    &anchor(anchor_number),
-                    browsers[0],
-                    app_authorization(app_id)
-                )
-                .map(|s| s.endpoint),
+                subscription_status(anchor_number, app_authorization(app_id)).map(|s| s.endpoint),
                 Some(ENDPOINT.to_string()),
                 "every identity pointing at the app reads its one registration"
             );
