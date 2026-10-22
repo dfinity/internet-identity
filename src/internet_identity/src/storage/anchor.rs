@@ -960,6 +960,10 @@ impl Anchor {
         let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
             return;
         };
+        // A browser has one route. Pointing at a record is leaving behind whatever address
+        // it registered for itself, and what that address had queued goes with it: those
+        // wake-ups were posted somewhere this browser no longer reads.
+        browser.webpush_subscription = None;
         // Whether this identity wants the app to deliver is the caller's to say: an
         // install is this identity asking for one, and taking over an app another
         // identity put here is not.
@@ -967,6 +971,21 @@ impl Anchor {
             app_id,
             enabled: delivers_when_new,
         });
+    }
+
+    /// This browser leaving the record it points at, which is what registering an address
+    /// of its own amounts to. Answers which record it left, so the caller can see whether
+    /// anything still points at that one.
+    ///
+    /// An install still running is left alone: it is not a route yet, and a browser whose
+    /// install never completes must keep the address it has.
+    pub fn leave_notification_app(&mut self, browser_id: BrowserId) -> Option<NotificationAppId> {
+        let browser = self.browsers.iter_mut().find(|b| b.id == browser_id)?;
+        let NotificationAppRef::Linked { app_id, .. } = browser.notification_app? else {
+            return None;
+        };
+        browser.notification_app = None;
+        Some(app_id)
     }
 
     /// The app this browser points at, where it has one.
