@@ -187,6 +187,9 @@ fn write_subscription(
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
+    // Keep what is queued only where the registration is replaced at the same address.
+    // Anything else leaves it announced to an address nothing listens on, and a full
+    // queue posts no wake-up for what arrives after it.
     let same_address = matches!(
         (anchor.webpush_subscription(browser_id), subscription.as_ref()),
         (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
@@ -196,8 +199,14 @@ fn write_subscription(
             queue.clear();
         }
     }
-    anchor.set_webpush_subscription(browser_id, subscription);
-    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
+    let left = anchor.set_webpush_subscription(browser_id, subscription);
+    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
+    // Read after the write, so the reference this browser just dropped is already gone:
+    // a record the last browser left behind is one nothing can reach again.
+    if let Some(app_id) = left {
+        storage_borrow_mut(|storage| storage.delete_notification_app_if_unreferenced(app_id));
+    }
+    Ok(())
 }
 
 /// What the Home Screen app registered, which is its record's and not any anchor's.
