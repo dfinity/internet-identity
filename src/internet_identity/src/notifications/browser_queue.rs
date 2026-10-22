@@ -66,7 +66,7 @@ pub(crate) fn remove_after_failed_wake_up(
         let posted_to = match target {
             DeliveryTarget::Browser => anchor
                 .webpush_subscription(browser_id)
-                .map(|registered| registered.endpoint.clone()),
+                .map(|registered| registered.endpoint.as_str().to_string()),
             DeliveryTarget::App(app_id) => {
                 // The app's address stands for this entry only while the entry still
                 // points at it. A switch to another record, or an install started, makes
@@ -81,7 +81,7 @@ pub(crate) fn remove_after_failed_wake_up(
                 storage
                     .notification_app(app_id)
                     .and_then(|app| app.webpush_subscription)
-                    .map(|registered| registered.endpoint)
+                    .map(|registered| registered.endpoint.into_string())
             }
         };
         if posted_to.is_none_or(|registered| registered != endpoint) {
@@ -216,6 +216,7 @@ pub(crate) fn remove_shown(
 mod tests {
     use super::*;
     use crate::notifications::app::NotificationAppId;
+    use crate::notifications::webpush::fixtures::subscription_at;
     use crate::notifications::webpush::fixtures::{
         anchor, app_for_key, app_key, setup, subscribe, APP_RELAY,
     };
@@ -381,8 +382,6 @@ mod tests {
     /// The iOS case: the entry holds no registration of its own and is delivered through
     /// the app it points at.
     fn routed_through_an_app() -> (AnchorNumber, BrowserId, NotificationAppId) {
-        use crate::storage::anchor::WebPushSubscription;
-
         setup();
         let anchor_number = storage_borrow_mut(|storage| {
             let anchor = storage.allocate_anchor(0).expect("allocating an anchor");
@@ -402,13 +401,7 @@ mod tests {
             storage
                 .set_notification_app_subscription(
                     app.id,
-                    Some(WebPushSubscription {
-                        endpoint: APP_RELAY.to_string(),
-                        created_at_ns: 0,
-                        vapid_public_key: vec![1; 65],
-                        jwt_signatures: vec![vec![2; 64]],
-                        jwt_issued_at_ns: 0,
-                    }),
+                    Some(subscription_at(APP_RELAY, 0, 0)),
                     0,
                 )
                 .expect("the record is there");
@@ -464,7 +457,6 @@ mod tests {
     /// route says whose queue this is.
     #[test]
     fn a_failed_wake_up_from_the_app_this_entry_left_removes_nothing() {
-        use crate::storage::anchor::WebPushSubscription;
         use serde_bytes::ByteBuf;
 
         let (anchor_number, browser_id, left_behind) = routed_through_an_app();
@@ -489,13 +481,7 @@ mod tests {
             storage
                 .set_notification_app_subscription(
                     app.id,
-                    Some(WebPushSubscription {
-                        endpoint: "https://web.push.apple.com/second".to_string(),
-                        created_at_ns: 0,
-                        vapid_public_key: vec![1; 65],
-                        jwt_signatures: vec![vec![2; 64]],
-                        jwt_issued_at_ns: 0,
-                    }),
+                    Some(subscription_at("https://web.push.apple.com/second", 0, 0)),
                     0,
                 )
                 .expect("the record is there");
@@ -508,7 +494,7 @@ mod tests {
         assert_eq!(
             storage_borrow(|storage| storage.notification_app(left_behind))
                 .and_then(|app| app.webpush_subscription)
-                .map(|registered| registered.endpoint),
+                .map(|registered| registered.endpoint.into_string()),
             Some(APP_RELAY.to_string()),
             "the app this entry left should keep its address"
         );
