@@ -143,14 +143,7 @@ fn write_subscription(
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    // A browser has one route, so registering an address of its own is how it leaves the
-    // Home Screen app it points at. Removing one asks for nothing in its place, so it
-    // leaves the reference where it is.
-    let left = match subscription {
-        Some(_) => anchor.leave_notification_app(browser_id),
-        None => None,
-    };
-    anchor.set_webpush_subscription(browser_id, subscription);
+    let left = anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
     // Read after the write, so the reference this browser just dropped is already gone:
     // a record the last browser left behind is one nothing can reach again.

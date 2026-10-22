@@ -8,9 +8,9 @@ use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
-    anchor_operation_with_authz_check, check_app_authorization, check_authorization,
-    check_authz_and_record_activity, check_browser_authorization, check_notification_authorization,
-    AuthorizationError,
+    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
+    check_browser_authorization, check_notification_app_authorization,
+    check_notification_authorization, AuthorizationError,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -449,7 +449,7 @@ fn notification_app_anchors(request: NotificationAppAnchorsRequest) -> Vec<Ancho
     if !notifications::notifications_enabled() {
         return vec![];
     }
-    let Ok(app) = check_app_authorization(app_id) else {
+    let Ok(app) = check_notification_app_authorization(app_id) else {
         return vec![];
     };
     app.anchors.into_iter().collect()
