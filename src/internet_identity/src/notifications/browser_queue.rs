@@ -4,10 +4,11 @@
 //! The queue lives on the browser's entry, and is cleared when its wake-up address changes.
 
 use crate::notifications::dispatch::DeliveryTarget;
+use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, QueuedNotification};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, NotificationToShow, Timestamp,
+    AnchorNumber, BrowserId, NotificationToShow, Timestamp,
 };
 
 /// Most entries one browser holds. A new one past it replaces the oldest.
@@ -102,7 +103,8 @@ pub(crate) fn remove_after_failed_wake_up(
 
 /// Drop what an app queued on every browser of the identity, so consent granted again
 /// later brings none of it back.
-pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname) {
+pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &ApplicationOrigin) {
+    let origin = &origin.as_str().to_string();
     storage_borrow_mut(|storage| {
         let Some(application_number) = storage.lookup_application_number_with_origin(origin) else {
             return;
@@ -195,8 +197,11 @@ mod tests {
         anchor, app_key, setup, subscribe, APP_RELAY, OTHER_APP_RELAY,
     };
     use crate::notifications::write_notifications_decision;
+
+    fn app_origin(origin: &str) -> ApplicationOrigin {
+        ApplicationOrigin::try_from(origin).expect("a bare origin")
+    }
     use candid::Principal;
-    use internet_identity_interface::internet_identity::types::NotificationRevokeConsentRequest;
     use pretty_assertions::assert_eq;
 
     const SECOND_NS: u64 = 1_000_000_000;
@@ -285,7 +290,7 @@ mod tests {
             .expect("signing in registers the browser")
             .id;
         subscribe(anchor_number, browser_id, RELAY, 0);
-        write_notifications_decision(anchor_number, &ORIGIN.to_string(), true, 0)
+        write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, 0)
             .expect("granting consent");
         (anchor_number, browser_id)
     }
@@ -385,7 +390,7 @@ mod tests {
             storage.write(stored).expect("pointing at the app");
             app.id
         });
-        write_notifications_decision(anchor_number, &ORIGIN.to_string(), true, 0)
+        write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, 0)
             .expect("granting consent");
         (anchor_number, browser_id, app_id)
     }
@@ -523,7 +528,7 @@ mod tests {
     fn an_app_that_lost_consent_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
-        write_notifications_decision(anchor_number, &ORIGIN.to_string(), false, SECOND_NS)
+        write_notifications_decision(anchor_number, &app_origin(ORIGIN), false, SECOND_NS)
             .expect("revoking consent");
 
         assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
@@ -533,16 +538,9 @@ mod tests {
     fn consent_granted_again_brings_back_nothing_queued_before_it_was_revoked() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
-        let revoke = NotificationRevokeConsentRequest {
-            anchor_number,
-            origin: ORIGIN.to_string(),
-        };
-        crate::notifications::revoke_consent(
-            revoke.try_into().expect("a valid request"),
-            SECOND_NS,
-        )
-        .expect("revoking consent");
-        write_notifications_decision(anchor_number, &ORIGIN.to_string(), true, SECOND_NS)
+        crate::notifications::revoke_consent(anchor_number, &app_origin(ORIGIN), SECOND_NS)
+            .expect("revoking consent");
+        write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, SECOND_NS)
             .expect("granting consent again");
 
         assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
