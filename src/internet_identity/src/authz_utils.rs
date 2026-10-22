@@ -1,6 +1,7 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
 use crate::session_delegation::expected_session_principal;
+use crate::storage::account::SessionLocator;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
 use crate::{anchor_management, state};
@@ -8,7 +9,8 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, BrowserId, IdentityNumber,
+    AccountNumber, AnchorNumber, AuthorizationKey, BrowserId, FrontendHostname, IdentityNumber,
+    SessionId, Timestamp,
 };
 use std::fmt::{Display, Formatter};
 
@@ -182,6 +184,49 @@ pub fn check_browser_authorization(
         .browser_by_principal(caller)
         .ok_or(AuthorizationError::from(caller))?;
     Ok((anchor, browser_id))
+}
+
+/// The live app session the caller is signing as.
+pub struct AuthorizedSession {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_id: SessionId,
+    pub valid_till_ns: Timestamp,
+    pub read_only: bool,
+}
+
+/// Which app session the caller is signing as, while it is live.
+///
+/// The session index is keyed by the principal a session's chain is rooted at, so a hit is
+/// itself the proof that the caller is that session: nothing is named in the request and
+/// nothing is attached to it.
+pub fn check_app_authorization(now: Timestamp) -> Result<AuthorizedSession, AuthorizationError> {
+    let caller = caller();
+    state::storage_borrow(|storage| {
+        let locator = storage.lookup_session_with_principal(caller)?;
+        let session = storage.read_session(&locator)?;
+        // Either bound: a session past its lifetime and one nobody has used for longer
+        // than it was allowed are equally gone.
+        if session.is_expired_or_idle(now) {
+            return None;
+        }
+        let SessionLocator {
+            anchor_number,
+            origin,
+            account_number,
+            session_id,
+        } = locator;
+        Some(AuthorizedSession {
+            anchor_number,
+            origin,
+            account_number,
+            session_id,
+            valid_till_ns: session.valid_till_ns,
+            read_only: session.read_only,
+        })
+    })
+    .ok_or(AuthorizationError::from(caller))
 }
 
 /// Whether the prepare-time [`AuthorizationKey`] is still a valid

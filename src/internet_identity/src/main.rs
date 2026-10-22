@@ -8,8 +8,9 @@ use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
-    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization, AuthorizationError,
+    anchor_operation_with_authz_check, check_app_authorization, check_authorization,
+    check_authz_and_record_activity, check_browser_authorization, AuthorizationError,
+    AuthorizedSession,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -47,8 +48,8 @@ use notifications::webpush::{
 use notifications::{
     ValidatedGetNextNotificationRequest, ValidatedGetNotificationDelegationRequest,
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
-    ValidatedRemoveNotificationRequest, ValidatedSendNotificationArg,
+    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationRequest,
+    ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -464,13 +465,16 @@ fn notification_grant_consent(
 
 #[update]
 fn notification_revoke_consent(
-    request: NotificationRevokeConsentRequest,
+    NotificationRevokeConsentRequest {
+        anchor_number,
+        origin,
+    }: NotificationRevokeConsentRequest,
 ) -> Result<(), NotificationRevokeConsentError> {
-    let validated: ValidatedNotificationRevokeConsentRequest = request.try_into()?;
-    check_authz_and_record_activity(validated.anchor_number)
+    check_authz_and_record_activity(anchor_number)
         .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
 
-    notifications::revoke_consent(validated, ic_cdk::api::time())
+    notifications::revoke_consent(anchor_number, &origin, ic_cdk::api::time())
+        .map_err(|err| NotificationRevokeConsentError::InternalCanisterError(format!("{err}")))
 }
 
 /// `false` for an origin this deployment does not notify for and for an unauthorized
@@ -485,6 +489,36 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
     }
 
     notifications::consent_granted(validated)
+}
+
+// ---- Notifications: called by an app's frontend ----
+
+#[query]
+fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGrantedError> {
+    if !notifications::notifications_enabled() {
+        return Ok(false);
+    }
+    let now = ic_cdk::api::time();
+    let AuthorizedSession {
+        anchor_number,
+        origin,
+        ..
+    } = check_app_authorization(now)
+        .map_err(|_| AppNotificationConsentGrantedError::NoSuchSession)?;
+    Ok(notifications::consent_granted_for(anchor_number, &origin))
+}
+
+#[update]
+fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
+    let now = ic_cdk::api::time();
+    let AuthorizedSession {
+        anchor_number,
+        origin,
+        ..
+    } = check_app_authorization(now)
+        .map_err(|_| AppRevokeNotificationConsentError::NoSuchSession)?;
+    notifications::revoke_consent(anchor_number, &origin, now)
+        .map_err(|err| AppRevokeNotificationConsentError::InternalCanisterError(format!("{err}")))
 }
 
 // ---- Notifications: called by an app's backend ----

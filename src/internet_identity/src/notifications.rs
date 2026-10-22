@@ -23,15 +23,13 @@ use crate::storage::storable::anchor_application_config::PermissionDecision;
 use crate::storage::StorageError;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, FrontendHostname, NotAccepted, NotAcceptedReason, Notification,
-    NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
-    Timestamp,
+    NotificationGrantConsentError, SendNotificationResponse, Timestamp,
 };
 pub use validation::{
     notifications_enabled, ValidatedGetNextNotificationRequest,
     ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
-    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
-    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationRequest,
-    ValidatedSendNotificationArg,
+    ValidatedNotificationGrantConsentRequest, ValidatedPrepareNotificationDelegationRequest,
+    ValidatedRemoveNotificationRequest, ValidatedSendNotificationArg,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at
@@ -68,20 +66,16 @@ pub fn grant_consent(
         .map_err(|err| NotificationGrantConsentError::InternalCanisterError(format!("{err}")))
 }
 
-/// Withdraws the origin's consent, and what it still has queued for the identity's
-/// browsers. Device subscriptions stay: they are shared across every consented app.
+/// Withdraws `origin`'s consent to notify `anchor_number`, and what it still has queued for
+/// the identity's browsers. Device subscriptions stay: they are shared across every
+/// consented app. Consent that was never given is already withdrawn, so that is `Ok`.
 pub fn revoke_consent(
-    ValidatedNotificationRevokeConsentRequest {
-        anchor_number,
-        origin,
-        ..
-    }: ValidatedNotificationRevokeConsentRequest,
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
     now_ns: Timestamp,
-) -> Result<(), NotificationRevokeConsentError> {
-    // Consent that cannot exist is already withdrawn, so an app the identity never
-    // reached is nothing to report.
-    let _ = write_notifications_decision(anchor_number, &origin, false, now_ns);
-    browser_queue::remove_app(anchor_number, &origin);
+) -> Result<(), StorageError> {
+    write_notifications_decision(anchor_number, origin, false, now_ns)?;
+    browser_queue::remove_app(anchor_number, origin);
     Ok(())
 }
 
@@ -150,7 +144,6 @@ mod tests {
     use crate::notifications::test_setup as setup;
     use internet_identity_interface::internet_identity::types::{
         NotificationConsentGrantedRequest, NotificationGrantConsentRequest,
-        NotificationRevokeConsentRequest,
     };
 
     const APP: &str = "https://app.example";
@@ -176,15 +169,8 @@ mod tests {
         grant_consent(request.try_into().expect("a notifiable origin"), now_ns)
     }
 
-    fn revoke(
-        anchor_number: AnchorNumber,
-        origin: &str,
-    ) -> Result<(), NotificationRevokeConsentError> {
-        let request = NotificationRevokeConsentRequest {
-            anchor_number,
-            origin: origin.to_string(),
-        };
-        revoke_consent(request.try_into().expect("a notifiable origin"), 1_000)
+    fn revoke(anchor_number: AnchorNumber, origin: &str) -> Result<(), StorageError> {
+        revoke_consent(anchor_number, &origin.to_string(), 1_000)
     }
 
     fn granted(anchor_number: AnchorNumber, origin: &str) -> bool {

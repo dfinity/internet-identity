@@ -1821,6 +1821,17 @@ type NotificationRevokeConsentError = variant {
     InternalCanisterError : text;
 };
 
+type AppNotificationConsentGrantedError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+};
+
+type AppRevokeNotificationConsentError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
 type NotificationGrantConsentRequest = record {
     anchor_number : UserNumber;
     origin : text;
@@ -2519,4 +2530,7 @@ service : (opt InternetIdentityInit) -> {
 
     // Called by an app's backend canister for the origin it names.
     app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });
+    // Called by an app's frontend, as its session.
+    app_notification_consent_granted : () -> (variant { Ok : bool; Err : AppNotificationConsentGrantedError }) query;
+    app_revoke_notification_consent : () -> (variant { Ok; Err : AppRevokeNotificationConsentError });
 };

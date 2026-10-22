@@ -7,8 +7,7 @@ use internet_identity_interface::internet_identity::types::{
     AccountNumber, AnchorNumber, FrontendHostname, GetNextNotificationError,
     GetNextNotificationRequest, GetNotificationDelegationRequest, Notification,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, NotificationToShow, PrepareNotificationDelegationRequest,
+    NotificationGrantConsentRequest, NotificationToShow, PrepareNotificationDelegationRequest,
     RemoveNotificationError, RemoveNotificationRequest, SendNotificationArg, SendNotificationError,
     SessionKey, Timestamp,
 };
@@ -21,12 +20,6 @@ use url::Url;
 struct Validated;
 
 pub struct ValidatedNotificationGrantConsentRequest {
-    pub anchor_number: AnchorNumber,
-    pub origin: FrontendHostname,
-    _validated: Validated,
-}
-
-pub struct ValidatedNotificationRevokeConsentRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     _validated: Validated,
@@ -114,24 +107,6 @@ impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantCons
             anchor_number,
             origin: notifying_origin(&origin)
                 .map_err(NotificationGrantConsentError::InternalCanisterError)?,
-            _validated: Validated,
-        })
-    }
-}
-
-impl TryFrom<NotificationRevokeConsentRequest> for ValidatedNotificationRevokeConsentRequest {
-    type Error = NotificationRevokeConsentError;
-
-    fn try_from(
-        NotificationRevokeConsentRequest {
-            anchor_number,
-            origin,
-        }: NotificationRevokeConsentRequest,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self {
-            anchor_number,
-            origin: notifying_origin(&origin)
-                .map_err(NotificationRevokeConsentError::InternalCanisterError)?,
             _validated: Validated,
         })
     }

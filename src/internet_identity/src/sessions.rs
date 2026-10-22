@@ -1,5 +1,6 @@
 use crate::authz_utils::{
-    check_authorization, check_authz_and_record_activity, AuthorizationError, IdentityUpdateError,
+    check_app_authorization, check_authorization, check_authz_and_record_activity,
+    AuthorizationError, AuthorizedSession, IdentityUpdateError,
 };
 use crate::browser_key::verify_browser_keys;
 use crate::delegation::{
@@ -356,24 +357,32 @@ pub fn app_prepare_delegation(
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
     let now = time();
     let AuthorizedSession {
-        locator,
-        account,
-        session,
-    } = authorize_session(now)?;
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
+        valid_till_ns,
+        read_only,
+    } = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+    let locator = SessionLocator {
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
+    };
+    let account = storage_borrow(|storage| storage.read_account(&locator.account_key()))
+        .ok_or(AppSessionError::NoSuchSession)?;
 
     // Everything that can refuse, before the stamp. Returning `Err` on the IC commits
     // whatever was written before it — only a trap rolls back — so a stamp above this
     // would leave the session recorded as used while the caller is told the call failed.
     // All three depend on values already in hand, so there is nothing to gain by
     // computing them later.
-    let expiration = u64::min(
-        now.saturating_add(APP_DELEGATION_TTL_NS),
-        session.valid_till_ns,
-    );
+    let expiration = u64::min(now.saturating_add(APP_DELEGATION_TTL_NS), valid_till_ns);
     let seed = account_seed(&account)?;
-    let access = DelegationAccess::from_read_only(session.read_only);
+    let access = DelegationAccess::from_read_only(read_only);
 
-    // A session revoked between `authorize_session` above and this stamp is a race, not
+    // A session revoked between `check_app_authorization` above and this stamp is a race, not
     // an internal fault: the answer is the one the caller would have got a moment
     // earlier.
     storage_borrow_mut(|storage| storage.record_session_use(&locator, now)).map_err(
@@ -408,21 +417,34 @@ pub fn app_get_delegation(
 ) -> Result<SignedDelegation, AppSessionError> {
     let now = time();
     let AuthorizedSession {
-        account, session, ..
-    } = authorize_session(now)?;
+        anchor_number,
+        origin,
+        account_number,
+        valid_till_ns,
+        read_only,
+        ..
+    } = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+    let account = storage_borrow(|storage| {
+        storage.read_account(&AccountKey {
+            anchor_number,
+            origin,
+            account_number,
+        })
+    })
+    .ok_or(AppSessionError::NoSuchSession)?;
 
     // An expiration this canister would never have signed, which means one the caller
     // did not get from `app_prepare_delegation`: that returns
     // `min(now + APP_DELEGATION_TTL_NS, session.valid_till_ns)`, and `now` has only
     // advanced since, so the value it handed out cannot exceed either bound here.
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
-        || request.expiration > session.valid_till_ns
+        || request.expiration > valid_till_ns
     {
         return Err(AppSessionError::NoSuchDelegation);
     }
 
     let seed = account_seed(&account)?;
-    let access = DelegationAccess::from_read_only(session.read_only);
+    let access = DelegationAccess::from_read_only(read_only);
     let permissions = access.permissions();
 
     state::assets_and_signatures(|certified_assets, sigs| {
@@ -447,46 +469,16 @@ pub fn app_get_delegation(
         },
         signature: ByteBuf::from(signature),
     })
-    // The session is live — `authorize_session` above said so — so a signature that is
+    // The session is live — `check_app_authorization` above said so — so a signature that is
     // not there was never added for these parameters.
     .map_err(|_| AppSessionError::NoSuchDelegation)
-}
-
-/// A live session the caller has been proved to be, and where it lives.
-///
-/// Only [`authorize_session`] constructs one, so holding it is the evidence rather than
-/// three values a caller gathered: the principal lookup and the liveness check have both
-/// happened, and no field can be here without them.
-struct AuthorizedSession {
-    locator: SessionLocator,
-    account: Account,
-    session: Session,
-}
-
-/// Authenticates a refresh from `caller()` alone.
-///
-/// The session index is keyed by the principal a session's chain is rooted at, so a hit is
-/// itself the proof that the caller is that session: nothing is named in the request and
-/// nothing is attached to it.
-fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionError> {
-    let (locator, account, session) = find_caller_session()?;
-    // Either bound: a session past its lifetime and one nobody has used for longer
-    // than it was allowed are equally gone, and a refresh is the thing that finds out.
-    if session.is_expired_or_idle(now) {
-        return Err(AppSessionError::NoSuchSession);
-    }
-    Ok(AuthorizedSession {
-        locator,
-        account,
-        session,
-    })
 }
 
 /// Whether the calling session is still usable, for the II frontend's silent re-auth
 /// path. Advisory: a query reply is not certified, and the refresh path enforces the
 /// same conditions on every mint regardless of the answer here.
 pub fn check_session() -> bool {
-    authorize_session(time()).is_ok()
+    check_app_authorization(time()).is_ok()
 }
 
 /// Signs the caller's own session out. A caller cannot produce another session's

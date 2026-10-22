@@ -1,5 +1,6 @@
 //! Tests for the notification API, exercised through Candid against a canister.
 
+use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
     browser_get_next_notification, browser_remove_notification, consent_granted, grant_consent,
@@ -15,9 +16,9 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
     GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
-    NotificationGrantConsentError, NotificationRevokeConsentError, NotificationToShow,
-    OperatingSystem, PrepareAccountSessionRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse,
+    NotificationGrantConsentError, NotificationToShow, OperatingSystem,
+    PrepareAccountSessionRequest, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -44,20 +45,32 @@ fn chrome_on_a_mac() -> BrowserDescription {
     }
 }
 
-/// Signs `anchor` in at `origin`, which puts the origin in the application registry.
-/// `browser_seed` names the browser: a key rotates on every sign-in, so a repeat sign-in
-/// needs a browser of its own.
+/// Signs `anchor` in at `origin`, which puts the origin in the application registry, and
+/// returns the session principal the app signs with. `browser_seed` names the browser: a
+/// key rotates on every sign-in, so a repeat sign-in needs a browser of its own.
 fn sign_in_at(
     env: &PocketIc,
     canister_id: CanisterId,
     anchor: AnchorNumber,
     origin: &str,
     browser_seed: u8,
-) {
+) -> Principal {
+    open_session(env, canister_id, anchor, origin, browser_seed, None)
+}
+
+/// [`sign_in_at`], with a session that lives `valid_for` nanoseconds.
+fn open_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    anchor: AnchorNumber,
+    origin: &str,
+    browser_seed: u8,
+    valid_for: Option<u64>,
+) -> Principal {
     let browser = BrowserKey::new(browser_seed);
     let session_key = ByteBuf::from(vec![1; 32]);
     let next_browser_key = browser.successor().public_key();
-    prepare_account_session(
+    let prepared = prepare_account_session(
         env,
         canister_id,
         principal_1(),
@@ -74,12 +87,13 @@ fn sign_in_at(
             next_browser_key,
             session_key,
             permissions: None,
-            valid_for: None,
+            valid_for,
             max_idle: None,
         },
     )
     .expect("prepare_account_session rejected")
     .expect("prepare_account_session refused");
+    Principal::self_authenticating(&prepared.user_key)
 }
 
 #[test]
@@ -95,10 +109,9 @@ fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationGrantConsentError::InternalCanisterError(_))
     ));
-    assert!(matches!(
-        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
-        Err(NotificationRevokeConsentError::InternalCanisterError(_))
-    ));
+    // Withdrawing is never refused, and there is nothing here to withdraw.
+    revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("revoke refused");
     // A disabled deployment answers like one nobody consented on.
     assert!(!consent_granted(
         &env,
@@ -237,13 +250,13 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
     )?
     .expect("grant rejected");
 
-    // So one revoke, through a third spelling, clears them all.
+    // So one revoke, of the spelling it is stored under, clears them all.
     revoke_consent(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp.net".into(),
+        "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app".into(),
     )?
     .expect("revoke rejected");
     for spelling in [
@@ -377,10 +390,8 @@ fn should_refuse_consent_once_notifications_are_disabled() -> Result<(), RejectR
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationGrantConsentError::InternalCanisterError(_))
     ));
-    assert!(matches!(
-        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
-        Err(NotificationRevokeConsentError::InternalCanisterError(_))
-    ));
+    revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("revoke refused");
     assert!(!consent_granted(
         &env,
         canister_id,
@@ -389,6 +400,217 @@ fn should_refuse_consent_once_notifications_are_disabled() -> Result<(), RejectR
         ORIGIN.into()
     )?);
     Ok(())
+}
+
+mod app_consent {
+    use super::*;
+    use canister_tests::api::internet_identity::api_v2::app_revoke_session;
+    use canister_tests::api::internet_identity::notifications::{
+        app_notification_consent_granted, app_revoke_notification_consent,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        AppNotificationConsentGrantedError, AppRevokeNotificationConsentError,
+    };
+    use std::time::Duration;
+
+    const OTHER_ORIGIN: &str = "https://other-dapp.com";
+
+    /// A canister that notifies, one anchor, and the session it holds at `ORIGIN`.
+    fn install_with_session(env: &PocketIc) -> (CanisterId, AnchorNumber, Principal) {
+        let canister_id =
+            install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
+        let anchor = flows::register_anchor(env, canister_id);
+        let session = sign_in_at(env, canister_id, anchor, ORIGIN, 1);
+        (canister_id, anchor, session)
+    }
+
+    fn granted(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        session: Principal,
+    ) -> Result<bool, RejectResponse> {
+        Ok(app_notification_consent_granted(env, canister_id, session)?
+            .expect("consent read refused"))
+    }
+
+    #[test]
+    fn should_read_and_revoke_consent_as_the_apps_session() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, session) = install_with_session(&env);
+
+        assert!(!granted(&env, canister_id, session)?);
+
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+        assert!(granted(&env, canister_id, session)?);
+
+        app_revoke_notification_consent(&env, canister_id, session)?.expect("revoke rejected");
+        assert!(!granted(&env, canister_id, session)?);
+        // The app's revoke is the identity's: II sees the consent gone too.
+        assert!(!consent_granted(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            ORIGIN.into()
+        )?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_only_for_the_app_the_session_is_at() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, session) = install_with_session(&env);
+        let elsewhere = sign_in_at(&env, canister_id, anchor, OTHER_ORIGIN, 2);
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+
+        assert!(!granted(&env, canister_id, elsewhere)?);
+        // Revoking from another app's session leaves this app's consent alone.
+        app_revoke_notification_consent(&env, canister_id, elsewhere)?.expect("revoke rejected");
+        assert!(granted(&env, canister_id, session)?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_caller_with_no_session() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, session) = install_with_session(&env);
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+
+        // The identity's own principal, a stranger and anonymous hold no app session.
+        for stranger in [principal_1(), principal_2(), Principal::anonymous()] {
+            assert_eq!(
+                app_notification_consent_granted(&env, canister_id, stranger)?,
+                Err(AppNotificationConsentGrantedError::NoSuchSession)
+            );
+            assert_eq!(
+                app_revoke_notification_consent(&env, canister_id, stranger)?,
+                Err(AppRevokeNotificationConsentError::NoSuchSession)
+            );
+        }
+        assert!(granted(&env, canister_id, session)?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_an_expired_session() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id =
+            install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_notifications_enabled());
+        let anchor = flows::register_anchor(&env, canister_id);
+        let session = open_session(
+            &env,
+            canister_id,
+            anchor,
+            ORIGIN,
+            1,
+            Some(10 * 60 * 1_000_000_000),
+        );
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+        assert!(granted(&env, canister_id, session)?);
+
+        env.advance_time(Duration::from_secs(11 * 60));
+        // A query reads the state of the last round, so one has to run at the new time.
+        env.tick();
+
+        assert_eq!(
+            app_notification_consent_granted(&env, canister_id, session)?,
+            Err(AppNotificationConsentGrantedError::NoSuchSession)
+        );
+        assert_eq!(
+            app_revoke_notification_consent(&env, canister_id, session)?,
+            Err(AppRevokeNotificationConsentError::NoSuchSession)
+        );
+        assert!(consent_granted(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            ORIGIN.into()
+        )?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_session_the_app_signed_out() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, session) = install_with_session(&env);
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+
+        app_revoke_session(&env, canister_id, session)?.expect("sign-out rejected");
+
+        assert_eq!(
+            app_notification_consent_granted(&env, canister_id, session)?,
+            Err(AppNotificationConsentGrantedError::NoSuchSession)
+        );
+        assert_eq!(
+            app_revoke_notification_consent(&env, canister_id, session)?,
+            Err(AppRevokeNotificationConsentError::NoSuchSession)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_find_the_consent_granted_through_a_gateway_twin() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_session(&env);
+        // Signed in through the legacy spelling, which is the one the frontend remaps to.
+        let session = sign_in_at(&env, canister_id, anchor, GATEWAY, 2);
+
+        grant_consent(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into(),
+        )?
+        .expect("grant rejected");
+        assert!(granted(&env, canister_id, session)?);
+
+        app_revoke_notification_consent(&env, canister_id, session)?.expect("revoke rejected");
+        assert!(!consent_granted(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into()
+        )?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_false_and_still_revoke_once_notifications_are_disabled(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, session) = install_with_session(&env);
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+
+        let switch = |enabled: bool| {
+            upgrade_ii_canister_with_arg(
+                &env,
+                canister_id,
+                II_WASM.clone(),
+                Some(InternetIdentityInit {
+                    notifications_enabled: Some(enabled),
+                    ..Default::default()
+                }),
+            )
+        };
+        switch(false)?;
+
+        assert!(!granted(&env, canister_id, session)?);
+        app_revoke_notification_consent(&env, canister_id, session)?.expect("revoke rejected");
+
+        // The revoke held: switched back on, the app is still not allowed.
+        switch(true)?;
+        assert!(!granted(&env, canister_id, session)?);
+        Ok(())
+    }
 }
 
 mod subscriptions {

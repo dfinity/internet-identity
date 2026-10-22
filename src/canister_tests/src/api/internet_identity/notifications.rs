@@ -2,8 +2,9 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, GetNextNotificationError,
-    GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationDelegationRequest,
+    AnchorNumber, AppNotificationConsentGrantedError, AppRevokeNotificationConsentError, BrowserId,
+    FrontendHostname, GetNextNotificationError, GetNextNotificationRequest,
+    GetNextNotificationResponse, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationRevokeConsentError,
@@ -73,6 +74,37 @@ pub fn consent_granted(
             anchor_number,
             origin,
         },),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_notification_consent_granted(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<bool, AppNotificationConsentGrantedError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_notification_consent_granted",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_revoke_notification_consent(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<(), AppRevokeNotificationConsentError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_revoke_notification_consent",
+        (),
     )
     .map(|(x,)| x)
 }
