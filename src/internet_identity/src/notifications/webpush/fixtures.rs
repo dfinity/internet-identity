@@ -62,6 +62,22 @@ fn key(seed: u8) -> PublicKey {
 }
 
 /// The key a Home Screen app generated in its own partition and presents on every call.
+/// A registration whose every field passes the shape its newtype asserts, which is the
+/// only kind storage can hand back.
+pub(crate) fn subscription_at(
+    endpoint: &str,
+    created_at_ns: Timestamp,
+    issued_at_ns: Timestamp,
+) -> WebPushSubscription {
+    WebPushSubscription {
+        endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
+        created_at_ns,
+        vapid_public_key: VapidPublicKey::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
+        jwt_signatures: JwtPool::try_new(valid_pool(), issued_at_ns)
+            .expect("a pool of 64-byte signatures"),
+    }
+}
+
 pub(crate) fn app_key(seed: u8) -> PublicKey {
     ByteBuf::from(vec![seed; 91])
 }
@@ -102,7 +118,7 @@ pub(crate) fn valid_vapid_key() -> Vec<u8> {
         .to_vec()
 }
 
-pub(super) fn valid_pool() -> Vec<Vec<u8>> {
+pub(crate) fn valid_pool() -> Vec<Vec<u8>> {
     vec![vec![3u8; JWT_SIG_LEN]; 3]
 }
 
@@ -131,16 +147,18 @@ pub(super) fn validated(
         endpoint,
         vapid_public_key,
         jwt_signatures,
+        jwt_issued_at_ns,
         ..
     } = request(anchor_number, endpoint, jwt_issued_at_ns);
     (
         PushEndpoint::try_from(endpoint.as_str()).expect("the fixture endpoint validates"),
         VapidPublicKey::try_from(vapid_public_key.into_vec()).expect("the fixture key validates"),
-        JwtPool::try_from(
+        JwtPool::try_new(
             jwt_signatures
                 .into_iter()
                 .map(ByteBuf::into_vec)
                 .collect::<Vec<_>>(),
+            jwt_issued_at_ns,
         )
         .expect("the fixture pool validates"),
     )
@@ -175,7 +193,6 @@ pub(super) fn try_subscribe_as(
         endpoint,
         vapid_public_key,
         jwt_signatures,
-        now_ns,
         now_ns,
     )
 }
@@ -235,5 +252,6 @@ pub(super) fn stored_endpoint(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
 ) -> Option<String> {
-    stored_subscription(anchor_number, browser_id).map(|subscription| subscription.endpoint)
+    stored_subscription(anchor_number, browser_id)
+        .map(|subscription| subscription.endpoint.into_string())
 }
