@@ -1087,7 +1087,14 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::AnchorNotFound { anchor_number });
         };
 
-        Ok(Anchor::from((anchor_number, storable_anchor)))
+        // A row that no longer holds the shape its fields assert is a row this canister
+        // cannot act on, the same as CBOR that will not decode.
+        Anchor::try_from((anchor_number, storable_anchor)).map_err(|reason| {
+            StorageError::MalformedAnchor {
+                anchor_number,
+                reason,
+            }
+        })
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
@@ -1569,7 +1576,10 @@ impl<M: Memory + Clone> Storage<M> {
             .notification_app_memory
             .get(&app_id)
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
-        let mut app = NotificationApp::from(stored);
+        // The record is read back only to keep its own fields; a row that will not read
+        // is one this write cannot be applied to.
+        let mut app = NotificationApp::try_from(stored)
+            .map_err(|reason| StorageError::MalformedNotificationApp { app_id, reason })?;
         // Keep what is queued only where the registration is replaced at the same address.
         // Anything else leaves it announced to an address nothing listens on, and a full
         // queue posts no wake-up for what arrives after it.
@@ -1673,9 +1683,17 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// The record `app_id` names, if it is still there.
     pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
-        self.notification_app_memory
-            .get(&app_id)
-            .map(NotificationApp::from)
+        let stored = self.notification_app_memory.get(&app_id)?;
+        // A record that will not read back is reported as no record, which is what every
+        // caller here already handles: the alternative is an endpoint trapping on a row
+        // only an operator can repair. Logged so it is not silent.
+        NotificationApp::try_from(stored)
+            .inspect_err(|reason| {
+                ic_cdk::println!(
+                    "ERROR: Notification app {app_id} holds a value it cannot be read as: {reason}"
+                );
+            })
+            .ok()
     }
 
     /// The anchors pointing at `app_id`, in ascending order and stable across calls.
@@ -5044,6 +5062,16 @@ pub enum StorageError {
         range: (AnchorNumber, AnchorNumber),
     },
     BadAnchorNumber(u64),
+    /// A row decoded, but a value in it no longer holds the shape its type asserts.
+    MalformedAnchor {
+        anchor_number: AnchorNumber,
+        reason: String,
+    },
+    /// As `MalformedAnchor`, for a Home Screen app's record.
+    MalformedNotificationApp {
+        app_id: NotificationAppId,
+        reason: String,
+    },
     DeserializationError(candid::error::Error),
     SerializationError(candid::error::Error),
     EntrySizeLimitExceeded {
@@ -5134,6 +5162,17 @@ impl fmt::Display for StorageError {
                 range.0, range.1
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
+            Self::MalformedAnchor {
+                anchor_number,
+                reason,
+            } => write!(
+                f,
+                "Identity Anchor {anchor_number} holds a value it cannot be read as: {reason}"
+            ),
+            Self::MalformedNotificationApp { app_id, reason } => write!(
+                f,
+                "Notification app {app_id} holds a value it cannot be read as: {reason}"
+            ),
             Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
             Self::ApplicationConfigNotFound { anchor_number } => write!(
                 f,
