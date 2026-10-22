@@ -15,11 +15,9 @@ use crate::delegation::{
     add_delegation_signature, delegation_signature_msg_with_permissions,
     der_encode_canister_sig_key,
 };
+use crate::notifications::consent_granted_for;
 use crate::notifications::dispatch;
-use crate::notifications::{
-    consent_granted_for, ValidatedGetNotificationDelegationRequest,
-    ValidatedPrepareNotificationDelegationRequest,
-};
+use crate::origin::ApplicationOrigin;
 use crate::state::{self, storage_borrow};
 use crate::storage::account::{Account, AccountKey};
 use crate::storage::anchor::Anchor;
@@ -30,7 +28,7 @@ use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AnchorNumber, BrowserId, Delegation, FrontendHostname,
     GetNotificationDelegationResponse, NotificationDelegationError,
-    PrepareNotificationDelegationResponse, SignedDelegation, Timestamp,
+    PrepareNotificationDelegationResponse, SessionKey, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -109,22 +107,20 @@ fn read_account(
 }
 
 pub fn prepare(
-    ValidatedPrepareNotificationDelegationRequest {
-        anchor_number,
-        origin,
-        account_number,
-        session_key,
-        ..
-    }: ValidatedPrepareNotificationDelegationRequest,
+    anchor_number: AnchorNumber,
+    origin: &ApplicationOrigin,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
     anchor: &Anchor,
     browser_id: BrowserId,
     now_ns: Timestamp,
 ) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
-    check_notification_access(anchor, browser_id, &origin)?;
+    let origin = &origin.as_str().to_string();
+    check_notification_access(anchor, browser_id, origin)?;
 
-    let account = read_account(anchor_number, &origin, account_number)?;
+    let account = read_account(anchor_number, origin, account_number)?;
     let seed = notification_pull_seed(&account);
-    let message = sender_info(&origin, &account_principal(&account));
+    let message = sender_info(origin, &account_principal(&account));
     let expiration = now_ns.saturating_add(NOTIFICATION_DELEGATION_TTL_NS);
 
     state::signature_map_mut(|sigs| {
@@ -148,19 +144,18 @@ pub fn prepare(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn get(
-    ValidatedGetNotificationDelegationRequest {
-        anchor_number,
-        origin,
-        account_number,
-        session_key,
-        expiration,
-        ..
-    }: ValidatedGetNotificationDelegationRequest,
+    anchor_number: AnchorNumber,
+    origin: &ApplicationOrigin,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    expiration: Timestamp,
     anchor: &Anchor,
     browser_id: BrowserId,
 ) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
-    check_notification_access(anchor, browser_id, &origin)?;
+    let origin = &origin.as_str().to_string();
+    check_notification_access(anchor, browser_id, origin)?;
 
     // Nothing can have been prepared before the salt was set, and deriving a
     // seed without one traps.
@@ -168,9 +163,9 @@ pub fn get(
         return Err(NotificationDelegationError::NoSuchDelegation);
     }
 
-    let account = read_account(anchor_number, &origin, account_number)?;
+    let account = read_account(anchor_number, origin, account_number)?;
     let seed = notification_pull_seed(&account);
-    let message = sender_info(&origin, &account_principal(&account));
+    let message = sender_info(origin, &account_principal(&account));
 
     state::assets_and_signatures(|certified_assets, sigs| {
         let root_hash = Some(certified_assets.root_hash());

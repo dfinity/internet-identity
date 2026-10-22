@@ -1,9 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::validation::{
-    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
-};
+use super::validation::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::state;
@@ -19,25 +17,30 @@ use internet_identity_interface::internet_identity::types::{
 /// before, endpoint included.
 pub fn set_subscription(
     key: NotificationKey,
-    request: ValidatedSetWebPushSubscriptionRequest,
+    anchor_number: AnchorNumber,
+    endpoint: PushEndpoint,
+    vapid_public_key: VapidPublicKey,
+    jwt_signatures: JwtPool,
+    jwt_issued_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
     let browser_id = match key {
-        NotificationKey::App(app_id) => return set_app_subscription(app_id, request, now_ns),
+        NotificationKey::App(app_id) => {
+            return set_app_subscription(
+                app_id,
+                endpoint,
+                vapid_public_key,
+                jwt_signatures,
+                jwt_issued_at_ns,
+                now_ns,
+            )
+        }
         NotificationKey::Browser(browser_id) => browser_id,
     };
-    let anchor = state::anchor(request.anchor_number);
-
-    let ValidatedSetWebPushSubscriptionRequest {
-        anchor_number: _,
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
-        ..
-    } = request;
+    let anchor = state::anchor(anchor_number);
+    let endpoint = endpoint.into_string();
 
     // The same endpoint means this replaces the pool on a registration that is still
     // live, so the registration keeps its age and its queue, and the pool has to move
@@ -59,8 +62,8 @@ pub fn set_subscription(
         Some(WebPushSubscription {
             endpoint,
             created_at_ns,
-            vapid_public_key,
-            jwt_signatures,
+            vapid_public_key: vapid_public_key.into_vec(),
+            jwt_signatures: jwt_signatures.into_vec(),
             jwt_issued_at_ns,
             notifications,
             // A re-subscribe has had no second wake-up of its own yet.
@@ -76,11 +79,8 @@ pub fn set_subscription(
 /// Takes the browser rather than reading it off the caller, since silencing one is done
 /// from another.
 pub fn remove_subscription(
-    ValidatedRemoveWebPushSubscriptionRequest {
-        anchor_number,
-        browser_id,
-        ..
-    }: ValidatedRemoveWebPushSubscriptionRequest,
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
     clear_subscription(anchor_number, browser_id)
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
@@ -156,17 +156,13 @@ fn write_subscription(
 /// What the Home Screen app registered, which is its record's and not any anchor's.
 fn set_app_subscription(
     app_id: NotificationAppId,
-    request: ValidatedSetWebPushSubscriptionRequest,
+    endpoint: PushEndpoint,
+    vapid_public_key: VapidPublicKey,
+    jwt_signatures: JwtPool,
+    jwt_issued_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let ValidatedSetWebPushSubscriptionRequest {
-        anchor_number: _,
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
-        ..
-    } = request;
+    let endpoint = endpoint.into_string();
     // Read now rather than taking what authorizing the call happened to see: this decides
     // whether the pool is being replaced at the same address, which the record owns.
     let NotificationApp {
@@ -205,8 +201,8 @@ fn set_app_subscription(
             Some(WebPushSubscription {
                 endpoint,
                 created_at_ns,
-                vapid_public_key,
-                jwt_signatures,
+                vapid_public_key: vapid_public_key.into_vec(),
+                jwt_signatures: jwt_signatures.into_vec(),
                 jwt_issued_at_ns,
                 notifications,
                 woken_again_at_ns: None,
@@ -223,7 +219,6 @@ mod tests {
     use super::super::fixtures::*;
     use super::*;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
-    use internet_identity_interface::internet_identity::types::RemoveWebPushSubscriptionRequest;
 
     const ENDPOINT: &str = "https://relay.example/a";
     const ROTATED: &str = "https://relay.example/b";
@@ -255,12 +250,7 @@ mod tests {
     }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
-        let request = RemoveWebPushSubscriptionRequest {
-            anchor_number,
-            browser_id,
-        };
-        remove_subscription(request.try_into().expect("the fixture request validates"))
-            .expect("removing a subscription");
+        remove_subscription(anchor_number, browser_id).expect("removing a subscription");
     }
 
     #[test]
