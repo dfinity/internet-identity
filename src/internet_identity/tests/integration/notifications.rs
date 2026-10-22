@@ -16,9 +16,9 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
     GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
-    NotificationGrantConsentError, NotificationRevokeConsentError, NotificationToShow,
-    OperatingSystem, PrepareAccountSessionRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse,
+    NotificationGrantConsentError, NotificationToShow, OperatingSystem,
+    PrepareAccountSessionRequest, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -109,10 +109,9 @@ fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationGrantConsentError::InternalCanisterError(_))
     ));
-    assert!(matches!(
-        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
-        Err(NotificationRevokeConsentError::InternalCanisterError(_))
-    ));
+    // Withdrawing is never refused, and there is nothing here to withdraw.
+    revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("revoke refused");
     // A disabled deployment answers like one nobody consented on.
     assert!(!consent_granted(
         &env,
@@ -251,13 +250,13 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
     )?
     .expect("grant rejected");
 
-    // So one revoke, through a third spelling, clears them all.
+    // So one revoke, of the spelling it is stored under, clears them all.
     revoke_consent(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp.net".into(),
+        "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app".into(),
     )?
     .expect("revoke rejected");
     for spelling in [
@@ -391,10 +390,8 @@ fn should_refuse_consent_once_notifications_are_disabled() -> Result<(), RejectR
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationGrantConsentError::InternalCanisterError(_))
     ));
-    assert!(matches!(
-        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
-        Err(NotificationRevokeConsentError::InternalCanisterError(_))
-    ));
+    revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("revoke refused");
     assert!(!consent_granted(
         &env,
         canister_id,

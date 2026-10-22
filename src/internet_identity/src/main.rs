@@ -47,8 +47,8 @@ use notifications::webpush::{
 use notifications::{
     ValidatedGetNextNotificationRequest, ValidatedGetNotificationDelegationRequest,
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
-    ValidatedRemoveNotificationRequest, ValidatedSendNotificationArg,
+    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationRequest,
+    ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -464,13 +464,11 @@ fn notification_grant_consent(
 
 #[update]
 fn notification_revoke_consent(
-    request: NotificationRevokeConsentRequest,
-) -> Result<(), NotificationRevokeConsentError> {
-    let ValidatedNotificationRevokeConsentRequest {
+    NotificationRevokeConsentRequest {
         anchor_number,
         origin,
-        ..
-    } = request.try_into()?;
+    }: NotificationRevokeConsentRequest,
+) -> Result<(), NotificationRevokeConsentError> {
     check_authz_and_record_activity(anchor_number)
         .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
 

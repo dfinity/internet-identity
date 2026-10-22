@@ -28,9 +28,8 @@ use internet_identity_interface::internet_identity::types::{
 pub use validation::{
     notifications_enabled, ValidatedGetNextNotificationRequest,
     ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
-    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
-    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationRequest,
-    ValidatedSendNotificationArg,
+    ValidatedNotificationGrantConsentRequest, ValidatedPrepareNotificationDelegationRequest,
+    ValidatedRemoveNotificationRequest, ValidatedSendNotificationArg,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at
@@ -145,7 +144,6 @@ mod tests {
     use crate::notifications::test_setup as setup;
     use internet_identity_interface::internet_identity::types::{
         NotificationConsentGrantedRequest, NotificationGrantConsentRequest,
-        NotificationRevokeConsentRequest,
     };
 
     const APP: &str = "https://app.example";
@@ -172,17 +170,7 @@ mod tests {
     }
 
     fn revoke(anchor_number: AnchorNumber, origin: &str) -> Result<(), StorageError> {
-        let ValidatedNotificationRevokeConsentRequest {
-            anchor_number,
-            origin,
-            ..
-        } = NotificationRevokeConsentRequest {
-            anchor_number,
-            origin: origin.to_string(),
-        }
-        .try_into()
-        .expect("a notifiable origin");
-        revoke_consent(anchor_number, &origin, 1_000)
+        revoke_consent(anchor_number, &origin.to_string(), 1_000)
     }
 
     fn granted(anchor_number: AnchorNumber, origin: &str) -> bool {
