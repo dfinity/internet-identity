@@ -180,18 +180,18 @@ pub fn check_app_authorization(
 }
 
 /// Which key a call about notifications was signed with: a browser of this identity, or
-/// an app one of its browsers points at. An app speaks for an entry only while the entry
-/// routes through it.
+/// an app one of its browsers points at.
 ///
 /// Notifications belong to an identity, which points at browsers, which may point at an
 /// app. The app is what shows them, so it is what asks for them, acknowledges them and
 /// registers for them, but what it acts on is still the entry: that is where they are
 /// queued and which identity they are for.
 ///
-/// Answers which key it was and nothing more. Which entry that key acts on, and what is
-/// stored against it, are lookups the caller makes for itself against a read of its own,
-/// so nothing here is carried past the point where it was true.
-pub fn check_notification_authorization(
+/// Answers which key it was and nothing more. Which entry that key acts on, delivery
+/// being switched off included, and what is stored against it, are lookups the caller
+/// makes for itself against a read of its own, so nothing here is carried past the point
+/// where it was true.
+pub fn check_browser_or_app_authorization(
     anchor_number: AnchorNumber,
 ) -> Result<NotificationKey, AuthorizationError> {
     let caller = caller();
@@ -203,13 +203,7 @@ pub fn check_notification_authorization(
     // by asking which of them routes through a record this caller belongs to.
     state::storage_borrow(|storage| {
         anchor.browsers().iter().find_map(|browser| {
-            let reference = browser.notification_app?;
-            // Switching delivery off is this identity saying the app does not act for it,
-            // so the app stops being a caller this entry recognises.
-            if !reference.is_delivering() {
-                return None;
-            }
-            let app_id = reference.linked_app()?;
+            let app_id = browser.notification_app?.linked_app()?;
             storage
                 .notification_app_of(app_id, caller)
                 .is_some()
