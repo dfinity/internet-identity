@@ -1787,8 +1787,11 @@ mod probe {
         Ok(())
     }
 
+    /// A browser has one route: registering an address of its own is it leaving the
+    /// record, so there is no longer a record to probe rather than one to fall back from.
     #[test]
-    fn should_not_fall_back_to_the_browsers_own_registration() -> Result<(), RejectResponse> {
+    fn should_leave_the_record_when_the_browser_registers_an_address_of_its_own(
+    ) -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, first, _) = install_with_two_anchors(&env);
         link_app(&env, canister_id, first, 1, 100);
@@ -1802,7 +1805,7 @@ mod probe {
 
         assert_eq!(
             probe(&env, canister_id, browser(1), first)?,
-            Err(ProbeNotificationAppError::NotReachable)
+            Err(ProbeNotificationAppError::NoNotificationApp)
         );
         assert_eq!(pending_probe(&env, canister_id, browser(1), first)?, None);
         Ok(())
@@ -2529,11 +2532,14 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
 /// hand out, and the app spends it. Nothing is stored between them but the principal of
 /// that key and when it stops being spendable.
 mod app_link {
+    use super::subscriptions::{key_holder, request, ENDPOINT};
     use super::*;
     use candid::Principal;
     use canister_tests::api::internet_identity::notifications::{
-        link_notification_app, prepare_notification_app_link,
+        get_webpush_subscription_status, link_notification_app, prepare_notification_app_link,
+        set_webpush_subscription,
     };
+    use canister_tests::framework::BrowserKey;
     use internet_identity_interface::internet_identity::types::{
         LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
         PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
@@ -2644,6 +2650,60 @@ mod app_link {
                 app.principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
+        );
+        Ok(())
+    }
+
+    /// A browser has one route. Completing an install is the browser saying the Home
+    /// Screen app delivers for it now, so the address it registered for itself goes, and
+    /// what that address had queued goes with it.
+    #[test]
+    fn should_leave_its_own_address_behind_when_it_points_at_an_app() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(BROWSER_SEED);
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            key_holder(&key).principal(),
+            request(anchor, ENDPOINT),
+        )?
+        .expect("subscribe rejected");
+        assert!(get_webpush_subscription_status(
+            &env,
+            canister_id,
+            key_holder(&key).principal(),
+            anchor
+        )?
+        .is_some());
+
+        let link_key = BrowserKey::new(100);
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            link_key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+        link(
+            &env,
+            canister_id,
+            link_key.principal(),
+            anchor,
+            BrowserKey::new(101).principal(),
+        )?
+        .expect("link_notification_app returned Err");
+
+        assert_eq!(
+            get_webpush_subscription_status(
+                &env,
+                canister_id,
+                key_holder(&key).principal(),
+                anchor
+            )?,
+            None
         );
         Ok(())
     }

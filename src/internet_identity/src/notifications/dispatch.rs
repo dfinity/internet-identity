@@ -1033,17 +1033,19 @@ mod tests {
         )
     }
 
+    /// A probe asks the record to prove it is installed, so it goes to the record's
+    /// address and there is nowhere else to send it. A browser pointing at a record has
+    /// no address of its own, and news has nowhere to go either.
     #[test]
-    fn a_probe_is_never_answered_by_the_browser_itself() {
+    fn a_probe_at_a_record_with_no_address_sends_nothing() {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
-        route_through_an_app(recipient, browsers[0], 9, None);
+        let browser = browsers.first().copied().expect("one browser");
+        route_through_an_app(recipient, browser, 9, None);
 
-        assert_eq!(probe(recipient, browsers[0]), None);
-        assert!(queued(recipient, browsers[0]).is_empty());
-
-        // The same entry is reachable for news, through its own registration.
-        assert!(news(recipient, browsers[0]).is_some());
+        assert_eq!(probe(recipient, browser), None);
+        assert!(queued(recipient, browser).is_empty());
+        assert!(news(recipient, browser).is_none());
     }
 
     #[test]
@@ -1658,19 +1660,22 @@ mod tests {
         assert_eq!(anchor(other).notification_app(other_browsers[0]), None);
     }
 
+    /// A browser has one route: pointing at a record takes the address it registered for
+    /// itself, so the pass wakes it at the record's and there is no own address left for
+    /// a `Gone` to come back about.
     #[test]
-    fn a_gone_browser_endpoint_leaves_the_app_it_also_points_at() {
+    fn pointing_at_an_app_takes_over_from_the_browsers_own_address() {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
-        let app = route_through_an_app(recipient, browsers[0], 9, Some(APP_RELAY));
+        let browser = browsers.first().copied().expect("one browser");
+        let app = route_through_an_app(recipient, browser, 9, Some(APP_RELAY));
         submit(recipient, 7, 10 * SECOND_NS);
+
         let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
-        assert_eq!(delivery.target, DeliveryTarget::Browser);
 
-        settle(&delivery, PostOutcome::Gone, SECOND_NS);
-
-        assert!(stored_subscription(recipient, browsers[0]).is_none());
-        assert_eq!(stored_app(app), Some(app));
+        assert_eq!(delivery.target, DeliveryTarget::App(app));
+        assert_eq!(delivery.endpoint, APP_RELAY);
+        assert!(stored_subscription(recipient, browser).is_none());
     }
 
     #[test]
