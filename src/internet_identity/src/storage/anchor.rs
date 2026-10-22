@@ -1056,14 +1056,13 @@ impl Anchor {
         else {
             return;
         };
-        // Anything other than this same app: another app, or an install this entry
-        // started and has not finished. Both mean what is waiting was posted somewhere
-        // the app answering now cannot read.
-        let followed_another_route = browser.notification_app.is_some();
+        // A browser has one route. Pointing at a record leaves behind whatever address it
+        // registered for itself, and what is waiting goes with it: the entry only reaches
+        // here because the record it points at changed, so everything queued was posted
+        // somewhere this browser no longer reads.
+        browser.webpush_subscription = None;
+        browser.notifications.clear();
         browser.notification_app = Some(NotificationAppRef::Linked { app_id, enabled });
-        if followed_another_route && browser.webpush_subscription.is_none() {
-            browser.notifications.clear();
-        }
     }
 
     /// This identity asking the app it points at to deliver for it. Never a subscription
@@ -1095,6 +1094,14 @@ impl Anchor {
             return;
         };
         *current = enabled;
+        if enabled {
+            return;
+        }
+        // What is queued was posted to an address this entry has just stopped being
+        // delivered at. Nothing drains it while delivery is off and nothing joins it, so
+        // leaving it would only mean the first wake-up after switching back on shows
+        // something from before the switch-off instead of what caused it.
+        browser.notifications.clear();
     }
 
     /// Forgets `app_id` on every entry of this identity that points at it: the reference,
@@ -1142,11 +1149,31 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
-    /// The app this browser points at, where it has one.
-    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
+    /// This browser leaving the record it points at, which is what registering an address
+    /// of its own amounts to. Answers which record it left, so the caller can see whether
+    /// anything still points at that one.
+    ///
+    /// An install still running is left alone: it is not a route yet, and a browser whose
+    /// install never completes must keep the address it has.
+    pub fn leave_notification_app(&mut self, browser_id: BrowserId) -> Option<NotificationAppId> {
+        let browser = self.browsers.iter_mut().find(|b| b.id == browser_id)?;
+        let NotificationAppRef::Linked { app_id, .. } = browser.notification_app? else {
+            return None;
+        };
+        browser.notification_app = None;
+        Some(app_id)
+    }
+
+    /// The entry this id names, where the registry still lists one.
+    pub fn browser(&self, browser_id: BrowserId) -> Option<&Browser> {
         self.browsers
             .iter()
             .find(|browser| browser.id == browser_id)
+    }
+
+    /// The app this browser points at, where it has one.
+    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
+        self.browser(browser_id)
             .and_then(|browser| browser.notification_app)
     }
 
@@ -1202,9 +1229,7 @@ impl Anchor {
 
     /// What this browser registered for Web Push, if anything.
     pub fn webpush_subscription(&self, browser_id: BrowserId) -> Option<&WebPushSubscription> {
-        self.browsers
-            .iter()
-            .find(|browser| browser.id == browser_id)
+        self.browser(browser_id)
             .and_then(|browser| browser.webpush_subscription.as_ref())
     }
 
@@ -1222,9 +1247,7 @@ impl Anchor {
 
     /// What this entry has waiting, empty for one with nothing.
     pub fn notifications_for_browser(&self, browser_id: BrowserId) -> &[QueuedNotification] {
-        self.browsers
-            .iter()
-            .find(|browser| browser.id == browser_id)
+        self.browser(browser_id)
             .map_or(&[], |browser| &browser.notifications)
     }
 
