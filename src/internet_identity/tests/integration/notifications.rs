@@ -23,6 +23,7 @@ use internet_identity_interface::internet_identity::types::{
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
+use std::time::Duration;
 
 const ORIGIN: &str = "https://some-dapp.com";
 const GATEWAY: &str = "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app";
@@ -2468,6 +2469,7 @@ mod claims {
             },
         )?
         .expect("the switch returned Err");
+        run_dispatch_pass(&env);
 
         let shown = browser_get_next_notification(&env, canister_id, app, next_request(second))?
             .expect("browser_get_next_notification returned Err")
@@ -2494,6 +2496,16 @@ mod claims {
         );
         Ok(())
     }
+}
+
+/// Runs the dispatcher's next pass.
+///
+/// What Internet Identity has to say is written onto the entries it is for when the pass
+/// expands its backlog item, the same way an application's notifications are, so a test
+/// that reads a queue straight after asking reads it before anything was put there.
+fn run_dispatch_pass(env: &PocketIc) {
+    env.advance_time(Duration::from_secs(1));
+    env.tick();
 }
 
 fn next_request(anchor_number: AnchorNumber) -> GetNextNotificationRequest {
