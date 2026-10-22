@@ -172,7 +172,6 @@ mod tests {
     use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
     use crate::notifications::write_notifications_decision;
     use candid::Principal;
-    use internet_identity_interface::internet_identity::types::NotificationRevokeConsentRequest;
     use pretty_assertions::assert_eq;
 
     const SECOND_NS: u64 = 1_000_000_000;
@@ -410,15 +409,8 @@ mod tests {
     fn consent_granted_again_brings_back_nothing_queued_before_it_was_revoked() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
-        let revoke = NotificationRevokeConsentRequest {
-            anchor_number,
-            origin: ORIGIN.to_string(),
-        };
-        crate::notifications::revoke_consent(
-            revoke.try_into().expect("a valid request"),
-            SECOND_NS,
-        )
-        .expect("revoking consent");
+        crate::notifications::revoke_consent(anchor_number, &ORIGIN.to_string(), SECOND_NS)
+            .expect("revoking consent");
         write_notifications_decision(anchor_number, &ORIGIN.to_string(), true, SECOND_NS)
             .expect("granting consent again");
 

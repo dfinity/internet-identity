@@ -466,11 +466,16 @@ fn notification_grant_consent(
 fn notification_revoke_consent(
     request: NotificationRevokeConsentRequest,
 ) -> Result<(), NotificationRevokeConsentError> {
-    let validated: ValidatedNotificationRevokeConsentRequest = request.try_into()?;
-    check_authz_and_record_activity(validated.anchor_number)
+    let ValidatedNotificationRevokeConsentRequest {
+        anchor_number,
+        origin,
+        ..
+    } = request.try_into()?;
+    check_authz_and_record_activity(anchor_number)
         .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
 
-    notifications::revoke_consent(validated, ic_cdk::api::time())
+    notifications::revoke_consent(anchor_number, &origin, ic_cdk::api::time())
+        .map_err(|err| NotificationRevokeConsentError::InternalCanisterError(format!("{err}")))
 }
 
 /// `false` for an origin this deployment does not notify for and for an unauthorized
@@ -513,7 +518,8 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
         ..
     } = check_app_authorization(now)
         .map_err(|_| AppRevokeNotificationConsentError::NoSuchSession)?;
-    notifications::app_revoke_consent(anchor_number, &origin, now)
+    notifications::revoke_consent(anchor_number, &origin, now)
+        .map_err(|err| AppRevokeNotificationConsentError::InternalCanisterError(format!("{err}")))
 }
 
 // ---- Notifications: called by an app's backend ----
