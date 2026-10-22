@@ -1452,7 +1452,7 @@ mod tests {
     fn allow_app(anchor_number: AnchorNumber) -> ApplicationNumber {
         crate::notifications::write_notifications_decision(
             anchor_number,
-            &APP.to_string(),
+            &crate::origin::ApplicationOrigin::try_from(APP).expect("a bare origin"),
             true,
             0,
         )
