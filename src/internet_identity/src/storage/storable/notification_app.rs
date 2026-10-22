@@ -43,16 +43,23 @@ impl From<NotificationApp> for StorableNotificationApp {
     }
 }
 
-impl From<StorableNotificationApp> for NotificationApp {
-    fn from(value: StorableNotificationApp) -> Self {
-        NotificationApp {
+impl TryFrom<StorableNotificationApp> for NotificationApp {
+    type Error = String;
+
+    /// Fallible for the registration it may carry, which asserts the shape of its own
+    /// fields.
+    fn try_from(value: StorableNotificationApp) -> Result<Self, Self::Error> {
+        Ok(NotificationApp {
             id: value.id,
             principal: Principal::from_slice(&value.principal),
             created_at: value.created_at,
             last_used: value.last_used,
             anchors: value.anchors,
-            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
-        }
+            webpush_subscription: value
+                .webpush_subscription
+                .map(WebPushSubscription::try_from)
+                .transpose()?,
+        })
     }
 }
 

@@ -29,6 +29,30 @@ use std::collections::HashMap;
 
 /// Records that an account was used, the way `prepare_account_delegation` does:
 /// read it, stamp it, write it back. `None` where the identity has no such account.
+/// A registration whose fields pass the shape each newtype asserts, which is the only
+/// kind storage can hand back.
+fn test_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
+    use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
+    use p256::elliptic_curve::sec1::ToEncodedPoint;
+
+    let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
+    crate::storage::anchor::WebPushSubscription {
+        endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
+        created_at_ns: 0,
+        vapid_public_key: VapidPublicKey::try_from(
+            secret
+                .public_key()
+                .to_encoded_point(false)
+                .as_bytes()
+                .to_vec(),
+        )
+        .expect("a SEC1 P-256 point"),
+        jwt_signatures: JwtPool::try_new(vec![vec![3; 64]], 0).expect("a 64-byte signature"),
+        notifications: Vec::new(),
+        woken_again_at_ns: None,
+    }
+}
+
 fn record_use(
     storage: &mut Storage<VectorMemory>,
     anchor_number: AnchorNumber,
@@ -7473,7 +7497,7 @@ mod browser_session_count_tests {
 
 #[test]
 fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
-    use crate::storage::anchor::{QueuedNotification, WebPushSubscription};
+    use crate::storage::anchor::QueuedNotification;
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
@@ -7496,15 +7520,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
             browser_id,
-            Some(WebPushSubscription {
-                endpoint: "https://relay.example/a".to_string(),
-                created_at_ns: 0,
-                vapid_public_key: vec![4; 65],
-                jwt_signatures: vec![vec![3; 64]],
-                jwt_issued_at_ns: 0,
-                notifications: Vec::new(),
-                woken_again_at_ns: None,
-            }),
+            Some(test_subscription("https://relay.example/a")),
         );
     }
     anchor
@@ -7766,8 +7782,6 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
 
 #[test]
 fn an_apps_subscription_is_the_records_and_not_an_anchors() {
-    use crate::storage::anchor::WebPushSubscription;
-
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
@@ -7777,15 +7791,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     storage
         .set_notification_app_subscription(
             app.id,
-            Some(WebPushSubscription {
-                endpoint: "https://web.push.apple.com/one".to_string(),
-                created_at_ns: 2_000,
-                vapid_public_key: vec![1; 65],
-                jwt_signatures: vec![vec![2; 64]],
-                jwt_issued_at_ns: 2_000,
-                notifications: Vec::new(),
-                woken_again_at_ns: None,
-            }),
+            Some(test_subscription("https://web.push.apple.com/one")),
             2_000,
         )
         .expect("the record is there, so the registration is stored");
@@ -7794,7 +7800,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     assert_eq!(
         stored
             .webpush_subscription
-            .map(|subscription| subscription.endpoint),
+            .map(|subscription| subscription.endpoint.into_string()),
         Some("https://web.push.apple.com/one".to_string())
     );
     // Stamped by the app's own call, which is the only liveness anything here has.
