@@ -516,6 +516,8 @@ mod app_consent {
         assert!(granted(&env, canister_id, session)?);
 
         env.advance_time(Duration::from_secs(11 * 60));
+        // A query reads the state of the last round, so one has to run at the new time.
+        env.tick();
 
         assert_eq!(
             app_notification_consent_granted(&env, canister_id, session)?,
