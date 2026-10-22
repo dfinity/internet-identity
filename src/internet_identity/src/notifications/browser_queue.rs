@@ -85,7 +85,7 @@ pub(crate) fn remove_after_failed_wake_up(
         if posted_to.is_none_or(|registered| registered != endpoint) {
             return;
         }
-        let Some(queue) = anchor.notifications_mut(browser_id) else {
+        let Some(queue) = anchor.notifications_for_browser_mut(browser_id) else {
             return;
         };
         match queue.iter().position(|queued| queued == notification) {
@@ -117,7 +117,7 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
             anchor.browsers().iter().map(|browser| browser.id).collect();
         let mut removed = false;
         for browser_id in browser_ids {
-            if let Some(queue) = anchor.notifications_mut(browser_id) {
+            if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
                 let before = queue.len();
                 queue.retain(|queued| queued.application_number != application_number);
                 removed |= queue.len() < before;
@@ -142,7 +142,7 @@ pub(crate) fn next_to_show(
     let anchor_number = anchor.anchor_number();
     storage_borrow(|storage| {
         anchor
-            .notifications(browser_id)
+            .notifications_for_browser(browser_id)
             .iter()
             .filter(|queued| queued.expires_at_ns > now_ns)
             .find_map(|queued| {
@@ -174,7 +174,7 @@ pub(crate) fn remove_shown(
         else {
             return Ok(());
         };
-        let Some(queue) = anchor.notifications_mut(browser_id) else {
+        let Some(queue) = anchor.notifications_for_browser_mut(browser_id) else {
             return Ok(());
         };
         let Some(position) = queue.iter().position(|queued| {
@@ -314,7 +314,7 @@ mod tests {
     ) {
         let mut stored = anchor(anchor_number);
         stored
-            .notifications_mut(browser_id)
+            .notifications_for_browser_mut(browser_id)
             .expect("a listed browser")
             .extend(notifications);
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
@@ -345,7 +345,7 @@ mod tests {
     }
 
     fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {
-        ids(anchor(anchor_number).notifications(browser_id))
+        ids(anchor(anchor_number).notifications_for_browser(browser_id))
     }
 
     /// The iOS case: the entry holds no registration of its own and is delivered through
@@ -597,7 +597,7 @@ mod tests {
         remove(anchor_number, browser_id, &without_account);
 
         assert_eq!(
-            anchor(anchor_number).notifications(browser_id),
+            anchor(anchor_number).notifications_for_browser(browser_id),
             [QueuedNotification {
                 account_number: Some(3),
                 ..from_app(7, 60 * SECOND_NS)

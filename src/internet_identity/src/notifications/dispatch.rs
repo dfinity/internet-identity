@@ -312,7 +312,7 @@ fn fan_out_to_browsers(
         let mut to_post = Vec::new();
         let mut queued_anywhere = false;
         for delivery in woken {
-            let Some(queue) = anchor.notifications_mut(delivery.browser_id) else {
+            let Some(queue) = anchor.notifications_for_browser_mut(delivery.browser_id) else {
                 continue;
             };
             queued_anywhere = true;
@@ -686,7 +686,7 @@ mod tests {
 
     fn queued(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {
         anchor(anchor_number)
-            .notifications(browser_id)
+            .notifications_for_browser(browser_id)
             .iter()
             .map(|queued| queued.notification_id)
             .collect()
@@ -700,7 +700,7 @@ mod tests {
         let mut stored = anchor(anchor_number);
         change(
             stored
-                .notifications_mut(browser_id)
+                .notifications_for_browser_mut(browser_id)
                 .expect("a registered browser"),
         );
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");

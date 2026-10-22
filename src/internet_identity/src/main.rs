@@ -9,8 +9,8 @@ use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_app_authorization, check_authorization,
-    check_authz_and_record_activity, check_browser_authorization, check_notification_authorization,
-    NotificationKey,
+    check_authz_and_record_activity, check_browser_authorization,
+    check_browser_or_app_authorization, NotificationKey,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -347,7 +347,7 @@ fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
 ) -> Result<(), SetWebPushSubscriptionError> {
     let validated: ValidatedSetWebPushSubscriptionRequest = request.try_into()?;
-    let key = check_notification_authorization(validated.anchor_number)
+    let key = check_browser_or_app_authorization(validated.anchor_number)
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
     notifications::webpush::set_subscription(key, validated, ic_cdk::api::time())
@@ -362,7 +362,7 @@ fn get_webpush_subscription_status(
     let Ok(validated) = ValidatedGetWebPushSubscriptionStatusRequest::try_from(request) else {
         return None;
     };
-    let Ok(key) = check_notification_authorization(validated.anchor_number) else {
+    let Ok(key) = check_browser_or_app_authorization(validated.anchor_number) else {
         return None;
     };
 
@@ -687,9 +687,9 @@ fn notification_entry(
 ) -> Option<(storage::anchor::Anchor, BrowserId)> {
     let anchor = state::anchor(anchor_number);
     let browser_id = match key {
-        NotificationKey::Browser(browser_id) => browser_id,
-        NotificationKey::App(app_id) => anchor.browser_routing_through(app_id)?,
-    };
+        NotificationKey::Browser(browser_id) => Some(browser_id),
+        NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
+    }?;
     Some((anchor, browser_id))
 }
 
@@ -699,7 +699,7 @@ fn prepare_notification_delegation(
     request: PrepareNotificationDelegationRequest,
 ) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
     let request: ValidatedPrepareNotificationDelegationRequest = request.try_into()?;
-    let key = check_notification_authorization(request.anchor_number)
+    let key = check_browser_or_app_authorization(request.anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
@@ -713,7 +713,7 @@ fn get_notification_delegation(
     request: GetNotificationDelegationRequest,
 ) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
     let request: ValidatedGetNotificationDelegationRequest = request.try_into()?;
-    let key = check_notification_authorization(request.anchor_number)
+    let key = check_browser_or_app_authorization(request.anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
@@ -728,7 +728,7 @@ fn browser_get_next_notification(
     request: GetNextNotificationRequest,
 ) -> Result<GetNextNotificationResponse, GetNextNotificationError> {
     let request: ValidatedGetNextNotificationRequest = request.try_into()?;
-    let key = check_notification_authorization(request.anchor_number)
+    let key = check_browser_or_app_authorization(request.anchor_number)
         .map_err(|_| GetNextNotificationError::InvalidBrowserKey)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
         .ok_or(GetNextNotificationError::InvalidBrowserKey)?;
@@ -748,7 +748,7 @@ fn browser_remove_notification(
     request: RemoveNotificationRequest,
 ) -> Result<RemoveNotificationResponse, RemoveNotificationError> {
     let request: ValidatedRemoveNotificationRequest = request.try_into()?;
-    let key = check_notification_authorization(request.anchor_number)
+    let key = check_browser_or_app_authorization(request.anchor_number)
         .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
         .ok_or(RemoveNotificationError::InvalidBrowserKey)?;

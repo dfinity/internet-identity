@@ -128,9 +128,10 @@ impl Browser {
     /// Whether this entry points at `app_id` with delivery switched off, which is this
     /// identity's answer about this device rather than about the record carrying it.
     pub fn is_delivery_disabled_for(&self, app_id: NotificationAppId) -> bool {
-        self.notification_app.is_some_and(|reference| {
-            reference.linked_app() == Some(app_id) && !reference.is_delivering()
-        })
+        let Some(reference) = self.notification_app else {
+            return false;
+        };
+        reference.linked_app() == Some(app_id) && !reference.is_delivering()
     }
 }
 
@@ -170,18 +171,6 @@ pub struct WebPushSubscription {
     /// Raw ECDSA P-256 signatures, in window order.
     pub jwt_signatures: Vec<Vec<u8>>,
     pub jwt_issued_at_ns: Timestamp,
-}
-
-/// Whether a write replaces the JWT pool on the address that is already registered, rather
-/// than moving to a different one. Every holder of a registration decides it the same way.
-pub fn keeps_endpoint(
-    registered: Option<&WebPushSubscription>,
-    replacing: Option<&WebPushSubscription>,
-) -> bool {
-    match (registered, replacing) {
-        (Some(registered), Some(replacing)) => registered.endpoint == replacing.endpoint,
-        _ => false,
-    }
 }
 
 impl From<StorableWebPushSubscription> for WebPushSubscription {
@@ -1015,17 +1004,14 @@ impl Anchor {
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
     pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
-        let Some(index) = self
+        let Some(browser) = self
             .browsers
             .iter()
-            .position(|browser| browser.id == browser_id)
+            .find(|browser| browser.id == browser_id)
         else {
             return;
         };
-        if self.browsers[index]
-            .notification_app
-            .is_some_and(|reference| reference.linked_app() == Some(app_id))
-        {
+        if browser.is_pointing_at(app_id) {
             return;
         }
         // Whether this identity wants the app to deliver is the user's answer about the
@@ -1063,14 +1049,20 @@ impl Anchor {
                 }
             }
         }
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
+            return;
+        };
         // Anything other than this same app: another app, or an install this entry
         // started and has not finished. Both mean what is waiting was posted somewhere
         // the app answering now cannot read.
-        let followed_another_route = self.browsers[index].notification_app.is_some();
-        self.browsers[index].notification_app =
-            Some(NotificationAppRef::Linked { app_id, enabled });
-        if followed_another_route && self.browsers[index].webpush_subscription.is_none() {
-            self.browsers[index].notifications.clear();
+        let followed_another_route = browser.notification_app.is_some();
+        browser.notification_app = Some(NotificationAppRef::Linked { app_id, enabled });
+        if followed_another_route && browser.webpush_subscription.is_none() {
+            browser.notifications.clear();
         }
     }
 
@@ -1105,32 +1097,48 @@ impl Anchor {
         *current = enabled;
     }
 
-    /// Called from `Storage::forget_notification_app`, which runs when a push service
-    /// answers that the app's endpoint is gone: on iOS that is the user having deleted the
-    /// web app, taking the partition that held its key with it, so every entry pointing at
-    /// the record points at something that cannot be reached again. The record itself is
-    /// not this list's to delete: the caller is the one that can see whether anything
-    /// still points at it.
-    pub fn stop_pointing_at_notification_app(
-        &mut self,
-        browser_id: BrowserId,
-    ) -> Option<NotificationAppId> {
-        self.browsers
-            .iter_mut()
-            .find(|browser| browser.id == browser_id)?
-            .notification_app
-            .take()
-            .and_then(|reference| reference.linked_app())
+    /// Forgets `app_id` on every entry of this identity that points at it: the reference,
+    /// what its address was carrying, and the registration of an entry that had switched
+    /// it off, which must not start delivering again on the record going away.
+    ///
+    /// The record itself is not this list's to delete: only a caller holding every anchor
+    /// can see whether another identity still points at it.
+    pub fn drop_notification_app(&mut self, app_id: NotificationAppId) {
+        for browser in &mut self.browsers {
+            if !browser.is_pointing_at(app_id) {
+                continue;
+            }
+            // Both answers are about an entry that still holds the reference, so both are
+            // read before it goes.
+            let delivered_through_it = browser.is_delivered_through(app_id);
+            let switched_off = browser.is_delivery_disabled_for(app_id);
+            browser.notification_app = None;
+            // The answer was about this device, not about the record that carried it, so
+            // an entry that registered an address of its own would start delivering again
+            // on the record going away. Silencing it keeps what the user said.
+            if switched_off {
+                browser.webpush_subscription = None;
+            }
+            // What this entry has waiting went to the record's address, which nothing can
+            // read once the record is gone.
+            if delivered_through_it {
+                browser.notifications.clear();
+            }
+        }
     }
 
-    /// The entry of this identity whose calls an app signing as `app_id` acts on.
+    /// The entry of this identity whose calls an app signing as `app_id` acts on: one
+    /// pointing at it with delivery on. Switching delivery off is this identity saying
+    /// the app does not act for it, so there is no entry to find.
     ///
     /// At most one: pointing an entry at a record takes that record off every other entry
     /// of the identity, which is what lets an app resolve its calls to a single entry.
-    pub fn browser_routing_through(&self, app_id: NotificationAppId) -> Option<BrowserId> {
+    pub fn browser_delivering_through(&self, app_id: NotificationAppId) -> Option<BrowserId> {
         self.browsers
             .iter()
-            .find(|browser| browser.is_pointing_at(app_id))
+            .find(|browser| {
+                browser.is_pointing_at(app_id) && !browser.is_delivery_disabled_for(app_id)
+            })
             .map(|browser| browser.id)
     }
 
@@ -1213,7 +1221,7 @@ impl Anchor {
     }
 
     /// What this entry has waiting, empty for one with nothing.
-    pub fn notifications(&self, browser_id: BrowserId) -> &[QueuedNotification] {
+    pub fn notifications_for_browser(&self, browser_id: BrowserId) -> &[QueuedNotification] {
         self.browsers
             .iter()
             .find(|browser| browser.id == browser_id)
@@ -1227,7 +1235,7 @@ impl Anchor {
     /// subscription, so a browser that registered nothing of its own has one too: a
     /// caller reading `None` as "not registered for notifications" would be reading it
     /// as something it does not say.
-    pub fn notifications_mut(
+    pub fn notifications_for_browser_mut(
         &mut self,
         browser_id: BrowserId,
     ) -> Option<&mut Vec<QueuedNotification>> {

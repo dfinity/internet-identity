@@ -7507,7 +7507,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         );
     }
     anchor
-        .notifications_mut(queued_on)
+        .notifications_for_browser_mut(queued_on)
         .expect("a registered browser")
         .extend([3, 1, 2].map(queued));
     storage.write(anchor).expect("writing the anchor");
@@ -7517,8 +7517,11 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         .read(anchor_number)
         .expect("reading the anchor");
 
-    assert_eq!(reloaded.notifications(queued_on), [3, 1, 2].map(queued));
-    assert!(reloaded.notifications(left_empty).is_empty());
+    assert_eq!(
+        reloaded.notifications_for_browser(queued_on),
+        [3, 1, 2].map(queued)
+    );
+    assert!(reloaded.notifications_for_browser(left_empty).is_empty());
 }
 
 #[test]
@@ -7838,7 +7841,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
     for anchor_number in [10_000, 10_001] {
         let mut anchor = storage.read(anchor_number).expect("reading the anchor");
         anchor
-            .notifications_mut(0)
+            .notifications_for_browser_mut(0)
             .expect("a listed browser")
             .push(queued_notification(7));
         storage.write(anchor).expect("queueing");
@@ -7852,7 +7855,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
         let anchor = storage.read(anchor_number).expect("reading the anchor");
         assert_eq!(anchor.notification_app(0), None);
         // A replacement app must not inherit what the dead one was sent.
-        assert!(anchor.notifications(0).is_empty());
+        assert!(anchor.notifications_for_browser(0).is_empty());
     }
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
     assert_eq!(storage.notification_app(app.id), None);
@@ -7917,7 +7920,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));
-    own.notifications_mut(0)
+    own.notifications_for_browser_mut(0)
         .expect("a listed browser")
         .push(queued_notification(7));
     storage
@@ -7927,7 +7930,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     let mut routed = anchor_with_browser(&mut storage);
     routed.point_at_notification_app(0, app.id);
     routed
-        .notifications_mut(0)
+        .notifications_for_browser_mut(0)
         .expect("a listed browser")
         .push(queued_notification(8));
     storage.write(routed).expect("writing the routed entry");
@@ -7943,7 +7946,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         "the reference goes either way"
     );
     assert_eq!(
-        own.notifications(0)
+        own.notifications_for_browser(0)
             .iter()
             .map(|queued| queued.notification_id)
             .collect::<Vec<_>>(),
@@ -7956,7 +7959,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         None,
         "the reference goes either way"
     );
-    assert!(routed.notifications(0).is_empty());
+    assert!(routed.notifications_for_browser(0).is_empty());
 
     assert_eq!(storage.notification_app(app.id), None);
 }
@@ -7996,7 +7999,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
     storage.write(anchor).expect("pointing at the app");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
     anchor
-        .notifications_mut(0)
+        .notifications_for_browser_mut(0)
         .expect("a listed browser")
         .push(queued_notification(7));
     storage.write(anchor).expect("queueing");
@@ -8009,7 +8012,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         storage
             .read(10_000)
             .expect("reading")
-            .notifications(0)
+            .notifications_for_browser(0)
             .len(),
         1
     );
@@ -8019,7 +8022,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         .expect("the record is there");
 
     let anchor = storage.read(10_000).expect("reading the anchor");
-    assert!(anchor.notifications(0).is_empty());
+    assert!(anchor.notifications_for_browser(0).is_empty());
 }
 
 #[test]
@@ -8036,7 +8039,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));
-    own.notifications_mut(0)
+    own.notifications_for_browser_mut(0)
         .expect("a listed browser")
         .push(queued_notification(7));
     storage
@@ -8046,7 +8049,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     let mut routed = anchor_with_browser(&mut storage);
     routed.point_at_notification_app(0, app.id);
     routed
-        .notifications_mut(0)
+        .notifications_for_browser_mut(0)
         .expect("a listed browser")
         .push(queued_notification(8));
     storage.write(routed).expect("writing the routed entry");
@@ -8057,7 +8060,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
 
     let own = storage.read(10_000).expect("reading the anchor");
     assert_eq!(
-        own.notifications(0)
+        own.notifications_for_browser(0)
             .iter()
             .map(|queued| queued.notification_id)
             .collect::<Vec<_>>(),
@@ -8065,7 +8068,7 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
     );
 
     let routed = storage.read(10_001).expect("reading the anchor");
-    assert!(routed.notifications(0).is_empty());
+    assert!(routed.notifications_for_browser(0).is_empty());
 }
 
 #[test]

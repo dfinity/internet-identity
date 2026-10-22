@@ -9,7 +9,7 @@ use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{keeps_endpoint, Anchor, WebPushSubscription};
+use crate::storage::anchor::{Anchor, WebPushSubscription};
 use crate::storage::Storage;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
@@ -181,19 +181,18 @@ pub fn subscription_status(
 ///
 /// A queue is a list of wake-ups already posted to one endpoint. A registration that is
 /// removed, or replaced by a different endpoint, leaves nothing that could show them, so
-/// they go with it, and so does the re-wake stamp: it rations second wake-ups for an
-/// entry still waiting, and this entry is waiting for nothing. A pool replacement on the
-/// same endpoint keeps both.
+/// they go with it. A pool replacement on the same endpoint keeps them.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    if !keeps_endpoint(
-        anchor.webpush_subscription(browser_id),
-        subscription.as_ref(),
-    ) {
-        if let Some(queue) = anchor.notifications_mut(browser_id) {
+    let same_address = matches!(
+        (anchor.webpush_subscription(browser_id), subscription.as_ref()),
+        (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
+    );
+    if !same_address {
+        if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
             queue.clear();
         }
     }
@@ -285,7 +284,7 @@ mod tests {
     fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
         let mut stored = anchor(anchor_number);
         stored
-            .notifications_mut(browser_id)
+            .notifications_for_browser_mut(browser_id)
             .expect("a registered browser")
             .push(crate::storage::anchor::QueuedNotification {
                 application_number: 1,
@@ -298,7 +297,9 @@ mod tests {
     }
 
     fn queued(anchor_number: AnchorNumber, browser_id: BrowserId) -> usize {
-        anchor(anchor_number).notifications(browser_id).len()
+        anchor(anchor_number)
+            .notifications_for_browser(browser_id)
+            .len()
     }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
