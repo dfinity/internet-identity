@@ -1684,11 +1684,16 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Forgets a record no anchor points at. The record is committed with the reply even
     /// where that reply is an `Err`.
+    ///
+    /// A reference outlives the record it names, so a browser can leave one that is
+    /// already gone: nothing to forget is an answer here, not a fault.
     pub(crate) fn delete_notification_app_if_unreferenced(&mut self, app_id: NotificationAppId) {
         if !self.anchors_with_notification_app(app_id).is_empty() {
             return;
         }
-        self.delete_notification_app(app_id);
+        if self.notification_app_memory.contains_key(&app_id) {
+            self.delete_notification_app(app_id);
+        }
     }
 
     fn sync_anchor_with_passkey_pubkey_index(
