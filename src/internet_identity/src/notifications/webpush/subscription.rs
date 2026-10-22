@@ -18,10 +18,9 @@ pub fn set_subscription(
     endpoint: PushEndpoint,
     vapid_public_key: VapidPublicKey,
     jwt_signatures: JwtPool,
-    jwt_issued_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let endpoint = endpoint.into_string();
+    let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
 
     // The same endpoint means this replaces the pool on a registration that is still
     // live, so the registration keeps its age and its queue, and the pool has to move
@@ -29,7 +28,7 @@ pub fn set_subscription(
     // the coverage the browser believes it has. Any other endpoint is a new registration.
     let (created_at_ns, notifications) = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
-            if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
+            if jwt_issued_at_ns <= registered.jwt_signatures.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
             (registered.created_at_ns, registered.notifications.clone())
@@ -43,9 +42,8 @@ pub fn set_subscription(
         Some(WebPushSubscription {
             endpoint,
             created_at_ns,
-            vapid_public_key: vapid_public_key.into_vec(),
-            jwt_signatures: jwt_signatures.into_vec(),
-            jwt_issued_at_ns,
+            vapid_public_key,
+            jwt_signatures,
             notifications,
             // A re-subscribe has had no second wake-up of its own yet.
             woken_again_at_ns: None,
@@ -84,7 +82,7 @@ pub(crate) fn clear_gone_subscription(
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
     if anchor
         .webpush_subscription(browser_id)
-        .is_none_or(|registered| registered.endpoint != endpoint)
+        .is_none_or(|registered| registered.endpoint.as_str() != endpoint)
     {
         return Ok(());
     }
@@ -100,9 +98,9 @@ pub fn subscription_status(
     anchor
         .webpush_subscription(browser_id)
         .map(|registered| WebPushSubscriptionStatus {
-            endpoint: registered.endpoint.clone(),
-            pool_len: registered.jwt_signatures.len() as u32,
-            issued_at_ns: registered.jwt_issued_at_ns,
+            endpoint: registered.endpoint.as_str().to_string(),
+            pool_len: registered.jwt_signatures.signatures().len() as u32,
+            issued_at_ns: registered.jwt_signatures.issued_at_ns(),
         })
 }
 
@@ -249,7 +247,8 @@ mod tests {
             );
         }
         assert_eq!(
-            stored_subscription(anchor_number, browsers[0]).map(|s| s.jwt_issued_at_ns),
+            stored_subscription(anchor_number, browsers[0])
+                .map(|s| s.jwt_signatures.issued_at_ns()),
             Some(5_000)
         );
     }
@@ -266,7 +265,7 @@ mod tests {
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.created_at_ns, 1_000);
-        assert_eq!(stored.jwt_issued_at_ns, 9_000);
+        assert_eq!(stored.jwt_signatures.issued_at_ns(), 9_000);
     }
 
     /// Another endpoint is another registration, so the pool it arrives with answers to
@@ -281,7 +280,7 @@ mod tests {
             .expect("a rotated endpoint is not a pool replacement");
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
-        assert_eq!(stored.endpoint, ROTATED);
+        assert_eq!(stored.endpoint.as_str(), ROTATED);
         assert_eq!(stored.created_at_ns, 1_000);
     }
 

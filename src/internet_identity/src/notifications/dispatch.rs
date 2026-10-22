@@ -278,8 +278,8 @@ fn fan_out_to_browsers(
                     anchor_number: pending.anchor_number,
                     browser_id: browser.id,
                     notification: Some(queued.clone()),
-                    endpoint: subscription.endpoint.clone(),
-                    vapid_public_key: subscription.vapid_public_key.clone(),
+                    endpoint: subscription.endpoint.as_str().to_string(),
+                    vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
                     jwt,
                     urgency: pending.urgency.clone(),
                     ttl_seconds,
@@ -379,8 +379,8 @@ fn rewake_delivery(anchor: &Anchor, browser_id: BrowserId, now_ns: Timestamp) ->
         anchor_number: anchor.anchor_number(),
         browser_id,
         notification: None,
-        endpoint: subscription.endpoint.clone(),
-        vapid_public_key: subscription.vapid_public_key.clone(),
+        endpoint: subscription.endpoint.as_str().to_string(),
+        vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
         jwt,
         // What it is for is already queued; this says only that it is still waiting.
         urgency: Urgency::Normal,
@@ -395,7 +395,7 @@ pub(crate) fn wake_up_jwt(browser: &Browser, now_ns: Timestamp) -> Option<String
         return None;
     }
     let subscription = browser.webpush_subscription.as_ref()?;
-    let relay_origin = vapid_jwt::relay_origin_of(&subscription.endpoint)?;
+    let relay_origin = vapid_jwt::relay_origin_of(subscription.endpoint.as_str())?;
     vapid_jwt::assemble(subscription, &relay_origin, now_ns)
 }
 
@@ -1143,7 +1143,8 @@ mod tests {
         settle(&delivery, PostOutcome::Gone, SECOND_NS);
 
         assert_eq!(
-            stored_subscription(recipient, browsers[0]).map(|registered| registered.endpoint),
+            stored_subscription(recipient, browsers[0])
+                .map(|registered| registered.endpoint.into_string()),
             Some(ROTATED.to_string())
         );
     }
