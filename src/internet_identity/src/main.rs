@@ -487,6 +487,22 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
     notifications::consent_granted(validated)
 }
 
+// ---- Notifications: called by an app's frontend, as the user it signed in ----
+
+/// Authorized by the caller alone: its principal is the account the app's user signs in
+/// as, which names both the identity and the app, so an app can ask only about itself.
+#[query]
+fn app_notification_consent_granted() -> bool {
+    notifications::app_consent_granted(caller())
+}
+
+/// Authorized like [`app_notification_consent_granted`]. Idempotent: a caller with no
+/// consent to withdraw, or none at all, is `Ok`.
+#[update]
+fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
+    notifications::app_revoke_consent(caller(), ic_cdk::api::time())
+}
+
 // ---- Notifications: called by an app's backend ----
 
 /// Authorized by the origin listing the caller in the sender list it publishes. A

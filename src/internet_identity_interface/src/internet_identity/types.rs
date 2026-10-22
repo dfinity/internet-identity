@@ -1061,6 +1061,13 @@ pub enum NotificationRevokeConsentError {
     InternalCanisterError(String),
 }
 
+/// Why an app could not withdraw its own consent to notify the caller. A caller that is
+/// no account has nothing to withdraw, which is `Ok`, so this is only II failing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppRevokeNotificationConsentError {
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationGrantConsentRequest {
     pub anchor_number: AnchorNumber,

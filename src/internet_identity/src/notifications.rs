@@ -21,11 +21,13 @@ pub(crate) const BROWSER_GONE_AFTER_NS: u64 = 60 * 24 * 60 * 60 * 1_000_000_000;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::anchor_application_config::PermissionDecision;
 use crate::storage::StorageError;
+use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, NotAccepted, NotAcceptedReason, Notification,
-    NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
-    Timestamp,
+    AnchorNumber, AppRevokeNotificationConsentError, FrontendHostname, NotAccepted,
+    NotAcceptedReason, Notification, NotificationGrantConsentError, NotificationRevokeConsentError,
+    SendNotificationResponse, Timestamp,
 };
+use validation::ValidatedAppNotificationCaller;
 pub use validation::{
     notifications_enabled, ValidatedGetNextNotificationRequest,
     ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
@@ -78,11 +80,59 @@ pub fn revoke_consent(
     }: ValidatedNotificationRevokeConsentRequest,
     now_ns: Timestamp,
 ) -> Result<(), NotificationRevokeConsentError> {
+    withdraw_consent(anchor_number, &origin, now_ns);
+    Ok(())
+}
+
+/// Whether the app the caller signed in to may notify them. `false` for a principal
+/// that is no account, and while this deployment does not notify.
+pub fn app_consent_granted(caller: Principal) -> bool {
+    match app_caller(caller) {
+        Ok(Some(ValidatedAppNotificationCaller {
+            anchor_number,
+            origin,
+            ..
+        })) => consent_granted_for(anchor_number, &origin),
+        Ok(None) | Err(_) => false,
+    }
+}
+
+/// Withdraws the consent of the app the caller signed in to, as
+/// [`revoke_consent`] does for the identity itself.
+pub fn app_revoke_consent(
+    caller: Principal,
+    now_ns: Timestamp,
+) -> Result<(), AppRevokeNotificationConsentError> {
+    // A principal that is no account has no consent to withdraw.
+    let Some(ValidatedAppNotificationCaller {
+        anchor_number,
+        origin,
+        ..
+    }) = app_caller(caller).map_err(AppRevokeNotificationConsentError::InternalCanisterError)?
+    else {
+        return Ok(());
+    };
+    withdraw_consent(anchor_number, &origin, now_ns);
+    Ok(())
+}
+
+/// The identity and origin `caller` is the account of. Refused while this deployment
+/// does not notify, before anything is looked up, so a disabled deployment answers the
+/// same for every caller.
+fn app_caller(caller: Principal) -> Result<Option<ValidatedAppNotificationCaller>, String> {
+    if !notifications_enabled() {
+        return Err(validation::NOT_ENABLED.to_string());
+    }
+    storage_borrow(|storage| storage.lookup_account_with_principal(caller))
+        .map(ValidatedAppNotificationCaller::try_from)
+        .transpose()
+}
+
+fn withdraw_consent(anchor_number: AnchorNumber, origin: &FrontendHostname, now_ns: Timestamp) {
     // Consent that cannot exist is already withdrawn, so an app the identity never
     // reached is nothing to report.
-    let _ = write_notifications_decision(anchor_number, &origin, false, now_ns);
-    browser_queue::remove_app(anchor_number, &origin);
-    Ok(())
+    let _ = write_notifications_decision(anchor_number, origin, false, now_ns);
+    browser_queue::remove_app(anchor_number, origin);
 }
 
 /// Whether the request's origin may notify its identity.

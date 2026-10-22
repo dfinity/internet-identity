@@ -2,15 +2,16 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, GetNextNotificationError,
-    GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationDelegationRequest,
-    GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
-    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest,
-    PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
-    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
-    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    AnchorNumber, AppRevokeNotificationConsentError, BrowserId, FrontendHostname,
+    GetNextNotificationError, GetNextNotificationRequest, GetNextNotificationResponse,
+    GetNotificationDelegationRequest, GetNotificationDelegationResponse,
+    GetWebPushSubscriptionStatusRequest, NotificationConsentGrantedRequest,
+    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
+    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
+    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
+    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
+    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -73,6 +74,38 @@ pub fn consent_granted(
             anchor_number,
             origin,
         },),
+    )
+    .map(|(x,)| x)
+}
+
+/// Asked as `sender`, the principal an app's user signs in as.
+pub fn app_notification_consent_granted(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<bool, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_notification_consent_granted",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_revoke_notification_consent(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<(), AppRevokeNotificationConsentError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_revoke_notification_consent",
+        (),
     )
     .map(|(x,)| x)
 }

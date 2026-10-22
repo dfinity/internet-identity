@@ -2,6 +2,7 @@
 //! this deployment notifies for, spelled the one way it is keyed by.
 
 use crate::delegation::frontend_length_within_limit;
+use crate::storage::account::AccountKey;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AnchorNumber, FrontendHostname, GetNextNotificationError,
@@ -33,6 +34,14 @@ pub struct ValidatedNotificationRevokeConsentRequest {
 }
 
 pub struct ValidatedNotificationConsentGrantedRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    _validated: Validated,
+}
+
+/// The identity and origin a dapp's caller is the account of, for the consent the app
+/// reads and withdraws for itself.
+pub struct ValidatedAppNotificationCaller {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     _validated: Validated,
@@ -99,7 +108,7 @@ impl TryFrom<RemoveNotificationRequest> for ValidatedRemoveNotificationRequest {
     }
 }
 
-const NOT_ENABLED: &str = "notifications are not enabled";
+pub(super) const NOT_ENABLED: &str = "notifications are not enabled";
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {
     type Error = NotificationGrantConsentError;
@@ -239,6 +248,18 @@ impl TryFrom<NotificationConsentGrantedRequest> for ValidatedNotificationConsent
         Ok(Self {
             anchor_number,
             origin: notifying_origin(&origin)?,
+            _validated: Validated,
+        })
+    }
+}
+
+impl TryFrom<AccountKey> for ValidatedAppNotificationCaller {
+    type Error = String;
+
+    fn try_from(account: AccountKey) -> Result<Self, Self::Error> {
+        Ok(Self {
+            anchor_number: account.anchor_number,
+            origin: notifying_origin(&account.origin)?,
             _validated: Validated,
         })
     }

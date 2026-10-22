@@ -169,6 +169,9 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : PublicKey,
     'expiration' : Timestamp,
   });
+  const AppRevokeNotificationConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+  });
   const NotificationId = IDL.Nat64;
   const Urgency = IDL.Variant({
     'Low' : IDL.Null,
@@ -1124,12 +1127,23 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
         ['query'],
       ),
+    'app_notification_consent_granted' : IDL.Func([], [IDL.Bool], ['query']),
     'app_prepare_delegation' : IDL.Func(
         [AppPrepareDelegationRequest],
         [
           IDL.Variant({
             'Ok' : AppPrepareDelegationResponse,
             'Err' : AppSessionError,
+          }),
+        ],
+        [],
+      ),
+    'app_revoke_notification_consent' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AppRevokeNotificationConsentError,
           }),
         ],
         [],

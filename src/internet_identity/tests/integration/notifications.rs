@@ -391,6 +391,158 @@ fn should_refuse_consent_once_notifications_are_disabled() -> Result<(), RejectR
     Ok(())
 }
 
+mod app_consent {
+    use super::*;
+    use candid::Principal;
+    use canister_tests::api::internet_identity::get_principal;
+    use canister_tests::api::internet_identity::notifications::{
+        app_notification_consent_granted, app_revoke_notification_consent,
+    };
+    use internet_identity_interface::internet_identity::types::AppRevokeNotificationConsentError;
+
+    const OTHER_ORIGIN: &str = "https://other-dapp.com";
+
+    /// The principal `anchor`'s user is at `origin`: what the app sees, and calls as.
+    fn account_at(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        origin: &str,
+    ) -> Principal {
+        get_principal(env, canister_id, principal_1(), anchor, origin)
+            .expect("get_principal rejected")
+    }
+
+    #[test]
+    fn should_read_and_revoke_consent_as_the_signed_in_user() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let user = account_at(&env, canister_id, anchor, ORIGIN);
+
+        assert!(!app_notification_consent_granted(&env, canister_id, user)?);
+
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+        assert!(app_notification_consent_granted(&env, canister_id, user)?);
+
+        app_revoke_notification_consent(&env, canister_id, user)?.expect("revoke rejected");
+        assert!(!app_notification_consent_granted(&env, canister_id, user)?);
+        // The app's revoke is the identity's: II sees the consent gone too.
+        assert!(!consent_granted(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            ORIGIN.into()
+        )?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_only_for_the_app_the_caller_signed_in_to() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        sign_in_at(&env, canister_id, anchor, OTHER_ORIGIN, 2);
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+        let elsewhere = account_at(&env, canister_id, anchor, OTHER_ORIGIN);
+
+        assert!(!app_notification_consent_granted(
+            &env,
+            canister_id,
+            elsewhere
+        )?);
+        // Revoking as another app's user leaves this app's consent alone.
+        app_revoke_notification_consent(&env, canister_id, elsewhere)?.expect("revoke rejected");
+        assert!(app_notification_consent_granted(
+            &env,
+            canister_id,
+            account_at(&env, canister_id, anchor, ORIGIN)
+        )?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_answer_nothing_for_a_principal_that_is_no_account() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+
+        for stranger in [principal_2(), principal_1(), Principal::anonymous()] {
+            assert!(!app_notification_consent_granted(
+                &env,
+                canister_id,
+                stranger
+            )?);
+            app_revoke_notification_consent(&env, canister_id, stranger)?.expect("revoke rejected");
+        }
+        assert!(app_notification_consent_granted(
+            &env,
+            canister_id,
+            account_at(&env, canister_id, anchor, ORIGIN)
+        )?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_find_the_consent_granted_through_a_gateway_twin() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        sign_in_at(&env, canister_id, anchor, GATEWAY, 2);
+        let user = account_at(&env, canister_id, anchor, GATEWAY);
+
+        grant_consent(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into(),
+        )?
+        .expect("grant rejected");
+        assert!(app_notification_consent_granted(&env, canister_id, user)?);
+
+        app_revoke_notification_consent(&env, canister_id, user)?.expect("revoke rejected");
+        assert!(!consent_granted(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into()
+        )?);
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_once_notifications_are_disabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("grant rejected");
+        let user = account_at(&env, canister_id, anchor, ORIGIN);
+
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
+
+        assert!(!app_notification_consent_granted(&env, canister_id, user)?);
+        // Refused for every caller alike, so it says nothing about who is an account.
+        for caller in [user, principal_2()] {
+            assert!(matches!(
+                app_revoke_notification_consent(&env, canister_id, caller)?,
+                Err(AppRevokeNotificationConsentError::InternalCanisterError(_))
+            ));
+        }
+        Ok(())
+    }
+}
+
 mod subscriptions {
     use super::*;
     use canister_tests::api::internet_identity::api_v2::prepare_account_session;
