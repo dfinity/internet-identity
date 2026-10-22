@@ -1,6 +1,6 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
-use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
+use super::validation::{JwtPool, PushEndpoint, VapidPublicKey, JWT_SIG_LEN};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -121,15 +121,29 @@ pub(super) fn request(
     }
 }
 
-/// Only validation can build one, so the fixture goes through it.
+/// Only validation can build these, so the fixture goes through it.
 pub(super) fn validated(
     anchor_number: AnchorNumber,
     endpoint: &str,
     jwt_issued_at_ns: Timestamp,
-) -> ValidatedSetWebPushSubscriptionRequest {
-    request(anchor_number, endpoint, jwt_issued_at_ns)
-        .try_into()
-        .expect("the fixture request validates")
+) -> (PushEndpoint, VapidPublicKey, JwtPool) {
+    let SetWebPushSubscriptionRequest {
+        endpoint,
+        vapid_public_key,
+        jwt_signatures,
+        ..
+    } = request(anchor_number, endpoint, jwt_issued_at_ns);
+    (
+        PushEndpoint::try_from(endpoint.as_str()).expect("the fixture endpoint validates"),
+        VapidPublicKey::try_from(vapid_public_key.into_vec()).expect("the fixture key validates"),
+        JwtPool::try_from(
+            jwt_signatures
+                .into_iter()
+                .map(ByteBuf::into_vec)
+                .collect::<Vec<_>>(),
+        )
+        .expect("the fixture pool validates"),
+    )
 }
 
 /// `set_subscription` for a test that has an anchor number rather than the anchor.
@@ -154,7 +168,16 @@ pub(super) fn try_subscribe_as(
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    super::set_subscription(key, validated(anchor_number, endpoint, now_ns), now_ns)
+    let (endpoint, vapid_public_key, jwt_signatures) = validated(anchor_number, endpoint, now_ns);
+    super::set_subscription(
+        key,
+        anchor_number,
+        endpoint,
+        vapid_public_key,
+        jwt_signatures,
+        now_ns,
+        now_ns,
+    )
 }
 
 /// A Home Screen app record, with `anchor`'s browser `browser_id` pointing at it.
