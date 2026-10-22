@@ -984,14 +984,24 @@ impl Anchor {
 
     /// Replaces what this browser registered. A browser the registry no longer lists
     /// has nothing to register against, so the write is dropped.
+    ///
+    /// A browser has one route, so registering an address of its own leaves the record it
+    /// points at, and the record it left is the answer: the caller is the one that can see
+    /// whether anything still points at it. Removing a registration asks for nothing in
+    /// its place and leaves the reference where it is.
     pub fn set_webpush_subscription(
         &mut self,
         browser_id: BrowserId,
         subscription: Option<WebPushSubscription>,
-    ) {
+    ) -> Option<NotificationAppId> {
+        let left = match subscription {
+            Some(_) => self.leave_notification_app(browser_id),
+            None => None,
+        };
         if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
             browser.webpush_subscription = subscription;
         }
+        left
     }
 
     /// The queue of the browser's registration, empty for one not registered.
