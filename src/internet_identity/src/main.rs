@@ -40,7 +40,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
-use notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
+use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
 use notifications::{
     admit_batch, enabled_or, fetchable_origin, notifying_origin, TooManyNotifications,
 };
@@ -351,7 +351,8 @@ fn set_webpush_subscription(
     // Every field at once rather than the first to fail, so a browser doesn't go round
     // three times to learn what one answer can say.
     let (endpoint, vapid_public_key, jwt_signatures) = match (
-        PushEndpoint::try_from(endpoint.as_str()),
+        PushEndpoint::try_from(endpoint.as_str())
+            .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
         VapidPublicKey::try_from(vapid_public_key.into_vec()),
         JwtPool::try_from(
             jwt_signatures
