@@ -8,8 +8,8 @@ use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
-    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization, AuthorizationError,
+    anchor_operation_with_authz_check, check_app_authorization, check_authorization,
+    check_authz_and_record_activity, check_browser_authorization, AuthorizationError,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -499,7 +499,8 @@ fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGran
         anchor_number,
         origin,
         ..
-    } = sessions::caller_session(now).ok_or(AppNotificationConsentGrantedError::NoSuchSession)?;
+    } = check_app_authorization(now)
+        .map_err(|_| AppNotificationConsentGrantedError::NoSuchSession)?;
     Ok(notifications::consent_granted_for(anchor_number, &origin))
 }
 
@@ -510,7 +511,8 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
         anchor_number,
         origin,
         ..
-    } = sessions::caller_session(now).ok_or(AppRevokeNotificationConsentError::NoSuchSession)?;
+    } = check_app_authorization(now)
+        .map_err(|_| AppRevokeNotificationConsentError::NoSuchSession)?;
     notifications::app_revoke_consent(anchor_number, &origin, now)
 }
 

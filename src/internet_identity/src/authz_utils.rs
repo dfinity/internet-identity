@@ -1,6 +1,7 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
 use crate::session_delegation::expected_session_principal;
+use crate::storage::account::SessionLocator;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
 use crate::{anchor_management, state};
@@ -8,7 +9,7 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, BrowserId, IdentityNumber,
+    AnchorNumber, AuthorizationKey, BrowserId, IdentityNumber, Timestamp,
 };
 use std::fmt::{Display, Formatter};
 
@@ -182,6 +183,23 @@ pub fn check_browser_authorization(
         .browser_by_principal(caller)
         .ok_or(AuthorizationError::from(caller))?;
     Ok((anchor, browser_id))
+}
+
+/// Which app session the caller is signing as, while it is live.
+///
+/// The session index is keyed by the principal a session's chain is rooted at, so a hit is
+/// itself the proof that the caller is that session: nothing is named in the request and
+/// nothing is attached to it.
+pub fn check_app_authorization(now: Timestamp) -> Result<SessionLocator, AuthorizationError> {
+    let caller = caller();
+    state::storage_borrow(|storage| {
+        let locator = storage.lookup_session_with_principal(caller)?;
+        let session = storage.read_session(&locator)?;
+        // Either bound: a session past its lifetime and one nobody has used for longer
+        // than it was allowed are equally gone.
+        (!session.is_expired_or_idle(now)).then_some(locator)
+    })
+    .ok_or(AuthorizationError::from(caller))
 }
 
 /// Whether the prepare-time [`AuthorizationKey`] is still a valid

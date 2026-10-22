@@ -1,5 +1,6 @@
 use crate::authz_utils::{
-    check_authorization, check_authz_and_record_activity, AuthorizationError, IdentityUpdateError,
+    check_app_authorization, check_authorization, check_authz_and_record_activity,
+    AuthorizationError, IdentityUpdateError,
 };
 use crate::browser_key::verify_browser_keys;
 use crate::delegation::{
@@ -463,30 +464,21 @@ struct AuthorizedSession {
     session: Session,
 }
 
-/// Authenticates a refresh from `caller()` alone.
-///
-/// The session index is keyed by the principal a session's chain is rooted at, so a hit is
-/// itself the proof that the caller is that session: nothing is named in the request and
-/// nothing is attached to it.
+/// The caller's live session, with what a refresh mints from.
 fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionError> {
-    let (locator, account, session) = find_caller_session()?;
-    // Either bound: a session past its lifetime and one nobody has used for longer
-    // than it was allowed are equally gone, and a refresh is the thing that finds out.
-    if session.is_expired_or_idle(now) {
-        return Err(AppSessionError::NoSuchSession);
-    }
+    let locator = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+    let (account, session) = storage_borrow(|storage| {
+        Some((
+            storage.read_account(&locator.account_key())?,
+            storage.read_session(&locator)?,
+        ))
+    })
+    .ok_or(AppSessionError::NoSuchSession)?;
     Ok(AuthorizedSession {
         locator,
         account,
         session,
     })
-}
-
-/// The caller's live session, or `None` where [`authorize_session`] refuses it.
-pub fn caller_session(now: Timestamp) -> Option<SessionLocator> {
-    authorize_session(now)
-        .ok()
-        .map(|AuthorizedSession { locator, .. }| locator)
 }
 
 /// Whether the calling session is still usable, for the II frontend's silent re-auth
