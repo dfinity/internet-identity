@@ -482,6 +482,14 @@ fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionErro
     })
 }
 
+/// The caller's live session, for app-facing calls elsewhere that act on the identity and
+/// app it names. `None` wherever [`authorize_session`] refuses it.
+pub fn caller_session(now: Timestamp) -> Option<SessionLocator> {
+    authorize_session(now)
+        .ok()
+        .map(|AuthorizedSession { locator, .. }| locator)
+}
+
 /// Whether the calling session is still usable, for the II frontend's silent re-auth
 /// path. Advisory: a query reply is not certified, and the refresh path enforces the
 /// same conditions on every mint regardless of the answer here.

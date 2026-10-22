@@ -487,20 +487,27 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
     notifications::consent_granted(validated)
 }
 
-// ---- Notifications: called by an app's frontend, as the user it signed in ----
+// ---- Notifications: called by an app's frontend, as its session ----
 
-/// Authorized by the caller alone: its principal is the account the app's user signs in
-/// as, which names both the identity and the app, so an app can ask only about itself.
+/// Authorized by the caller's live session alone: it names both the identity and the app,
+/// so an app can ask only about its own consent for that user. `Ok(false)` while this
+/// deployment does not notify.
 #[query]
-fn app_notification_consent_granted() -> bool {
-    notifications::app_consent_granted(caller())
+fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGrantedError> {
+    if !notifications::notifications_enabled() {
+        return Ok(false);
+    }
+    let session = sessions::caller_session(ic_cdk::api::time())
+        .ok_or(AppNotificationConsentGrantedError::NoSuchSession)?;
+    Ok(notifications::app_consent_granted(&session))
 }
 
-/// Authorized like [`app_notification_consent_granted`]. Idempotent: a caller with no
-/// consent to withdraw, or none at all, is `Ok`.
+/// Authorized like [`app_notification_consent_granted`].
 #[update]
 fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
-    notifications::app_revoke_consent(caller(), ic_cdk::api::time())
+    let session = sessions::caller_session(ic_cdk::api::time())
+        .ok_or(AppRevokeNotificationConsentError::NoSuchSession)?;
+    notifications::app_revoke_consent(&session, ic_cdk::api::time())
 }
 
 // ---- Notifications: called by an app's backend ----

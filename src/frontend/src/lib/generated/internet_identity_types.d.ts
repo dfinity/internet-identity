@@ -96,6 +96,15 @@ export interface AppGetDelegationRequest {
    */
   'expiration' : Timestamp,
 }
+/**
+ * Why an app could not read its own consent to notify the caller.
+ */
+export type AppNotificationConsentGrantedError = {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
 export interface AppPrepareDelegationRequest {
   /**
    * The key the app delegation delegates to. Nothing about the account is named:
@@ -108,11 +117,16 @@ export interface AppPrepareDelegationResponse {
   'expiration' : Timestamp,
 }
 /**
- * Why an app could not withdraw its own consent to notify the caller. A caller that is
- * no account has nothing to withdraw, which is Ok, so this is only II failing.
+ * Why an app could not withdraw its own consent to notify the caller.
  */
 export type AppRevokeNotificationConsentError = {
     'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
   };
 export type AppSessionError = {
     /**
@@ -2306,11 +2320,15 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
-   * Called by a dapp as the user it signed in, not by its backend: the caller's principal
-   * names both the identity and the origin, so an app reads and withdraws only its own
-   * consent for that user. False for a principal that is no account.
+   * Called by an app's frontend as its session, not by its backend: the session names both
+   * the identity and the app, so an app reads and withdraws only its own consent for that
+   * user. Ok(false) from the query while this deployment does not notify.
    */
-  'app_notification_consent_granted' : ActorMethod<[], boolean>,
+  'app_notification_consent_granted' : ActorMethod<
+    [],
+    { 'Ok' : boolean } |
+      { 'Err' : AppNotificationConsentGrantedError }
+  >,
   /**
    * Mints a short-lived app delegation from a live session. Called by app frontends
    * with the session chain, so revoking the session ends access within one delegation
