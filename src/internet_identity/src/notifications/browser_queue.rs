@@ -67,17 +67,14 @@ pub(crate) fn remove_after_failed_wake_up(
                 .webpush_subscription(browser_id)
                 .map(|registered| registered.endpoint.clone()),
             DeliveryTarget::App(app_id) => {
-                // The app's address stands for this entry only while the entry still points
-                // at it. A switch to another app, or an install started, makes the queue
-                // somebody else's, and a late failure from the old address would drop a
-                // notification this entry can still show. An entry that registered an
-                // address of its own is reached here too, because a probe goes to the app
-                // whatever the entry registered.
-                if anchor
-                    .notification_app(browser_id)
-                    .and_then(|reference| reference.linked_app())
-                    != Some(app_id)
-                {
+                // The app's address stands for this entry only while the entry still
+                // points at it. A switch to another record, or an install started, makes
+                // the queue somebody else's, and a late failure from the old address
+                // would drop a notification this entry can still show.
+                let Some(browser) = anchor.browser(browser_id) else {
+                    return;
+                };
+                if !browser.is_pointing_at(app_id) {
                     return;
                 }
                 storage
