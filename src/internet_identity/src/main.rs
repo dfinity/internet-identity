@@ -10,6 +10,7 @@ use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_app_authorization, check_authorization,
     check_authz_and_record_activity, check_browser_authorization, AuthorizationError,
+    AuthorizedSession,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -53,7 +54,7 @@ use notifications::{
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
-use storage::account::{AccountDelegationError, PrepareAccountDelegation, SessionLocator};
+use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -498,7 +499,7 @@ fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGran
         return Ok(false);
     }
     let now = ic_cdk::api::time();
-    let SessionLocator {
+    let AuthorizedSession {
         anchor_number,
         origin,
         ..
@@ -510,7 +511,7 @@ fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGran
 #[update]
 fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
     let now = ic_cdk::api::time();
-    let SessionLocator {
+    let AuthorizedSession {
         anchor_number,
         origin,
         ..
