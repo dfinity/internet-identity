@@ -2198,11 +2198,14 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
 /// hand out, and the app spends it. Nothing is stored between them but the principal of
 /// that key and when it stops being spendable.
 mod app_link {
+    use super::subscriptions::{key_holder, request, ENDPOINT};
     use super::*;
     use candid::Principal;
     use canister_tests::api::internet_identity::notifications::{
-        link_notification_app, prepare_notification_app_link,
+        get_webpush_subscription_status, link_notification_app, prepare_notification_app_link,
+        set_webpush_subscription,
     };
+    use canister_tests::framework::BrowserKey;
     use internet_identity_interface::internet_identity::types::{
         LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
         PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
@@ -2313,6 +2316,60 @@ mod app_link {
                 app.principal()
             )?,
             Err(LinkNotificationAppError::NoPendingLink)
+        );
+        Ok(())
+    }
+
+    /// A browser has one route. Completing an install is the browser saying the Home
+    /// Screen app delivers for it now, so the address it registered for itself goes, and
+    /// what that address had queued goes with it.
+    #[test]
+    fn should_leave_its_own_address_behind_when_it_points_at_an_app() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(BROWSER_SEED);
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            key_holder(&key).principal(),
+            request(anchor, ENDPOINT),
+        )?
+        .expect("subscribe rejected");
+        assert!(get_webpush_subscription_status(
+            &env,
+            canister_id,
+            key_holder(&key).principal(),
+            anchor
+        )?
+        .is_some());
+
+        let link_key = BrowserKey::new(100);
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            link_key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+        link(
+            &env,
+            canister_id,
+            link_key.principal(),
+            anchor,
+            BrowserKey::new(101).principal(),
+        )?
+        .expect("link_notification_app returned Err");
+
+        assert_eq!(
+            get_webpush_subscription_status(
+                &env,
+                canister_id,
+                key_holder(&key).principal(),
+                anchor
+            )?,
+            None
         );
         Ok(())
     }
