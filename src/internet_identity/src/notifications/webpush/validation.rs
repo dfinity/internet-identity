@@ -13,17 +13,20 @@ pub(super) const JWT_SIG_LEN: usize = 64;
 /// One JWT per validity window; 30 covers ~30 days. Bounded to cap the row.
 const MAX_JWT_POOL_LEN: usize = 30;
 
-/// A relay address a push can be posted to: 1..=512 bytes, a URL with a host, and a
-/// scheme this deployment delivers over.
+/// A relay address a push can be posted to: 1..=512 bytes, a URL, and a host to post it
+/// at.
 ///
-/// The scheme rule reads `notifications_allow_insecure_endpoint`, so what this
-/// guarantees is that the address was deliverable when it was registered. That is the
-/// decision the canister makes once and stores; an endpoint already on a subscription
-/// is not re-judged when the flag moves.
+/// Shape only. Whether this deployment will deliver over the scheme is
+/// `deliverable_endpoint`, because that reads a deploy flag: a value minted while it was
+/// set would otherwise claim something that stops being true when it is cleared.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PushEndpoint(String);
 
 impl PushEndpoint {
+    pub fn as_url(&self) -> Option<Url> {
+        Url::parse(&self.0).ok()
+    }
+
     pub fn into_string(self) -> String {
         self.0
     }
@@ -37,17 +40,32 @@ impl TryFrom<&str> for PushEndpoint {
         let Ok(url) = Url::parse(endpoint) else {
             return Err("endpoint is not a URL".to_string());
         };
-        let local = url.scheme() == "http"
-            && allow_insecure_endpoint()
-            && crate::utils::is_loopback_host(url.host_str().unwrap_or_default());
-        if url.scheme() != "https" && !local {
-            return Err("endpoint must be an https:// URL".to_string());
-        }
         if url.host().is_none() {
             return Err("endpoint has no host".to_string());
         }
         Ok(Self(endpoint.to_string()))
     }
+}
+
+/// Refuses an endpoint this deployment will not POST to: plain `http` needs a loopback
+/// host and the deploy flag, as the sender list and SSO discovery do.
+///
+/// Read per call rather than carried on the endpoint, because both answers come from
+/// persistent state.
+pub fn deliverable_endpoint(endpoint: &PushEndpoint) -> Result<(), String> {
+    let Some(url) = endpoint.as_url() else {
+        return Err("endpoint is not a URL".to_string());
+    };
+    if url.scheme() == "https" {
+        return Ok(());
+    }
+    if url.scheme() == "http"
+        && allow_insecure_endpoint()
+        && crate::utils::is_loopback_host(url.host_str().unwrap_or_default())
+    {
+        return Ok(());
+    }
+    Err("endpoint must be an https:// URL".to_string())
 }
 
 /// The VAPID application server key, uncompressed SEC1 P-256.
@@ -163,7 +181,9 @@ mod tests {
             ..
         } = request;
         let problems: Vec<String> = [
-            PushEndpoint::try_from(endpoint.as_str()).err(),
+            PushEndpoint::try_from(endpoint.as_str())
+                .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint))
+                .err(),
             VapidPublicKey::try_from(vapid_public_key.into_vec()).err(),
             JwtPool::try_from(
                 jwt_signatures
