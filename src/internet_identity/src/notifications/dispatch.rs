@@ -334,8 +334,8 @@ fn fan_out_to_destinations(
                     browser_id,
                     target,
                     notification: None,
-                    endpoint: subscription.endpoint.clone(),
-                    vapid_public_key: subscription.vapid_public_key.clone(),
+                    endpoint: subscription.endpoint.as_str().to_string(),
+                    vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
                     jwt,
                     urgency: pending.urgency.clone(),
                     ttl_seconds: IDENTITY_NOTIFICATION_TTL_NS / SECOND_NS,
@@ -436,8 +436,8 @@ fn fan_out_to_browsers(
                     browser_id: browser.id,
                     target,
                     notification: Some(queued.clone()),
-                    endpoint: subscription.endpoint.clone(),
-                    vapid_public_key: subscription.vapid_public_key.clone(),
+                    endpoint: subscription.endpoint.as_str().to_string(),
+                    vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
                     jwt,
                     urgency: pending.urgency.clone(),
                     ttl_seconds,
@@ -661,7 +661,7 @@ fn authorized_wake_up<'a>(
     if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
         return None;
     }
-    let relay_origin = vapid_jwt::relay_origin_of(&subscription.endpoint)?;
+    let relay_origin = vapid_jwt::relay_origin_of(subscription.endpoint.as_str())?;
     let jwt = vapid_jwt::assemble(subscription, &relay_origin, now_ns)?;
     Some((subscription, jwt))
 }
@@ -844,6 +844,7 @@ mod tests {
     use super::*;
     use crate::notifications::backlog::NOTIFICATION_BACKLOG;
     use crate::notifications::identity_backlog::IDENTITY_NOTIFICATION_BACKLOG;
+    use crate::notifications::webpush::fixtures::subscription_at;
     use crate::notifications::webpush::fixtures::{
         anchor, anchor_with_browsers, app_for_key, app_key, setup, stored_subscription, subscribe,
         APP_RELAY, OTHER_APP_RELAY,
@@ -951,7 +952,6 @@ mod tests {
         seed: u8,
         endpoint: Option<&str>,
     ) -> NotificationAppId {
-        use crate::notifications::webpush::fixtures::valid_vapid_key;
         use std::collections::BTreeMap;
 
         // Outside the borrow below: it takes one of its own.
@@ -961,13 +961,7 @@ mod tests {
                 storage
                     .set_notification_app_subscription(
                         app.id,
-                        Some(WebPushSubscription {
-                            endpoint: endpoint.to_string(),
-                            created_at_ns: 0,
-                            vapid_public_key: valid_vapid_key(),
-                            jwt_signatures: vec![vec![3u8; 64]],
-                            jwt_issued_at_ns: 0,
-                        }),
+                        Some(subscription_at(endpoint, 0, 0)),
                         0,
                     )
                     .expect("the record is there");
@@ -1713,7 +1707,8 @@ mod tests {
         settle(&delivery, PostOutcome::Gone, SECOND_NS);
 
         assert_eq!(
-            stored_subscription(recipient, browsers[0]).map(|registered| registered.endpoint),
+            stored_subscription(recipient, browsers[0])
+                .map(|registered| registered.endpoint.into_string()),
             Some(ROTATED.to_string())
         );
     }

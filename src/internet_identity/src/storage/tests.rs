@@ -7474,7 +7474,7 @@ mod browser_session_count_tests {
 
 #[test]
 fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
-    use crate::storage::anchor::{QueuedNotification, WebPushSubscription};
+    use crate::storage::anchor::QueuedNotification;
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
@@ -7498,13 +7498,11 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
             browser_id,
-            Some(WebPushSubscription {
-                endpoint: "https://relay.example/a".to_string(),
-                created_at_ns: 0,
-                vapid_public_key: vec![4; 65],
-                jwt_signatures: vec![vec![3; 64]],
-                jwt_issued_at_ns: 0,
-            }),
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://relay.example/a",
+                0,
+                0,
+            )),
         );
     }
     anchor
@@ -7769,8 +7767,6 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
 
 #[test]
 fn an_apps_subscription_is_the_records_and_not_an_anchors() {
-    use crate::storage::anchor::WebPushSubscription;
-
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
@@ -7780,13 +7776,11 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     storage
         .set_notification_app_subscription(
             app.id,
-            Some(WebPushSubscription {
-                endpoint: "https://web.push.apple.com/one".to_string(),
-                created_at_ns: 2_000,
-                vapid_public_key: vec![1; 65],
-                jwt_signatures: vec![vec![2; 64]],
-                jwt_issued_at_ns: 2_000,
-            }),
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://web.push.apple.com/one",
+                2_000,
+                2_000,
+            )),
             2_000,
         )
         .expect("the record is there, so the registration is stored");
@@ -7795,7 +7789,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     assert_eq!(
         stored
             .webpush_subscription
-            .map(|subscription| subscription.endpoint),
+            .map(|subscription| subscription.endpoint.into_string()),
         Some("https://web.push.apple.com/one".to_string())
     );
     // Stamped by the app's own call, which is the only liveness anything here has.
@@ -7966,13 +7960,7 @@ fn queued_notification(notification_id: u64) -> crate::storage::anchor::QueuedNo
 }
 
 fn app_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
-    crate::storage::anchor::WebPushSubscription {
-        endpoint: endpoint.to_string(),
-        created_at_ns: 1_000,
-        vapid_public_key: vec![1; 65],
-        jwt_signatures: vec![vec![2; 64]],
-        jwt_issued_at_ns: 1_000,
-    }
+    crate::notifications::webpush::fixtures::subscription_at(endpoint, 1_000, 1_000)
 }
 
 #[test]
@@ -8067,7 +8055,6 @@ fn a_new_app_address_leaves_alone_a_browser_that_left_it_for_an_address_of_its_o
 #[test]
 fn an_entry_delivers_through_the_app_it_points_at() {
     use crate::notifications::webpush::delivering_subscription;
-    use crate::storage::anchor::WebPushSubscription;
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
@@ -8077,13 +8064,11 @@ fn an_entry_delivers_through_the_app_it_points_at() {
     storage
         .set_notification_app_subscription(
             app.id,
-            Some(WebPushSubscription {
-                endpoint: "https://web.push.apple.com/one".to_string(),
-                created_at_ns: 1_000,
-                vapid_public_key: vec![1; 65],
-                jwt_signatures: vec![vec![2; 64]],
-                jwt_issued_at_ns: 1_000,
-            }),
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://web.push.apple.com/one",
+                1_000,
+                1_000,
+            )),
             1_000,
         )
         .expect("the record is there");
@@ -8095,7 +8080,7 @@ fn an_entry_delivers_through_the_app_it_points_at() {
     let anchor = storage.read(10_000).expect("reading the anchor");
 
     assert_eq!(
-        delivering_subscription(&storage, &anchor, 0).map(|one| one.endpoint),
+        delivering_subscription(&storage, &anchor, 0).map(|one| one.endpoint.into_string()),
         Some("https://web.push.apple.com/one".to_string())
     );
 }
@@ -8103,7 +8088,6 @@ fn an_entry_delivers_through_the_app_it_points_at() {
 #[test]
 fn an_entry_that_stopped_routing_delivers_through_nothing() {
     use crate::notifications::webpush::delivering_subscription;
-    use crate::storage::anchor::WebPushSubscription;
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
@@ -8113,13 +8097,11 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
     storage
         .set_notification_app_subscription(
             app.id,
-            Some(WebPushSubscription {
-                endpoint: "https://web.push.apple.com/one".to_string(),
-                created_at_ns: 1_000,
-                vapid_public_key: vec![1; 65],
-                jwt_signatures: vec![vec![2; 64]],
-                jwt_issued_at_ns: 1_000,
-            }),
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://web.push.apple.com/one",
+                1_000,
+                1_000,
+            )),
             1_000,
         )
         .expect("the record is there");

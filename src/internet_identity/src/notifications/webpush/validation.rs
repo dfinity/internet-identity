@@ -1,6 +1,7 @@
 //! Turning a caller's Web Push request into one the channel can act on: a deployment
 //! that notifies at all, and fields the canister can deliver against.
 
+use internet_identity_interface::internet_identity::types::Timestamp;
 use std::ops::RangeInclusive;
 use url::Url;
 
@@ -23,6 +24,10 @@ const MAX_JWT_POOL_LEN: usize = 30;
 pub struct PushEndpoint(String);
 
 impl PushEndpoint {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
     pub fn as_url(&self) -> Option<Url> {
         Url::parse(&self.0).ok()
     }
@@ -76,6 +81,10 @@ pub fn deliverable_endpoint(endpoint: &PushEndpoint) -> Result<(), String> {
 pub struct VapidPublicKey(Vec<u8>);
 
 impl VapidPublicKey {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
     pub fn into_vec(self) -> Vec<u8> {
         self.0
     }
@@ -97,23 +106,25 @@ impl TryFrom<Vec<u8>> for VapidPublicKey {
     }
 }
 
-/// One JWT signature per validity window, in window order.
+/// One JWT signature per validity window, in window order, and the instant they were
+/// signed at.
+///
+/// The two travel together because one signature covers one elapsed window: when the pool
+/// was minted is what says which window a given signature is for, so a pool without it
+/// means nothing.
 ///
 /// The signatures themselves are not verified: garbage only breaks the uploader's own
 /// delivery, and 30 ECDSA verifications per subscribe isn't worth it.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct JwtPool(Vec<Vec<u8>>);
-
-impl JwtPool {
-    pub fn into_vec(self) -> Vec<Vec<u8>> {
-        self.0
-    }
+pub struct JwtPool {
+    signatures: Vec<Vec<u8>>,
+    issued_at_ns: Timestamp,
 }
 
-impl TryFrom<Vec<Vec<u8>>> for JwtPool {
-    type Error = String;
-
-    fn try_from(signatures: Vec<Vec<u8>>) -> Result<Self, Self::Error> {
+impl JwtPool {
+    /// Takes two values rather than one, which is the case an inherent constructor is
+    /// for: a `TryFrom` over a tuple would say less and read worse.
+    pub fn try_new(signatures: Vec<Vec<u8>>, issued_at_ns: Timestamp) -> Result<Self, String> {
         validate_param_len(signatures.len(), 1..=MAX_JWT_POOL_LEN, "jwt_pool")?;
         if let Some(bad) = signatures.iter().find(|sig| sig.len() != JWT_SIG_LEN) {
             return Err(format!(
@@ -121,7 +132,22 @@ impl TryFrom<Vec<Vec<u8>>> for JwtPool {
                 bad.len()
             ));
         }
-        Ok(Self(signatures))
+        Ok(Self {
+            signatures,
+            issued_at_ns,
+        })
+    }
+
+    pub fn issued_at_ns(&self) -> Timestamp {
+        self.issued_at_ns
+    }
+
+    pub fn signatures(&self) -> &[Vec<u8>] {
+        &self.signatures
+    }
+
+    pub fn into_signatures(self) -> Vec<Vec<u8>> {
+        self.signatures
     }
 }
 
@@ -178,6 +204,7 @@ mod tests {
             endpoint,
             vapid_public_key,
             jwt_signatures,
+            jwt_issued_at_ns,
             ..
         } = request;
         let problems: Vec<String> = [
@@ -185,11 +212,12 @@ mod tests {
                 .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint))
                 .err(),
             VapidPublicKey::try_from(vapid_public_key.into_vec()).err(),
-            JwtPool::try_from(
+            JwtPool::try_new(
                 jwt_signatures
                     .into_iter()
                     .map(ByteBuf::into_vec)
                     .collect::<Vec<_>>(),
+                jwt_issued_at_ns,
             )
             .err(),
         ]
