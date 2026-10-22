@@ -973,14 +973,14 @@ impl Anchor {
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
     pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
-        let Some(index) = self
+        let Some(browser) = self
             .browsers
             .iter()
-            .position(|browser| browser.id == browser_id)
+            .find(|browser| browser.id == browser_id)
         else {
             return;
         };
-        if self.browsers[index]
+        if browser
             .notification_app
             .is_some_and(|reference| reference.linked_app() == Some(app_id))
         {
@@ -1015,12 +1015,18 @@ impl Anchor {
                 browser.notification_app = None;
             }
         }
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
+            return;
+        };
         // A browser has one route. Pointing at a record is leaving behind whatever address
         // it registered for itself, and what that address had queued goes with it: those
         // wake-ups were posted somewhere this browser no longer reads.
-        self.browsers[index].webpush_subscription = None;
-        self.browsers[index].notification_app =
-            Some(NotificationAppRef::Linked { app_id, enabled });
+        browser.webpush_subscription = None;
+        browser.notification_app = Some(NotificationAppRef::Linked { app_id, enabled });
     }
 
     /// This identity asking the app it points at to deliver for it. Never a subscription
