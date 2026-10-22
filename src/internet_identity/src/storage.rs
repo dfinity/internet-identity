@@ -1582,7 +1582,7 @@ impl<M: Memory + Clone> Storage<M> {
             let pointing: Vec<BrowserId> = anchor
                 .browsers()
                 .iter()
-                .filter(|browser| browser.is_delivered_through(app_id))
+                .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| browser.id)
                 .collect();
             let mut cleared = false;

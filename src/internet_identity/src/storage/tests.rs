@@ -7862,7 +7862,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
 }
 
 #[test]
-fn forgetting_an_app_keeps_an_entry_silent_that_had_switched_it_off() {
+fn forgetting_an_app_is_let_go_of_by_an_entry_that_had_switched_it_off() {
     let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
     let app = storage
         .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
@@ -7873,41 +7873,28 @@ fn forgetting_an_app_keeps_an_entry_silent_that_had_switched_it_off() {
 
     let mut off = anchor_with_browser(&mut storage);
     off.point_at_notification_app(0, app.id);
-    off.set_webpush_subscription(0, Some(app_subscription("https://own")));
     off.disable_notification_app(0);
     storage.write(off).expect("writing the entry that said no");
 
     let mut on = anchor_with_browser(&mut storage);
     on.point_at_notification_app(0, app.id);
-    on.set_webpush_subscription(0, Some(app_subscription("https://other")));
     storage.write(on).expect("writing the entry that said yes");
 
     storage
         .forget_notification_app(app.id)
         .expect("every anchor holding the record is readable");
 
-    // The answer was about this device. The reference carrying it is gone, so keeping it
-    // means silencing the address the entry registered for itself.
-    assert_eq!(
-        storage
-            .read(10_000)
-            .expect("reading the anchor")
-            .webpush_subscription(0),
-        None,
-        "an entry that switched delivery off should not start delivering again"
-    );
-    assert!(
-        storage
-            .read(10_001)
-            .expect("reading the anchor")
-            .webpush_subscription(0)
-            .is_some(),
-        "an entry that never switched it off keeps its own address"
-    );
+    // Switching delivery off is an answer about the record, not a reason to keep pointing
+    // at one that is gone: both entries let go, and neither is left with an address.
+    for anchor_number in [10_000, 10_001] {
+        let anchor = storage.read(anchor_number).expect("reading the anchor");
+        assert_eq!(anchor.notification_app(0), None);
+        assert_eq!(anchor.webpush_subscription(0), None);
+    }
 }
 
 #[test]
-fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent() {
+fn forgetting_an_app_leaves_alone_a_browser_that_left_it_for_an_address_of_its_own() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
@@ -7917,6 +7904,8 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
         .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
         .expect("the record is there");
 
+    // Registering an address of its own is this entry leaving the record, so what it has
+    // waiting is its own address's and nothing about the record reaches it again.
     let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));
@@ -7943,7 +7932,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     assert_eq!(
         own.notification_app(0),
         None,
-        "the reference goes either way"
+        "it left the record when it registered an address of its own"
     );
     assert_eq!(
         own.notifications_for_browser(0)
@@ -7957,7 +7946,7 @@ fn forgetting_an_app_leaves_alone_what_a_browser_with_its_own_address_was_sent()
     assert_eq!(
         routed.notification_app(0),
         None,
-        "the reference goes either way"
+        "the record it pointed at is gone"
     );
     assert!(routed.notifications_for_browser(0).is_empty());
 
@@ -8026,7 +8015,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
 }
 
 #[test]
-fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
+fn a_new_app_address_leaves_alone_a_browser_that_left_it_for_an_address_of_its_own() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 20_000), memory.clone());
     let app = storage
@@ -8036,6 +8025,8 @@ fn a_new_app_address_leaves_alone_what_a_browser_with_its_own_was_sent() {
         .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
         .expect("the record is there");
 
+    // Registering an address of its own is this entry leaving the record, so what it has
+    // waiting is its own address's and nothing about the record reaches it again.
     let mut own = anchor_with_browser(&mut storage);
     own.point_at_notification_app(0, app.id);
     own.set_webpush_subscription(0, Some(app_subscription("https://own")));

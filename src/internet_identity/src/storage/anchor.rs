@@ -119,12 +119,6 @@ impl Browser {
             .is_some_and(|reference| reference.linked_app() == Some(app_id))
     }
 
-    /// Whether this entry's wake-ups were posted to `app_id`'s address, which is what
-    /// says that address going away takes this entry's queue with it.
-    pub fn is_delivered_through(&self, app_id: NotificationAppId) -> bool {
-        self.webpush_subscription.is_none() && self.is_pointing_at(app_id)
-    }
-
     /// Whether this entry points at `app_id` with delivery switched off, which is this
     /// identity's answer about this device rather than about the record carrying it.
     pub fn is_delivery_disabled_for(&self, app_id: NotificationAppId) -> bool {
@@ -1104,9 +1098,8 @@ impl Anchor {
         browser.notifications.clear();
     }
 
-    /// Forgets `app_id` on every entry of this identity that points at it: the reference,
-    /// what its address was carrying, and the registration of an entry that had switched
-    /// it off, which must not start delivering again on the record going away.
+    /// Forgets `app_id` on every entry of this identity that points at it, and what the
+    /// record's address was carrying for them.
     ///
     /// The record itself is not this list's to delete: only a caller holding every anchor
     /// can see whether another identity still points at it.
@@ -1115,22 +1108,11 @@ impl Anchor {
             if !browser.is_pointing_at(app_id) {
                 continue;
             }
-            // Both answers are about an entry that still holds the reference, so both are
-            // read before it goes.
-            let delivered_through_it = browser.is_delivered_through(app_id);
-            let switched_off = browser.is_delivery_disabled_for(app_id);
             browser.notification_app = None;
-            // The answer was about this device, not about the record that carried it, so
-            // an entry that registered an address of its own would start delivering again
-            // on the record going away. Silencing it keeps what the user said.
-            if switched_off {
-                browser.webpush_subscription = None;
-            }
-            // What this entry has waiting went to the record's address, which nothing can
-            // read once the record is gone.
-            if delivered_through_it {
-                browser.notifications.clear();
-            }
+            // Everything waiting went to the record's address, because a browser pointing
+            // at a record has no address of its own, and nothing can read that one once
+            // the record is gone.
+            browser.notifications.clear();
         }
     }
 
@@ -1235,14 +1217,24 @@ impl Anchor {
 
     /// Replaces what this browser registered. A browser the registry no longer lists
     /// has nothing to register against, so the write is dropped.
+    ///
+    /// A browser has one route, so registering an address of its own leaves the record it
+    /// points at, and the record it left is the answer: the caller is the one that can see
+    /// whether anything still points at it. Removing a registration asks for nothing in
+    /// its place and leaves the reference where it is.
     pub fn set_webpush_subscription(
         &mut self,
         browser_id: BrowserId,
         subscription: Option<WebPushSubscription>,
-    ) {
+    ) -> Option<NotificationAppId> {
+        let left = match subscription {
+            Some(_) => self.leave_notification_app(browser_id),
+            None => None,
+        };
         if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
             browser.webpush_subscription = subscription;
         }
+        left
     }
 
     /// What this entry has waiting, empty for one with nothing.
