@@ -112,9 +112,7 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{
-    keeps_endpoint, Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS,
-};
+use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1572,19 +1570,24 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&app_id)
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         let mut app = NotificationApp::from(stored);
-        let endpoint_kept =
-            keeps_endpoint(app.webpush_subscription.as_ref(), subscription.as_ref());
+        // Keep what is queued only where the registration is replaced at the same address.
+        // Anything else leaves it announced to an address nothing listens on, and a full
+        // queue posts no wake-up for what arrives after it.
+        let same_address = matches!(
+            (app.webpush_subscription.as_ref(), subscription.as_ref()),
+            (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
+        );
         app.webpush_subscription = subscription;
         app.last_used = now;
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
-        if !endpoint_kept {
+        if !same_address {
             self.clear_queues_routed_through(app_id);
         }
         Ok(())
     }
 
-    /// Drops what every browser routing through `app_id` had waiting, and its re-wake stamp.
+    /// Drops what every browser routing through `app_id` had waiting.
     /// Left in place, entries nobody can show would suppress every wake-up until they expire.
     fn clear_queues_routed_through(&mut self, app_id: NotificationAppId) {
         for anchor_number in self.anchors_with_notification_app(app_id) {
@@ -1717,36 +1720,7 @@ impl<M: Memory + Clone> Storage<M> {
                     continue;
                 }
             };
-            // The reference goes from every entry that holds one. The queue and the stamp
-            // go only from the entries this record's address delivered for.
-            let pointing: Vec<(BrowserId, bool, bool)> = anchor
-                .browsers()
-                .iter()
-                .filter(|browser| browser.is_pointing_at(app_id))
-                .map(|browser| {
-                    (
-                        browser.id,
-                        browser.is_delivered_through(app_id),
-                        browser.is_delivery_disabled_for(app_id),
-                    )
-                })
-                .collect();
-            for (browser_id, delivered_through_it, switched_off) in pointing {
-                anchor.stop_pointing_at_notification_app(browser_id);
-                // The answer was about this device, not about the record that carried it:
-                // the flag goes with the reference, so an entry that registered an address
-                // of its own would start delivering again on a record being forgotten.
-                // Silencing it keeps what the user said, the way `clear_subscription` does.
-                if switched_off {
-                    anchor.set_webpush_subscription(browser_id, None);
-                }
-                if !delivered_through_it {
-                    continue;
-                }
-                if let Some(queue) = anchor.notifications_mut(browser_id) {
-                    queue.clear();
-                }
-            }
+            anchor.drop_notification_app(app_id);
             if let Err(err) = self.write(anchor) {
                 ic_cdk::println!(
                     "Failed to drop notification app {app_id} from anchor {anchor_number}: {err}"
@@ -3244,7 +3218,7 @@ impl<M: Memory + Clone> Storage<M> {
         let browser_ids: Vec<BrowserId> =
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
-            if let Some(queue) = anchor.notifications_mut(browser_id) {
+            if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
                 queue.retain(|queued| {
                     queued
                         .application_number
@@ -3788,7 +3762,7 @@ impl<M: Memory + Clone> Storage<M> {
         // A browser the identity signed out of must stop being notified for it. The entry
         // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
-        if let Some(queue) = anchor.notifications_mut(browser_id) {
+        if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
             queue.clear();
         }
         let mut state = self.account_state(anchor_number);
