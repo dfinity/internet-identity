@@ -1608,7 +1608,7 @@ mod browser_tests {
             .unwrap();
         anchor.point_at_notification_app(first, 7);
         anchor
-            .notifications_mut(first)
+            .notifications_for_browser_mut(first)
             .expect("a listed browser")
             .push(QueuedNotification {
                 application_number: Some(1),
@@ -1621,7 +1621,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(second, 7);
 
-        assert!(anchor.notifications(first).is_empty());
+        assert!(anchor.notifications_for_browser(first).is_empty());
     }
 
     #[test]
@@ -1637,7 +1637,7 @@ mod browser_tests {
             .unwrap();
         anchor.point_at_notification_app(id, 7);
         anchor
-            .notifications_mut(id)
+            .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(QueuedNotification {
                 application_number: Some(1),
@@ -1649,11 +1649,11 @@ mod browser_tests {
             });
 
         anchor.point_at_notification_app(id, 7);
-        assert_eq!(anchor.notifications(id).len(), 1);
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
 
         anchor.point_at_notification_app(id, 8);
 
-        assert!(anchor.notifications(id).is_empty());
+        assert!(anchor.notifications_for_browser(id).is_empty());
     }
 
     /// A reference naming a record that is gone is no app this identity has. The record
@@ -2359,7 +2359,7 @@ mod browser_tests {
             }),
         );
         anchor
-            .notifications_mut(id)
+            .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(QueuedNotification {
                 application_number: Some(1),
@@ -2372,7 +2372,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(id, 8);
 
-        assert_eq!(anchor.notifications(id).len(), 1);
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     /// An install that has not completed is a route of its own: what was posted while
@@ -2382,7 +2382,7 @@ mod browser_tests {
         let (mut anchor, id) = anchor_with_browser();
         anchor.point_at_notification_app(id, 7);
         anchor
-            .notifications_mut(id)
+            .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(QueuedNotification {
                 application_number: Some(1),
@@ -2396,7 +2396,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(id, 8);
 
-        assert!(anchor.notifications(id).is_empty());
+        assert!(anchor.notifications_for_browser(id).is_empty());
     }
 
     #[test]
