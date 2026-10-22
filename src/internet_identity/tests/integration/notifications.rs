@@ -2,8 +2,8 @@
 
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
-    browser_get_next_notification, browser_remove_notification, consent_granted, grant_consent,
-    revoke_consent,
+    browser_get_next_notification, browser_remove_notification, consent_granted,
+    get_webpush_subscription_status, grant_consent, remove_webpush_subscription, revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -17,7 +17,7 @@ use internet_identity_interface::internet_identity::types::{
     GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
     NotificationGrantConsentError, NotificationRevokeConsentError, NotificationToShow,
     OperatingSystem, PrepareAccountSessionRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -115,6 +115,15 @@ fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<
         browser_remove_notification(&env, canister_id, principal_1(), remove_request(anchor))?,
         Err(RemoveNotificationError::InternalCanisterError(_))
     ));
+    assert!(matches!(
+        remove_webpush_subscription(&env, canister_id, principal_1(), anchor, 0)?,
+        Err(RemoveWebPushSubscriptionError::InternalCanisterError(_))
+    ));
+    // A query answers like one nobody registered on.
+    assert_eq!(
+        get_webpush_subscription_status(&env, canister_id, principal_1(), anchor)?,
+        None
+    );
     Ok(())
 }
 
