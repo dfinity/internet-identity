@@ -171,7 +171,7 @@ pub fn check_authorization(
 
 /// The record `app_id` names, where the caller is the app it belongs to. An id is public
 /// and allocated in sequence, so naming one is not evidence of anything by itself.
-pub fn check_app_authorization(
+pub fn check_notification_app_authorization(
     app_id: NotificationAppId,
 ) -> Result<NotificationApp, AuthorizationError> {
     let caller = caller();
