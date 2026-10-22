@@ -24,32 +24,24 @@ pub fn set_subscription(
     endpoint: PushEndpoint,
     vapid_public_key: VapidPublicKey,
     jwt_signatures: JwtPool,
-    jwt_issued_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
     let browser_id = match key {
         NotificationKey::App(app_id) => {
-            return set_app_subscription(
-                app_id,
-                endpoint,
-                vapid_public_key,
-                jwt_signatures,
-                jwt_issued_at_ns,
-                now_ns,
-            )
+            return set_app_subscription(app_id, endpoint, vapid_public_key, jwt_signatures, now_ns)
         }
         NotificationKey::Browser(browser_id) => browser_id,
     };
     let anchor = state::anchor(anchor_number);
-    let endpoint = endpoint.into_string();
+    let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
 
     // The same endpoint is a pool replacement on a registration that is still live, so it
     // keeps its age and the pool has to move forward. Any other endpoint is a new one.
     let created_at_ns = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
-            if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
+            if jwt_issued_at_ns <= registered.jwt_signatures.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
             registered.created_at_ns
@@ -63,9 +55,8 @@ pub fn set_subscription(
         Some(WebPushSubscription {
             endpoint,
             created_at_ns,
-            vapid_public_key: vapid_public_key.into_vec(),
-            jwt_signatures: jwt_signatures.into_vec(),
-            jwt_issued_at_ns,
+            vapid_public_key,
+            jwt_signatures,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -108,7 +99,7 @@ pub(crate) fn clear_gone_subscription(
             let Some(registered) = anchor.webpush_subscription(browser_id) else {
                 return Ok(());
             };
-            if registered.endpoint != endpoint {
+            if registered.endpoint.as_str() != endpoint {
                 return Ok(());
             }
             write_subscription(anchor, browser_id, None)
@@ -117,7 +108,7 @@ pub(crate) fn clear_gone_subscription(
             let gone = storage_borrow(|storage| {
                 storage.notification_app(app_id).is_some_and(|app| {
                     app.webpush_subscription
-                        .is_some_and(|subscription| subscription.endpoint == endpoint)
+                        .is_some_and(|subscription| subscription.endpoint.as_str() == endpoint)
                 })
             });
             // Only where the record is the one the relay reported gone: dropping it
@@ -162,18 +153,11 @@ pub fn subscription_status(
             .webpush_subscription(browser_id)
             .cloned(),
     };
-    subscription.map(
-        |WebPushSubscription {
-             endpoint,
-             jwt_signatures,
-             jwt_issued_at_ns,
-             ..
-         }| WebPushSubscriptionStatus {
-            endpoint,
-            pool_len: jwt_signatures.len() as u32,
-            issued_at_ns: jwt_issued_at_ns,
-        },
-    )
+    subscription.map(|registered| WebPushSubscriptionStatus {
+        endpoint: registered.endpoint.as_str().to_string(),
+        pool_len: registered.jwt_signatures.signatures().len() as u32,
+        issued_at_ns: registered.jwt_signatures.issued_at_ns(),
+    })
 }
 
 /// Writes what this browser registered, and clears what was waiting where that address
@@ -215,10 +199,9 @@ fn set_app_subscription(
     endpoint: PushEndpoint,
     vapid_public_key: VapidPublicKey,
     jwt_signatures: JwtPool,
-    jwt_issued_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let endpoint = endpoint.into_string();
+    let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
     // Read now rather than taking what authorizing the call happened to see: this decides
     // whether the pool is being replaced at the same address, which the record owns.
     let NotificationApp {
@@ -235,10 +218,10 @@ fn set_app_subscription(
         Some(WebPushSubscription {
             endpoint: registered_endpoint,
             created_at_ns: registered_created_at_ns,
-            jwt_issued_at_ns: registered_jwt_issued_at_ns,
+            jwt_signatures: registered_pool,
             ..
         }) if registered_endpoint == endpoint => {
-            if jwt_issued_at_ns <= registered_jwt_issued_at_ns {
+            if jwt_issued_at_ns <= registered_pool.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
             registered_created_at_ns
@@ -256,9 +239,8 @@ fn set_app_subscription(
             Some(WebPushSubscription {
                 endpoint,
                 created_at_ns,
-                vapid_public_key: vapid_public_key.into_vec(),
-                jwt_signatures: jwt_signatures.into_vec(),
-                jwt_issued_at_ns,
+                vapid_public_key,
+                jwt_signatures,
             }),
             now_ns,
         )
@@ -429,7 +411,8 @@ mod tests {
             );
         }
         assert_eq!(
-            stored_subscription(anchor_number, browsers[0]).map(|s| s.jwt_issued_at_ns),
+            stored_subscription(anchor_number, browsers[0])
+                .map(|s| s.jwt_signatures.issued_at_ns()),
             Some(5_000)
         );
     }
@@ -446,7 +429,7 @@ mod tests {
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.created_at_ns, 1_000);
-        assert_eq!(stored.jwt_issued_at_ns, 9_000);
+        assert_eq!(stored.jwt_signatures.issued_at_ns(), 9_000);
     }
 
     /// Another endpoint is another registration, so the pool it arrives with answers to
@@ -461,7 +444,7 @@ mod tests {
             .expect("a rotated endpoint is not a pool replacement");
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
-        assert_eq!(stored.endpoint, ROTATED);
+        assert_eq!(stored.endpoint.as_str(), ROTATED);
         assert_eq!(stored.created_at_ns, 1_000);
     }
 
@@ -561,7 +544,9 @@ mod tests {
             .expect("an app registers its subscription");
 
         assert_eq!(
-            app(app_id).webpush_subscription.map(|s| s.endpoint),
+            app(app_id)
+                .webpush_subscription
+                .map(|s| s.endpoint.into_string()),
             Some(ENDPOINT.to_string())
         );
         assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
@@ -593,7 +578,9 @@ mod tests {
             );
         }
         assert_eq!(
-            app(app_id).webpush_subscription.map(|s| s.jwt_issued_at_ns),
+            app(app_id)
+                .webpush_subscription
+                .map(|s| s.jwt_signatures.issued_at_ns()),
             Some(5_000)
         );
     }
@@ -610,7 +597,7 @@ mod tests {
             .expect("a rotated endpoint is not a pool replacement");
 
         let stored = app(app_id).webpush_subscription.expect("a subscription");
-        assert_eq!(stored.endpoint, ROTATED);
+        assert_eq!(stored.endpoint.as_str(), ROTATED);
         assert_eq!(stored.created_at_ns, 1_000);
     }
 

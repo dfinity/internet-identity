@@ -1,5 +1,6 @@
+use crate::notifications::webpush::fixtures::subscription_at;
 use crate::openid::OpenIdCredential;
-use crate::storage::anchor::{Anchor, AnchorError, Device, WebPushSubscription};
+use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DeviceData, DeviceProtection, KeyType, MetadataEntry, MetadataEntryV2, Purpose,
@@ -1627,13 +1628,7 @@ mod browser_tests {
         let (mut anchor, id) = anchor_with_browser();
         anchor.set_webpush_subscription(
             id,
-            Some(WebPushSubscription {
-                endpoint: "https://push.example/one".to_string(),
-                created_at_ns: 1_000,
-                vapid_public_key: vec![1; 8],
-                jwt_signatures: vec![],
-                jwt_issued_at_ns: 1_000,
-            }),
+            Some(subscription_at("https://push.example/one", 1_000, 1_000)),
         );
         anchor
             .notifications_for_browser_mut(id)
