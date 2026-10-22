@@ -1,9 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::validation::{
-    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
-};
+use super::validation::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
@@ -17,17 +15,13 @@ use internet_identity_interface::internet_identity::types::{
 pub fn set_subscription(
     anchor: Anchor,
     browser_id: BrowserId,
-    request: ValidatedSetWebPushSubscriptionRequest,
+    endpoint: PushEndpoint,
+    vapid_public_key: VapidPublicKey,
+    jwt_signatures: JwtPool,
+    jwt_issued_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let ValidatedSetWebPushSubscriptionRequest {
-        anchor_number: _,
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
-        ..
-    } = request;
+    let endpoint = endpoint.into_string();
 
     // The same endpoint means this replaces the pool on a registration that is still
     // live, so the registration keeps its age and its queue, and the pool has to move
@@ -49,8 +43,8 @@ pub fn set_subscription(
         Some(WebPushSubscription {
             endpoint,
             created_at_ns,
-            vapid_public_key,
-            jwt_signatures,
+            vapid_public_key: vapid_public_key.into_vec(),
+            jwt_signatures: jwt_signatures.into_vec(),
             jwt_issued_at_ns,
             notifications,
             // A re-subscribe has had no second wake-up of its own yet.
@@ -66,11 +60,8 @@ pub fn set_subscription(
 /// Takes the browser rather than reading it off the caller, since silencing one is done
 /// from another.
 pub fn remove_subscription(
-    ValidatedRemoveWebPushSubscriptionRequest {
-        anchor_number,
-        browser_id,
-        ..
-    }: ValidatedRemoveWebPushSubscriptionRequest,
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
     clear_subscription(anchor_number, browser_id)
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
@@ -135,7 +126,6 @@ mod tests {
     use super::super::fixtures::*;
     use super::*;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
-    use internet_identity_interface::internet_identity::types::RemoveWebPushSubscriptionRequest;
 
     const ENDPOINT: &str = "https://relay.example/a";
     const ROTATED: &str = "https://relay.example/b";
@@ -167,12 +157,7 @@ mod tests {
     }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
-        let request = RemoveWebPushSubscriptionRequest {
-            anchor_number,
-            browser_id,
-        };
-        remove_subscription(request.try_into().expect("the fixture request validates"))
-            .expect("removing a subscription");
+        remove_subscription(anchor_number, browser_id).expect("removing a subscription");
     }
 
     #[test]
