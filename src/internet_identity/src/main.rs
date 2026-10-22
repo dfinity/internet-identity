@@ -494,12 +494,12 @@ fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGran
     if !notifications::notifications_enabled() {
         return Ok(false);
     }
+    let now = ic_cdk::api::time();
     let SessionLocator {
         anchor_number,
         origin,
         ..
-    } = sessions::caller_session(ic_cdk::api::time())
-        .ok_or(AppNotificationConsentGrantedError::NoSuchSession)?;
+    } = sessions::caller_session(now).ok_or(AppNotificationConsentGrantedError::NoSuchSession)?;
     Ok(notifications::consent_granted_for(anchor_number, &origin))
 }
 
