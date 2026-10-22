@@ -96,9 +96,6 @@ export interface AppGetDelegationRequest {
    */
   'expiration' : Timestamp,
 }
-/**
- * Why an app could not read its own consent to notify the caller.
- */
 export type AppNotificationConsentGrantedError = {
     /**
      * No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -116,9 +113,6 @@ export interface AppPrepareDelegationResponse {
   'user_key' : PublicKey,
   'expiration' : Timestamp,
 }
-/**
- * Why an app could not withdraw its own consent to notify the caller.
- */
 export type AppRevokeNotificationConsentError = {
     'InternalCanisterError' : string
   } |
@@ -2320,9 +2314,7 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
-   * Called by an app's frontend as its session, not by its backend: the session names both
-   * the identity and the app, so an app reads and withdraws only its own consent for that
-   * user. Ok(false) from the query while this deployment does not notify.
+   * Called by an app's frontend, as its session.
    */
   'app_notification_consent_granted' : ActorMethod<
     [],

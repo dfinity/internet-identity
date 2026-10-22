@@ -53,7 +53,7 @@ use notifications::{
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
-use storage::account::{AccountDelegationError, PrepareAccountDelegation};
+use storage::account::{AccountDelegationError, PrepareAccountDelegation, SessionLocator};
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -487,27 +487,31 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
     notifications::consent_granted(validated)
 }
 
-// ---- Notifications: called by an app's frontend, as its session ----
+// ---- Notifications: called by an app's frontend ----
 
-/// Authorized by the caller's live session alone: it names both the identity and the app,
-/// so an app can ask only about its own consent for that user. `Ok(false)` while this
-/// deployment does not notify.
 #[query]
 fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGrantedError> {
     if !notifications::notifications_enabled() {
         return Ok(false);
     }
-    let session = sessions::caller_session(ic_cdk::api::time())
+    let SessionLocator {
+        anchor_number,
+        origin,
+        ..
+    } = sessions::caller_session(ic_cdk::api::time())
         .ok_or(AppNotificationConsentGrantedError::NoSuchSession)?;
-    Ok(notifications::app_consent_granted(&session))
+    Ok(notifications::consent_granted_for(anchor_number, &origin))
 }
 
-/// Authorized like [`app_notification_consent_granted`].
 #[update]
 fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
-    let session = sessions::caller_session(ic_cdk::api::time())
-        .ok_or(AppRevokeNotificationConsentError::NoSuchSession)?;
-    notifications::app_revoke_consent(&session, ic_cdk::api::time())
+    let now = ic_cdk::api::time();
+    let SessionLocator {
+        anchor_number,
+        origin,
+        ..
+    } = sessions::caller_session(now).ok_or(AppRevokeNotificationConsentError::NoSuchSession)?;
+    notifications::app_revoke_consent(anchor_number, &origin, now)
 }
 
 // ---- Notifications: called by an app's backend ----

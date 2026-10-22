@@ -19,7 +19,6 @@ pub mod webpush;
 pub(crate) const BROWSER_GONE_AFTER_NS: u64 = 60 * 24 * 60 * 60 * 1_000_000_000;
 
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::account::SessionLocator;
 use crate::storage::storable::anchor_application_config::PermissionDecision;
 use crate::storage::StorageError;
 use internet_identity_interface::internet_identity::types::{
@@ -86,32 +85,16 @@ pub fn revoke_consent(
     Ok(())
 }
 
-/// Whether the app `session` is at may notify its identity.
-pub fn app_consent_granted(
-    SessionLocator {
-        anchor_number,
-        origin,
-        ..
-    }: &SessionLocator,
-) -> bool {
-    consent_granted_for(*anchor_number, origin)
-}
-
-/// Withdraws the consent of the app `session` is at, as [`revoke_consent`] does for the
-/// identity itself. A live session means the identity has reached the app, so a write
-/// that fails here is a storage failure, not consent that cannot exist.
+/// Withdraws `origin`'s consent to notify `anchor_number`, as [`revoke_consent`] does.
 pub fn app_revoke_consent(
-    SessionLocator {
-        anchor_number,
-        origin,
-        ..
-    }: &SessionLocator,
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
     now_ns: Timestamp,
 ) -> Result<(), AppRevokeNotificationConsentError> {
-    write_notifications_decision(*anchor_number, origin, false, now_ns).map_err(|err| {
+    write_notifications_decision(anchor_number, origin, false, now_ns).map_err(|err| {
         AppRevokeNotificationConsentError::InternalCanisterError(format!("{err}"))
     })?;
-    browser_queue::remove_app(*anchor_number, origin);
+    browser_queue::remove_app(anchor_number, origin);
     Ok(())
 }
 

@@ -78,7 +78,6 @@ pub fn consent_granted(
     .map(|(x,)| x)
 }
 
-/// Asked as `sender`, an app's session principal.
 pub fn app_notification_consent_granted(
     env: &PocketIc,
     canister_id: CanisterId,

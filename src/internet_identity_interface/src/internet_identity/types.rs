@@ -1061,14 +1061,12 @@ pub enum NotificationRevokeConsentError {
     InternalCanisterError(String),
 }
 
-/// Why an app could not read its own consent to notify the caller.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppNotificationConsentGrantedError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
     NoSuchSession,
 }
 
-/// Why an app could not withdraw its own consent to notify the caller.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppRevokeNotificationConsentError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.

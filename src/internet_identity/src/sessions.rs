@@ -482,8 +482,7 @@ fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionErro
     })
 }
 
-/// The caller's live session, for app-facing calls elsewhere that act on the identity and
-/// app it names. `None` wherever [`authorize_session`] refuses it.
+/// The caller's live session, or `None` where [`authorize_session`] refuses it.
 pub fn caller_session(now: Timestamp) -> Option<SessionLocator> {
     authorize_session(now)
         .ok()
