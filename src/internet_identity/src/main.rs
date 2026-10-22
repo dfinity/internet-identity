@@ -357,11 +357,12 @@ fn set_webpush_subscription(
         PushEndpoint::try_from(endpoint.as_str())
             .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
         VapidPublicKey::try_from(vapid_public_key.into_vec()),
-        JwtPool::try_from(
+        JwtPool::try_new(
             jwt_signatures
                 .into_iter()
                 .map(ByteBuf::into_vec)
                 .collect::<Vec<_>>(),
+            jwt_issued_at_ns,
         ),
     ) {
         (Ok(endpoint), Ok(vapid_public_key), Ok(jwt_signatures)) => {
@@ -388,7 +389,6 @@ fn set_webpush_subscription(
         endpoint,
         vapid_public_key,
         jwt_signatures,
-        jwt_issued_at_ns,
         ic_cdk::api::time(),
     )
 }
