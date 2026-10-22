@@ -487,19 +487,16 @@ mod app_consent {
 
     #[test]
     fn should_find_the_consent_granted_through_a_gateway_twin() -> Result<(), RejectResponse> {
+        const TWIN: &str = "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io";
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
-        sign_in_at(&env, canister_id, anchor, GATEWAY, 2);
-        let user = account_at(&env, canister_id, anchor, GATEWAY);
+        // Signed in at the spelling consent is not keyed by, so the account's origin has
+        // to be folded before either endpoint can find the consent granted at `GATEWAY`.
+        sign_in_at(&env, canister_id, anchor, TWIN, 2);
+        let user = account_at(&env, canister_id, anchor, TWIN);
 
-        grant_consent(
-            &env,
-            canister_id,
-            principal_1(),
-            anchor,
-            "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into(),
-        )?
-        .expect("grant rejected");
+        grant_consent(&env, canister_id, principal_1(), anchor, GATEWAY.into())?
+            .expect("grant rejected");
         assert!(app_notification_consent_granted(&env, canister_id, user)?);
 
         app_revoke_notification_consent(&env, canister_id, user)?.expect("revoke rejected");
@@ -508,7 +505,7 @@ mod app_consent {
             canister_id,
             principal_1(),
             anchor,
-            "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into()
+            GATEWAY.into()
         )?);
         Ok(())
     }
