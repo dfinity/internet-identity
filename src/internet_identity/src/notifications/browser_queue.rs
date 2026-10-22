@@ -58,7 +58,7 @@ pub(crate) fn remove_after_failed_wake_up(
         };
         if anchor
             .webpush_subscription(browser_id)
-            .is_none_or(|registered| registered.endpoint != endpoint)
+            .is_none_or(|registered| registered.endpoint.as_str() != endpoint)
         {
             return;
         }
