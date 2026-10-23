@@ -109,8 +109,14 @@ fn write_subscription(
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    anchor.set_webpush_subscription(browser_id, subscription);
-    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
+    let left = anchor.set_webpush_subscription(browser_id, subscription);
+    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
+    // Read after the write, so the reference this browser just dropped is already gone:
+    // a record the last browser left behind is one nothing can reach again.
+    if let Some(app_id) = left {
+        storage_borrow_mut(|storage| storage.delete_notification_app_if_unreferenced(app_id));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

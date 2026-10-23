@@ -2,7 +2,8 @@
 //! app is one record however many identities it serves.
 
 use candid::Principal;
-use internet_identity_interface::internet_identity::types::Timestamp;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
+use std::collections::BTreeSet;
 
 pub use internet_identity_interface::internet_identity::types::NotificationAppId;
 
@@ -15,6 +16,9 @@ pub struct NotificationApp {
     pub created_at: Timestamp,
     /// Stamped by the app's own update calls only, so a query leaves it where it was.
     pub last_used: Timestamp,
+    /// The identities whose browsers point at this app. Also the reference count: a
+    /// record with none left is deleted.
+    pub anchors: BTreeSet<AnchorNumber>,
 }
 
 /// What a browser holds about a Home Screen app: an install it has handed a key to, or

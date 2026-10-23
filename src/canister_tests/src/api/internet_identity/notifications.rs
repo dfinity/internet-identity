@@ -6,8 +6,8 @@ use internet_identity_interface::internet_identity::types::{
     GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
     LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
-    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationAppId, NotificationConsentGrantedRequest, NotificationDelegationError,
+    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
     PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
     PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
@@ -233,6 +233,22 @@ pub fn browser_remove_notification(
         sender,
         "browser_remove_notification",
         (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn notification_app_anchors(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    app_id: NotificationAppId,
+) -> Result<Vec<AnchorNumber>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "notification_app_anchors",
+        (app_id,),
     )
     .map(|(x,)| x)
 }

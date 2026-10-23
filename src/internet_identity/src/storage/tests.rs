@@ -7,7 +7,7 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::account::AccountReference;
 use crate::storage::account::{Account, AccountKey};
-use crate::storage::anchor::{Anchor, Device};
+use crate::storage::anchor::{Anchor, Device, MAX_BROWSERS};
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::{AccountReferenceListWrite, AccountReferenceWrite};
@@ -7632,5 +7632,150 @@ fn app_records_and_their_counter_survive_an_upgrade() {
             .expect("creating the second record")
             .id,
         1
+    );
+}
+
+/// The next anchor the allocator hands out, with one browser registered.
+fn anchor_with_browser(storage: &mut Storage<VectorMemory>) -> Anchor {
+    let mut anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+    anchor
+        .resolve_browser(browser_key(1, 0), browser_key(1, 1), description(1), 0)
+        .expect("registering a browser");
+    anchor
+}
+
+#[test]
+fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
+    let app = storage
+        .ensure_notification_app(app_principal, None, 1_000)
+        .expect("creating the record");
+
+    for _ in 0..2 {
+        let mut anchor = anchor_with_browser(&mut storage);
+        anchor.point_at_notification_app(0, app.id, true);
+        storage.write(anchor).expect("writing the anchor");
+    }
+
+    assert_eq!(
+        storage.anchors_with_notification_app(app.id),
+        vec![10_000, 10_001]
+    );
+}
+
+#[test]
+fn an_app_nothing_points_at_is_deleted() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
+    let app = storage
+        .ensure_notification_app(app_principal, None, 1_000)
+        .expect("creating the record");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id, true);
+    storage.write(anchor).expect("pointing at the app");
+
+    let replacement = storage
+        .ensure_notification_app(Principal::self_authenticating(vec![8u8; 91]), None, 2_000)
+        .expect("creating the record the browser moves to");
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor.point_at_notification_app(0, replacement.id, true);
+    storage.write(anchor).expect("dropping the reference");
+
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
+}
+
+#[test]
+fn an_app_outlives_one_identity_letting_go_of_it() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
+    let app = storage
+        .ensure_notification_app(app_principal, None, 1_000)
+        .expect("creating the record");
+    for _ in 0..2 {
+        let mut anchor = anchor_with_browser(&mut storage);
+        anchor.point_at_notification_app(0, app.id, true);
+        storage.write(anchor).expect("writing the anchor");
+    }
+
+    let replacement = storage
+        .ensure_notification_app(Principal::self_authenticating(vec![8u8; 91]), None, 2_000)
+        .expect("creating the record the browser moves to");
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor.point_at_notification_app(0, replacement.id, true);
+    storage.write(anchor).expect("dropping one reference");
+
+    assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
+    assert!(storage.notification_app_of(app.id, app_principal).is_some());
+}
+
+#[test]
+fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
+    let app = storage
+        .ensure_notification_app(app_principal, None, 1_000)
+        .expect("creating the record");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id, true);
+    storage.write(anchor).expect("pointing at the app");
+
+    // The victim is the entry with the lowest `(last_used, id)`.
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    let mut evicted = vec![];
+    for seed in 2..=(MAX_BROWSERS as u8 + 1) {
+        let (_, dropped) = anchor
+            .resolve_browser(
+                browser_key(seed, 0),
+                browser_key(seed, 1),
+                description(seed),
+                1,
+            )
+            .expect("registering a browser");
+        evicted.extend(dropped);
+    }
+    assert_eq!(evicted, vec![0]);
+    storage.write(anchor).expect("writing the evicted list");
+
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
+}
+
+#[test]
+fn an_app_no_anchor_points_at_is_deleted_on_request() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
+    let app = storage
+        .ensure_notification_app(app_principal, None, 1_000)
+        .expect("creating the record");
+
+    storage.delete_notification_app_if_unreferenced(app.id);
+
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
+}
+
+#[test]
+fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app_principal = Principal::self_authenticating(vec![7u8; 91]);
+    let app = storage
+        .ensure_notification_app(app_principal, None, 1_000)
+        .expect("creating the record");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id, true);
+    storage.write(anchor).expect("pointing at the app");
+
+    storage.delete_notification_app_if_unreferenced(app.id);
+
+    assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_000]);
+    // The record now carries the anchor that kept it alive.
+    assert_eq!(
+        storage.notification_app_of(app.id, app_principal),
+        Some(crate::notifications::app::NotificationApp {
+            anchors: std::collections::BTreeSet::from([10_000]),
+            ..app
+        })
     );
 }

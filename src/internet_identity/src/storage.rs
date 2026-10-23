@@ -122,8 +122,9 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::notification_app::{
-    StorableNotificationApp, StorableNotificationAppId,
+    StorableNotificationApp, StorableNotificationAppId, StorableNotificationAppRef,
 };
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -945,6 +946,7 @@ impl<M: Memory + Clone> Storage<M> {
             previous_passkey_credentials,
             previous_recovery_keys,
             previous_email_recovery,
+            previous_browsers,
         ) = if let Some(StorableAnchor {
             // The following fields need to be compared with the previous anchor
             openid_credentials,
@@ -952,11 +954,12 @@ impl<M: Memory + Clone> Storage<M> {
             recovery_keys,
             email_recovery,
 
+            browsers,
+
             // The following fields do not require merging.
             created_at_ns: _,
             name: _,
             verified_emails: _,
-            browsers: _,
             next_browser_id: _,
             session_count: _,
         }) = previous_anchor_maybe
@@ -966,10 +969,11 @@ impl<M: Memory + Clone> Storage<M> {
                 passkey_credentials.unwrap_or_default(),
                 recovery_keys.unwrap_or_default(),
                 email_recovery.unwrap_or_default(),
+                browsers.unwrap_or_default(),
             )
         } else {
             // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
-            (vec![], vec![], vec![], vec![])
+            (vec![], vec![], vec![], vec![], vec![])
         };
         // `storable_anchor.verified_emails` is not synced through any
         // reverse-lookup index — verified emails are addressable only
@@ -1005,6 +1009,12 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             &previous_passkey_credentials,
             &current_passkey_credentials,
+        );
+
+        self.sync_notification_apps_with_anchor(
+            anchor_number,
+            &previous_browsers,
+            storable_anchor.browsers.as_deref().unwrap_or_default(),
         );
 
         // The reverse address index for email recovery: map
@@ -1461,6 +1471,99 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert(hash, anchor_number);
         }
         Ok(())
+    }
+
+    /// Keeps each app record's anchor list in step with the apps this anchor's browsers
+    /// point at, and deletes a record the last browser has just stopped pointing at. The
+    /// list is also the reference count.
+    fn sync_notification_apps_with_anchor(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous_browsers: &[StorableBrowser],
+        current_browsers: &[StorableBrowser],
+    ) {
+        let apps_of = |browsers: &[StorableBrowser]| {
+            browsers
+                .iter()
+                .filter_map(|browser| match browser.notification_app {
+                    Some(StorableNotificationAppRef::Linked(app_id, _)) => Some(app_id),
+                    _ => None,
+                })
+                .collect::<BTreeSet<_>>()
+        };
+        let previous = apps_of(previous_browsers);
+        let current = apps_of(current_browsers);
+
+        for app_id in previous.difference(&current) {
+            let Some(mut app) = self.notification_app_memory.get(app_id) else {
+                // There is no reference left to count down and nothing here can rebuild
+                // one, so the write carries on: an anchor must not fail over bookkeeping
+                // it cannot fix.
+                ic_cdk::println!(
+                    "ERROR: Anchor number {} stopped pointing at notification app {}, which has \
+                     no record.",
+                    anchor_number,
+                    app_id,
+                );
+                continue;
+            };
+            app.anchors.remove(&anchor_number);
+            if app.anchors.is_empty() {
+                self.delete_notification_app(*app_id);
+                continue;
+            }
+            self.notification_app_memory.insert(*app_id, app);
+        }
+
+        for app_id in current.difference(&previous) {
+            let Some(mut app) = self.notification_app_memory.get(app_id) else {
+                ic_cdk::println!(
+                    "ERROR: Anchor number {} began pointing at notification app {}, which has \
+                     no record.",
+                    anchor_number,
+                    app_id,
+                );
+                continue;
+            };
+            if !app.anchors.insert(anchor_number) {
+                continue;
+            }
+            self.notification_app_memory.insert(*app_id, app);
+        }
+    }
+
+    /// The anchors pointing at `app_id`, in ascending order and stable across calls.
+    pub fn anchors_with_notification_app(&self, app_id: NotificationAppId) -> Vec<AnchorNumber> {
+        self.notification_app_memory
+            .get(&app_id)
+            .map(|app| app.anchors.into_iter().collect())
+            .unwrap_or_default()
+    }
+
+    /// Forgets a record. Its id is retired with it.
+    fn delete_notification_app(&mut self, app_id: NotificationAppId) {
+        if self.notification_app_memory.remove(&app_id).is_none() {
+            // An id is handed out with the record it names and retired with it, so an id
+            // reaching here names a record.
+            ic_cdk::println!(
+                "ERROR: Notification app {} has no record to forget.",
+                app_id,
+            );
+        }
+    }
+
+    /// Forgets a record no anchor points at. The record is committed with the reply even
+    /// where that reply is an `Err`.
+    ///
+    /// A reference outlives the record it names, so a browser can leave one that is
+    /// already gone: nothing to forget is an answer here, not a fault.
+    pub(crate) fn delete_notification_app_if_unreferenced(&mut self, app_id: NotificationAppId) {
+        if !self.anchors_with_notification_app(app_id).is_empty() {
+            return;
+        }
+        if self.notification_app_memory.contains_key(&app_id) {
+            self.delete_notification_app(app_id);
+        }
     }
 
     fn sync_anchor_with_passkey_pubkey_index(
@@ -3283,6 +3386,8 @@ impl<M: Memory + Clone> Storage<M> {
             principal: app_principal,
             created_at: now,
             last_used: now,
+            // The anchor pointing at it is added by the write that points it.
+            anchors: BTreeSet::new(),
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
