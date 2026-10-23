@@ -206,7 +206,6 @@ pub enum AuthnMethodConfirmationError {
     WrongCode { retries_left: u8 },
     RegistrationModeOff,
     NoAuthnMethodToConfirm,
-    PasskeyWithThisCredentialIdIsAlreadyUsed,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

@@ -205,10 +205,7 @@ fn verify_tentative_device(
             AuthnMethodConfirmationError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
             }
-            AuthnMethodConfirmationError::PasskeyWithThisCredentialIdIsAlreadyUsed => {
-                trap("passkey with this credential id is already used");
-            }
-            // Unreachable since these two errors already result in a trap in this legacy method.
+            // Unreachable since this error already results in a trap in this legacy method.
             AuthnMethodConfirmationError::Unauthorized(principal) => {
                 trap(&format!("{principal} could not be authenticated."))
             }

@@ -479,7 +479,9 @@ fn should_not_confirm_authn_method_with_credential_id_claimed_by_another_anchor(
 
     assert_eq!(
         result,
-        Err(AuthnMethodConfirmationError::PasskeyWithThisCredentialIdIsAlreadyUsed)
+        Err(AuthnMethodConfirmationError::InternalCanisterError(
+            "passkey with this credential id is already used".to_string()
+        ))
     );
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
     assert_eq!(anchor_info.into_device_data(), vec![device_data_2()]);

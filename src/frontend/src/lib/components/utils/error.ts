@@ -181,7 +181,6 @@ export const handleError = (error: unknown) => {
       case "NameTooLong":
       case "Unauthorized":
       case "NoAuthnMethodToConfirm":
-      case "PasskeyWithThisCredentialIdIsAlreadyUsed":
       case "SsoNormalLoginRequired":
         // Shouldn't have happened; reaching here means they weren't avoided.
         toaster.error({

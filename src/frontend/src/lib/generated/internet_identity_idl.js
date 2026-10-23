@@ -258,7 +258,6 @@ export const idlFactory = ({ IDL }) => {
   const AuthnMethodConfirmationError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'RegistrationModeOff' : IDL.Null,
-    'PasskeyWithThisCredentialIdIsAlreadyUsed' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'NoAuthnMethodToConfirm' : IDL.Null,
     'WrongCode' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
