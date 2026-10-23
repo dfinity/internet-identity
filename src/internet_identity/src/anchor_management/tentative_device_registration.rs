@@ -103,6 +103,13 @@ pub async fn add_tentative_device(
                 } => {
                     anchor_management::check_passkey_pubkey_is_not_used(&tentative_device.pubkey)
                         .map_err(|_| AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed)?;
+                    if let Some(credential_id) = &tentative_device.credential_id {
+                        anchor_management::check_passkey_credential_id_is_not_used(
+                            credential_id,
+                            Some(anchor_number),
+                        )
+                        .map_err(AuthnMethodRegisterError::InvalidMetadata)?;
+                    }
 
                     registration.state = DeviceTentativelyAdded {
                         tentative_device,

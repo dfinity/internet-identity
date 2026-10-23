@@ -311,6 +311,36 @@ pub fn check_passkey_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String
         .ok_or_else(|| "passkey with this public key is already used".to_string())
 }
 
+/// Check if the given `CredentialId` is not used by any anchor other than `anchor_number`.
+/// Pass `None` when no anchor exists yet, so that any existing use is refused.
+pub fn check_passkey_credential_id_is_not_used(
+    credential_id: &CredentialId,
+    anchor_number: Option<AnchorNumber>,
+) -> Result<(), String> {
+    storage_borrow(|storage| storage.lookup_anchor_with_device_credential(credential_id))
+        .is_none_or(|owner| Some(owner) == anchor_number)
+        .then_some(())
+        .ok_or_else(|| "passkey with this credential id is already used".to_string())
+}
+
+/// Check if the credential id in `device_data` is not used by another anchor, if it differs from
+/// the current credential id of the device with `device_key`.
+pub fn check_changed_passkey_credential_id_is_not_used(
+    anchor: &Anchor,
+    device_key: &DeviceKey,
+    device_data: &DeviceData,
+) -> Result<(), String> {
+    let current_credential_id = anchor
+        .device(device_key)
+        .and_then(|device| device.credential_id.as_ref());
+    match &device_data.credential_id {
+        Some(credential_id) if Some(credential_id) != current_credential_id => {
+            check_passkey_credential_id_is_not_used(credential_id, Some(anchor.anchor_number()))
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Check if the given `PublicKey` is not used as a recovery phrase by any anchor.
 pub fn check_recovery_phrase_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String> {
     lookup_caller_identity_by_recovery_phrase(Principal::self_authenticating(pubkey))

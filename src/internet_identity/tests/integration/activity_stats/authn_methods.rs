@@ -43,7 +43,8 @@ fn should_report_daily_active_authn_methods() -> Result<(), RejectResponse> {
         // so that it's more than an off-by-one error away from 0.
         create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-        // Patch the `authn_method` since one cannot reuse the same passkey pubkey used before.
+        // Patch the `authn_method` since one cannot reuse the same passkey pubkey or credential id
+        // used before.
         authn_method.authn_method = match authn_method.authn_method {
             AuthnMethod::WebAuthn(WebAuthn {
                 pubkey,
@@ -56,7 +57,12 @@ fn should_report_daily_active_authn_methods() -> Result<(), RejectResponse> {
                     .chain(vec![i as u8; 32])
                     .collect::<Vec<u8>>()
                     .into(),
-                credential_id,
+                credential_id: credential_id
+                    .into_vec()
+                    .into_iter()
+                    .chain(vec![i as u8; 32])
+                    .collect::<Vec<u8>>()
+                    .into(),
                 aaguid,
             }),
             AuthnMethod::PubKey(_) => AuthnMethod::PubKey(PublicKeyAuthn {
@@ -120,7 +126,8 @@ fn should_report_monthly_active_authn_methods() -> Result<(), RejectResponse> {
         // so that it's more than an off-by-one error away from 0.
         create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-        // Patch the `authn_method` since one cannot reuse the same passkey pubkey used before.
+        // Patch the `authn_method` since one cannot reuse the same passkey pubkey or credential id
+        // used before.
         authn_method.authn_method = match authn_method.authn_method {
             AuthnMethod::WebAuthn(WebAuthn {
                 pubkey,
@@ -133,7 +140,12 @@ fn should_report_monthly_active_authn_methods() -> Result<(), RejectResponse> {
                     .chain(vec![i as u8; 32])
                     .collect::<Vec<u8>>()
                     .into(),
-                credential_id,
+                credential_id: credential_id
+                    .into_vec()
+                    .into_iter()
+                    .chain(vec![i as u8; 32])
+                    .collect::<Vec<u8>>()
+                    .into(),
                 aaguid,
             }),
             AuthnMethod::PubKey(_) => AuthnMethod::PubKey(PublicKeyAuthn {
