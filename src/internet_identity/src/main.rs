@@ -467,11 +467,7 @@ fn prepare_notification_app_link(
         enabled: true,
     }) = anchor.notification_app(browser_id)
     {
-        // A record that will not read back is not one that is answering, so it stands in
-        // the way of nothing: the user is offered the install.
         let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
-            .unwrap_or_default()
             .is_some_and(|app| {
                 app.webpush_subscription.is_some() && !app.probe_went_unanswered(now)
             });
