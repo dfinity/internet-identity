@@ -175,7 +175,10 @@ pub fn check_notification_app_authorization(
     app_id: NotificationAppId,
 ) -> Result<NotificationApp, AuthorizationError> {
     let caller = caller();
+    // A record that will not read back authorizes nobody, which is what this answers for
+    // a record that is not there either: both mean the caller is not the app it claims.
     state::storage_borrow(|storage| storage.notification_app_of(app_id, caller))
+        .unwrap_or_default()
         .ok_or(AuthorizationError::from(caller))
 }
 
@@ -205,6 +208,7 @@ pub fn check_notification_authorization(
             let app_id = browser.notification_app?.linked_app()?;
             storage
                 .notification_app_of(app_id, caller)
+                .unwrap_or_default()
                 .is_some()
                 .then_some(app_id)
         })
