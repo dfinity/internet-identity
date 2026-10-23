@@ -1,12 +1,7 @@
 //! Turning a caller's Web Push request into one the channel can act on: a deployment
 //! that notifies at all, and fields the canister can deliver against.
 
-use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, GetWebPushSubscriptionStatusRequest, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    Timestamp,
-};
-use serde_bytes::ByteBuf;
+use internet_identity_interface::internet_identity::types::Timestamp;
 use std::ops::RangeInclusive;
 use url::Url;
 
@@ -19,115 +14,140 @@ pub(super) const JWT_SIG_LEN: usize = 64;
 /// One JWT per validity window; 30 covers ~30 days. Bounded to cap the row.
 const MAX_JWT_POOL_LEN: usize = 30;
 
-/// Held by every validated request below. Private to this module, so the `TryFrom`
-/// impls are the only way to build one and holding a request is proof its fields have
-/// been through them.
-struct Validated;
+/// A relay address a push can be posted to: 1..=512 bytes, a URL, and a host to post it
+/// at.
+///
+/// Shape only. Whether this deployment will deliver over the scheme is
+/// `deliverable_endpoint`, because that reads a deploy flag: a value minted while it was
+/// set would otherwise claim something that stops being true when it is cleared.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PushEndpoint(String);
 
-pub struct ValidatedSetWebPushSubscriptionRequest {
-    pub anchor_number: AnchorNumber,
-    pub endpoint: String,
-    pub vapid_public_key: Vec<u8>,
-    pub jwt_signatures: Vec<Vec<u8>>,
-    pub jwt_issued_at_ns: Timestamp,
-    _validated: Validated,
-}
+impl PushEndpoint {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 
-pub struct ValidatedRemoveWebPushSubscriptionRequest {
-    pub anchor_number: AnchorNumber,
-    pub browser_id: BrowserId,
-    _validated: Validated,
-}
+    pub fn as_url(&self) -> Option<Url> {
+        Url::parse(&self.0).ok()
+    }
 
-pub struct ValidatedGetWebPushSubscriptionStatusRequest {
-    pub anchor_number: AnchorNumber,
-    _validated: Validated,
-}
-
-impl TryFrom<SetWebPushSubscriptionRequest> for ValidatedSetWebPushSubscriptionRequest {
-    type Error = SetWebPushSubscriptionError;
-
-    fn try_from(
-        SetWebPushSubscriptionRequest {
-            anchor_number,
-            endpoint,
-            vapid_public_key,
-            jwt_signatures,
-            jwt_issued_at_ns,
-        }: SetWebPushSubscriptionRequest,
-    ) -> Result<Self, Self::Error> {
-        check_enabled().map_err(SetWebPushSubscriptionError::InternalCanisterError)?;
-
-        let vapid_public_key = vapid_public_key.into_vec();
-        let jwt_signatures: Vec<Vec<u8>> =
-            jwt_signatures.into_iter().map(ByteBuf::into_vec).collect();
-
-        // Report every invalid field at once rather than failing on the first, so a
-        // browser doesn't go round three times to learn what one answer can say.
-        let problems: Vec<String> = [
-            validate_endpoint(&endpoint),
-            validate_vapid_public_key(&vapid_public_key),
-            validate_jwt_pool(&jwt_signatures),
-        ]
-        .into_iter()
-        .filter_map(Result::err)
-        .collect();
-        if !problems.is_empty() {
-            return Err(SetWebPushSubscriptionError::InternalCanisterError(
-                problems.join("; "),
-            ));
-        }
-
-        Ok(Self {
-            anchor_number,
-            endpoint,
-            vapid_public_key,
-            jwt_signatures,
-            jwt_issued_at_ns,
-            _validated: Validated,
-        })
+    pub fn into_string(self) -> String {
+        self.0
     }
 }
 
-impl TryFrom<RemoveWebPushSubscriptionRequest> for ValidatedRemoveWebPushSubscriptionRequest {
-    type Error = RemoveWebPushSubscriptionError;
-
-    fn try_from(
-        RemoveWebPushSubscriptionRequest {
-            anchor_number,
-            browser_id,
-        }: RemoveWebPushSubscriptionRequest,
-    ) -> Result<Self, Self::Error> {
-        check_enabled().map_err(RemoveWebPushSubscriptionError::InternalCanisterError)?;
-        Ok(Self {
-            anchor_number,
-            browser_id,
-            _validated: Validated,
-        })
-    }
-}
-
-impl TryFrom<GetWebPushSubscriptionStatusRequest> for ValidatedGetWebPushSubscriptionStatusRequest {
+impl TryFrom<&str> for PushEndpoint {
     type Error = String;
 
-    fn try_from(
-        GetWebPushSubscriptionStatusRequest { anchor_number }: GetWebPushSubscriptionStatusRequest,
-    ) -> Result<Self, Self::Error> {
-        check_enabled()?;
-        Ok(Self {
-            anchor_number,
-            _validated: Validated,
-        })
+    fn try_from(endpoint: &str) -> Result<Self, Self::Error> {
+        validate_param_len(endpoint.len(), 1..=MAX_ENDPOINT_LEN, "endpoint")?;
+        let Ok(url) = Url::parse(endpoint) else {
+            return Err("endpoint is not a URL".to_string());
+        };
+        if url.host().is_none() {
+            return Err("endpoint has no host".to_string());
+        }
+        Ok(Self(endpoint.to_string()))
     }
 }
 
-/// Server-side gate for the channel. Per deployment rather than per app: a subscription
-/// belongs to a browser, not to one of the apps that may notify it.
-fn check_enabled() -> Result<(), String> {
-    if crate::notifications::notifications_enabled() {
-        Ok(())
-    } else {
-        Err("notifications are not enabled".to_string())
+/// Refuses an endpoint this deployment will not POST to: plain `http` needs a loopback
+/// host and the deploy flag, as the sender list and SSO discovery do.
+///
+/// Read per call rather than carried on the endpoint, because both answers come from
+/// persistent state.
+pub fn deliverable_endpoint(endpoint: &PushEndpoint) -> Result<(), String> {
+    let Some(url) = endpoint.as_url() else {
+        return Err("endpoint is not a URL".to_string());
+    };
+    if url.scheme() == "https" {
+        return Ok(());
+    }
+    if url.scheme() == "http"
+        && allow_insecure_endpoint()
+        && crate::utils::is_loopback_host(url.host_str().unwrap_or_default())
+    {
+        return Ok(());
+    }
+    Err("endpoint must be an https:// URL".to_string())
+}
+
+/// The VAPID application server key, uncompressed SEC1 P-256.
+///
+/// Length plus curve validity. The key is echoed to the relay as VAPID `k=`, and a
+/// relay rejects a push whose `k` it cannot parse.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VapidPublicKey(Vec<u8>);
+
+impl VapidPublicKey {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl TryFrom<Vec<u8>> for VapidPublicKey {
+    type Error = String;
+
+    fn try_from(vapid_public_key: Vec<u8>) -> Result<Self, Self::Error> {
+        validate_param_len(
+            vapid_public_key.len(),
+            VAPID_PUBKEY_LEN..=VAPID_PUBKEY_LEN,
+            "vapid_public_key",
+        )?;
+        if p256::PublicKey::from_sec1_bytes(&vapid_public_key).is_err() {
+            return Err("vapid_public_key is not a valid SEC1 P-256 point".to_string());
+        }
+        Ok(Self(vapid_public_key))
+    }
+}
+
+/// One JWT signature per validity window, in window order, and the instant they were
+/// signed at.
+///
+/// The two travel together because one signature covers one elapsed window: when the pool
+/// was minted is what says which window a given signature is for, so a pool without it
+/// means nothing.
+///
+/// The signatures themselves are not verified: garbage only breaks the uploader's own
+/// delivery, and 30 ECDSA verifications per subscribe isn't worth it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JwtPool {
+    signatures: Vec<Vec<u8>>,
+    issued_at_ns: Timestamp,
+}
+
+impl JwtPool {
+    /// Takes two values rather than one, which is the case an inherent constructor is
+    /// for: a `TryFrom` over a tuple would say less and read worse.
+    pub fn try_new(signatures: Vec<Vec<u8>>, issued_at_ns: Timestamp) -> Result<Self, String> {
+        validate_param_len(signatures.len(), 1..=MAX_JWT_POOL_LEN, "jwt_pool")?;
+        if let Some(bad) = signatures.iter().find(|sig| sig.len() != JWT_SIG_LEN) {
+            return Err(format!(
+                "each jwt signature must be {JWT_SIG_LEN} bytes, got {}",
+                bad.len()
+            ));
+        }
+        Ok(Self {
+            signatures,
+            issued_at_ns,
+        })
+    }
+
+    pub fn issued_at_ns(&self) -> Timestamp {
+        self.issued_at_ns
+    }
+
+    pub fn signatures(&self) -> &[Vec<u8>] {
+        &self.signatures
+    }
+
+    pub fn into_signatures(self) -> Vec<Vec<u8>> {
+        self.signatures
     }
 }
 
@@ -153,67 +173,20 @@ fn validate_param_len(
     Ok(())
 }
 
-/// Length plus an absolute `https://` URL. The canister POSTs to this to wake the
-/// browser, so a value that is not one is a row nothing can ever be delivered to.
-///
-/// As with the sender list, a deployment whose relay is a local server says so with
-/// a deploy flag, and even then only a loopback host may be plain `http`: a wake-up
-/// carries the browser's authorization, and anywhere else it would be handed to
-/// whoever is on the path.
-fn validate_endpoint(endpoint: &str) -> Result<(), String> {
-    validate_param_len(endpoint.len(), 1..=MAX_ENDPOINT_LEN, "endpoint")?;
-    let Ok(url) = Url::parse(endpoint) else {
-        return Err("endpoint is not a URL".to_string());
-    };
-    let local = url.scheme() == "http"
-        && allow_insecure_endpoint()
-        && crate::utils::is_loopback_host(url.host_str().unwrap_or_default());
-    if url.scheme() != "https" && !local {
-        return Err("endpoint must be an https:// URL".to_string());
-    }
-    if url.host().is_none() {
-        return Err("endpoint has no host".to_string());
-    }
-    Ok(())
-}
-
 /// Whether this deployment lets a browser register a plain-http endpoint, which only
 /// one whose relay is a local server ever should.
 fn allow_insecure_endpoint() -> bool {
     crate::state::persistent_state(|s| s.notifications_allow_insecure_endpoint).unwrap_or(false)
 }
 
-/// Length plus curve validity. The key is echoed to the relay as VAPID `k=`, and a relay
-/// rejects a push whose `k` it cannot parse.
-fn validate_vapid_public_key(vapid_public_key: &[u8]) -> Result<(), String> {
-    validate_param_len(
-        vapid_public_key.len(),
-        VAPID_PUBKEY_LEN..=VAPID_PUBKEY_LEN,
-        "vapid_public_key",
-    )?;
-    if p256::PublicKey::from_sec1_bytes(vapid_public_key).is_err() {
-        return Err("vapid_public_key is not a valid SEC1 P-256 point".to_string());
-    }
-    Ok(())
-}
-
-/// Not verified: garbage only breaks the uploader's own delivery, and 30
-/// ECDSA verifications per subscribe isn't worth it.
-fn validate_jwt_pool(signatures: &[Vec<u8>]) -> Result<(), String> {
-    validate_param_len(signatures.len(), 1..=MAX_JWT_POOL_LEN, "jwt_pool")?;
-    if let Some(bad) = signatures.iter().find(|sig| sig.len() != JWT_SIG_LEN) {
-        return Err(format!(
-            "each jwt signature must be {JWT_SIG_LEN} bytes, got {}",
-            bad.len()
-        ));
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::fixtures::*;
     use super::*;
+    use internet_identity_interface::internet_identity::types::{
+        AnchorNumber, SetWebPushSubscriptionRequest,
+    };
+    use serde_bytes::ByteBuf;
     const ANCHOR: AnchorNumber = 10_000;
 
     /// What `notifications_allow_insecure_endpoint` says, for a test that is about a
@@ -224,10 +197,37 @@ mod tests {
         });
     }
 
-    fn validate(
-        request: SetWebPushSubscriptionRequest,
-    ) -> Result<ValidatedSetWebPushSubscriptionRequest, SetWebPushSubscriptionError> {
-        request.try_into()
+    /// Every field, the way the endpoint takes them: all three problems rather than the
+    /// first.
+    fn validate(request: SetWebPushSubscriptionRequest) -> Result<(), String> {
+        let SetWebPushSubscriptionRequest {
+            endpoint,
+            vapid_public_key,
+            jwt_signatures,
+            jwt_issued_at_ns,
+            ..
+        } = request;
+        let problems: Vec<String> = [
+            PushEndpoint::try_from(endpoint.as_str())
+                .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint))
+                .err(),
+            VapidPublicKey::try_from(vapid_public_key.into_vec()).err(),
+            JwtPool::try_new(
+                jwt_signatures
+                    .into_iter()
+                    .map(ByteBuf::into_vec)
+                    .collect::<Vec<_>>(),
+                jwt_issued_at_ns,
+            )
+            .err(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if problems.is_empty() {
+            return Ok(());
+        }
+        Err(problems.join("; "))
     }
 
     #[test]
@@ -253,28 +253,6 @@ mod tests {
 
         assert!(loopback.is_ok());
         assert!(elsewhere.is_err(), "only a local relay, not any plain host");
-    }
-
-    /// The channel is off until an operator enables notifications, and nothing may be
-    /// written before then.
-    #[test]
-    fn refuses_every_request_while_the_channel_is_off() {
-        crate::state::persistent_state_mut(|s| s.notifications_enabled = None);
-
-        assert!(validate(request(ANCHOR, "https://relay.example/a", 0)).is_err());
-        assert!(ValidatedRemoveWebPushSubscriptionRequest::try_from(
-            RemoveWebPushSubscriptionRequest {
-                anchor_number: ANCHOR,
-                browser_id: 1,
-            }
-        )
-        .is_err());
-        assert!(ValidatedGetWebPushSubscriptionStatusRequest::try_from(
-            GetWebPushSubscriptionStatusRequest {
-                anchor_number: ANCHOR,
-            }
-        )
-        .is_err());
     }
 
     /// The canister POSTs to this to wake the browser, so a value it could never POST
@@ -333,8 +311,7 @@ mod tests {
         sent.vapid_public_key = ByteBuf::from(vec![4u8; 10]);
         sent.jwt_signatures = vec![];
 
-        let Err(SetWebPushSubscriptionError::InternalCanisterError(problems)) = validate(sent)
-        else {
+        let Err(problems) = validate(sent) else {
             panic!("three bad fields must be refused");
         };
         assert_eq!(problems.split("; ").count(), 3, "{problems}");

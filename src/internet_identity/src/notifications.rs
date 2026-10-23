@@ -5,19 +5,21 @@
 //! spelling consent is keyed by.
 
 pub(crate) mod admission_queue;
+pub mod app;
 pub(crate) mod backlog;
 pub(crate) mod browser_queue;
 pub mod delegation;
 pub(crate) mod dispatch;
 pub mod senders;
 pub mod submission;
-mod validation;
+pub(crate) mod validation;
 pub mod webpush;
 
 /// A browser unused for this long counts as gone and is not woken. The send endpoint
 /// answers `NoSuchRecipient` for a recipient whose every browser is past it.
 pub(crate) const BROWSER_GONE_AFTER_NS: u64 = 60 * 24 * 60 * 60 * 1_000_000_000;
 
+use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::anchor_application_config::PermissionDecision;
 use crate::storage::StorageError;
@@ -26,18 +28,16 @@ use internet_identity_interface::internet_identity::types::{
     NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
     Timestamp,
 };
+pub(crate) use validation::NOT_ENABLED_MESSAGE;
 pub use validation::{
-    notifications_enabled, ValidatedGetNextNotificationRequest,
-    ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
-    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
-    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationRequest,
-    ValidatedSendNotificationArg,
+    admit_batch, enabled_or, fetchable_origin, notifications_enabled, notifying_origin,
+    TooManyNotifications,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at
 /// `retry_after`.
 pub fn defer_whole_batch(
-    ValidatedSendNotificationArg { notifications, .. }: ValidatedSendNotificationArg,
+    notifications: Vec<Notification>,
     retry_after: Timestamp,
 ) -> SendNotificationResponse {
     SendNotificationResponse {
@@ -52,42 +52,35 @@ pub fn defer_whole_batch(
     }
 }
 
-/// Grants the request's origin permission to notify its identity.
+/// Grants `origin` permission to notify `anchor_number`.
 ///
-/// Takes the validated request rather than its parts, so an origin that has not been
-/// through `TryFrom` cannot reach the write.
+/// Takes an `ApplicationOrigin` rather than a string, so a spelling nobody folded
+/// cannot reach the write.
 pub fn grant_consent(
-    ValidatedNotificationGrantConsentRequest {
-        anchor_number,
-        origin,
-        ..
-    }: ValidatedNotificationGrantConsentRequest,
+    anchor_number: AnchorNumber,
+    origin: &ApplicationOrigin,
     now_ns: Timestamp,
 ) -> Result<(), NotificationGrantConsentError> {
-    write_notifications_decision(anchor_number, &origin, true, now_ns)
+    write_notifications_decision(anchor_number, origin, true, now_ns)
         .map_err(|err| NotificationGrantConsentError::InternalCanisterError(format!("{err}")))
 }
 
 /// Withdraws the origin's consent, and what it still has queued for the identity's
 /// browsers. Device subscriptions stay: they are shared across every consented app.
 pub fn revoke_consent(
-    ValidatedNotificationRevokeConsentRequest {
-        anchor_number,
-        origin,
-        ..
-    }: ValidatedNotificationRevokeConsentRequest,
+    anchor_number: AnchorNumber,
+    origin: &ApplicationOrigin,
     now_ns: Timestamp,
 ) -> Result<(), NotificationRevokeConsentError> {
     // Consent that cannot exist is already withdrawn, so an app the identity never
     // reached is nothing to report.
-    let _ = write_notifications_decision(anchor_number, &origin, false, now_ns);
-    browser_queue::remove_app(anchor_number, &origin);
+    let _ = write_notifications_decision(anchor_number, origin, false, now_ns);
+    browser_queue::remove_app(anchor_number, origin);
     Ok(())
 }
 
-/// Whether the request's origin may notify its identity.
-/// Whether `origin` may notify `anchor_number`, for callers that hold the
-/// origin already folded rather than a request to validate.
+/// Whether `origin` may notify `anchor_number`, for callers holding the folded spelling
+/// as a plain string rather than an `ApplicationOrigin`.
 pub fn consent_granted_for(anchor_number: AnchorNumber, origin: &FrontendHostname) -> bool {
     storage_borrow(|storage| {
         storage
@@ -96,14 +89,8 @@ pub fn consent_granted_for(anchor_number: AnchorNumber, origin: &FrontendHostnam
     })
 }
 
-pub fn consent_granted(
-    ValidatedNotificationConsentGrantedRequest {
-        anchor_number,
-        origin,
-        ..
-    }: ValidatedNotificationConsentGrantedRequest,
-) -> bool {
-    consent_granted_for(anchor_number, &origin)
+pub fn consent_granted(anchor_number: AnchorNumber, origin: &ApplicationOrigin) -> bool {
+    consent_granted_for(anchor_number, &origin.as_str().to_string())
 }
 
 /// Records the identity's answer for notifications, leaving the rest of the app's config
@@ -113,10 +100,13 @@ pub fn consent_granted(
 /// changed. Denying an app the identity never allowed decides nothing: it stays unset.
 fn write_notifications_decision(
     anchor_number: AnchorNumber,
-    origin: &FrontendHostname,
+    origin: &ApplicationOrigin,
     allowed: bool,
     now_ns: Timestamp,
 ) -> Result<(), StorageError> {
+    // The storage index keys by the owned spelling; this is the one place the folded
+    // value crosses out of its type.
+    let origin = &origin.as_str().to_string();
     storage_borrow_mut(|storage| {
         let mut config = storage
             .read_anchor_application_config(anchor_number, origin)
@@ -148,10 +138,6 @@ pub(crate) fn test_setup() {
 mod tests {
     use super::*;
     use crate::notifications::test_setup as setup;
-    use internet_identity_interface::internet_identity::types::{
-        NotificationConsentGrantedRequest, NotificationGrantConsentRequest,
-        NotificationRevokeConsentRequest,
-    };
 
     const APP: &str = "https://app.example";
     const NEVER: &str = "https://never.example";
@@ -169,30 +155,29 @@ mod tests {
         origin: &str,
         now_ns: Timestamp,
     ) -> Result<(), NotificationGrantConsentError> {
-        let request = NotificationGrantConsentRequest {
+        grant_consent(
             anchor_number,
-            origin: origin.to_string(),
-        };
-        grant_consent(request.try_into().expect("a notifiable origin"), now_ns)
+            &notifying_origin(origin).expect("a notifiable origin"),
+            now_ns,
+        )
     }
 
     fn revoke(
         anchor_number: AnchorNumber,
         origin: &str,
     ) -> Result<(), NotificationRevokeConsentError> {
-        let request = NotificationRevokeConsentRequest {
+        revoke_consent(
             anchor_number,
-            origin: origin.to_string(),
-        };
-        revoke_consent(request.try_into().expect("a notifiable origin"), 1_000)
+            &notifying_origin(origin).expect("a notifiable origin"),
+            1_000,
+        )
     }
 
     fn granted(anchor_number: AnchorNumber, origin: &str) -> bool {
-        let request = NotificationConsentGrantedRequest {
+        consent_granted(
             anchor_number,
-            origin: origin.to_string(),
-        };
-        consent_granted(request.try_into().expect("a notifiable origin"))
+            &notifying_origin(origin).expect("a notifiable origin"),
+        )
     }
 
     /// An identity that has signed in at `origin`, which is what a grant needs.
@@ -244,16 +229,11 @@ mod tests {
         assert!(revoke(anchor, NEVER).is_ok());
     }
 
-    /// Built through `TryFrom`, so the deferral tests hand the reply builder
-    /// the same validated request a caller's call would.
-    fn batch(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {
+    /// Admitted the way the endpoint admits one, so the deferral tests hand the reply
+    /// builder what a caller's call would leave it.
+    fn batch(notifications: Vec<Notification>) -> Vec<Notification> {
         enable_notifications();
-        internet_identity_interface::internet_identity::types::SendNotificationArg {
-            origin: APP.to_string(),
-            notifications,
-        }
-        .try_into()
-        .expect("a notifiable origin")
+        admit_batch(notifications).unwrap_or_else(|_| panic!("within the cap"))
     }
 
     fn notification(id: u64, recipient: &str) -> Notification {

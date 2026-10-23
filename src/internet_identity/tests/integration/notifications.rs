@@ -2,8 +2,8 @@
 
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
-    browser_get_next_notification, browser_remove_notification, consent_granted, grant_consent,
-    revoke_consent,
+    browser_get_next_notification, browser_remove_notification, consent_granted,
+    get_webpush_subscription_status, grant_consent, remove_webpush_subscription, revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -17,7 +17,7 @@ use internet_identity_interface::internet_identity::types::{
     GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
     NotificationGrantConsentError, NotificationRevokeConsentError, NotificationToShow,
     OperatingSystem, PrepareAccountSessionRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -115,6 +115,15 @@ fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<
         browser_remove_notification(&env, canister_id, principal_1(), remove_request(anchor))?,
         Err(RemoveNotificationError::InternalCanisterError(_))
     ));
+    assert!(matches!(
+        remove_webpush_subscription(&env, canister_id, principal_1(), anchor, 0)?,
+        Err(RemoveWebPushSubscriptionError::InternalCanisterError(_))
+    ));
+    // A query answers like one nobody registered on.
+    assert_eq!(
+        get_webpush_subscription_status(&env, canister_id, principal_1(), anchor)?,
+        None
+    );
     Ok(())
 }
 
@@ -1294,5 +1303,394 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
             canister_id: principal_2(),
             id: 1,
         },
+    }
+}
+
+/// The two halves of an install: the browser registers the one-shot key it is about to
+/// hand out, and the app spends it. Nothing is stored between them but the principal of
+/// that key and when it stops being spendable.
+mod app_link {
+    use super::subscriptions::{key_holder, request, ENDPOINT};
+    use super::*;
+    use candid::Principal;
+    use canister_tests::api::internet_identity::notifications::{
+        get_webpush_subscription_status, link_notification_app, prepare_notification_app_link,
+        set_webpush_subscription,
+    };
+    use canister_tests::framework::BrowserKey;
+    use internet_identity_interface::internet_identity::types::{
+        LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
+        PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
+    };
+    use pretty_assertions::assert_eq;
+
+    const BROWSER_SEED: u8 = 1;
+
+    /// An identity signed in once, so its browser has a key the canister recognises.
+    fn install_with_browser(env: &PocketIc) -> (CanisterId, AnchorNumber) {
+        let canister_id =
+            install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
+        let anchor = flows::register_anchor(env, canister_id);
+        sign_in_at(env, canister_id, anchor, ORIGIN, BROWSER_SEED);
+        (canister_id, anchor)
+    }
+
+    /// The successor the sign-in announced, which is the only slot a browser is recognised by.
+    fn browser(browser_seed: u8) -> Principal {
+        BrowserKey::new(browser_seed).successor().principal()
+    }
+
+    fn prepare(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+        link_principal: Principal,
+    ) -> Result<Result<(), PrepareNotificationAppLinkError>, RejectResponse> {
+        prepare_notification_app_link(
+            env,
+            canister_id,
+            sender,
+            PrepareNotificationAppLinkRequest {
+                anchor_number: anchor,
+                link_principal,
+            },
+        )
+    }
+
+    fn link(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        anchor: AnchorNumber,
+        app_principal: Principal,
+    ) -> Result<Result<LinkNotificationAppResponse, LinkNotificationAppError>, RejectResponse> {
+        link_notification_app(
+            env,
+            canister_id,
+            sender,
+            LinkNotificationAppRequest {
+                anchor_number: anchor,
+                app_principal,
+                app_id: None,
+            },
+        )
+    }
+
+    #[test]
+    fn should_link_an_app_the_browser_handed_a_key_to() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(100);
+        let app = BrowserKey::new(101);
+
+        assert_eq!(
+            prepare(
+                &env,
+                canister_id,
+                browser(BROWSER_SEED),
+                anchor,
+                key.principal()
+            )?,
+            Ok(())
+        );
+        assert_eq!(
+            link(&env, canister_id, key.principal(), anchor, app.principal())?,
+            Ok(LinkNotificationAppResponse { app_id: 0 })
+        );
+        Ok(())
+    }
+
+    /// The key is the whole of the authority, so a caller that is not the one the browser
+    /// registered is refused however well formed its app key is.
+    #[test]
+    fn should_refuse_a_caller_the_browser_did_not_hand_the_key_to() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(100);
+        let app = BrowserKey::new(101);
+
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+
+        assert_eq!(
+            link(
+                &env,
+                canister_id,
+                BrowserKey::new(102).principal(),
+                anchor,
+                app.principal()
+            )?,
+            Err(LinkNotificationAppError::NoPendingLink)
+        );
+        Ok(())
+    }
+
+    /// A browser has one route. Completing an install is the browser saying the Home
+    /// Screen app delivers for it now, so the address it registered for itself goes, and
+    /// what that address had queued goes with it.
+    #[test]
+    fn should_leave_its_own_address_behind_when_it_points_at_an_app() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(BROWSER_SEED);
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            key_holder(&key).principal(),
+            request(anchor, ENDPOINT),
+        )?
+        .expect("subscribe rejected");
+        assert!(get_webpush_subscription_status(
+            &env,
+            canister_id,
+            key_holder(&key).principal(),
+            anchor
+        )?
+        .is_some());
+
+        let link_key = BrowserKey::new(100);
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            link_key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+        link(
+            &env,
+            canister_id,
+            link_key.principal(),
+            anchor,
+            BrowserKey::new(101).principal(),
+        )?
+        .expect("link_notification_app returned Err");
+
+        assert_eq!(
+            get_webpush_subscription_status(
+                &env,
+                canister_id,
+                key_holder(&key).principal(),
+                anchor
+            )?,
+            None
+        );
+        Ok(())
+    }
+
+    /// One shot: the slot is cleared by the app that spends it, so the same URL opened
+    /// again buys nothing. This is what a boundary node replaying the call would get.
+    #[test]
+    fn should_refuse_a_key_that_has_already_been_spent() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(100);
+
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+        link(
+            &env,
+            canister_id,
+            key.principal(),
+            anchor,
+            BrowserKey::new(101).principal(),
+        )?
+        .expect("link_notification_app returned Err");
+
+        assert_eq!(
+            link(
+                &env,
+                canister_id,
+                key.principal(),
+                anchor,
+                BrowserKey::new(103).principal()
+            )?,
+            Err(LinkNotificationAppError::NoPendingLink)
+        );
+        Ok(())
+    }
+
+    /// The anonymous principal is held by everyone, so an install offered to it is one
+    /// anybody could complete: it may not be written to the slot.
+    #[test]
+    fn should_refuse_an_anonymous_link_principal() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+
+        assert_eq!(
+            prepare(
+                &env,
+                canister_id,
+                browser(BROWSER_SEED),
+                anchor,
+                Principal::anonymous()
+            )?,
+            Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous)
+        );
+        // And nothing was written: the app the anonymous caller would have been is refused.
+        assert_eq!(
+            link(
+                &env,
+                canister_id,
+                Principal::anonymous(),
+                anchor,
+                BrowserKey::new(101).principal()
+            )?,
+            Err(LinkNotificationAppError::NoPendingLink)
+        );
+        Ok(())
+    }
+
+    /// The record is keyed by this principal, and the anonymous one is held by everyone,
+    /// so a record keyed by it is one any caller at all would resolve to.
+    #[test]
+    fn should_refuse_an_anonymous_app_principal() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(100);
+
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+        assert_eq!(
+            link(
+                &env,
+                canister_id,
+                key.principal(),
+                anchor,
+                Principal::anonymous()
+            )?,
+            Err(LinkNotificationAppError::AppPrincipalIsAnonymous)
+        );
+
+        // Refused before the slot is read, so the install the browser started is intact.
+        assert_eq!(
+            link(
+                &env,
+                canister_id,
+                key.principal(),
+                anchor,
+                BrowserKey::new(101).principal()
+            )?
+            .is_ok(),
+            true
+        );
+        Ok(())
+    }
+
+    /// An app key is minted in a partition no browser can reach, so a key one of this
+    /// identity's browsers already signs with is not an app: it is refused, and the
+    /// install stays spendable.
+    #[test]
+    fn should_refuse_an_app_key_a_browser_already_signs_with() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(100);
+
+        for held in [
+            BrowserKey::new(BROWSER_SEED).principal(),
+            BrowserKey::new(BROWSER_SEED).successor().principal(),
+        ] {
+            prepare(
+                &env,
+                canister_id,
+                browser(BROWSER_SEED),
+                anchor,
+                key.principal(),
+            )?
+            .expect("prepare_notification_app_link returned Err");
+            assert_eq!(
+                link(&env, canister_id, key.principal(), anchor, held)?,
+                Err(LinkNotificationAppError::PrincipalAlreadyInUse)
+            );
+        }
+
+        // Refused before anything is written, so the install the browser started is intact.
+        assert_eq!(
+            link(
+                &env,
+                canister_id,
+                key.principal(),
+                anchor,
+                BrowserKey::new(101).principal()
+            )?
+            .is_ok(),
+            true
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+
+        assert_eq!(
+            prepare(
+                &env,
+                canister_id,
+                principal_2(),
+                anchor,
+                BrowserKey::new(100).principal()
+            )?,
+            Err(PrepareNotificationAppLinkError::InvalidBrowserKey)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_once_notifications_are_disabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
+
+        assert!(matches!(
+            prepare(
+                &env,
+                canister_id,
+                browser(BROWSER_SEED),
+                anchor,
+                BrowserKey::new(100).principal()
+            )?,
+            Err(PrepareNotificationAppLinkError::InternalCanisterError(_))
+        ));
+        assert!(matches!(
+            link(
+                &env,
+                canister_id,
+                BrowserKey::new(100).principal(),
+                anchor,
+                BrowserKey::new(101).principal()
+            )?,
+            Err(LinkNotificationAppError::InternalCanisterError(_))
+        ));
+        Ok(())
     }
 }

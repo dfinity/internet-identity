@@ -1112,6 +1112,61 @@ pub enum RemoveWebPushSubscriptionError {
     InternalCanisterError(String),
 }
 
+/// Gives a Home Screen app a record of its own, on the authority of a browser that is
+/// signed in. The token is the authorization, not the caller being a browser we know.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareNotificationAppLinkRequest {
+    pub anchor_number: AnchorNumber,
+    /// The principal of the one-shot key this browser is putting in the install URL.
+    pub link_principal: Principal,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareNotificationAppLinkError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// The principal named is not one a key can sign as, so no app could ever present
+    /// it: the install URL's authority is the key behind this principal and nothing else.
+    LinkPrincipalIsAnonymous,
+    InternalCanisterError(String),
+}
+
+/// Numbers a Home Screen app's record. Public, so every call naming one is checked
+/// against the principal the record belongs to.
+pub type NotificationAppId = u64;
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// The principal the app signs as, self-authenticating over the key it generated in
+    /// its own partition.
+    pub app_principal: Principal,
+    /// The record this app already has, where it is linking a second identity to the app
+    /// it is running as. Absent is a first install and takes a record of its own.
+    pub app_id: Option<NotificationAppId>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppResponse {
+    /// Kept by the app, so a later link names the record it already has rather than
+    /// taking a second one and leaving the anchors on the first.
+    pub app_id: NotificationAppId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum LinkNotificationAppError {
+    /// The principal offered is not one a key can sign as, so no app could ever present
+    /// it. Refused before the pending link is read, so the install is unspent and the app
+    /// may call again until that link expires.
+    AppPrincipalIsAnonymous,
+    /// No browser of this identity is waiting for this caller, or the install it started
+    /// has expired.
+    NoPendingLink,
+    /// A browser of this identity already signs as that principal.
+    PrincipalAlreadyInUse,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,

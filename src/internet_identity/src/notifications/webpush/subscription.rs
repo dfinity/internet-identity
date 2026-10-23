@@ -1,9 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::validation::{
-    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
-};
+use super::validation::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
@@ -17,17 +15,12 @@ use internet_identity_interface::internet_identity::types::{
 pub fn set_subscription(
     anchor: Anchor,
     browser_id: BrowserId,
-    request: ValidatedSetWebPushSubscriptionRequest,
+    endpoint: PushEndpoint,
+    vapid_public_key: VapidPublicKey,
+    jwt_signatures: JwtPool,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let ValidatedSetWebPushSubscriptionRequest {
-        anchor_number: _,
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
-        ..
-    } = request;
+    let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
 
     // The same endpoint means this replaces the pool on a registration that is still
     // live, so the registration keeps its age and its queue, and the pool has to move
@@ -35,7 +28,7 @@ pub fn set_subscription(
     // the coverage the browser believes it has. Any other endpoint is a new registration.
     let (created_at_ns, notifications) = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
-            if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
+            if jwt_issued_at_ns <= registered.jwt_signatures.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
             (registered.created_at_ns, registered.notifications.clone())
@@ -51,7 +44,6 @@ pub fn set_subscription(
             created_at_ns,
             vapid_public_key,
             jwt_signatures,
-            jwt_issued_at_ns,
             notifications,
             // A re-subscribe has had no second wake-up of its own yet.
             woken_again_at_ns: None,
@@ -66,11 +58,8 @@ pub fn set_subscription(
 /// Takes the browser rather than reading it off the caller, since silencing one is done
 /// from another.
 pub fn remove_subscription(
-    ValidatedRemoveWebPushSubscriptionRequest {
-        anchor_number,
-        browser_id,
-        ..
-    }: ValidatedRemoveWebPushSubscriptionRequest,
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
     clear_subscription(anchor_number, browser_id)
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
@@ -93,7 +82,7 @@ pub(crate) fn clear_gone_subscription(
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
     if anchor
         .webpush_subscription(browser_id)
-        .is_none_or(|registered| registered.endpoint != endpoint)
+        .is_none_or(|registered| registered.endpoint.as_str() != endpoint)
     {
         return Ok(());
     }
@@ -109,9 +98,9 @@ pub fn subscription_status(
     anchor
         .webpush_subscription(browser_id)
         .map(|registered| WebPushSubscriptionStatus {
-            endpoint: registered.endpoint.clone(),
-            pool_len: registered.jwt_signatures.len() as u32,
-            issued_at_ns: registered.jwt_issued_at_ns,
+            endpoint: registered.endpoint.as_str().to_string(),
+            pool_len: registered.jwt_signatures.signatures().len() as u32,
+            issued_at_ns: registered.jwt_signatures.issued_at_ns(),
         })
 }
 
@@ -129,7 +118,6 @@ mod tests {
     use super::super::fixtures::*;
     use super::*;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
-    use internet_identity_interface::internet_identity::types::RemoveWebPushSubscriptionRequest;
 
     const ENDPOINT: &str = "https://relay.example/a";
     const ROTATED: &str = "https://relay.example/b";
@@ -161,12 +149,7 @@ mod tests {
     }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
-        let request = RemoveWebPushSubscriptionRequest {
-            anchor_number,
-            browser_id,
-        };
-        remove_subscription(request.try_into().expect("the fixture request validates"))
-            .expect("removing a subscription");
+        remove_subscription(anchor_number, browser_id).expect("removing a subscription");
     }
 
     #[test]
@@ -264,7 +247,8 @@ mod tests {
             );
         }
         assert_eq!(
-            stored_subscription(anchor_number, browsers[0]).map(|s| s.jwt_issued_at_ns),
+            stored_subscription(anchor_number, browsers[0])
+                .map(|s| s.jwt_signatures.issued_at_ns()),
             Some(5_000)
         );
     }
@@ -281,7 +265,7 @@ mod tests {
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.created_at_ns, 1_000);
-        assert_eq!(stored.jwt_issued_at_ns, 9_000);
+        assert_eq!(stored.jwt_signatures.issued_at_ns(), 9_000);
     }
 
     /// Another endpoint is another registration, so the pool it arrives with answers to
@@ -296,7 +280,7 @@ mod tests {
             .expect("a rotated endpoint is not a pool replacement");
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
-        assert_eq!(stored.endpoint, ROTATED);
+        assert_eq!(stored.endpoint.as_str(), ROTATED);
         assert_eq!(stored.created_at_ns, 1_000);
     }
 

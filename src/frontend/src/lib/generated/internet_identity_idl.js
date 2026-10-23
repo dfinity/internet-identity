@@ -799,6 +799,21 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const NotificationAppId = IDL.Nat64;
+  const LinkNotificationAppRequest = IDL.Record({
+    'app_principal' : IDL.Principal,
+    'app_id' : IDL.Opt(NotificationAppId),
+    'anchor_number' : UserNumber,
+  });
+  const LinkNotificationAppResponse = IDL.Record({
+    'app_id' : NotificationAppId,
+  });
+  const LinkNotificationAppError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'PrincipalAlreadyInUse' : IDL.Null,
+    'NoPendingLink' : IDL.Null,
+    'AppPrincipalIsAnonymous' : IDL.Null,
+  });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
   const ApplicationInfo = IDL.Record({
     'origin' : FrontendHostname,
@@ -970,6 +985,15 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'trusted_url' : IDL.Text,
     'expiration' : Timestamp,
+  });
+  const PrepareNotificationAppLinkRequest = IDL.Record({
+    'link_principal' : IDL.Principal,
+    'anchor_number' : UserNumber,
+  });
+  const PrepareNotificationAppLinkError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'LinkPrincipalIsAnonymous' : IDL.Null,
   });
   const PrepareNotificationDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
@@ -1513,6 +1537,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'link_notification_app' : IDL.Func(
+        [LinkNotificationAppRequest],
+        [
+          IDL.Variant({
+            'Ok' : LinkNotificationAppResponse,
+            'Err' : LinkNotificationAppError,
+          }),
+        ],
+        [],
+      ),
     'list_applications' : IDL.Func(
         [ListApplicationsRequest],
         [
@@ -1732,6 +1766,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareMcpRegistrationDelegation,
             'Err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'prepare_notification_app_link' : IDL.Func(
+        [PrepareNotificationAppLinkRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : PrepareNotificationAppLinkError,
           }),
         ],
         [],

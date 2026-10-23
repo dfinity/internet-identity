@@ -29,6 +29,30 @@ use std::collections::HashMap;
 
 /// Records that an account was used, the way `prepare_account_delegation` does:
 /// read it, stamp it, write it back. `None` where the identity has no such account.
+/// A registration whose fields pass the shape each newtype asserts, which is the only
+/// kind storage can hand back.
+fn test_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
+    use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
+    use p256::elliptic_curve::sec1::ToEncodedPoint;
+
+    let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
+    crate::storage::anchor::WebPushSubscription {
+        endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
+        created_at_ns: 0,
+        vapid_public_key: VapidPublicKey::try_from(
+            secret
+                .public_key()
+                .to_encoded_point(false)
+                .as_bytes()
+                .to_vec(),
+        )
+        .expect("a SEC1 P-256 point"),
+        jwt_signatures: JwtPool::try_new(vec![vec![3; 64]], 0).expect("a 64-byte signature"),
+        notifications: Vec::new(),
+        woken_again_at_ns: None,
+    }
+}
+
 fn record_use(
     storage: &mut Storage<VectorMemory>,
     anchor_number: AnchorNumber,
@@ -7473,7 +7497,7 @@ mod browser_session_count_tests {
 
 #[test]
 fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
-    use crate::storage::anchor::{QueuedNotification, WebPushSubscription};
+    use crate::storage::anchor::QueuedNotification;
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
@@ -7496,15 +7520,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
             browser_id,
-            Some(WebPushSubscription {
-                endpoint: "https://relay.example/a".to_string(),
-                created_at_ns: 0,
-                vapid_public_key: vec![4; 65],
-                jwt_signatures: vec![vec![3; 64]],
-                jwt_issued_at_ns: 0,
-                notifications: Vec::new(),
-                woken_again_at_ns: None,
-            }),
+            Some(test_subscription("https://relay.example/a")),
         );
     }
     anchor
@@ -7520,4 +7536,101 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
 
     assert_eq!(reloaded.notifications(queued_on), [3, 1, 2].map(queued));
     assert!(reloaded.notifications(left_empty).is_empty());
+}
+
+#[test]
+fn an_app_naming_its_record_keeps_the_one_it_already_had() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((1, 2), memory.clone());
+    let principal = Principal::self_authenticating(vec![7u8; 91]);
+
+    let first = storage
+        .ensure_notification_app(principal, None, 1_000)
+        .expect("creating the record");
+    let again = storage
+        .ensure_notification_app(principal, Some(first.id), 2_000)
+        .expect("reading the record back");
+
+    assert_eq!(first.id, again.id);
+    assert_eq!(again.created_at, 1_000);
+    assert_eq!(again.last_used, 2_000);
+    assert_eq!(
+        storage.notification_app_of(first.id, principal),
+        Some(again)
+    );
+}
+
+#[test]
+fn an_app_naming_a_record_that_is_not_its_own_takes_a_fresh_one() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((1, 2), memory.clone());
+    let mine = Principal::self_authenticating(vec![7u8; 91]);
+    let someone_else = Principal::self_authenticating(vec![8u8; 91]);
+
+    let theirs = storage
+        .ensure_notification_app(someone_else, None, 1_000)
+        .expect("creating the record");
+    let ours = storage
+        .ensure_notification_app(mine, Some(theirs.id), 2_000)
+        .expect("creating a record of our own");
+
+    assert_ne!(ours.id, theirs.id);
+    assert_eq!(
+        storage.notification_app_of(theirs.id, someone_else),
+        Some(theirs)
+    );
+}
+
+#[test]
+fn app_ids_are_never_reissued() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((1, 2), memory.clone());
+
+    let ids: Vec<_> = (1u8..=3)
+        .map(|seed| {
+            storage
+                .ensure_notification_app(
+                    Principal::self_authenticating(vec![seed; 91]),
+                    None,
+                    1_000,
+                )
+                .expect("creating the record")
+                .id
+        })
+        .collect();
+
+    assert_eq!(ids, vec![0, 1, 2]);
+}
+
+#[test]
+fn an_id_that_names_nothing_has_no_app_record() {
+    let memory = VectorMemory::default();
+    let storage = Storage::new((1, 2), memory.clone());
+
+    assert_eq!(
+        storage.notification_app_of(7, Principal::self_authenticating([9u8; 91])),
+        None
+    );
+}
+
+/// The records survive an upgrade, along with the counter that says which ids are spent.
+#[test]
+fn app_records_and_their_counter_survive_an_upgrade() {
+    let memory = VectorMemory::default();
+    let first = Principal::self_authenticating(vec![1u8; 91]);
+    let mut storage = Storage::new((1, 2), memory.clone());
+    let before = storage
+        .ensure_notification_app(first, None, 1_000)
+        .expect("creating the record");
+
+    let mut reloaded = Storage::from_memory(memory);
+
+    assert_eq!(reloaded.notification_app_of(before.id, first), Some(before));
+    assert_eq!(
+        reloaded
+            .ensure_notification_app(Principal::self_authenticating(vec![2u8; 91]), None, 2_000)
+            .expect("creating the second record")
+            .id,
+        1
+    );
 }

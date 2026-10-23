@@ -1865,6 +1865,55 @@ type RemoveWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
+// Registers the one-shot key a browser is about to hand its install, so the app that
+// spends it is the one this browser sent. Authorized by the caller being a browser this
+// identity is signed in from; the principal named here is what authorizes the
+// link_notification_app call that follows.
+type PrepareNotificationAppLinkRequest = record {
+    anchor_number : UserNumber;
+    // The principal of the one-shot key this browser puts in the install URL.
+    link_principal : principal;
+};
+
+type PrepareNotificationAppLinkError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // The anonymous principal is held by everyone, so an install offered to it is one
+    // anybody could complete.
+    LinkPrincipalIsAnonymous;
+    InternalCanisterError : text;
+};
+
+// Numbers a Home Screen app's record. Public, so every call naming one is checked
+// against the principal the record belongs to.
+type NotificationAppId = nat64;
+
+type LinkNotificationAppRequest = record {
+    anchor_number : UserNumber;
+    // The principal the app signs as, over the key it generated in its own partition.
+    app_principal : principal;
+    // The record this app already has, where it is linking a second identity to the app
+    // it is running as. Null is a first install and takes a record of its own.
+    app_id : opt NotificationAppId;
+};
+
+type LinkNotificationAppResponse = record {
+    // Kept by the app, so a later link names the record it already has.
+    app_id : NotificationAppId;
+};
+
+type LinkNotificationAppError = variant {
+    // The record is keyed by this principal, and the anonymous one is held by everyone,
+    // so any caller at all would resolve to that record.
+    AppPrincipalIsAnonymous;
+    // No browser of this identity is waiting for this caller, or the install it started
+    // has expired.
+    NoPendingLink;
+    // A browser of this identity already signs as that principal.
+    PrincipalAlreadyInUse;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2515,6 +2564,13 @@ service : (opt InternetIdentityInit) -> {
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
+
+    // Called by the browser starting an install, naming the one-shot key it puts in the
+    // install URL as the only caller that may complete the link.
+    prepare_notification_app_link : (PrepareNotificationAppLinkRequest) -> (variant { Ok; Err : PrepareNotificationAppLinkError });
+    // Called by the Home Screen app on its first open, signed with that one-shot key.
+    // Creates the app's record where its key has none, and points the browser at it.
+    link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok : LinkNotificationAppResponse; Err : LinkNotificationAppError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.
