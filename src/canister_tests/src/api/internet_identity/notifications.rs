@@ -10,12 +10,13 @@ use internet_identity_interface::internet_identity::types::{
     GetWebPushSubscriptionStatusRequest, LinkNotificationAppError, LinkNotificationAppRequest,
     LinkNotificationAppResponse, NotificationAppAnchorsRequest, NotificationAppStatus,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationGrantConsentRequest, NotificationId, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
     PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
-    PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
-    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
-    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    PrepareNotificationDelegationResponse, ProbeNotificationAppError, ProbeNotificationAppRequest,
+    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
+    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -289,12 +290,29 @@ pub fn get_notification_app_status(
     .map(|(x,)| x)
 }
 
+pub fn probe_notification_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: ProbeNotificationAppRequest,
+) -> Result<Result<NotificationId, ProbeNotificationAppError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "probe_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn enable_notification_app(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     request: EnableNotificationAppRequest,
-) -> Result<Result<(), EnableNotificationAppError>, RejectResponse> {
+) -> Result<Result<NotificationId, EnableNotificationAppError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,

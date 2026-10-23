@@ -1342,6 +1342,7 @@ mod browser_tests {
             last_used,
             anchors: std::collections::BTreeSet::new(),
             webpush_subscription: None,
+            pending_probe: None,
         }
     }
 
@@ -1546,7 +1547,8 @@ mod browser_tests {
         );
     }
 
-    /// Nobody to carry an answer from, so the app starts delivering.
+    /// Nobody to carry an answer from, and every caller that points an entry at an app
+    /// is the user asking for that app, so it starts delivering.
     #[test]
     fn pointing_at_an_app_this_identity_has_never_had_starts_it_on() {
         let (mut anchor, id) = anchor_with_browser();
@@ -1583,6 +1585,7 @@ mod browser_tests {
                 .and_then(|app| app.linked_app()),
             Some(7)
         );
+        assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(second));
     }
 
     #[test]
@@ -1609,105 +1612,17 @@ mod browser_tests {
             .notifications_for_browser_mut(first)
             .expect("a listed browser")
             .push(QueuedNotification {
-                application_number: 1,
+                application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
                 account_number: None,
+                event: None,
             });
 
         anchor.point_at_notification_app(second, 7);
 
         assert!(anchor.notifications_for_browser(first).is_empty());
-    }
-
-    /// A browser has one route: pointing at a record takes the address it registered for
-    /// itself, and what that address was sent goes with it.
-    #[test]
-    fn pointing_at_an_app_takes_the_browsers_own_address_and_what_it_was_sent() {
-        let (mut anchor, id) = anchor_with_browser();
-        anchor.set_webpush_subscription(
-            id,
-            Some(subscription_at("https://push.example/one", 1_000, 1_000)),
-        );
-        anchor
-            .notifications_for_browser_mut(id)
-            .expect("a listed browser")
-            .push(QueuedNotification {
-                application_number: 1,
-                sender: Principal::from_slice(&[7; 10]),
-                notification_id: 1,
-                expires_at_ns: u64::MAX,
-                account_number: None,
-            });
-
-        anchor.point_at_notification_app(id, 7);
-
-        assert!(anchor.webpush_subscription(id).is_none());
-        assert!(anchor.notifications_for_browser(id).is_empty());
-    }
-
-    /// The other half of one route per browser: registering an address of its own is how
-    /// a browser leaves the record it points at. An install still running is not a route,
-    /// so it is left where it is.
-    #[test]
-    fn registering_an_address_of_its_own_leaves_the_record_it_points_at() {
-        let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
-
-        assert_eq!(anchor.leave_notification_app(id), Some(7));
-        assert!(anchor.notification_app(id).is_none());
-
-        anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
-
-        assert_eq!(anchor.leave_notification_app(id), None);
-        assert!(anchor.notification_app(id).is_some());
-    }
-
-    /// Switching delivery off empties the queue: nothing drains it while it is off and
-    /// nothing joins it, so what is left would only be shown in place of whatever causes
-    /// the first wake-up after switching back on.
-    #[test]
-    fn switching_delivery_off_clears_what_was_queued() {
-        let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
-        anchor
-            .notifications_for_browser_mut(id)
-            .expect("a listed browser")
-            .push(QueuedNotification {
-                application_number: 1,
-                sender: Principal::from_slice(&[7; 10]),
-                notification_id: 1,
-                expires_at_ns: u64::MAX,
-                account_number: None,
-            });
-
-        anchor.disable_notification_app(id);
-
-        assert!(anchor.notifications_for_browser(id).is_empty());
-    }
-
-    /// An install that has not completed is a route of its own: what was posted while
-    /// the entry pointed at the app before it is unreadable by the app that finishes.
-    #[test]
-    fn finishing_an_install_over_an_old_app_drops_what_that_app_was_sent() {
-        let (mut anchor, id) = anchor_with_browser();
-        anchor.point_at_notification_app(id, 7);
-        anchor
-            .notifications_for_browser_mut(id)
-            .expect("a listed browser")
-            .push(QueuedNotification {
-                application_number: 1,
-                sender: Principal::from_slice(&[7; 10]),
-                notification_id: 1,
-                expires_at_ns: u64::MAX,
-                account_number: None,
-            });
-        anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
-
-        anchor.point_at_notification_app(id, 8);
-
-        assert!(anchor.notifications_for_browser(id).is_empty());
     }
 
     #[test]
@@ -1726,11 +1641,12 @@ mod browser_tests {
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(QueuedNotification {
-                application_number: 1,
+                application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
                 account_number: None,
+                event: None,
             });
 
         anchor.point_at_notification_app(id, 7);
@@ -1755,6 +1671,7 @@ mod browser_tests {
                 subscribed: false,
                 enabled: true,
                 last_seen_ns: 2_000,
+                pending_probe: None,
             })
         );
         assert_eq!(
@@ -1778,17 +1695,18 @@ mod browser_tests {
 
         assert_eq!(
             anchor
-                .browsers_info(|app_id| Some(record(app_id, 2_000)))
+                .browsers_info(0, |app_id| Some(record(app_id, 2_000)))
                 .expect("one browser")[0]
                 .notification_app,
             Some(NotificationAppInfo {
                 subscribed: false,
                 enabled: true,
                 last_seen_ns: 2_000,
+                pending_probe: None,
             })
         );
         assert_eq!(
-            anchor.browsers_info(|_| None).expect("one browser")[0].notification_app,
+            anchor.browsers_info(0, |_| None).expect("one browser")[0].notification_app,
             None
         );
     }
@@ -2424,21 +2342,96 @@ mod browser_tests {
         assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(1));
     }
 
-    /// Every caller that points an entry at an app is the user asking for that app, so a
-    /// first link has nothing to carry an answer from and starts delivering.
+    /// A browser has one route: pointing at a record takes the address it registered for
+    /// itself, and what that address was sent goes with it.
     #[test]
-    fn pointing_at_an_app_this_identity_has_never_had_starts_it_delivering() {
+    fn pointing_at_an_app_takes_the_browsers_own_address_and_what_it_was_sent() {
         let (mut anchor, id) = anchor_with_browser();
+        anchor.set_webpush_subscription(
+            id,
+            Some(subscription_at("https://push.example/one", 1_000, 1_000)),
+        );
+        anchor
+            .notifications_for_browser_mut(id)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
 
         anchor.point_at_notification_app(id, 7);
 
-        assert_eq!(
-            anchor.notification_app(id),
-            Some(NotificationAppRef::Linked {
-                app_id: 7,
-                enabled: true
-            })
-        );
+        assert!(anchor.webpush_subscription(id).is_none());
+        assert!(anchor.notifications_for_browser(id).is_empty());
+    }
+
+    /// The other half of one route per browser: registering an address of its own is how
+    /// a browser leaves the record it points at. An install still running is not a route,
+    /// so it is left where it is.
+    #[test]
+    fn registering_an_address_of_its_own_leaves_the_record_it_points_at() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(anchor.leave_notification_app(id), Some(7));
+        assert!(anchor.notification_app(id).is_none());
+
+        anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
+
+        assert_eq!(anchor.leave_notification_app(id), None);
+        assert!(anchor.notification_app(id).is_some());
+    }
+
+    /// Switching delivery off empties the queue: nothing drains it while it is off and
+    /// nothing joins it, so what is left would only be shown in place of whatever causes
+    /// the first wake-up after switching back on.
+    #[test]
+    fn switching_delivery_off_clears_what_was_queued() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_for_browser_mut(id)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
+
+        anchor.disable_notification_app(id);
+
+        assert!(anchor.notifications_for_browser(id).is_empty());
+    }
+
+    /// An install that has not completed is a route of its own: what was posted while
+    /// the entry pointed at the app before it is unreadable by the app that finishes.
+    #[test]
+    fn finishing_an_install_over_an_old_app_drops_what_that_app_was_sent() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_for_browser_mut(id)
+            .expect("a listed browser")
+            .push(QueuedNotification {
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
+        anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
+
+        anchor.point_at_notification_app(id, 8);
+
+        assert!(anchor.notifications_for_browser(id).is_empty());
     }
 
     #[test]

@@ -104,7 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
-use crate::notifications::app::{NotificationApp, NotificationAppId};
+use crate::notifications::app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -222,6 +222,7 @@ const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
+const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 39u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -320,6 +321,10 @@ const NOTIFICATION_APP_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATION_APP_MEMO
 /// Monotonic [`NotificationAppId`] allocator: an id is retired with its record, never reissued.
 const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
     MemoryId::new(NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX);
+
+/// Monotonic allocator for Internet Identity's own notification ids.
+const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID: MemoryId =
+    MemoryId::new(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -464,6 +469,9 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the notification app id allocator.
     next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the identity notification id allocator.
+    next_identity_notification_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    next_identity_notification_id_memory: StableCell<NotificationId, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -611,6 +619,8 @@ impl<M: Memory + Clone> Storage<M> {
         let notification_app_memory = memory_manager.get(NOTIFICATION_APP_MEMORY_ID);
         let next_notification_app_id_memory =
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
+        let next_identity_notification_id_memory =
+            memory_manager.get(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -710,6 +720,14 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             next_notification_app_id_memory: StableCell::init(next_notification_app_id_memory, 0)
                 .expect("next_notification_app_id_memory"),
+            next_identity_notification_id_memory_wrapper: MemoryWrapper::new(
+                next_identity_notification_id_memory.clone(),
+            ),
+            next_identity_notification_id_memory: StableCell::init(
+                next_identity_notification_id_memory,
+                0,
+            )
+            .expect("next_identity_notification_id_memory"),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -1580,6 +1598,10 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             };
+            // Every entry pointing at the record, not only those it delivered for:
+            // Internet Identity's own go to the app's address whatever the entry
+            // registered for itself, so they die with that address even where the rest
+            // of the queue does not.
             let pointing: Vec<BrowserId> = anchor
                 .browsers()
                 .iter()
@@ -1588,10 +1610,7 @@ impl<M: Memory + Clone> Storage<M> {
                 .collect();
             let mut cleared = false;
             for browser_id in pointing {
-                if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
-                    cleared |= !queue.is_empty();
-                    queue.clear();
-                }
+                cleared |= anchor.drop_what_the_app_was_sent(browser_id);
             }
             if !cleared {
                 continue;
@@ -1618,6 +1637,40 @@ impl<M: Memory + Clone> Storage<M> {
         app.last_used = now;
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app));
+    }
+
+    /// Counted rather than taken from the clock: block time is the same for every message
+    /// in a round, and an acknowledgement matches by id. Saturates at the ceiling.
+    pub fn allocate_identity_notification_id(&mut self) -> NotificationId {
+        let id = *self.next_identity_notification_id_memory.get();
+        let _ = self
+            .next_identity_notification_id_memory
+            .set(id.saturating_add(1));
+        id
+    }
+
+    /// Records that an entry has just asked `app_id` to prove it is still installed.
+    ///
+    /// Kept on the record rather than on the entry that asked, because the answer lands
+    /// here: an app answers by calling, which moves `last_used`. One ask at a time serves
+    /// every identity pointing at it, which is also what stops a device with many
+    /// identities buying one outcall per entry.
+    pub fn set_notification_app_probe(
+        &mut self,
+        app_id: NotificationAppId,
+        notification_id: NotificationId,
+        now: Timestamp,
+    ) {
+        // The ask is kept so an answer can be recognised.
+        let Some(mut app) = self.notification_app(app_id) else {
+            return;
+        };
+        app.pending_probe = Some(PendingProbe {
+            notification_id,
+            asked_at_ns: now,
+        });
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
     }
 
     /// The record `app_id` names, if it is still there.
@@ -3173,7 +3226,11 @@ impl<M: Memory + Clone> Storage<M> {
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
-                queue.retain(|queued| !forgotten.contains(&queued.application_number));
+                queue.retain(|queued| {
+                    queued
+                        .application_number
+                        .is_none_or(|number| !forgotten.contains(&number))
+                });
             }
         }
 
@@ -3513,6 +3570,8 @@ impl<M: Memory + Clone> Storage<M> {
             anchors: BTreeSet::new(),
             // Registered by the app once it has permission.
             webpush_subscription: None,
+            // Written the first time an entry asks it to prove it is still installed.
+            pending_probe: None,
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
@@ -4568,6 +4627,10 @@ impl<M: Memory + Clone> Storage<M> {
                 self.next_notification_app_id_memory_wrapper.size(),
             ),
             (
+                "next_identity_notification_id".to_string(),
+                self.next_identity_notification_id_memory_wrapper.size(),
+            ),
+            (
                 "lookup_session_with_principal".to_string(),
                 self.lookup_session_with_principal_memory_wrapper.size(),
             ),
@@ -4639,14 +4702,14 @@ pub struct CreateSessionParams {
 }
 
 #[cfg(not(test))]
-fn canister_id() -> Principal {
+pub(crate) fn canister_id() -> Principal {
     ic_cdk::id()
 }
 
 /// `ic_cdk::id()` traps outside a canister, so the unit tests derive principals against
 /// a fixed canister id.
 #[cfg(test)]
-fn canister_id() -> Principal {
+pub(crate) fn canister_id() -> Principal {
     Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 7, 1, 1])
 }
 /// Which of the counters derived from a reference list a delta is applied to.

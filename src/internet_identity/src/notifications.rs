@@ -10,6 +10,7 @@ pub(crate) mod backlog;
 pub(crate) mod browser_queue;
 pub mod delegation;
 pub(crate) mod dispatch;
+pub(crate) mod identity_backlog;
 pub mod senders;
 pub mod submission;
 pub(crate) mod validation;

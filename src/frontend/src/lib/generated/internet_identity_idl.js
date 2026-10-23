@@ -306,11 +306,19 @@ export const idlFactory = ({ IDL }) => {
   const GetNextNotificationRequest = IDL.Record({
     'anchor_number' : UserNumber,
   });
+  const IdentityForNotification = IDL.Record({
+    'name' : IDL.Opt(IDL.Text),
+    'anchor_number' : UserNumber,
+  });
+  const NotificationEvent = IDL.Variant({
+    'NotificationsOn' : IdentityForNotification,
+  });
   const AccountNumber = IDL.Nat64;
   const NotificationToShow = IDL.Record({
     'id' : NotificationId,
     'origin' : FrontendHostname,
     'canister_id' : IDL.Principal,
+    'event' : IDL.Opt(NotificationEvent),
     'account_number' : IDL.Opt(AccountNumber),
   });
   const GetNextNotificationResponse = IDL.Record({
@@ -490,6 +498,7 @@ export const idlFactory = ({ IDL }) => {
     'NoNotificationApp' : IDL.Null,
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'NotReachable' : IDL.Null,
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
@@ -660,6 +669,7 @@ export const idlFactory = ({ IDL }) => {
   const NotificationAppInfo = IDL.Record({
     'last_seen_ns' : IDL.Nat64,
     'enabled' : IDL.Bool,
+    'pending_probe' : IDL.Opt(NotificationId),
     'subscribed' : IDL.Bool,
   });
   const NotificationAppStatus = IDL.Variant({
@@ -1059,6 +1069,15 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'expiration' : Timestamp,
   });
+  const ProbeNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const ProbeNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NotReachable' : IDL.Null,
+  });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
@@ -1430,7 +1449,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'enable_notification_app' : IDL.Func(
         [EnableNotificationAppRequest],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EnableNotificationAppError })],
+        [
+          IDL.Variant({
+            'Ok' : NotificationId,
+            'Err' : EnableNotificationAppError,
+          }),
+        ],
         [],
       ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -1870,6 +1894,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareSessionDelegation,
             'Err' : SessionDelegationError,
+          }),
+        ],
+        [],
+      ),
+    'probe_notification_app' : IDL.Func(
+        [ProbeNotificationAppRequest],
+        [
+          IDL.Variant({
+            'Ok' : NotificationId,
+            'Err' : ProbeNotificationAppError,
           }),
         ],
         [],
