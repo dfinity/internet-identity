@@ -53,6 +53,20 @@ export const prepareInstallUrl = async ({
 /** The placeholder the new tab holds while the URL is still being minted: this page, told to wait rather than to decide. */
 export const INSTALL_PLACEHOLDER_URL = `${NOTIFICATION_APP_PATH}?installing`;
 
+/** `undefined` where this browser has nothing to send the user to; the reason is logged rather than raised.
+ *  A record that still answers refuses an install, which is what keeps a second app off a device that already has one.
+ *  That refusal is not worked around here: the caller that means to replace an app probes it first, and the screen says so where it is still there. */
+export const installUrlOrNone = async (
+  identityNumber: bigint,
+): Promise<string | undefined> => {
+  try {
+    return await prepareInstallUrl({ identityNumber });
+  } catch (error) {
+    console.error(error);
+    return undefined;
+  }
+};
+
 /** Must be called straight from the click, which is the only time a browser allows it; the tab is opened on the placeholder and pointed once the URL resolves.
  *  A blocked tab is not an error: the screen shows the link instead. */
 export const openInstallTab = (

@@ -45,3 +45,11 @@ export const writeMcpConfig = async (
     throw new Error(result.Err);
   }
 };
+
+/** `"unread"` while the lookup is still running, `undefined` where it answered that no sign-in has registered this browser. */
+export type BrowserIdRead = number | "unread" | undefined;
+
+/** `undefined` where there is no browser to act on yet: one with no registration has no key to sign the install link with and no entry to attach a subscription to, and settings cannot mint one.
+ * The read that has not landed yet is not an absence, or the section would flash away as the lookup answers. */
+export const knownBrowserId = (read: BrowserIdRead): number | undefined =>
+  typeof read === "number" ? read : undefined;

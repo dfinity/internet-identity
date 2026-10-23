@@ -7,15 +7,40 @@ vi.mock("./subscribeDevice", () => ({
 vi.mock("./pushSubscription", () => ({
   requestNotificationPermission: vi.fn(() => Promise.resolve("granted")),
 }));
+vi.mock("./notificationState", () => ({
+  notificationsNeedInstallHere: vi.fn(() => false),
+}));
+vi.mock("./deviceApp", () => ({ claimDeviceApp: vi.fn() }));
+vi.mock("$lib/utils/notifications/appStatus", () => ({
+  browserAppStatus: vi.fn(),
+}));
+vi.mock("./browserActor", () => ({ browserKeyActor: vi.fn() }));
+vi.mock("./turnedOff", () => ({ clearNotificationsOff: vi.fn() }));
+vi.mock("./turnOnAndProve", () => ({ turnOnAndProve: vi.fn() }));
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type {
+  NotificationAppInfo,
+  _SERVICE,
+} from "$lib/generated/internet_identity_types";
 import { disallowApp, turnOnNotifications } from "./enableNotifications";
 import type { AppDeviceState, BrowserDeviceState } from "./notificationState";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { requestNotificationPermission } from "./pushSubscription";
+import {
+  browserAppStatus,
+  type BrowserAppStatus,
+} from "$lib/utils/notifications/appStatus";
+import { claimDeviceApp } from "./deviceApp";
+import { turnOnAndProve } from "./turnOnAndProve";
+import { browserKeyActor } from "./browserActor";
+import { clearNotificationsOff } from "./turnedOff";
 
 const register = vi.mocked(ensureRegisteredDevice);
 const permission = vi.mocked(requestNotificationPermission);
+const appStatus = vi.mocked(browserAppStatus);
+const claim = vi.mocked(claimDeviceApp);
+const browserActor = vi.mocked(browserKeyActor);
+const prove = vi.mocked(turnOnAndProve);
 const ORIGIN = "https://app.example";
 const IDENTITY = BigInt(10_000);
 
@@ -101,6 +126,8 @@ describe("turnOnNotifications", () => {
     expect(register.mock.invocationCallOrder[0]).toBeLessThan(
       grant.mock.invocationCallOrder[0],
     );
+    // Asking for them here takes back whatever the switch in settings said.
+    expect(clearNotificationsOff).toHaveBeenCalledWith(IDENTITY);
     expect(grant).toHaveBeenCalledWith({
       anchor_number: IDENTITY,
       origin: ORIGIN,
@@ -200,24 +227,6 @@ describe("turnOnNotifications", () => {
     expect(grant).not.toHaveBeenCalled();
   });
 
-  it("asks this browser for nothing where the app delivers", async () => {
-    const { actor, grant } = actorAnswering(ok);
-
-    await expect(
-      turnOnNotifications({
-        identityNumber: IDENTITY,
-        origin: ORIGIN,
-        actor,
-        device: appState({ subscribed: false, enabled: false }),
-        consented: false,
-      }),
-    ).resolves.toEqual({ status: "enabled" });
-
-    expect(permission).not.toHaveBeenCalled();
-    expect(register).not.toHaveBeenCalled();
-    expect(grant).toHaveBeenCalledTimes(1);
-  });
-
   it("reports a refused grant rather than swallowing it", async () => {
     const { actor } = actorAnswering({
       Err: { Disabled: null },
@@ -236,5 +245,189 @@ describe("turnOnNotifications", () => {
         consented: false,
       }),
     ).rejects.toThrow();
+  });
+});
+
+/** An app this device has, as the canister reports it to this browser. */
+const appInfo = (
+  enabled: boolean,
+  over: { subscribed?: boolean } = {},
+): BrowserAppStatus => ({
+  kind: "app",
+  app: {
+    subscribed: true,
+    enabled,
+    ...over,
+  } as unknown as NotificationAppInfo,
+});
+
+describe("turnOnNotifications where a Home Screen app delivers", () => {
+  const setEnabled = vi.fn(() => Promise.resolve(ok));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset, not clear: a queued one-shot answer outlives a clear and would answer the next case here.
+    appStatus.mockReset();
+    setEnabled.mockResolvedValue(ok);
+    browserActor.mockResolvedValue({
+      set_notification_app_enabled: setEnabled,
+    } as unknown as ActorSubclass<_SERVICE>);
+  });
+
+  /// `subscribed` outlives the app it names, so the switch going on is also the app
+  /// being asked to show it is still there, in the one call that does both.
+  it("turns this identity's flag back on by proving the app answers", async () => {
+    appStatus.mockResolvedValue(appInfo(false));
+    prove.mockResolvedValue(true);
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "enabled" });
+
+    expect(prove).toHaveBeenCalledWith(IDENTITY);
+    expect(grant).toHaveBeenCalledTimes(1);
+    expect(permission).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
+  });
+
+  it("asks for the install where the app no longer answers", async () => {
+    appStatus.mockResolvedValue(appInfo(false));
+    prove.mockResolvedValue(false);
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "install-required" });
+
+    expect(grant).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing where the app already delivers for this identity", async () => {
+    appStatus.mockResolvedValue(appInfo(true));
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: true,
+      }),
+    ).resolves.toEqual({ status: "enabled" });
+
+    expect(setEnabled).not.toHaveBeenCalled();
+    expect(grant).not.toHaveBeenCalled();
+  });
+
+  /// Nothing is written on the way to the install: the link the install finishes with
+  /// starts the entry delivering, so the answer given here is carried by the link rather
+  /// than by a flag written ahead of it.
+  it("writes nothing on the way to the install", async () => {
+    appStatus.mockResolvedValue(appInfo(false, { subscribed: false }));
+    const { actor } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "install-required" });
+
+    expect(setEnabled).not.toHaveBeenCalled();
+  });
+
+  it("asks for the install where no app can be claimed", async () => {
+    appStatus.mockResolvedValue({ kind: "no-app" });
+    claim.mockResolvedValue("no-donor");
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "install-required" });
+
+    expect(grant).not.toHaveBeenCalled();
+    expect(permission).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
+  });
+
+  it("reads the canister again after a claim that answered nothing", async () => {
+    appStatus
+      .mockResolvedValueOnce({ kind: "no-app" })
+      .mockResolvedValueOnce(appInfo(true));
+    claim.mockResolvedValue("no-donor");
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "enabled" });
+
+    expect(appStatus).toHaveBeenCalledTimes(2);
+    expect(grant).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a re-read it could not make as neither yes nor no", async () => {
+    appStatus
+      .mockResolvedValueOnce({ kind: "no-app" })
+      .mockResolvedValueOnce({ kind: "unanswered", reason: "offline" });
+    claim.mockResolvedValue("no-donor");
+    const { actor } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "unanswered", reason: "offline" });
+  });
+
+  it("reports an app it could not read as neither yes nor no", async () => {
+    appStatus.mockResolvedValue({ kind: "unanswered", reason: "offline" });
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState(),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "unanswered", reason: "offline" });
+
+    expect(claim).not.toHaveBeenCalled();
+    expect(setEnabled).not.toHaveBeenCalled();
+    expect(grant).not.toHaveBeenCalled();
   });
 });
