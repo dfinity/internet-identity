@@ -1069,14 +1069,7 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::AnchorNotFound { anchor_number });
         };
 
-        // A row that no longer holds the shape its fields assert is a row this canister
-        // cannot act on, the same as CBOR that will not decode.
-        Anchor::try_from((anchor_number, storable_anchor)).map_err(|reason| {
-            StorageError::MalformedAnchor {
-                anchor_number,
-                reason,
-            }
-        })
+        Ok(Anchor::from((anchor_number, storable_anchor)))
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
@@ -4862,11 +4855,6 @@ pub enum StorageError {
         range: (AnchorNumber, AnchorNumber),
     },
     BadAnchorNumber(u64),
-    /// A row decoded, but a value in it no longer holds the shape its type asserts.
-    MalformedAnchor {
-        anchor_number: AnchorNumber,
-        reason: String,
-    },
     DeserializationError(candid::error::Error),
     SerializationError(candid::error::Error),
     EntrySizeLimitExceeded {
@@ -4952,13 +4940,6 @@ impl fmt::Display for StorageError {
                 range.0, range.1
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
-            Self::MalformedAnchor {
-                anchor_number,
-                reason,
-            } => write!(
-                f,
-                "Identity Anchor {anchor_number} holds a value it cannot be read as: {reason}"
-            ),
             Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
             Self::ApplicationConfigNotFound { anchor_number } => write!(
                 f,
