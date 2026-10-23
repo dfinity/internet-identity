@@ -262,15 +262,15 @@ const appInfo = (
 });
 
 describe("turnOnNotifications where a Home Screen app delivers", () => {
-  const setEnabled = vi.fn(() => Promise.resolve(ok));
+  const switchOn = vi.fn(() => Promise.resolve(ok));
 
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset, not clear: a queued one-shot answer outlives a clear and would answer the next case here.
     appStatus.mockReset();
-    setEnabled.mockResolvedValue(ok);
+    switchOn.mockResolvedValue(ok);
     browserActor.mockResolvedValue({
-      set_notification_app_enabled: setEnabled,
+      enable_notification_app: switchOn,
     } as unknown as ActorSubclass<_SERVICE>);
   });
 
@@ -329,7 +329,7 @@ describe("turnOnNotifications where a Home Screen app delivers", () => {
       }),
     ).resolves.toEqual({ status: "enabled" });
 
-    expect(setEnabled).not.toHaveBeenCalled();
+    expect(switchOn).not.toHaveBeenCalled();
     expect(grant).not.toHaveBeenCalled();
   });
 
@@ -350,7 +350,7 @@ describe("turnOnNotifications where a Home Screen app delivers", () => {
       }),
     ).resolves.toEqual({ status: "install-required" });
 
-    expect(setEnabled).not.toHaveBeenCalled();
+    expect(switchOn).not.toHaveBeenCalled();
   });
 
   it("asks for the install where no app can be claimed", async () => {
@@ -427,7 +427,7 @@ describe("turnOnNotifications where a Home Screen app delivers", () => {
     ).resolves.toEqual({ status: "unanswered", reason: "offline" });
 
     expect(claim).not.toHaveBeenCalled();
-    expect(setEnabled).not.toHaveBeenCalled();
+    expect(switchOn).not.toHaveBeenCalled();
     expect(grant).not.toHaveBeenCalled();
   });
 });
