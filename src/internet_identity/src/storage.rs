@@ -1069,9 +1069,7 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::AnchorNotFound { anchor_number });
         };
 
-        // A row that no longer holds the shape its fields assert is a row this canister
-        // cannot act on, the same as CBOR that will not decode.
-        Anchor::try_from((anchor_number, storable_anchor)).map_err(StorageError::MalformedValue)
+        Ok(Anchor::from((anchor_number, storable_anchor)))
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
@@ -1553,9 +1551,8 @@ impl<M: Memory + Clone> Storage<M> {
             .notification_app_memory
             .get(&app_id)
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
-        // The record is read back only to keep its own fields; a row that will not read
-        // is one this write cannot be applied to.
-        let mut app = NotificationApp::try_from(stored).map_err(StorageError::MalformedValue)?;
+        // The record is read back only to keep its own fields.
+        let mut app = NotificationApp::from(stored);
         app.webpush_subscription = subscription;
         app.last_used = now;
         self.notification_app_memory
@@ -1564,19 +1561,10 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// The record `app_id` names, if it is still there.
-    /// `Ok(None)` where no record carries this id, and an `Err` where one does but holds
-    /// a value it cannot be read as. Those are different answers and the caller is the
-    /// one that can tell which of them it can live with.
-    pub fn notification_app(
-        &self,
-        app_id: NotificationAppId,
-    ) -> Result<Option<NotificationApp>, StorageError> {
-        let Some(stored) = self.notification_app_memory.get(&app_id) else {
-            return Ok(None);
-        };
-        NotificationApp::try_from(stored)
-            .map(Some)
-            .map_err(StorageError::MalformedValue)
+    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
+        self.notification_app_memory
+            .get(&app_id)
+            .map(NotificationApp::from)
     }
 
     /// The anchors pointing at `app_id`, in ascending order and stable across calls.
@@ -3392,10 +3380,9 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         app_id: NotificationAppId,
         app_principal: Principal,
-    ) -> Result<Option<NotificationApp>, StorageError> {
-        Ok(self
-            .notification_app(app_id)?
-            .filter(|app| app.principal == app_principal))
+    ) -> Option<NotificationApp> {
+        self.notification_app(app_id)
+            .filter(|app| app.principal == app_principal)
     }
 
     /// The record `app_principal` links with: the one `known` names where the app still
@@ -3411,13 +3398,8 @@ impl<M: Memory + Clone> Storage<M> {
         known: Option<NotificationAppId>,
         now: Timestamp,
     ) -> Result<NotificationApp, StorageError> {
-        // A record the app names but that will not read back is not one it can be handed
-        // again, so the write is refused rather than quietly linking it as a new app.
-        let known = match known {
-            Some(app_id) => self.notification_app_of(app_id, app_principal)?,
-            None => None,
-        };
-        if let Some(app) = known {
+        if let Some(app) = known.and_then(|app_id| self.notification_app_of(app_id, app_principal))
+        {
             let app = NotificationApp {
                 last_used: now,
                 ..app
@@ -4902,10 +4884,6 @@ pub enum StorageError {
         range: (AnchorNumber, AnchorNumber),
     },
     BadAnchorNumber(u64),
-    /// A row decoded, but a value in it no longer holds the shape its type asserts.
-    /// Beside `DeserializationError` and carrying what failed, not which row: the caller
-    /// knows what it was reading.
-    MalformedValue(String),
     DeserializationError(candid::error::Error),
     SerializationError(candid::error::Error),
     EntrySizeLimitExceeded {
@@ -4996,9 +4974,6 @@ impl fmt::Display for StorageError {
                 range.0, range.1
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
-            Self::MalformedValue(reason) => {
-                write!(f, "a stored value cannot be read as its type: {reason}")
-            }
             Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
             Self::ApplicationConfigNotFound { anchor_number } => write!(
                 f,

@@ -219,14 +219,9 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
     }
 }
 
-impl TryFrom<StorableBrowser> for Browser {
-    type Error = String;
-
-    /// Fallible for one reason: the registration this entry may carry asserts the shape
-    /// of its own fields, and a row that no longer holds that shape is one this canister
-    /// cannot act on.
-    fn try_from(value: StorableBrowser) -> Result<Self, Self::Error> {
-        Ok(Browser {
+impl From<StorableBrowser> for Browser {
+    fn from(value: StorableBrowser) -> Self {
+        Browser {
             id: value.id,
             current_browser_key: ByteBuf::from(value.current_browser_key),
             next_browser_key: ByteBuf::from(value.next_browser_key),
@@ -234,12 +229,22 @@ impl TryFrom<StorableBrowser> for Browser {
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
-            webpush_subscription: value
-                .webpush_subscription
-                .map(WebPushSubscription::try_from)
-                .transpose()?,
+            // A registration that will not read back reads as none, which is a state this
+            // entry can already be in and the one thing it recovers from by itself: the
+            // browser subscribes again and writes a row that does read. Refusing the
+            // whole anchor instead would take an identity down over a push address.
+            webpush_subscription: value.webpush_subscription.and_then(|stored| {
+                WebPushSubscription::try_from(stored)
+                    .inspect_err(|reason| {
+                        ic_cdk::println!(
+                            "ERROR: dropped the registration of browser {} as unreadable: {reason}",
+                            value.id
+                        );
+                    })
+                    .ok()
+            }),
             notification_app: value.notification_app.map(NotificationAppRef::from),
-        })
+        }
     }
 }
 
@@ -664,16 +669,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
     }
 }
 
-impl TryFrom<(AnchorNumber, StorableAnchor)> for Anchor {
-    type Error = String;
-
-    /// Fallible because a browser entry's registration asserts the shape of its fields.
-    /// A row that no longer holds it fails the read, the way CBOR that will not decode
-    /// does: in both cases storage handed back something that is not a value of this
-    /// type.
-    fn try_from(
-        (anchor_number, storable_anchor): (AnchorNumber, StorableAnchor),
-    ) -> Result<Self, Self::Error> {
+impl From<(AnchorNumber, StorableAnchor)> for Anchor {
+    fn from((anchor_number, storable_anchor): (AnchorNumber, StorableAnchor)) -> Self {
         let StorableAnchor {
             name,
             created_at_ns: created_at,
@@ -706,8 +703,8 @@ impl TryFrom<(AnchorNumber, StorableAnchor)> for Anchor {
         let browsers = browsers
             .unwrap_or_default()
             .into_iter()
-            .map(Browser::try_from)
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(Browser::from)
+            .collect();
         let next_browser_id = next_browser_id.unwrap_or_default();
 
         let mut devices = passkey_credentials
@@ -796,7 +793,7 @@ impl TryFrom<(AnchorNumber, StorableAnchor)> for Anchor {
 
         let metadata = None; // Deprecated field; not stored in stable memory
 
-        Ok(Anchor {
+        Anchor {
             anchor_number,
             name,
             created_at,
@@ -808,20 +805,18 @@ impl TryFrom<(AnchorNumber, StorableAnchor)> for Anchor {
             session_count: session_count.unwrap_or_default(),
             devices,
             metadata,
-        })
+        }
     }
 }
 
-impl TryFrom<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Anchor {
-    type Error = String;
-
-    fn try_from(
+impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Anchor {
+    fn from(
         (anchor_number, storable_fixed_anchor, storable_anchor): (
             AnchorNumber,
             StorableFixedAnchor,
             Option<StorableAnchor>,
         ),
-    ) -> Result<Self, Self::Error> {
+    ) -> Self {
         let StorableFixedAnchor {
             devices,
             metadata,
@@ -829,7 +824,7 @@ impl TryFrom<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for An
         } = storable_fixed_anchor;
 
         let Some(storable_anchor) = storable_anchor else {
-            return Ok(Anchor {
+            return Anchor {
                 name: None,
                 session_count: 0,
                 openid_credentials: vec![],
@@ -841,7 +836,7 @@ impl TryFrom<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for An
                 devices,
                 metadata,
                 created_at,
-            });
+            };
         };
 
         let name = storable_anchor.name.clone();
@@ -867,10 +862,10 @@ impl TryFrom<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for An
             .browsers
             .unwrap_or_default()
             .into_iter()
-            .map(Browser::try_from)
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(Browser::from)
+            .collect();
 
-        Ok(Anchor {
+        Anchor {
             anchor_number,
             devices,
             openid_credentials,
@@ -882,7 +877,7 @@ impl TryFrom<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for An
             metadata,
             name,
             created_at,
-        })
+        }
     }
 }
 

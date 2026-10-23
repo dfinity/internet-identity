@@ -43,23 +43,29 @@ impl From<NotificationApp> for StorableNotificationApp {
     }
 }
 
-impl TryFrom<StorableNotificationApp> for NotificationApp {
-    type Error = String;
-
-    /// Fallible for the registration it may carry, which asserts the shape of its own
-    /// fields.
-    fn try_from(value: StorableNotificationApp) -> Result<Self, Self::Error> {
-        Ok(NotificationApp {
+impl From<StorableNotificationApp> for NotificationApp {
+    fn from(value: StorableNotificationApp) -> Self {
+        NotificationApp {
             id: value.id,
             principal: Principal::from_slice(&value.principal),
             created_at: value.created_at,
             last_used: value.last_used,
             anchors: value.anchors,
-            webpush_subscription: value
-                .webpush_subscription
-                .map(WebPushSubscription::try_from)
-                .transpose()?,
-        })
+            // A registration that will not read back reads as none, which is a state this
+            // record can already be in and the one thing it recovers from by itself: the
+            // app registers again and writes a row that does read. Refusing the record
+            // instead would take every identity pointing at it off notifications.
+            webpush_subscription: value.webpush_subscription.and_then(|stored| {
+                WebPushSubscription::try_from(stored)
+                    .inspect_err(|reason| {
+                        ic_cdk::println!(
+                            "ERROR: dropped the registration of notification app {} as unreadable: {reason}",
+                            value.id
+                        );
+                    })
+                    .ok()
+            }),
+        }
     }
 }
 
