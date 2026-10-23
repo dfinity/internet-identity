@@ -7539,9 +7539,7 @@ fn an_app_naming_its_record_keeps_the_one_it_already_had() {
     assert_eq!(again.created_at, 1_000);
     assert_eq!(again.last_used, 2_000);
     assert_eq!(
-        storage
-            .notification_app_of(first.id, principal)
-            .expect("the record reads back"),
+        storage.notification_app_of(first.id, principal),
         Some(again)
     );
 }
@@ -7562,9 +7560,7 @@ fn an_app_naming_a_record_that_is_not_its_own_takes_a_fresh_one() {
 
     assert_ne!(ours.id, theirs.id);
     assert_eq!(
-        storage
-            .notification_app_of(theirs.id, someone_else)
-            .expect("the record reads back"),
+        storage.notification_app_of(theirs.id, someone_else),
         Some(theirs)
     );
 }
@@ -7596,9 +7592,7 @@ fn an_id_that_names_nothing_has_no_app_record() {
     let storage = Storage::new((1, 2), memory.clone());
 
     assert_eq!(
-        storage
-            .notification_app_of(7, Principal::self_authenticating([9u8; 91]))
-            .expect("the record reads back"),
+        storage.notification_app_of(7, Principal::self_authenticating([9u8; 91])),
         None
     );
 }
@@ -7615,12 +7609,7 @@ fn app_records_and_their_counter_survive_an_upgrade() {
 
     let mut reloaded = Storage::from_memory(memory);
 
-    assert_eq!(
-        reloaded
-            .notification_app_of(before.id, first)
-            .expect("the record reads back"),
-        Some(before)
-    );
+    assert_eq!(reloaded.notification_app_of(before.id, first), Some(before));
     assert_eq!(
         reloaded
             .ensure_notification_app(Principal::self_authenticating(vec![2u8; 91]), None, 2_000)
@@ -7678,12 +7667,7 @@ fn an_app_nothing_points_at_is_deleted() {
     storage.write(anchor).expect("dropping the reference");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
-    assert_eq!(
-        storage
-            .notification_app_of(app.id, app_principal)
-            .expect("the record reads back"),
-        None
-    );
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
 }
 
 #[test]
@@ -7707,10 +7691,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
     storage.write(anchor).expect("dropping one reference");
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
-    assert!(storage
-        .notification_app_of(app.id, app_principal)
-        .expect("the record reads back")
-        .is_some());
+    assert!(storage.notification_app_of(app.id, app_principal).is_some());
 }
 
 #[test]
@@ -7742,12 +7723,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
     storage.write(anchor).expect("writing the evicted list");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
-    assert_eq!(
-        storage
-            .notification_app_of(app.id, app_principal)
-            .expect("the record reads back"),
-        None
-    );
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
 }
 
 #[test]
@@ -7761,12 +7737,7 @@ fn an_app_no_anchor_points_at_is_deleted_on_request() {
     storage.delete_notification_app_if_unreferenced(app.id);
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
-    assert_eq!(
-        storage
-            .notification_app_of(app.id, app_principal)
-            .expect("the record reads back"),
-        None
-    );
+    assert_eq!(storage.notification_app_of(app.id, app_principal), None);
 }
 
 #[test]
@@ -7785,9 +7756,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_000]);
     // The record now carries the anchor that kept it alive.
     assert_eq!(
-        storage
-            .notification_app_of(app.id, app_principal)
-            .expect("the record reads back"),
+        storage.notification_app_of(app.id, app_principal),
         Some(crate::notifications::app::NotificationApp {
             anchors: std::collections::BTreeSet::from([10_000]),
             ..app
@@ -7815,10 +7784,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
         )
         .expect("the record is there, so the registration is stored");
 
-    let stored = storage
-        .notification_app(app.id)
-        .expect("the record reads back")
-        .expect("the record");
+    let stored = storage.notification_app(app.id).expect("the record");
     assert_eq!(
         stored
             .webpush_subscription
@@ -7845,18 +7811,10 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
         storage.set_notification_app_subscription(gone, None, 2_000),
         Err(StorageError::NotificationAppNotFound { app_id }) if app_id == gone
     ));
-    assert_eq!(
-        storage
-            .notification_app(gone)
-            .expect("the record reads back"),
-        None
-    );
+    assert_eq!(storage.notification_app(gone), None);
     // The record that is there is left alone by a write naming another.
     assert_eq!(
-        storage
-            .notification_app(app.id)
-            .expect("the record reads back")
-            .map(|app| app.last_used),
+        storage.notification_app(app.id).map(|app| app.last_used),
         Some(1_000)
     );
 }
@@ -7894,12 +7852,7 @@ fn forgetting_an_app_takes_every_reference_with_it() {
         assert!(anchor.notifications_for_browser(0).is_empty());
     }
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
-    assert_eq!(
-        storage
-            .notification_app(app.id)
-            .expect("the record reads back"),
-        None
-    );
+    assert_eq!(storage.notification_app(app.id), None);
 }
 
 #[test]
@@ -7991,12 +7944,7 @@ fn forgetting_an_app_leaves_alone_a_browser_that_left_it_for_an_address_of_its_o
     );
     assert!(routed.notifications_for_browser(0).is_empty());
 
-    assert_eq!(
-        storage
-            .notification_app(app.id)
-            .expect("the record reads back"),
-        None
-    );
+    assert_eq!(storage.notification_app(app.id), None);
 }
 
 fn queued_notification(notification_id: u64) -> crate::storage::anchor::QueuedNotification {

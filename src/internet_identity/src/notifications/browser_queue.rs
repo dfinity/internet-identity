@@ -74,12 +74,8 @@ pub(crate) fn remove_after_failed_wake_up(
                 if !browser.is_pointing_at(app_id) {
                     return;
                 }
-                // A record that will not read back has no address this post could have
-                // gone to, so the guard below leaves the queue alone.
                 storage
                     .notification_app(app_id)
-                    .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
-                    .unwrap_or_default()
                     .and_then(|app| app.webpush_subscription)
                     .map(|registered| registered.endpoint.into_string())
             }

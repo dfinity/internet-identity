@@ -45,16 +45,11 @@ pub enum NotificationAppRef {
 
 /// The record `app_id` names, or `None` where the deployment does not notify, so a
 /// deployment with notifications off never reports an app however its anchors read.
-///
-/// `None` too for a record that will not read back: this answers what to show about an
-/// app, and there is nothing to show about one whose row is not a record any more.
 pub fn record(app_id: NotificationAppId) -> Option<NotificationApp> {
     if !super::notifications_enabled() {
         return None;
     }
     crate::state::storage_borrow(|storage| storage.notification_app(app_id))
-        .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
-        .unwrap_or_default()
 }
 
 impl NotificationAppRef {
