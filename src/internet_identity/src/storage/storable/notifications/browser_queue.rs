@@ -1,5 +1,4 @@
-//! A notification a browser's service worker has yet to take, stored on the Web Push
-//! subscription it was woken through, so the registration going takes it too.
+//! A notification a browser's service worker has yet to take, stored on the browser's entry.
 
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::application_number::StorableApplicationNumber;

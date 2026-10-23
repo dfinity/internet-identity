@@ -187,10 +187,11 @@ pub fn check_notification_app_authorization(
 /// registers for them, but what it acts on is still the entry: that is where they are
 /// queued and which identity they are for.
 ///
-/// Answers which key it was and nothing more. Which entry that key acts on, and what is
-/// stored against it, are lookups the caller makes for itself against a read of its own,
-/// so nothing here is carried past the point where it was true.
-pub fn check_notification_authorization(
+/// Answers which key it was and nothing more. Which entry that key acts on, delivery
+/// being switched off included, and what is stored against it, are lookups the caller
+/// makes for itself against a read of its own, so nothing here is carried past the point
+/// where it was true.
+pub fn check_browser_or_notification_app_authorization(
     anchor_number: AnchorNumber,
 ) -> Result<NotificationKey, AuthorizationError> {
     let caller = caller();

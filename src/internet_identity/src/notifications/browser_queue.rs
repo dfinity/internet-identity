@@ -1,8 +1,9 @@
 //! What each browser's service worker has yet to show, one entry per wake-up sent.
 //! An entry is added before its wake-up is posted, and the service worker removes the
 //! one it shows on every wake-up, so wake-ups and shown notifications stay one to one.
-//! The queue lives on the browser's Web Push subscription, so it goes with it.
+//! The queue lives on the browser's entry, and is cleared when its wake-up address changes.
 
+use crate::notifications::dispatch::DeliveryTarget;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, QueuedNotification};
@@ -43,11 +44,13 @@ pub(crate) fn add(
 }
 
 /// A failed post means no wake-up is coming, so one entry goes with it: its own, or the
-/// oldest if a wake-up already took it. Nothing goes once it expired or the browser
-/// registered elsewhere, since expiry or the new registration may have dropped it.
+/// oldest if a wake-up already took it. Nothing goes once it expired or whoever held the
+/// posted address registered elsewhere, since expiry or the new registration may have
+/// dropped it.
 pub(crate) fn remove_after_failed_wake_up(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
+    target: DeliveryTarget,
     notification: &QueuedNotification,
     endpoint: &str,
     now_ns: Timestamp,
@@ -56,13 +59,31 @@ pub(crate) fn remove_after_failed_wake_up(
         let Ok(mut anchor) = storage.read(anchor_number) else {
             return;
         };
-        if anchor
-            .webpush_subscription(browser_id)
-            .is_none_or(|registered| registered.endpoint.as_str() != endpoint)
-        {
+        let posted_to = match target {
+            DeliveryTarget::Browser => anchor
+                .webpush_subscription(browser_id)
+                .map(|registered| registered.endpoint.as_str().to_string()),
+            DeliveryTarget::App(app_id) => {
+                // The app's address stands for this entry only while the entry still
+                // points at it. A switch to another record, or an install started, makes
+                // the queue somebody else's, and a late failure from the old address
+                // would drop a notification this entry can still show.
+                let Some(browser) = anchor.browser(browser_id) else {
+                    return;
+                };
+                if !browser.is_pointing_at(app_id) {
+                    return;
+                }
+                storage
+                    .notification_app(app_id)
+                    .and_then(|app| app.webpush_subscription)
+                    .map(|registered| registered.endpoint.into_string())
+            }
+        };
+        if posted_to.is_none_or(|registered| registered != endpoint) {
             return;
         }
-        let Some(queue) = anchor.notifications_mut(browser_id) else {
+        let Some(queue) = anchor.notifications_for_browser_mut(browser_id) else {
             return;
         };
         match queue.iter().position(|queued| queued == notification) {
@@ -95,7 +116,7 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &ApplicationOrigin
             anchor.browsers().iter().map(|browser| browser.id).collect();
         let mut removed = false;
         for browser_id in browser_ids {
-            if let Some(queue) = anchor.notifications_mut(browser_id) {
+            if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
                 let before = queue.len();
                 queue.retain(|queued| queued.application_number != application_number);
                 removed |= queue.len() < before;
@@ -120,7 +141,7 @@ pub(crate) fn next_to_show(
     let anchor_number = anchor.anchor_number();
     storage_borrow(|storage| {
         anchor
-            .notifications(browser_id)
+            .notifications_for_browser(browser_id)
             .iter()
             .filter(|queued| queued.expires_at_ns > now_ns)
             .find_map(|queued| {
@@ -152,7 +173,7 @@ pub(crate) fn remove_shown(
         else {
             return Ok(());
         };
-        let Some(queue) = anchor.notifications_mut(browser_id) else {
+        let Some(queue) = anchor.notifications_for_browser_mut(browser_id) else {
             return Ok(());
         };
         let Some(position) = queue.iter().position(|queued| {
@@ -171,7 +192,11 @@ pub(crate) fn remove_shown(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
+    use crate::notifications::app::NotificationAppId;
+    use crate::notifications::webpush::fixtures::subscription_at;
+    use crate::notifications::webpush::fixtures::{
+        anchor, app_key, setup, subscribe, APP_RELAY, OTHER_APP_RELAY,
+    };
     use crate::notifications::write_notifications_decision;
 
     fn app_origin(origin: &str) -> ApplicationOrigin {
@@ -292,7 +317,7 @@ mod tests {
     ) {
         let mut stored = anchor(anchor_number);
         stored
-            .notifications_mut(browser_id)
+            .notifications_for_browser_mut(browser_id)
             .expect("a listed browser")
             .extend(notifications);
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
@@ -323,7 +348,98 @@ mod tests {
     }
 
     fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {
-        ids(anchor(anchor_number).notifications(browser_id))
+        ids(anchor(anchor_number).notifications_for_browser(browser_id))
+    }
+
+    /// The iOS case: the entry holds no registration of its own and is delivered through
+    /// the app it points at.
+    fn routed_through_an_app() -> (AnchorNumber, BrowserId, NotificationAppId) {
+        setup();
+        let anchor_number = storage_borrow_mut(|storage| {
+            let anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+            let anchor_number = anchor.anchor_number();
+            storage.write(anchor).expect("writing the anchor");
+            storage.sign_in_for_testing(anchor_number, &ORIGIN.to_string());
+            anchor_number
+        });
+        let browser_id = anchor(anchor_number)
+            .browsers()
+            .first()
+            .expect("signing in registers the browser")
+            .id;
+        let app_id = storage_borrow_mut(|storage| {
+            let app = storage
+                .ensure_notification_app(Principal::self_authenticating(app_key(9)), None, 0)
+                .expect("creating the app record");
+            storage
+                .set_notification_app_subscription(
+                    app.id,
+                    Some(subscription_at(APP_RELAY, 0, 0)),
+                    0,
+                )
+                .expect("the record is there");
+            let mut stored = storage.read(anchor_number).expect("reading the anchor");
+            stored.point_at_notification_app(browser_id, app.id);
+            storage.write(stored).expect("pointing at the app");
+            app.id
+        });
+        write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, 0)
+            .expect("granting consent");
+        (anchor_number, browser_id, app_id)
+    }
+
+    #[test]
+    fn a_failed_app_routed_wake_up_drops_its_entry() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        enqueue(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+
+        remove_after_failed_wake_up(
+            anchor_number,
+            browser_id,
+            DeliveryTarget::App(app_id),
+            &from_app(7, 60 * SECOND_NS),
+            APP_RELAY,
+            2 * SECOND_NS,
+        );
+
+        assert_eq!(left_for(anchor_number, browser_id), Vec::<u64>::new());
+    }
+
+    #[test]
+    fn a_failed_app_routed_wake_up_drops_its_entry_though_delivery_was_switched_off() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        enqueue(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        let mut stored = anchor(anchor_number);
+        stored.disable_notification_app(browser_id);
+        storage_borrow_mut(|storage| storage.write(stored)).expect("switching delivery off");
+
+        remove_after_failed_wake_up(
+            anchor_number,
+            browser_id,
+            DeliveryTarget::App(app_id),
+            &from_app(7, 60 * SECOND_NS),
+            APP_RELAY,
+            2 * SECOND_NS,
+        );
+
+        assert_eq!(left_for(anchor_number, browser_id), Vec::<u64>::new());
+    }
+
+    #[test]
+    fn a_failed_app_routed_wake_up_for_an_old_endpoint_removes_nothing() {
+        let (anchor_number, browser_id, app_id) = routed_through_an_app();
+        enqueue(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+
+        remove_after_failed_wake_up(
+            anchor_number,
+            browser_id,
+            DeliveryTarget::App(app_id),
+            &from_app(7, 60 * SECOND_NS),
+            OTHER_APP_RELAY,
+            2 * SECOND_NS,
+        );
+
+        assert_eq!(left_for(anchor_number, browser_id), vec![7]);
     }
 
     #[test]
@@ -469,7 +585,7 @@ mod tests {
         remove(anchor_number, browser_id, &without_account);
 
         assert_eq!(
-            anchor(anchor_number).notifications(browser_id),
+            anchor(anchor_number).notifications_for_browser(browser_id),
             [QueuedNotification {
                 account_number: Some(3),
                 ..from_app(7, 60 * SECOND_NS)

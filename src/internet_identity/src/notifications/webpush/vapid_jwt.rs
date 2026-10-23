@@ -64,8 +64,6 @@ mod tests {
                 issued_at_ns,
             )
             .expect("a pool of 64-byte signatures"),
-            notifications: Vec::new(),
-            woken_again_at_ns: None,
         }
     }
 

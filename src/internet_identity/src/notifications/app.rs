@@ -60,4 +60,13 @@ impl NotificationAppRef {
             NotificationAppRef::Linked { app_id, .. } => Some(*app_id),
         }
     }
+
+    /// Whether this identity wants the app to deliver for it on this device. An install
+    /// that has not completed delivers nothing either.
+    pub fn is_delivering(&self) -> bool {
+        match self {
+            NotificationAppRef::Pending { .. } => false,
+            NotificationAppRef::Linked { enabled, .. } => *enabled,
+        }
+    }
 }

@@ -9,8 +9,8 @@ use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization, check_notification_app_authorization,
-    check_notification_authorization, AuthorizationError,
+    check_browser_authorization, check_browser_or_notification_app_authorization,
+    check_notification_app_authorization, NotificationKey,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -379,7 +379,7 @@ fn set_webpush_subscription(
         }
     };
 
-    let key = check_notification_authorization(anchor_number)
+    let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
     notifications::webpush::set_subscription(
@@ -402,7 +402,7 @@ fn get_webpush_subscription_status(
     if !notifications::notifications_enabled() {
         return None;
     }
-    let Ok(key) = check_notification_authorization(anchor_number) else {
+    let Ok(key) = check_browser_or_notification_app_authorization(anchor_number) else {
         return None;
     };
 
@@ -720,6 +720,23 @@ fn claim_notification_app(
     })
 }
 
+/// The entry a notification call acts on: the browser that signed it, or the one whose
+/// wake-ups route through the app that did.
+///
+/// Read here rather than carried out of the authorization, so what a call acts on is what
+/// is stored when it acts rather than what was stored when it was let in.
+fn notification_entry(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+) -> Option<(storage::anchor::Anchor, BrowserId)> {
+    let anchor = state::anchor(anchor_number);
+    let browser_id = match key {
+        NotificationKey::Browser(browser_id) => Some(browser_id),
+        NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
+    }?;
+    Some((anchor, browser_id))
+}
+
 /// Authorized by the browser key the caller signs with.
 #[update]
 fn prepare_notification_delegation(
@@ -733,8 +750,10 @@ fn prepare_notification_delegation(
     } = request;
     let origin =
         notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
-    let (anchor, browser_id) = check_browser_authorization(anchor_number)
+    let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
+    let (anchor, browser_id) = notification_entry(request.anchor_number, key)
+        .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::prepare(
         anchor_number,
@@ -747,7 +766,7 @@ fn prepare_notification_delegation(
     )
 }
 
-/// Authorized by the browser key the caller signs with.
+/// Authorized like the prepare it follows: by the browser key, or by the app's key.
 #[query]
 fn get_notification_delegation(
     request: GetNotificationDelegationRequest,
@@ -761,8 +780,10 @@ fn get_notification_delegation(
     } = request;
     let origin =
         notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
-    let (anchor, browser_id) = check_browser_authorization(anchor_number)
+    let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
+    let (anchor, browser_id) = notification_entry(request.anchor_number, key)
+        .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::get(
         anchor_number,
@@ -775,21 +796,18 @@ fn get_notification_delegation(
     )
 }
 
-/// Authorized by the browser key the caller signs with: a service worker reads its own
-/// browser's queue.
+/// Authorized by the browser key the caller signs with, or by the key of the Home Screen
+/// app that entry routes through.
 #[query]
 fn browser_get_next_notification(
     request: GetNextNotificationRequest,
 ) -> Result<GetNextNotificationResponse, GetNextNotificationError> {
     let GetNextNotificationRequest { anchor_number } = request;
     enabled_or(GetNextNotificationError::InternalCanisterError)?;
-    let (anchor, browser_id) = check_browser_authorization(anchor_number).map_err(
-        |AuthorizationError { principal }| {
-            GetNextNotificationError::InternalCanisterError(format!(
-                "{principal} is no browser of this identity"
-            ))
-        },
-    )?;
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| GetNextNotificationError::InvalidBrowserKey)?;
+    let (anchor, browser_id) = notification_entry(anchor_number, key)
+        .ok_or(GetNextNotificationError::InvalidBrowserKey)?;
 
     Ok(GetNextNotificationResponse {
         notification: notifications::browser_queue::next_to_show(
@@ -800,7 +818,7 @@ fn browser_get_next_notification(
     })
 }
 
-/// Authorized by the browser key the caller signs with, like the read it follows.
+/// Authorized like the read it follows: by the browser key, or by the app's key.
 #[update]
 fn browser_remove_notification(
     request: RemoveNotificationRequest,
@@ -810,13 +828,19 @@ fn browser_remove_notification(
         notification,
     } = request;
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
-    let (anchor, browser_id) = check_browser_authorization(anchor_number).map_err(
-        |AuthorizationError { principal }| {
-            RemoveNotificationError::InternalCanisterError(format!(
-                "{principal} is no browser of this identity"
-            ))
-        },
-    )?;
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
+    let (anchor, browser_id) =
+        notification_entry(anchor_number, key).ok_or(RemoveNotificationError::InvalidBrowserKey)?;
+
+    // Nothing at all for a browser caller, which is the common one. For a Home Screen app
+    // it is the one thing that says it is still installed, since iOS destroys its storage
+    // when the user deletes it and tells nobody.
+    if let NotificationKey::App(app_id) = key {
+        state::storage_borrow_mut(|storage| {
+            storage.stamp_notification_app_use(app_id, caller(), ic_cdk::api::time())
+        });
+    }
 
     notifications::browser_queue::remove_shown(anchor, browser_id, &notification)
         .map(|()| RemoveNotificationResponse {})

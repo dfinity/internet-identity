@@ -317,6 +317,7 @@ export const idlFactory = ({ IDL }) => {
     'notification' : IDL.Opt(NotificationToShow),
   });
   const GetNextNotificationError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
   const RemoveNotificationRequest = IDL.Record({
@@ -325,6 +326,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const RemoveNotificationResponse = IDL.Record({});
   const RemoveNotificationError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
   const CheckCaptchaArg = IDL.Record({ 'solution' : IDL.Text });

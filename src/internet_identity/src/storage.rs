@@ -1553,11 +1553,71 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         // The record is read back only to keep its own fields.
         let mut app = NotificationApp::from(stored);
+        // Keep what is queued only where the registration is replaced at the same address.
+        // Anything else leaves it announced to an address nothing listens on, and a full
+        // queue posts no wake-up for what arrives after it.
+        let same_address = matches!(
+            (app.webpush_subscription.as_ref(), subscription.as_ref()),
+            (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
+        );
         app.webpush_subscription = subscription;
         app.last_used = now;
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
+        if !same_address {
+            self.clear_queues_routed_through(app_id);
+        }
         Ok(())
+    }
+
+    /// Drops what every browser routing through `app_id` had waiting.
+    /// Left in place, entries nobody can show would suppress every wake-up until they expire.
+    fn clear_queues_routed_through(&mut self, app_id: NotificationAppId) {
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let Ok(mut anchor) = self.read(anchor_number) else {
+                ic_cdk::println!(
+                    "Failed to read anchor {anchor_number} to clear what app {app_id} queued"
+                );
+                continue;
+            };
+            let pointing: Vec<BrowserId> = anchor
+                .browsers()
+                .iter()
+                .filter(|browser| browser.is_pointing_at(app_id))
+                .map(|browser| browser.id)
+                .collect();
+            let mut cleared = false;
+            for browser_id in pointing {
+                if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
+                    cleared |= !queue.is_empty();
+                    queue.clear();
+                }
+            }
+            if !cleared {
+                continue;
+            }
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
+                );
+            }
+        }
+    }
+
+    /// Stamps that the app `app_id` names has just called, which is the only evidence
+    /// there is that an installed app still exists. Only the app it belongs to counts.
+    pub fn stamp_notification_app_use(
+        &mut self,
+        app_id: NotificationAppId,
+        app_principal: Principal,
+        now: Timestamp,
+    ) {
+        let Some(mut app) = self.notification_app_of(app_id, app_principal) else {
+            return;
+        };
+        app.last_used = now;
+        self.notification_app_memory
+            .insert(app.id, StorableNotificationApp::from(app));
     }
 
     /// The record `app_id` names, if it is still there.
@@ -1584,6 +1644,42 @@ impl<M: Memory + Clone> Storage<M> {
                 "ERROR: Notification app {} has no record to forget.",
                 app_id,
             );
+        }
+    }
+
+    /// Drops every reference to `app_id`, and with it what that record's address was
+    /// carrying for the entries it delivered to.
+    ///
+    /// `Err` where an anchor could not be read or written, naming the first that failed.
+    /// Every other anchor is still attempted, so a failure here is a partial one and the
+    /// references that were dropped stay dropped.
+    pub fn forget_notification_app(
+        &mut self,
+        app_id: NotificationAppId,
+    ) -> Result<(), StorageError> {
+        let mut failure = None;
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let mut anchor = match self.read(anchor_number) {
+                Ok(anchor) => anchor,
+                Err(err) => {
+                    ic_cdk::println!(
+                        "Failed to read anchor {anchor_number} to drop notification app {app_id}"
+                    );
+                    failure = failure.or(Some(err));
+                    continue;
+                }
+            };
+            anchor.drop_notification_app(app_id);
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to drop notification app {app_id} from anchor {anchor_number}: {err}"
+                );
+                failure = failure.or(Some(err));
+            }
+        }
+        match failure {
+            Some(err) => Err(err),
+            None => Ok(()),
         }
     }
 
@@ -3076,7 +3172,7 @@ impl<M: Memory + Clone> Storage<M> {
         let browser_ids: Vec<BrowserId> =
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
-            if let Some(queue) = anchor.notifications_mut(browser_id) {
+            if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
                 queue.retain(|queued| !forgotten.contains(&queued.application_number));
             }
         }
@@ -3611,9 +3707,12 @@ impl<M: Memory + Clone> Storage<M> {
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
-        // A browser the identity signed out of must stop being notified for it. The
-        // entry itself stays, so that signing back in is not a new browser.
+        // A browser the identity signed out of must stop being notified for it. The entry
+        // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
+        if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
+            queue.clear();
+        }
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
