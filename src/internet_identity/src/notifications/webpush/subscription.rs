@@ -106,16 +106,10 @@ pub(crate) fn clear_gone_subscription(
         }
         DeliveryTarget::App(app_id) => {
             let gone = storage_borrow(|storage| {
-                // A record that will not read back is not the one the relay named, so
-                // it is left alone rather than forgotten on a guess.
-                storage
-                    .notification_app(app_id)
-                    .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
-                    .unwrap_or_default()
-                    .is_some_and(|app| {
-                        app.webpush_subscription
-                            .is_some_and(|subscription| subscription.endpoint.as_str() == endpoint)
-                    })
+                storage.notification_app(app_id).is_some_and(|app| {
+                    app.webpush_subscription
+                        .is_some_and(|subscription| subscription.endpoint.as_str() == endpoint)
+                })
             });
             // Only where the record is the one the relay reported gone: dropping it
             // unconditionally would forget a record that is still delivering.
@@ -153,12 +147,7 @@ pub fn subscription_status(
 ) -> Option<WebPushSubscriptionStatus> {
     let subscription = match key {
         NotificationKey::App(app_id) => {
-            // A query: a record that will not read back has no status to report, which
-            // is what it answers for one that is not there.
-            storage_borrow(|storage| storage.notification_app(app_id))
-                .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
-                .unwrap_or_default()?
-                .webpush_subscription
+            storage_borrow(|storage| storage.notification_app(app_id))?.webpush_subscription
         }
         NotificationKey::Browser(browser_id) => state::anchor(anchor_number)
             .webpush_subscription(browser_id)
@@ -218,13 +207,9 @@ fn set_app_subscription(
     let NotificationApp {
         webpush_subscription: registered,
         ..
-    } = storage_borrow(|storage| storage.notification_app(app_id))
-        .map_err(|err| SetWebPushSubscriptionError::InternalCanisterError(format!("{err}")))?
-        .ok_or_else(|| {
-            SetWebPushSubscriptionError::InternalCanisterError(format!(
-                "no notification app {app_id}"
-            ))
-        })?;
+    } = storage_borrow(|storage| storage.notification_app(app_id)).ok_or_else(|| {
+        SetWebPushSubscriptionError::InternalCanisterError(format!("no notification app {app_id}"))
+    })?;
 
     let created_at_ns = match registered {
         // A pool that is running out is replaced at the same address, so the registration
