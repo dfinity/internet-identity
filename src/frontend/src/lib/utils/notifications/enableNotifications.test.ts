@@ -10,7 +10,7 @@ vi.mock("./pushSubscription", () => ({
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { disallowApp, turnOnNotifications } from "./enableNotifications";
-import type { DeviceNotificationState } from "./notificationState";
+import type { AppDeviceState, BrowserDeviceState } from "./notificationState";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { requestNotificationPermission } from "./pushSubscription";
 
@@ -32,13 +32,19 @@ const actorAnswering = (...replies: { Ok: null }[]) => {
 
 const ok = { Ok: null } as const;
 
-const state = (
-  over: Partial<DeviceNotificationState> = {},
-): DeviceNotificationState => ({
+const state = (over: Partial<BrowserDeviceState> = {}): BrowserDeviceState => ({
+  source: "browser",
   supported: true,
   permission: "default",
   subscribed: false,
   registered: false,
+  ...over,
+});
+
+const appState = (over: Partial<AppDeviceState> = {}): AppDeviceState => ({
+  source: "app",
+  subscribed: true,
+  enabled: true,
   ...over,
 });
 
@@ -192,6 +198,24 @@ describe("turnOnNotifications", () => {
 
     expect(register).not.toHaveBeenCalled();
     expect(grant).not.toHaveBeenCalled();
+  });
+
+  it("asks this browser for nothing where the app delivers", async () => {
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      turnOnNotifications({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        device: appState({ subscribed: false, enabled: false }),
+        consented: false,
+      }),
+    ).resolves.toEqual({ status: "enabled" });
+
+    expect(permission).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
+    expect(grant).toHaveBeenCalledTimes(1);
   });
 
   it("reports a refused grant rather than swallowing it", async () => {

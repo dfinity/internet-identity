@@ -17,31 +17,40 @@ vi.mock("./pushSubscription", () => ({
   isPushSupported: vi.fn(() => true),
   currentDeviceSubscription: vi.fn(),
 }));
+vi.mock("$lib/utils/notifications/appStatus", () => ({
+  browserAppStatus: vi.fn(),
+}));
+vi.mock("./deviceApp", () => ({ claimDeviceApp: vi.fn() }));
+vi.mock("./alreadyInstalled", () => ({ saidAlreadyInstalled: vi.fn() }));
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
-  notificationsUnavailableHere,
+  notificationsNeedInstallHere,
   readBrowserPushState,
   readDeviceState,
   readGranted,
   resolveOptIn,
   resolveOptInScreen,
   watchNotificationPermission,
+  type BrowserDeviceState,
   type BrowserPushState,
-  type DeviceNotificationState,
 } from "./notificationState";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+import { browserAppStatus } from "$lib/utils/notifications/appStatus";
+import type { NotificationAppInfo } from "$lib/generated/internet_identity_types";
+import { claimDeviceApp } from "./deviceApp";
+import { saidAlreadyInstalled } from "./alreadyInstalled";
+import { recordPermission } from "./notificationDiagnostics";
 
 const ORIGIN = "https://app.example";
 const IDENTITY = BigInt(10_000);
 
-const state = (
-  over: Partial<DeviceNotificationState>,
-): DeviceNotificationState => ({
+const state = (over: Partial<BrowserDeviceState>): BrowserDeviceState => ({
+  source: "browser",
   supported: true,
   permission: "default",
   subscribed: false,
@@ -101,17 +110,18 @@ describe("resolveOptInScreen", () => {
   });
 });
 
-describe("notificationsUnavailableHere", () => {
+describe("notificationsNeedInstallHere", () => {
   it("is false where the browser can deliver notifications", () => {
-    expect(notificationsUnavailableHere()).toBe(false);
+    expect(notificationsNeedInstallHere()).toBe(false);
   });
 
   it.each([["Ios"], ["Ipados"]])("is true on %s", (os) => {
-    vi.mocked(browserAndSystem).mockReturnValue({
+    // Once, not for good: a platform left behind here would send every resolution below down the Home Screen app's path.
+    vi.mocked(browserAndSystem).mockReturnValueOnce({
       os: { [os]: null },
       brand: { Safari: null },
     } as never);
-    expect(notificationsUnavailableHere()).toBe(true);
+    expect(notificationsNeedInstallHere()).toBe(true);
   });
 });
 
@@ -262,6 +272,7 @@ describe("resolveOptIn", () => {
   });
 
   const ready = {
+    source: "browser",
     supported: true,
     permission: "granted" as NotificationPermission,
     subscribed: true,
@@ -289,7 +300,12 @@ describe("resolveOptIn", () => {
         actor: actorGranting(false),
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "enable", state: ready, consented: false });
+    ).resolves.toEqual({
+      screen: "enable",
+      state: ready,
+      consented: false,
+      installFirst: false,
+    });
   });
 
   /** A browser that could not be read is not a browser with nothing to ask. The
@@ -466,6 +482,24 @@ describe("readGranted", () => {
       }),
     ).resolves.toBe(false);
   });
+
+  it("reads this browser while the app's consent is still being read", async () => {
+    let release: (granted: boolean) => void = () => undefined;
+    const consent = new Promise<boolean>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(currentDeviceSubscription).mockImplementation(() => {
+      release(true);
+      return Promise.resolve({ endpoint: ENDPOINT } as PushSubscription);
+    });
+    const actor = {
+      notification_consent_granted: vi.fn(() => consent),
+    } as unknown as ActorSubclass<_SERVICE>;
+
+    await expect(
+      readGranted({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+    ).resolves.toBe(true);
+  });
 });
 
 describe("watchNotificationPermission", () => {
@@ -576,5 +610,261 @@ describe("watchNotificationPermission", () => {
     await vi.advanceTimersByTimeAsync(1_000);
 
     expect(onAllowed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("where a Home Screen app delivers", () => {
+  const appStatus = vi.mocked(browserAppStatus);
+  const claim = vi.mocked(claimDeviceApp);
+  const saidSo = vi.mocked(saidAlreadyInstalled);
+
+  const actorGranting = (granted: boolean) =>
+    ({
+      notification_consent_granted: vi.fn(() => Promise.resolve(granted)),
+    }) as unknown as ActorSubclass<_SERVICE>;
+
+  const app = (over: Partial<NotificationAppInfo> = {}) =>
+    ({ subscribed: true, enabled: true, ...over }) as NotificationAppInfo;
+
+  const resolve = (consented: boolean) =>
+    resolveOptIn({
+      identityNumber: IDENTITY,
+      origin: ORIGIN,
+      actor: actorGranting(consented),
+      browser: Promise.resolve(undefined),
+    });
+
+  const granted = (consented: boolean) =>
+    readGranted({
+      identityNumber: IDENTITY,
+      origin: ORIGIN,
+      actor: actorGranting(consented),
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset, not clear: a queued one-shot answer outlives a clear and would answer the next case here.
+    appStatus.mockReset();
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Ios: null },
+      brand: { Safari: null },
+    } as never);
+    claim.mockResolvedValue("no-donor");
+    saidSo.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Macos: null },
+      brand: { Chrome: null },
+    } as never);
+  });
+
+  describe("resolveOptIn", () => {
+    it("asks, and claims nothing, where the app could not be read", async () => {
+      appStatus.mockResolvedValue({ kind: "unanswered", reason: "offline" });
+
+      await expect(resolve(false)).resolves.toEqual({
+        screen: "enable",
+        state: { source: "app", subscribed: false, enabled: false },
+        consented: false,
+        installFirst: false,
+      });
+      expect(claim).not.toHaveBeenCalled();
+      expect(saidSo).not.toHaveBeenCalled();
+    });
+
+    it("offers the install where this browser points at no app", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+
+      await expect(resolve(false)).resolves.toMatchObject({
+        screen: "enable",
+        installFirst: true,
+      });
+      expect(claim).toHaveBeenCalledTimes(1);
+    });
+
+    it("points at the app another identity here hands over", async () => {
+      appStatus
+        .mockResolvedValueOnce({ kind: "no-app" })
+        .mockResolvedValueOnce({ kind: "app", app: app() });
+      claim.mockResolvedValue("claimed");
+
+      await expect(resolve(true)).resolves.toEqual({
+        screen: "skip",
+        granted: true,
+      });
+      expect(appStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it("takes the user's word that this device already has one", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+      saidSo.mockResolvedValue(true);
+
+      await expect(resolve(true)).resolves.toEqual({
+        screen: "skip",
+        granted: true,
+      });
+    });
+
+    /// Their word is that the device has the app, which says nothing about whether this
+    /// dapp may notify them. Skipping on it answers the dapp no and never asks again.
+    it("still asks about a dapp this identity has not allowed", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+      saidSo.mockResolvedValue(true);
+
+      await expect(resolve(false)).resolves.toEqual({
+        screen: "enable",
+        state: { source: "app", subscribed: false, enabled: false },
+        consented: false,
+        installFirst: false,
+      });
+    });
+
+    /// No donor was ever asked, so nothing was learned about this device: offering the
+    /// install would hand a second app to a phone that already has one.
+    it("offers no install where the claim could not be attempted", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+      claim.mockResolvedValue("indeterminate");
+      saidSo.mockResolvedValue(false);
+
+      await expect(resolve(false)).resolves.toEqual({
+        screen: "enable",
+        state: { source: "app", subscribed: false, enabled: false },
+        consented: false,
+        installFirst: false,
+      });
+    });
+
+    it("asks where the app is there but this identity has it switched off", async () => {
+      appStatus.mockResolvedValue({
+        kind: "app",
+        app: app({ enabled: false }),
+      });
+
+      await expect(resolve(true)).resolves.toMatchObject({
+        screen: "enable",
+        installFirst: false,
+      });
+    });
+
+    it("offers the install where the app holds no subscription", async () => {
+      appStatus.mockResolvedValue({
+        kind: "app",
+        app: app({ subscribed: false }),
+      });
+
+      await expect(resolve(true)).resolves.toMatchObject({
+        screen: "enable",
+        installFirst: true,
+      });
+    });
+
+    it("records no permission of this browser's for a device the app delivers on", async () => {
+      appStatus.mockResolvedValue({ kind: "app", app: app() });
+
+      await resolve(true);
+
+      expect(recordPermission).not.toHaveBeenCalled();
+    });
+
+    it("answers without waiting for the browser probe", async () => {
+      appStatus.mockResolvedValue({ kind: "app", app: app() });
+
+      await expect(
+        resolveOptIn({
+          identityNumber: IDENTITY,
+          origin: ORIGIN,
+          actor: actorGranting(true),
+          browser: new Promise(() => undefined),
+        }),
+      ).resolves.toEqual({ screen: "skip", granted: true });
+    });
+
+    it("reads the canister again after a claim that answered nothing", async () => {
+      appStatus
+        .mockResolvedValueOnce({ kind: "no-app" })
+        .mockResolvedValueOnce({ kind: "app", app: app() });
+      claim.mockResolvedValue("no-donor");
+
+      await expect(resolve(true)).resolves.toEqual({
+        screen: "skip",
+        granted: true,
+      });
+      expect(appStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks where the read after a claim answers nothing", async () => {
+      appStatus
+        .mockResolvedValueOnce({ kind: "no-app" })
+        .mockResolvedValueOnce({ kind: "unanswered", reason: "offline" });
+      claim.mockResolvedValue("no-donor");
+
+      await expect(resolve(false)).resolves.toMatchObject({
+        screen: "enable",
+        installFirst: false,
+      });
+      expect(saidSo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("readGranted", () => {
+    it("is granted where the app this browser points at delivers", async () => {
+      appStatus.mockResolvedValue({ kind: "app", app: app() });
+      await expect(granted(true)).resolves.toBe(true);
+    });
+
+    it("is not granted where this identity has the app switched off", async () => {
+      appStatus.mockResolvedValue({
+        kind: "app",
+        app: app({ enabled: false }),
+      });
+      await expect(granted(true)).resolves.toBe(false);
+    });
+
+    it("is not granted where the app could not be read", async () => {
+      appStatus.mockResolvedValue({ kind: "unanswered", reason: "offline" });
+      await expect(granted(true)).resolves.toBe(false);
+    });
+
+    it("agrees with the resolution on the user's word that the app is there", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+      saidSo.mockResolvedValue(true);
+
+      await expect(resolve(true)).resolves.toEqual({
+        screen: "skip",
+        granted: true,
+      });
+      await expect(granted(true)).resolves.toBe(true);
+    });
+
+    it("is not granted on their word alone where this app is not allowed", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+      saidSo.mockResolvedValue(true);
+      await expect(granted(false)).resolves.toBe(false);
+    });
+
+    it("is not granted where nothing says this device has an app", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+      await expect(granted(true)).resolves.toBe(false);
+    });
+
+    it("reads the app while its consent is still being read", async () => {
+      let release: (consented: boolean) => void = () => undefined;
+      const consent = new Promise<boolean>((resolve) => {
+        release = resolve;
+      });
+      appStatus.mockImplementation(() => {
+        release(true);
+        return Promise.resolve({ kind: "app", app: app() });
+      });
+      const actor = {
+        notification_consent_granted: vi.fn(() => consent),
+      } as unknown as ActorSubclass<_SERVICE>;
+
+      await expect(
+        readGranted({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+      ).resolves.toBe(true);
+    });
   });
 });
