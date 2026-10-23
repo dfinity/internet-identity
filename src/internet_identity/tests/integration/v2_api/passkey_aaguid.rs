@@ -744,7 +744,7 @@ fn should_enforce_unique_passkey_credential_ids_in_registration_mode_flows(
     )?;
     assert_eq!(
         result_exit_conflict,
-        Err(AuthnMethodRegistrationModeExitError::InvalidMetadata(
+        Err(AuthnMethodRegistrationModeExitError::InternalCanisterError(
             "passkey with this credential id is already used".to_string()
         ))
     );

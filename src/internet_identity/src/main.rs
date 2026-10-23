@@ -1591,7 +1591,7 @@ mod v2_api {
                     credential_id,
                     Some(identity_number),
                 )
-                .map_err(AuthnMethodRegistrationModeExitError::InvalidMetadata)?;
+                .map_err(AuthnMethodRegistrationModeExitError::InternalCanisterError)?;
             }
 
             // Add device to anchor with bookkeeping
