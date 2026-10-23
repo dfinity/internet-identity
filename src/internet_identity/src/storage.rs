@@ -1089,12 +1089,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         // A row that no longer holds the shape its fields assert is a row this canister
         // cannot act on, the same as CBOR that will not decode.
-        Anchor::try_from((anchor_number, storable_anchor)).map_err(|reason| {
-            StorageError::MalformedAnchor {
-                anchor_number,
-                reason,
-            }
-        })
+        Anchor::try_from((anchor_number, storable_anchor)).map_err(StorageError::MalformedValue)
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
@@ -1578,8 +1573,7 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         // The record is read back only to keep its own fields; a row that will not read
         // is one this write cannot be applied to.
-        let mut app = NotificationApp::try_from(stored)
-            .map_err(|reason| StorageError::MalformedNotificationApp { app_id, reason })?;
+        let mut app = NotificationApp::try_from(stored).map_err(StorageError::MalformedValue)?;
         // Keep what is queued only where the registration is replaced at the same address.
         // Anything else leaves it announced to an address nothing listens on, and a full
         // queue posts no wake-up for what arrives after it.
@@ -1640,7 +1634,13 @@ impl<M: Memory + Clone> Storage<M> {
         app_principal: Principal,
         now: Timestamp,
     ) {
-        let Some(mut app) = self.notification_app_of(app_id, app_principal) else {
+        // Liveness only: a record that will not read back has nothing to stamp, and this
+        // answers nothing, so there is no caller to tell.
+        let stamped = self
+            .notification_app_of(app_id, app_principal)
+            .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
+            .unwrap_or_default();
+        let Some(mut app) = stamped else {
             return;
         };
         app.last_used = now;
@@ -1670,7 +1670,14 @@ impl<M: Memory + Clone> Storage<M> {
         notification_id: NotificationId,
         now: Timestamp,
     ) {
-        let Some(mut app) = self.notification_app(app_id) else {
+        // The ask is kept so an answer can be recognised. A record that will not read
+        // back has nothing to ask, and this answers nothing, so there is no caller to
+        // tell.
+        let asked = self
+            .notification_app(app_id)
+            .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
+            .unwrap_or_default();
+        let Some(mut app) = asked else {
             return;
         };
         app.pending_probe = Some(PendingProbe {
@@ -1682,18 +1689,19 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// The record `app_id` names, if it is still there.
-    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
-        let stored = self.notification_app_memory.get(&app_id)?;
-        // A record that will not read back is reported as no record, which is what every
-        // caller here already handles: the alternative is an endpoint trapping on a row
-        // only an operator can repair. Logged so it is not silent.
+    /// `Ok(None)` where no record carries this id, and an `Err` where one does but holds
+    /// a value it cannot be read as. Those are different answers and the caller is the
+    /// one that can tell which of them it can live with.
+    pub fn notification_app(
+        &self,
+        app_id: NotificationAppId,
+    ) -> Result<Option<NotificationApp>, StorageError> {
+        let Some(stored) = self.notification_app_memory.get(&app_id) else {
+            return Ok(None);
+        };
         NotificationApp::try_from(stored)
-            .inspect_err(|reason| {
-                ic_cdk::println!(
-                    "ERROR: Notification app {app_id} holds a value it cannot be read as: {reason}"
-                );
-            })
-            .ok()
+            .map(Some)
+            .map_err(StorageError::MalformedValue)
     }
 
     /// The anchors pointing at `app_id`, in ascending order and stable across calls.
@@ -3549,9 +3557,10 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         app_id: NotificationAppId,
         app_principal: Principal,
-    ) -> Option<NotificationApp> {
-        self.notification_app(app_id)
-            .filter(|app| app.principal == app_principal)
+    ) -> Result<Option<NotificationApp>, StorageError> {
+        Ok(self
+            .notification_app(app_id)?
+            .filter(|app| app.principal == app_principal))
     }
 
     /// The record `app_principal` links with: the one `known` names where the app still
@@ -3567,8 +3576,13 @@ impl<M: Memory + Clone> Storage<M> {
         known: Option<NotificationAppId>,
         now: Timestamp,
     ) -> Result<NotificationApp, StorageError> {
-        if let Some(app) = known.and_then(|app_id| self.notification_app_of(app_id, app_principal))
-        {
+        // A record the app names but that will not read back is not one it can be handed
+        // again, so the write is refused rather than quietly linking it as a new app.
+        let known = match known {
+            Some(app_id) => self.notification_app_of(app_id, app_principal)?,
+            None => None,
+        };
+        if let Some(app) = known {
             let app = NotificationApp {
                 last_used: now,
                 ..app
@@ -5063,15 +5077,9 @@ pub enum StorageError {
     },
     BadAnchorNumber(u64),
     /// A row decoded, but a value in it no longer holds the shape its type asserts.
-    MalformedAnchor {
-        anchor_number: AnchorNumber,
-        reason: String,
-    },
-    /// As `MalformedAnchor`, for a Home Screen app's record.
-    MalformedNotificationApp {
-        app_id: NotificationAppId,
-        reason: String,
-    },
+    /// Beside `DeserializationError` and carrying what failed, not which row: the caller
+    /// knows what it was reading.
+    MalformedValue(String),
     DeserializationError(candid::error::Error),
     SerializationError(candid::error::Error),
     EntrySizeLimitExceeded {
@@ -5162,17 +5170,9 @@ impl fmt::Display for StorageError {
                 range.0, range.1
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
-            Self::MalformedAnchor {
-                anchor_number,
-                reason,
-            } => write!(
-                f,
-                "Identity Anchor {anchor_number} holds a value it cannot be read as: {reason}"
-            ),
-            Self::MalformedNotificationApp { app_id, reason } => write!(
-                f,
-                "Notification app {app_id} holds a value it cannot be read as: {reason}"
-            ),
+            Self::MalformedValue(reason) => {
+                write!(f, "a stored value cannot be read as its type: {reason}")
+            }
             Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
             Self::ApplicationConfigNotFound { anchor_number } => write!(
                 f,
