@@ -1,4 +1,6 @@
 use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::storage::anchor::WebPushSubscription;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use candid::Principal;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -22,6 +24,8 @@ pub struct StorableNotificationApp {
     pub last_used: Timestamp,
     #[n(4)]
     pub anchors: BTreeSet<AnchorNumber>,
+    #[n(5)]
+    pub webpush_subscription: Option<StorableWebPushSubscription>,
 }
 
 impl From<NotificationApp> for StorableNotificationApp {
@@ -32,6 +36,9 @@ impl From<NotificationApp> for StorableNotificationApp {
             created_at: value.created_at,
             last_used: value.last_used,
             anchors: value.anchors,
+            webpush_subscription: value
+                .webpush_subscription
+                .map(StorableWebPushSubscription::from),
         }
     }
 }
@@ -44,6 +51,20 @@ impl From<StorableNotificationApp> for NotificationApp {
             created_at: value.created_at,
             last_used: value.last_used,
             anchors: value.anchors,
+            // A registration that will not read back reads as none, which is a state this
+            // record can already be in and the one thing it recovers from by itself: the
+            // app registers again and writes a row that does read. Refusing the record
+            // instead would take every identity pointing at it off notifications.
+            webpush_subscription: value.webpush_subscription.and_then(|stored| {
+                WebPushSubscription::try_from(stored)
+                    .inspect_err(|reason| {
+                        ic_cdk::println!(
+                            "ERROR: dropped the registration of notification app {} as unreadable: {reason}",
+                            value.id
+                        );
+                    })
+                    .ok()
+            }),
         }
     }
 }

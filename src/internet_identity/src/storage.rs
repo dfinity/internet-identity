@@ -112,7 +112,7 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
+use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1530,6 +1530,41 @@ impl<M: Memory + Clone> Storage<M> {
             }
             self.notification_app_memory.insert(*app_id, app);
         }
+    }
+
+    /// Stores what the app has registered for Web Push, and stamps its liveness.
+    ///
+    /// The only writer is the app itself. A browser pointing at it turns its own
+    /// delivery off by clearing the `enabled` flag on its reference, through
+    /// `Anchor::disable_notification_app`, never by clearing this: the subscription
+    /// belongs to the app and every other identity delivers through it.
+    ///
+    /// Errors where `app_id` names no record, so a caller never reports a registration
+    /// that was dropped.
+    pub fn set_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let stored = self
+            .notification_app_memory
+            .get(&app_id)
+            .ok_or(StorageError::NotificationAppNotFound { app_id })?;
+        // The record is read back only to keep its own fields.
+        let mut app = NotificationApp::from(stored);
+        app.webpush_subscription = subscription;
+        app.last_used = now;
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
+        Ok(())
+    }
+
+    /// The record `app_id` names, if it is still there.
+    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
+        self.notification_app_memory
+            .get(&app_id)
+            .map(NotificationApp::from)
     }
 
     /// The anchors pointing at `app_id`, in ascending order and stable across calls.
@@ -3338,14 +3373,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(app_id)
     }
 
-    /// The record of the app signing as `app_principal`, if there is one.
-    /// The record `app_id` names, where it still exists.
-    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
-        self.notification_app_memory
-            .get(&app_id)
-            .map(NotificationApp::from)
-    }
-
     /// The record `app_id` names, but only where `app_principal` is the caller it belongs
     /// to. An id is public and allocated in sequence, so every caller naming one is
     /// checked against the principal the record was created for.
@@ -3388,6 +3415,8 @@ impl<M: Memory + Clone> Storage<M> {
             last_used: now,
             // The anchor pointing at it is added by the write that points it.
             anchors: BTreeSet::new(),
+            // Registered by the app once it has permission.
+            webpush_subscription: None,
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
@@ -4896,6 +4925,11 @@ pub enum StorageError {
     /// identity.
     SessionIdOverflow,
     ErrorUpdatingSessionIdAllocator,
+    /// No record under the id a write named. Its ids are never reissued, so a record
+    /// that is gone is gone for good.
+    NotificationAppNotFound {
+        app_id: NotificationAppId,
+    },
     /// Refused rather than saturated, so an id is never reissued.
     NotificationAppIdOverflow,
     ErrorUpdatingNotificationAppIdAllocator,
@@ -5018,6 +5052,9 @@ impl fmt::Display for StorageError {
             Self::SessionIdOverflow => write!(f, "No session ids left to allocate"),
             Self::ErrorUpdatingSessionIdAllocator => {
                 write!(f, "Error updating the session id allocator")
+            }
+            Self::NotificationAppNotFound { app_id } => {
+                write!(f, "no notification app record {app_id}")
             }
             Self::NotificationAppIdOverflow => {
                 write!(f, "No notification app ids left to allocate")

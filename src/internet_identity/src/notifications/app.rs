@@ -1,6 +1,7 @@
 //! The record a Home Screen app has of its own, which browsers point at. One installed
 //! app is one record however many identities it serves.
 
+use crate::storage::anchor::WebPushSubscription;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 use std::collections::BTreeSet;
@@ -19,6 +20,8 @@ pub struct NotificationApp {
     /// The identities whose browsers point at this app. Also the reference count: a
     /// record with none left is deleted.
     pub anchors: BTreeSet<AnchorNumber>,
+    /// One subscription for the whole record, absent until the app has permission.
+    pub webpush_subscription: Option<WebPushSubscription>,
 }
 
 /// What a browser holds about a Home Screen app: an install it has handed a key to, or
@@ -38,6 +41,15 @@ pub enum NotificationAppRef {
         /// The subscription is the app's and is shared, so turning off never removes it.
         enabled: bool,
     },
+}
+
+/// The record `app_id` names, or `None` where the deployment does not notify, so a
+/// deployment with notifications off never reports an app however its anchors read.
+pub fn record(app_id: NotificationAppId) -> Option<NotificationApp> {
+    if !super::notifications_enabled() {
+        return None;
+    }
+    crate::state::storage_borrow(|storage| storage.notification_app(app_id))
 }
 
 impl NotificationAppRef {

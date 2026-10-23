@@ -179,6 +179,47 @@ pub fn check_notification_app_authorization(
         .ok_or(AuthorizationError::from(caller))
 }
 
+/// Which key a call about notifications was signed with: a browser of this identity, or
+/// an app one of its browsers points at.
+///
+/// Notifications belong to an identity, which points at browsers, which may point at an
+/// app. The app is what shows them, so it is what asks for them, acknowledges them and
+/// registers for them, but what it acts on is still the entry: that is where they are
+/// queued and which identity they are for.
+///
+/// Answers which key it was and nothing more. Which entry that key acts on, and what is
+/// stored against it, are lookups the caller makes for itself against a read of its own,
+/// so nothing here is carried past the point where it was true.
+pub fn check_notification_authorization(
+    anchor_number: AnchorNumber,
+) -> Result<NotificationKey, AuthorizationError> {
+    let caller = caller();
+    let anchor = state::anchor(anchor_number);
+    if let Some(browser_id) = anchor.browser_by_principal(caller) {
+        return Ok(NotificationKey::Browser(browser_id));
+    }
+    // The anchor is already loaded and holds a handful of entries, so the app is found
+    // by asking which of them routes through a record this caller belongs to.
+    state::storage_borrow(|storage| {
+        anchor.browsers().iter().find_map(|browser| {
+            let app_id = browser.notification_app?.linked_app()?;
+            storage
+                .notification_app_of(app_id, caller)
+                .is_some()
+                .then_some(app_id)
+        })
+    })
+    .map(NotificationKey::App)
+    .ok_or(AuthorizationError::from(caller))
+}
+
+/// The key a notification call was signed with, which is what authorizing it established.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NotificationKey {
+    Browser(BrowserId),
+    App(NotificationAppId),
+}
+
 /// Which of this identity's browsers the caller is signing as.
 ///
 /// A browser key is not an access method: it says which browser a call comes from and

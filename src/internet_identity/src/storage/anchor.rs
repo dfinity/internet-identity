@@ -1,6 +1,6 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
-use crate::notifications::app::{NotificationAppId, NotificationAppRef};
+use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
@@ -933,6 +933,22 @@ impl Anchor {
         })
     }
 
+    /// The browser of this identity that points at `app_id`, where one does. At most one:
+    /// [`Anchor::point_at_notification_app`] takes the reference off every other entry.
+    pub fn browser_pointing_at_notification_app(
+        &self,
+        app_id: NotificationAppId,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                browser
+                    .notification_app
+                    .is_some_and(|reference| reference.linked_app() == Some(app_id))
+            })
+            .map(|browser| browser.id)
+    }
+
     /// Records that `browser_id` has started an install, naming the only caller that may
     /// complete it. Replaces any earlier pending install of that browser, so minting a
     /// second install URL retires the first.
@@ -972,31 +988,102 @@ impl Anchor {
     }
 
     /// Points `browser_id` at `app_id`, which also spends the pending install that
-    /// authorized it.
+    /// authorized it, and takes that record off every other entry of this identity.
     ///
-    /// One app per browser. Refusing a second instead would leave a user who deleted the
-    /// app from their Home Screen unable to set one up again: iOS destroys its storage and
-    /// the key with it, while a reference here would survive naming a record nothing holds.
-    pub fn point_at_notification_app(
-        &mut self,
-        browser_id: BrowserId,
-        app_id: NotificationAppId,
-        delivers_when_new: bool,
-    ) {
-        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+    /// One entry per record, because the app resolves its calls through the one entry it
+    /// finds: a browser that lost its key is a second entry here while the app keeps the
+    /// key it generated, so without this the app would answer for an entry nothing is
+    /// queued on any more.
+    ///
+    /// Pointing at the record this browser already points at changes nothing, switch
+    /// included: a claim token may be spent twice, and a replay is not the user asking
+    /// for delivery back on.
+    pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
+        let Some(browser) = self
+            .browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+        else {
+            return;
+        };
+        if browser
+            .notification_app
+            .is_some_and(|reference| reference.linked_app() == Some(app_id))
+        {
+            return;
+        }
+        // Whether this identity wants the app to deliver is the user's answer about the
+        // app, not about whichever entry happens to hold the reference, so a rotation
+        // that moves it between this identity's browsers carries their answer along. A
+        // first link has nobody to carry it from and starts delivering, because every
+        // caller that makes one is the user asking for this app.
+        let enabled = self
+            .browsers
+            .iter()
+            .find_map(|browser| match browser.notification_app {
+                Some(NotificationAppRef::Linked {
+                    app_id: held,
+                    enabled,
+                }) if held == app_id => Some(enabled),
+                _ => None,
+            })
+            .unwrap_or(true);
+        for browser in &mut self.browsers {
+            // Every OTHER entry lets go, never this one: the entry being pointed is what
+            // the check above reads, and stripping it here would make re-pointing at the
+            // app this entry already has look like a fresh one and silently switch
+            // delivery back on.
+            if browser.id != browser_id
+                && browser
+                    .notification_app
+                    .is_some_and(|reference| reference.linked_app() == Some(app_id))
+            {
+                browser.notification_app = None;
+            }
+        }
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
             return;
         };
         // A browser has one route. Pointing at a record is leaving behind whatever address
         // it registered for itself, and what that address had queued goes with it: those
         // wake-ups were posted somewhere this browser no longer reads.
         browser.webpush_subscription = None;
-        // Whether this identity wants the app to deliver is the caller's to say: an
-        // install is this identity asking for one, and taking over an app another
-        // identity put here is not.
-        browser.notification_app = Some(NotificationAppRef::Linked {
-            app_id,
-            enabled: delivers_when_new,
-        });
+        browser.notification_app = Some(NotificationAppRef::Linked { app_id, enabled });
+    }
+
+    /// This identity asking the app it points at to deliver for it. Never a subscription
+    /// write: the subscription is the app's and is shared.
+    pub fn enable_notification_app(&mut self, browser_id: BrowserId) {
+        self.set_notification_app_delivery(browser_id, true);
+    }
+
+    /// This identity asking the app it points at to stop delivering for it. Never a
+    /// subscription removal: the subscription is the app's and is shared with every other
+    /// identity pointing at it.
+    pub fn disable_notification_app(&mut self, browser_id: BrowserId) {
+        self.set_notification_app_delivery(browser_id, false);
+    }
+
+    fn set_notification_app_delivery(&mut self, browser_id: BrowserId, enabled: bool) {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
+            return;
+        };
+        // An install that has not completed has no delivery to switch.
+        let Some(NotificationAppRef::Linked {
+            enabled: current, ..
+        }) = browser.notification_app.as_mut()
+        else {
+            return;
+        };
+        *current = enabled;
     }
 
     /// This browser leaving the record it points at, which is what registering an address
@@ -1020,6 +1107,56 @@ impl Anchor {
             .iter()
             .find(|browser| browser.id == browser_id)
             .and_then(|browser| browser.notification_app)
+    }
+
+    /// What this browser reads about the app it points at.
+    ///
+    /// The record lives outside any anchor, because one app serves however many
+    /// identities point at it, so it is asked for rather than read here.
+    ///
+    /// `None` where this browser points at nothing and where `app` finds no record: a
+    /// reference naming a record that is gone is no app this identity has, and
+    /// `last_seen_ns` is the only evidence an app still exists at all.
+    fn linked_app_info(
+        &self,
+        browser_id: BrowserId,
+        app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
+    ) -> Option<NotificationAppInfo> {
+        let NotificationAppRef::Linked { app_id, enabled } = self.notification_app(browser_id)?
+        else {
+            return None;
+        };
+        let app = app(app_id)?;
+        Some(NotificationAppInfo {
+            subscribed: app.webpush_subscription.is_some(),
+            enabled,
+            last_seen_ns: app.last_used,
+        })
+    }
+
+    /// An install whose key is still spendable reads as neither linked nor nothing: the
+    /// app it was handed to can still finish, and only the user can open it. Past that
+    /// point it reads as nothing, because the URL on their Home Screen is frozen and no
+    /// launch of it can ever complete.
+    pub fn notification_app_status(
+        &self,
+        browser_id: BrowserId,
+        now_ns: Timestamp,
+        app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
+    ) -> NotificationAppStatus {
+        match self.notification_app(browser_id) {
+            Some(NotificationAppRef::Pending { expires_at_ns, .. }) if expires_at_ns > now_ns => {
+                NotificationAppStatus::AwaitingInstall(expires_at_ns)
+            }
+            Some(NotificationAppRef::Pending { .. }) => NotificationAppStatus::NoApp,
+            Some(NotificationAppRef::Linked { .. }) => {
+                match self.linked_app_info(browser_id, app) {
+                    Some(info) => NotificationAppStatus::Linked(info),
+                    None => NotificationAppStatus::NoApp,
+                }
+            }
+            None => NotificationAppStatus::NoApp,
+        }
     }
 
     /// What this browser registered for Web Push, if anything.
@@ -1110,7 +1247,14 @@ impl Anchor {
     ///
     /// `None` rather than an empty list, because that is the shape the interface
     /// carries and no caller wants the difference.
-    pub fn browsers_info(&self) -> Option<Vec<BrowserInfo>> {
+    ///
+    /// `app` answers what a record holds, as it does for
+    /// [`Anchor::linked_app_info`], which is what keeps the two reads of an
+    /// installed app answering the same thing.
+    pub fn browsers_info(
+        &self,
+        app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
+    ) -> Option<Vec<BrowserInfo>> {
         if self.browsers.is_empty() {
             return None;
         }
@@ -1123,6 +1267,7 @@ impl Anchor {
                     created_at: browser.created_at,
                     last_used: browser.last_used,
                     session_count: browser.session_count,
+                    notification_app: self.linked_app_info(browser.id, &app),
                 })
                 .collect(),
         )
