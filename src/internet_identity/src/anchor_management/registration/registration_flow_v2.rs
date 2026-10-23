@@ -332,18 +332,24 @@ fn create_identity(
     now: u64,
     verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<IdentityNumber, IdRegFinishError> {
-    // Enforce global uniqueness of passkey and recovery phrase pubkeys across all anchors.
+    // Enforce global uniqueness of passkey and recovery phrase pubkeys and passkey credential ids
+    // across all anchors.
     if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
         authn_method: AuthnMethodData { authn_method, .. },
         ..
     }) = &arg
     {
-        let pubkey = match authn_method {
-            AuthnMethod::WebAuthn(webauthn) => &webauthn.pubkey,
-            AuthnMethod::PubKey(pubkey_authn) => &pubkey_authn.pubkey,
+        let (pubkey, credential_id) = match authn_method {
+            AuthnMethod::WebAuthn(webauthn) => (&webauthn.pubkey, Some(&webauthn.credential_id)),
+            AuthnMethod::PubKey(pubkey_authn) => (&pubkey_authn.pubkey, None),
         };
         anchor_management::check_passkey_pubkey_is_not_used(pubkey)
             .and_then(|()| anchor_management::check_recovery_phrase_pubkey_is_not_used(pubkey))
+            .and_then(|()| {
+                credential_id.map_or(Ok(()), |credential_id| {
+                    anchor_management::check_passkey_credential_id_is_not_used(credential_id, None)
+                })
+            })
             .map_err(IdRegFinishError::InvalidAuthnMethod)?;
     }
 

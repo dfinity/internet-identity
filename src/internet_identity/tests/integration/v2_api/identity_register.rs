@@ -16,7 +16,7 @@ use internet_identity_interface::internet_identity::types::IdentityInfoError::Un
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, CheckCaptchaError,
     IdRegFinishError, IdRegStartError, InternetIdentityInit, MetadataEntryV2, PublicKeyAuthn,
-    RateLimitConfig, RegistrationFlowNextStep, StaticCaptchaTrigger,
+    RateLimitConfig, RegistrationFlowNextStep, StaticCaptchaTrigger, WebAuthn,
 };
 use pocket_ic::RejectResponse;
 use pretty_assertions::assert_eq;
@@ -80,6 +80,29 @@ fn should_not_register_identity_with_pubkey_used_by_another_identity() {
             "InvalidAuthnMethod(\"recovery phrase with this public key is already used\")"
                 .to_string()
         )
+    );
+}
+
+#[test]
+fn should_not_register_identity_with_credential_id_used_by_another_identity() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let passkey = sample_webauthn_authn_method(0);
+    create_identity_with_authn_method(&env, canister_id, &passkey);
+
+    let AuthnMethod::WebAuthn(webauthn) = sample_webauthn_authn_method(0).authn_method else {
+        panic!("expected a WebAuthn authn method");
+    };
+    let same_credential_id = AuthnMethodData {
+        authn_method: AuthnMethod::WebAuthn(WebAuthn {
+            pubkey: ByteBuf::from(vec![42; 32]),
+            ..webauthn
+        }),
+        ..passkey
+    };
+    assert_eq!(
+        create_identity_with_authn_method_and_name(&env, canister_id, &same_credential_id, None),
+        Err("InvalidAuthnMethod(\"passkey with this credential id is already used\")".to_string())
     );
 }
 

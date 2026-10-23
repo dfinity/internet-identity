@@ -158,8 +158,8 @@ async fn add_tentative_device(
             AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed => {
                 AddTentativeDeviceResponse::PasskeyWithThisPublicKeyIsAlreadyUsed
             }
-            AuthnMethodRegisterError::InvalidMetadata(_) => {
-                trap("Unreachable error");
+            AuthnMethodRegisterError::InvalidMetadata(message) => {
+                trap(&message);
             }
             AuthnMethodRegisterError::NotSelfAuthenticating(_) => {
                 trap("Unreachable error");
@@ -205,7 +205,7 @@ fn verify_tentative_device(
             AuthnMethodConfirmationError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
             }
-            // Unreachable since these two errors already result in a trap in this legacy method.
+            // Unreachable since this error already results in a trap in this legacy method.
             AuthnMethodConfirmationError::Unauthorized(principal) => {
                 trap(&format!("{principal} could not be authenticated."))
             }
@@ -234,6 +234,12 @@ fn register(
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+        if let Some(credential_id) = &device_data.credential_id {
+            anchor_management::check_passkey_credential_id_is_not_used(
+                credential_id,
+                Some(anchor_number),
+            )?;
+        }
 
         Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
     })
@@ -246,6 +252,11 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
         if device_key != device_data.pubkey {
             anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
         }
+        anchor_management::check_changed_passkey_credential_id_is_not_used(
+            anchor,
+            &device_key,
+            &device_data,
+        )?;
 
         Ok::<_, String>((
             (),
@@ -261,6 +272,11 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
         if device_key != device_data.pubkey {
             anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
         }
+        anchor_management::check_changed_passkey_credential_id_is_not_used(
+            anchor,
+            &device_key,
+            &device_data,
+        )?;
 
         let operation =
             anchor_management::replace_device(anchor_number, anchor, device_key, device_data);
@@ -1570,6 +1586,13 @@ mod v2_api {
             anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey).map_err(
                 |_| AuthnMethodRegistrationModeExitError::PasskeyWithThisPublicKeyIsAlreadyUsed,
             )?;
+            if let Some(credential_id) = &device_data.credential_id {
+                anchor_management::check_passkey_credential_id_is_not_used(
+                    credential_id,
+                    Some(identity_number),
+                )
+                .map_err(AuthnMethodRegistrationModeExitError::InternalCanisterError)?;
+            }
 
             // Add device to anchor with bookkeeping
             let mut anchor = state::anchor(identity_number);

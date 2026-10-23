@@ -142,10 +142,7 @@ fn is_device_used(device: &Device) -> bool {
     anchor_management::check_passkey_pubkey_is_not_used(&device.pubkey).is_err()
         || anchor_management::check_recovery_phrase_pubkey_is_not_used(&device.pubkey).is_err()
         || device.credential_id.as_ref().is_some_and(|credential_id| {
-            state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_device_credential(credential_id)
-            })
-            .is_some()
+            anchor_management::check_passkey_credential_id_is_not_used(credential_id, None).is_err()
         })
 }
 
