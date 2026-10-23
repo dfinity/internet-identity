@@ -1021,6 +1021,8 @@ type AuthnMethodConfirmationError = variant {
     RegistrationModeOff;
     // There is no registered authentication method to be confirmed.
     NoAuthnMethodToConfirm;
+    // The credential id of the authentication method to be confirmed is used by another identity.
+    PasskeyWithThisCredentialIdIsAlreadyUsed;
 };
 
 type AuthnMethodRegistrationModeEnterError = variant { 

@@ -252,6 +252,12 @@ export type AuthnMethodConfirmationError = {
      */
     'RegistrationModeOff' : null
   } |
+  {
+    /**
+     * The credential id of the authentication method to be confirmed is used by another identity.
+     */
+    'PasskeyWithThisCredentialIdIsAlreadyUsed' : null
+  } |
   { 'Unauthorized' : Principal } |
   {
     /**
