@@ -451,7 +451,12 @@ pub(crate) fn routed_app<M: Memory + Clone>(
     if !enabled || browser.session_count == 0 {
         return None;
     }
-    storage.notification_app(app_id)
+    // Nothing routes through a record that will not read back: there is no address on it
+    // to wake, which is the same answer as for a record that is gone.
+    storage
+        .notification_app(app_id)
+        .inspect_err(|err| ic_cdk::println!("ERROR: {err}"))
+        .unwrap_or_default()
 }
 
 /// Whether anything could be woken for this entry right now.
@@ -745,7 +750,9 @@ mod tests {
     }
 
     fn stored_app(app_id: NotificationAppId) -> Option<NotificationAppId> {
-        storage_borrow(|storage| storage.notification_app(app_id)).map(|app| app.id)
+        storage_borrow(|storage| storage.notification_app(app_id))
+            .expect("the record reads back")
+            .map(|app| app.id)
     }
 
     /// An identity with `count` browsers, every one registered with the relay.
