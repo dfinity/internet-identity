@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clear, createStore, set as idbSet } from "idb-keyval";
 
 /** Lets one test refuse a write, which is the only way the store ends up holding a key
- *  without the successor it announced. */
-const storage = vi.hoisted(() => ({ writesFail: false }));
+ *  without the successor it announced, and one refuse a read, which is what separates
+ *  "this browser holds no key" from "this browser could not be asked". */
+const storage = vi.hoisted(() => ({ writesFail: false, readsFail: false }));
 
 vi.mock("idb-keyval", async (importOriginal) => {
   const actual = await importOriginal<typeof import("idb-keyval")>();
@@ -14,12 +15,22 @@ vi.mock("idb-keyval", async (importOriginal) => {
       storage.writesFail
         ? Promise.reject(new Error("quota exceeded"))
         : actual.set(...args),
+    get: (...args: Parameters<typeof actual.get>) =>
+      storage.readsFail
+        ? Promise.reject(new Error("storage is closed"))
+        : actual.get(...args),
+    keys: (...args: Parameters<typeof actual.keys>) =>
+      storage.readsFail
+        ? Promise.reject(new Error("storage is closed"))
+        : actual.keys(...args),
   };
 });
 import {
   browserKeyIdentity,
   type BrowserProof,
+  BrowserKeyUnreadableError,
   currentBrowserId,
+  registeredIdentityNumbers,
   StaleBrowserKeyError,
   withBrowserProof,
 } from "./browser-key.store";
@@ -152,6 +163,7 @@ const withoutLockApi = (): void => {
 describe("browser key", () => {
   beforeEach(async () => {
     storage.writesFail = false;
+    storage.readsFail = false;
     await clear(BROWSER_KEY_STORE);
     withoutLockApi();
   });
@@ -372,6 +384,32 @@ describe("browser key", () => {
     await expect(currentBrowserId(IDENTITY)).resolves.toBeUndefined();
   });
 
+  it("knows of no browser where storage refuses to answer", async () => {
+    await signIn(IDENTITY, 1, 7);
+    storage.readsFail = true;
+
+    await expect(currentBrowserId(IDENTITY)).resolves.toBeUndefined();
+  });
+
+  it("lists the identities this browser holds a key for", async () => {
+    await signIn(IDENTITY, 1, 7);
+    await signIn(BigInt(10_001), 2, 8);
+
+    await expect(registeredIdentityNumbers()).resolves.toEqual([
+      IDENTITY,
+      BigInt(10_001),
+    ]);
+  });
+
+  it("raises where storage refuses to answer, which is not an empty list", async () => {
+    await signIn(IDENTITY, 1, 7);
+    storage.readsFail = true;
+
+    await expect(registeredIdentityNumbers()).rejects.toBeInstanceOf(
+      BrowserKeyUnreadableError,
+    );
+  });
+
   /**
    * The Web Push endpoints read the browser off the caller, so the identity has to sign
    * as the successor the canister recorded and nothing else.
@@ -390,6 +428,15 @@ describe("browser key", () => {
     await attempt(IDENTITY, 1);
 
     await expect(browserKeyIdentity(IDENTITY)).resolves.toBeUndefined();
+  });
+
+  it("keeps storage refusing to answer apart from holding no key", async () => {
+    await signIn(IDENTITY, 1, 7);
+    storage.readsFail = true;
+
+    await expect(browserKeyIdentity(IDENTITY)).rejects.toBeInstanceOf(
+      BrowserKeyUnreadableError,
+    );
   });
 
   it("has the successor sign for itself, so an unheld key cannot be announced", async () => {

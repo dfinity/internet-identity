@@ -16,7 +16,6 @@ import {
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
 import {
-  notificationsUnavailableHere,
   readBrowserPushState,
   readGranted,
   resolveOptIn,
@@ -188,18 +187,6 @@ const answerConsent = async (
       params.icrc95DerivationOrigin ?? channel.origin,
     );
 
-    // No notifications on iOS yet, so nothing is offered and the app is told
-    // plainly that it may not notify here rather than being refused outright:
-    // the method exists, this browser just has no answer but no.
-    if (notificationsUnavailableHere()) {
-      await channel.send({
-        jsonrpc: "2.0",
-        id: requestId,
-        result: { granted: false },
-      });
-      return "answered";
-    }
-
     const granted = await runConsentCeremony(
       effectiveOrigin,
       browser,
@@ -303,6 +290,7 @@ const askUntilSettled = async (
       actor: authenticated.actor,
       device: resolution.state,
       consented: resolution.consented,
+      installFirst: resolution.installFirst,
     });
 
     // The header keeps the identity switcher up for this screen, and switching

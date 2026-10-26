@@ -24,11 +24,15 @@ vi.mock("$lib/utils/validateDerivationOrigin", () => ({
 /// of. What it resolves to is this suite's subject: whether a question opens a
 /// screen, and whether nothing to ask answers the app without one.
 vi.mock("$lib/utils/notifications/notificationState", () => ({
-  notificationsUnavailableHere: vi.fn(() => false),
   readBrowserPushState: vi.fn(() => Promise.resolve({})),
   readGranted: vi.fn(() => Promise.resolve(true)),
   resolveOptIn: vi.fn(() =>
-    Promise.resolve({ screen: "enable", state: {}, consented: false }),
+    Promise.resolve({
+      screen: "enable",
+      state: {},
+      consented: false,
+      installFirst: false,
+    }),
   ),
 }));
 vi.mock("$lib/stores/authentication.store", async () => {
@@ -62,7 +66,6 @@ import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
 import { waitForStore } from "$lib/utils/utils";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import {
-  notificationsUnavailableHere,
   readBrowserPushState,
   readGranted,
   resolveOptIn,
@@ -135,9 +138,9 @@ beforeEach(async () => {
     screen: "enable",
     state: {} as never,
     consented: false,
+    installFirst: false,
   });
   vi.mocked(readGranted).mockResolvedValue(true);
-  vi.mocked(notificationsUnavailableHere).mockReturnValue(false);
   notificationConsentStore.clear();
   (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(true);
   const { authorizationPromptStore, authorizedStore } =
@@ -353,6 +356,7 @@ describe("handleNotificationConsentRequest", () => {
 
   it("opens the screen on the state the resolution read", async () => {
     const state = {
+      source: "browser" as const,
       supported: true,
       permission: "denied" as NotificationPermission,
       subscribed: false,
@@ -362,6 +366,7 @@ describe("handleNotificationConsentRequest", () => {
       screen: "enable",
       state,
       consented: false,
+      installFirst: false,
     });
     let opened: NotificationConsentContext | undefined;
     const unsubscribe = notificationConsentStore.subscribe((context) => {
@@ -406,7 +411,7 @@ describe("handleNotificationConsentRequest", () => {
   });
 
   /** Reading the answer back takes two canister calls, and the screen the user came
-   *  from is not what belongs in front of them while that runs — the redirect is. */
+   *  from is not what belongs in front of them while that runs: the redirect is. */
   it("releases the screen before reading the answer back", async () => {
     let answer: (granted: boolean) => void;
     vi.mocked(readGranted).mockReturnValueOnce(
@@ -493,28 +498,6 @@ describe("handleNotificationConsentRequest", () => {
     notificationConsentStore.settle();
     await second;
     expect(readBrowserPushState).toHaveBeenCalledTimes(3);
-  });
-
-  /** iOS delivers notifications only to a Home Screen app, which is not built, so
-   *  nothing is offered there. The method exists, so this is an answer and not a
-   *  refusal: the app is told plainly that it may not notify here. */
-  it("answers no on iOS without opening a screen", async () => {
-    vi.mocked(notificationsUnavailableHere).mockReturnValue(true);
-    const opened = vi.fn();
-    const unsubscribe = notificationConsentStore.subscribe((context) => {
-      if (context !== undefined) {
-        opened();
-      }
-    });
-
-    const { sent, errors } = await run({ settle: false });
-
-    unsubscribe();
-    expect(opened).not.toHaveBeenCalled();
-    expect(sent[0].result).toEqual({ granted: false });
-    expect(errors).toEqual([]);
-    expect(resolveOptIn).not.toHaveBeenCalled();
-    expect(readGranted).not.toHaveBeenCalled();
   });
 
   it("reports what the canister recorded", async () => {

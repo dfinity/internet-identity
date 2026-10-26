@@ -1,5 +1,6 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::session_delegation::expected_session_principal;
 use crate::storage::account::SessionLocator;
 use crate::storage::anchor::Anchor;
@@ -168,6 +169,58 @@ pub fn check_authorization(
     }
 
     Err(AuthorizationError::from(caller))
+}
+
+/// The record `app_id` names, where the caller is the app it belongs to. An id is public
+/// and allocated in sequence, so naming one is not evidence of anything by itself.
+pub fn check_notification_app_authorization(
+    app_id: NotificationAppId,
+) -> Result<NotificationApp, AuthorizationError> {
+    let caller = caller();
+    state::storage_borrow(|storage| storage.notification_app_of(app_id, caller))
+        .ok_or(AuthorizationError::from(caller))
+}
+
+/// Which key a call about notifications was signed with: a browser of this identity, or
+/// an app one of its browsers points at.
+///
+/// Notifications belong to an identity, which points at browsers, which may point at an
+/// app. The app is what shows them, so it is what asks for them, acknowledges them and
+/// registers for them, but what it acts on is still the entry: that is where they are
+/// queued and which identity they are for.
+///
+/// Answers which key it was and nothing more. Which entry that key acts on, delivery
+/// being switched off included, and what is stored against it, are lookups the caller
+/// makes for itself against a read of its own, so nothing here is carried past the point
+/// where it was true.
+pub fn check_browser_or_notification_app_authorization(
+    anchor_number: AnchorNumber,
+) -> Result<NotificationKey, AuthorizationError> {
+    let caller = caller();
+    let anchor = state::anchor(anchor_number);
+    if let Some(browser_id) = anchor.browser_by_principal(caller) {
+        return Ok(NotificationKey::Browser(browser_id));
+    }
+    // The anchor is already loaded and holds a handful of entries, so the app is found
+    // by asking which of them routes through a record this caller belongs to.
+    state::storage_borrow(|storage| {
+        anchor.browsers().iter().find_map(|browser| {
+            let app_id = browser.notification_app?.linked_app()?;
+            storage
+                .notification_app_of(app_id, caller)
+                .is_some()
+                .then_some(app_id)
+        })
+    })
+    .map(NotificationKey::App)
+    .ok_or(AuthorizationError::from(caller))
+}
+
+/// The key a notification call was signed with, which is what authorizing it established.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NotificationKey {
+    Browser(BrowserId),
+    App(NotificationAppId),
 }
 
 /// Which of this identity's browsers the caller is signing as.
