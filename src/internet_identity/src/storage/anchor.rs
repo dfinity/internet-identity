@@ -1,12 +1,15 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
+use crate::notifications::installed_app::{NotificationAppId, NotificationAppRef};
+use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
-use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
+use crate::storage::storable::notification_app::StorableNotificationAppRef;
+use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -102,11 +105,14 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// The Home Screen app this browser installed or claimed, where it has one. The
+    /// reference outlives signing out and turning notifications off.
+    pub notification_app: Option<NotificationAppRef>,
 }
 
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct QueuedNotification {
+pub struct InboxNotification {
     pub application_number: ApplicationNumber,
     /// The app canister that sent it, which the service worker fetches it from.
     pub sender: Principal,
@@ -116,9 +122,9 @@ pub struct QueuedNotification {
     pub account_number: Option<AccountNumber>,
 }
 
-impl From<QueuedNotification> for StorableQueuedNotification {
-    fn from(value: QueuedNotification) -> Self {
-        StorableQueuedNotification {
+impl From<InboxNotification> for StorableInboxNotification {
+    fn from(value: InboxNotification) -> Self {
+        StorableInboxNotification {
             application_number: value.application_number,
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
@@ -134,38 +140,44 @@ impl From<QueuedNotification> for StorableQueuedNotification {
 /// letting the registry evict it takes the registration with it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WebPushSubscription {
-    pub endpoint: String,
+    pub endpoint: PushEndpoint,
     pub created_at_ns: Timestamp,
-    pub vapid_public_key: Vec<u8>,
-    /// Raw ECDSA P-256 signatures, in window order.
-    pub jwt_signatures: Vec<Vec<u8>>,
-    pub jwt_issued_at_ns: Timestamp,
+    pub vapid_public_key: VapidPublicKey,
+    /// Raw ECDSA P-256 signatures in window order, with the instant they were signed at.
+    pub jwt_signatures: JwtPool,
     /// What the service worker has yet to show, oldest first, each woken through this
     /// registration.
-    pub notifications: Vec<QueuedNotification>,
+    pub notifications: Vec<InboxNotification>,
     /// When this browser was last woken again for something it could not show yet.
     pub woken_again_at_ns: Option<Timestamp>,
 }
 
-impl From<StorableWebPushSubscription> for WebPushSubscription {
-    fn from(value: StorableWebPushSubscription) -> Self {
-        WebPushSubscription {
-            endpoint: value.endpoint,
+impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
+    type Error = String;
+
+    /// A row this canister wrote, read back. Every newtype below asserts shape alone, so
+    /// the only way one refuses is a row that is not what it claims to be — which is the
+    /// same failure as CBOR that will not decode, and belongs to the read.
+    fn try_from(value: StorableWebPushSubscription) -> Result<Self, Self::Error> {
+        Ok(WebPushSubscription {
+            endpoint: PushEndpoint::try_from(value.endpoint.as_str())?,
             created_at_ns: value.created_at_ns,
-            vapid_public_key: value.vapid_public_key,
-            jwt_signatures: value
-                .jwt_pool
-                .signatures
-                .into_iter()
-                .map(Vec::from)
-                .collect(),
-            jwt_issued_at_ns: value.jwt_pool.issued_at_ns,
+            vapid_public_key: VapidPublicKey::try_from(value.vapid_public_key)?,
+            jwt_signatures: JwtPool::try_new(
+                value
+                    .jwt_pool
+                    .signatures
+                    .into_iter()
+                    .map(Vec::from)
+                    .collect(),
+                value.jwt_pool.issued_at_ns,
+            )?,
             notifications: value
                 .notifications
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|queued| {
-                    Some(QueuedNotification {
+                    Some(InboxNotification {
                         application_number: queued.application_number,
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
                         notification_id: queued.notification_id,
@@ -175,25 +187,31 @@ impl From<StorableWebPushSubscription> for WebPushSubscription {
                 })
                 .collect(),
             woken_again_at_ns: value.woken_again_at_ns,
-        }
+        })
     }
 }
 
 impl From<WebPushSubscription> for StorableWebPushSubscription {
     fn from(value: WebPushSubscription) -> Self {
+        let issued_at_ns = value.jwt_signatures.issued_at_ns();
         StorableWebPushSubscription {
-            endpoint: value.endpoint,
+            endpoint: value.endpoint.into_string(),
             created_at_ns: value.created_at_ns,
-            vapid_public_key: value.vapid_public_key,
+            vapid_public_key: value.vapid_public_key.into_vec(),
             jwt_pool: StorableWebPushJwtPool {
-                signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
-                issued_at_ns: value.jwt_issued_at_ns,
+                signatures: value
+                    .jwt_signatures
+                    .into_signatures()
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+                issued_at_ns,
             },
             notifications: (!value.notifications.is_empty()).then(|| {
                 value
                     .notifications
                     .into_iter()
-                    .map(StorableQueuedNotification::from)
+                    .map(StorableInboxNotification::from)
                     .collect()
             }),
             woken_again_at_ns: value.woken_again_at_ns,
@@ -211,7 +229,21 @@ impl From<StorableBrowser> for Browser {
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
-            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            // A registration that will not read back reads as none, which is a state this
+            // entry can already be in and the one thing it recovers from by itself: the
+            // browser subscribes again and writes a row that does read. Refusing the
+            // whole anchor instead would take an identity down over a push address.
+            webpush_subscription: value.webpush_subscription.and_then(|stored| {
+                WebPushSubscription::try_from(stored)
+                    .inspect_err(|reason| {
+                        ic_cdk::println!(
+                            "ERROR: dropped the registration of browser {} as unreadable: {reason}",
+                            value.id
+                        );
+                    })
+                    .ok()
+            }),
+            notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
 }
@@ -229,6 +261,7 @@ impl From<Browser> for StorableBrowser {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
+            notification_app: value.notification_app.map(StorableNotificationAppRef::from),
         }
     }
 }
@@ -867,6 +900,106 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
+    /// Whether a browser of this anchor already signs with `key`. An app key comes from a
+    /// partition no browser can reach, so a collision here is not a reinstall.
+    /// Whether a browser of this identity already signs as `principal`, which an app may
+    /// not take over: the record would answer for an entry that is not its own.
+    pub fn browser_signs_as(&self, principal: Principal) -> bool {
+        self.browsers.iter().any(|browser| {
+            principal == Principal::self_authenticating(&browser.current_browser_key)
+                || principal == Principal::self_authenticating(&browser.next_browser_key)
+        })
+    }
+
+    /// Records that `browser_id` has started an install, naming the only caller that may
+    /// complete it. Replaces any earlier pending install of that browser, so minting a
+    /// second install URL retires the first.
+    ///
+    /// `link_principal` is the principal of the one-shot key the browser generated and
+    /// put in the install URL's fragment. The app added from that URL signs as it to
+    /// link, once: nothing else is stored between the two halves, so that signature is
+    /// the whole of the authority.
+    pub fn start_notification_app_link(
+        &mut self,
+        browser_id: BrowserId,
+        link_principal: Principal,
+        expires_at_ns: Timestamp,
+    ) {
+        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+            return;
+        };
+        browser.notification_app = Some(NotificationAppRef::Pending {
+            link_principal,
+            expires_at_ns,
+        });
+    }
+
+    /// The browser of this anchor whose pending install names `caller`, where the slot has
+    /// not expired.
+    pub fn browser_awaiting_link(&self, caller: Principal, now_ns: Timestamp) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| match browser.notification_app {
+                Some(NotificationAppRef::Pending {
+                    link_principal,
+                    expires_at_ns,
+                }) => link_principal == caller && expires_at_ns > now_ns,
+                _ => false,
+            })
+            .map(|browser| browser.id)
+    }
+
+    /// Points `browser_id` at `app_id`, which also spends the pending install that
+    /// authorized it.
+    ///
+    /// One app per browser. Refusing a second instead would leave a user who deleted the
+    /// app from their Home Screen unable to set one up again: iOS destroys its storage and
+    /// the key with it, while a reference here would survive naming a record nothing holds.
+    pub fn point_at_notification_app(
+        &mut self,
+        browser_id: BrowserId,
+        app_id: NotificationAppId,
+        delivers_when_new: bool,
+    ) {
+        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+            return;
+        };
+        // A browser has one route. Pointing at a record is leaving behind whatever address
+        // it registered for itself, and what that address had queued goes with it: those
+        // wake-ups were posted somewhere this browser no longer reads.
+        browser.webpush_subscription = None;
+        // Whether this identity wants the app to deliver is the caller's to say: an
+        // install is this identity asking for one, and taking over an app another
+        // identity put here is not.
+        browser.notification_app = Some(NotificationAppRef::Linked {
+            app_id,
+            enabled: delivers_when_new,
+        });
+    }
+
+    /// This browser leaving the record it points at, which is what registering an address
+    /// of its own amounts to. Answers which record it left, so the caller can see whether
+    /// anything still points at that one.
+    ///
+    /// An install still running is left alone: it is not a route yet, and a browser whose
+    /// install never completes must keep the address it has.
+    pub fn leave_notification_app(&mut self, browser_id: BrowserId) -> Option<NotificationAppId> {
+        let browser = self.browsers.iter_mut().find(|b| b.id == browser_id)?;
+        let NotificationAppRef::Linked { app_id, .. } = browser.notification_app? else {
+            return None;
+        };
+        browser.notification_app = None;
+        Some(app_id)
+    }
+
+    /// The app this browser points at, where it has one.
+    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
+        self.browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .and_then(|browser| browser.notification_app)
+    }
+
     /// What this browser registered for Web Push, if anything.
     pub fn webpush_subscription(&self, browser_id: BrowserId) -> Option<&WebPushSubscription> {
         self.browsers
@@ -877,18 +1010,28 @@ impl Anchor {
 
     /// Replaces what this browser registered. A browser the registry no longer lists
     /// has nothing to register against, so the write is dropped.
+    ///
+    /// A browser has one route, so registering an address of its own leaves the record it
+    /// points at, and the record it left is the answer: the caller is the one that can see
+    /// whether anything still points at it. Removing a registration asks for nothing in
+    /// its place and leaves the reference where it is.
     pub fn set_webpush_subscription(
         &mut self,
         browser_id: BrowserId,
         subscription: Option<WebPushSubscription>,
-    ) {
+    ) -> Option<NotificationAppId> {
+        let left = match subscription {
+            Some(_) => self.leave_notification_app(browser_id),
+            None => None,
+        };
         if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
             browser.webpush_subscription = subscription;
         }
+        left
     }
 
     /// The queue of the browser's registration, empty for one not registered.
-    pub fn notifications(&self, browser_id: BrowserId) -> &[QueuedNotification] {
+    pub fn notifications(&self, browser_id: BrowserId) -> &[InboxNotification] {
         self.webpush_subscription(browser_id)
             .map_or(&[], |subscription| &subscription.notifications)
     }
@@ -896,7 +1039,7 @@ impl Anchor {
     pub fn notifications_mut(
         &mut self,
         browser_id: BrowserId,
-    ) -> Option<&mut Vec<QueuedNotification>> {
+    ) -> Option<&mut Vec<InboxNotification>> {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)
@@ -1037,6 +1180,7 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            notification_app: None,
         });
 
         let mut dropped = vec![];

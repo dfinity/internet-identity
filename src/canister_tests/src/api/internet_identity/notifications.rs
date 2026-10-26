@@ -5,15 +5,51 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, FrontendHostname, GetNextNotificationError,
     GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
+    LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest,
+    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
+    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
     PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
     RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
     SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
+
+pub fn prepare_notification_app_link(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: PrepareNotificationAppLinkRequest,
+) -> Result<Result<(), PrepareNotificationAppLinkError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_notification_app_link",
+        (request,),
+    )
+    .map(|(result,)| result)
+}
+
+pub fn link_notification_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: LinkNotificationAppRequest,
+) -> Result<Result<LinkNotificationAppResponse, LinkNotificationAppError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "link_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
 
 pub fn grant_consent(
     env: &PocketIc,

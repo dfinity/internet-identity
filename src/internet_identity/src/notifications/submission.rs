@@ -1,25 +1,23 @@
 //! Put an app's batch into the backlog, answering for what II cannot take.
 
-use crate::notifications::admission_queue::Admission;
-use crate::notifications::backlog::PendingNotification;
-use crate::notifications::{dispatch, ValidatedSendNotificationArg, BROWSER_GONE_AFTER_NS};
+use crate::admission_queue::Admission;
+use crate::notifications::backlog::app::PendingNotification;
+use crate::notifications::{dispatch, BROWSER_GONE_AFTER_NS};
+use crate::origin::ApplicationOrigin;
 use crate::state::{self, storage_borrow};
 use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, ApplicationNumber, FrontendHostname, NotAccepted,
-    NotAcceptedReason, Notification, SendNotificationResponse, Timestamp, Urgency,
+    AccountNumber, AnchorNumber, ApplicationNumber, NotAccepted, NotAcceptedReason, Notification,
+    SendNotificationResponse, Timestamp, Urgency,
 };
 use std::collections::BTreeMap;
 
 /// Queue what can reach its recipient, and schedule a pass for it. `sender` is the app
 /// canister the service worker fetches the content from.
 pub fn submit(
-    ValidatedSendNotificationArg {
-        origin,
-        notifications,
-        ..
-    }: ValidatedSendNotificationArg,
+    origin: &ApplicationOrigin,
+    notifications: Vec<Notification>,
     sender: Principal,
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
@@ -36,7 +34,7 @@ pub fn submit(
     {
         let resolution = resolved
             .entry(recipient)
-            .or_insert_with(|| resolve_recipient(recipient, &origin, now_ns))
+            .or_insert_with(|| resolve_recipient(recipient, origin, now_ns))
             .clone();
         match resolution {
             Ok(Resolved {
@@ -66,7 +64,7 @@ pub fn submit(
 
     let admissions = state::notification_backlog_mut(now_ns, |backlog| {
         backlog.admit(
-            StorableOriginSha256::from_origin(&origin),
+            StorableOriginSha256::from_origin(&origin.as_str().to_string()),
             reachable,
             now_ns,
         )
@@ -103,9 +101,10 @@ struct Resolved {
 /// channel when it has not allowed the app, or no browser can be woken now.
 fn resolve_recipient(
     recipient: Principal,
-    origin: &FrontendHostname,
+    origin: &ApplicationOrigin,
     now_ns: Timestamp,
 ) -> Result<Resolved, NotAcceptedReason> {
+    let origin = &origin.as_str().to_string();
     storage_borrow(|storage| {
         let account = storage
             .lookup_account_with_principal(recipient)
@@ -147,9 +146,8 @@ fn resolve_recipient(
 mod tests {
     use super::*;
     use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
-    use crate::notifications::{write_notifications_decision, ValidatedSendNotificationArg};
+    use crate::notifications::write_notifications_decision;
     use crate::state::storage_borrow_mut;
-    use internet_identity_interface::internet_identity::types::SendNotificationArg;
     use pretty_assertions::assert_eq;
 
     const APP: &str = "https://app.example";
@@ -191,7 +189,7 @@ mod tests {
     }
 
     fn allow(recipient: &Recipient) {
-        write_notifications_decision(recipient.anchor_number, &APP.to_string(), true, NOW_NS)
+        write_notifications_decision(recipient.anchor_number, &app_origin(), true, NOW_NS)
             .expect("writing consent");
     }
 
@@ -204,13 +202,12 @@ mod tests {
         }
     }
 
+    fn app_origin() -> ApplicationOrigin {
+        ApplicationOrigin::try_from(APP).expect("a bare origin")
+    }
+
     fn send(notifications: Vec<Notification>, now_ns: Timestamp) -> Vec<NotAccepted> {
-        let request = ValidatedSendNotificationArg::try_from(SendNotificationArg {
-            origin: APP.to_string(),
-            notifications,
-        })
-        .expect("a valid batch");
-        submit(request, sender(), now_ns).not_accepted
+        submit(&app_origin(), notifications, sender(), now_ns).not_accepted
     }
 
     fn queued(now_ns: Timestamp) -> Vec<PendingNotification> {

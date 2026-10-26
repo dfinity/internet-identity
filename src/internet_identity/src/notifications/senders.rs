@@ -10,7 +10,7 @@
 //! with SSO discovery. What bounds the outcalls is the cache,
 //! [`SENDERS_OUTCALL_LIMIT`] and the failure backoff.
 
-use crate::notifications::ValidatedSendNotificationArg;
+use crate::origin::ApplicationOrigin;
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
@@ -122,12 +122,8 @@ pub enum Senders {
 /// Whether `caller` may send for the request's origin, starting the fetch if
 /// the list is not cached. Only an update may call this: a fill spawns an
 /// outcall.
-pub fn authorize(
-    ValidatedSendNotificationArg { origin, .. }: &ValidatedSendNotificationArg,
-    caller: Principal,
-    now_ns: Timestamp,
-) -> Senders {
-    match single_flight_cache::get(&SENDERS_CACHE, origin.clone()) {
+pub fn authorize(origin: &ApplicationOrigin, caller: Principal, now_ns: Timestamp) -> Senders {
+    match single_flight_cache::get(&SENDERS_CACHE, origin.as_str().to_string()) {
         Cached::Ready(senders) => {
             if senders.contains(&caller) {
                 Senders::Listed
@@ -136,7 +132,7 @@ pub fn authorize(
             }
         }
         Cached::Pending => Senders::Pending {
-            retry_after: retry_after(origin, now_ns),
+            retry_after: retry_after(&origin.as_str().to_string(), now_ns),
         },
     }
 }
@@ -354,14 +350,9 @@ mod tests {
         SENDERS_CACHE.with_borrow_mut(|cache| *cache = new_senders_cache());
     }
 
-    fn request(origin: &str) -> ValidatedSendNotificationArg {
+    fn origin(origin: &str) -> ApplicationOrigin {
         crate::state::persistent_state_mut(|s| s.notifications_enabled = Some(true));
-        internet_identity_interface::internet_identity::types::SendNotificationArg {
-            origin: origin.to_string(),
-            notifications: vec![],
-        }
-        .try_into()
-        .expect("a notifiable origin")
+        ApplicationOrigin::try_from(origin).expect("a bare origin")
     }
 
     #[test]
@@ -370,9 +361,9 @@ mod tests {
         let sender = principal("ryjl3-tyaaa-aaaaa-aaaba-cai");
         publish(APP, &[sender]);
 
-        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
+        assert!(pending(authorize(&origin(APP), sender, NOW_NS)));
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&request(APP), sender, NOW_NS), Senders::Listed);
+        assert_eq!(authorize(&origin(APP), sender, NOW_NS), Senders::Listed);
     }
 
     #[test]
@@ -382,9 +373,9 @@ mod tests {
         let other = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
         publish(APP, &[listed]);
 
-        assert!(pending(authorize(&request(APP), listed, NOW_NS)));
+        assert!(pending(authorize(&origin(APP), listed, NOW_NS)));
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&request(APP), other, NOW_NS), Senders::NotListed);
+        assert_eq!(authorize(&origin(APP), other, NOW_NS), Senders::NotListed);
     }
 
     #[test]
@@ -392,9 +383,9 @@ mod tests {
         reset();
         let sender = principal("ryjl3-tyaaa-aaaaa-aaaba-cai");
 
-        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
+        assert!(pending(authorize(&origin(APP), sender, NOW_NS)));
         single_flight_cache::run_detached();
-        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
+        assert!(pending(authorize(&origin(APP), sender, NOW_NS)));
     }
 
     /// The reported time is the cache's backoff deadline, not the estimate.
@@ -404,10 +395,10 @@ mod tests {
         single_flight_cache::set_test_now(1_000);
         let sender = principal("ryjl3-tyaaa-aaaaa-aaaba-cai");
 
-        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
+        assert!(pending(authorize(&origin(APP), sender, NOW_NS)));
         single_flight_cache::run_detached();
 
-        let Senders::Pending { retry_after } = authorize(&request(APP), sender, NOW_NS) else {
+        let Senders::Pending { retry_after } = authorize(&origin(APP), sender, NOW_NS) else {
             panic!("a parked origin is still pending");
         };
         assert_eq!(retry_after, (1_000 + RETRY_BASE_SECONDS) * 1_000_000_000);
@@ -425,7 +416,7 @@ mod tests {
         publish(APP, &[sender]);
 
         assert_eq!(
-            authorize(&request(APP), sender, NOW_NS),
+            authorize(&origin(APP), sender, NOW_NS),
             Senders::Pending {
                 retry_after: NOW_NS + PENDING_RETRY_AFTER_NS
             }
@@ -439,10 +430,10 @@ mod tests {
         let second = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
         publish(APP, &[first, second]);
 
-        assert!(pending(authorize(&request(APP), first, NOW_NS)));
+        assert!(pending(authorize(&origin(APP), first, NOW_NS)));
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&request(APP), first, NOW_NS), Senders::Listed);
-        assert_eq!(authorize(&request(APP), second, NOW_NS), Senders::Listed);
+        assert_eq!(authorize(&origin(APP), first, NOW_NS), Senders::Listed);
+        assert_eq!(authorize(&origin(APP), second, NOW_NS), Senders::Listed);
     }
 
     #[test]

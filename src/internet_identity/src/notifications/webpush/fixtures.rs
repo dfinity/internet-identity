@@ -1,6 +1,6 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
-use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
+use super::validation::{JwtPool, PushEndpoint, VapidPublicKey, JWT_SIG_LEN};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
@@ -83,15 +83,31 @@ pub(super) fn request(
     }
 }
 
-/// Only validation can build one, so the fixture goes through it.
+/// Only validation can build these, so the fixture goes through it.
 pub(super) fn validated(
     anchor_number: AnchorNumber,
     endpoint: &str,
     jwt_issued_at_ns: Timestamp,
-) -> ValidatedSetWebPushSubscriptionRequest {
-    request(anchor_number, endpoint, jwt_issued_at_ns)
-        .try_into()
-        .expect("the fixture request validates")
+) -> (PushEndpoint, VapidPublicKey, JwtPool) {
+    let SetWebPushSubscriptionRequest {
+        endpoint,
+        vapid_public_key,
+        jwt_signatures,
+        jwt_issued_at_ns,
+        ..
+    } = request(anchor_number, endpoint, jwt_issued_at_ns);
+    (
+        PushEndpoint::try_from(endpoint.as_str()).expect("the fixture endpoint validates"),
+        VapidPublicKey::try_from(vapid_public_key.into_vec()).expect("the fixture key validates"),
+        JwtPool::try_new(
+            jwt_signatures
+                .into_iter()
+                .map(ByteBuf::into_vec)
+                .collect::<Vec<_>>(),
+            jwt_issued_at_ns,
+        )
+        .expect("the fixture pool validates"),
+    )
 }
 
 /// `set_subscription` for a test that has an anchor number rather than the anchor.
@@ -101,10 +117,13 @@ pub(super) fn try_subscribe(
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
+    let (endpoint, vapid_public_key, jwt_signatures) = validated(anchor_number, endpoint, now_ns);
     super::set_subscription(
         anchor(anchor_number),
         browser_id,
-        validated(anchor_number, endpoint, now_ns),
+        endpoint,
+        vapid_public_key,
+        jwt_signatures,
         now_ns,
     )
 }
@@ -131,5 +150,6 @@ pub(super) fn stored_endpoint(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
 ) -> Option<String> {
-    stored_subscription(anchor_number, browser_id).map(|subscription| subscription.endpoint)
+    stored_subscription(anchor_number, browser_id)
+        .map(|subscription| subscription.endpoint.into_string())
 }

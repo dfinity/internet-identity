@@ -1367,6 +1367,45 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
+  {
+    /**
+     * A browser of this identity already signs as that principal.
+     */
+    'PrincipalAlreadyInUse' : null
+  } |
+  {
+    /**
+     * No browser of this identity is waiting for this caller, or the install it started
+     * has expired.
+     */
+    'NoPendingLink' : null
+  } |
+  {
+    /**
+     * The record is keyed by this principal, and the anonymous one is held by everyone,
+     * so any caller at all would resolve to that record.
+     */
+    'AppPrincipalIsAnonymous' : null
+  };
+export interface LinkNotificationAppRequest {
+  /**
+   * The principal the app signs as, over the key it generated in its own partition.
+   */
+  'app_principal' : Principal,
+  /**
+   * The record this app already has, where it is linking a second identity to the app
+   * it is running as. Null is a first install and takes a record of its own.
+   */
+  'app_id' : [] | [NotificationAppId],
+  'anchor_number' : UserNumber,
+}
+export interface LinkNotificationAppResponse {
+  /**
+   * Kept by the app, so a later link names the record it already has.
+   */
+  'app_id' : NotificationAppId,
+}
 export type ListApplicationsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
@@ -1471,6 +1510,11 @@ export interface Notification {
    */
   'expires_at' : [] | [Timestamp],
 }
+/**
+ * Numbers a Home Screen app's record. Public, so every call naming one is checked
+ * against the principal the record belongs to.
+ */
+export type NotificationAppId = bigint;
 export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
@@ -1832,6 +1876,33 @@ export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
   'trusted_url' : string,
   'expiration' : Timestamp,
+}
+export type PrepareNotificationAppLinkError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The anonymous principal is held by everyone, so an install offered to it is one
+     * anybody could complete.
+     */
+    'LinkPrincipalIsAnonymous' : null
+  };
+/**
+ * Registers the one-shot key a browser is about to hand its install, so the app that
+ * spends it is the one this browser sent. Authorized by the caller being a browser this
+ * identity is signed in from; the principal named here is what authorizes the
+ * link_notification_app call that follows.
+ */
+export interface PrepareNotificationAppLinkRequest {
+  /**
+   * The principal of the one-shot key this browser puts in the install URL.
+   */
+  'link_principal' : Principal,
+  'anchor_number' : UserNumber,
 }
 export interface PrepareNotificationDelegationRequest {
   'session_key' : SessionKey,
@@ -2763,6 +2834,15 @@ export interface _SERVICE {
    */
   'init_salt' : ActorMethod<[], undefined>,
   /**
+   * Called by the Home Screen app on its first open, signed with that one-shot key.
+   * Creates the app's record where its key has none, and points the browser at it.
+   */
+  'link_notification_app' : ActorMethod<
+    [LinkNotificationAppRequest],
+    { 'Ok' : LinkNotificationAppResponse } |
+      { 'Err' : LinkNotificationAppError }
+  >,
+  /**
    * Every app the identity decided a permission for, so the user can change or forget
    * what they decided. Authorized by the identity's own access methods.
    */
@@ -3021,6 +3101,15 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
     { 'Ok' : PrepareMcpRegistrationDelegation } |
       { 'Err' : string }
+  >,
+  /**
+   * Called by the browser starting an install, naming the one-shot key it puts in the
+   * install URL as the only caller that may complete the link.
+   */
+  'prepare_notification_app_link' : ActorMethod<
+    [PrepareNotificationAppLinkRequest],
+    { 'Ok' : null } |
+      { 'Err' : PrepareNotificationAppLinkError }
   >,
   /**
    * Authorized by the browser key the caller signs with.

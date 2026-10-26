@@ -40,15 +40,9 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::senders::Senders;
-use notifications::webpush::{
-    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
-    ValidatedSetWebPushSubscriptionRequest,
-};
+use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
 use notifications::{
-    ValidatedGetNextNotificationRequest, ValidatedGetNotificationDelegationRequest,
-    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
-    ValidatedRemoveNotificationRequest, ValidatedSendNotificationArg,
+    admit_batch, enabled_or, fetchable_origin, notifying_origin, TooManyNotifications,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -57,6 +51,7 @@ use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
+mod admission_queue;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -81,6 +76,7 @@ mod mcp_registration;
 
 mod notifications;
 mod openid;
+mod origin;
 mod session_delegation;
 mod sessions;
 mod single_flight_cache;
@@ -344,11 +340,55 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let validated: ValidatedSetWebPushSubscriptionRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(validated.anchor_number)
+    let SetWebPushSubscriptionRequest {
+        anchor_number,
+        endpoint,
+        vapid_public_key,
+        jwt_signatures,
+        jwt_issued_at_ns,
+    } = request;
+    enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
+
+    // Every field at once rather than the first to fail, so a browser doesn't go round
+    // three times to learn what one answer can say.
+    let (endpoint, vapid_public_key, jwt_signatures) = match (
+        PushEndpoint::try_from(endpoint.as_str())
+            .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
+        VapidPublicKey::try_from(vapid_public_key.into_vec()),
+        JwtPool::try_new(
+            jwt_signatures
+                .into_iter()
+                .map(ByteBuf::into_vec)
+                .collect::<Vec<_>>(),
+            jwt_issued_at_ns,
+        ),
+    ) {
+        (Ok(endpoint), Ok(vapid_public_key), Ok(jwt_signatures)) => {
+            (endpoint, vapid_public_key, jwt_signatures)
+        }
+        (endpoint, vapid_public_key, jwt_signatures) => {
+            let problems: Vec<String> =
+                [endpoint.err(), vapid_public_key.err(), jwt_signatures.err()]
+                    .into_iter()
+                    .flatten()
+                    .collect();
+            return Err(SetWebPushSubscriptionError::InternalCanisterError(
+                problems.join("; "),
+            ));
+        }
+    };
+
+    let (anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
-    notifications::webpush::set_subscription(anchor, browser_id, validated, ic_cdk::api::time())
+    notifications::webpush::set_subscription(
+        anchor,
+        browser_id,
+        endpoint,
+        vapid_public_key,
+        jwt_signatures,
+        ic_cdk::api::time(),
+    )
 }
 
 /// Authorized by the browser key the caller signs with, like the write it reconciles
@@ -361,10 +401,11 @@ fn set_webpush_subscription(
 fn get_webpush_subscription_status(
     request: GetWebPushSubscriptionStatusRequest,
 ) -> Option<WebPushSubscriptionStatus> {
-    let Ok(validated) = ValidatedGetWebPushSubscriptionStatusRequest::try_from(request) else {
+    let GetWebPushSubscriptionStatusRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
         return None;
-    };
-    let Ok((anchor, browser_id)) = check_browser_authorization(validated.anchor_number) else {
+    }
+    let Ok((anchor, browser_id)) = check_browser_authorization(anchor_number) else {
         return None;
     };
 
@@ -377,11 +418,105 @@ fn get_webpush_subscription_status(
 fn remove_webpush_subscription(
     request: RemoveWebPushSubscriptionRequest,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
-    let validated: ValidatedRemoveWebPushSubscriptionRequest = request.try_into()?;
-    check_authz_and_record_activity(validated.anchor_number)
+    let RemoveWebPushSubscriptionRequest {
+        anchor_number,
+        browser_id,
+    } = request;
+    enabled_or(RemoveWebPushSubscriptionError::InternalCanisterError)?;
+    check_authz_and_record_activity(anchor_number)
         .map_err(|_| RemoveWebPushSubscriptionError::Unauthorized(caller()))?;
 
-    notifications::webpush::remove_subscription(validated)
+    notifications::webpush::remove_subscription(anchor_number, browser_id)
+}
+
+/// How long an install has to complete. Long enough to walk the steps at a reading pace,
+/// short enough that a fragment left in a browser history is of little use.
+const PENDING_LINK_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+/// Hands this browser's install a one-shot key, named by the principal the app will sign
+/// the link call as. The private half travels to the app in the URL fragment and never
+/// crosses the network, so a boundary node that sees the link call cannot replay it
+/// against a key of its own.
+#[update]
+fn prepare_notification_app_link(
+    request: PrepareNotificationAppLinkRequest,
+) -> Result<(), PrepareNotificationAppLinkError> {
+    let PrepareNotificationAppLinkRequest {
+        anchor_number,
+        link_principal,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(PrepareNotificationAppLinkError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    // The whole authority of an install URL is the key behind this principal, and the
+    // anonymous principal is held by everyone, so an install offered to it is one
+    // anybody could complete.
+    if link_principal == Principal::anonymous() {
+        return Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous);
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
+
+    let now = ic_cdk::api::time();
+    anchor.start_notification_app_link(
+        browser_id,
+        link_principal,
+        now.saturating_add(PENDING_LINK_LIFETIME_NS),
+    );
+
+    state::storage_borrow_mut(|storage| {
+        storage.write(anchor).map_err(|err| {
+            PrepareNotificationAppLinkError::InternalCanisterError(format!("{err:?}"))
+        })
+    })
+}
+
+/// Called by the Home Screen app, signed with the one-shot key its installing browser put
+/// in the URL fragment. The signature covers this call and nothing else, so it cannot be
+/// lifted onto a call naming another key, and the slot it spends is cleared here.
+#[update]
+fn link_notification_app(
+    request: LinkNotificationAppRequest,
+) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
+    let LinkNotificationAppRequest {
+        anchor_number,
+        app_principal,
+        app_id,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(LinkNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    // The record is keyed by this principal, and the anonymous one is held by everyone,
+    // so a record keyed by it is one any caller at all would resolve to.
+    if app_principal == Principal::anonymous() {
+        return Err(LinkNotificationAppError::AppPrincipalIsAnonymous);
+    }
+    let now = ic_cdk::api::time();
+    let mut anchor = state::anchor(anchor_number);
+    let installing_browser = anchor
+        .browser_awaiting_link(caller(), now)
+        .ok_or(LinkNotificationAppError::NoPendingLink)?;
+    if anchor.browser_signs_as(app_principal) {
+        return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
+    }
+
+    let app = state::storage_borrow_mut(|storage| {
+        storage.ensure_notification_app(app_principal, app_id, now)
+    })
+    .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
+    anchor.point_at_notification_app(installing_browser, app.id, true);
+
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })?;
+    // The app keeps this so a later link names the record it already has.
+    Ok(LinkNotificationAppResponse { app_id: app.id })
 }
 
 /// Authorized by the browser key the caller signs with.
@@ -389,11 +524,26 @@ fn remove_webpush_subscription(
 fn prepare_notification_delegation(
     request: PrepareNotificationDelegationRequest,
 ) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
-    let request: ValidatedPrepareNotificationDelegationRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+    let PrepareNotificationDelegationRequest {
+        anchor_number,
+        origin,
+        account_number,
+        session_key,
+    } = request;
+    let origin =
+        notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
+    let (anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
 
-    notifications::delegation::prepare(request, &anchor, browser_id, ic_cdk::api::time())
+    notifications::delegation::prepare(
+        anchor_number,
+        &origin,
+        account_number,
+        session_key,
+        &anchor,
+        browser_id,
+        ic_cdk::api::time(),
+    )
 }
 
 /// Authorized by the browser key the caller signs with.
@@ -401,11 +551,27 @@ fn prepare_notification_delegation(
 fn get_notification_delegation(
     request: GetNotificationDelegationRequest,
 ) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
-    let request: ValidatedGetNotificationDelegationRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+    let GetNotificationDelegationRequest {
+        anchor_number,
+        origin,
+        account_number,
+        session_key,
+        expiration,
+    } = request;
+    let origin =
+        notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
+    let (anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
 
-    notifications::delegation::get(request, &anchor, browser_id)
+    notifications::delegation::get(
+        anchor_number,
+        &origin,
+        account_number,
+        session_key,
+        expiration,
+        &anchor,
+        browser_id,
+    )
 }
 
 /// Authorized by the browser key the caller signs with: a service worker reads its own
@@ -414,8 +580,9 @@ fn get_notification_delegation(
 fn browser_get_next_notification(
     request: GetNextNotificationRequest,
 ) -> Result<GetNextNotificationResponse, GetNextNotificationError> {
-    let request: ValidatedGetNextNotificationRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number).map_err(
+    let GetNextNotificationRequest { anchor_number } = request;
+    enabled_or(GetNextNotificationError::InternalCanisterError)?;
+    let (anchor, browser_id) = check_browser_authorization(anchor_number).map_err(
         |AuthorizationError { principal }| {
             GetNextNotificationError::InternalCanisterError(format!(
                 "{principal} is no browser of this identity"
@@ -424,7 +591,7 @@ fn browser_get_next_notification(
     )?;
 
     Ok(GetNextNotificationResponse {
-        notification: notifications::browser_queue::next_to_show(
+        notification: notifications::browser_inbox::next_to_collect(
             &anchor,
             browser_id,
             ic_cdk::api::time(),
@@ -437,8 +604,12 @@ fn browser_get_next_notification(
 fn browser_remove_notification(
     request: RemoveNotificationRequest,
 ) -> Result<RemoveNotificationResponse, RemoveNotificationError> {
-    let request: ValidatedRemoveNotificationRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number).map_err(
+    let RemoveNotificationRequest {
+        anchor_number,
+        notification,
+    } = request;
+    enabled_or(RemoveNotificationError::InternalCanisterError)?;
+    let (anchor, browser_id) = check_browser_authorization(anchor_number).map_err(
         |AuthorizationError { principal }| {
             RemoveNotificationError::InternalCanisterError(format!(
                 "{principal} is no browser of this identity"
@@ -446,7 +617,7 @@ fn browser_remove_notification(
         },
     )?;
 
-    notifications::browser_queue::remove_shown(anchor, browser_id, &request.notification)
+    notifications::browser_inbox::remove_collected(anchor, browser_id, &notification)
         .map(|()| RemoveNotificationResponse {})
         .map_err(RemoveNotificationError::InternalCanisterError)
 }
@@ -455,36 +626,50 @@ fn browser_remove_notification(
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,
 ) -> Result<(), NotificationGrantConsentError> {
-    let validated: ValidatedNotificationGrantConsentRequest = request.try_into()?;
-    check_authz_and_record_activity(validated.anchor_number)
+    let NotificationGrantConsentRequest {
+        anchor_number,
+        origin,
+    } = request;
+    let origin =
+        notifying_origin(&origin).map_err(NotificationGrantConsentError::InternalCanisterError)?;
+    check_authz_and_record_activity(anchor_number)
         .map_err(|_| NotificationGrantConsentError::Unauthorized(caller()))?;
 
-    notifications::grant_consent(validated, ic_cdk::api::time())
+    notifications::grant_consent(anchor_number, &origin, ic_cdk::api::time())
 }
 
 #[update]
 fn notification_revoke_consent(
     request: NotificationRevokeConsentRequest,
 ) -> Result<(), NotificationRevokeConsentError> {
-    let validated: ValidatedNotificationRevokeConsentRequest = request.try_into()?;
-    check_authz_and_record_activity(validated.anchor_number)
+    let NotificationRevokeConsentRequest {
+        anchor_number,
+        origin,
+    } = request;
+    let origin =
+        notifying_origin(&origin).map_err(NotificationRevokeConsentError::InternalCanisterError)?;
+    check_authz_and_record_activity(anchor_number)
         .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
 
-    notifications::revoke_consent(validated, ic_cdk::api::time())
+    notifications::revoke_consent(anchor_number, &origin, ic_cdk::api::time())
 }
 
 /// `false` for an origin this deployment does not notify for and for an unauthorized
 /// caller, so neither can be probed with it.
 #[query]
 fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> bool {
-    let Ok(validated) = ValidatedNotificationConsentGrantedRequest::try_from(request) else {
+    let NotificationConsentGrantedRequest {
+        anchor_number,
+        origin,
+    } = request;
+    let Ok(origin) = notifying_origin(&origin) else {
         return false;
     };
-    if check_authorization(validated.anchor_number).is_err() {
+    if check_authorization(anchor_number).is_err() {
         return false;
     }
 
-    notifications::consent_granted(validated)
+    notifications::consent_granted(anchor_number, &origin)
 }
 
 // ---- Notifications: called by an app's backend ----
@@ -495,15 +680,26 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 fn app_send_notification(
     request: SendNotificationArg,
 ) -> Result<SendNotificationResponse, SendNotificationError> {
-    let request: ValidatedSendNotificationArg = request.try_into()?;
+    let SendNotificationArg {
+        origin,
+        notifications,
+    } = request;
+    let origin = notifying_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
+    fetchable_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
+    let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {
+        SendNotificationError::TooManyNotifications {
+            limit: limit as u32,
+        }
+    })?;
 
-    match notifications::senders::authorize(&request, caller(), ic_cdk::api::time()) {
+    match notifications::senders::authorize(&origin, caller(), ic_cdk::api::time()) {
         Senders::NotListed => Err(SendNotificationError::NoSuchSender),
         Senders::Pending { retry_after } => {
-            Ok(notifications::defer_whole_batch(request, retry_after))
+            Ok(notifications::defer_whole_batch(notifications, retry_after))
         }
         Senders::Listed => Ok(notifications::submission::submit(
-            request,
+            &origin,
+            notifications,
             caller(),
             ic_cdk::api::time(),
         )),
