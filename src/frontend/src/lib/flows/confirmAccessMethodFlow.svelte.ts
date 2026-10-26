@@ -2,8 +2,7 @@ import { get } from "svelte/store";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { secureRandomId, throwCanisterError, waitFor } from "$lib/utils/utils";
 import { SvelteURL } from "svelte/reactivity";
-
-const POLL_INTERVAL = 3000; // Should be frequent enough
+import { POLL_INTERVAL_MS } from "$lib/constants/polling.constants";
 
 export class ConfirmAccessMethodFlow {
   #view = $state<
@@ -55,7 +54,7 @@ export class ConfirmAccessMethodFlow {
           break;
         }
         // Wait before retrying
-        await waitFor(POLL_INTERVAL);
+        await waitFor(POLL_INTERVAL_MS);
       }
     } catch (error) {
       // Close registration window if error was thrown
@@ -83,7 +82,7 @@ export class ConfirmAccessMethodFlow {
         return;
       }
       // Wait before retrying
-      await waitFor(POLL_INTERVAL);
+      await waitFor(POLL_INTERVAL_MS);
     }
     throw new Error("Registration not completed within time window");
   };

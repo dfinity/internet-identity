@@ -11,8 +11,7 @@ import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdent
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { nanosToMillis } from "$lib/utils/time";
 import { SvelteDate, SvelteURL } from "svelte/reactivity";
-
-const POLL_INTERVAL = 3000; // Should be frequent enough
+import { POLL_INTERVAL_MS } from "$lib/constants/polling.constants";
 
 export class RegisterAccessMethodFlow {
   #view = $state<
@@ -60,7 +59,7 @@ export class RegisterAccessMethodFlow {
         return this.#registerSession(identityNumber);
       }
       // Wait before retrying
-      await waitFor(POLL_INTERVAL);
+      await waitFor(POLL_INTERVAL_MS);
     }
     throw new Error("Registration not completed within time window");
   };
@@ -87,7 +86,7 @@ export class RegisterAccessMethodFlow {
         return;
       }
       // Wait before retrying
-      await waitFor(POLL_INTERVAL);
+      await waitFor(POLL_INTERVAL_MS);
     }
     throw new Error("Registration not completed within time window");
   };
