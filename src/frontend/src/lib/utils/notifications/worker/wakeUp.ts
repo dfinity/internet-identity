@@ -110,7 +110,9 @@ const refFor = (
   notification: NotificationToShow,
 ): NotificationRef => ({
   identityNumber,
-  origin: notification.origin,
+  // The worker's own key for a shown notification. Internet Identity's own names no
+  // app, which an empty origin stands for here and nowhere else.
+  origin: notification.origin[0] ?? "",
   accountNumber: notification.account_number[0],
   appCanisterId: notification.canister_id.toText(),
   id: notification.id,
@@ -242,8 +244,14 @@ const showQueued = async (
     return true;
   }
 
+  // Only Internet Identity's own carries no origin, and that returned just above.
+  const [origin] = notification.origin;
+  if (origin === undefined) {
+    return false;
+  }
+
   const target = {
-    origin: notification.origin,
+    origin,
     accountNumber: notification.account_number[0],
   };
   const held = await loadPullIdentity({
@@ -296,8 +304,8 @@ const showQueued = async (
     }
 
     const [sender, alternativeOrigins] = await Promise.all([
-      senderOf(notification.origin),
-      fetchAlternativeOrigins(notification.origin),
+      senderOf(origin),
+      fetchAlternativeOrigins(origin),
     ]);
     await show(context, ref, {
       // The sender leads the title: an app's own title and body are its text to
@@ -308,7 +316,7 @@ const showQueued = async (
       icon: sender.icon,
       url: allowedLink({
         url: content.url,
-        origin: notification.origin,
+        origin,
         alternativeOrigins,
       }),
     });
@@ -330,7 +338,7 @@ const showQueued = async (
     await show(context, ref, {
       title: PLACEHOLDER_TITLE,
       body: PLACEHOLDER_BODY,
-      url: notification.origin,
+      url: origin,
     });
     // The mint is still in flight, and `waitUntil` keeps this worker alive for it, so
     // the rest of the work happens here under the same wake-up. The canister does post

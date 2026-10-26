@@ -1,4 +1,4 @@
-use crate::notifications::app::{
+use crate::notifications::installed_app::{
     NotificationApp, NotificationAppId, NotificationAppRef, PendingProbe,
 };
 use crate::storage::anchor::WebPushSubscription;
@@ -21,9 +21,9 @@ pub struct StorableNotificationApp {
     #[cbor(n(1), with = "minicbor::bytes")]
     pub principal: Vec<u8>,
     #[n(2)]
-    pub created_at: Timestamp,
+    pub created_at_ns: Timestamp,
     #[n(3)]
-    pub last_used: Timestamp,
+    pub last_used_ns: Timestamp,
     #[n(4)]
     pub anchors: BTreeSet<AnchorNumber>,
     #[n(5)]
@@ -48,8 +48,8 @@ impl From<NotificationApp> for StorableNotificationApp {
         StorableNotificationApp {
             id: value.id,
             principal: value.principal.as_slice().to_vec(),
-            created_at: value.created_at,
-            last_used: value.last_used,
+            created_at_ns: value.created_at_ns,
+            last_used_ns: value.last_used_ns,
             anchors: value.anchors,
             webpush_subscription: value
                 .webpush_subscription
@@ -67,8 +67,8 @@ impl From<StorableNotificationApp> for NotificationApp {
         NotificationApp {
             id: value.id,
             principal: Principal::from_slice(&value.principal),
-            created_at: value.created_at,
-            last_used: value.last_used,
+            created_at_ns: value.created_at_ns,
+            last_used_ns: value.last_used_ns,
             anchors: value.anchors,
             // A registration that will not read back reads as none, which is a state this
             // record can already be in and the one thing it recovers from by itself: the

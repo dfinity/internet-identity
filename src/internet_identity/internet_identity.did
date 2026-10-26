@@ -1111,10 +1111,6 @@ type NotificationAppInfo = record {
     // When the app last called, which is the only evidence there is that it still
     // exists: nothing says when a user deletes a web app from their Home Screen.
     last_seen_ns : nat64;
-    // A probe this app has been asked and has not yet had time to answer. Null once its
-    // window is up, answered or not: what says it answered is last_seen_ns moving. Held
-    // on the app's own record, so every identity pointing at it shares one ask.
-    pending_probe : opt NotificationId;
 };
 
 // What a browser has. An install reads as AwaitingInstall only while its key can still be
@@ -2147,7 +2143,9 @@ type GetNextNotificationRequest = record {
 // What a service worker shows for one wake-up: the app and account it is for, the
 // canister holding its content, and which notification.
 type NotificationToShow = record {
-    origin : FrontendHostname;
+    // Null where Internet Identity sent this itself: it is about the identity rather
+    // than an app, so there is no origin to name and none is looked up.
+    origin : opt FrontendHostname;
     account_number : opt AccountNumber;   // null = the unreserved default account
     canister_id : principal;
     id : NotificationId;

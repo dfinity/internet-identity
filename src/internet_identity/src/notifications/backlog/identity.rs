@@ -6,8 +6,8 @@
 //! browsers. One queue for both would let a browser that can provoke wake-ups take turns
 //! away from every app.
 
-use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
-use super::dispatch::{self, IdentityNotification};
+use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
+use crate::notifications::dispatch::{self, IdentityNotification};
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, NotificationEvent, NotificationId, Timestamp, Urgency,
 };
@@ -91,7 +91,7 @@ const DRAINED_PER_EXPIRY: usize = dispatch::MAX_IDENTITY_POSTS_PER_PASS
     * (EXPIRY_NS / dispatch::INTERVAL.as_nanos() as u64) as usize
     / BROWSERS_PER_IDENTITY;
 
-pub(crate) const IDENTITY_NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
+pub(crate) const IDENTITY_BACKLOG: QueueConfig = QueueConfig {
     max_entries: DRAINED_PER_EXPIRY,
     // A flat ceiling rather than a fraction of the whole: the senders here are
     // identities, and the point of the queue is that none of them dominates. Twenty
@@ -113,16 +113,11 @@ pub(crate) const IDENTITY_NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
     },
 };
 
-const _: () = assert!(IDENTITY_NOTIFICATION_BACKLOG.is_coherent());
+const _: () = assert!(IDENTITY_BACKLOG.is_coherent());
 
 // A single identity must stay below the pressure reset threshold.
-const _: () = assert!(
-    IDENTITY_NOTIFICATION_BACKLOG.max_entries_per_sender
-        < IDENTITY_NOTIFICATION_BACKLOG.pressure_cleared_below
-);
+const _: () =
+    assert!(IDENTITY_BACKLOG.max_entries_per_sender < IDENTITY_BACKLOG.pressure_cleared_below);
 
 // Opening one slot must not reset the pressure timer.
-const _: () = assert!(
-    IDENTITY_NOTIFICATION_BACKLOG.pressure_cleared_below
-        < IDENTITY_NOTIFICATION_BACKLOG.max_entries
-);
+const _: () = assert!(IDENTITY_BACKLOG.pressure_cleared_below < IDENTITY_BACKLOG.max_entries);
