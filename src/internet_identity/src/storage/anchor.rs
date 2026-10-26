@@ -900,6 +900,28 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
+    /// The browser that signed a claim token for `claiming_anchor_number`, if any still
+    /// holds the key. The successor slot only, as in [`Self::browser_by_principal`].
+    pub fn browser_that_signed_claim(
+        &self,
+        signature: &[u8],
+        claiming_anchor_number: AnchorNumber,
+        expires_at_ns: Timestamp,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                crate::browser_key::verify_notification_app_claim(
+                    &browser.next_browser_key,
+                    signature,
+                    self.anchor_number,
+                    claiming_anchor_number,
+                    expires_at_ns,
+                )
+            })
+            .map(|browser| browser.id)
+    }
+
     /// Whether a browser of this anchor already signs with `key`. An app key comes from a
     /// partition no browser can reach, so a collision here is not a reinstall.
     /// Whether a browser of this identity already signs as `principal`, which an app may

@@ -16,6 +16,9 @@ const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 /// replayed in the other's role.
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 
+/// Prefix for the token a browser signs to let another identity point at its Home Screen app.
+const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
+
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
 const BROWSER_KEY_SIGNATURE_BYTES: usize = 64;
 
@@ -82,10 +85,30 @@ pub fn verify_browser_keys(
     })
 }
 
+/// The token names no app, because a browser has only one.
+pub fn verify_notification_app_claim(
+    key: &PublicKey,
+    signature: &[u8],
+    offering_anchor_number: u64,
+    claiming_anchor_number: u64,
+    expires_at_ns: u64,
+) -> bool {
+    verify(
+        key,
+        signature,
+        &claim_token_message(
+            offering_anchor_number,
+            claiming_anchor_number,
+            expires_at_ns,
+        ),
+    )
+}
+
 /// What a browser presents and what it signs, for tests of the callers that verify one.
 #[cfg(test)]
 pub mod test_keys {
     use super::*;
+    use p256::ecdsa::signature::Signer;
     use p256::ecdsa::SigningKey;
     use serde_bytes::ByteBuf;
 
@@ -113,6 +136,42 @@ pub mod test_keys {
     pub fn public_key(key: &SigningKey) -> PublicKey {
         spki(VerifyingKey::from(key).to_encoded_point(false).as_bytes())
     }
+
+    /// A claim token as the identity that has the app mints one.
+    pub fn claim_token(
+        key: &SigningKey,
+        offering_anchor_number: u64,
+        claiming_anchor_number: u64,
+        expires_at_ns: u64,
+    ) -> Vec<u8> {
+        let signature: Signature = key.sign(&claim_token_message(
+            offering_anchor_number,
+            claiming_anchor_number,
+            expires_at_ns,
+        ));
+        signature.to_bytes().to_vec()
+    }
+}
+
+fn claim_token_message(
+    offering_anchor_number: u64,
+    claiming_anchor_number: u64,
+    expires_at_ns: u64,
+) -> Vec<u8> {
+    let offering = offering_anchor_number.to_be_bytes();
+    let claiming = claiming_anchor_number.to_be_bytes();
+    let expires = expires_at_ns.to_be_bytes();
+    let mut message = Vec::with_capacity(
+        NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN.len()
+            + offering.len()
+            + claiming.len()
+            + expires.len(),
+    );
+    message.extend_from_slice(NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN);
+    message.extend_from_slice(&offering);
+    message.extend_from_slice(&claiming);
+    message.extend_from_slice(&expires);
+    message
 }
 
 fn verify(key: &PublicKey, signature: &[u8], message: &[u8]) -> bool {
@@ -178,6 +237,20 @@ mod tests {
 
         fn successor(&self, session_key: &SessionKey, current: &PublicKey) -> Vec<u8> {
             self.sign(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, current)
+        }
+
+        fn claim_token(
+            &self,
+            offering_anchor_number: u64,
+            claiming_anchor_number: u64,
+            expires_at_ns: u64,
+        ) -> Vec<u8> {
+            super::test_keys::claim_token(
+                &self.signing,
+                offering_anchor_number,
+                claiming_anchor_number,
+                expires_at_ns,
+            )
         }
     }
 
@@ -383,5 +456,103 @@ mod tests {
             &session
         )
         .is_none());
+    }
+
+    #[test]
+    fn a_browser_key_signs_a_claim_token_for_its_own_anchors_and_expiry() {
+        let browser = key(1);
+
+        assert!(verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_001,
+            5_000,
+        ));
+    }
+
+    #[test]
+    fn a_claim_token_does_not_verify_for_another_claiming_anchor() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_002,
+            5_000,
+        ));
+    }
+
+    #[test]
+    fn a_claim_token_does_not_verify_for_another_offering_anchor() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_002,
+            10_001,
+            5_000,
+        ));
+    }
+
+    #[test]
+    fn a_claim_token_does_not_verify_for_a_later_expiry() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_001,
+            6_000,
+        ));
+    }
+
+    #[test]
+    fn another_key_does_not_verify_a_claim_token() {
+        let browser = key(1);
+
+        assert!(!verify_notification_app_claim(
+            &key(2).public,
+            &browser.claim_token(10_000, 10_001, 5_000),
+            10_000,
+            10_001,
+            5_000,
+        ));
+    }
+
+    /// Asserted identically in `browser-key.claim.test.ts`: both sides are pinned, so a
+    /// change to either layout fails a test instead of being refused at runtime.
+    #[test]
+    fn the_claim_token_message_is_the_bytes_the_frontend_signs() {
+        assert_eq!(
+            hex::encode(claim_token_message(10_000, 10_001, 5_000)),
+            "69692d6e6f74696669636174696f6e2d6170702d636c61696d0000000000002710000000000000271100\
+             00000000001388"
+        );
+    }
+
+    #[test]
+    fn a_sign_in_signature_is_not_accepted_as_a_claim_token() {
+        let browser = key(1);
+        let next = key(2);
+        let session = session_key(3);
+
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.current(&session, &next.public),
+            10_000,
+            10_001,
+            5_000,
+        ));
+        assert!(!verify_notification_app_claim(
+            &browser.public,
+            &browser.successor(&session, &next.public),
+            10_000,
+            10_001,
+            5_000,
+        ));
     }
 }

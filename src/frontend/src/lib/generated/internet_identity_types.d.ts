@@ -521,6 +521,43 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
+export type ClaimNotificationAppError = {
+    /**
+     * The offering identity's browser points at no app to hand over.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The key the caller signed with is no browser key of the identity it named.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No browser of the offering identity signed this, or the one that did has
+     * rotated its key past it since.
+     */
+    'InvalidClaimToken' : null
+  } |
+  { 'ClaimTokenExpired' : null };
+/**
+ * Points a browser of the identity being added at the Home Screen app another identity on
+ * the same device already has. One device has one such app, so a second identity joins the
+ * existing one rather than installing its own.
+ * 
+ * The signature is the whole authority and nothing is stored between the two halves: a
+ * browser of the offering identity signs over both anchor numbers and the expiry, and this
+ * call spends it. Only a key that identity still holds verifies, and the expiry is bounded
+ * from above, so an old signature is worthless.
+ */
+export interface ClaimNotificationAppRequest {
+  'signature' : Uint8Array | number[],
+  'offering_anchor_number' : UserNumber,
+  'anchor_number' : UserNumber,
+  'expires_at_ns' : bigint,
+}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -2544,6 +2581,15 @@ export interface _SERVICE {
    * the same conditions regardless of the answer here.
    */
   'check_session' : ActorMethod<[], boolean>,
+  /**
+   * Called by the identity being added, from its own browser on the device, with a
+   * token the identity that has the app signed for it.
+   */
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
+  >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],
