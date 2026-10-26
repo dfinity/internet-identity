@@ -1158,10 +1158,10 @@ impl Anchor {
             .map(|browser| browser.id)
     }
 
-    /// Drops what this entry was sent at the address of the record it points at, which is
-    /// everything it has waiting: a browser pointing at a record has no address of its
-    /// own. `true` where anything went.
-    pub fn drop_what_the_app_was_sent(&mut self, browser_id: BrowserId) -> bool {
+    /// Clears everything this browser has waiting, which is all of it: a browser pointing
+    /// at a record has no address of its own, so every entry was bound for the record's
+    /// address and dies with it. `true` where anything went.
+    pub fn clear_notifications_for_browser(&mut self, browser_id: BrowserId) -> bool {
         let Some(browser) = self
             .browsers
             .iter_mut()
@@ -1213,7 +1213,6 @@ impl Anchor {
     fn linked_app_info(
         &self,
         browser_id: BrowserId,
-        now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> Option<NotificationAppInfo> {
         let NotificationAppRef::Linked { app_id, enabled } = self.notification_app(browser_id)?
@@ -1225,7 +1224,6 @@ impl Anchor {
             subscribed: app.webpush_subscription.is_some(),
             enabled,
             last_seen_ns: app.last_used_ns,
-            pending_probe: app.outstanding_probe(now_ns),
         })
     }
 
@@ -1245,7 +1243,7 @@ impl Anchor {
             }
             Some(NotificationAppRef::Pending { .. }) => NotificationAppStatus::NoApp,
             Some(NotificationAppRef::Linked { .. }) => {
-                match self.linked_app_info(browser_id, now_ns, app) {
+                match self.linked_app_info(browser_id, app) {
                     Some(info) => NotificationAppStatus::Linked(info),
                     None => NotificationAppStatus::NoApp,
                 }
@@ -1345,7 +1343,6 @@ impl Anchor {
     /// installed app answering the same thing.
     pub fn browsers_info(
         &self,
-        now_ns: Timestamp,
         app: impl Fn(NotificationAppId) -> Option<NotificationApp>,
     ) -> Option<Vec<BrowserInfo>> {
         if self.browsers.is_empty() {
@@ -1361,7 +1358,7 @@ impl Anchor {
                     last_used: browser.last_used,
                     session_count: browser.session_count,
                     // A probe is read where it was sent, not off the identity's app list.
-                    notification_app: self.linked_app_info(browser.id, now_ns, &app),
+                    notification_app: self.linked_app_info(browser.id, &app),
                 })
                 .collect(),
         )

@@ -18,10 +18,6 @@ use internet_identity_interface::internet_identity::types::{
 /// Most entries one inbox holds. A new one past it replaces the oldest.
 pub(crate) const CAPACITY: usize = 100;
 
-/// The origin Internet Identity's own notification is shown under: it is about this
-/// identity rather than an app, so there is nothing to name and nothing is looked up.
-pub(crate) const NO_APP_ORIGIN: &str = "";
-
 /// Whether a deposited entry calls for a wake-up of its own.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum WakeUp {
@@ -155,7 +151,7 @@ pub(crate) fn next_to_collect(
             .find_map(|entry| {
                 if let Some(event) = entry.event.clone() {
                     return Some(NotificationToShow {
-                        origin: NO_APP_ORIGIN.to_string(),
+                        origin: None,
                         account_number: None,
                         canister_id: entry.sender,
                         id: entry.notification_id,
@@ -165,14 +161,14 @@ pub(crate) fn next_to_collect(
                 let origin =
                     storage.lookup_origin_with_application_number(entry.application_number?)?;
                 let notification = NotificationToShow {
-                    origin,
+                    origin: Some(origin.clone()),
                     account_number: entry.account_number,
                     canister_id: entry.sender,
                     id: entry.notification_id,
                     event: None,
                 };
                 storage
-                    .read_anchor_application_config(anchor_number, &notification.origin)
+                    .read_anchor_application_config(anchor_number, &origin)
                     .filter(|config| config.notifications_allowed())
                     .map(|_| notification)
             })
@@ -195,7 +191,10 @@ pub(crate) fn remove_collected(
         // another one must not shadow the live entry being acknowledged.
         // `next_to_collect` hands out only unexpired entries, so this searches the same
         // set it does.
-        let collected_from = storage.lookup_application_number_with_origin(&collected.origin);
+        let collected_from = collected
+            .origin
+            .as_ref()
+            .and_then(|origin| storage.lookup_application_number_with_origin(origin));
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
             return Ok(());
         };
@@ -549,7 +548,7 @@ mod tests {
         assert!(shown.event.is_some());
 
         let crafted = NotificationToShow {
-            origin: ORIGIN.to_string(),
+            origin: Some(ORIGIN.to_string()),
             event: None,
             ..shown
         };
@@ -589,7 +588,7 @@ mod tests {
         let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the event is shown");
         assert_eq!(shown.id, 1);
         assert!(shown.event.is_some());
-        assert_eq!(shown.origin, NO_APP_ORIGIN);
+        assert_eq!(shown.origin, None);
 
         remove(anchor_number, browser_id, &shown, 2 * SECOND_NS);
 
@@ -613,7 +612,7 @@ mod tests {
         assert_eq!(
             next(anchor_number, browser_id, 2 * SECOND_NS),
             Some(NotificationToShow {
-                origin: ORIGIN.to_string(),
+                origin: Some(ORIGIN.to_string()),
                 account_number: Some(3),
                 canister_id: Principal::from_slice(&[7; 10]),
                 id: 7,
@@ -754,7 +753,7 @@ mod tests {
         let (anchor_number, browser_id) = signed_in();
         put(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
         let gone = NotificationToShow {
-            origin: ORIGIN.to_string(),
+            origin: Some(ORIGIN.to_string()),
             account_number: None,
             canister_id: Principal::from_slice(&[7; 10]),
             id: 8,

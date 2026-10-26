@@ -80,9 +80,10 @@ const internetIdentityActor = async (
 const refFor = (
   identityNumber: bigint,
   notification: NotificationToShow,
+  origin: string,
 ): NotificationRef => ({
   identityNumber,
-  origin: notification.origin,
+  origin,
   accountNumber: notification.account_number[0],
   appCanisterId: notification.canister_id.toText(),
   id: notification.id,
@@ -192,9 +193,15 @@ const showQueued = async (
     pending: Promise<unknown>[];
   },
 ): Promise<boolean> => {
-  const ref = refFor(identityNumber, notification);
+  const [origin] = notification.origin;
+  if (origin === undefined) {
+    // Internet Identity's own, which says what happened rather than naming an app.
+    // This worker has nothing to render it with, so nothing is shown.
+    return false;
+  }
+  const ref = refFor(identityNumber, notification, origin);
   const target = {
-    origin: notification.origin,
+    origin,
     accountNumber: notification.account_number[0],
   };
   const held = await loadPullIdentity({
@@ -211,7 +218,7 @@ const showQueued = async (
     await show(context, ref, {
       title: PLACEHOLDER_TITLE,
       body: PLACEHOLDER_BODY,
-      url: notification.origin,
+      url: origin,
     });
     sendAndForget(
       pending,
@@ -244,8 +251,8 @@ const showQueued = async (
   }
 
   const [sender, alternativeOrigins] = await Promise.all([
-    senderOf(notification.origin),
-    fetchAlternativeOrigins(notification.origin),
+    senderOf(origin),
+    fetchAlternativeOrigins(origin),
   ]);
   await show(context, ref, {
     // The sender leads the title: an app's own title and body are its text to
@@ -256,7 +263,7 @@ const showQueued = async (
     icon: sender.icon,
     url: allowedLink({
       url: content.url,
-      origin: notification.origin,
+      origin,
       alternativeOrigins,
     }),
   });

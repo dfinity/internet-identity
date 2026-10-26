@@ -1917,8 +1917,7 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let browsers =
-            anchor.browsers_info(ic_cdk::api::time(), notifications::installed_app::record);
+        let browsers = anchor.browsers_info(notifications::installed_app::record);
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

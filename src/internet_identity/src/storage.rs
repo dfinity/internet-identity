@@ -1610,7 +1610,7 @@ impl<M: Memory + Clone> Storage<M> {
                 .collect();
             let mut cleared = false;
             for browser_id in pointing {
-                cleared |= anchor.drop_what_the_app_was_sent(browser_id);
+                cleared |= anchor.clear_notifications_for_browser(browser_id);
             }
             if !cleared {
                 continue;

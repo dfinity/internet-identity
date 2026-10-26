@@ -1673,7 +1673,6 @@ mod browser_tests {
                 subscribed: false,
                 enabled: true,
                 last_seen_ns: 2_000,
-                pending_probe: None,
             })
         );
         assert_eq!(
@@ -1697,18 +1696,17 @@ mod browser_tests {
 
         assert_eq!(
             anchor
-                .browsers_info(0, |app_id| Some(record(app_id, 2_000)))
+                .browsers_info(|app_id| Some(record(app_id, 2_000)))
                 .expect("one browser")[0]
                 .notification_app,
             Some(NotificationAppInfo {
                 subscribed: false,
                 enabled: true,
                 last_seen_ns: 2_000,
-                pending_probe: None,
             })
         );
         assert_eq!(
-            anchor.browsers_info(0, |_| None).expect("one browser")[0].notification_app,
+            anchor.browsers_info(|_| None).expect("one browser")[0].notification_app,
             None
         );
     }
