@@ -2,6 +2,7 @@ use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::session_delegation::expected_session_principal;
+use crate::storage::account::{Session, SessionLocator};
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
 use crate::{anchor_management, state};
@@ -9,7 +10,8 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, BrowserId, IdentityNumber,
+    AccountNumber, AnchorNumber, AuthorizationKey, BrowserId, FrontendHostname, IdentityNumber,
+    SessionId, Timestamp,
 };
 use std::fmt::{Display, Formatter};
 
@@ -235,6 +237,59 @@ pub fn check_browser_authorization(
         .browser_by_principal(caller)
         .ok_or(AuthorizationError::from(caller))?;
     Ok((anchor, browser_id))
+}
+
+/// The live app session the caller is signing as.
+pub struct AuthorizedSession {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_id: SessionId,
+    pub valid_till_ns: Timestamp,
+    pub read_only: bool,
+}
+
+/// The app session behind this call, if the caller still has a usable one.
+///
+/// An app is recognised by how it signed the call, not by anything it passes, so there is
+/// nothing here to validate and no way to ask about a session other than its own. A
+/// session that has run past its lifetime, or sat unused too long, counts as gone.
+pub fn check_app_authorization(now: Timestamp) -> Result<AuthorizedSession, AuthorizationError> {
+    let caller = caller();
+
+    let (locator, session) = state::storage_borrow(|storage| {
+        let locator = storage.lookup_session_with_principal(caller)?;
+        let session = storage.read_session(&locator)?;
+        Some((locator, session))
+    })
+    .ok_or(AuthorizationError::from(caller))?;
+
+    // Either bound: a session past its lifetime and one nobody has used for longer than
+    // it was allowed are equally gone.
+    if session.is_expired_or_idle(now) {
+        return Err(AuthorizationError::from(caller));
+    }
+
+    let SessionLocator {
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
+    } = locator;
+    let Session {
+        valid_till_ns,
+        read_only,
+        ..
+    } = session;
+
+    Ok(AuthorizedSession {
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
+        valid_till_ns,
+        read_only,
+    })
 }
 
 /// Whether the prepare-time [`AuthorizationKey`] is still a valid

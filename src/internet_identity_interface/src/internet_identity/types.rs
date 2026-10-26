@@ -1061,6 +1061,27 @@ pub enum NotificationRevokeConsentError {
     InternalCanisterError(String),
 }
 
+/// What an app is told about its own consent. A record rather than a bare `bool`, so a
+/// second fact about the decision can be added without a breaking change.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppNotificationConsentStatusResponse {
+    pub is_granted: bool,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppNotificationConsentStatusError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppRevokeNotificationConsentError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationGrantConsentRequest {
     pub anchor_number: AnchorNumber,

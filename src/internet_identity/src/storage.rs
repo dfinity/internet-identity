@@ -4018,17 +4018,24 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Ends one session, index entry and count included.
+    /// Ends the session a principal signs as, index entry and count included.
     ///
-    /// The key names one session by its id, so a key for a session that was replaced since
-    /// is [`StorageError::SessionNotFound`] rather than taking its successor down with it.
-    /// One pass removes it and says whether there was anything to remove, so the walk that
-    /// checked and the walk that removed are the same walk.
+    /// A principal the index does not lead to is `Ok`: revoking asks for the session to be
+    /// gone, and it is. The id comes from the index rather than the caller, so a principal
+    /// whose session was replaced since cannot take its successor down with it.
+    ///
+    /// One pass removes the session and says whether there was anything to remove, so the
+    /// walk that checked and the walk that removed are the same walk.
     pub fn revoke_session(
         &mut self,
-        key: &SessionLocator,
+        principal: Principal,
         now: Timestamp,
     ) -> Result<(), StorageError> {
+        let Some(key) = self.lookup_session_with_principal(principal) else {
+            return Ok(());
+        };
+        let key = &key;
+
         let not_found = || StorageError::SessionNotFound {
             anchor_number: key.anchor_number,
             session_id: key.session_id,

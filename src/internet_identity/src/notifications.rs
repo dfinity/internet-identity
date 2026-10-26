@@ -24,13 +24,11 @@ use crate::storage::storable::anchor_application_config::PermissionDecision;
 use crate::storage::StorageError;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, FrontendHostname, NotAccepted, NotAcceptedReason, Notification,
-    NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
-    Timestamp,
+    NotificationGrantConsentError, SendNotificationResponse, Timestamp,
 };
 pub(crate) use validation::NOT_ENABLED_MESSAGE;
 pub use validation::{
-    admit_batch, enabled_or, fetchable_origin, notifications_enabled, notifying_origin,
-    TooManyNotifications,
+    admit_batch, enabled_or, fetchable_origin, notifications_enabled, TooManyNotifications,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at
@@ -64,16 +62,18 @@ pub fn grant_consent(
         .map_err(|err| NotificationGrantConsentError::InternalCanisterError(format!("{err}")))
 }
 
-/// Withdraws the origin's consent, and what it still has queued for the identity's
-/// browsers. Device subscriptions stay: they are shared across every consented app.
+/// Withdraws `origin`'s consent to notify `anchor_number`, and what it still has queued for
+/// the identity's browsers. Device subscriptions stay: they are shared across every
+/// consented app. Consent that was never given is already withdrawn, so that is `Ok`.
 pub fn revoke_consent(
     anchor_number: AnchorNumber,
     origin: &ApplicationOrigin,
     now_ns: Timestamp,
-) -> Result<(), NotificationRevokeConsentError> {
-    // Consent that cannot exist is already withdrawn, so an app the identity never
-    // reached is nothing to report.
-    let _ = write_notifications_decision(anchor_number, origin, false, now_ns);
+) -> Result<(), StorageError> {
+    // Consent that cannot exist is already withdrawn: writing `false` where no decision
+    // is stored changes nothing and answers `Ok` without a write, so only a write that
+    // genuinely fails is reported here.
+    write_notifications_decision(anchor_number, origin, false, now_ns)?;
     browser_inbox::remove_app_entries(anchor_number, origin);
     Ok(())
 }
@@ -156,18 +156,15 @@ mod tests {
     ) -> Result<(), NotificationGrantConsentError> {
         grant_consent(
             anchor_number,
-            &notifying_origin(origin).expect("a notifiable origin"),
+            &ApplicationOrigin::try_from(origin).expect("a bare origin"),
             now_ns,
         )
     }
 
-    fn revoke(
-        anchor_number: AnchorNumber,
-        origin: &str,
-    ) -> Result<(), NotificationRevokeConsentError> {
+    fn revoke(anchor_number: AnchorNumber, origin: &str) -> Result<(), StorageError> {
         revoke_consent(
             anchor_number,
-            &notifying_origin(origin).expect("a notifiable origin"),
+            &ApplicationOrigin::try_from(origin).expect("a bare origin"),
             1_000,
         )
     }
@@ -175,7 +172,7 @@ mod tests {
     fn granted(anchor_number: AnchorNumber, origin: &str) -> bool {
         consent_granted(
             anchor_number,
-            &notifying_origin(origin).expect("a notifiable origin"),
+            &ApplicationOrigin::try_from(origin).expect("a bare origin"),
         )
     }
 

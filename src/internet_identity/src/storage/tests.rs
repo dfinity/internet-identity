@@ -6772,23 +6772,24 @@ mod session_removal_tests {
     use super::params;
     use super::TEST_NOW;
     use crate::storage::account::SessionLocator;
-    use crate::storage::{CreateSessionParams, StorageError};
+    use crate::storage::CreateSessionParams;
     use crate::Storage;
+    use candid::Principal;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
 
     const ORIGIN: &str = "https://example.com";
 
-    /// The keys come back with the storage: a session is named by the id it was
-    /// allocated, which only the ceremony that created it knows.
+    /// The principals come back with the storage: a session is revoked by the principal
+    /// it signs as, which only the ceremony that created it knows.
     fn storage_with_sessions(
         browsers: &[u8],
     ) -> (
         Storage<VectorMemory>,
         AnchorNumber,
         u64,
-        Vec<SessionLocator>,
+        Vec<Principal>,
     ) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt([17u8; 32]);
@@ -6806,11 +6807,22 @@ mod session_removal_tests {
                     .unwrap()
                     .0
             })
+            .collect::<Vec<SessionLocator>>();
+        let principals = keys
+            .iter()
+            .map(|key| {
+                storage
+                    .lookup_session_with_principal_memory
+                    .iter()
+                    .find(|(_, handle)| handle.session_id == key.session_id)
+                    .map(|(principal, _)| principal)
+                    .expect("the session should be indexed")
+            })
             .collect();
         let application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
-        (storage, anchor_number, application_number, keys)
+        (storage, anchor_number, application_number, principals)
     }
 
     fn sessions(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<u32> {
@@ -6831,22 +6843,22 @@ mod session_removal_tests {
     fn removing_a_session_leaves_the_others() {
         let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1, 2, 3]);
 
-        storage.revoke_session(&keys[1], TEST_NOW).unwrap();
+        storage.revoke_session(keys[1], TEST_NOW).unwrap();
 
         // Ids in registration order, so the seeds 1, 2, 3 became 0, 1, 2.
         assert_eq!(sessions(&storage, anchor_number), vec![0, 2]);
     }
 
     #[test]
-    fn removing_a_session_twice_is_refused_the_second_time() {
+    fn removing_a_session_twice_leaves_it_gone() {
         let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1]);
-        storage.revoke_session(&keys[0], TEST_NOW).unwrap();
+        storage.revoke_session(keys[0], TEST_NOW).unwrap();
 
-        let refused = storage.revoke_session(&keys[0], TEST_NOW);
+        let second = storage.revoke_session(keys[0], TEST_NOW);
 
         assert!(
-            matches!(refused, Err(StorageError::SessionNotFound { .. })),
-            "a session already gone should be refused, got {refused:?}"
+            second.is_ok(),
+            "a principal that leads nowhere is already in the state revoking asks for, got {second:?}"
         );
         assert_eq!(sessions(&storage, anchor_number), Vec::<u32>::new());
     }
@@ -6855,7 +6867,7 @@ mod session_removal_tests {
     fn removing_the_last_session_keeps_the_reference() {
         let (mut storage, anchor_number, application_number, keys) = storage_with_sessions(&[1]);
 
-        storage.revoke_session(&keys[0], TEST_NOW).unwrap();
+        storage.revoke_session(keys[0], TEST_NOW).unwrap();
 
         assert_ne!(
             storage.stored_account_references(anchor_number, application_number),
@@ -6998,6 +7010,7 @@ mod write_path_property_tests {
     use super::params_at;
     use super::record_use;
     use super::TEST_NOW;
+    use candid::Principal;
     use crate::storage::account::{AccountKey, AccountReference};
     use crate::storage::{CreateSessionParams, Storage};
     use ic_stable_structures::VectorMemory;
@@ -7088,8 +7101,8 @@ mod write_path_property_tests {
                 });
             }
             5 => {
-                if let Some(key) = pick_session(storage, anchor_number, &origin, rng) {
-                    let _ = storage.revoke_session(&key, TEST_NOW);
+                if let Some(principal) = pick_session(storage, anchor_number, &origin, rng) {
+                    let _ = storage.revoke_session(principal, TEST_NOW);
                 }
             }
             _ => {
@@ -7122,7 +7135,7 @@ mod write_path_property_tests {
         anchor_number: AnchorNumber,
         origin: &str,
         rng: &mut Rng,
-    ) -> Option<crate::storage::account::SessionLocator> {
+    ) -> Option<Principal> {
         let application_number =
             storage.lookup_application_number_with_origin(&origin.to_string())?;
         let references = storage.stored_account_references(anchor_number, application_number)?;
@@ -7138,13 +7151,12 @@ mod write_path_property_tests {
         if sessions.is_empty() {
             return None;
         }
-        let (account_number, session_id) = sessions[rng.below(sessions.len() as u64) as usize];
-        Some(crate::storage::account::SessionLocator {
-            anchor_number,
-            origin: origin.to_string(),
-            account_number,
-            session_id,
-        })
+        let (_, session_id) = sessions[rng.below(sessions.len() as u64) as usize];
+        storage
+            .lookup_session_with_principal_memory
+            .iter()
+            .find(|(_, handle)| handle.session_id == session_id)
+            .map(|(principal, _)| principal)
     }
 
     /// Every derived value, rebuilt from the lists a second way.

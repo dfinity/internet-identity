@@ -3,14 +3,16 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::delegation::DelegationAccess;
+use crate::origin::ApplicationOrigin;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
-    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization, check_browser_or_notification_app_authorization,
-    check_notification_app_authorization, NotificationKey,
+    anchor_operation_with_authz_check, check_app_authorization, check_authorization,
+    check_authz_and_record_activity, check_browser_authorization,
+    check_browser_or_notification_app_authorization, check_notification_app_authorization,
+    AuthorizedSession, NotificationKey,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -44,9 +46,7 @@ use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
-use notifications::{
-    admit_batch, enabled_or, fetchable_origin, notifying_origin, TooManyNotifications,
-};
+use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -855,8 +855,9 @@ fn prepare_notification_delegation(
         account_number,
         session_key,
     } = request;
-    let origin =
-        notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(NotificationDelegationError::InternalCanisterError)?;
+    enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
@@ -885,8 +886,9 @@ fn get_notification_delegation(
         session_key,
         expiration,
     } = request;
-    let origin =
-        notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(NotificationDelegationError::InternalCanisterError)?;
+    enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
@@ -957,32 +959,37 @@ fn browser_remove_notification(
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,
 ) -> Result<(), NotificationGrantConsentError> {
+    use NotificationGrantConsentError::*;
+
     let NotificationGrantConsentRequest {
         anchor_number,
         origin,
     } = request;
-    let origin =
-        notifying_origin(&origin).map_err(NotificationGrantConsentError::InternalCanisterError)?;
-    check_authz_and_record_activity(anchor_number)
-        .map_err(|_| NotificationGrantConsentError::Unauthorized(caller()))?;
+
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+    notifications::enabled_or(InternalCanisterError)?;
+
+    check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
     notifications::grant_consent(anchor_number, &origin, ic_cdk::api::time())
 }
 
 #[update]
 fn notification_revoke_consent(
-    request: NotificationRevokeConsentRequest,
-) -> Result<(), NotificationRevokeConsentError> {
-    let NotificationRevokeConsentRequest {
+    NotificationRevokeConsentRequest {
         anchor_number,
         origin,
-    } = request;
-    let origin =
-        notifying_origin(&origin).map_err(NotificationRevokeConsentError::InternalCanisterError)?;
-    check_authz_and_record_activity(anchor_number)
-        .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
+    }: NotificationRevokeConsentRequest,
+) -> Result<(), NotificationRevokeConsentError> {
+    use NotificationRevokeConsentError::*;
+
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+    notifications::enabled_or(InternalCanisterError)?;
+
+    check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
     notifications::revoke_consent(anchor_number, &origin, ic_cdk::api::time())
+        .map_err(|err| InternalCanisterError(format!("{err}")))
 }
 
 /// `false` for an origin this deployment does not notify for and for an unauthorized
@@ -993,14 +1000,56 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
         anchor_number,
         origin,
     } = request;
-    let Ok(origin) = notifying_origin(&origin) else {
+    let Ok(origin) = ApplicationOrigin::try_from(origin.as_str()) else {
         return false;
     };
+    if !notifications::notifications_enabled() {
+        return false;
+    }
     if check_authorization(anchor_number).is_err() {
         return false;
     }
 
     notifications::consent_granted(anchor_number, &origin)
+}
+
+// ---- Notifications: called by an app's frontend ----
+
+#[query]
+fn app_notification_consent_status(
+) -> Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError> {
+    use AppNotificationConsentStatusError::*;
+
+    notifications::enabled_or(InternalCanisterError)?;
+
+    let AuthorizedSession {
+        anchor_number,
+        origin,
+        ..
+    } = check_app_authorization(ic_cdk::api::time()).map_err(|_| NoSuchSession)?;
+
+    Ok(AppNotificationConsentStatusResponse {
+        is_granted: notifications::consent_granted_for(anchor_number, &origin),
+    })
+}
+
+#[update]
+fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
+    use AppRevokeNotificationConsentError::*;
+
+    let now = ic_cdk::api::time();
+
+    let AuthorizedSession {
+        anchor_number,
+        origin,
+        ..
+    } = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+
+    notifications::enabled_or(InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+
+    notifications::revoke_consent(anchor_number, &origin, now)
+        .map_err(|err| InternalCanisterError(format!("{err}")))
 }
 
 // ---- Notifications: called by an app's backend ----
@@ -1015,7 +1064,9 @@ fn app_send_notification(
         origin,
         notifications,
     } = request;
-    let origin = notifying_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(SendNotificationError::InternalCanisterError)?;
+    enabled_or(SendNotificationError::InternalCanisterError)?;
     fetchable_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
     let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {
         SendNotificationError::TooManyNotifications {
@@ -1251,7 +1302,14 @@ fn get_account_session(
 fn app_prepare_delegation(
     request: AppPrepareDelegationRequest,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
-    sessions::app_prepare_delegation(request)
+    let now = ic_cdk::api::time();
+
+    // `NoSuchSession` whichever bound refused: which one it was would tell the app
+    // something about the identity behind the session, and it would do nothing
+    // differently either way.
+    let session = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+
+    sessions::app_prepare_delegation(session, request, now)
 }
 
 #[update]
@@ -1263,19 +1321,29 @@ fn revoke_browser_sessions(
 
 #[update]
 fn app_revoke_session() -> Result<(), AppSessionError> {
-    sessions::app_revoke_session(ic_cdk::api::time())
+    // Nothing to authorize: the caller arrives as the principal its session signs with,
+    // which names that session and no other, and a session past its bounds is still the
+    // caller's to sign out. Idempotent — a session that is not there is `Ok`.
+    state::storage_borrow_mut(|storage| storage.revoke_session(caller(), ic_cdk::api::time()))
+        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))
 }
 
+/// Whether the calling session is still usable, for the II frontend's silent re-auth
+/// path. Advisory: a query reply is not certified, and the refresh path enforces the
+/// same conditions on every mint regardless of the answer here.
 #[query]
 fn check_session() -> bool {
-    sessions::check_session()
+    check_app_authorization(ic_cdk::api::time()).is_ok()
 }
 
 #[query]
 fn app_get_delegation(
     request: AppGetDelegationRequest,
 ) -> Result<SignedDelegation, AppSessionError> {
-    sessions::app_get_delegation(request)
+    let now = ic_cdk::api::time();
+    let session = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+
+    sessions::app_get_delegation(session, request, now)
 }
 
 #[update]

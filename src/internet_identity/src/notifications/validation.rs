@@ -37,19 +37,6 @@ pub fn admit_batch(
     Ok(dedup_last_wins(notifications))
 }
 
-/// The origin of an application this deployment notifies for.
-///
-/// Two answers in one: the folded spelling, and the deployment-wide gate. The gate is
-/// not a property of the origin — it is read from persistent state and can change under
-/// a value already in hand — so it is asked here, per call, rather than carried.
-pub fn notifying_origin(origin: &str) -> Result<ApplicationOrigin, String> {
-    let origin = ApplicationOrigin::try_from(origin)?;
-    if !notifications_enabled() {
-        return Err(NOT_ENABLED_MESSAGE.to_string());
-    }
-    Ok(origin)
-}
-
 /// Collapses each `(recipient, id)` to its last entry, in the place the first
 /// held: a re-send replaces a pending notification rather than queueing behind
 /// it.
@@ -257,7 +244,7 @@ mod tests {
             "https://abc-cai.ic0.app",
         ] {
             assert_eq!(
-                notifying_origin(origin).unwrap().as_str(),
+                ApplicationOrigin::try_from(origin).unwrap().as_str(),
                 "https://abc-cai.ic0.app"
             );
         }
@@ -267,7 +254,9 @@ mod tests {
     fn leaves_a_custom_domain_alone() {
         set_enabled(Some(true));
         assert_eq!(
-            notifying_origin("https://oisy.com").unwrap().as_str(),
+            ApplicationOrigin::try_from("https://oisy.com")
+                .unwrap()
+                .as_str(),
             "https://oisy.com"
         );
     }
@@ -278,7 +267,7 @@ mod tests {
     fn leaves_a_deeper_subdomain_alone() {
         set_enabled(Some(true));
         assert_eq!(
-            notifying_origin("https://foo.bar.icp0.io")
+            ApplicationOrigin::try_from("https://foo.bar.icp0.io")
                 .unwrap()
                 .as_str(),
             "https://foo.bar.icp0.io"
@@ -289,28 +278,38 @@ mod tests {
     fn keeps_the_raw_label_the_frontend_keeps() {
         set_enabled(Some(true));
         assert_eq!(
-            notifying_origin("https://abc-cai.raw.icp0.io")
+            ApplicationOrigin::try_from("https://abc-cai.raw.icp0.io")
                 .unwrap()
                 .as_str(),
             "https://abc-cai.raw.ic0.app"
         );
     }
 
+    /// The gate is asked of the deployment, not of the origin: a well-formed origin
+    /// reads as well-formed whether or not anything is notified.
     #[test]
-    fn accepts_any_origin_while_enabled() {
+    fn an_origin_is_admitted_while_enabled() {
         set_enabled(Some(true));
-        assert!(notifying_origin("https://any.example").is_ok());
+        assert!(enabled_or(|message| message).is_ok());
+        assert!(ApplicationOrigin::try_from("https://any.example").is_ok());
     }
 
     #[test]
-    fn refuses_every_origin_while_disabled() {
+    fn every_endpoint_is_refused_while_disabled() {
         set_enabled(Some(false));
-        assert!(notifying_origin("https://any.example").is_err());
+        assert_eq!(
+            enabled_or(|message| message),
+            Err(NOT_ENABLED_MESSAGE.to_string())
+        );
+        assert!(ApplicationOrigin::try_from("https://any.example").is_ok());
     }
 
     #[test]
-    fn refuses_every_origin_when_nothing_is_configured() {
+    fn every_endpoint_is_refused_when_nothing_is_configured() {
         set_enabled(None);
-        assert!(notifying_origin("https://allowed.example").is_err());
+        assert_eq!(
+            enabled_or(|message| message),
+            Err(NOT_ENABLED_MESSAGE.to_string())
+        );
     }
 }

@@ -2,21 +2,23 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, ClaimNotificationAppError, ClaimNotificationAppRequest,
-    DisableNotificationAppError, DisableNotificationAppRequest, EnableNotificationAppError,
-    EnableNotificationAppRequest, FrontendHostname, GetNextNotificationError,
-    GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationAppStatusRequest,
-    GetNotificationDelegationRequest, GetNotificationDelegationResponse,
-    GetWebPushSubscriptionStatusRequest, LinkNotificationAppError, LinkNotificationAppRequest,
-    LinkNotificationAppResponse, NotificationAppAnchorsRequest, NotificationAppStatus,
-    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationId, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
-    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
-    PrepareNotificationDelegationResponse, ProbeNotificationAppError, ProbeNotificationAppRequest,
-    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
-    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
-    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    AnchorNumber, AppNotificationConsentStatusError, AppNotificationConsentStatusResponse,
+    AppRevokeNotificationConsentError, BrowserId, ClaimNotificationAppError,
+    ClaimNotificationAppRequest, DisableNotificationAppError, DisableNotificationAppRequest,
+    EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
+    GetNextNotificationError, GetNextNotificationRequest, GetNextNotificationResponse,
+    GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
+    GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
+    LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
+    NotificationAppAnchorsRequest, NotificationAppStatus, NotificationConsentGrantedRequest,
+    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
+    NotificationId, NotificationRevokeConsentError, NotificationRevokeConsentRequest,
+    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
+    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
+    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
+    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
+    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+    WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -113,6 +115,40 @@ pub fn consent_granted(
             anchor_number,
             origin,
         },),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_notification_consent_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<
+    Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError>,
+    RejectResponse,
+> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_notification_consent_status",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_revoke_notification_consent(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<(), AppRevokeNotificationConsentError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_revoke_notification_consent",
+        (),
     )
     .map(|(x,)| x)
 }

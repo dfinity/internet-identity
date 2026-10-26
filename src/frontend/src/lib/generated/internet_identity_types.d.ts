@@ -96,6 +96,20 @@ export interface AppGetDelegationRequest {
    */
   'expiration' : Timestamp,
 }
+export type AppNotificationConsentStatusError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+/**
+ * What an app is told about its own consent. A record rather than a bare bool, so a
+ * second fact about the decision can be added without a breaking change.
+ */
+export interface AppNotificationConsentStatusResponse { 'is_granted' : boolean }
 export interface AppPrepareDelegationRequest {
   /**
    * The key the app delegation delegates to. Nothing about the account is named:
@@ -107,6 +121,15 @@ export interface AppPrepareDelegationResponse {
   'user_key' : PublicKey,
   'expiration' : Timestamp,
 }
+export type AppRevokeNotificationConsentError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
 export type AppSessionError = {
     /**
      * The session is live, but nothing was signed for the session_key and expiration
@@ -2591,6 +2614,14 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
+   * Called by an app's frontend, as its session.
+   */
+  'app_notification_consent_status' : ActorMethod<
+    [],
+    { 'Ok' : AppNotificationConsentStatusResponse } |
+      { 'Err' : AppNotificationConsentStatusError }
+  >,
+  /**
    * Mints a short-lived app delegation from a live session. Called by app frontends
    * with the session chain, so revoking the session ends access within one delegation
    * lifetime.
@@ -2599,6 +2630,11 @@ export interface _SERVICE {
     [AppPrepareDelegationRequest],
     { 'Ok' : AppPrepareDelegationResponse } |
       { 'Err' : AppSessionError }
+  >,
+  'app_revoke_notification_consent' : ActorMethod<
+    [],
+    { 'Ok' : null } |
+      { 'Err' : AppRevokeNotificationConsentError }
   >,
   /**
    * Signs the calling session out. A session that is already gone is success, so a

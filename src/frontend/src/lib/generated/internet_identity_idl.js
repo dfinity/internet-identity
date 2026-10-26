@@ -162,12 +162,23 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
+  const AppNotificationConsentStatusResponse = IDL.Record({
+    'is_granted' : IDL.Bool,
+  });
+  const AppNotificationConsentStatusError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
   const AppPrepareDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
   });
   const AppPrepareDelegationResponse = IDL.Record({
     'user_key' : PublicKey,
     'expiration' : Timestamp,
+  });
+  const AppRevokeNotificationConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
   });
   const NotificationId = IDL.Nat64;
   const Urgency = IDL.Variant({
@@ -1215,12 +1226,32 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
         ['query'],
       ),
+    'app_notification_consent_status' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : AppNotificationConsentStatusResponse,
+            'Err' : AppNotificationConsentStatusError,
+          }),
+        ],
+        ['query'],
+      ),
     'app_prepare_delegation' : IDL.Func(
         [AppPrepareDelegationRequest],
         [
           IDL.Variant({
             'Ok' : AppPrepareDelegationResponse,
             'Err' : AppSessionError,
+          }),
+        ],
+        [],
+      ),
+    'app_revoke_notification_consent' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AppRevokeNotificationConsentError,
           }),
         ],
         [],
