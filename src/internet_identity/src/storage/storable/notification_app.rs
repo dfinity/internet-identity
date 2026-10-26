@@ -1,4 +1,4 @@
-use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use candid::Principal;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -16,9 +16,9 @@ pub struct StorableNotificationApp {
     #[cbor(n(1), with = "minicbor::bytes")]
     pub principal: Vec<u8>,
     #[n(2)]
-    pub created_at: Timestamp,
+    pub created_at_ns: Timestamp,
     #[n(3)]
-    pub last_used: Timestamp,
+    pub last_used_ns: Timestamp,
 }
 
 impl From<NotificationApp> for StorableNotificationApp {
@@ -26,8 +26,8 @@ impl From<NotificationApp> for StorableNotificationApp {
         StorableNotificationApp {
             id: value.id,
             principal: value.principal.as_slice().to_vec(),
-            created_at: value.created_at,
-            last_used: value.last_used,
+            created_at_ns: value.created_at_ns,
+            last_used_ns: value.last_used_ns,
         }
     }
 }
@@ -37,8 +37,8 @@ impl From<StorableNotificationApp> for NotificationApp {
         NotificationApp {
             id: value.id,
             principal: Principal::from_slice(&value.principal),
-            created_at: value.created_at,
-            last_used: value.last_used,
+            created_at_ns: value.created_at_ns,
+            last_used_ns: value.last_used_ns,
         }
     }
 }

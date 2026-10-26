@@ -104,7 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
-use crate::notifications::app::{NotificationApp, NotificationAppId};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -3271,7 +3271,7 @@ impl<M: Memory + Clone> Storage<M> {
         if let Some(app) = known.and_then(|app_id| self.notification_app_of(app_id, app_principal))
         {
             let app = NotificationApp {
-                last_used: now,
+                last_used_ns: now,
                 ..app
             };
             self.notification_app_memory
@@ -3281,8 +3281,8 @@ impl<M: Memory + Clone> Storage<M> {
         let app = NotificationApp {
             id: self.allocate_notification_app_id()?,
             principal: app_principal,
-            created_at: now,
-            last_used: now,
+            created_at_ns: now,
+            last_used_ns: now,
         };
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
