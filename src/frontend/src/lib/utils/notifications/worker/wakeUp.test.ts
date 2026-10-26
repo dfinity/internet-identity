@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Principal } from "@icp-sdk/core/principal";
 import type { Identity } from "@icp-sdk/core/agent";
+import type { NotificationEvent } from "$lib/generated/internet_identity_types";
 
-const registeredIdentityNumbers = vi.fn<() => Promise<bigint[]>>();
+const signing =
+  vi.fn<() => Promise<{ identityNumber: bigint; identity: Identity }[]>>();
 const loadPullIdentity = vi.fn<() => Promise<Identity | undefined>>();
 const mintPullIdentity = vi.fn<() => Promise<Identity | undefined>>();
 const fetchNotificationContent = vi.fn();
@@ -13,9 +15,6 @@ const fetchAppMetadata = vi.fn((): Promise<{ name?: string } | undefined> =>
 const refillJwtPool = vi.fn((_options: unknown) => Promise.resolve(false));
 const fetchAlternativeOrigins = vi.fn(() => Promise.resolve([] as string[]));
 
-const browserKeyIdentity = vi.fn<() => Promise<Identity | undefined>>(() =>
-  Promise.resolve(undefined),
-);
 const createSync = vi.fn((_options: unknown) => ({}));
 
 const AGENT_OPTIONS = {
@@ -23,9 +22,8 @@ const AGENT_OPTIONS = {
   shouldFetchRootKey: true,
 };
 
-vi.mock("$lib/stores/browser-key.store", () => ({
-  registeredIdentityNumbers: () => registeredIdentityNumbers(),
-  browserKeyIdentity: () => browserKeyIdentity(),
+vi.mock("$lib/utils/notifications/signingIdentities", () => ({
+  signingIdentities: () => signing(),
 }));
 vi.mock("$lib/utils/notifications/workerConfig", () => ({
   config: {
@@ -87,6 +85,8 @@ const notification = {
   account_number: [] as [],
   canister_id: SENDER,
   id: BigInt(42),
+  // Sent by an app, which is what the worker fetches text from.
+  event: [] as [] | [NotificationEvent],
 };
 
 /** A registration that remembers what is on screen, as the browser would. */
@@ -114,6 +114,7 @@ const registration = () => {
         shown
           .filter((entry) => tag === undefined || entry.options.tag === tag)
           .map((entry) => ({
+            tag: entry.options.tag,
             data: entry.options.data,
             close: entry.close,
           })),
@@ -148,10 +149,12 @@ const internetIdentity = (queue: (typeof notification)[]) => {
 
 const identity = {} as Identity;
 
+/** An entry this storage can sign for, as `signingIdentities` answers them. */
+const signs = (identityNumber: bigint) => ({ identityNumber, identity });
+
 beforeEach(() => {
   vi.clearAllMocks();
-  browserKeyIdentity.mockResolvedValue(undefined);
-  registeredIdentityNumbers.mockResolvedValue([IDENTITY]);
+  signing.mockResolvedValue([signs(IDENTITY)]);
   loadPullIdentity.mockResolvedValue(identity);
   mintPullIdentity.mockResolvedValue(identity);
   fetchNotificationContent.mockResolvedValue({
@@ -189,8 +192,6 @@ describe("onWakeUp", () => {
     // Every other case injects the actor, so this is the only cover for the one the
     // worker builds: without the page's options it would talk to mainnet's default
     // host and verify against the wrong root key.
-    browserKeyIdentity.mockResolvedValue({} as Identity);
-
     await onWakeUp({ registration: registration() });
 
     expect(createSync).toHaveBeenCalledWith(
@@ -209,20 +210,176 @@ describe("onWakeUp", () => {
     );
   });
 
-  it("shows a placeholder and mints a delegation when it holds none", async () => {
+  it("mints a delegation it holds none of and shows the app's text", async () => {
     const shown = registration();
     const ii = internetIdentity([notification]);
     loadPullIdentity.mockResolvedValue(undefined);
+    fetchAppMetadata.mockResolvedValue({ name: "Example App" });
 
     await onWakeUp({
       registration: shown,
       internetIdentity: ii.factory,
     });
 
-    expect(shown.shown[0].title).toBe("Internet Identity");
     expect(mintPullIdentity).toHaveBeenCalledOnce();
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Example App · New message",
+    ]);
+    expect(ii.removed).toHaveLength(1);
+  });
+
+  it("shows the placeholder where the delegation does not arrive in time", async () => {
+    const shown = registration();
+    const ii = internetIdentity([notification]);
+    loadPullIdentity.mockResolvedValue(undefined);
+    // Answers only once the test says so, which is how the mint is still running while the screen is checked.
+    let finishMint = (_identity: Identity | undefined) => undefined as void;
+    mintPullIdentity.mockImplementation(
+      () =>
+        new Promise<Identity | undefined>((resolve) => {
+          finishMint = resolve;
+        }),
+    );
+
+    let returned = false;
+    const wakeUp = onWakeUp({
+      registration: shown,
+      internetIdentity: ii.factory,
+    }).then(() => {
+      returned = true;
+    });
+    // The placeholder is owed at the deadline rather than at the end of the wake-up.
+    await vi.waitFor(
+      () => expect(shown.shown[0]?.title).toBe("Internet Identity"),
+      {
+        timeout: 10_000,
+        interval: 100,
+      },
+    );
+    await new Promise((settle) => setTimeout(settle, 50));
+
+    // Returning here would leave the delegation the still-running mint is about to answer with nowhere to be cached.
+    expect(returned).toBe(false);
+    finishMint(undefined);
+    await wakeUp;
+    expect(returned).toBe(true);
+
     expect(fetchNotificationContent).not.toHaveBeenCalled();
-    expect(ii.removed).toHaveLength(0);
+    // A wake-up that left its entry queued would put the queue one behind every
+    // wake-up after it, so the entry is spent even though only the placeholder
+    // could be shown for it.
+    expect(ii.removed).toHaveLength(1);
+  }, 15_000);
+
+  it("replaces the placeholder with the app's own text when the mint lands late", async () => {
+    const shown = registration();
+    const ii = internetIdentity([notification]);
+    loadPullIdentity.mockResolvedValue(undefined);
+    let finishMint = (_identity: Identity | undefined) => undefined as void;
+    mintPullIdentity.mockImplementation(
+      () =>
+        new Promise<Identity | undefined>((resolve) => {
+          finishMint = resolve;
+        }),
+    );
+
+    const wakeUp = onWakeUp({
+      registration: shown,
+      internetIdentity: ii.factory,
+    });
+    await vi.waitFor(
+      () => expect(shown.shown[0]?.title).toBe("Internet Identity"),
+      { timeout: 10_000, interval: 100 },
+    );
+
+    finishMint(identity);
+    await wakeUp;
+
+    // The placeholder carries this entry's own tag, so the app's text closes it.
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Example App · New message",
+    ]);
+    expect(ii.removed).toHaveLength(1);
+  }, 15_000);
+
+  it("says the deadline ran out rather than that the mint failed", async () => {
+    const logged = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    loadPullIdentity.mockResolvedValue(undefined);
+    let finishMint = (_identity: Identity | undefined) => undefined as void;
+    mintPullIdentity.mockImplementation(
+      () =>
+        new Promise<Identity | undefined>((resolve) => {
+          finishMint = resolve;
+        }),
+    );
+
+    const wakeUp = onWakeUp({
+      registration: registration(),
+      internetIdentity: internetIdentity([notification]).factory,
+    });
+    await vi.waitFor(() => expect(logged).toHaveBeenCalled(), {
+      timeout: 10_000,
+      interval: 100,
+    });
+
+    expect(String(logged.mock.calls[0][0])).toContain("still being minted");
+    finishMint(undefined);
+    await wakeUp;
+  }, 15_000);
+
+  it("takes the placeholder off screen once the real text arrives", async () => {
+    const shown = registration();
+    fetchAppMetadata.mockResolvedValue({ name: "Example App" });
+
+    await onWakeUp({
+      registration: shown,
+      internetIdentity: internetIdentity([]).factory,
+    });
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Internet Identity",
+    ]);
+
+    await onWakeUp({
+      registration: shown,
+      internetIdentity: internetIdentity([notification]).factory,
+    });
+
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Example App · New message",
+    ]);
+  });
+
+  it("shows what Internet Identity itself sent, without minting anything", async () => {
+    const shown = registration();
+    const ii = internetIdentity([
+      {
+        ...notification,
+        event: [
+          {
+            NotificationsOn: {
+              anchor_number: BigInt(10_000),
+              name: ["Work"] as [string],
+            },
+          },
+        ],
+      },
+    ]);
+
+    await onWakeUp({
+      registration: shown,
+      internetIdentity: ii.factory,
+    });
+
+    expect(shown.shown[0].title).toBe("Notifications are on");
+    // Named, because nobody recognises an identity by its number.
+    expect(shown.shown[0].options.body).toContain("Work");
+    // One notification, and no delegation minted for it.
+    expect(shown.shown).toHaveLength(1);
+    expect(mintPullIdentity).not.toHaveBeenCalled();
+    // Taken off the queue, since it has been shown and nothing is coming back for it.
+    expect(ii.removed).toHaveLength(1);
   });
 
   it("takes content the app no longer serves as a dismissal", async () => {
@@ -303,9 +460,9 @@ describe("onWakeUp", () => {
     ]);
   });
 
-  it("asks for every identity this browser holds a key for", async () => {
+  it("asks for every entry this storage holds a key for", async () => {
     const second = BigInt(10_001);
-    registeredIdentityNumbers.mockResolvedValue([IDENTITY, second]);
+    signing.mockResolvedValue([signs(IDENTITY), signs(second)]);
     const ii = internetIdentity([
       notification,
       { ...notification, id: BigInt(43) },
@@ -327,7 +484,7 @@ describe("onWakeUp", () => {
 
   it("shows one notification per wake-up, whatever is waiting elsewhere", async () => {
     const shown = registration();
-    registeredIdentityNumbers.mockResolvedValue([IDENTITY, BigInt(10_001)]);
+    signing.mockResolvedValue([signs(IDENTITY), signs(BigInt(10_001))]);
     const ii = internetIdentity([notification]);
 
     await onWakeUp({
