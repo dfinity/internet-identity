@@ -16,7 +16,6 @@ use candid::Principal;
 use ic_canister_sig_creation::signature_map::CanisterSigInputs;
 use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
 use ic_cdk::api::time;
-use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
@@ -352,6 +351,9 @@ fn get_account_principal_for_origin(
 /// requestable by the app.
 pub const APP_DELEGATION_TTL_NS: u64 = 5 * MINUTE_NS;
 
+/// Starts a delegation the app can call canisters with as the user's account at this
+/// origin, answering the key to call under and when it expires. The app fetches the
+/// delegation itself with [`app_get_delegation`].
 pub fn app_prepare_delegation(
     request: AppPrepareDelegationRequest,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
@@ -363,6 +365,9 @@ pub fn app_prepare_delegation(
         session_id,
         valid_till_ns,
         read_only,
+        // `NoSuchSession` here and below: which branch failed would tell the app something
+        // about the identity behind the session, and it would do nothing differently either
+        // way.
     } = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
     let locator = SessionLocator {
         anchor_number,
@@ -412,6 +417,9 @@ pub fn app_prepare_delegation(
     })
 }
 
+/// Fetches the delegation prepared for the caller's session, which the app then calls
+/// canisters with as the user. `NoSuchDelegation` where this key and expiration were
+/// never prepared.
 pub fn app_get_delegation(
     request: AppGetDelegationRequest,
 ) -> Result<SignedDelegation, AppSessionError> {
@@ -489,32 +497,27 @@ pub fn check_session() -> bool {
 /// anyway. Only a storage failure comes back as an error — an app is never handed a
 /// refusal whose only sane response is to do nothing.
 pub fn app_revoke_session(now: Timestamp) -> Result<(), AppSessionError> {
-    // Found rather than authorized, so a session that is present and past its bounds is
-    // not refused: it is still the caller's to sign out, and refusing would leave its
-    // record and index entry behind.
-    let Ok((locator, _, _)) = find_caller_session() else {
+    let Ok(AuthorizedSession {
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
+        ..
+    }) = check_app_authorization(now)
+    else {
+        // No live session behind this caller, which is the state revoking asks for.
         return Ok(());
+    };
+    let locator = SessionLocator {
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
     };
     match storage_borrow_mut(|storage| storage.revoke_session(&locator, now)) {
         Ok(()) | Err(StorageError::SessionNotFound { .. }) => Ok(()),
         Err(err) => Err(AppSessionError::InternalCanisterError(err.to_string())),
     }
-}
-
-/// The caller's session as stored, without asking whether it is still live.
-fn find_caller_session() -> Result<(SessionLocator, Account, Session), AppSessionError> {
-    let locator = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
-        .ok_or(AppSessionError::NoSuchSession)?;
-
-    let (account, session) = storage_borrow(|storage| {
-        Some((
-            storage.read_account(&locator.account_key())?,
-            storage.read_session(&locator)?,
-        ))
-    })
-    .ok_or(AppSessionError::NoSuchSession)?;
-
-    Ok((locator, account, session))
 }
 
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {

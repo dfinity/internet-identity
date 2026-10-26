@@ -959,15 +959,17 @@ fn browser_remove_notification(
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,
 ) -> Result<(), NotificationGrantConsentError> {
+    use NotificationGrantConsentError::*;
+
     let NotificationGrantConsentRequest {
         anchor_number,
         origin,
     } = request;
-    let origin = ApplicationOrigin::try_from(origin.as_str())
-        .map_err(NotificationGrantConsentError::InternalCanisterError)?;
-    enabled_or(NotificationGrantConsentError::InternalCanisterError)?;
-    check_authz_and_record_activity(anchor_number)
-        .map_err(|_| NotificationGrantConsentError::Unauthorized(caller()))?;
+
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+    notifications::enabled_or(InternalCanisterError)?;
+
+    check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
     notifications::grant_consent(anchor_number, &origin, ic_cdk::api::time())
 }
@@ -979,14 +981,15 @@ fn notification_revoke_consent(
         origin,
     }: NotificationRevokeConsentRequest,
 ) -> Result<(), NotificationRevokeConsentError> {
-    let origin = ApplicationOrigin::try_from(origin.as_str())
-        .map_err(NotificationRevokeConsentError::InternalCanisterError)?;
-    enabled_or(NotificationRevokeConsentError::InternalCanisterError)?;
-    check_authz_and_record_activity(anchor_number)
-        .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
+    use NotificationRevokeConsentError::*;
+
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+    notifications::enabled_or(InternalCanisterError)?;
+
+    check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
     notifications::revoke_consent(anchor_number, &origin, ic_cdk::api::time())
-        .map_err(|err| NotificationRevokeConsentError::InternalCanisterError(format!("{err}")))
+        .map_err(|err| InternalCanisterError(format!("{err}")))
 }
 
 /// `false` for an origin this deployment does not notify for and for an unauthorized
@@ -1015,14 +1018,16 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 #[query]
 fn app_notification_consent_status(
 ) -> Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError> {
-    enabled_or(AppNotificationConsentStatusError::InternalCanisterError)?;
-    let now = ic_cdk::api::time();
+    use AppNotificationConsentStatusError::*;
+
+    notifications::enabled_or(InternalCanisterError)?;
+
     let AuthorizedSession {
         anchor_number,
         origin,
         ..
-    } = check_app_authorization(now)
-        .map_err(|_| AppNotificationConsentStatusError::NoSuchSession)?;
+    } = check_app_authorization(ic_cdk::api::time()).map_err(|_| NoSuchSession)?;
+
     Ok(AppNotificationConsentStatusResponse {
         is_granted: notifications::consent_granted_for(anchor_number, &origin),
     })
@@ -1030,18 +1035,21 @@ fn app_notification_consent_status(
 
 #[update]
 fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
+    use AppRevokeNotificationConsentError::*;
+
     let now = ic_cdk::api::time();
+
     let AuthorizedSession {
         anchor_number,
         origin,
         ..
-    } = check_app_authorization(now)
-        .map_err(|_| AppRevokeNotificationConsentError::NoSuchSession)?;
-    enabled_or(AppRevokeNotificationConsentError::InternalCanisterError)?;
-    let origin = ApplicationOrigin::try_from(origin.as_str())
-        .map_err(AppRevokeNotificationConsentError::InternalCanisterError)?;
+    } = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+
+    notifications::enabled_or(InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+
     notifications::revoke_consent(anchor_number, &origin, now)
-        .map_err(|err| AppRevokeNotificationConsentError::InternalCanisterError(format!("{err}")))
+        .map_err(|err| InternalCanisterError(format!("{err}")))
 }
 
 // ---- Notifications: called by an app's backend ----
