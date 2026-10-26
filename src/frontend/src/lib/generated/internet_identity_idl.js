@@ -163,6 +163,7 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchSession' : IDL.Null,
   });
   const AppNotificationConsentGrantedError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
   const AppPrepareDelegationRequest = IDL.Record({

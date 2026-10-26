@@ -1855,6 +1855,7 @@ type NotificationRevokeConsentError = variant {
 type AppNotificationConsentGrantedError = variant {
     // No live session behind this caller: expired, idle, revoked, or never one at all.
     NoSuchSession;
+    InternalCanisterError : text;
 };
 
 type AppRevokeNotificationConsentError = variant {

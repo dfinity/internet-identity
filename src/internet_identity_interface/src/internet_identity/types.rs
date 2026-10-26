@@ -1065,6 +1065,7 @@ pub enum NotificationRevokeConsentError {
 pub enum AppNotificationConsentGrantedError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
     NoSuchSession,
+    InternalCanisterError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

@@ -979,11 +979,9 @@ fn notification_revoke_consent(
         origin,
     }: NotificationRevokeConsentRequest,
 ) -> Result<(), NotificationRevokeConsentError> {
-    // The II frontend sends the spelling consent is stored under, and withdrawing it is
-    // allowed whether or not this deployment still notifies, so the origin is folded for
-    // its shape alone rather than through the deployment gate.
     let origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(NotificationRevokeConsentError::InternalCanisterError)?;
+    enabled_or(NotificationRevokeConsentError::InternalCanisterError)?;
     check_authz_and_record_activity(anchor_number)
         .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
 
@@ -1016,9 +1014,7 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 
 #[query]
 fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGrantedError> {
-    if !notifications::notifications_enabled() {
-        return Ok(false);
-    }
+    enabled_or(AppNotificationConsentGrantedError::InternalCanisterError)?;
     let now = ic_cdk::api::time();
     let AuthorizedSession {
         anchor_number,
@@ -1038,6 +1034,7 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
         ..
     } = check_app_authorization(now)
         .map_err(|_| AppRevokeNotificationConsentError::NoSuchSession)?;
+    enabled_or(AppRevokeNotificationConsentError::InternalCanisterError)?;
     let origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(AppRevokeNotificationConsentError::InternalCanisterError)?;
     notifications::revoke_consent(anchor_number, &origin, now)

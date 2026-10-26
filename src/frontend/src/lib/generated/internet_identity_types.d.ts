@@ -97,6 +97,9 @@ export interface AppGetDelegationRequest {
   'expiration' : Timestamp,
 }
 export type AppNotificationConsentGrantedError = {
+    'InternalCanisterError' : string
+  } |
+  {
     /**
      * No live session behind this caller: expired, idle, revoked, or never one at all.
      */

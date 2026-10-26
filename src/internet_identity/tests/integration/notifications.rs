@@ -18,9 +18,9 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
     GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
     LinkNotificationAppRequest, NotificationAppId, NotificationGrantConsentError,
-    NotificationToShow, OperatingSystem, PrepareAccountSessionRequest,
-    PrepareNotificationAppLinkRequest, RemoveNotificationError, RemoveNotificationRequest,
-    RemoveNotificationResponse, RemoveWebPushSubscriptionError,
+    NotificationRevokeConsentError, NotificationToShow, OperatingSystem,
+    PrepareAccountSessionRequest, PrepareNotificationAppLinkRequest, RemoveNotificationError,
+    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -133,9 +133,10 @@ fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationGrantConsentError::InternalCanisterError(_))
     ));
-    // Withdrawing is never refused, and there is nothing here to withdraw.
-    revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
-        .expect("revoke refused");
+    assert!(matches!(
+        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
+        Err(NotificationRevokeConsentError::InternalCanisterError(_))
+    ));
     // A disabled deployment answers like one nobody consented on.
     assert!(!consent_granted(
         &env,
@@ -617,8 +618,7 @@ mod app_consent {
     }
 
     #[test]
-    fn should_answer_false_and_still_revoke_once_notifications_are_disabled(
-    ) -> Result<(), RejectResponse> {
+    fn should_refuse_both_once_notifications_are_disabled() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, session) = install_with_session(&env);
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
@@ -637,12 +637,18 @@ mod app_consent {
         };
         switch(false)?;
 
-        assert!(!granted(&env, canister_id, session)?);
-        app_revoke_notification_consent(&env, canister_id, session)?.expect("revoke rejected");
+        assert!(matches!(
+            app_notification_consent_granted(&env, canister_id, session)?,
+            Err(AppNotificationConsentGrantedError::InternalCanisterError(_))
+        ));
+        assert!(matches!(
+            app_revoke_notification_consent(&env, canister_id, session)?,
+            Err(AppRevokeNotificationConsentError::InternalCanisterError(_))
+        ));
 
-        // The revoke held: switched back on, the app is still not allowed.
+        // Neither call touched the decision: switched back on, consent still stands.
         switch(true)?;
-        assert!(!granted(&env, canister_id, session)?);
+        assert!(granted(&env, canister_id, session)?);
         Ok(())
     }
 }
