@@ -1047,10 +1047,12 @@ export interface GetIdAliasRequest {
 }
 export type GetNextNotificationError = {
     /**
-     * Also a caller that is no browser of the identity.
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
      */
-    'InternalCanisterError' : string
-  };
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
 export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
 /**
  * Null once nothing is left to show.
@@ -2145,10 +2147,12 @@ export type RegistrationFlowNextStep = {
 export type RegistrationId = string;
 export type RemoveNotificationError = {
     /**
-     * Also a caller that is no browser of the identity.
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
      */
-    'InternalCanisterError' : string
-  };
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
 export interface RemoveNotificationRequest {
   /**
    * As browser_get_next_notification returned it.

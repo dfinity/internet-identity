@@ -3,12 +3,8 @@ use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJ
 use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::{Decode, Encode};
 
-/// One browser's push subscription, stored on the browser entry itself. The device's
-/// VAPID JWT pool rides along, sharing its lifetime: signing the browser out or letting
-/// the registry evict it takes both.
-///
-/// Keying by the browser rather than by the endpoint is what makes the endpoint
-/// mutable: a browser that re-creates its push subscription keeps its entry.
+/// Where a push notification goes, and the VAPID JWT pool it is authorized with. Held by a
+/// browser entry, and by a Home Screen app's record, which has one for every identity.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
 pub struct StorableWebPushSubscription {
@@ -26,13 +22,7 @@ pub struct StorableWebPushSubscription {
     pub vapid_public_key: Vec<u8>,
     #[n(3)]
     pub jwt_pool: StorableWebPushJwtPool,
-    /// What the service worker has yet to show, oldest first. Each was woken through
-    /// this registration, so a new one starts empty.
+    /// A queue some records carry here. The entry holds the queue, so this is read only.
     #[n(4)]
     pub notifications: Option<Vec<StorableInboxNotification>>,
-    /// When this browser was last woken a second time for a notification it could not
-    /// show yet. The wake-up is posted at the browser's own asking, so it is allowed
-    /// again only once the delegation it was for has expired.
-    #[n(5)]
-    pub woken_again_at_ns: Option<StorableTimestamp>,
 }

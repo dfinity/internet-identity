@@ -105,9 +105,29 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// What this identity's service worker has yet to show on this device, oldest first.
+    pub notifications: Vec<InboxNotification>,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
+}
+
+impl Browser {
+    /// Whether this entry points at `app_id`. Pointing is which app this browser has,
+    /// not where its wake-ups went.
+    pub fn is_pointing_at(&self, app_id: NotificationAppId) -> bool {
+        self.notification_app
+            .is_some_and(|reference| reference.linked_app() == Some(app_id))
+    }
+
+    /// Whether this entry points at `app_id` with delivery switched off, which is this
+    /// identity's answer about this device rather than about the record carrying it.
+    pub fn is_delivery_disabled_for(&self, app_id: NotificationAppId) -> bool {
+        let Some(reference) = self.notification_app else {
+            return false;
+        };
+        reference.linked_app() == Some(app_id) && !reference.is_delivering()
+    }
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -145,11 +165,6 @@ pub struct WebPushSubscription {
     pub vapid_public_key: VapidPublicKey,
     /// Raw ECDSA P-256 signatures in window order, with the instant they were signed at.
     pub jwt_signatures: JwtPool,
-    /// What the service worker has yet to show, oldest first, each woken through this
-    /// registration.
-    pub notifications: Vec<InboxNotification>,
-    /// When this browser was last woken again for something it could not show yet.
-    pub woken_again_at_ns: Option<Timestamp>,
 }
 
 impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
@@ -172,21 +187,6 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                     .collect(),
                 value.jwt_pool.issued_at_ns,
             )?,
-            notifications: value
-                .notifications
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|queued| {
-                    Some(InboxNotification {
-                        application_number: queued.application_number,
-                        sender: Principal::try_from_slice(&queued.sender).ok()?,
-                        notification_id: queued.notification_id,
-                        expires_at_ns: queued.expires_at_ns,
-                        account_number: queued.account_number,
-                    })
-                })
-                .collect(),
-            woken_again_at_ns: value.woken_again_at_ns,
         })
     }
 }
@@ -207,14 +207,8 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                     .collect(),
                 issued_at_ns,
             },
-            notifications: (!value.notifications.is_empty()).then(|| {
-                value
-                    .notifications
-                    .into_iter()
-                    .map(StorableInboxNotification::from)
-                    .collect()
-            }),
-            woken_again_at_ns: value.woken_again_at_ns,
+            // The entry holds it, so it is read here and never written.
+            notifications: None,
         }
     }
 }
@@ -233,7 +227,7 @@ impl From<StorableBrowser> for Browser {
             // entry can already be in and the one thing it recovers from by itself: the
             // browser subscribes again and writes a row that does read. Refusing the
             // whole anchor instead would take an identity down over a push address.
-            webpush_subscription: value.webpush_subscription.and_then(|stored| {
+            webpush_subscription: value.webpush_subscription.clone().and_then(|stored| {
                 WebPushSubscription::try_from(stored)
                     .inspect_err(|reason| {
                         ic_cdk::println!(
@@ -243,6 +237,27 @@ impl From<StorableBrowser> for Browser {
                     })
                     .ok()
             }),
+            // From the entry, or from the subscription for a record that carries it there.
+            notifications: value
+                .notifications
+                .or_else(|| {
+                    value
+                        .webpush_subscription
+                        .as_ref()
+                        .and_then(|subscription| subscription.notifications.clone())
+                })
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|queued| {
+                    Some(InboxNotification {
+                        application_number: queued.application_number,
+                        sender: Principal::try_from_slice(&queued.sender).ok()?,
+                        notification_id: queued.notification_id,
+                        expires_at_ns: queued.expires_at_ns,
+                        account_number: queued.account_number,
+                    })
+                })
+                .collect(),
             notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
@@ -262,6 +277,13 @@ impl From<Browser> for StorableBrowser {
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
+            notifications: (!value.notifications.is_empty()).then(|| {
+                value
+                    .notifications
+                    .into_iter()
+                    .map(StorableInboxNotification::from)
+                    .collect()
+            }),
         }
     }
 }
@@ -1006,10 +1028,7 @@ impl Anchor {
         else {
             return;
         };
-        if browser
-            .notification_app
-            .is_some_and(|reference| reference.linked_app() == Some(app_id))
-        {
+        if browser.is_pointing_at(app_id) {
             return;
         }
         // Whether this identity wants the app to deliver is the user's answer about the
@@ -1039,6 +1058,12 @@ impl Anchor {
                     .is_some_and(|reference| reference.linked_app() == Some(app_id))
             {
                 browser.notification_app = None;
+                // The address belongs to another entry now, so nothing here can show
+                // what it had waiting. An entry that registered an address of its own
+                // was posted to at that address and can still show it.
+                if browser.webpush_subscription.is_none() {
+                    browser.notifications.clear();
+                }
             }
         }
         let Some(browser) = self
@@ -1048,10 +1073,12 @@ impl Anchor {
         else {
             return;
         };
-        // A browser has one route. Pointing at a record is leaving behind whatever address
-        // it registered for itself, and what that address had queued goes with it: those
-        // wake-ups were posted somewhere this browser no longer reads.
+        // A browser has one route. Pointing at a record leaves behind whatever address it
+        // registered for itself, and what is waiting goes with it: the entry only reaches
+        // here because the record it points at changed, so everything queued was posted
+        // somewhere this browser no longer reads.
         browser.webpush_subscription = None;
+        browser.notifications.clear();
         browser.notification_app = Some(NotificationAppRef::Linked { app_id, enabled });
     }
 
@@ -1084,6 +1111,47 @@ impl Anchor {
             return;
         };
         *current = enabled;
+        if enabled {
+            return;
+        }
+        // What is queued was posted to an address this entry has just stopped being
+        // delivered at. Nothing drains it while delivery is off and nothing joins it, so
+        // leaving it would only mean the first wake-up after switching back on shows
+        // something from before the switch-off instead of what caused it.
+        browser.notifications.clear();
+    }
+
+    /// Forgets `app_id` on every entry of this identity that points at it, and what the
+    /// record's address was carrying for them.
+    ///
+    /// The record itself is not this list's to delete: only a caller holding every anchor
+    /// can see whether another identity still points at it.
+    pub fn drop_notification_app(&mut self, app_id: NotificationAppId) {
+        for browser in &mut self.browsers {
+            if !browser.is_pointing_at(app_id) {
+                continue;
+            }
+            browser.notification_app = None;
+            // Everything waiting went to the record's address, because a browser pointing
+            // at a record has no address of its own, and nothing can read that one once
+            // the record is gone.
+            browser.notifications.clear();
+        }
+    }
+
+    /// The entry of this identity whose calls an app signing as `app_id` acts on: one
+    /// pointing at it with delivery on. Switching delivery off is this identity saying
+    /// the app does not act for it, so there is no entry to find.
+    ///
+    /// At most one: pointing an entry at a record takes that record off every other entry
+    /// of the identity, which is what lets an app resolve its calls to a single entry.
+    pub fn browser_delivering_through(&self, app_id: NotificationAppId) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                browser.is_pointing_at(app_id) && !browser.is_delivery_disabled_for(app_id)
+            })
+            .map(|browser| browser.id)
     }
 
     /// This browser leaving the record it points at, which is what registering an address
@@ -1101,11 +1169,16 @@ impl Anchor {
         Some(app_id)
     }
 
-    /// The app this browser points at, where it has one.
-    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
+    /// The entry this id names, where the registry still lists one.
+    pub fn browser(&self, browser_id: BrowserId) -> Option<&Browser> {
         self.browsers
             .iter()
             .find(|browser| browser.id == browser_id)
+    }
+
+    /// The app this browser points at, where it has one.
+    pub fn notification_app(&self, browser_id: BrowserId) -> Option<NotificationAppRef> {
+        self.browser(browser_id)
             .and_then(|browser| browser.notification_app)
     }
 
@@ -1161,9 +1234,7 @@ impl Anchor {
 
     /// What this browser registered for Web Push, if anything.
     pub fn webpush_subscription(&self, browser_id: BrowserId) -> Option<&WebPushSubscription> {
-        self.browsers
-            .iter()
-            .find(|browser| browser.id == browser_id)
+        self.browser(browser_id)
             .and_then(|browser| browser.webpush_subscription.as_ref())
     }
 
@@ -1189,21 +1260,27 @@ impl Anchor {
         left
     }
 
-    /// The queue of the browser's registration, empty for one not registered.
-    pub fn notifications(&self, browser_id: BrowserId) -> &[InboxNotification] {
-        self.webpush_subscription(browser_id)
-            .map_or(&[], |subscription| &subscription.notifications)
+    /// What this entry has waiting, empty for one with nothing.
+    pub fn notifications_for_browser(&self, browser_id: BrowserId) -> &[InboxNotification] {
+        self.browser(browser_id)
+            .map_or(&[], |browser| &browser.notifications)
     }
 
-    pub fn notifications_mut(
+    /// What this entry has waiting, to add to or take from.
+    ///
+    /// `Some` for every browser the registry lists, an empty queue included, and `None`
+    /// only where no entry carries this id. The queue belongs to the entry and not to a
+    /// subscription, so a browser that registered nothing of its own has one too: a
+    /// caller reading `None` as "not registered for notifications" would be reading it
+    /// as something it does not say.
+    pub fn notifications_for_browser_mut(
         &mut self,
         browser_id: BrowserId,
     ) -> Option<&mut Vec<InboxNotification>> {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)
-            .and_then(|browser| browser.webpush_subscription.as_mut())
-            .map(|subscription| &mut subscription.notifications)
+            .map(|browser| &mut browser.notifications)
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1347,6 +1424,7 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            notifications: Vec::new(),
             notification_app: None,
         });
 

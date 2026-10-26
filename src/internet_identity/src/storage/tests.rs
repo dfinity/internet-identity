@@ -1,6 +1,7 @@
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
+use crate::notifications::webpush::fixtures::app_key;
 use crate::openid::{Domain, OpenIdCredential};
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -29,30 +30,6 @@ use std::collections::HashMap;
 
 /// Records that an account was used, the way `prepare_account_delegation` does:
 /// read it, stamp it, write it back. `None` where the identity has no such account.
-/// A registration whose fields pass the shape each newtype asserts, which is the only
-/// kind storage can hand back.
-fn test_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
-    use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
-    use p256::elliptic_curve::sec1::ToEncodedPoint;
-
-    let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
-    crate::storage::anchor::WebPushSubscription {
-        endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
-        created_at_ns: 0,
-        vapid_public_key: VapidPublicKey::try_from(
-            secret
-                .public_key()
-                .to_encoded_point(false)
-                .as_bytes()
-                .to_vec(),
-        )
-        .expect("a SEC1 P-256 point"),
-        jwt_signatures: JwtPool::try_new(vec![vec![3; 64]], 0).expect("a 64-byte signature"),
-        notifications: Vec::new(),
-        woken_again_at_ns: None,
-    }
-}
-
 fn record_use(
     storage: &mut Storage<VectorMemory>,
     anchor_number: AnchorNumber,
@@ -7520,11 +7497,15 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
             browser_id,
-            Some(test_subscription("https://relay.example/a")),
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://relay.example/a",
+                0,
+                0,
+            )),
         );
     }
     anchor
-        .notifications_mut(queued_on)
+        .notifications_for_browser_mut(queued_on)
         .expect("a registered browser")
         .extend([3, 1, 2].map(queued));
     storage.write(anchor).expect("writing the anchor");
@@ -7534,8 +7515,11 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         .read(anchor_number)
         .expect("reading the anchor");
 
-    assert_eq!(reloaded.notifications(queued_on), [3, 1, 2].map(queued));
-    assert!(reloaded.notifications(left_empty).is_empty());
+    assert_eq!(
+        reloaded.notifications_for_browser(queued_on),
+        [3, 1, 2].map(queued)
+    );
+    assert!(reloaded.notifications_for_browser(left_empty).is_empty());
 }
 
 #[test]
@@ -7791,7 +7775,11 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     storage
         .set_notification_app_subscription(
             app.id,
-            Some(test_subscription("https://web.push.apple.com/one")),
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://web.push.apple.com/one",
+                2_000,
+                2_000,
+            )),
             2_000,
         )
         .expect("the record is there, so the registration is stored");
@@ -7829,4 +7817,306 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
         storage.notification_app(app.id).map(|app| app.last_used_ns),
         Some(1_000)
     );
+}
+
+#[test]
+fn forgetting_an_app_takes_every_reference_with_it() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
+        .expect("creating the record");
+    for _ in 0..2 {
+        let mut anchor = anchor_with_browser(&mut storage);
+        anchor.point_at_notification_app(0, app.id);
+        storage.write(anchor).expect("writing the anchor");
+    }
+
+    for anchor_number in [10_000, 10_001] {
+        let mut anchor = storage.read(anchor_number).expect("reading the anchor");
+        anchor
+            .notifications_for_browser_mut(0)
+            .expect("a listed browser")
+            .push(queued_notification(7));
+        storage.write(anchor).expect("queueing");
+    }
+
+    storage
+        .forget_notification_app(app.id)
+        .expect("every anchor holding the record is readable");
+
+    for anchor_number in [10_000, 10_001] {
+        let anchor = storage.read(anchor_number).expect("reading the anchor");
+        assert_eq!(anchor.notification_app(0), None);
+        // A replacement app must not inherit what the dead one was sent.
+        assert!(anchor.notifications_for_browser(0).is_empty());
+    }
+    assert!(storage.anchors_with_notification_app(app.id).is_empty());
+    assert_eq!(storage.notification_app(app.id), None);
+}
+
+#[test]
+fn forgetting_an_app_is_let_go_of_by_an_entry_that_had_switched_it_off() {
+    let mut storage = Storage::new((10_000, 20_000), VectorMemory::default());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
+        .expect("creating the record");
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
+
+    let mut off = anchor_with_browser(&mut storage);
+    off.point_at_notification_app(0, app.id);
+    off.disable_notification_app(0);
+    storage.write(off).expect("writing the entry that said no");
+
+    let mut on = anchor_with_browser(&mut storage);
+    on.point_at_notification_app(0, app.id);
+    storage.write(on).expect("writing the entry that said yes");
+
+    storage
+        .forget_notification_app(app.id)
+        .expect("every anchor holding the record is readable");
+
+    // Switching delivery off is an answer about the record, not a reason to keep pointing
+    // at one that is gone: both entries let go, and neither is left with an address.
+    for anchor_number in [10_000, 10_001] {
+        let anchor = storage.read(anchor_number).expect("reading the anchor");
+        assert_eq!(anchor.notification_app(0), None);
+        assert_eq!(anchor.webpush_subscription(0), None);
+    }
+}
+
+#[test]
+fn forgetting_an_app_leaves_alone_a_browser_that_left_it_for_an_address_of_its_own() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
+        .expect("creating the record");
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
+
+    // Registering an address of its own is this entry leaving the record, so what it has
+    // waiting is its own address's and nothing about the record reaches it again.
+    let mut own = anchor_with_browser(&mut storage);
+    own.point_at_notification_app(0, app.id);
+    own.set_webpush_subscription(0, Some(app_subscription("https://own")));
+    own.notifications_for_browser_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(7));
+    storage
+        .write(own)
+        .expect("writing the entry with its own address");
+
+    let mut routed = anchor_with_browser(&mut storage);
+    routed.point_at_notification_app(0, app.id);
+    routed
+        .notifications_for_browser_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(8));
+    storage.write(routed).expect("writing the routed entry");
+
+    storage
+        .forget_notification_app(app.id)
+        .expect("every anchor holding the record is readable");
+
+    let own = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(
+        own.notification_app(0),
+        None,
+        "it left the record when it registered an address of its own"
+    );
+    assert_eq!(
+        own.notifications_for_browser(0)
+            .iter()
+            .map(|queued| queued.notification_id)
+            .collect::<Vec<_>>(),
+        vec![7]
+    );
+
+    let routed = storage.read(10_001).expect("reading the anchor");
+    assert_eq!(
+        routed.notification_app(0),
+        None,
+        "the record it pointed at is gone"
+    );
+    assert!(routed.notifications_for_browser(0).is_empty());
+
+    assert_eq!(storage.notification_app(app.id), None);
+}
+
+fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNotification {
+    crate::storage::anchor::InboxNotification {
+        application_number: 1,
+        sender: Principal::from_slice(&[7; 10]),
+        notification_id,
+        expires_at_ns: u64::MAX,
+        account_number: None,
+    }
+}
+
+fn app_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
+    crate::notifications::webpush::fixtures::subscription_at(endpoint, 1_000, 1_000)
+}
+
+#[test]
+fn a_new_app_address_drops_what_the_old_one_was_sent() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
+        .expect("creating the record");
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id);
+    storage.write(anchor).expect("pointing at the app");
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor
+        .notifications_for_browser_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(7));
+    storage.write(anchor).expect("queueing");
+
+    // The same address is a pool replacement, which keeps what is waiting.
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 2_000)
+        .expect("the record is there");
+    assert_eq!(
+        storage
+            .read(10_000)
+            .expect("reading")
+            .notifications_for_browser(0)
+            .len(),
+        1
+    );
+
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000)
+        .expect("the record is there");
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+    assert!(anchor.notifications_for_browser(0).is_empty());
+}
+
+#[test]
+fn a_new_app_address_leaves_alone_a_browser_that_left_it_for_an_address_of_its_own() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
+        .expect("creating the record");
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 1_000)
+        .expect("the record is there");
+
+    // Registering an address of its own is this entry leaving the record, so what it has
+    // waiting is its own address's and nothing about the record reaches it again.
+    let mut own = anchor_with_browser(&mut storage);
+    own.point_at_notification_app(0, app.id);
+    own.set_webpush_subscription(0, Some(app_subscription("https://own")));
+    own.notifications_for_browser_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(7));
+    storage
+        .write(own)
+        .expect("writing the entry with its own address");
+
+    let mut routed = anchor_with_browser(&mut storage);
+    routed.point_at_notification_app(0, app.id);
+    routed
+        .notifications_for_browser_mut(0)
+        .expect("a listed browser")
+        .push(queued_notification(8));
+    storage.write(routed).expect("writing the routed entry");
+
+    storage
+        .set_notification_app_subscription(app.id, Some(app_subscription("https://b")), 3_000)
+        .expect("the record is there");
+
+    let own = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(
+        own.notifications_for_browser(0)
+            .iter()
+            .map(|queued| queued.notification_id)
+            .collect::<Vec<_>>(),
+        vec![7]
+    );
+
+    let routed = storage.read(10_001).expect("reading the anchor");
+    assert!(routed.notifications_for_browser(0).is_empty());
+}
+
+#[test]
+fn an_entry_delivers_through_the_app_it_points_at() {
+    use crate::notifications::webpush::delivering_subscription;
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
+        .expect("creating the record");
+    storage
+        .set_notification_app_subscription(
+            app.id,
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://web.push.apple.com/one",
+                1_000,
+                1_000,
+            )),
+            1_000,
+        )
+        .expect("the record is there");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id);
+    anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
+    storage.write(anchor).expect("pointing at the app");
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+
+    assert_eq!(
+        delivering_subscription(&storage, &anchor, 0).map(|one| one.endpoint.into_string()),
+        Some("https://web.push.apple.com/one".to_string())
+    );
+}
+
+#[test]
+fn an_entry_that_stopped_routing_delivers_through_nothing() {
+    use crate::notifications::webpush::delivering_subscription;
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(app_key(7)), None, 1_000)
+        .expect("creating the record");
+    storage
+        .set_notification_app_subscription(
+            app.id,
+            Some(crate::notifications::webpush::fixtures::subscription_at(
+                "https://web.push.apple.com/one",
+                1_000,
+                1_000,
+            )),
+            1_000,
+        )
+        .expect("the record is there");
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor.point_at_notification_app(0, app.id);
+    anchor.move_browser_session_counts(&BTreeMap::from([(0, 1)]));
+    anchor.disable_notification_app(0);
+    storage.write(anchor).expect("pointing at the app");
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(delivering_subscription(&storage, &anchor, 0), None);
+
+    let mut anchor = storage.read(10_000).expect("reading the anchor");
+    anchor.enable_notification_app(0);
+    anchor.move_browser_session_counts(&BTreeMap::from([(0, -1)]));
+    storage.write(anchor).expect("signing the browser out");
+
+    let anchor = storage.read(10_000).expect("reading the anchor");
+    assert_eq!(delivering_subscription(&storage, &anchor, 0), None);
 }

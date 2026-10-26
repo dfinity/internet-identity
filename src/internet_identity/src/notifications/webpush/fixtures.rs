@@ -11,6 +11,31 @@ use internet_identity_interface::internet_identity::types::{
     PublicKey, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, Timestamp,
 };
 use serde_bytes::ByteBuf;
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+
+thread_local! {
+    /// Which record each app principal was given. A real app names its own id on a later
+    /// call, and without the principal index that is the only way back to its record, so
+    /// a test has to remember what a key was handed the first time it was used.
+    static APP_IDS: RefCell<BTreeMap<Principal, NotificationAppId>> =
+        const { RefCell::new(BTreeMap::new()) };
+}
+
+/// The record the app holding `public_key` has, created the first time it is seen.
+pub(crate) fn app_for_key(public_key: PublicKey, now_ns: Timestamp) -> NotificationApp {
+    let principal = Principal::self_authenticating(public_key);
+    let known = APP_IDS.with(|ids| ids.borrow().get(&principal).copied());
+    let app = storage_borrow_mut(|storage| {
+        storage
+            .ensure_notification_app(principal, known, now_ns)
+            .expect("creating the app record")
+    });
+    APP_IDS.with(|ids| {
+        ids.borrow_mut().insert(principal, app.id);
+    });
+    app
+}
 
 /// One anchor with `count` browsers on it, as sign-ins leave them.
 pub(crate) fn anchor_with_browsers(count: u8) -> (AnchorNumber, Vec<BrowserId>) {
@@ -36,6 +61,31 @@ fn key(seed: u8) -> PublicKey {
     ByteBuf::from(vec![seed.wrapping_add(1); 91])
 }
 
+/// The key a Home Screen app generated in its own partition and presents on every call.
+/// A registration whose every field passes the shape its newtype asserts, which is the
+/// only kind storage can hand back.
+pub(crate) fn subscription_at(
+    endpoint: &str,
+    created_at_ns: Timestamp,
+    issued_at_ns: Timestamp,
+) -> WebPushSubscription {
+    WebPushSubscription {
+        endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
+        created_at_ns,
+        vapid_public_key: VapidPublicKey::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
+        jwt_signatures: JwtPool::try_new(valid_pool(), issued_at_ns)
+            .expect("a pool of 64-byte signatures"),
+    }
+}
+
+pub(crate) fn app_key(seed: u8) -> PublicKey {
+    ByteBuf::from(vec![seed; 91])
+}
+
+/// Where a Home Screen app's own registration sends its wake-ups.
+pub(crate) const APP_RELAY: &str = "https://web.push.apple.com/a";
+pub(crate) const OTHER_APP_RELAY: &str = "https://web.push.apple.com/b";
+
 fn chrome_on_a_mac() -> BrowserDescription {
     BrowserDescription {
         brand: BrowserBrand::Chrome,
@@ -49,6 +99,7 @@ fn chrome_on_a_mac() -> BrowserDescription {
 /// request validates in.
 pub(crate) fn setup() {
     crate::notifications::test_setup();
+    APP_IDS.with(|ids| ids.borrow_mut().clear());
     crate::state::persistent_state_mut(|s| s.notifications_enabled = Some(true));
 }
 
@@ -57,7 +108,7 @@ pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {
 }
 
 /// A real, fixed SEC1 point: a length-only fixture cannot pass the curve check.
-pub(super) fn valid_vapid_key() -> Vec<u8> {
+pub(crate) fn valid_vapid_key() -> Vec<u8> {
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
     secret
@@ -67,7 +118,7 @@ pub(super) fn valid_vapid_key() -> Vec<u8> {
         .to_vec()
 }
 
-pub(super) fn valid_pool() -> Vec<Vec<u8>> {
+pub(crate) fn valid_pool() -> Vec<Vec<u8>> {
     vec![vec![3u8; JWT_SIG_LEN]; 3]
 }
 
@@ -153,12 +204,7 @@ pub(super) fn app_pointed_at_by(
     key_seed: u8,
     now_ns: Timestamp,
 ) -> NotificationAppId {
-    let app_id = storage_borrow_mut(|storage| {
-        storage
-            .ensure_notification_app(Principal::self_authenticating(key(key_seed)), None, now_ns)
-            .expect("creating the app record")
-            .id
-    });
+    let app_id = app_for_key(key(key_seed), now_ns).id;
     point_at_app(anchor_number, browser_id, app_id);
     app_id
 }
