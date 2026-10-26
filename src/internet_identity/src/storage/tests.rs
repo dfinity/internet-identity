@@ -7488,11 +7488,12 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
         .expect("registering a browser");
     let queued = |notification_id: u64| InboxNotification {
-        application_number: 4,
+        application_number: Some(4),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: 100 * notification_id,
         account_number: Some(notification_id),
+        event: None,
     };
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
@@ -7949,11 +7950,12 @@ fn forgetting_an_app_leaves_alone_a_browser_that_left_it_for_an_address_of_its_o
 
 fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNotification {
     crate::storage::anchor::InboxNotification {
-        application_number: 1,
+        application_number: Some(1),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: u64::MAX,
         account_number: None,
+        event: None,
     }
 }
 
@@ -8119,4 +8121,50 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
 
     let anchor = storage.read(10_000).expect("reading the anchor");
     assert_eq!(delivering_subscription(&storage, &anchor, 0), None);
+}
+
+#[test]
+fn an_identity_notification_is_queued_without_an_application() {
+    use crate::storage::anchor::InboxNotification;
+    use internet_identity_interface::internet_identity::types::{
+        IdentityForNotification, NotificationEvent,
+    };
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let mut anchor = anchor_with_browser(&mut storage);
+    anchor
+        .notifications_for_browser_mut(0)
+        .expect("a registered browser")
+        .push(InboxNotification {
+            application_number: None,
+            sender: Principal::from_slice(&[7; 10]),
+            notification_id: 1,
+            expires_at_ns: 2_000,
+            account_number: None,
+            event: Some(NotificationEvent::NotificationsOn(
+                IdentityForNotification {
+                    anchor_number: 10_000,
+                    name: Some("Work".to_string()),
+                },
+            )),
+        });
+    storage.write(anchor).expect("writing the anchor");
+
+    let reloaded = Storage::from_memory(memory)
+        .read(10_000)
+        .expect("reading the anchor");
+
+    assert_eq!(
+        reloaded
+            .notifications_for_browser(0)
+            .first()
+            .and_then(|one| one.event.clone()),
+        Some(NotificationEvent::NotificationsOn(
+            IdentityForNotification {
+                anchor_number: 10_000,
+                name: Some("Work".to_string()),
+            }
+        ))
+    );
 }

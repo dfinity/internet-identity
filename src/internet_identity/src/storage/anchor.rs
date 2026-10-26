@@ -9,7 +9,9 @@ use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
-use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
+use crate::storage::storable::notifications::browser_inbox::{
+    StorableInboxNotification, StorableNotificationEvent,
+};
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -133,19 +135,23 @@ impl Browser {
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InboxNotification {
-    pub application_number: ApplicationNumber,
-    /// The app canister that sent it, which the service worker fetches it from.
+    /// `None` where Internet Identity sent this itself.
+    pub application_number: Option<ApplicationNumber>,
+    /// The canister that sent it, which the service worker fetches the text from.
     pub sender: Principal,
     pub notification_id: NotificationId,
     pub expires_at_ns: Timestamp,
-    /// `None` is the unreserved default account.
+    /// `None` is the unreserved default account, and always `None` for our own.
     pub account_number: Option<AccountNumber>,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    pub event: Option<NotificationEvent>,
 }
 
 impl From<InboxNotification> for StorableInboxNotification {
     fn from(value: InboxNotification) -> Self {
         StorableInboxNotification {
             application_number: value.application_number,
+            event: value.event.map(StorableNotificationEvent::from),
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
             expires_at_ns: value.expires_at_ns,
@@ -251,6 +257,7 @@ impl From<StorableBrowser> for Browser {
                 .filter_map(|queued| {
                     Some(InboxNotification {
                         application_number: queued.application_number,
+                        event: queued.event.map(NotificationEvent::from),
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
                         notification_id: queued.notification_id,
                         expires_at_ns: queued.expires_at_ns,
@@ -1058,12 +1065,9 @@ impl Anchor {
                     .is_some_and(|reference| reference.linked_app() == Some(app_id))
             {
                 browser.notification_app = None;
-                // The address belongs to another entry now, so nothing here can show
-                // what it had waiting. An entry that registered an address of its own
-                // was posted to at that address and can still show it.
-                if browser.webpush_subscription.is_none() {
-                    browser.notifications.clear();
-                }
+                // The record's address belongs to the entry being pointed now, and this
+                // one has no address of its own to have been posted at.
+                browser.notifications.clear();
             }
         }
         let Some(browser) = self
@@ -1152,6 +1156,22 @@ impl Anchor {
                 browser.is_pointing_at(app_id) && !browser.is_delivery_disabled_for(app_id)
             })
             .map(|browser| browser.id)
+    }
+
+    /// Clears everything this browser has waiting, which is all of it: a browser pointing
+    /// at a record has no address of its own, so every entry was bound for the record's
+    /// address and dies with it. `true` where anything went.
+    pub fn clear_notifications_for_browser(&mut self, browser_id: BrowserId) -> bool {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
+            return false;
+        };
+        let had_any = !browser.notifications.is_empty();
+        browser.notifications.clear();
+        had_any
     }
 
     /// This browser leaving the record it points at, which is what registering an address
@@ -1266,13 +1286,6 @@ impl Anchor {
             .map_or(&[], |browser| &browser.notifications)
     }
 
-    /// What this entry has waiting, to add to or take from.
-    ///
-    /// `Some` for every browser the registry lists, an empty queue included, and `None`
-    /// only where no entry carries this id. The queue belongs to the entry and not to a
-    /// subscription, so a browser that registered nothing of its own has one too: a
-    /// caller reading `None` as "not registered for notifications" would be reading it
-    /// as something it does not say.
     pub fn notifications_for_browser_mut(
         &mut self,
         browser_id: BrowserId,
@@ -1344,6 +1357,7 @@ impl Anchor {
                     created_at: browser.created_at,
                     last_used: browser.last_used,
                     session_count: browser.session_count,
+                    // A probe is read where it was sent, not off the identity's app list.
                     notification_app: self.linked_app_info(browser.id, &app),
                 })
                 .collect(),

@@ -42,6 +42,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
+use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
 use notifications::{
     admit_batch, enabled_or, fetchable_origin, notifying_origin, TooManyNotifications,
@@ -456,23 +457,26 @@ fn prepare_notification_app_link(
     }
     let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
+    let now = ic_cdk::api::time();
     // The install slot replaces the reference this entry holds, so starting one takes
-    // delivery off an app that is working. What decides that is the canister's own
-    // record of the app rather than anything the caller asserts; an app switched off or
-    // without a subscription is replaced freely.
+    // delivery off an app that is working. What decides whether it is working is what the
+    // canister stores about it, never anything the caller asserts: an app switched off or
+    // with no registration of its own is replaced freely, and so is one that was asked to
+    // prove itself, had its window, and never called.
     if let Some(NotificationAppRef::Linked {
         app_id,
         enabled: true,
     }) = anchor.notification_app(browser_id)
     {
-        let delivering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .is_some_and(|app| app.webpush_subscription.is_some());
-        if delivering {
+        let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
+            .is_some_and(|app| {
+                app.webpush_subscription.is_some() && !app.probe_went_unanswered(now)
+            });
+        if still_answering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
         }
     }
 
-    let now = ic_cdk::api::time();
     anchor.start_notification_app_link(
         browser_id,
         link_principal,
@@ -486,8 +490,279 @@ fn prepare_notification_app_link(
     })
 }
 
-/// Authorized as the app the record belongs to, which is in no anchor's browser list.
-/// Empty wherever there is nobody to deliver for, and those cases cannot be told apart.
+/// Authorized by the browser key alone, so the install page can ask without a session, and
+/// only about the caller's own entry. A deployment with notifications off and a caller we
+/// do not recognise both read as `NoApp`, which is what they have in common.
+#[query]
+fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> NotificationAppStatus {
+    if !notifications::notifications_enabled() {
+        return NotificationAppStatus::NoApp;
+    }
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return NotificationAppStatus::NoApp;
+    };
+    anchor.notification_app_status(
+        browser_id,
+        ic_cdk::api::time(),
+        notifications::installed_app::record,
+    )
+}
+
+/// Switches delivery on and proves the app is there in one call, because the two cannot
+/// be separated: a reference that is off is skipped when the canister picks who to send
+/// to, so a probe sent first finds nothing to wake, and a switch thrown first announces
+/// itself and then has the probe say the same thing to the same device. The probe is the
+/// announcement here. Where nothing can be woken the switch does not stay on: an entry
+/// that delivers for nobody must not read as on while the caller offers the install.
+#[update]
+fn enable_notification_app(
+    request: EnableNotificationAppRequest,
+) -> Result<NotificationId, EnableNotificationAppError> {
+    let EnableNotificationAppRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
+        return Err(EnableNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| EnableNotificationAppError::InvalidBrowserKey)?;
+    // An install nobody has opened is not an app to switch on: the flag lives on the
+    // reference the app writes, so flipping it here would answer Ok and change nothing.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(EnableNotificationAppError::NoNotificationApp);
+    }
+
+    let now_ns = ic_cdk::api::time();
+    // One already on its way is asking what this call asks, and a second would reach the
+    // same address with the same thing to say. The ask is the record's, so another
+    // identity pointing at this app may be the one that made it.
+    let outstanding = outstanding_probe_of(&anchor, browser_id, now_ns);
+    anchor.enable_notification_app(browser_id);
+    let identity = identity_for_notification(&anchor);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| EnableNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })?;
+    if let Some(probe) = outstanding {
+        return Ok(probe);
+    }
+
+    match notifications::dispatch::notify_identity(
+        anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity),
+        notifications::dispatch::IdentityNotification::Probe,
+        now_ns,
+    ) {
+        Some(probe) => Ok(probe),
+        None => {
+            // Read again rather than reusing what was written above: the dispatch owns the
+            // anchor while it runs, and the queue it may have touched is on it.
+            state::storage_borrow_mut(|storage| {
+                let mut anchor = storage.read(anchor_number).map_err(|err| {
+                    EnableNotificationAppError::InternalCanisterError(format!("{err:?}"))
+                })?;
+                anchor.disable_notification_app(browser_id);
+                storage.write(anchor).map_err(|err| {
+                    EnableNotificationAppError::InternalCanisterError(format!("{err:?}"))
+                })
+            })?;
+            Err(EnableNotificationAppError::NotReachable)
+        }
+    }
+}
+
+/// The reference stays: this stops delivery for this identity and leaves the app where it
+/// is, subscription included, because the subscription is the record's and is shared.
+///
+/// Nothing is announced. An app reads who it delivers for from the canister, and a
+/// wake-up posted to an entry that has just stopped delivering would be dropped on its
+/// way out anyway.
+#[update]
+fn disable_notification_app(
+    request: DisableNotificationAppRequest,
+) -> Result<(), DisableNotificationAppError> {
+    let DisableNotificationAppRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
+        return Err(DisableNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| DisableNotificationAppError::InvalidBrowserKey)?;
+    // As for switching on: there is nothing to switch until the app has linked.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(DisableNotificationAppError::NoNotificationApp);
+    }
+
+    anchor.disable_notification_app(browser_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| DisableNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
+/// The probe still inside its window on the record this entry points at.
+///
+/// The ask is kept on the record because the answer lands there, so every identity
+/// pointing at one app shares the ask: one of them probing is the whole device probing.
+fn outstanding_probe_of(
+    anchor: &storage::anchor::Anchor,
+    browser_id: BrowserId,
+    now_ns: Timestamp,
+) -> Option<NotificationId> {
+    let app_id = anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())?;
+    notifications::installed_app::record(app_id)?.outstanding_probe(now_ns)
+}
+
+/// Nothing says when a user deletes a web app, so the app proving itself is the only
+/// evidence. A browser whose record has a probe outstanding is given that one back.
+#[update]
+fn probe_notification_app(
+    request: ProbeNotificationAppRequest,
+) -> Result<NotificationId, ProbeNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(ProbeNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| ProbeNotificationAppError::InvalidBrowserKey)?;
+    if anchor.notification_app(browser_id).is_none() {
+        return Err(ProbeNotificationAppError::NoNotificationApp);
+    }
+    let now_ns = ic_cdk::api::time();
+    if let Some(outstanding) = outstanding_probe_of(&anchor, browser_id, now_ns) {
+        return Ok(outstanding);
+    }
+
+    notifications::dispatch::notify_identity(
+        request.anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity_for_notification(&anchor)),
+        notifications::dispatch::IdentityNotification::Probe,
+        now_ns,
+    )
+    .ok_or(ProbeNotificationAppError::NotReachable)
+}
+
+/// Which identity a notification is about, in the terms the user knows it by.
+fn identity_for_notification(anchor: &storage::anchor::Anchor) -> IdentityForNotification {
+    IdentityForNotification {
+        anchor_number: anchor.anchor_number(),
+        name: anchor.name(),
+    }
+}
+
+/// Thirty minutes. Bounding a claimed expiry from above keeps a signature made by a
+/// since-retired browser key worthless years later. The frontend asks for less.
+const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
+    expires_at_ns > now && expires_at_ns <= now.saturating_add(CLAIM_TOKEN_LIFETIME_NS)
+}
+
+#[cfg(test)]
+mod claim_token_expiry {
+    use super::{claim_token_expiry_in_range, CLAIM_TOKEN_LIFETIME_NS};
+
+    const NOW: u64 = 1_700_000_000_000_000_000;
+
+    #[test]
+    fn an_expiry_that_has_arrived_is_no_longer_claimable() {
+        assert!(!claim_token_expiry_in_range(NOW, NOW));
+        assert!(!claim_token_expiry_in_range(NOW - 1, NOW));
+    }
+
+    #[test]
+    fn an_expiry_is_claimable_up_to_and_including_the_ceiling() {
+        assert!(claim_token_expiry_in_range(NOW + 1, NOW));
+        assert!(claim_token_expiry_in_range(
+            NOW + CLAIM_TOKEN_LIFETIME_NS,
+            NOW
+        ));
+    }
+
+    #[test]
+    fn an_expiry_beyond_the_ceiling_is_refused() {
+        assert!(!claim_token_expiry_in_range(
+            NOW + CLAIM_TOKEN_LIFETIME_NS + 1,
+            NOW
+        ));
+    }
+
+    #[test]
+    fn a_ceiling_that_would_overflow_still_accepts_what_is_under_it() {
+        assert!(claim_token_expiry_in_range(u64::MAX, u64::MAX - 1));
+    }
+}
+
+/// Points a browser of `anchor_number` at the Home Screen app that
+/// `offering_anchor_number` already has on the same device.
+///
+/// Authorized twice over: the caller must be a browser of the identity being added, and
+/// `request.signature` must be one a browser of the offering identity made over both
+/// anchor numbers and the expiry. Nothing is stored between the two halves, and spending
+/// the same signature twice changes nothing.
+#[update]
+fn claim_notification_app(
+    request: ClaimNotificationAppRequest,
+) -> Result<(), ClaimNotificationAppError> {
+    let ClaimNotificationAppRequest {
+        anchor_number,
+        offering_anchor_number,
+        expires_at_ns,
+        signature,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(ClaimNotificationAppError::InternalCanisterError(
+            NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let now = ic_cdk::api::time();
+    if !claim_token_expiry_in_range(expires_at_ns, now) {
+        return Err(ClaimNotificationAppError::ClaimTokenExpired);
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
+
+    let offering_anchor = state::anchor(offering_anchor_number);
+    let offering_browser = offering_anchor
+        .browser_that_signed_claim(&signature, anchor_number, expires_at_ns)
+        .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
+    // Taken from the offering browser's own reference, so the claiming identity is never
+    // told which record it reached.
+    let app_id = offering_anchor
+        .notification_app(offering_browser)
+        .and_then(|reference| reference.linked_app())
+        .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
+
+    // A claim is the user asking this identity to use the app already on the device, so
+    // it links with delivery on exactly as a first install does.
+    anchor.point_at_notification_app(browser_id, app_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })?;
+
+    Ok(())
+}
+
+/// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
+/// nobody to deliver for, and those cases cannot be told apart.
 #[query]
 fn notification_app_anchors(request: NotificationAppAnchorsRequest) -> Vec<AnchorNumber> {
     let NotificationAppAnchorsRequest { app_id } = request;
@@ -551,180 +826,6 @@ fn link_notification_app(
     })
 }
 
-/// Thirty minutes. Bounding a claimed expiry from above keeps a signature made by a
-/// since-retired browser key worthless years later. The frontend asks for less.
-const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
-
-fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
-    expires_at_ns > now && expires_at_ns <= now.saturating_add(CLAIM_TOKEN_LIFETIME_NS)
-}
-
-#[cfg(test)]
-mod claim_token_expiry {
-    use super::{claim_token_expiry_in_range, CLAIM_TOKEN_LIFETIME_NS};
-
-    const NOW: u64 = 1_700_000_000_000_000_000;
-
-    #[test]
-    fn an_expiry_that_has_arrived_is_no_longer_claimable() {
-        assert!(!claim_token_expiry_in_range(NOW, NOW));
-        assert!(!claim_token_expiry_in_range(NOW - 1, NOW));
-    }
-
-    #[test]
-    fn an_expiry_is_claimable_up_to_and_including_the_ceiling() {
-        assert!(claim_token_expiry_in_range(NOW + 1, NOW));
-        assert!(claim_token_expiry_in_range(
-            NOW + CLAIM_TOKEN_LIFETIME_NS,
-            NOW
-        ));
-    }
-
-    #[test]
-    fn an_expiry_beyond_the_ceiling_is_refused() {
-        assert!(!claim_token_expiry_in_range(
-            NOW + CLAIM_TOKEN_LIFETIME_NS + 1,
-            NOW
-        ));
-    }
-
-    #[test]
-    fn a_ceiling_that_would_overflow_still_accepts_what_is_under_it() {
-        assert!(claim_token_expiry_in_range(u64::MAX, u64::MAX - 1));
-    }
-}
-
-/// Authorized by the browser key alone, so the install page can ask without a session, and
-/// only about the caller's own entry. A deployment with notifications off and a caller we
-/// do not recognise both read as `NoApp`, which is what they have in common.
-#[query]
-fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> NotificationAppStatus {
-    if !notifications::notifications_enabled() {
-        return NotificationAppStatus::NoApp;
-    }
-    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
-        return NotificationAppStatus::NoApp;
-    };
-    anchor.notification_app_status(
-        browser_id,
-        ic_cdk::api::time(),
-        notifications::installed_app::record,
-    )
-}
-
-/// The reference stays either way: this switches delivery on, it does not install
-/// anything.
-#[update]
-fn enable_notification_app(
-    request: EnableNotificationAppRequest,
-) -> Result<(), EnableNotificationAppError> {
-    let EnableNotificationAppRequest { anchor_number } = request;
-    if !notifications::notifications_enabled() {
-        return Err(EnableNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED_MESSAGE.to_string(),
-        ));
-    }
-    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
-        .map_err(|_| EnableNotificationAppError::InvalidBrowserKey)?;
-    // An install nobody has opened is not an app to switch: the flag lives on the
-    // reference the app writes, so flipping it here would answer Ok and change nothing.
-    if anchor
-        .notification_app(browser_id)
-        .and_then(|reference| reference.linked_app())
-        .is_none()
-    {
-        return Err(EnableNotificationAppError::NoNotificationApp);
-    }
-
-    anchor.enable_notification_app(browser_id);
-    state::storage_borrow_mut(|storage| {
-        storage
-            .write(anchor)
-            .map_err(|err| EnableNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
-}
-
-/// The reference stays: this stops delivery for this identity and leaves the app where
-/// it is, subscription included, because the subscription is the record's and is shared.
-#[update]
-fn disable_notification_app(
-    request: DisableNotificationAppRequest,
-) -> Result<(), DisableNotificationAppError> {
-    let DisableNotificationAppRequest { anchor_number } = request;
-    if !notifications::notifications_enabled() {
-        return Err(DisableNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED_MESSAGE.to_string(),
-        ));
-    }
-    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
-        .map_err(|_| DisableNotificationAppError::InvalidBrowserKey)?;
-    // As for switching on: there is nothing to switch until the app has linked.
-    if anchor
-        .notification_app(browser_id)
-        .and_then(|reference| reference.linked_app())
-        .is_none()
-    {
-        return Err(DisableNotificationAppError::NoNotificationApp);
-    }
-
-    anchor.disable_notification_app(browser_id);
-    state::storage_borrow_mut(|storage| {
-        storage
-            .write(anchor)
-            .map_err(|err| DisableNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
-}
-
-/// Points a browser of `anchor_number` at the Home Screen app that
-/// `offering_anchor_number` already has on the same device.
-///
-/// Authorized twice over: the caller must be a browser of the identity being added, and
-/// `request.signature` must be one a browser of the offering identity made over both
-/// anchor numbers and the expiry. Nothing is stored between the two halves, and spending
-/// the same signature twice changes nothing.
-#[update]
-fn claim_notification_app(
-    request: ClaimNotificationAppRequest,
-) -> Result<(), ClaimNotificationAppError> {
-    let ClaimNotificationAppRequest {
-        anchor_number,
-        offering_anchor_number,
-        expires_at_ns,
-        signature,
-    } = request;
-    if !notifications::notifications_enabled() {
-        return Err(ClaimNotificationAppError::InternalCanisterError(
-            notifications::NOT_ENABLED_MESSAGE.to_string(),
-        ));
-    }
-    let now = ic_cdk::api::time();
-    if !claim_token_expiry_in_range(expires_at_ns, now) {
-        return Err(ClaimNotificationAppError::ClaimTokenExpired);
-    }
-    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
-        .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
-
-    let offering_anchor = state::anchor(offering_anchor_number);
-    let offering_browser = offering_anchor
-        .browser_that_signed_claim(&signature, anchor_number, expires_at_ns)
-        .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
-    // Taken from the offering browser's own reference, so the claiming identity is never
-    // told which record it reached.
-    let app_id = offering_anchor
-        .notification_app(offering_browser)
-        .and_then(|reference| reference.linked_app())
-        .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
-
-    // A claim is the user asking this identity to use the app already on the device, so
-    // it links with delivery on exactly as a first install does.
-    anchor.point_at_notification_app(browser_id, app_id);
-    state::storage_borrow_mut(|storage| {
-        storage
-            .write(anchor)
-            .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
-}
-
 /// The entry a notification call acts on: the browser that signed it, or the one whose
 /// wake-ups route through the app that did.
 ///
@@ -742,7 +843,8 @@ fn notification_entry(
     Some((anchor, browser_id))
 }
 
-/// Authorized by the browser key the caller signs with.
+/// Authorized by the browser key the caller signs with, or by the key of the Home Screen
+/// app that entry routes through.
 #[update]
 fn prepare_notification_delegation(
     request: PrepareNotificationDelegationRequest,
@@ -838,16 +940,15 @@ fn browser_remove_notification(
     let (anchor, browser_id) =
         notification_entry(anchor_number, key).ok_or(RemoveNotificationError::InvalidBrowserKey)?;
 
-    // Nothing at all for a browser caller, which is the common one. For a Home Screen app
-    // it is the one thing that says it is still installed, since iOS destroys its storage
-    // when the user deletes it and tells nobody.
+    let now_ns = ic_cdk::api::time();
+    // An acknowledgement is the only thing that tells us the app is still installed.
     if let NotificationKey::App(app_id) = key {
         state::storage_borrow_mut(|storage| {
-            storage.stamp_notification_app_use(app_id, caller(), ic_cdk::api::time())
+            storage.stamp_notification_app_use(app_id, caller(), now_ns)
         });
     }
 
-    notifications::browser_inbox::remove_collected(anchor, browser_id, &notification)
+    notifications::browser_inbox::remove_collected(anchor, browser_id, &notification, now_ns)
         .map(|()| RemoveNotificationResponse {})
         .map_err(RemoveNotificationError::InternalCanisterError)
 }

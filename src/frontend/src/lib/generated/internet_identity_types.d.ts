@@ -897,10 +897,23 @@ export type EnableNotificationAppError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string };
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing could be woken, so nothing was switched on: the app has registered
+     * nothing, the browser counts as gone, or there was no room for another outcall.
+     */
+    'NotReachable' : null
+  };
 /**
- * This identity asking the app its browser points at to deliver for it. Never a
- * subscription write: the subscription is the app's and is shared.
+ * This identity asking the app its browser points at to deliver for it, which is also
+ * what asks the app to prove it is still there: a reference that is off is skipped when
+ * the canister picks who to send to, so the two cannot be separated. Probing first would
+ * find nothing to wake, and switching on first would announce it and then say the same
+ * thing again on the probe. The probe is the announcement. Where nothing can be woken the
+ * switch does not stay on.
+ * 
+ * Never a subscription write: the subscription is the app's and is shared.
  */
 export interface EnableNotificationAppRequest { 'anchor_number' : UserNumber }
 export type ForgetApplicationsError = { 'InternalCanisterError' : string } |
@@ -1206,6 +1219,14 @@ export interface IdentityAnchorInfo {
 export interface IdentityAuthnInfo {
   'authn_methods' : Array<AuthnMethod>,
   'recovery_authn_methods' : Array<AuthnMethod>,
+}
+/**
+ * Which identity a notification is about, in the terms the user knows it by: nobody
+ * recognises an identity by its number.
+ */
+export interface IdentityForNotification {
+  'name' : [] | [string],
+  'anchor_number' : UserNumber,
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
@@ -1651,6 +1672,15 @@ export type NotificationDelegationError = {
   { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string };
 /**
+ * Something Internet Identity has to tell the user about their own identity.
+ */
+export type NotificationEvent = {
+    /**
+     * This device now receives this identity's notifications.
+     */
+    'NotificationsOn' : IdentityForNotification
+  };
+/**
  * Why a notification call was refused.
  */
 export type NotificationGrantConsentError = {
@@ -1680,8 +1710,21 @@ export interface NotificationRevokeConsentRequest {
  */
 export interface NotificationToShow {
   'id' : NotificationId,
-  'origin' : FrontendHostname,
+  /**
+   * Null where Internet Identity sent this itself: it is about the identity rather
+   * than an app, so there is no origin to name and none is looked up.
+   */
+  'origin' : [] | [FrontendHostname],
   'canister_id' : Principal,
+  /**
+   * Set where Internet Identity sent this itself, and what it has to say. An app's
+   * notification carries no text: the service worker fetches it from the app with a
+   * delegation it mints for the purpose, which is what keeps the content off the push
+   * service. One of these carries no text either, for the same reason, but there is
+   * nothing to fetch and nobody to mint for. The words are the frontend's, so this
+   * says what happened rather than what to show.
+   */
+  'event' : [] | [NotificationEvent],
   'account_number' : [] | [AccountNumber],
 }
 export type OfferNotificationAppError = {
@@ -2080,6 +2123,34 @@ export interface PreparedIdAlias {
   'issuer_id_alias_jwt' : string,
   'canister_sig_pk_der' : PublicKey,
 }
+export type ProbeNotificationAppError = {
+    /**
+     * This browser points at no app, so there is nothing to wake.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing was sent, so there is nothing to watch for: the app has registered
+     * nothing, this identity has it switched off or is signed out on this browser, the
+     * browser counts as gone, or there was no room for another outcall. The browser's
+     * own registration is never woken instead.
+     */
+    'NotReachable' : null
+  };
+/**
+ * Asks the canister to wake the Home Screen app this browser points at, so the browser
+ * can learn whether it is still there. Nothing says when a user deletes a web app, so
+ * the only way to find out is to send it something and see what happens.
+ */
+export interface ProbeNotificationAppRequest { 'anchor_number' : UserNumber }
 export type PublicKey = Uint8Array | number[];
 /**
  * Authentication method using generic signatures
@@ -2835,7 +2906,7 @@ export interface _SERVICE {
    */
   'enable_notification_app' : ActorMethod<
     [EnableNotificationAppRequest],
-    { 'Ok' : null } |
+    { 'Ok' : NotificationId } |
       { 'Err' : EnableNotificationAppError }
   >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
@@ -3314,6 +3385,15 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
+  >,
+  /**
+   * Called by the browser, which watches for the answer leaving its own queue: that
+   * is what says the app this browser points at is still installed.
+   */
+  'probe_notification_app' : ActorMethod<
+    [ProbeNotificationAppRequest],
+    { 'Ok' : NotificationId } |
+      { 'Err' : ProbeNotificationAppError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],

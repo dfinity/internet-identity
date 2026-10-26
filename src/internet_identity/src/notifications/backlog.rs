@@ -3,3 +3,4 @@
 //! `QueueItem` impl, and the caps and retry policy it runs under.
 
 pub(crate) mod app;
+pub(crate) mod identity;
