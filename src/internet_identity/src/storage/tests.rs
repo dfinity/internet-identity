@@ -7497,7 +7497,7 @@ mod browser_session_count_tests {
 
 #[test]
 fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
-    use crate::storage::anchor::QueuedNotification;
+    use crate::storage::anchor::InboxNotification;
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
@@ -7510,7 +7510,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     let (left_empty, _) = anchor
         .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
         .expect("registering a browser");
-    let queued = |notification_id: u64| QueuedNotification {
+    let queued = |notification_id: u64| InboxNotification {
         application_number: 4,
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
@@ -7552,8 +7552,8 @@ fn an_app_naming_its_record_keeps_the_one_it_already_had() {
         .expect("reading the record back");
 
     assert_eq!(first.id, again.id);
-    assert_eq!(again.created_at, 1_000);
-    assert_eq!(again.last_used, 2_000);
+    assert_eq!(again.created_at_ns, 1_000);
+    assert_eq!(again.last_used_ns, 2_000);
     assert_eq!(
         storage.notification_app_of(first.id, principal),
         Some(again)
@@ -7773,7 +7773,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
     // The record now carries the anchor that kept it alive.
     assert_eq!(
         storage.notification_app_of(app.id, app_principal),
-        Some(crate::notifications::app::NotificationApp {
+        Some(crate::notifications::installed_app::NotificationApp {
             anchors: std::collections::BTreeSet::from([10_000]),
             ..app
         })
@@ -7804,7 +7804,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
         Some("https://web.push.apple.com/one".to_string())
     );
     // Stamped by the app's own call, which is the only liveness anything here has.
-    assert_eq!(stored.last_used, 2_000);
+    assert_eq!(stored.last_used_ns, 2_000);
 }
 
 /// A caller is told its write landed nowhere rather than reporting a registration the
@@ -7826,7 +7826,7 @@ fn registering_against_a_record_that_is_gone_stores_nothing() {
     assert_eq!(storage.notification_app(gone), None);
     // The record that is there is left alone by a write naming another.
     assert_eq!(
-        storage.notification_app(app.id).map(|app| app.last_used),
+        storage.notification_app(app.id).map(|app| app.last_used_ns),
         Some(1_000)
     );
 }

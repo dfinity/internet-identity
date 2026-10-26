@@ -1273,7 +1273,9 @@ mod mirror_verified_email_tests {
 mod browser_tests {
     use super::*;
     use crate::browser_key::test_keys::{claim_token, public_key, signing_key};
-    use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
+    use crate::notifications::installed_app::{
+        NotificationApp, NotificationAppId, NotificationAppRef,
+    };
     use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, BrowserId, FormFactor, NotificationAppInfo,
@@ -1337,8 +1339,8 @@ mod browser_tests {
         NotificationApp {
             id: app_id,
             principal: Principal::self_authenticating(vec![app_id as u8; 91]),
-            created_at: 1_000,
-            last_used,
+            created_at_ns: 1_000,
+            last_used_ns: last_used,
             anchors: std::collections::BTreeSet::new(),
             webpush_subscription: None,
         }

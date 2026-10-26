@@ -3,7 +3,7 @@
 
 use super::validation::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::authz_utils::NotificationKey;
-use crate::notifications::app::{NotificationApp, NotificationAppId};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
@@ -217,7 +217,7 @@ mod tests {
         stored
             .notifications_mut(browser_id)
             .expect("a registered browser")
-            .push(crate::storage::anchor::QueuedNotification {
+            .push(crate::storage::anchor::InboxNotification {
                 application_number: 1,
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -368,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn removing_a_registration_takes_its_browser_queue_with_it() {
+    fn removing_a_registration_takes_its_browser_inbox_with_it() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(2);
         for browser in &browsers {
@@ -384,7 +384,7 @@ mod tests {
 
     /// Wake-ups for what was queued went to the old endpoint, so none reach the new one.
     #[test]
-    fn a_rotated_endpoint_leaves_the_old_browser_queue_behind() {
+    fn a_rotated_endpoint_leaves_the_old_browser_inbox_behind() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
@@ -396,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    fn topping_up_the_pool_keeps_the_browser_queue() {
+    fn topping_up_the_pool_keeps_the_browser_inbox() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);

@@ -1,44 +1,48 @@
-//! What each browser's service worker has yet to show, one entry per wake-up sent.
-//! An entry is added before its wake-up is posted, and the service worker removes the
-//! one it shows on every wake-up, so wake-ups and shown notifications stay one to one.
-//! The queue lives on the browser's Web Push subscription, so it goes with it.
+//! What each browser has yet to collect, one entry per wake-up sent.
+//!
+//! The canister deposits an entry before posting its wake-up, and the service worker
+//! collects one on every wake-up, so wake-ups and collected notifications stay one to
+//! one. What the worker renders afterwards is its own business, not this module's.
+//!
+//! The inbox lives on the browser's Web Push subscription, so it goes with it.
 
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, QueuedNotification};
+use crate::storage::anchor::{Anchor, InboxNotification};
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, NotificationToShow, Timestamp,
 };
 
-/// Most entries one browser holds. A new one past it replaces the oldest.
-pub(crate) const MAX_PER_BROWSER: usize = 100;
+/// Most entries one inbox holds. A new one past it replaces the oldest.
+pub(crate) const CAPACITY: usize = 100;
 
-/// Where an added entry went.
+/// Whether a deposited entry calls for a wake-up of its own.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Added {
-    /// Its wake-up is still to be posted.
-    Queued,
-    /// The queue was full, so the oldest entry made way. The wake-up already on its way
-    /// for that one covers this one.
-    ReplacedOldest,
+pub(crate) enum WakeUp {
+    /// Nothing is on its way for this entry yet.
+    Needed,
+    /// The inbox was at [`CAPACITY`], so its oldest entry was dropped to fit this one.
+    /// That entry's wake-up was posted and never answered, so it is still coming, and
+    /// the worker will be handed this entry when it arrives.
+    AlreadyComing,
 }
 
-/// Queue a notification behind the browser's newest, dropping what expired first.
-pub(crate) fn add(
-    queue: &mut Vec<QueuedNotification>,
-    notification: QueuedNotification,
+/// Put a notification behind the inbox's newest, dropping what expired first.
+pub(crate) fn deposit(
+    inbox: &mut Vec<InboxNotification>,
+    notification: InboxNotification,
     now_ns: Timestamp,
-) -> Added {
-    queue.retain(|queued| queued.expires_at_ns > now_ns);
-    let full = queue.len() >= MAX_PER_BROWSER;
+) -> WakeUp {
+    inbox.retain(|entry| entry.expires_at_ns > now_ns);
+    let full = inbox.len() >= CAPACITY;
     if full {
-        queue.remove(0);
+        inbox.remove(0);
     }
-    queue.push(notification);
+    inbox.push(notification);
     if full {
-        Added::ReplacedOldest
+        WakeUp::AlreadyComing
     } else {
-        Added::Queued
+        WakeUp::Needed
     }
 }
 
@@ -48,7 +52,7 @@ pub(crate) fn add(
 pub(crate) fn remove_after_failed_wake_up(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
-    notification: &QueuedNotification,
+    notification: &InboxNotification,
     endpoint: &str,
     now_ns: Timestamp,
 ) {
@@ -62,15 +66,15 @@ pub(crate) fn remove_after_failed_wake_up(
         {
             return;
         }
-        let Some(queue) = anchor.notifications_mut(browser_id) else {
+        let Some(inbox) = anchor.notifications_mut(browser_id) else {
             return;
         };
-        match queue.iter().position(|queued| queued == notification) {
+        match inbox.iter().position(|entry| entry == notification) {
             Some(own) => {
-                queue.remove(own);
+                inbox.remove(own);
             }
-            None if notification.expires_at_ns > now_ns && !queue.is_empty() => {
-                queue.remove(0);
+            None if notification.expires_at_ns > now_ns && !inbox.is_empty() => {
+                inbox.remove(0);
             }
             None => return,
         }
@@ -80,9 +84,9 @@ pub(crate) fn remove_after_failed_wake_up(
     });
 }
 
-/// Drop what an app queued on every browser of the identity, so consent granted again
-/// later brings none of it back.
-pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &ApplicationOrigin) {
+/// Drop what an app deposited in every browser's inbox, so consent granted again later
+/// brings none of it back.
+pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &ApplicationOrigin) {
     let origin = &origin.as_str().to_string();
     storage_borrow_mut(|storage| {
         let Some(application_number) = storage.lookup_application_number_with_origin(origin) else {
@@ -95,24 +99,24 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &ApplicationOrigin
             anchor.browsers().iter().map(|browser| browser.id).collect();
         let mut removed = false;
         for browser_id in browser_ids {
-            if let Some(queue) = anchor.notifications_mut(browser_id) {
-                let before = queue.len();
-                queue.retain(|queued| queued.application_number != application_number);
-                removed |= queue.len() < before;
+            if let Some(inbox) = anchor.notifications_mut(browser_id) {
+                let before = inbox.len();
+                inbox.retain(|entry| entry.application_number != application_number);
+                removed |= inbox.len() < before;
             }
         }
         if !removed {
             return;
         }
         if let Err(err) = storage.write(anchor) {
-            ic_cdk::println!("Failed to drop what an app without consent queued: {err}");
+            ic_cdk::println!("Failed to drop what an app without consent deposited: {err}");
         }
     });
 }
 
-/// The oldest entry the browser has yet to show, passing over what expired and what
+/// The oldest entry the browser may still collect, passing over what expired and what
 /// belongs to an app that lost consent or that II no longer holds.
-pub(crate) fn next_to_show(
+pub(crate) fn next_to_collect(
     anchor: &Anchor,
     browser_id: BrowserId,
     now_ns: Timestamp,
@@ -122,15 +126,15 @@ pub(crate) fn next_to_show(
         anchor
             .notifications(browser_id)
             .iter()
-            .filter(|queued| queued.expires_at_ns > now_ns)
-            .find_map(|queued| {
+            .filter(|entry| entry.expires_at_ns > now_ns)
+            .find_map(|entry| {
                 let origin =
-                    storage.lookup_origin_with_application_number(queued.application_number)?;
+                    storage.lookup_origin_with_application_number(entry.application_number)?;
                 let notification = NotificationToShow {
                     origin,
-                    account_number: queued.account_number,
-                    canister_id: queued.sender,
-                    id: queued.notification_id,
+                    account_number: entry.account_number,
+                    canister_id: entry.sender,
+                    id: entry.notification_id,
                 };
                 storage
                     .read_anchor_application_config(anchor_number, &notification.origin)
@@ -140,30 +144,31 @@ pub(crate) fn next_to_show(
     })
 }
 
-/// Remove the entry the service worker shows. One already gone is no error: expiry, a
-/// full queue or a failed wake-up may have dropped it first.
-pub(crate) fn remove_shown(
+/// Remove the entry the service worker collected. One already gone is no error: expiry,
+/// a full inbox or a failed wake-up may have dropped it first.
+pub(crate) fn remove_collected(
     mut anchor: Anchor,
     browser_id: BrowserId,
-    shown: &NotificationToShow,
+    collected: &NotificationToShow,
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
-        let Some(application_number) = storage.lookup_application_number_with_origin(&shown.origin)
+        let Some(application_number) =
+            storage.lookup_application_number_with_origin(&collected.origin)
         else {
             return Ok(());
         };
-        let Some(queue) = anchor.notifications_mut(browser_id) else {
+        let Some(inbox) = anchor.notifications_mut(browser_id) else {
             return Ok(());
         };
-        let Some(position) = queue.iter().position(|queued| {
-            queued.application_number == application_number
-                && queued.sender == shown.canister_id
-                && queued.notification_id == shown.id
-                && queued.account_number == shown.account_number
+        let Some(position) = inbox.iter().position(|entry| {
+            entry.application_number == application_number
+                && entry.sender == collected.canister_id
+                && entry.notification_id == collected.id
+                && entry.account_number == collected.account_number
         }) else {
             return Ok(());
         };
-        queue.remove(position);
+        inbox.remove(position);
         storage.write(anchor).map_err(|err| format!("{err}"))
     })
 }
@@ -182,8 +187,8 @@ mod tests {
 
     const SECOND_NS: u64 = 1_000_000_000;
 
-    fn queued(notification_id: u64, expires_at_ns: Timestamp) -> QueuedNotification {
-        QueuedNotification {
+    fn entry(notification_id: u64, expires_at_ns: Timestamp) -> InboxNotification {
+        InboxNotification {
             application_number: 1,
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
@@ -192,58 +197,58 @@ mod tests {
         }
     }
 
-    fn ids(queue: &[QueuedNotification]) -> Vec<u64> {
-        queue.iter().map(|one| one.notification_id).collect()
+    fn ids(inbox: &[InboxNotification]) -> Vec<u64> {
+        inbox.iter().map(|one| one.notification_id).collect()
     }
 
     #[test]
     fn an_entry_is_added_behind_the_newest() {
-        let mut queue = Vec::new();
+        let mut inbox = Vec::new();
 
         for id in 1..=3 {
             assert_eq!(
-                add(&mut queue, queued(id, 60 * SECOND_NS), SECOND_NS),
-                Added::Queued
+                deposit(&mut inbox, entry(id, 60 * SECOND_NS), SECOND_NS),
+                WakeUp::Needed
             );
         }
 
-        assert_eq!(ids(&queue), vec![1, 2, 3]);
+        assert_eq!(ids(&inbox), vec![1, 2, 3]);
     }
 
     #[test]
     fn adding_drops_what_expired_first() {
-        let mut queue = vec![queued(1, 2 * SECOND_NS), queued(2, 60 * SECOND_NS)];
+        let mut inbox = vec![entry(1, 2 * SECOND_NS), entry(2, 60 * SECOND_NS)];
 
-        add(&mut queue, queued(3, 60 * SECOND_NS), 2 * SECOND_NS);
+        deposit(&mut inbox, entry(3, 60 * SECOND_NS), 2 * SECOND_NS);
 
-        assert_eq!(ids(&queue), vec![2, 3]);
+        assert_eq!(ids(&inbox), vec![2, 3]);
     }
 
     #[test]
-    fn a_full_queue_replaces_its_oldest_and_needs_no_new_wake_up() {
-        let mut queue: Vec<_> = (0..MAX_PER_BROWSER as u64)
-            .map(|id| queued(id, 60 * SECOND_NS))
+    fn a_full_inbox_replaces_its_oldest_and_needs_no_new_wake_up() {
+        let mut inbox: Vec<_> = (0..CAPACITY as u64)
+            .map(|id| entry(id, 60 * SECOND_NS))
             .collect();
 
-        let added = add(&mut queue, queued(1_000, 60 * SECOND_NS), SECOND_NS);
+        let added = deposit(&mut inbox, entry(1_000, 60 * SECOND_NS), SECOND_NS);
 
-        assert_eq!(added, Added::ReplacedOldest);
-        assert_eq!(queue.len(), MAX_PER_BROWSER);
-        assert_eq!(queue.first().map(|one| one.notification_id), Some(1));
-        assert_eq!(queue.last().map(|one| one.notification_id), Some(1_000));
+        assert_eq!(added, WakeUp::AlreadyComing);
+        assert_eq!(inbox.len(), CAPACITY);
+        assert_eq!(inbox.first().map(|one| one.notification_id), Some(1));
+        assert_eq!(inbox.last().map(|one| one.notification_id), Some(1_000));
     }
 
-    /// A full queue of expired entries is a free one.
+    /// A full inbox of expired entries is a free one.
     #[test]
-    fn a_full_queue_of_expired_entries_takes_a_new_one_with_a_wake_up() {
-        let mut queue: Vec<_> = (0..MAX_PER_BROWSER as u64)
-            .map(|id| queued(id, 2 * SECOND_NS))
+    fn a_full_inbox_of_expired_entries_takes_a_new_one_with_a_wake_up() {
+        let mut inbox: Vec<_> = (0..CAPACITY as u64)
+            .map(|id| entry(id, 2 * SECOND_NS))
             .collect();
 
-        let added = add(&mut queue, queued(1_000, 60 * SECOND_NS), 2 * SECOND_NS);
+        let added = deposit(&mut inbox, entry(1_000, 60 * SECOND_NS), 2 * SECOND_NS);
 
-        assert_eq!(added, Added::Queued);
-        assert_eq!(ids(&queue), vec![1_000]);
+        assert_eq!(added, WakeUp::Needed);
+        assert_eq!(ids(&inbox), vec![1_000]);
     }
 
     const ORIGIN: &str = "https://app.example";
@@ -278,17 +283,17 @@ mod tests {
         .expect("signing in stores the application")
     }
 
-    fn from_app(notification_id: u64, expires_at_ns: Timestamp) -> QueuedNotification {
-        QueuedNotification {
+    fn from_app(notification_id: u64, expires_at_ns: Timestamp) -> InboxNotification {
+        InboxNotification {
             application_number: app(),
-            ..queued(notification_id, expires_at_ns)
+            ..entry(notification_id, expires_at_ns)
         }
     }
 
-    fn enqueue(
+    fn put(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
-        notifications: impl IntoIterator<Item = QueuedNotification>,
+        notifications: impl IntoIterator<Item = InboxNotification>,
     ) {
         let mut stored = anchor(anchor_number);
         stored
@@ -303,7 +308,7 @@ mod tests {
         browser_id: BrowserId,
         now_ns: Timestamp,
     ) -> Option<NotificationToShow> {
-        next_to_show(&anchor(anchor_number), browser_id, now_ns)
+        next_to_collect(&anchor(anchor_number), browser_id, now_ns)
     }
 
     fn next_id(
@@ -319,7 +324,7 @@ mod tests {
         browser_id: BrowserId,
         notification: &NotificationToShow,
     ) {
-        remove_shown(anchor(anchor_number), browser_id, notification).expect("removing");
+        remove_collected(anchor(anchor_number), browser_id, notification).expect("removing");
     }
 
     fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {
@@ -329,11 +334,11 @@ mod tests {
     #[test]
     fn the_next_is_the_oldest_and_nothing_is_removed() {
         let (anchor_number, browser_id) = signed_in();
-        let for_account = QueuedNotification {
+        let for_account = InboxNotification {
             account_number: Some(3),
             ..from_app(7, 60 * SECOND_NS)
         };
-        enqueue(
+        put(
             anchor_number,
             browser_id,
             [for_account, from_app(8, 60 * SECOND_NS)],
@@ -352,23 +357,23 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_queue_has_no_next() {
+    fn an_empty_inbox_has_no_next() {
         let (anchor_number, browser_id) = signed_in();
 
         assert_eq!(next_id(anchor_number, browser_id, SECOND_NS), None);
     }
 
     #[test]
-    fn the_next_one_comes_once_what_was_shown_is_removed() {
+    fn the_next_one_comes_once_what_was_collected_is_removed() {
         let (anchor_number, browser_id) = signed_in();
-        enqueue(
+        put(
             anchor_number,
             browser_id,
             [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
         );
-        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a next one");
+        let collected = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a next one");
 
-        remove(anchor_number, browser_id, &shown);
+        remove(anchor_number, browser_id, &collected);
 
         assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(8));
     }
@@ -376,7 +381,7 @@ mod tests {
     #[test]
     fn what_expired_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
-        enqueue(
+        put(
             anchor_number,
             browser_id,
             [from_app(1, 2 * SECOND_NS), from_app(2, 60 * SECOND_NS)],
@@ -388,11 +393,11 @@ mod tests {
     #[test]
     fn an_app_ii_no_longer_holds_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
-        let unknown = QueuedNotification {
+        let unknown = InboxNotification {
             application_number: u64::MAX,
-            ..queued(1, 60 * SECOND_NS)
+            ..entry(1, 60 * SECOND_NS)
         };
-        enqueue(
+        put(
             anchor_number,
             browser_id,
             [unknown, from_app(2, 60 * SECOND_NS)],
@@ -404,7 +409,7 @@ mod tests {
     #[test]
     fn an_app_that_lost_consent_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
-        enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+        put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), false, SECOND_NS)
             .expect("revoking consent");
 
@@ -412,9 +417,9 @@ mod tests {
     }
 
     #[test]
-    fn consent_granted_again_brings_back_nothing_queued_before_it_was_revoked() {
+    fn consent_granted_again_brings_back_nothing_deposited_before_it_was_revoked() {
         let (anchor_number, browser_id) = signed_in();
-        enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+        put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         crate::notifications::revoke_consent(anchor_number, &app_origin(ORIGIN), SECOND_NS)
             .expect("revoking consent");
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, SECOND_NS)
@@ -427,7 +432,7 @@ mod tests {
     #[test]
     fn a_signed_out_browser_has_no_next() {
         let (anchor_number, browser_id) = signed_in();
-        enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+        put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         storage_borrow_mut(|storage| {
             storage.revoke_browser_sessions(anchor_number, browser_id, SECOND_NS)
         })
@@ -438,9 +443,9 @@ mod tests {
     }
 
     #[test]
-    fn removing_what_is_shown_leaves_the_rest() {
+    fn removing_what_was_collected_leaves_the_rest() {
         let (anchor_number, browser_id) = signed_in();
-        enqueue(
+        put(
             anchor_number,
             browser_id,
             [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
@@ -455,11 +460,11 @@ mod tests {
     #[test]
     fn removing_tells_accounts_apart() {
         let (anchor_number, browser_id) = signed_in();
-        let for_account = QueuedNotification {
+        let for_account = InboxNotification {
             account_number: Some(3),
             ..from_app(7, 60 * SECOND_NS)
         };
-        enqueue(
+        put(
             anchor_number,
             browser_id,
             [from_app(7, 60 * SECOND_NS), for_account],
@@ -470,7 +475,7 @@ mod tests {
 
         assert_eq!(
             anchor(anchor_number).notifications(browser_id),
-            [QueuedNotification {
+            [InboxNotification {
                 account_number: Some(3),
                 ..from_app(7, 60 * SECOND_NS)
             }]
@@ -478,9 +483,9 @@ mod tests {
     }
 
     #[test]
-    fn removing_what_is_no_longer_queued_changes_nothing() {
+    fn removing_what_is_no_longer_held_changes_nothing() {
         let (anchor_number, browser_id) = signed_in();
-        enqueue(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        put(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
         let gone = NotificationToShow {
             origin: ORIGIN.to_string(),
             account_number: None,
