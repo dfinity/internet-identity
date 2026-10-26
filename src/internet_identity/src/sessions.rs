@@ -16,6 +16,7 @@ use candid::Principal;
 use ic_canister_sig_creation::signature_map::CanisterSigInputs;
 use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
 use ic_cdk::api::time;
+use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
@@ -497,27 +498,11 @@ pub fn check_session() -> bool {
 /// anyway. Only a storage failure comes back as an error — an app is never handed a
 /// refusal whose only sane response is to do nothing.
 pub fn app_revoke_session(now: Timestamp) -> Result<(), AppSessionError> {
-    let Ok(AuthorizedSession {
-        anchor_number,
-        origin,
-        account_number,
-        session_id,
-        ..
-    }) = check_app_authorization(now)
-    else {
-        // No live session behind this caller, which is the state revoking asks for.
-        return Ok(());
-    };
-    let locator = SessionLocator {
-        anchor_number,
-        origin,
-        account_number,
-        session_id,
-    };
-    match storage_borrow_mut(|storage| storage.revoke_session(&locator, now)) {
-        Ok(()) | Err(StorageError::SessionNotFound { .. }) => Ok(()),
-        Err(err) => Err(AppSessionError::InternalCanisterError(err.to_string())),
-    }
+    // Nothing to authorize: the caller arrives as the principal its session signs with,
+    // which names that session and no other. A session past its bounds is still the
+    // caller's to sign out, so this does not ask whether it is live.
+    storage_borrow_mut(|storage| storage.revoke_session_with_principal(caller(), now))
+        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))
 }
 
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
