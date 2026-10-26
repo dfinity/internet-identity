@@ -1314,7 +1314,11 @@ fn revoke_browser_sessions(
 
 #[update]
 fn app_revoke_session() -> Result<(), AppSessionError> {
-    sessions::app_revoke_session(ic_cdk::api::time())
+    // Nothing to authorize: the caller arrives as the principal its session signs with,
+    // which names that session and no other, and a session past its bounds is still the
+    // caller's to sign out. Idempotent — a session that is not there is `Ok`.
+    state::storage_borrow_mut(|storage| storage.revoke_session(caller(), ic_cdk::api::time()))
+        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))
 }
 
 #[query]

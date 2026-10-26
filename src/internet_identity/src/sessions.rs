@@ -16,7 +16,6 @@ use candid::Principal;
 use ic_canister_sig_creation::signature_map::CanisterSigInputs;
 use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
 use ic_cdk::api::time;
-use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
@@ -493,18 +492,6 @@ pub fn check_session() -> bool {
 /// Signs the caller's own session out. A caller cannot produce another session's
 /// principal, so the seed match is the whole authorization.
 ///
-/// Idempotent: a session that is not there is `Ok`, because the caller wanted it gone and
-/// it is gone, and they could not tell a pruned session from one that never existed
-/// anyway. Only a storage failure comes back as an error — an app is never handed a
-/// refusal whose only sane response is to do nothing.
-pub fn app_revoke_session(now: Timestamp) -> Result<(), AppSessionError> {
-    // Nothing to authorize: the caller arrives as the principal its session signs with,
-    // which names that session and no other. A session past its bounds is still the
-    // caller's to sign out, so this does not ask whether it is live.
-    storage_borrow_mut(|storage| storage.revoke_session_with_principal(caller(), now))
-        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))
-}
-
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
     let salt = storage_borrow(|storage| storage.salt().copied()).ok_or_else(|| {
         AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
