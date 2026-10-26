@@ -424,8 +424,12 @@ fn should_refuse_consent_once_notifications_are_disabled() -> Result<(), RejectR
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationGrantConsentError::InternalCanisterError(_))
     ));
-    revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
-        .expect("revoke refused");
+    assert!(matches!(
+        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
+        Err(NotificationRevokeConsentError::InternalCanisterError(_))
+    ));
+    // A disabled deployment reads as one nobody consented on, and the decision taken
+    // before it was disabled is still there underneath.
     assert!(!consent_granted(
         &env,
         canister_id,
