@@ -1233,9 +1233,6 @@ pub struct NotificationAppInfo {
     pub enabled: bool,
     /// When the app last called, which is the only evidence there is that it still exists.
     pub last_seen_ns: Timestamp,
-    /// A probe this app has been asked and has not yet had time to answer. Empty once its
-    /// window is up, answered or not; `last_seen_ns` is what says it answered.
-    pub pending_probe: Option<NotificationId>,
 }
 
 /// What a browser has. An install reads as `AwaitingInstall` only while its key can still
@@ -1439,7 +1436,9 @@ pub struct GetNextNotificationRequest {
 /// canister holding its content, and which notification.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationToShow {
-    pub origin: FrontendHostname,
+    /// `None` where Internet Identity sent this itself: it is about the identity rather
+    /// than an app, so there is no origin to name.
+    pub origin: Option<FrontendHostname>,
     /// `None` is the unreserved default account.
     pub account_number: Option<AccountNumber>,
     pub canister_id: Principal,
