@@ -1272,7 +1272,7 @@ mod mirror_verified_email_tests {
 
 mod browser_tests {
     use super::*;
-    use crate::notifications::app::NotificationAppRef;
+    use crate::notifications::installed_app::NotificationAppRef;
     use crate::storage::anchor::{BrowserError, BrowserId, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, FormFactor, OperatingSystem, PublicKey,

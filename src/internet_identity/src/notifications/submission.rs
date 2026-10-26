@@ -1,7 +1,7 @@
 //! Put an app's batch into the backlog, answering for what II cannot take.
 
-use crate::notifications::admission_queue::Admission;
-use crate::notifications::backlog::PendingNotification;
+use crate::admission_queue::Admission;
+use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::{dispatch, BROWSER_GONE_AFTER_NS};
 use crate::origin::ApplicationOrigin;
 use crate::state::{self, storage_borrow};

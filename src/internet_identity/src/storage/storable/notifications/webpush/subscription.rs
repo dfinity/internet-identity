@@ -1,4 +1,4 @@
-use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
+use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::{Decode, Encode};
@@ -29,7 +29,7 @@ pub struct StorableWebPushSubscription {
     /// What the service worker has yet to show, oldest first. Each was woken through
     /// this registration, so a new one starts empty.
     #[n(4)]
-    pub notifications: Option<Vec<StorableQueuedNotification>>,
+    pub notifications: Option<Vec<StorableInboxNotification>>,
     /// When this browser was last woken a second time for a notification it could not
     /// show yet. The wake-up is posted at the browser's own asking, so it is allowed
     /// again only once the delegation it was for has expired.

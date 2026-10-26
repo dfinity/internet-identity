@@ -13,9 +13,9 @@ pub struct NotificationApp {
     /// The principal the app signs as, self-authenticating over the key it generated in
     /// its own partition. What an app-facing caller is matched against.
     pub principal: Principal,
-    pub created_at: Timestamp,
+    pub created_at_ns: Timestamp,
     /// Stamped by the app's own update calls only, so a query leaves it where it was.
-    pub last_used: Timestamp,
+    pub last_used_ns: Timestamp,
     /// The identities whose browsers point at this app. Also the reference count: a
     /// record with none left is deleted.
     pub anchors: BTreeSet<AnchorNumber>,

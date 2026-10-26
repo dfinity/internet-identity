@@ -2,14 +2,14 @@
 //! A pass queues each notification for the browser before posting its wake-up, and
 //! spawns the posts rather than awaiting them. Nothing is retried; every outcome is counted.
 
-use crate::notifications::admission_queue::Taken;
-use crate::notifications::backlog::PendingNotification;
-use crate::notifications::browser_queue::{self, Added};
+use crate::admission_queue::Taken;
+use crate::notifications::backlog::app::PendingNotification;
+use crate::notifications::browser_inbox::{self, WakeUp};
 use crate::notifications::delegation::NOTIFICATION_DELEGATION_TTL_NS;
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, Browser, QueuedNotification};
+use crate::storage::anchor::{Anchor, Browser, InboxNotification};
 use crate::storage::storable::application::StorableOriginSha256;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -136,7 +136,7 @@ pub(crate) struct Delivery {
     pub(crate) browser_id: BrowserId,
     /// The browser queue entry this wake-up announces, or `None` where it announces
     /// nothing new: a second wake-up for an entry the service worker already has.
-    pub(crate) notification: Option<QueuedNotification>,
+    pub(crate) notification: Option<InboxNotification>,
     pub(crate) endpoint: String,
     pub(crate) vapid_public_key: Vec<u8>,
     pub(crate) jwt: String,
@@ -256,7 +256,7 @@ fn fan_out_to_browsers(
     out: &mut Vec<Delivery>,
 ) {
     let pending = &taken.entry.item;
-    let queued = QueuedNotification {
+    let queued = InboxNotification {
         application_number: pending.application_number,
         sender: pending.sender,
         notification_id: pending.notification_id,
@@ -296,7 +296,7 @@ fn fan_out_to_browsers(
                 continue;
             };
             queued_anywhere = true;
-            if browser_queue::add(queue, queued.clone(), now_ns) == Added::Queued {
+            if browser_inbox::deposit(queue, queued.clone(), now_ns) == WakeUp::Needed {
                 to_post.push(delivery);
             }
         }
@@ -421,7 +421,7 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
             let Some(notification) = delivery.notification.as_ref() else {
                 return;
             };
-            browser_queue::remove_after_failed_wake_up(
+            browser_inbox::remove_after_failed_wake_up(
                 delivery.anchor_number,
                 delivery.browser_id,
                 notification,
@@ -548,7 +548,7 @@ mod outcalls {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::notifications::backlog::NOTIFICATION_BACKLOG;
+    use crate::notifications::backlog::app::APP_BACKLOG;
     use crate::notifications::webpush::fixtures::{
         anchor, anchor_with_browsers, setup, stored_subscription, subscribe,
     };
@@ -624,7 +624,7 @@ mod tests {
     fn change_queue(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
-        change: impl FnOnce(&mut Vec<QueuedNotification>),
+        change: impl FnOnce(&mut Vec<InboxNotification>),
     ) {
         let mut stored = anchor(anchor_number);
         change(
@@ -895,7 +895,7 @@ mod tests {
     #[test]
     fn a_pass_stops_taking_at_its_bound_when_nothing_is_woken() {
         setup();
-        let per_recipient = NOTIFICATION_BACKLOG.max_pending_per_group as u64;
+        let per_recipient = APP_BACKLOG.max_pending_per_group as u64;
         let recipients = MAX_TAKEN_PER_PASS as u64 / per_recipient + 1;
         for _ in 0..recipients {
             let (recipient, _) = anchor_with_browsers(1);
@@ -929,28 +929,26 @@ mod tests {
     }
 
     #[test]
-    fn a_full_browser_queue_takes_the_notification_without_a_new_wake_up() {
+    fn a_full_browser_inbox_takes_the_notification_without_a_new_wake_up() {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
         change_queue(recipient, browsers[0], |queue| {
-            queue.extend(
-                (0..browser_queue::MAX_PER_BROWSER as u64).map(|notification_id| {
-                    QueuedNotification {
-                        application_number: 1,
-                        sender: sender(),
-                        notification_id,
-                        expires_at_ns: 10 * SECOND_NS,
-                        account_number: Some(2),
-                    }
-                }),
-            )
+            queue.extend((0..browser_inbox::CAPACITY as u64).map(|notification_id| {
+                InboxNotification {
+                    application_number: 1,
+                    sender: sender(),
+                    notification_id,
+                    expires_at_ns: 10 * SECOND_NS,
+                    account_number: Some(2),
+                }
+            }))
         });
         submit(recipient, 1_000, 10 * SECOND_NS);
 
         assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
 
         let left = queued(recipient, browsers[0]);
-        assert_eq!(left.len(), browser_queue::MAX_PER_BROWSER);
+        assert_eq!(left.len(), browser_inbox::CAPACITY);
         assert_eq!(left.last(), Some(&1_000));
     }
 
@@ -1051,7 +1049,7 @@ mod tests {
 
         assert_eq!(
             delivery.notification,
-            Some(QueuedNotification {
+            Some(InboxNotification {
                 application_number: 1,
                 sender: sender(),
                 notification_id: 7,
