@@ -28,8 +28,7 @@ use internet_identity_interface::internet_identity::types::{
 };
 pub(crate) use validation::NOT_ENABLED_MESSAGE;
 pub use validation::{
-    admit_batch, enabled_or, fetchable_origin, notifications_enabled, notifying_origin,
-    TooManyNotifications,
+    admit_batch, enabled_or, fetchable_origin, notifications_enabled, TooManyNotifications,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at
@@ -157,7 +156,7 @@ mod tests {
     ) -> Result<(), NotificationGrantConsentError> {
         grant_consent(
             anchor_number,
-            &notifying_origin(origin).expect("a notifiable origin"),
+            &ApplicationOrigin::try_from(origin).expect("a bare origin"),
             now_ns,
         )
     }
@@ -165,7 +164,7 @@ mod tests {
     fn revoke(anchor_number: AnchorNumber, origin: &str) -> Result<(), StorageError> {
         revoke_consent(
             anchor_number,
-            &notifying_origin(origin).expect("a notifiable origin"),
+            &ApplicationOrigin::try_from(origin).expect("a bare origin"),
             1_000,
         )
     }
@@ -173,7 +172,7 @@ mod tests {
     fn granted(anchor_number: AnchorNumber, origin: &str) -> bool {
         consent_granted(
             anchor_number,
-            &notifying_origin(origin).expect("a notifiable origin"),
+            &ApplicationOrigin::try_from(origin).expect("a bare origin"),
         )
     }
 

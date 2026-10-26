@@ -46,9 +46,7 @@ use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
-use notifications::{
-    admit_batch, enabled_or, fetchable_origin, notifying_origin, TooManyNotifications,
-};
+use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -857,8 +855,9 @@ fn prepare_notification_delegation(
         account_number,
         session_key,
     } = request;
-    let origin =
-        notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(NotificationDelegationError::InternalCanisterError)?;
+    enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
@@ -887,8 +886,9 @@ fn get_notification_delegation(
         session_key,
         expiration,
     } = request;
-    let origin =
-        notifying_origin(&origin).map_err(NotificationDelegationError::InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(NotificationDelegationError::InternalCanisterError)?;
+    enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = notification_entry(request.anchor_number, key)
@@ -963,8 +963,9 @@ fn notification_grant_consent(
         anchor_number,
         origin,
     } = request;
-    let origin =
-        notifying_origin(&origin).map_err(NotificationGrantConsentError::InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(NotificationGrantConsentError::InternalCanisterError)?;
+    enabled_or(NotificationGrantConsentError::InternalCanisterError)?;
     check_authz_and_record_activity(anchor_number)
         .map_err(|_| NotificationGrantConsentError::Unauthorized(caller()))?;
 
@@ -998,9 +999,12 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
         anchor_number,
         origin,
     } = request;
-    let Ok(origin) = notifying_origin(&origin) else {
+    let Ok(origin) = ApplicationOrigin::try_from(origin.as_str()) else {
         return false;
     };
+    if !notifications::notifications_enabled() {
+        return false;
+    }
     if check_authorization(anchor_number).is_err() {
         return false;
     }
@@ -1052,7 +1056,9 @@ fn app_send_notification(
         origin,
         notifications,
     } = request;
-    let origin = notifying_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(SendNotificationError::InternalCanisterError)?;
+    enabled_or(SendNotificationError::InternalCanisterError)?;
     fetchable_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
     let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {
         SendNotificationError::TooManyNotifications {
