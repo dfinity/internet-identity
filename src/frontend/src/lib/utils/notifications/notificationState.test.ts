@@ -20,7 +20,7 @@ vi.mock("./pushSubscription", () => ({
 vi.mock("$lib/utils/notifications/appStatus", () => ({
   browserAppStatus: vi.fn(),
 }));
-vi.mock("./deviceApp", () => ({ claimDeviceApp: vi.fn() }));
+vi.mock("./deviceApp", () => ({ deviceHasDonorIdentity: vi.fn() }));
 vi.mock("./alreadyInstalled", () => ({ saidAlreadyInstalled: vi.fn() }));
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
@@ -42,7 +42,7 @@ import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
 import type { NotificationAppInfo } from "$lib/generated/internet_identity_types";
-import { claimDeviceApp } from "./deviceApp";
+import { deviceHasDonorIdentity } from "./deviceApp";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { recordPermission } from "./notificationDiagnostics";
 
@@ -615,7 +615,7 @@ describe("watchNotificationPermission", () => {
 
 describe("where a Home Screen app delivers", () => {
   const appStatus = vi.mocked(browserAppStatus);
-  const claim = vi.mocked(claimDeviceApp);
+  const donor = vi.mocked(deviceHasDonorIdentity);
   const saidSo = vi.mocked(saidAlreadyInstalled);
 
   const actorGranting = (granted: boolean) =>
@@ -649,7 +649,7 @@ describe("where a Home Screen app delivers", () => {
       os: { Ios: null },
       brand: { Safari: null },
     } as never);
-    claim.mockResolvedValue("no-donor");
+    donor.mockResolvedValue(false);
     saidSo.mockResolvedValue(false);
   });
 
@@ -670,7 +670,7 @@ describe("where a Home Screen app delivers", () => {
         consented: false,
         installFirst: false,
       });
-      expect(claim).not.toHaveBeenCalled();
+      expect(donor).not.toHaveBeenCalled();
       expect(saidSo).not.toHaveBeenCalled();
     });
 
@@ -681,20 +681,20 @@ describe("where a Home Screen app delivers", () => {
         screen: "enable",
         installFirst: true,
       });
-      expect(claim).toHaveBeenCalledTimes(1);
+      expect(donor).toHaveBeenCalledTimes(1);
     });
 
-    it("points at the app another identity here hands over", async () => {
-      appStatus
-        .mockResolvedValueOnce({ kind: "no-app" })
-        .mockResolvedValueOnce({ kind: "app", app: app() });
-      claim.mockResolvedValue("claimed");
+    /// The press takes the app over; the resolution only asks whether there is one to
+    /// take, and nothing here writes.
+    it("asks rather than installs where another identity here has an app", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
+      donor.mockResolvedValue(true);
 
-      await expect(resolve(true)).resolves.toEqual({
-        screen: "skip",
-        granted: true,
+      await expect(resolve(true)).resolves.toMatchObject({
+        screen: "enable",
+        installFirst: false,
       });
-      expect(appStatus).toHaveBeenCalledTimes(2);
+      expect(appStatus).toHaveBeenCalledTimes(1);
     });
 
     it("takes the user's word that this device already has one", async () => {
@@ -721,11 +721,11 @@ describe("where a Home Screen app delivers", () => {
       });
     });
 
-    /// No donor was ever asked, so nothing was learned about this device: offering the
-    /// install would hand a second app to a phone that already has one.
-    it("offers no install where the claim could not be attempted", async () => {
+    /// The donor list would not open, so nothing was learned about this device: offering
+    /// the install would hand a second app to a phone that already has one.
+    it("offers no install where the donors could not be read", async () => {
       appStatus.mockResolvedValue({ kind: "no-app" });
-      claim.mockResolvedValue("indeterminate");
+      donor.mockResolvedValue(undefined);
       saidSo.mockResolvedValue(false);
 
       await expect(resolve(false)).resolves.toEqual({
@@ -781,30 +781,14 @@ describe("where a Home Screen app delivers", () => {
       ).resolves.toEqual({ screen: "skip", granted: true });
     });
 
-    it("reads the canister again after a claim that answered nothing", async () => {
-      appStatus
-        .mockResolvedValueOnce({ kind: "no-app" })
-        .mockResolvedValueOnce({ kind: "app", app: app() });
-      claim.mockResolvedValue("no-donor");
+    /// One read and no write: the resolution picks a screen, and every state-changing
+    /// step belongs to the press that answers it.
+    it("reads the canister once and claims nothing", async () => {
+      appStatus.mockResolvedValue({ kind: "no-app" });
 
-      await expect(resolve(true)).resolves.toEqual({
-        screen: "skip",
-        granted: true,
-      });
-      expect(appStatus).toHaveBeenCalledTimes(2);
-    });
+      await resolve(true);
 
-    it("asks where the read after a claim answers nothing", async () => {
-      appStatus
-        .mockResolvedValueOnce({ kind: "no-app" })
-        .mockResolvedValueOnce({ kind: "unanswered", reason: "offline" });
-      claim.mockResolvedValue("no-donor");
-
-      await expect(resolve(false)).resolves.toMatchObject({
-        screen: "enable",
-        installFirst: false,
-      });
-      expect(saidSo).not.toHaveBeenCalled();
+      expect(appStatus).toHaveBeenCalledTimes(1);
     });
   });
 

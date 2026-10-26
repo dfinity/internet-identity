@@ -13,7 +13,7 @@ import type {
   NotificationAppInfo,
 } from "$lib/generated/internet_identity_types";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
-import { claimDeviceApp, type ClaimOutcome } from "./deviceApp";
+import { deviceHasDonorIdentity } from "./deviceApp";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
@@ -222,18 +222,16 @@ export const resolveOptIn = async ({
     : { screen, state, consented, installFirst: false };
 };
 
-/** An app another identity here already has is pointed at rather than installed again, but only where the canister says there is no app. */
+/** Which screen a device whose delivery is the Home Screen app's needs.
+ *
+ *  Asks only: an app another identity here already has is taken over by the press, not by
+ *  this resolution, so nothing here writes. Where a donor exists the question is still
+ *  allow rather than install, because the press can point this entry at the app. */
 const resolveAppOptIn = async (
   identityNumber: bigint,
   consented: boolean,
 ): Promise<OptInResolution> => {
-  let status = await browserAppStatus(identityNumber);
-  let claim: ClaimOutcome = "no-donor";
-  if (status.kind === "no-app") {
-    // The claim is written before its reply arrives, so a lost reply must not deny an app this browser already points at.
-    claim = await claimDeviceApp(identityNumber);
-    status = await browserAppStatus(identityNumber);
-  }
+  const status = await browserAppStatus(identityNumber);
 
   switch (status.kind) {
     case "unanswered": {
@@ -243,9 +241,11 @@ const resolveAppOptIn = async (
       return { screen: "enable", state, consented, installFirst: false };
     }
     case "no-app": {
-      if (claim === "indeterminate") {
-        // Nothing was asked of any donor, so this is not an answer that there is no app
-        // here: offering the install would hand a second one to a device that has one.
+      const donor = await deviceHasDonorIdentity(identityNumber);
+      if (donor !== false) {
+        // A donor the press can take the app over from, or a list that would not open,
+        // which is the absence of an answer: offering the install on either would hand a
+        // second app to a device that has one.
         const state = asAppState(undefined);
         return { screen: "enable", state, consented, installFirst: false };
       }
@@ -274,7 +274,12 @@ const resolveAppOptIn = async (
       const screen = resolveOptInScreen(state, consented);
       return screen === "skip"
         ? { screen, granted: consented && deliversHere(state) }
-        : { screen, state, consented, installFirst: !status.app.subscribed };
+        : {
+            screen,
+            state,
+            consented,
+            installFirst: !status.app.subscribed,
+          };
     }
   }
 };
