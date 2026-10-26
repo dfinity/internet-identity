@@ -7654,7 +7654,7 @@ fn an_app_is_indexed_by_the_anchors_pointing_at_it() {
 
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
-        anchor.point_at_notification_app(0, app.id, true);
+        anchor.point_at_notification_app(0, app.id);
         storage.write(anchor).expect("writing the anchor");
     }
 
@@ -7672,14 +7672,14 @@ fn an_app_nothing_points_at_is_deleted() {
         .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id, true);
+    anchor.point_at_notification_app(0, app.id);
     storage.write(anchor).expect("pointing at the app");
 
     let replacement = storage
         .ensure_notification_app(Principal::self_authenticating(vec![8u8; 91]), None, 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.point_at_notification_app(0, replacement.id, true);
+    anchor.point_at_notification_app(0, replacement.id);
     storage.write(anchor).expect("dropping the reference");
 
     assert!(storage.anchors_with_notification_app(app.id).is_empty());
@@ -7695,7 +7695,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .expect("creating the record");
     for _ in 0..2 {
         let mut anchor = anchor_with_browser(&mut storage);
-        anchor.point_at_notification_app(0, app.id, true);
+        anchor.point_at_notification_app(0, app.id);
         storage.write(anchor).expect("writing the anchor");
     }
 
@@ -7703,7 +7703,7 @@ fn an_app_outlives_one_identity_letting_go_of_it() {
         .ensure_notification_app(Principal::self_authenticating(vec![8u8; 91]), None, 2_000)
         .expect("creating the record the browser moves to");
     let mut anchor = storage.read(10_000).expect("reading the anchor");
-    anchor.point_at_notification_app(0, replacement.id, true);
+    anchor.point_at_notification_app(0, replacement.id);
     storage.write(anchor).expect("dropping one reference");
 
     assert_eq!(storage.anchors_with_notification_app(app.id), vec![10_001]);
@@ -7718,7 +7718,7 @@ fn an_app_only_an_evicted_browser_pointed_at_is_deleted() {
         .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id, true);
+    anchor.point_at_notification_app(0, app.id);
     storage.write(anchor).expect("pointing at the app");
 
     // The victim is the entry with the lowest `(last_used, id)`.
@@ -7764,7 +7764,7 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
         .ensure_notification_app(app_principal, None, 1_000)
         .expect("creating the record");
     let mut anchor = anchor_with_browser(&mut storage);
-    anchor.point_at_notification_app(0, app.id, true);
+    anchor.point_at_notification_app(0, app.id);
     storage.write(anchor).expect("pointing at the app");
 
     storage.delete_notification_app_if_unreferenced(app.id);
@@ -7777,5 +7777,56 @@ fn an_app_an_anchor_points_at_survives_the_request_to_delete_it() {
             anchors: std::collections::BTreeSet::from([10_000]),
             ..app
         })
+    );
+}
+
+#[test]
+fn an_apps_subscription_is_the_records_and_not_an_anchors() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(vec![7u8; 91]), None, 1_000)
+        .expect("creating the record");
+
+    storage
+        .set_notification_app_subscription(
+            app.id,
+            Some(test_subscription("https://web.push.apple.com/one")),
+            2_000,
+        )
+        .expect("the record is there, so the registration is stored");
+
+    let stored = storage.notification_app(app.id).expect("the record");
+    assert_eq!(
+        stored
+            .webpush_subscription
+            .map(|subscription| subscription.endpoint.into_string()),
+        Some("https://web.push.apple.com/one".to_string())
+    );
+    // Stamped by the app's own call, which is the only liveness anything here has.
+    assert_eq!(stored.last_used_ns, 2_000);
+}
+
+/// A caller is told its write landed nowhere rather than reporting a registration the
+/// record it named no longer has: ids are never reissued, so a record that is gone is
+/// gone for good.
+#[test]
+fn registering_against_a_record_that_is_gone_stores_nothing() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 20_000), memory.clone());
+    let app = storage
+        .ensure_notification_app(Principal::self_authenticating(vec![7u8; 91]), None, 1_000)
+        .expect("creating the record");
+    let gone = app.id + 1;
+
+    assert!(matches!(
+        storage.set_notification_app_subscription(gone, None, 2_000),
+        Err(StorageError::NotificationAppNotFound { app_id }) if app_id == gone
+    ));
+    assert_eq!(storage.notification_app(gone), None);
+    // The record that is there is left alone by a write naming another.
+    assert_eq!(
+        storage.notification_app(app.id).map(|app| app.last_used_ns),
+        Some(1_000)
     );
 }

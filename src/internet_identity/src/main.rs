@@ -9,7 +9,8 @@ use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization, check_notification_app_authorization, AuthorizationError,
+    check_browser_authorization, check_notification_app_authorization,
+    check_notification_authorization, AuthorizationError,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -39,6 +40,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
 use notifications::{
@@ -334,8 +336,8 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 // ---- Notifications: called by II's frontend / service worker ----
 
-/// Authorized by the browser key the caller signs with, which is what says whose
-/// subscription this is: the row it writes is the caller's own.
+/// Authorized by the caller's own key: a browser writes its entry's subscription, an app
+/// writes its record's.
 #[update]
 fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
@@ -378,12 +380,12 @@ fn set_webpush_subscription(
         }
     };
 
-    let (anchor, browser_id) = check_browser_authorization(anchor_number)
+    let key = check_notification_authorization(anchor_number)
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
     notifications::webpush::set_subscription(
-        anchor,
-        browser_id,
+        key,
+        anchor_number,
         endpoint,
         vapid_public_key,
         jwt_signatures,
@@ -391,12 +393,8 @@ fn set_webpush_subscription(
     )
 }
 
-/// Authorized by the browser key the caller signs with, like the write it reconciles
-/// against: a browser asks about its own registration, so the key that says which
-/// browser is asking is also the answer to which one to report.
-///
-/// `None` for a deployment that does not notify and for a caller that is no browser of
-/// this identity, so neither can be probed with it.
+/// `None` for a deployment that does not notify and for a caller that is neither a browser
+/// of this identity nor an app one of its browsers points at, so neither can be probed with it.
 #[query]
 fn get_webpush_subscription_status(
     request: GetWebPushSubscriptionStatusRequest,
@@ -405,11 +403,11 @@ fn get_webpush_subscription_status(
     if !notifications::notifications_enabled() {
         return None;
     }
-    let Ok((anchor, browser_id)) = check_browser_authorization(anchor_number) else {
+    let Ok(key) = check_notification_authorization(anchor_number) else {
         return None;
     };
 
-    notifications::webpush::subscription_status(&anchor, browser_id)
+    notifications::webpush::subscription_status(anchor_number, key)
 }
 
 /// Authorized by the identity rather than by the browser, so a browser that is lost or
@@ -458,6 +456,21 @@ fn prepare_notification_app_link(
     }
     let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
         .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
+    // The install slot replaces the reference this entry holds, so starting one takes
+    // delivery off an app that is working. What decides that is the canister's own
+    // record of the app rather than anything the caller asserts; an app switched off or
+    // without a subscription is replaced freely.
+    if let Some(NotificationAppRef::Linked {
+        app_id,
+        enabled: true,
+    }) = anchor.notification_app(browser_id)
+    {
+        let delivering = state::storage_borrow(|storage| storage.notification_app(app_id))
+            .is_some_and(|app| app.webpush_subscription.is_some());
+        if delivering {
+            return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
+        }
+    }
 
     let now = ic_cdk::api::time();
     anchor.start_notification_app_link(
@@ -476,7 +489,8 @@ fn prepare_notification_app_link(
 /// Authorized as the app the record belongs to, which is in no anchor's browser list.
 /// Empty wherever there is nobody to deliver for, and those cases cannot be told apart.
 #[query]
-fn notification_app_anchors(app_id: NotificationAppId) -> Vec<AnchorNumber> {
+fn notification_app_anchors(request: NotificationAppAnchorsRequest) -> Vec<AnchorNumber> {
+    let NotificationAppAnchorsRequest { app_id } = request;
     if !notifications::notifications_enabled() {
         return vec![];
     }
@@ -521,7 +535,7 @@ fn link_notification_app(
         storage.ensure_notification_app(app_principal, app_id, now)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
-    anchor.point_at_notification_app(installing_browser, app.id, true);
+    anchor.point_at_notification_app(installing_browser, app.id);
 
     state::storage_borrow_mut(|storage| {
         let Err(err) = storage.write(anchor) else {
@@ -580,6 +594,87 @@ mod claim_token_expiry {
     }
 }
 
+/// Authorized by the browser key alone, so the install page can ask without a session, and
+/// only about the caller's own entry. A deployment with notifications off and a caller we
+/// do not recognise both read as `NoApp`, which is what they have in common.
+#[query]
+fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> NotificationAppStatus {
+    if !notifications::notifications_enabled() {
+        return NotificationAppStatus::NoApp;
+    }
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return NotificationAppStatus::NoApp;
+    };
+    anchor.notification_app_status(
+        browser_id,
+        ic_cdk::api::time(),
+        notifications::installed_app::record,
+    )
+}
+
+/// The reference stays either way: this switches delivery on, it does not install
+/// anything.
+#[update]
+fn enable_notification_app(
+    request: EnableNotificationAppRequest,
+) -> Result<(), EnableNotificationAppError> {
+    let EnableNotificationAppRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
+        return Err(EnableNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| EnableNotificationAppError::InvalidBrowserKey)?;
+    // An install nobody has opened is not an app to switch: the flag lives on the
+    // reference the app writes, so flipping it here would answer Ok and change nothing.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(EnableNotificationAppError::NoNotificationApp);
+    }
+
+    anchor.enable_notification_app(browser_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| EnableNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
+/// The reference stays: this stops delivery for this identity and leaves the app where
+/// it is, subscription included, because the subscription is the record's and is shared.
+#[update]
+fn disable_notification_app(
+    request: DisableNotificationAppRequest,
+) -> Result<(), DisableNotificationAppError> {
+    let DisableNotificationAppRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
+        return Err(DisableNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| DisableNotificationAppError::InvalidBrowserKey)?;
+    // As for switching on: there is nothing to switch until the app has linked.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(DisableNotificationAppError::NoNotificationApp);
+    }
+
+    anchor.disable_notification_app(browser_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| DisableNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
 /// Points a browser of `anchor_number` at the Home Screen app that
 /// `offering_anchor_number` already has on the same device.
 ///
@@ -620,9 +715,9 @@ fn claim_notification_app(
         .and_then(|reference| reference.linked_app())
         .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
 
-    // Taking over an app another identity installed is not this identity asking for
-    // delivery: the switch starts off and the opt-in screen is where they answer.
-    anchor.point_at_notification_app(browser_id, app_id, false);
+    // A claim is the user asking this identity to use the app already on the device, so
+    // it links with delivery on exactly as a first install does.
+    anchor.point_at_notification_app(browser_id, app_id);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
@@ -1666,9 +1761,10 @@ mod v2_api {
     #[update]
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, IdentityInfoError> {
         check_authz_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
-        let anchor_info = anchor_management::get_anchor_info(identity_number);
+        let anchor = state::anchor(identity_number);
+        let anchor_info = anchor_management::anchor_info(&anchor);
 
-        let metadata = state::anchor(identity_number)
+        let metadata = anchor
             .identity_metadata()
             .clone()
             .unwrap_or_default()
@@ -1682,21 +1778,21 @@ mod v2_api {
         // enforces ≤1 entry, so the FE picks the first to render the
         // recovery-email card — but a future bump to N>1 won't need a
         // candid schema change.
-        let stored_email_recovery = state::anchor(identity_number).email_recovery.clone();
+        let stored_email_recovery = anchor.email_recovery.clone();
         let email_recovery = if stored_email_recovery.is_empty() {
             None
         } else {
             Some(stored_email_recovery)
         };
 
-        let stored_verified_emails = state::anchor(identity_number).verified_emails.clone();
+        let stored_verified_emails = anchor.verified_emails.clone();
         let verified_emails = if stored_verified_emails.is_empty() {
             None
         } else {
             Some(stored_verified_emails)
         };
 
-        let browsers = state::anchor(identity_number).browsers_info();
+        let browsers = anchor.browsers_info(notifications::installed_app::record);
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

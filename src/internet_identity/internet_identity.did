@@ -1089,6 +1089,37 @@ type BrowserInfo = record {
     last_used : Timestamp;
     // Sessions this browser holds. Zero means it is signed in to nothing.
     session_count : nat32;
+    // The Home Screen app this browser points at, where it has one. Absent is "not
+    // installed, or installed and never opened": the record is created by the app's
+    // first open, so there is nothing to point at before that. Absent too where the
+    // record this browser points at is gone, and where this deployment does not notify.
+    notification_app : opt NotificationAppInfo;
+};
+
+// Asks what this browser's entry says about the app it points at, for a page that has
+// the browser key and no session.
+type GetNotificationAppStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+type NotificationAppInfo = record {
+    // Whether the app has registered for Web Push. False means it has been opened and
+    // the permission has not been given yet.
+    subscribed : bool;
+    // Whether this identity wants it to deliver.
+    enabled : bool;
+    // When the app last called, which is the only evidence there is that it still
+    // exists: nothing says when a user deletes a web app from their Home Screen.
+    last_seen_ns : nat64;
+};
+
+// What a browser has. An install reads as AwaitingInstall only while its key can still be
+// spent; past that the app holding it can never finish, so it reads as nothing.
+type NotificationAppStatus = variant {
+    Linked : NotificationAppInfo;
+    // When the key this browser handed its install stops being spendable.
+    AwaitingInstall : nat64;
+    NoApp;
 };
 
 type PrepareAccountSessionRequest = record {
@@ -1881,6 +1912,9 @@ type PrepareNotificationAppLinkError = variant {
     // The anonymous principal is held by everyone, so an install offered to it is one
     // anybody could complete.
     LinkPrincipalIsAnonymous;
+    // This browser already points at an app that is delivering for this identity, and
+    // an install takes delivery off it.
+    AppAlreadyDelivering;
     InternalCanisterError : text;
 };
 
@@ -1911,6 +1945,55 @@ type LinkNotificationAppError = variant {
     NoPendingLink;
     // A browser of this identity already signs as that principal.
     PrincipalAlreadyInUse;
+    InternalCanisterError : text;
+};
+
+// This identity asking the app its browser points at to deliver for it. Never a
+// subscription write: the subscription is the app's and is shared.
+type EnableNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type EnableNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+// This identity asking the app its browser points at to stop delivering for it. Never a
+// subscription removal: the subscription is the app's and is shared with every other
+// identity pointing at it.
+type DisableNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type DisableNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+// Asks which identities a Home Screen app delivers for, named by the app's own record.
+type NotificationAppAnchorsRequest = record {
+    app_id : NotificationAppId;
+};
+
+// Offers the Home Screen app this browser has to another identity signed in on the
+// same browser, which is the only party that can reach both. The handle says nothing
+// about which app it is.
+type OfferNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type OfferNotificationAppError = variant {
+    // The caller is no browser of this identity.
+    Unauthorized : principal;
+    // This browser has no app to offer.
+    NoNotificationApp;
     InternalCanisterError : text;
 };
 
@@ -2587,7 +2670,10 @@ service : (opt InternetIdentityInit) -> {
     // Called by the service worker for the one it shows, while it fetches the content.
     browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 
-    // Called by the browser itself, signed with the browser key it signs in with.
+    // Called by the browser, or by the Home Screen app it points at: what the app
+    // registers belongs to its own record, which every identity pointing at it is
+    // delivered through, so the anchor named here is what authorized the call rather
+    // than where the subscription goes.
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
@@ -2604,7 +2690,7 @@ service : (opt InternetIdentityInit) -> {
     // is the whole of what it can deliver for. Empty in four cases, which all mean the
     // same thing to the app: the id names nothing, nothing points at it, this deployment
     // does not notify, or the caller is not the app that record belongs to.
-    notification_app_anchors : (NotificationAppId) -> (vec UserNumber) query;
+    notification_app_anchors : (NotificationAppAnchorsRequest) -> (vec UserNumber) query;
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
     // Called by an app's backend canister for the origin it names.
@@ -2613,4 +2699,12 @@ service : (opt InternetIdentityInit) -> {
     // Called by the identity being added, from its own browser on the device, with a
     // token the identity that has the app signed for it.
     claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+
+    // Called by the browser, which may hold nothing but its key: the install page is a
+    // tab of its own with no session.
+    get_notification_app_status : (GetNotificationAppStatusRequest) -> (NotificationAppStatus) query;
+
+    // Called by the identity, from the browser that points at the app.
+    enable_notification_app : (EnableNotificationAppRequest) -> (variant { Ok; Err : EnableNotificationAppError });
+    disable_notification_app : (DisableNotificationAppRequest) -> (variant { Ok; Err : DisableNotificationAppError });
 };

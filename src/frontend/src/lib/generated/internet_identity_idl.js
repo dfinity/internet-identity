@@ -375,6 +375,14 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Principal,
     'failed' : IDL.Text,
   });
+  const DisableNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const DisableNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const VerificationPath = IDL.Variant({
     'Doh' : IDL.Null,
     'Dnssec' : IDL.Null,
@@ -472,6 +480,14 @@ export const idlFactory = ({ IDL }) => {
     'session_key' : SessionKey,
     'expiration' : Timestamp,
     'nonce' : IDL.Text,
+  });
+  const EnableNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const EnableNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
@@ -636,6 +652,19 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const GetNotificationAppStatusRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationAppInfo = IDL.Record({
+    'last_seen_ns' : IDL.Nat64,
+    'enabled' : IDL.Bool,
+    'subscribed' : IDL.Bool,
+  });
+  const NotificationAppStatus = IDL.Variant({
+    'Linked' : NotificationAppInfo,
+    'NoApp' : IDL.Null,
+    'AwaitingInstall' : IDL.Nat64,
+  });
   const GetNotificationDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
     'origin' : FrontendHostname,
@@ -748,6 +777,7 @@ export const idlFactory = ({ IDL }) => {
   const BrowserInfo = IDL.Record({
     'id' : IDL.Nat32,
     'session_count' : IDL.Nat32,
+    'notification_app' : IDL.Opt(NotificationAppInfo),
     'description' : BrowserDescription,
     'created_at' : Timestamp,
     'last_used' : Timestamp,
@@ -861,6 +891,9 @@ export const idlFactory = ({ IDL }) => {
   const McpRegistrationV2 = IDL.Record({
     'permissions' : Permissions,
     'expiration' : Timestamp,
+  });
+  const NotificationAppAnchorsRequest = IDL.Record({
+    'app_id' : NotificationAppId,
   });
   const NotificationConsentGrantedRequest = IDL.Record({
     'origin' : IDL.Text,
@@ -1007,6 +1040,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'LinkPrincipalIsAnonymous' : IDL.Null,
+    'AppAlreadyDelivering' : IDL.Null,
   });
   const PrepareNotificationDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
@@ -1326,6 +1360,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
+    'disable_notification_app' : IDL.Func(
+        [DisableNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : DisableNotificationAppError })],
+        [],
+      ),
     'discover_sso' : IDL.Func([IDL.Text], [], []),
     'email_challenge_diagnostics' : IDL.Func(
         [IDL.Text],
@@ -1385,6 +1424,11 @@ export const idlFactory = ({ IDL }) => {
     'email_recovery_submit_dkim_leaf' : IDL.Func(
         [EmailChallengeSubmitDkimLeafArg],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
+        [],
+      ),
+    'enable_notification_app' : IDL.Func(
+        [EnableNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EnableNotificationAppError })],
         [],
       ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -1476,6 +1520,11 @@ export const idlFactory = ({ IDL }) => {
     'get_mcp_registration_delegation' : IDL.Func(
         [UserNumber, SessionKey, PublicKey, Timestamp],
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
+        ['query'],
+      ),
+    'get_notification_app_status' : IDL.Func(
+        [GetNotificationAppStatusRequest],
+        [NotificationAppStatus],
         ['query'],
       ),
     'get_notification_delegation' : IDL.Func(
@@ -1648,7 +1697,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'notification_app_anchors' : IDL.Func(
-        [NotificationAppId],
+        [NotificationAppAnchorsRequest],
         [IDL.Vec(UserNumber)],
         ['query'],
       ),
