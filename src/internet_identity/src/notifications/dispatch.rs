@@ -933,17 +933,15 @@ mod tests {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
         change_queue(recipient, browsers[0], |queue| {
-            queue.extend(
-                (0..browser_inbox::CAPACITY as u64).map(|notification_id| {
-                    InboxNotification {
-                        application_number: 1,
-                        sender: sender(),
-                        notification_id,
-                        expires_at_ns: 10 * SECOND_NS,
-                        account_number: Some(2),
-                    }
-                }),
-            )
+            queue.extend((0..browser_inbox::CAPACITY as u64).map(|notification_id| {
+                InboxNotification {
+                    application_number: 1,
+                    sender: sender(),
+                    notification_id,
+                    expires_at_ns: 10 * SECOND_NS,
+                    account_number: Some(2),
+                }
+            }))
         });
         submit(recipient, 1_000, 10 * SECOND_NS);
 

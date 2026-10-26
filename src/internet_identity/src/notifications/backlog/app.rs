@@ -97,13 +97,10 @@ pub(crate) const APP_BACKLOG: QueueConfig = QueueConfig {
 const _: () = assert!(APP_BACKLOG.is_coherent());
 
 // A single app must stay below the pressure reset threshold.
-const _: () = assert!(
-    APP_BACKLOG.max_entries_per_sender < APP_BACKLOG.pressure_cleared_below
-);
+const _: () = assert!(APP_BACKLOG.max_entries_per_sender < APP_BACKLOG.pressure_cleared_below);
 
 // Opening one slot must not reset the pressure timer.
-const _: () =
-    assert!(APP_BACKLOG.pressure_cleared_below < APP_BACKLOG.max_entries);
+const _: () = assert!(APP_BACKLOG.pressure_cleared_below < APP_BACKLOG.max_entries);
 
 #[cfg(test)]
 mod tests {

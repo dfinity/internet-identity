@@ -152,7 +152,8 @@ pub(crate) fn remove_collected(
     collected: &NotificationToShow,
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
-        let Some(application_number) = storage.lookup_application_number_with_origin(&collected.origin)
+        let Some(application_number) =
+            storage.lookup_application_number_with_origin(&collected.origin)
         else {
             return Ok(());
         };

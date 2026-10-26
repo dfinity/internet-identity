@@ -423,10 +423,7 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
 }
 
 /// Initialize the backlog at `now_ns` on first use.
-pub fn notification_backlog_mut<R>(
-    now_ns: Timestamp,
-    f: impl FnOnce(&mut AppBacklog) -> R,
-) -> R {
+pub fn notification_backlog_mut<R>(now_ns: Timestamp, f: impl FnOnce(&mut AppBacklog) -> R) -> R {
     STATE.with(|s| {
         let mut backlog = s.notification_backlog.borrow_mut();
         f(backlog.get_or_insert_with(|| AppBacklog::new(APP_BACKLOG, now_ns)))

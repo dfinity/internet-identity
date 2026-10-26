@@ -4,11 +4,11 @@
 //! authorizes first, so everything here acts on an origin already folded to the
 //! spelling consent is keyed by.
 
-pub mod installed_app;
 pub(crate) mod backlog;
 pub(crate) mod browser_inbox;
 pub mod delegation;
 pub(crate) mod dispatch;
+pub mod installed_app;
 pub mod senders;
 pub mod submission;
 pub(crate) mod validation;

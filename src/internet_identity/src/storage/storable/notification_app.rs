@@ -2,9 +2,10 @@ use crate::notifications::installed_app::{NotificationApp, NotificationAppId, No
 use candid::Principal;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
-use internet_identity_interface::internet_identity::types::Timestamp;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 
 pub type StorableNotificationAppId = NotificationAppId;
 
@@ -19,6 +20,8 @@ pub struct StorableNotificationApp {
     pub created_at_ns: Timestamp,
     #[n(3)]
     pub last_used_ns: Timestamp,
+    #[n(4)]
+    pub anchors: BTreeSet<AnchorNumber>,
 }
 
 impl From<NotificationApp> for StorableNotificationApp {
@@ -28,6 +31,7 @@ impl From<NotificationApp> for StorableNotificationApp {
             principal: value.principal.as_slice().to_vec(),
             created_at_ns: value.created_at_ns,
             last_used_ns: value.last_used_ns,
+            anchors: value.anchors,
         }
     }
 }
@@ -39,6 +43,7 @@ impl From<StorableNotificationApp> for NotificationApp {
             principal: Principal::from_slice(&value.principal),
             created_at_ns: value.created_at_ns,
             last_used_ns: value.last_used_ns,
+            anchors: value.anchors,
         }
     }
 }
