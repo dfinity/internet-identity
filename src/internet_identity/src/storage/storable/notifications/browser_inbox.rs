@@ -10,7 +10,7 @@ use minicbor::{Decode, Encode};
 /// canister to ask, and the app's own ID.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
-pub struct StorableQueuedNotification {
+pub struct StorableInboxNotification {
     #[n(0)]
     pub application_number: StorableApplicationNumber,
     /// The app canister that sent it.
@@ -33,7 +33,7 @@ mod tests {
 
     #[test]
     fn a_queued_notification_round_trips_its_sender_as_bytes() {
-        let queued = StorableQueuedNotification {
+        let queued = StorableInboxNotification {
             application_number: u64::MAX,
             sender: vec![0xff; Principal::MAX_LENGTH_IN_BYTES],
             notification_id: u64::MAX,
@@ -45,7 +45,7 @@ mod tests {
 
         assert_eq!(bytes.len(), 1 + (1 + 9) + (1 + 2 + 29) + 3 * (1 + 9));
         assert_eq!(
-            minicbor::decode::<StorableQueuedNotification>(&bytes).expect("decoding it"),
+            minicbor::decode::<StorableInboxNotification>(&bytes).expect("decoding it"),
             queued
         );
     }
