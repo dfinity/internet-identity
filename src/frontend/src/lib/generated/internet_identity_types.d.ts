@@ -1641,12 +1641,6 @@ export interface NotificationAppInfo {
    */
   'enabled' : boolean,
   /**
-   * A probe this app has been asked and has not yet had time to answer. Null once its
-   * window is up, answered or not: what says it answered is last_seen_ns moving. Held
-   * on the app's own record, so every identity pointing at it shares one ask.
-   */
-  'pending_probe' : [] | [NotificationId],
-  /**
    * Whether the app has registered for Web Push. False means it has been opened and
    * the permission has not been given yet.
    */
@@ -1716,7 +1710,11 @@ export interface NotificationRevokeConsentRequest {
  */
 export interface NotificationToShow {
   'id' : NotificationId,
-  'origin' : FrontendHostname,
+  /**
+   * Null where Internet Identity sent this itself: it is about the identity rather
+   * than an app, so there is no origin to name and none is looked up.
+   */
+  'origin' : [] | [FrontendHostname],
   'canister_id' : Principal,
   /**
    * Set where Internet Identity sent this itself, and what it has to say. An app's
