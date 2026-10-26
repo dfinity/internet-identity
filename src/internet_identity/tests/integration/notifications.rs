@@ -1256,7 +1256,7 @@ mod pull_delegation {
     }
 }
 
-mod browser_queue {
+mod browser_inbox {
     use super::subscriptions::{install_with_browser, key_holder};
     use super::*;
     use pretty_assertions::assert_eq;
@@ -1692,11 +1692,11 @@ mod probe {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        get_notification_app_status, probe_notification_app, set_webpush_subscription,
+        probe_notification_app, set_webpush_subscription,
     };
     use internet_identity_interface::internet_identity::types::{
-        GetNotificationAppStatusRequest, NotificationAppStatus, NotificationId,
-        ProbeNotificationAppError, ProbeNotificationAppRequest, SetWebPushSubscriptionRequest,
+        NotificationId, ProbeNotificationAppError, ProbeNotificationAppRequest,
+        SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -1734,27 +1734,6 @@ mod probe {
         )
     }
 
-    fn pending_probe(
-        env: &PocketIc,
-        canister_id: CanisterId,
-        sender: Principal,
-        anchor: AnchorNumber,
-    ) -> Result<Option<NotificationId>, RejectResponse> {
-        Ok(
-            match get_notification_app_status(
-                env,
-                canister_id,
-                sender,
-                GetNotificationAppStatusRequest {
-                    anchor_number: anchor,
-                },
-            )? {
-                NotificationAppStatus::Linked(info) => info.pending_probe,
-                NotificationAppStatus::AwaitingInstall(_) | NotificationAppStatus::NoApp => None,
-            },
-        )
-    }
-
     /// An identity whose browser points at a Home Screen app that has registered for push.
     fn install_with_a_registered_app(
         env: &PocketIc,
@@ -1775,10 +1754,9 @@ mod probe {
         let id = probe(&env, canister_id, browser(1), anchor)?
             .expect("probe_notification_app returned Err");
 
-        assert_eq!(
-            pending_probe(&env, canister_id, browser(1), anchor)?,
-            Some(id)
-        );
+        // The id answered names the probe now outstanding: asking again inside its
+        // window hands back the same one rather than sending a second.
+        assert_eq!(probe(&env, canister_id, browser(1), anchor)?, Ok(id));
         Ok(())
     }
 
@@ -1817,7 +1795,6 @@ mod probe {
             probe(&env, canister_id, browser(1), first)?,
             Err(ProbeNotificationAppError::NoNotificationApp)
         );
-        assert_eq!(pending_probe(&env, canister_id, browser(1), first)?, None);
         Ok(())
     }
 
@@ -1870,7 +1847,6 @@ mod probe {
                 "notifications are not enabled".to_string()
             ))
         );
-        assert_eq!(pending_probe(&env, canister_id, browser(1), anchor)?, None);
 
         upgrade_ii_canister_with_arg(
             &env,
@@ -2529,7 +2505,7 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
     RemoveNotificationRequest {
         anchor_number,
         notification: NotificationToShow {
-            origin: ORIGIN.into(),
+            origin: Some(ORIGIN.into()),
             account_number: None,
             canister_id: principal_2(),
             id: 1,
@@ -2933,11 +2909,13 @@ mod turning_on {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        enable_notification_app, get_notification_app_status, set_webpush_subscription,
+        enable_notification_app, get_notification_app_status, probe_notification_app,
+        set_webpush_subscription,
     };
     use internet_identity_interface::internet_identity::types::{
         EnableNotificationAppError, EnableNotificationAppRequest, GetNotificationAppStatusRequest,
-        NotificationAppInfo, NotificationAppStatus, NotificationId, SetWebPushSubscriptionRequest,
+        NotificationAppInfo, NotificationAppStatus, NotificationId, ProbeNotificationAppRequest,
+        SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -3009,15 +2987,25 @@ mod turning_on {
         )?
         .expect("set_webpush_subscription returned Err");
 
-        let probe = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
+        let queued = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
             .expect("the switch returned Err");
 
         let info = app_info(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
             .expect("this browser points at no app");
         assert!(info.enabled);
-        // The probe it answered is the one it queued, which is also what tells the
-        // device: nothing else is announced for this call.
-        assert_eq!(info.pending_probe, Some(probe));
+        // The probe it answered is the one it queued: asking again inside the window
+        // hands back the same id rather than sending a second.
+        assert_eq!(
+            probe_notification_app(
+                &env,
+                canister_id,
+                browser(FIRST_BROWSER_SEED),
+                ProbeNotificationAppRequest {
+                    anchor_number: anchor,
+                },
+            )?,
+            Ok(queued)
+        );
         Ok(())
     }
 
@@ -3037,7 +3025,6 @@ mod turning_on {
             .expect("this browser points at no app");
         // An entry that delivers for nobody must not read as switched on.
         assert!(!info.enabled);
-        assert_eq!(info.pending_probe, None);
         Ok(())
     }
 

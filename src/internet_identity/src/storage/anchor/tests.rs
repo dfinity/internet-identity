@@ -1274,8 +1274,10 @@ mod mirror_verified_email_tests {
 mod browser_tests {
     use super::*;
     use crate::browser_key::test_keys::{claim_token, public_key, signing_key};
-    use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
-    use crate::storage::anchor::{BrowserError, QueuedNotification, MAX_BROWSERS};
+    use crate::notifications::installed_app::{
+        NotificationApp, NotificationAppId, NotificationAppRef,
+    };
+    use crate::storage::anchor::{BrowserError, InboxNotification, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, BrowserId, FormFactor, NotificationAppInfo,
         NotificationAppStatus, OperatingSystem, PublicKey,
@@ -1338,8 +1340,8 @@ mod browser_tests {
         NotificationApp {
             id: app_id,
             principal: Principal::self_authenticating(vec![app_id as u8; 91]),
-            created_at: 1_000,
-            last_used,
+            created_at_ns: 1_000,
+            last_used_ns: last_used,
             anchors: std::collections::BTreeSet::new(),
             webpush_subscription: None,
             pending_probe: None,
@@ -1611,7 +1613,7 @@ mod browser_tests {
         anchor
             .notifications_for_browser_mut(first)
             .expect("a listed browser")
-            .push(QueuedNotification {
+            .push(InboxNotification {
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -1640,7 +1642,7 @@ mod browser_tests {
         anchor
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
-            .push(QueuedNotification {
+            .push(InboxNotification {
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -1671,7 +1673,6 @@ mod browser_tests {
                 subscribed: false,
                 enabled: true,
                 last_seen_ns: 2_000,
-                pending_probe: None,
             })
         );
         assert_eq!(
@@ -1695,18 +1696,17 @@ mod browser_tests {
 
         assert_eq!(
             anchor
-                .browsers_info(0, |app_id| Some(record(app_id, 2_000)))
+                .browsers_info(|app_id| Some(record(app_id, 2_000)))
                 .expect("one browser")[0]
                 .notification_app,
             Some(NotificationAppInfo {
                 subscribed: false,
                 enabled: true,
                 last_seen_ns: 2_000,
-                pending_probe: None,
             })
         );
         assert_eq!(
-            anchor.browsers_info(0, |_| None).expect("one browser")[0].notification_app,
+            anchor.browsers_info(|_| None).expect("one browser")[0].notification_app,
             None
         );
     }
@@ -2354,7 +2354,7 @@ mod browser_tests {
         anchor
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
-            .push(QueuedNotification {
+            .push(InboxNotification {
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -2396,7 +2396,7 @@ mod browser_tests {
         anchor
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
-            .push(QueuedNotification {
+            .push(InboxNotification {
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -2419,7 +2419,7 @@ mod browser_tests {
         anchor
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
-            .push(QueuedNotification {
+            .push(InboxNotification {
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,

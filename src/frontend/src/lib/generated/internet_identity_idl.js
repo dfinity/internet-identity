@@ -316,7 +316,7 @@ export const idlFactory = ({ IDL }) => {
   const AccountNumber = IDL.Nat64;
   const NotificationToShow = IDL.Record({
     'id' : NotificationId,
-    'origin' : FrontendHostname,
+    'origin' : IDL.Opt(FrontendHostname),
     'canister_id' : IDL.Principal,
     'event' : IDL.Opt(NotificationEvent),
     'account_number' : IDL.Opt(AccountNumber),
@@ -669,7 +669,6 @@ export const idlFactory = ({ IDL }) => {
   const NotificationAppInfo = IDL.Record({
     'last_seen_ns' : IDL.Nat64,
     'enabled' : IDL.Bool,
-    'pending_probe' : IDL.Opt(NotificationId),
     'subscribed' : IDL.Bool,
   });
   const NotificationAppStatus = IDL.Variant({
