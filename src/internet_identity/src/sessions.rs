@@ -1,6 +1,6 @@
 use crate::authz_utils::{
-    check_app_authorization, check_authorization, check_authz_and_record_activity,
-    AuthorizationError, AuthorizedSession, IdentityUpdateError,
+    check_authorization, check_authz_and_record_activity, AuthorizationError, AuthorizedSession,
+    IdentityUpdateError,
 };
 use crate::browser_key::verify_browser_keys;
 use crate::delegation::{
@@ -355,9 +355,10 @@ pub const APP_DELEGATION_TTL_NS: u64 = 5 * MINUTE_NS;
 /// origin, answering the key to call under and when it expires. The app fetches the
 /// delegation itself with [`app_get_delegation`].
 pub fn app_prepare_delegation(
+    session: AuthorizedSession,
     request: AppPrepareDelegationRequest,
+    now: Timestamp,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
-    let now = time();
     let AuthorizedSession {
         anchor_number,
         origin,
@@ -365,10 +366,7 @@ pub fn app_prepare_delegation(
         session_id,
         valid_till_ns,
         read_only,
-        // `NoSuchSession` here and below: which branch failed would tell the app something
-        // about the identity behind the session, and it would do nothing differently either
-        // way.
-    } = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+    } = session;
     let locator = SessionLocator {
         anchor_number,
         origin,
@@ -387,7 +385,7 @@ pub fn app_prepare_delegation(
     let seed = account_seed(&account)?;
     let access = DelegationAccess::from_read_only(read_only);
 
-    // A session revoked between `check_app_authorization` above and this stamp is a race, not
+    // A session revoked between the endpoint's authorization and this stamp is a race, not
     // an internal fault: the answer is the one the caller would have got a moment
     // earlier.
     storage_borrow_mut(|storage| storage.record_session_use(&locator, now)).map_err(
@@ -421,9 +419,10 @@ pub fn app_prepare_delegation(
 /// canisters with as the user. `NoSuchDelegation` where this key and expiration were
 /// never prepared.
 pub fn app_get_delegation(
+    session: AuthorizedSession,
     request: AppGetDelegationRequest,
+    now: Timestamp,
 ) -> Result<SignedDelegation, AppSessionError> {
-    let now = time();
     let AuthorizedSession {
         anchor_number,
         origin,
@@ -431,7 +430,7 @@ pub fn app_get_delegation(
         valid_till_ns,
         read_only,
         ..
-    } = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+    } = session;
     let account = storage_borrow(|storage| {
         storage.read_account(&AccountKey {
             anchor_number,
@@ -477,21 +476,11 @@ pub fn app_get_delegation(
         },
         signature: ByteBuf::from(signature),
     })
-    // The session is live — `check_app_authorization` above said so — so a signature that is
-    // not there was never added for these parameters.
+    // The session is live — authorizing it said so — so a signature that is not there was
+    // never added for these parameters.
     .map_err(|_| AppSessionError::NoSuchDelegation)
 }
 
-/// Whether the calling session is still usable, for the II frontend's silent re-auth
-/// path. Advisory: a query reply is not certified, and the refresh path enforces the
-/// same conditions on every mint regardless of the answer here.
-pub fn check_session() -> bool {
-    check_app_authorization(time()).is_ok()
-}
-
-/// Signs the caller's own session out. A caller cannot produce another session's
-/// principal, so the seed match is the whole authorization.
-///
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
     let salt = storage_borrow(|storage| storage.salt().copied()).ok_or_else(|| {
         AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())

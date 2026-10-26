@@ -1302,7 +1302,14 @@ fn get_account_session(
 fn app_prepare_delegation(
     request: AppPrepareDelegationRequest,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
-    sessions::app_prepare_delegation(request)
+    let now = ic_cdk::api::time();
+
+    // `NoSuchSession` whichever bound refused: which one it was would tell the app
+    // something about the identity behind the session, and it would do nothing
+    // differently either way.
+    let session = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+
+    sessions::app_prepare_delegation(session, request, now)
 }
 
 #[update]
@@ -1321,16 +1328,22 @@ fn app_revoke_session() -> Result<(), AppSessionError> {
         .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))
 }
 
+/// Whether the calling session is still usable, for the II frontend's silent re-auth
+/// path. Advisory: a query reply is not certified, and the refresh path enforces the
+/// same conditions on every mint regardless of the answer here.
 #[query]
 fn check_session() -> bool {
-    sessions::check_session()
+    check_app_authorization(ic_cdk::api::time()).is_ok()
 }
 
 #[query]
 fn app_get_delegation(
     request: AppGetDelegationRequest,
 ) -> Result<SignedDelegation, AppSessionError> {
-    sessions::app_get_delegation(request)
+    let now = ic_cdk::api::time();
+    let session = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+
+    sessions::app_get_delegation(session, request, now)
 }
 
 #[update]
