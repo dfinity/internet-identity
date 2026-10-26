@@ -1,6 +1,6 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
-use crate::notifications::app::{NotificationApp, NotificationAppId};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::session_delegation::expected_session_principal;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;

@@ -1,6 +1,6 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
-use crate::notifications::app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
@@ -9,8 +9,8 @@ use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
-use crate::storage::storable::notifications::browser_queue::{
-    StorableNotificationEvent, StorableQueuedNotification,
+use crate::storage::storable::notifications::browser_inbox::{
+    StorableInboxNotification, StorableNotificationEvent,
 };
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
@@ -108,7 +108,7 @@ pub struct Browser {
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
-    pub notifications: Vec<QueuedNotification>,
+    pub notifications: Vec<InboxNotification>,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
@@ -134,7 +134,7 @@ impl Browser {
 
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct QueuedNotification {
+pub struct InboxNotification {
     /// `None` where Internet Identity sent this itself.
     pub application_number: Option<ApplicationNumber>,
     /// The canister that sent it, which the service worker fetches the text from.
@@ -147,9 +147,9 @@ pub struct QueuedNotification {
     pub event: Option<NotificationEvent>,
 }
 
-impl From<QueuedNotification> for StorableQueuedNotification {
-    fn from(value: QueuedNotification) -> Self {
-        StorableQueuedNotification {
+impl From<InboxNotification> for StorableInboxNotification {
+    fn from(value: InboxNotification) -> Self {
+        StorableInboxNotification {
             application_number: value.application_number,
             event: value.event.map(StorableNotificationEvent::from),
             sender: value.sender.as_slice().to_vec(),
@@ -255,7 +255,7 @@ impl From<StorableBrowser> for Browser {
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|queued| {
-                    Some(QueuedNotification {
+                    Some(InboxNotification {
                         application_number: queued.application_number,
                         event: queued.event.map(NotificationEvent::from),
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
@@ -288,7 +288,7 @@ impl From<Browser> for StorableBrowser {
                 value
                     .notifications
                     .into_iter()
-                    .map(StorableQueuedNotification::from)
+                    .map(StorableInboxNotification::from)
                     .collect()
             }),
         }
@@ -1224,7 +1224,7 @@ impl Anchor {
         Some(NotificationAppInfo {
             subscribed: app.webpush_subscription.is_some(),
             enabled,
-            last_seen_ns: app.last_used,
+            last_seen_ns: app.last_used_ns,
             pending_probe: app.outstanding_probe(now_ns),
         })
     }
@@ -1283,7 +1283,7 @@ impl Anchor {
     }
 
     /// What this entry has waiting, empty for one with nothing.
-    pub fn notifications_for_browser(&self, browser_id: BrowserId) -> &[QueuedNotification] {
+    pub fn notifications_for_browser(&self, browser_id: BrowserId) -> &[InboxNotification] {
         self.browser(browser_id)
             .map_or(&[], |browser| &browser.notifications)
     }
@@ -1291,7 +1291,7 @@ impl Anchor {
     pub fn notifications_for_browser_mut(
         &mut self,
         browser_id: BrowserId,
-    ) -> Option<&mut Vec<QueuedNotification>> {
+    ) -> Option<&mut Vec<InboxNotification>> {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)

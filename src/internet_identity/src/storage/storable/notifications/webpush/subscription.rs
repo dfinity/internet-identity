@@ -1,4 +1,4 @@
-use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
+use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::{Decode, Encode};
@@ -24,5 +24,5 @@ pub struct StorableWebPushSubscription {
     pub jwt_pool: StorableWebPushJwtPool,
     /// A queue some records carry here. The entry holds the queue, so this is read only.
     #[n(4)]
-    pub notifications: Option<Vec<StorableQueuedNotification>>,
+    pub notifications: Option<Vec<StorableInboxNotification>>,
 }

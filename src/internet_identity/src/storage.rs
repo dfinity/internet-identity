@@ -104,7 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
-use crate::notifications::app::{NotificationApp, NotificationAppId, PendingProbe};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -1579,7 +1579,7 @@ impl<M: Memory + Clone> Storage<M> {
             (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
         );
         app.webpush_subscription = subscription;
-        app.last_used = now;
+        app.last_used_ns = now;
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
         if !same_address {
@@ -1634,7 +1634,7 @@ impl<M: Memory + Clone> Storage<M> {
         let Some(mut app) = self.notification_app_of(app_id, app_principal) else {
             return;
         };
-        app.last_used = now;
+        app.last_used_ns = now;
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app));
     }
@@ -3554,7 +3554,7 @@ impl<M: Memory + Clone> Storage<M> {
         if let Some(app) = known.and_then(|app_id| self.notification_app_of(app_id, app_principal))
         {
             let app = NotificationApp {
-                last_used: now,
+                last_used_ns: now,
                 ..app
             };
             self.notification_app_memory
@@ -3564,8 +3564,8 @@ impl<M: Memory + Clone> Storage<M> {
         let app = NotificationApp {
             id: self.allocate_notification_app_id()?,
             principal: app_principal,
-            created_at: now,
-            last_used: now,
+            created_at_ns: now,
+            last_used_ns: now,
             // The anchor pointing at it is added by the write that points it.
             anchors: BTreeSet::new(),
             // Registered by the app once it has permission.

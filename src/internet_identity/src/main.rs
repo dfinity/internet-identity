@@ -40,7 +40,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
-use notifications::app::NotificationAppRef;
+use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
@@ -54,6 +54,7 @@ use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
+mod admission_queue;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -500,7 +501,11 @@ fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> Noti
     let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
         return NotificationAppStatus::NoApp;
     };
-    anchor.notification_app_status(browser_id, ic_cdk::api::time(), notifications::app::record)
+    anchor.notification_app_status(
+        browser_id,
+        ic_cdk::api::time(),
+        notifications::installed_app::record,
+    )
 }
 
 /// Switches delivery on and proves the app is there in one call, because the two cannot
@@ -619,7 +624,7 @@ fn outstanding_probe_of(
     let app_id = anchor
         .notification_app(browser_id)
         .and_then(|reference| reference.linked_app())?;
-    notifications::app::record(app_id)?.outstanding_probe(now_ns)
+    notifications::installed_app::record(app_id)?.outstanding_probe(now_ns)
 }
 
 /// Nothing says when a user deletes a web app, so the app proving itself is the only
@@ -912,7 +917,7 @@ fn browser_get_next_notification(
         .ok_or(GetNextNotificationError::InvalidBrowserKey)?;
 
     Ok(GetNextNotificationResponse {
-        notification: notifications::browser_queue::next_to_show(
+        notification: notifications::browser_inbox::next_to_collect(
             &anchor,
             browser_id,
             ic_cdk::api::time(),
@@ -943,7 +948,7 @@ fn browser_remove_notification(
         });
     }
 
-    notifications::browser_queue::remove_shown(anchor, browser_id, &notification, now_ns)
+    notifications::browser_inbox::remove_collected(anchor, browser_id, &notification, now_ns)
         .map(|()| RemoveNotificationResponse {})
         .map_err(RemoveNotificationError::InternalCanisterError)
 }
@@ -1912,7 +1917,8 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let browsers = anchor.browsers_info(ic_cdk::api::time(), notifications::app::record);
+        let browsers =
+            anchor.browsers_info(ic_cdk::api::time(), notifications::installed_app::record);
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
