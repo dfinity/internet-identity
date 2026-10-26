@@ -16,9 +16,9 @@ pub struct NotificationApp {
     /// The principal the app signs as, self-authenticating over the key it generated in
     /// its own partition. What an app-facing caller is matched against.
     pub principal: Principal,
-    pub created_at: Timestamp,
+    pub created_at_ns: Timestamp,
     /// Stamped by the app's own update calls only, so a query leaves it where it was.
-    pub last_used: Timestamp,
+    pub last_used_ns: Timestamp,
     /// The identities whose browsers point at this app. Also the reference count: a
     /// record with none left is deleted.
     pub anchors: BTreeSet<AnchorNumber>,
@@ -61,7 +61,7 @@ impl NotificationApp {
     pub fn probe_went_unanswered(&self, now_ns: Timestamp) -> bool {
         self.pending_probe.is_some_and(|probe| {
             now_ns.saturating_sub(probe.asked_at_ns) >= PROBE_ANSWER_WINDOW_NS
-                && self.last_used < probe.asked_at_ns
+                && self.last_used_ns < probe.asked_at_ns
         })
     }
 }
@@ -121,8 +121,8 @@ mod probe_tests {
         NotificationApp {
             id: 1,
             principal: Principal::anonymous(),
-            created_at: 0,
-            last_used,
+            created_at_ns: 0,
+            last_used_ns: last_used,
             anchors: BTreeSet::new(),
             webpush_subscription: None,
             pending_probe: Some(PendingProbe {

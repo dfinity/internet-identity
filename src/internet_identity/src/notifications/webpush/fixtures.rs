@@ -2,7 +2,7 @@
 
 use super::validation::{JwtPool, PushEndpoint, VapidPublicKey, JWT_SIG_LEN};
 use crate::authz_utils::NotificationKey;
-use crate::notifications::app::{NotificationApp, NotificationAppId};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use candid::Principal;

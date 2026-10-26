@@ -4,13 +4,11 @@
 //! authorizes first, so everything here acts on an origin already folded to the
 //! spelling consent is keyed by.
 
-pub(crate) mod admission_queue;
-pub mod app;
 pub(crate) mod backlog;
-pub(crate) mod browser_queue;
+pub(crate) mod browser_inbox;
 pub mod delegation;
 pub(crate) mod dispatch;
-pub(crate) mod identity_backlog;
+pub mod installed_app;
 pub mod senders;
 pub mod submission;
 pub(crate) mod validation;
@@ -76,7 +74,7 @@ pub fn revoke_consent(
     // Consent that cannot exist is already withdrawn, so an app the identity never
     // reached is nothing to report.
     let _ = write_notifications_decision(anchor_number, origin, false, now_ns);
-    browser_queue::remove_app(anchor_number, origin);
+    browser_inbox::remove_app_entries(anchor_number, origin);
     Ok(())
 }
 
