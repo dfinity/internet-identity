@@ -1852,7 +1852,13 @@ type NotificationRevokeConsentError = variant {
     InternalCanisterError : text;
 };
 
-type AppNotificationConsentGrantedError = variant {
+// What an app is told about its own consent. A record rather than a bare bool, so a
+// second fact about the decision can be added without a breaking change.
+type AppNotificationConsentStatusResponse = record {
+    is_granted : bool;
+};
+
+type AppNotificationConsentStatusError = variant {
     // No live session behind this caller: expired, idle, revoked, or never one at all.
     NoSuchSession;
     InternalCanisterError : text;
@@ -2781,6 +2787,6 @@ service : (opt InternetIdentityInit) -> {
 
 
     // Called by an app's frontend, as its session.
-    app_notification_consent_granted : () -> (variant { Ok : bool; Err : AppNotificationConsentGrantedError }) query;
+    app_notification_consent_status : () -> (variant { Ok : AppNotificationConsentStatusResponse; Err : AppNotificationConsentStatusError }) query;
     app_revoke_notification_consent : () -> (variant { Ok; Err : AppRevokeNotificationConsentError });
 };

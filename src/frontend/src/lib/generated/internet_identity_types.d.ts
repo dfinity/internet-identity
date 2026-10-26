@@ -96,7 +96,7 @@ export interface AppGetDelegationRequest {
    */
   'expiration' : Timestamp,
 }
-export type AppNotificationConsentGrantedError = {
+export type AppNotificationConsentStatusError = {
     'InternalCanisterError' : string
   } |
   {
@@ -105,6 +105,11 @@ export type AppNotificationConsentGrantedError = {
      */
     'NoSuchSession' : null
   };
+/**
+ * What an app is told about its own consent. A record rather than a bare bool, so a
+ * second fact about the decision can be added without a breaking change.
+ */
+export interface AppNotificationConsentStatusResponse { 'is_granted' : boolean }
 export interface AppPrepareDelegationRequest {
   /**
    * The key the app delegation delegates to. Nothing about the account is named:
@@ -2611,10 +2616,10 @@ export interface _SERVICE {
   /**
    * Called by an app's frontend, as its session.
    */
-  'app_notification_consent_granted' : ActorMethod<
+  'app_notification_consent_status' : ActorMethod<
     [],
-    { 'Ok' : boolean } |
-      { 'Err' : AppNotificationConsentGrantedError }
+    { 'Ok' : AppNotificationConsentStatusResponse } |
+      { 'Err' : AppNotificationConsentStatusError }
   >,
   /**
    * Mints a short-lived app delegation from a live session. Called by app frontends

@@ -1013,16 +1013,19 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 // ---- Notifications: called by an app's frontend ----
 
 #[query]
-fn app_notification_consent_granted() -> Result<bool, AppNotificationConsentGrantedError> {
-    enabled_or(AppNotificationConsentGrantedError::InternalCanisterError)?;
+fn app_notification_consent_status(
+) -> Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError> {
+    enabled_or(AppNotificationConsentStatusError::InternalCanisterError)?;
     let now = ic_cdk::api::time();
     let AuthorizedSession {
         anchor_number,
         origin,
         ..
     } = check_app_authorization(now)
-        .map_err(|_| AppNotificationConsentGrantedError::NoSuchSession)?;
-    Ok(notifications::consent_granted_for(anchor_number, &origin))
+        .map_err(|_| AppNotificationConsentStatusError::NoSuchSession)?;
+    Ok(AppNotificationConsentStatusResponse {
+        is_granted: notifications::consent_granted_for(anchor_number, &origin),
+    })
 }
 
 #[update]

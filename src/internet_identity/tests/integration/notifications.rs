@@ -444,10 +444,10 @@ mod app_consent {
     use super::*;
     use canister_tests::api::internet_identity::api_v2::app_revoke_session;
     use canister_tests::api::internet_identity::notifications::{
-        app_notification_consent_granted, app_revoke_notification_consent,
+        app_notification_consent_status, app_revoke_notification_consent,
     };
     use internet_identity_interface::internet_identity::types::{
-        AppNotificationConsentGrantedError, AppRevokeNotificationConsentError,
+        AppNotificationConsentStatusError, AppRevokeNotificationConsentError,
     };
     use std::time::Duration;
 
@@ -467,8 +467,9 @@ mod app_consent {
         canister_id: CanisterId,
         session: Principal,
     ) -> Result<bool, RejectResponse> {
-        Ok(app_notification_consent_granted(env, canister_id, session)?
-            .expect("consent read refused"))
+        Ok(app_notification_consent_status(env, canister_id, session)?
+            .expect("consent read refused")
+            .is_granted)
     }
 
     #[test]
@@ -520,8 +521,8 @@ mod app_consent {
         // The identity's own principal, a stranger and anonymous hold no app session.
         for stranger in [principal_1(), principal_2(), Principal::anonymous()] {
             assert_eq!(
-                app_notification_consent_granted(&env, canister_id, stranger)?,
-                Err(AppNotificationConsentGrantedError::NoSuchSession)
+                app_notification_consent_status(&env, canister_id, stranger)?,
+                Err(AppNotificationConsentStatusError::NoSuchSession)
             );
             assert_eq!(
                 app_revoke_notification_consent(&env, canister_id, stranger)?,
@@ -556,8 +557,8 @@ mod app_consent {
         env.tick();
 
         assert_eq!(
-            app_notification_consent_granted(&env, canister_id, session)?,
-            Err(AppNotificationConsentGrantedError::NoSuchSession)
+            app_notification_consent_status(&env, canister_id, session)?,
+            Err(AppNotificationConsentStatusError::NoSuchSession)
         );
         assert_eq!(
             app_revoke_notification_consent(&env, canister_id, session)?,
@@ -583,8 +584,8 @@ mod app_consent {
         app_revoke_session(&env, canister_id, session)?.expect("sign-out rejected");
 
         assert_eq!(
-            app_notification_consent_granted(&env, canister_id, session)?,
-            Err(AppNotificationConsentGrantedError::NoSuchSession)
+            app_notification_consent_status(&env, canister_id, session)?,
+            Err(AppNotificationConsentStatusError::NoSuchSession)
         );
         assert_eq!(
             app_revoke_notification_consent(&env, canister_id, session)?,
@@ -642,8 +643,8 @@ mod app_consent {
         switch(false)?;
 
         assert!(matches!(
-            app_notification_consent_granted(&env, canister_id, session)?,
-            Err(AppNotificationConsentGrantedError::InternalCanisterError(_))
+            app_notification_consent_status(&env, canister_id, session)?,
+            Err(AppNotificationConsentStatusError::InternalCanisterError(_))
         ));
         assert!(matches!(
             app_revoke_notification_consent(&env, canister_id, session)?,

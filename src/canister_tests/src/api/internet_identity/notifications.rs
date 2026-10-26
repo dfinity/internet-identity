@@ -2,11 +2,12 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AppNotificationConsentGrantedError, AppRevokeNotificationConsentError, BrowserId,
-    ClaimNotificationAppError, ClaimNotificationAppRequest, DisableNotificationAppError,
-    DisableNotificationAppRequest, EnableNotificationAppError, EnableNotificationAppRequest,
-    FrontendHostname, GetNextNotificationError, GetNextNotificationRequest,
-    GetNextNotificationResponse, GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
+    AnchorNumber, AppNotificationConsentStatusError, AppNotificationConsentStatusResponse,
+    AppRevokeNotificationConsentError, BrowserId, ClaimNotificationAppError,
+    ClaimNotificationAppRequest, DisableNotificationAppError, DisableNotificationAppRequest,
+    EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
+    GetNextNotificationError, GetNextNotificationRequest, GetNextNotificationResponse,
+    GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
     LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
     NotificationAppAnchorsRequest, NotificationAppStatus, NotificationConsentGrantedRequest,
@@ -118,16 +119,19 @@ pub fn consent_granted(
     .map(|(x,)| x)
 }
 
-pub fn app_notification_consent_granted(
+pub fn app_notification_consent_status(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-) -> Result<Result<bool, AppNotificationConsentGrantedError>, RejectResponse> {
+) -> Result<
+    Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError>,
+    RejectResponse,
+> {
     query_candid_as(
         env,
         canister_id,
         sender,
-        "app_notification_consent_granted",
+        "app_notification_consent_status",
         (),
     )
     .map(|(x,)| x)

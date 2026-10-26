@@ -162,7 +162,10 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
-  const AppNotificationConsentGrantedError = IDL.Variant({
+  const AppNotificationConsentStatusResponse = IDL.Record({
+    'is_granted' : IDL.Bool,
+  });
+  const AppNotificationConsentStatusError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
@@ -1223,12 +1226,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
         ['query'],
       ),
-    'app_notification_consent_granted' : IDL.Func(
+    'app_notification_consent_status' : IDL.Func(
         [],
         [
           IDL.Variant({
-            'Ok' : IDL.Bool,
-            'Err' : AppNotificationConsentGrantedError,
+            'Ok' : AppNotificationConsentStatusResponse,
+            'Err' : AppNotificationConsentStatusError,
           }),
         ],
         ['query'],
