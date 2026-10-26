@@ -51,6 +51,7 @@ use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
+mod admission_queue;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -701,7 +702,7 @@ fn browser_get_next_notification(
     )?;
 
     Ok(GetNextNotificationResponse {
-        notification: notifications::browser_queue::next_to_show(
+        notification: notifications::browser_inbox::next_to_collect(
             &anchor,
             browser_id,
             ic_cdk::api::time(),
@@ -727,7 +728,7 @@ fn browser_remove_notification(
         },
     )?;
 
-    notifications::browser_queue::remove_shown(anchor, browser_id, &notification)
+    notifications::browser_inbox::remove_collected(anchor, browser_id, &notification)
         .map(|()| RemoveNotificationResponse {})
         .map_err(RemoveNotificationError::InternalCanisterError)
 }

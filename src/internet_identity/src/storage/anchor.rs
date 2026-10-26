@@ -1,6 +1,6 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
-use crate::notifications::app::{NotificationAppId, NotificationAppRef};
+use crate::notifications::installed_app::{NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
@@ -9,7 +9,7 @@ use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
-use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
+use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -112,7 +112,7 @@ pub struct Browser {
 
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct QueuedNotification {
+pub struct InboxNotification {
     pub application_number: ApplicationNumber,
     /// The app canister that sent it, which the service worker fetches it from.
     pub sender: Principal,
@@ -122,9 +122,9 @@ pub struct QueuedNotification {
     pub account_number: Option<AccountNumber>,
 }
 
-impl From<QueuedNotification> for StorableQueuedNotification {
-    fn from(value: QueuedNotification) -> Self {
-        StorableQueuedNotification {
+impl From<InboxNotification> for StorableInboxNotification {
+    fn from(value: InboxNotification) -> Self {
+        StorableInboxNotification {
             application_number: value.application_number,
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
@@ -147,7 +147,7 @@ pub struct WebPushSubscription {
     pub jwt_signatures: JwtPool,
     /// What the service worker has yet to show, oldest first, each woken through this
     /// registration.
-    pub notifications: Vec<QueuedNotification>,
+    pub notifications: Vec<InboxNotification>,
     /// When this browser was last woken again for something it could not show yet.
     pub woken_again_at_ns: Option<Timestamp>,
 }
@@ -177,7 +177,7 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|queued| {
-                    Some(QueuedNotification {
+                    Some(InboxNotification {
                         application_number: queued.application_number,
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
                         notification_id: queued.notification_id,
@@ -211,7 +211,7 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 value
                     .notifications
                     .into_iter()
-                    .map(StorableQueuedNotification::from)
+                    .map(StorableInboxNotification::from)
                     .collect()
             }),
             woken_again_at_ns: value.woken_again_at_ns,
@@ -1053,7 +1053,7 @@ impl Anchor {
     }
 
     /// The queue of the browser's registration, empty for one not registered.
-    pub fn notifications(&self, browser_id: BrowserId) -> &[QueuedNotification] {
+    pub fn notifications(&self, browser_id: BrowserId) -> &[InboxNotification] {
         self.webpush_subscription(browser_id)
             .map_or(&[], |subscription| &subscription.notifications)
     }
@@ -1061,7 +1061,7 @@ impl Anchor {
     pub fn notifications_mut(
         &mut self,
         browser_id: BrowserId,
-    ) -> Option<&mut Vec<QueuedNotification>> {
+    ) -> Option<&mut Vec<InboxNotification>> {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)

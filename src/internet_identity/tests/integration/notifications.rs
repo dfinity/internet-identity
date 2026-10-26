@@ -1255,7 +1255,7 @@ mod pull_delegation {
     }
 }
 
-mod browser_queue {
+mod browser_inbox {
     use super::subscriptions::{install_with_browser, key_holder};
     use super::*;
     use pretty_assertions::assert_eq;
