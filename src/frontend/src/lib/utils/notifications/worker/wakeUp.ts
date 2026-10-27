@@ -144,6 +144,11 @@ const show = async (
     tag,
     data: dataOf(ref, shown.url),
   });
+  void traceWake({
+    step: "shown",
+    tag,
+    nowShowing: (await registration.getNotifications()).length,
+  });
   await recordShown();
 };
 
@@ -488,7 +493,13 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   }
 
   if (shown) {
-    sendAndForget(pending, closeDismissed(context, shownTag));
+    // Awaited rather than let run, so what it did is visible in the trace below.
+    await closeDismissed(context, shownTag).catch(() => undefined);
+    void traceWake({
+      step: "after-sweep",
+      shownTag,
+      stillShowing: (await context.registration.getNotifications()).length,
+    });
   } else {
     // Whether this wake-up still owes the user something depends on what is on
     // screen, and an app may have dismissed what is on screen.

@@ -77,8 +77,8 @@ worker.addEventListener("push", (event) => {
     enqueue(async () => {
       void trace({
         step: "push",
+        build: "d74f4b35",
         configured,
-        scope: worker.registration.scope,
       });
       if (!configured) {
         // Nothing can be asked of anyone without knowing which canister to ask, and
