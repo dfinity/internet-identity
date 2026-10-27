@@ -917,10 +917,20 @@ test.describe("notifications on a Home Screen app", () => {
     browser,
   }) => {
     const phone = await browser.newContext({ userAgent: IPHONE_AGENT });
+    // What iOS answers in an installed web app, as `addToHomeScreen` does: without it
+    // the app's own page takes the in-browser path and leaves for `/`.
+    await phone.addInitScript(() => {
+      Object.defineProperty(navigator, "standalone", {
+        configurable: true,
+        value: true,
+      });
+    });
     const page = await phone.newPage();
 
+    // Only `https:` is followed, and nothing fetches it: the hand-over is an iOS
+    // scheme that no test browser answers, so the destination is never reached.
     const carried = new URLSearchParams({
-      url: `${APP_URL}/#chat`,
+      url: "https://chat.example.com/#chat",
       title: "Example App",
       body: "New message",
     });

@@ -95,8 +95,15 @@
     };
 
     const onVisible = () => {
-      // A notification clicked while the app is backgrounded arrives as this same
-      // foreground, carrying its fragment; that is a doorway to open, not one to leave.
+      // A notification clicked while the app is backgrounded is navigated in and only
+      // then focused, so this page has already read and dropped its fragment by now.
+      // What is left is `target`, and `onHidden` clears it, so one that is still set
+      // was put there for this foreground rather than a previous one.
+      if (target !== undefined) {
+        return;
+      }
+      // The other order, where the navigation lands after the window is surfaced: the
+      // fragment is still in the URL, and that is a doorway to open, not one to leave.
       if (carried(window.location.hash) !== undefined) {
         return;
       }
