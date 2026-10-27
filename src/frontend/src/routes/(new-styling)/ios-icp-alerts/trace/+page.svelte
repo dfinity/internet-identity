@@ -9,17 +9,35 @@
 
   const read = async () => {
     try {
-      const registration = await navigator.serviceWorker.getRegistration();
+      const all = await navigator.serviceWorker.getRegistrations();
+      const controlling = await navigator.serviceWorker.getRegistration();
       worker = JSON.stringify(
         {
-          active: registration?.active?.scriptURL,
-          state: registration?.active?.state,
-          waiting: registration?.waiting !== null,
-          installing: registration?.installing !== null,
+          registrations: all.map((registration) => ({
+            scope: registration.scope,
+            state: registration.active?.state,
+            controlsThisPage: registration === controlling,
+            shownNotifications: undefined as number | undefined,
+          })),
         },
         null,
         2,
       );
+
+      // How many notifications each registration still owns: a click goes to the one
+      // that showed it, which need not be the one controlling this page.
+      const owned = await Promise.all(
+        all.map(async (registration) => ({
+          scope: registration.scope,
+          notifications: (await registration.getNotifications()).map(
+            (notification) => ({
+              title: notification.title,
+              data: notification.data as unknown,
+            }),
+          ),
+        })),
+      );
+      worker += `\n\n${JSON.stringify(owned, null, 2)}`;
 
       const log = await caches.open("ii-notification-trace");
       const keys = await log.keys();
@@ -33,6 +51,28 @@
     } catch (error) {
       lines = `could not read: ${String(error)}`;
     }
+  };
+
+  /** A notification shaped like the real thing, shown by the registration controlling
+   *  this page, so a click exercises the same handler without waiting for a send. */
+  const test = async () => {
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (registration === undefined) {
+      lines = "no registration controls this page";
+      return;
+    }
+    await registration.showNotification("Trace test", {
+      body: "Click me",
+      data: {
+        identityNumber: "10000",
+        origin: "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io",
+        accountNumber: "",
+        appCanisterId: "vt36r-2qaaa-aaaad-aad5a-cai",
+        id: "1",
+        url: "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/#chat",
+      },
+    });
+    lines = "test notification shown: click it, then Refresh";
   };
 
   const clear = async () => {
@@ -52,6 +92,7 @@
 <main class="flex min-h-dvh flex-col gap-4 p-6">
   <div class="flex gap-2">
     <button class="btn btn-primary" onclick={() => void read()}>Refresh</button>
+    <button class="btn btn-secondary" onclick={() => void test()}>Test</button>
     <button class="btn btn-secondary" onclick={() => void clear()}>Clear</button
     >
   </div>
