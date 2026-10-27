@@ -16,11 +16,12 @@ import {
 } from "$lib/utils/notifications/worker/wakeUp";
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
-import { refOf } from "$lib/utils/notifications/worker/shownNotification";
 import {
-  openable,
-  sameOriginWayTo,
-} from "$lib/utils/notifications/worker/openTarget";
+  dataOf,
+  refOf,
+  tagOf,
+} from "$lib/utils/notifications/worker/shownNotification";
+import { onIos, openable } from "$lib/utils/notifications/worker/openTarget";
 import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
@@ -72,12 +73,18 @@ const trace = async (entry: Record<string, unknown>): Promise<void> => {
   }
 };
 
+// Diagnostic, on beta only: every start of this worker is recorded, so a click that
+// reaches no handler can be told apart from one whose worker never started. A click
+// on a terminated worker makes Chrome evaluate this script first, and an evaluation
+// that throws loses the click with no sign of it. Remove with the tracing above.
+void trace({ step: "evaluated", build: "no-enumerate-1" });
+
 worker.addEventListener("push", (event) => {
   event.waitUntil(
     enqueue(async () => {
       void trace({
         step: "push",
-        build: "d74f4b35",
+        build: "no-enumerate-1",
         configured,
       });
       if (!configured) {
@@ -88,15 +95,7 @@ worker.addEventListener("push", (event) => {
         return;
       }
       await onWakeUp({ registration: worker.registration });
-      const shown = await worker.registration.getNotifications();
-      void trace({
-        step: "woke",
-        showing: shown.map((notification) => ({
-          title: notification.title,
-          hasData:
-            notification.data !== undefined && notification.data !== null,
-        })),
-      });
+      void trace({ step: "woke" });
     }),
   );
 });
@@ -125,24 +124,11 @@ const appWindow = async (): Promise<WindowClient | undefined> => {
  * destination inside the app reuses one; anything else opens its own.
  */
 const pointAt = async (url: string, inTheApp: boolean): Promise<void> => {
-  // A browser opens the link the app named. `openWindow` is refused for another
-  // origin in some browsers, and the app's link is on the app's origin, so a refusal
-  // falls back to a page of this origin that redirects: a window that opens on the
-  // wrong page for an instant beats a click that opens nothing.
   if (!inTheApp) {
-    const opened = await worker.clients.openWindow(url).then(
-      () => true,
-      () => false,
-    );
-    if (!opened) {
-      await worker.clients.openWindow(sameOriginWayTo(url));
-    }
+    await worker.clients.openWindow(url);
     return;
   }
 
-  // The installed app has one window, and iOS surfaces it for a URL in its own scope
-  // rather than taking it there, so the window is pointed by hand. With no window to
-  // point, opening one is what is left.
   const window = await appWindow();
   if (window === undefined) {
     await worker.clients.openWindow(url);
@@ -153,14 +139,91 @@ const pointAt = async (url: string, inTheApp: boolean): Promise<void> => {
   await window.focus();
 };
 
+/**
+ * Opens what a click names, starting with what the click itself permits.
+ *
+ * A browser's permission to open a window belongs to the synchronous run of the
+ * click handler: anything awaited before `openWindow` spends it, and the click then
+ * opens nothing. So the ordinary path calls it first and asks questions afterwards.
+ * Only the installed iOS app needs to be told where to go before it can go there,
+ * and iOS is also the one platform that honours the call after the fact.
+ */
+const openOnClick = (
+  url: string,
+  shown: { title: string; body: string },
+): Promise<void> => {
+  if (!onIos()) {
+    return worker.clients.openWindow(url).then(
+      () => undefined,
+      () => undefined,
+    );
+  }
+  return (async () => {
+    const destination = await openable(url, shown);
+    await pointAt(destination.url, destination.inTheApp);
+  })();
+};
+
+/** Where a click with nothing to open goes: the app this worker belongs to. */
+const openTheApp = async (): Promise<void> => {
+  const clients = await worker.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  const open = clients.find((client) => client.url.startsWith(worker.origin));
+  if (open !== undefined) {
+    await open.focus();
+    return;
+  }
+  await worker.clients.openWindow("/");
+};
+
+/** Diagnostic, on beta only: the trace page asks the worker to show a notification,
+ *  so a worker-shown one can be told apart from a page-shown one. Remove with the
+ *  tracing above. */
+worker.addEventListener("message", (event) => {
+  const ask = event.data as { type?: string; withIcon?: boolean } | undefined;
+  if (ask?.type === "trace-show-real") {
+    // The tag, data and title a real notification carries, without the canister that
+    // would otherwise have to produce one.
+    const ref = {
+      identityNumber: BigInt(10772),
+      origin: "https://oizmi-wyaaa-aaaam-ajo5q-cai.ic0.app",
+      accountNumber: undefined,
+      appCanisterId: "oizmi-wyaaa-aaaam-ajo5q-cai",
+      id: BigInt("8893169870452928613"),
+    };
+    void worker.registration.showNotification("Test App \u00b7 hello", {
+      body: "world",
+      tag: tagOf(ref),
+      data: dataOf(ref, "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/#chat"),
+    });
+    return;
+  }
+  if (ask?.type !== "trace-show") {
+    return;
+  }
+  const icon =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  void worker.registration.showNotification("Worker test", {
+    body:
+      ask.withIcon === true
+        ? "Shown by the worker, with an icon"
+        : "Shown by the worker",
+    icon: ask.withIcon === true ? icon : undefined,
+    tag: "trace-worker-test",
+    data: {
+      identityNumber: "10000",
+      origin: "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io",
+      accountNumber: "",
+      appCanisterId: "vt36r-2qaaa-aaaad-aad5a-cai",
+      id: "1",
+      url: "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/#chat",
+    },
+  });
+});
+
 worker.addEventListener("notificationclick", (event) => {
-  // Diagnostic, on beta only: a click that opens nothing and dismisses nothing has
-  // not reached this handler at all, and that is worth telling apart from one that
-  // reached it and failed. Remove once the desktop behaviour is confirmed.
-  const seen = {
-    title: event.notification.title,
-    data: event.notification.data as unknown,
-  };
   // A click does not take the notification off the screen by itself.
   event.notification.close();
   const target = refOf(event.notification.data);
@@ -168,55 +231,30 @@ worker.addEventListener("notificationclick", (event) => {
     typeof event.notification.data?.url === "string"
       ? event.notification.data.url
       : undefined;
-  event.waitUntil(
-    (async () => {
-      // Opening comes first: the click is what permits a worker to open a window,
-      // and that permission does not survive an await on a canister call. The
-      // app's window cannot be focused instead, because `matchAll` sees this origin
-      // only and the link is the app's.
-      void trace({
-        step: "clicked",
-        ...seen,
-        hasRef: target !== undefined,
-        urlType: typeof url,
-      });
-      if (target !== undefined && url !== undefined) {
-        const destination = await openable(url, {
+  // Started here rather than inside `waitUntil`: the window has to be asked for
+  // while the click still permits it, which is this synchronous run and no later.
+  const opening =
+    target !== undefined && url !== undefined
+      ? openOnClick(url, {
           title: event.notification.title,
           body: event.notification.body,
-        });
-        // A refused window must not cost the app its report, but it is reported:
-        // a click that opens nothing looks to the user like a dismissal.
-        void trace({
-          step: "opening",
-          destination: destination.url,
-          inTheApp: destination.inTheApp,
-          agent: navigator.userAgent,
-        });
-        await pointAt(destination.url, destination.inTheApp).then(
-          () => trace({ step: "opened", destination: destination.url }),
-          (error: unknown) =>
-            trace({ step: "open-failed", error: String(error) }),
-        );
-      } else {
-        const clients = await worker.clients.matchAll({
-          type: "window",
-          includeUncontrolled: true,
-        });
-        void trace({
-          step: "no-link",
-          why: "the notification carried no readable reference or url",
-          clients: clients.map((client) => client.url),
-        });
-        const open = clients.find((client) =>
-          client.url.startsWith(worker.origin),
-        );
-        if (open !== undefined) {
-          await open.focus();
-        } else {
-          await worker.clients.openWindow("/");
-        }
-      }
+        })
+      : openTheApp();
+  event.waitUntil(
+    (async () => {
+      void trace({
+        step: "clicked",
+        title: event.notification.title,
+        data: event.notification.data as unknown,
+        hasRef: target !== undefined,
+        urlType: typeof url,
+        agent: navigator.userAgent,
+      });
+      await opening.then(
+        () => trace({ step: "opened", destination: url }),
+        (error: unknown) =>
+          trace({ step: "open-failed", error: String(error) }),
+      );
 
       // Then the app learns its notification did its job. Nothing can act on a
       // failure here: a click has no caller to answer and nothing to come back for,

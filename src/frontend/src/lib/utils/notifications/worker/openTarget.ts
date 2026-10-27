@@ -16,7 +16,8 @@ const DOORWAY = `${NOTIFICATION_APP_PATH}/open`;
  * tab reads as the app there. On iOS the app has a partition of its own, which is
  * what makes the stored answer meaningful at all.
  */
-const onIos = (): boolean => /iPhone|iPod|iPad/.test(navigator.userAgent);
+export const onIos = (): boolean =>
+  /iPhone|iPod|iPad/.test(navigator.userAgent);
 
 const isTheApp = async (): Promise<boolean> => {
   if (!onIos()) {
@@ -55,8 +56,3 @@ export const openable = async (
   }
   return { url: `${DOORWAY}#${carried.toString()}`, inTheApp: true };
 };
-
-/** The same page, used by a browser whose worker was refused another origin: it
- *  carries the link and redirects to it. */
-export const sameOriginWayTo = (url: string): string =>
-  `${DOORWAY}#${new URLSearchParams({ url }).toString()}`;

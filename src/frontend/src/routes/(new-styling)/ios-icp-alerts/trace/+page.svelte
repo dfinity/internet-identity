@@ -82,6 +82,30 @@
     setTimeout(() => void test(), 5_000);
   };
 
+  /** The same notification, shown by the worker rather than by this page: the one
+   *  difference left between a test that dispatches a click and a push that does not. */
+  const workerTest = async (withIcon: boolean) => {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const active = registration?.active;
+    if (active === undefined || active === null) {
+      lines = "no active worker to ask";
+      return;
+    }
+    active.postMessage({ type: "trace-show", withIcon });
+    lines = `asked the worker to show one${withIcon ? " with an icon" : ""}: click it, then Refresh`;
+  };
+
+  /** Tag, data and title exactly as a real notification carries them. */
+  const realShape = async () => {
+    const active = (await navigator.serviceWorker.getRegistration())?.active;
+    if (active === undefined || active === null) {
+      lines = "no active worker to ask";
+      return;
+    }
+    active.postMessage({ type: "trace-show-real" });
+    lines = "asked the worker for a real-shaped one: click it, then Refresh";
+  };
+
   const clear = async () => {
     await caches.delete("ii-notification-trace");
     await read();
@@ -102,6 +126,15 @@
     <button class="btn btn-secondary" onclick={() => void test()}>Test</button>
     <button class="btn btn-secondary" onclick={() => void testLater()}
       >Test in 5s</button
+    >
+    <button class="btn btn-secondary" onclick={() => void workerTest(false)}
+      >Worker</button
+    >
+    <button class="btn btn-secondary" onclick={() => void workerTest(true)}
+      >Worker + icon</button
+    >
+    <button class="btn btn-secondary" onclick={() => void realShape()}
+      >Real shape</button
     >
     <button class="btn btn-secondary" onclick={() => void clear()}>Clear</button
     >
