@@ -17,7 +17,6 @@ import {
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/worker/shownNotification";
-import { openable } from "$lib/utils/notifications/worker/openTarget";
 import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
@@ -102,17 +101,17 @@ worker.addEventListener("notificationclick", (event) => {
       : undefined;
   event.waitUntil(
     (async () => {
-      // Opening comes first: the click is what permits a worker to open a window,
-      // and that permission does not survive an await on a canister call. The
-      // app's window cannot be focused instead, because `matchAll` sees this origin
-      // only and the link is the app's.
+      // Opening comes first, and with nothing awaited in front of it: the click is
+      // what permits a worker to open a window, and that permission does not
+      // survive an await of any kind. Where to go was decided when the
+      // notification was shown. The app's window cannot be focused instead,
+      // because `matchAll` sees this origin only and the link is the app's.
       if (target !== undefined && url !== undefined) {
-        const destination = await openable(url, {
-          title: event.notification.title,
-          body: event.notification.body,
-        });
-        // A refused window must not cost the app its report.
-        await pointAt(destination).catch(() => undefined);
+        // A refused window must not cost the app its report, but it is reported
+        // here: a window that silently fails to open looks like a dismissal.
+        await pointAt(url).catch((error: unknown) =>
+          console.error("Opening the notification's link failed", error),
+        );
       } else {
         const clients = await worker.clients.matchAll({
           type: "window",

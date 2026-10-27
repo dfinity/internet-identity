@@ -30,6 +30,7 @@ import {
   reportNotificationReceived,
 } from "./appNotifications";
 import { allowedLink, fetchAlternativeOrigins } from "./notificationLink";
+import { openable } from "./openTarget";
 import { refillJwtPool } from "./poolRefill";
 import { loadPullIdentity, mintPullIdentity } from "./pullDelegation";
 import {
@@ -151,6 +152,43 @@ const closeShown = (
   { registration }: WakeUpContext,
   ref: NotificationRef,
 ): Promise<void> => closeUnder(registration, [tagOf(ref)]);
+
+/** Long enough for a store that answers, short enough that one which does not cannot
+ *  cost the user the notification. */
+const DESTINATION_RESOLVE_MS = 1_000;
+
+/**
+ * Where a click should go, decided here rather than on the click.
+ *
+ * Opening a window is permitted by the click and by nothing else, and that permission
+ * does not survive an await of any kind, a read of this browser's own storage included.
+ * So the destination is settled while the notification is being built, where an await
+ * costs nothing.
+ *
+ * Bounded, because this is on the path to showing anything at all: a store that fails
+ * or never answers falls back to the link itself, which is where a browser should go
+ * anyway, rather than leaving the user with the placeholder.
+ */
+const openTarget = async (
+  link: string,
+  title: string,
+  body: string,
+): Promise<string> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      openable(link, { title, body }),
+      new Promise<string>((resolve) => {
+        timer = setTimeout(() => resolve(link), DESTINATION_RESOLVE_MS);
+      }),
+    ]);
+  } catch (error) {
+    console.error("Could not resolve the notification's destination", error);
+    return link;
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 /** Who the notification is from, as the app publishes it, falling back to the host
  *  name, which is the part no app can claim for itself. */
@@ -307,18 +345,24 @@ const showQueued = async (
       senderOf(origin),
       fetchAlternativeOrigins(origin),
     ]);
+    // The sender leads the title: an app's own title and body are its text to
+    // write, so the one line naming who sent it has to be somewhere the app
+    // cannot claim and a platform showing a single body line cannot drop.
+    const title = `${sender.name} · ${content.title}`;
+    const link = allowedLink({
+      url: content.url,
+      origin,
+      alternativeOrigins,
+    });
     await show(context, ref, {
-      // The sender leads the title: an app's own title and body are its text to
-      // write, so the one line naming who sent it has to be somewhere the app
-      // cannot claim and a platform showing a single body line cannot drop.
-      title: `${sender.name} · ${content.title}`,
+      title,
       body: content.body,
       icon: sender.icon,
-      url: allowedLink({
-        url: content.url,
-        origin,
-        alternativeOrigins,
-      }),
+      // Resolved here rather than on the click. Opening a window is permitted by
+      // the click and by nothing else, and that permission does not survive an
+      // await of any kind, a read of this browser's own storage included. What is
+      // written down is where the click should go, so the click only has to go.
+      url: await openTarget(link, title, content.body),
     });
 
     sendAndForget(

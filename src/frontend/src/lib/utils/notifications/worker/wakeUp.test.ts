@@ -56,6 +56,12 @@ vi.mock("$lib/utils/notifications/worker/appNotifications", () => ({
   reportNotificationReceived: (call: unknown) =>
     reportNotificationReceived(call),
 }));
+// A browser rather than the installed app: the doorway is the app's path, and these
+// tests assert the link itself.
+vi.mock("$lib/utils/notifications/worker/openTarget", () => ({
+  openable: (url: string) => Promise.resolve(url),
+}));
+
 vi.mock("$lib/utils/appMetadata", () => ({
   fetchAppMetadata: () => fetchAppMetadata(),
   logoAsDataUrl: () => Promise.resolve("data:image/webp;base64,AA=="),
