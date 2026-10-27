@@ -75,6 +75,13 @@
     lines = "test notification shown: click it, then Refresh";
   };
 
+  /** The same notification, five seconds late, so it arrives while this tab is in the
+   *  background: that is the one difference between it and a notification a push shows. */
+  const testLater = async () => {
+    lines = "switch away now: a notification follows in five seconds";
+    setTimeout(() => void test(), 5_000);
+  };
+
   const clear = async () => {
     await caches.delete("ii-notification-trace");
     await read();
@@ -93,6 +100,9 @@
   <div class="flex gap-2">
     <button class="btn btn-primary" onclick={() => void read()}>Refresh</button>
     <button class="btn btn-secondary" onclick={() => void test()}>Test</button>
+    <button class="btn btn-secondary" onclick={() => void testLater()}
+      >Test in 5s</button
+    >
     <button class="btn btn-secondary" onclick={() => void clear()}>Clear</button
     >
   </div>
