@@ -6,11 +6,22 @@ import { NOTIFICATION_APP_PATH } from "../appPath";
 /** The page that hands the link over, inside the app's scope so it opens in the app. */
 const DOORWAY = `${NOTIFICATION_APP_PATH}/open`;
 
-/** Only the installed app says so, and it says so from its own page: a desktop browser
- * holding an app key is still a browser, and handing it the doorway leaves it opening a
- * page whose whole job is to pass the link to Safari. Storage that will not answer
- * confirms nothing, so the link itself is used. */
+/**
+ * The doorway exists for one platform. iOS gives a standalone app an in-app browser
+ * view for another origin, and nowhere else does, so nowhere else should be sent
+ * through a page whose only job is to hand a link to Safari.
+ *
+ * Checked first, because what is stored cannot answer this on its own: a desktop
+ * browser shares a storage partition with an installed app of the same origin, so a
+ * tab reads as the app there. On iOS the app has a partition of its own, which is
+ * what makes the stored answer meaningful at all.
+ */
+const onIos = (): boolean => /iPhone|iPod|iPad/.test(navigator.userAgent);
+
 const isTheApp = async (): Promise<boolean> => {
+  if (!onIos()) {
+    return false;
+  }
   const stored = await readAppKey();
   switch (stored.kind) {
     case "key":
