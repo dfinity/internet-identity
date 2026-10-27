@@ -44,3 +44,8 @@ export const openable = async (
   }
   return { url: `${DOORWAY}#${carried.toString()}`, inTheApp: true };
 };
+
+/** The same page, used by a browser whose worker was refused another origin: it
+ *  carries the link and redirects to it. */
+export const sameOriginWayTo = (url: string): string =>
+  `${DOORWAY}#${new URLSearchParams({ url }).toString()}`;

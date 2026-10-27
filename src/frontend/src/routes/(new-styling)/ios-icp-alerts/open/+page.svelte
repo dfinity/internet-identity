@@ -7,6 +7,7 @@
   import { Trans } from "$lib/components/locale";
   import { NOTIFICATION_APP_NAME } from "../appName";
   import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
+  import { isStandalone } from "../standalone";
   import NotificationMock from "../NotificationMock.svelte";
 
   let target = $state<string | undefined>(undefined);
@@ -68,6 +69,13 @@
           ? { title: carrying.title, body: carrying.body }
           : undefined;
       if (target === undefined) {
+        return;
+      }
+      // A browser reaches this page only because a worker cannot open another origin
+      // directly, so there is nothing to hand over: it goes where the link points.
+      // The Safari scheme is the installed app's problem alone.
+      if (!isStandalone()) {
+        window.location.replace(target);
         return;
       }
       window.location.href = viaSafari(target);

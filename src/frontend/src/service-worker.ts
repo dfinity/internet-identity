@@ -17,7 +17,10 @@ import {
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/worker/shownNotification";
-import { openable } from "$lib/utils/notifications/worker/openTarget";
+import {
+  openable,
+  sameOriginWayTo,
+} from "$lib/utils/notifications/worker/openTarget";
 import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
@@ -80,11 +83,18 @@ const appWindow = async (): Promise<WindowClient | undefined> => {
  * destination inside the app reuses one; anything else opens its own.
  */
 const pointAt = async (url: string, inTheApp: boolean): Promise<void> => {
-  // A browser opens the link the app named, and nothing else. `openWindow` takes a
-  // URL off this origin, resolving null rather than failing, and that is the whole
-  // of the job here.
+  // A browser opens the link the app named. `openWindow` is refused for another
+  // origin in some browsers, and the app's link is on the app's origin, so a refusal
+  // falls back to a page of this origin that redirects: a window that opens on the
+  // wrong page for an instant beats a click that opens nothing.
   if (!inTheApp) {
-    await worker.clients.openWindow(url);
+    const opened = await worker.clients.openWindow(url).then(
+      () => true,
+      () => false,
+    );
+    if (!opened) {
+      await worker.clients.openWindow(sameOriginWayTo(url));
+    }
     return;
   }
 
