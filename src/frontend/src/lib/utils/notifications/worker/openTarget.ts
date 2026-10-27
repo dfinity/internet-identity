@@ -22,18 +22,25 @@ const isTheApp = async (): Promise<boolean> => {
   }
 };
 
-/** What the doorway shows and where it sends them. The fragment never leaves the device, so the notification's own words travel in it. */
+/**
+ * Where a click should go, and which of the two jobs opening it is.
+ *
+ * `inTheApp` is the installed iOS app, which has one window and cannot open another
+ * origin without stranding the user in an in-app view: it is pointed at the doorway,
+ * a page of its own that hands the link to Safari. Anything else is a browser, which
+ * opens the app's link and needs none of that.
+ */
 export const openable = async (
   url: string,
   shown?: { title: string; body: string },
-): Promise<string> => {
+): Promise<{ url: string; inTheApp: boolean }> => {
   if (!url.startsWith("https:") || !(await isTheApp())) {
-    return url;
+    return { url, inTheApp: false };
   }
   const carried = new URLSearchParams({ url });
   if (shown !== undefined) {
     carried.set("title", shown.title);
     carried.set("body", shown.body);
   }
-  return `${DOORWAY}#${carried.toString()}`;
+  return { url: `${DOORWAY}#${carried.toString()}`, inTheApp: true };
 };

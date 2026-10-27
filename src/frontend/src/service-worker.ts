@@ -79,26 +79,26 @@ const appWindow = async (): Promise<WindowClient | undefined> => {
  * rather than taking it there, so the running window is pointed by hand. Only a
  * destination inside the app reuses one; anything else opens its own.
  */
-const pointAt = async (url: string): Promise<void> => {
-  const reuse = url.startsWith(NOTIFICATION_APP_PATH)
-    ? await appWindow()
-    : undefined;
-  if (reuse !== undefined) {
-    // `navigate` is refused in some app views, and rejects outright for anything
-    // off this origin. A refusal must not end the click as a bare focus, which
-    // looks to the user like nothing happened, so it falls through to opening.
-    const went = await reuse.navigate(url).then(
-      () => true,
-      () => false,
-    );
-    if (went) {
-      await reuse.focus();
-      return;
-    }
+const pointAt = async (url: string, inTheApp: boolean): Promise<void> => {
+  // A browser opens the link the app named, and nothing else. `openWindow` takes a
+  // URL off this origin, resolving null rather than failing, and that is the whole
+  // of the job here.
+  if (!inTheApp) {
+    await worker.clients.openWindow(url);
+    return;
   }
-  // Opens the link whether or not it is this origin's: cross-origin resolves null
-  // rather than failing, and the window is opened either way.
-  await worker.clients.openWindow(url);
+
+  // The installed app has one window, and iOS surfaces it for a URL in its own scope
+  // rather than taking it there, so the window is pointed by hand. With no window to
+  // point, opening one is what is left.
+  const window = await appWindow();
+  if (window === undefined) {
+    await worker.clients.openWindow(url);
+    return;
+  }
+  // Refused in some app views, where the page's own `hashchange` is what is left.
+  await window.navigate(url).catch(() => undefined);
+  await window.focus();
 };
 
 worker.addEventListener("notificationclick", (event) => {
@@ -127,8 +127,12 @@ worker.addEventListener("notificationclick", (event) => {
           title: event.notification.title,
           body: event.notification.body,
         });
-        // A refused window must not cost the app its report.
-        await pointAt(destination).catch(() => undefined);
+        // A refused window must not cost the app its report, but it is reported:
+        // a click that opens nothing looks to the user like a dismissal.
+        await pointAt(destination.url, destination.inTheApp).catch(
+          (error: unknown) =>
+            console.error("Opening the notification's link failed", error),
+        );
       } else {
         const clients = await worker.clients.matchAll({
           type: "window",
