@@ -144,7 +144,6 @@ const show = async (
     tag,
     data: dataOf(ref, shown.url),
   });
-  void traceWake({ step: "shown", tag });
   await recordShown();
 };
 
@@ -424,22 +423,6 @@ const closeDismissed = async (context: WakeUpContext): Promise<void> => {
 };
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
-/** Diagnostic, on beta only: see `service-worker.ts`. Remove with the tracing there. */
-const traceWake = async (entry: Record<string, unknown>): Promise<void> => {
-  try {
-    const log = await caches.open("ii-notification-trace");
-    await log.put(
-      new Request(`https://trace.invalid/${Date.now()}-${Math.random()}`),
-      new Response(
-        JSON.stringify({ at: new Date().toISOString(), ...entry }, null, 2),
-        { headers: { "content-type": "application/json" } },
-      ),
-    );
-  } catch {
-    // Never the reason a wake-up fails.
-  }
-};
-
 export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   const signing = await (context.signing ?? signingIdentities)();
   // One round trip each, side by side: a wake-up shows one notification, so asking
@@ -448,12 +431,6 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   const queued = await Promise.all(
     signing.map((one) => nextFor(context, one).catch(() => undefined)),
   );
-
-  void traceWake({
-    step: "wake-up",
-    signingIdentities: signing.length,
-    queued: queued.map((entry) => entry !== undefined),
-  });
 
   // Swept before anything is shown, and never after. Chrome reconciles its own
   // record of what is on screen when the registration is enumerated, and an
@@ -492,7 +469,6 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     const onScreen =
       (await context.registration.getNotifications()).length > 0 ||
       (await shownRecently());
-    void traceWake({ step: "nothing-shown", onScreen });
     if (!onScreen) {
       // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
       // nothing on screen owes the user something.

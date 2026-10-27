@@ -16,11 +16,7 @@ import {
 } from "$lib/utils/notifications/worker/wakeUp";
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
-import {
-  dataOf,
-  refOf,
-  tagOf,
-} from "$lib/utils/notifications/worker/shownNotification";
+import { refOf } from "$lib/utils/notifications/worker/shownNotification";
 import { onIos, openable } from "$lib/utils/notifications/worker/openTarget";
 import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
 
@@ -46,56 +42,16 @@ worker.addEventListener("activate", (event) => {
 // `waitUntil` extends this worker's life; it does not serialise its handlers.
 const enqueue = promiseQueue();
 
-/**
- * Diagnostic, on beta only: a worker's console is not reachable in every browser, so
- * what a click did is written where a page can read it back.
- *
- *   const c = await caches.open("ii-notification-trace");
- *   for (const k of await c.keys()) console.log(await (await c.match(k)).json());
- *   await caches.delete("ii-notification-trace");   // to clear
- *
- * Remove once the desktop behaviour is confirmed.
- */
-const TRACE = "ii-notification-trace";
-
-const trace = async (entry: Record<string, unknown>): Promise<void> => {
-  try {
-    const log = await caches.open(TRACE);
-    await log.put(
-      new Request(`https://trace.invalid/${Date.now()}-${Math.random()}`),
-      new Response(
-        JSON.stringify({ at: new Date().toISOString(), ...entry }, null, 2),
-        { headers: { "content-type": "application/json" } },
-      ),
-    );
-  } catch {
-    // A trace must never be the reason a click fails.
-  }
-};
-
-// Diagnostic, on beta only: every start of this worker is recorded, so a click that
-// reaches no handler can be told apart from one whose worker never started. A click
-// on a terminated worker makes Chrome evaluate this script first, and an evaluation
-// that throws loses the click with no sign of it. Remove with the tracing above.
-void trace({ step: "evaluated", build: "no-enumerate-1" });
-
 worker.addEventListener("push", (event) => {
   event.waitUntil(
     enqueue(async () => {
-      void trace({
-        step: "push",
-        build: "no-enumerate-1",
-        configured,
-      });
       if (!configured) {
         // Nothing can be asked of anyone without knowing which canister to ask, and
         // the subscription still owes the user a notification.
         await showPlaceholder(worker.registration);
-        void trace({ step: "placeholder-shown" });
         return;
       }
       await onWakeUp({ registration: worker.registration });
-      void trace({ step: "woke" });
     }),
   );
 });
@@ -178,51 +134,6 @@ const openTheApp = async (): Promise<void> => {
   await worker.clients.openWindow("/");
 };
 
-/** Diagnostic, on beta only: the trace page asks the worker to show a notification,
- *  so a worker-shown one can be told apart from a page-shown one. Remove with the
- *  tracing above. */
-worker.addEventListener("message", (event) => {
-  const ask = event.data as { type?: string; withIcon?: boolean } | undefined;
-  if (ask?.type === "trace-show-real") {
-    // The tag, data and title a real notification carries, without the canister that
-    // would otherwise have to produce one.
-    const ref = {
-      identityNumber: BigInt(10772),
-      origin: "https://oizmi-wyaaa-aaaam-ajo5q-cai.ic0.app",
-      accountNumber: undefined,
-      appCanisterId: "oizmi-wyaaa-aaaam-ajo5q-cai",
-      id: BigInt("8893169870452928613"),
-    };
-    void worker.registration.showNotification("Test App \u00b7 hello", {
-      body: "world",
-      tag: tagOf(ref),
-      data: dataOf(ref, "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/#chat"),
-    });
-    return;
-  }
-  if (ask?.type !== "trace-show") {
-    return;
-  }
-  const icon =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-  void worker.registration.showNotification("Worker test", {
-    body:
-      ask.withIcon === true
-        ? "Shown by the worker, with an icon"
-        : "Shown by the worker",
-    icon: ask.withIcon === true ? icon : undefined,
-    tag: "trace-worker-test",
-    data: {
-      identityNumber: "10000",
-      origin: "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io",
-      accountNumber: "",
-      appCanisterId: "vt36r-2qaaa-aaaad-aad5a-cai",
-      id: "1",
-      url: "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/#chat",
-    },
-  });
-});
-
 worker.addEventListener("notificationclick", (event) => {
   // A click does not take the notification off the screen by itself.
   event.notification.close();
@@ -242,19 +153,7 @@ worker.addEventListener("notificationclick", (event) => {
       : openTheApp();
   event.waitUntil(
     (async () => {
-      void trace({
-        step: "clicked",
-        title: event.notification.title,
-        data: event.notification.data as unknown,
-        hasRef: target !== undefined,
-        urlType: typeof url,
-        agent: navigator.userAgent,
-      });
-      await opening.then(
-        () => trace({ step: "opened", destination: url }),
-        (error: unknown) =>
-          trace({ step: "open-failed", error: String(error) }),
-      );
+      await opening.catch(() => undefined);
 
       // Then the app learns its notification did its job. Nothing can act on a
       // failure here: a click has no caller to answer and nothing to come back for,
