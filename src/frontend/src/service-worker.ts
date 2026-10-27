@@ -45,16 +45,58 @@ worker.addEventListener("activate", (event) => {
 // `waitUntil` extends this worker's life; it does not serialise its handlers.
 const enqueue = promiseQueue();
 
+/**
+ * Diagnostic, on beta only: a worker's console is not reachable in every browser, so
+ * what a click did is written where a page can read it back.
+ *
+ *   const c = await caches.open("ii-notification-trace");
+ *   for (const k of await c.keys()) console.log(await (await c.match(k)).json());
+ *   await caches.delete("ii-notification-trace");   // to clear
+ *
+ * Remove once the desktop behaviour is confirmed.
+ */
+const TRACE = "ii-notification-trace";
+
+const trace = async (entry: Record<string, unknown>): Promise<void> => {
+  try {
+    const log = await caches.open(TRACE);
+    await log.put(
+      new Request(`https://trace.invalid/${Date.now()}-${Math.random()}`),
+      new Response(
+        JSON.stringify({ at: new Date().toISOString(), ...entry }, null, 2),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+  } catch {
+    // A trace must never be the reason a click fails.
+  }
+};
+
 worker.addEventListener("push", (event) => {
   event.waitUntil(
     enqueue(async () => {
+      void trace({
+        step: "push",
+        configured,
+        scope: worker.registration.scope,
+      });
       if (!configured) {
         // Nothing can be asked of anyone without knowing which canister to ask, and
         // the subscription still owes the user a notification.
         await showPlaceholder(worker.registration);
+        void trace({ step: "placeholder-shown" });
         return;
       }
       await onWakeUp({ registration: worker.registration });
+      const shown = await worker.registration.getNotifications();
+      void trace({
+        step: "woke",
+        showing: shown.map((notification) => ({
+          title: notification.title,
+          hasData:
+            notification.data !== undefined && notification.data !== null,
+        })),
+      });
     }),
   );
 });
@@ -109,33 +151,6 @@ const pointAt = async (url: string, inTheApp: boolean): Promise<void> => {
   // Refused in some app views, where the page's own `hashchange` is what is left.
   await window.navigate(url).catch(() => undefined);
   await window.focus();
-};
-
-/**
- * Diagnostic, on beta only: a worker's console is not reachable in every browser, so
- * what a click did is written where a page can read it back.
- *
- *   const c = await caches.open("ii-notification-trace");
- *   for (const k of await c.keys()) console.log(await (await c.match(k)).json());
- *   await caches.delete("ii-notification-trace");   // to clear
- *
- * Remove once the desktop behaviour is confirmed.
- */
-const TRACE = "ii-notification-trace";
-
-const trace = async (entry: Record<string, unknown>): Promise<void> => {
-  try {
-    const log = await caches.open(TRACE);
-    await log.put(
-      new Request(`https://trace.invalid/${Date.now()}-${Math.random()}`),
-      new Response(
-        JSON.stringify({ at: new Date().toISOString(), ...entry }, null, 2),
-        { headers: { "content-type": "application/json" } },
-      ),
-    );
-  } catch {
-    // A trace must never be the reason a click fails.
-  }
 };
 
 worker.addEventListener("notificationclick", (event) => {
