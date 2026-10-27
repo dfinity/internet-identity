@@ -11,7 +11,13 @@ import {
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
-import { rememberSpentFragment } from "$lib/utils/notifications/notificationAppKey";
+import {
+  readAppKey,
+  rememberSpentFragment,
+} from "$lib/utils/notifications/notificationAppKey";
+import { alreadyRegistered } from "$lib/utils/notifications/subscribeDevice";
+import { loadVapidKey } from "$lib/utils/notifications/vapidKeyStore";
+import { currentDeviceSubscription } from "$lib/utils/notifications/pushSubscription";
 
 export type Screen =
   | { kind: "working" }
@@ -125,6 +131,37 @@ const spendTheFragment = async (
       return { status: "token-refused", reason: fragment.reason };
     case "token":
       return await linkWithToken(record, fragment.token);
+  }
+};
+
+/**
+ * Whether this launch has an update call to make, from what this device wrote down.
+ *
+ * Local reads only: the app record, the stored endpoint, and the subscription the
+ * browser holds. Nothing here subscribes and nothing reaches the network, so the page
+ * can ask before it paints. Anything it cannot read answers `true`, because a launch
+ * that might be about to wait should say so rather than sit on a blank screen.
+ */
+export const launchWillWrite = async (hash: string): Promise<boolean> => {
+  try {
+    const stored = await readAppKey();
+    if (stored.kind !== "key" || stored.record.appId === undefined) {
+      return true;
+    }
+    const { appId, spentFragment } = stored.record;
+    // A fragment this app has not already answered is one it will present.
+    if (hash !== "" && spentFragment !== hash) {
+      return true;
+    }
+    const key = await loadVapidKey();
+    if (key === undefined || !alreadyRegistered(key, appId)) {
+      return true;
+    }
+    // An endpoint the browser has replaced since is one it will register afresh.
+    const live = await currentDeviceSubscription();
+    return live?.endpoint !== key.endpoint;
+  } catch {
+    return true;
   }
 };
 

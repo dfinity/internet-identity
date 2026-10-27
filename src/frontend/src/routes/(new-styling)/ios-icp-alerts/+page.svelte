@@ -25,6 +25,7 @@
     failed,
     holdsTheInstallPlaceholder,
     insideTheApp,
+    launchWillWrite,
     insideTheBrowser,
     type Screen,
     settleFromSettings,
@@ -47,20 +48,32 @@
    *  Guessing one shape and correcting it shows the wrong skeleton first. */
   let inTheApp = $state<boolean | undefined>(undefined);
   /**
-   * Whether the wait has gone on long enough to be worth drawing.
+   * Whether this wait is worth drawing a skeleton for.
    *
-   * A launch with nothing to send is one query, and a skeleton that appears and leaves
-   * inside a couple of hundred milliseconds is a flash rather than an answer. Held back
-   * by that much, so the fast launch paints its real screen and nothing else, while a
-   * launch that does have an update call to make still says so.
+   * A launch with nothing to send is one query, and a skeleton inside that is a flash
+   * rather than an answer. So the page asks first, from what this device has written
+   * down and without reaching the network, whether an update call is coming, and only
+   * draws the wait when one is.
    */
   let waitIsWorthDrawing = $state(false);
-  const SKELETON_AFTER_MS = 250;
+  let waitBackstop: ReturnType<typeof setTimeout> | undefined;
+  /** However fast it was meant to be: a blank page held longer than this says less than
+   *  a skeleton does. */
+  const DRAW_ANYWAY_AFTER_MS = 1_000;
 
-  /** Restarts the delay, for every path that puts the page back into `working`. */
+  /** Asked again by every path that puts the page back into `working`. */
   const beginWaiting = () => {
     waitIsWorthDrawing = false;
-    setTimeout(() => (waitIsWorthDrawing = true), SKELETON_AFTER_MS);
+    clearTimeout(waitBackstop);
+    void launchWillWrite(window.location.hash).then((willWrite) => {
+      if (willWrite) {
+        waitIsWorthDrawing = true;
+      }
+    });
+    waitBackstop = setTimeout(
+      () => (waitIsWorthDrawing = true),
+      DRAW_ANYWAY_AFTER_MS,
+    );
   };
 
   const buttonGroup = "mt-7 flex flex-col gap-2.5";
@@ -403,6 +416,22 @@
     rel="apple-touch-icon"
     sizes="180x180"
     href="/ios-icp-alerts-icon-180.png"
+  />
+  <!-- Both schemes, stated in the document rather than in a stylesheet. Until the CSS
+       that carries `color-scheme` has been fetched and applied, the browser has been
+       told nothing, assumes light, and paints a white canvas: between the launch
+       screen and the first styled frame, which both sit at #161616 in the dark, that
+       white is the flash. Declared here and the first frame is already right. -->
+  <meta name="color-scheme" content="light dark" />
+  <meta
+    name="theme-color"
+    media="(prefers-color-scheme: dark)"
+    content="#161616"
+  />
+  <meta
+    name="theme-color"
+    media="(prefers-color-scheme: light)"
+    content="#ffffff"
   />
   <!-- iOS honours these as well as the manifest: the standalone launch, the Home Screen name and the status bar. -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
