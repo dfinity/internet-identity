@@ -83,16 +83,32 @@ const pointAt = async (url: string): Promise<void> => {
   const reuse = url.startsWith(NOTIFICATION_APP_PATH)
     ? await appWindow()
     : undefined;
-  if (reuse === undefined) {
-    await worker.clients.openWindow(url);
-    return;
+  if (reuse !== undefined) {
+    // `navigate` is refused in some app views, and rejects outright for anything
+    // off this origin. A refusal must not end the click as a bare focus, which
+    // looks to the user like nothing happened, so it falls through to opening.
+    const went = await reuse.navigate(url).then(
+      () => true,
+      () => false,
+    );
+    if (went) {
+      await reuse.focus();
+      return;
+    }
   }
-  // Refused in some app views, where the page's own `hashchange` is what is left.
-  await reuse.navigate(url).catch(() => undefined);
-  await reuse.focus();
+  // Opens the link whether or not it is this origin's: cross-origin resolves null
+  // rather than failing, and the window is opened either way.
+  await worker.clients.openWindow(url);
 };
 
 worker.addEventListener("notificationclick", (event) => {
+  // Diagnostic, on beta only: a click that opens nothing and dismisses nothing has
+  // not reached this handler at all, and that is worth telling apart from one that
+  // reached it and failed. Remove once the desktop behaviour is confirmed.
+  console.info("notificationclick", {
+    data: event.notification.data,
+    title: event.notification.title,
+  });
   // A click does not take the notification off the screen by itself.
   event.notification.close();
   const target = refOf(event.notification.data);
