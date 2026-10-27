@@ -13,6 +13,7 @@ import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
 import {
   readAppKey,
+  rememberInstalled,
   rememberSpentFragment,
 } from "$lib/utils/notifications/notificationAppKey";
 import { alreadyRegistered } from "$lib/utils/notifications/subscribeDevice";
@@ -172,6 +173,8 @@ export const insideTheApp = async (
   onTokenSpent: () => void,
 ): Promise<Screen> => {
   const record = await ensureAppKey();
+  // Only this page knows it is the installed app, and the worker cannot ask.
+  void rememberInstalled();
   const actor = await appKeyActor(record);
 
   // The Home Screen entry replays the URL captured at install, key and all, so every

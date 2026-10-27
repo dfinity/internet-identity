@@ -6,17 +6,19 @@ import { NOTIFICATION_APP_PATH } from "../appPath";
 /** The page that hands the link over, inside the app's scope so it opens in the app. */
 const DOORWAY = `${NOTIFICATION_APP_PATH}/open`;
 
-/** The registration is shared with the browser that installed the app, but storage is not: an app key exists only in the app's own partition.
- * Storage that will not answer is taken for the app, since opening the link directly there strands the user in the in-app browser view. */
+/** Only the installed app says so, and it says so from its own page: a desktop browser
+ * holding an app key is still a browser, and handing it the doorway leaves it opening a
+ * page whose whole job is to pass the link to Safari. Storage that will not answer
+ * confirms nothing, so the link itself is used. */
 const isTheApp = async (): Promise<boolean> => {
   const stored = await readAppKey();
   switch (stored.kind) {
     case "key":
-      return true;
+      return stored.record.installed === true;
     case "no-key":
       return false;
     case "unreadable":
-      return true;
+      return false;
   }
 };
 

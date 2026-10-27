@@ -16,6 +16,10 @@ export interface AppKeyRecord {
    *  the URL captured at install on every launch, so the same token arrives again and
    *  again; one that is already recorded here has been answered and is not sent twice. */
   spentFragment?: string;
+  /** Written by the app's own page when it is running as the installed Home Screen
+   *  app. A key's presence cannot stand in for this: a browser that holds one is
+   *  still a browser, and only the installed app needs a link handed to Safari. */
+  installed?: boolean;
 }
 
 /** `unreadable` is not `no-key`: this key is the app's only name to the canister, so each caller has to say what it does when it cannot tell. */
@@ -55,6 +59,23 @@ export const ensureAppKey = async (): Promise<AppKeyRecord> => {
       await idbSet(RECORD_KEY, record, APP_KEY_STORE);
       return record;
     }
+  }
+};
+
+/** Records that this storage belongs to the installed app, which only its own page knows. */
+export const rememberInstalled = async (): Promise<void> => {
+  try {
+    const stored = await readAppKey();
+    if (stored.kind !== "key" || stored.record.installed === true) {
+      return;
+    }
+    await idbSet(
+      RECORD_KEY,
+      { ...stored.record, installed: true },
+      APP_KEY_STORE,
+    );
+  } catch (error) {
+    console.error(error);
   }
 };
 
