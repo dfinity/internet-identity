@@ -111,14 +111,41 @@ const pointAt = async (url: string, inTheApp: boolean): Promise<void> => {
   await window.focus();
 };
 
+/**
+ * Diagnostic, on beta only: a worker's console is not reachable in every browser, so
+ * what a click did is written where a page can read it back.
+ *
+ *   const c = await caches.open("ii-notification-trace");
+ *   for (const k of await c.keys()) console.log(await (await c.match(k)).json());
+ *   await caches.delete("ii-notification-trace");   // to clear
+ *
+ * Remove once the desktop behaviour is confirmed.
+ */
+const TRACE = "ii-notification-trace";
+
+const trace = async (entry: Record<string, unknown>): Promise<void> => {
+  try {
+    const log = await caches.open(TRACE);
+    await log.put(
+      new Request(`https://trace.invalid/${Date.now()}-${Math.random()}`),
+      new Response(
+        JSON.stringify({ at: new Date().toISOString(), ...entry }, null, 2),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+  } catch {
+    // A trace must never be the reason a click fails.
+  }
+};
+
 worker.addEventListener("notificationclick", (event) => {
   // Diagnostic, on beta only: a click that opens nothing and dismisses nothing has
   // not reached this handler at all, and that is worth telling apart from one that
   // reached it and failed. Remove once the desktop behaviour is confirmed.
-  console.info("notificationclick", {
-    data: event.notification.data,
+  const seen = {
     title: event.notification.title,
-  });
+    data: event.notification.data as unknown,
+  };
   // A click does not take the notification off the screen by itself.
   event.notification.close();
   const target = refOf(event.notification.data);
@@ -132,6 +159,12 @@ worker.addEventListener("notificationclick", (event) => {
       // and that permission does not survive an await on a canister call. The
       // app's window cannot be focused instead, because `matchAll` sees this origin
       // only and the link is the app's.
+      void trace({
+        step: "clicked",
+        ...seen,
+        hasRef: target !== undefined,
+        urlType: typeof url,
+      });
       if (target !== undefined && url !== undefined) {
         const destination = await openable(url, {
           title: event.notification.title,
@@ -139,14 +172,26 @@ worker.addEventListener("notificationclick", (event) => {
         });
         // A refused window must not cost the app its report, but it is reported:
         // a click that opens nothing looks to the user like a dismissal.
-        await pointAt(destination.url, destination.inTheApp).catch(
+        void trace({
+          step: "opening",
+          destination: destination.url,
+          inTheApp: destination.inTheApp,
+          agent: navigator.userAgent,
+        });
+        await pointAt(destination.url, destination.inTheApp).then(
+          () => trace({ step: "opened", destination: destination.url }),
           (error: unknown) =>
-            console.error("Opening the notification's link failed", error),
+            trace({ step: "open-failed", error: String(error) }),
         );
       } else {
         const clients = await worker.clients.matchAll({
           type: "window",
           includeUncontrolled: true,
+        });
+        void trace({
+          step: "no-link",
+          why: "the notification carried no readable reference or url",
+          clients: clients.map((client) => client.url),
         });
         const open = clients.find((client) =>
           client.url.startsWith(worker.origin),
