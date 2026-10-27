@@ -1,7 +1,6 @@
 dist/
 node_modules/
 target/
-vendor/
 package-lock.json
 chat.did
 .icp/

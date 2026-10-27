@@ -1,6 +1,6 @@
 # A workspace of its own rather than a member of Internet Identity's: the
-# vendored notification library needs ic-cdk 0.20, which that workspace does
-# not resolve.
+# notification library needs ic-cdk 0.20, which that workspace does not
+# resolve.
 [workspace]
 
 [package]
@@ -19,8 +19,7 @@ ic-asset-certification = "3.0.3"
 ic-cdk = "0.20"
 ic-http-certification = "3.0.3"
 ic-stable-structures = "0.7"
-# Vendored while the library repo is internal; see vendor/identity-notifications/README.md.
-identity-notifications = { path = "vendor/identity-notifications" }
+identity-notifications = "0.1.1"
 include_dir = "0.7"
 serde = "1"
 serde_json = "1"

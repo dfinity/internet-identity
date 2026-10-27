@@ -4,7 +4,7 @@
   "private": true,
   "license": "SEE LICENSE IN ../../LICENSE",
   "dependencies": {
-    "@icp-sdk/auth": "file:vendor/icp-sdk-auth-10.0.0-notification-consent.tgz",
+    "@icp-sdk/auth": "^11.1.0",
     "@icp-sdk/core": "^6.1.0"
   },
   "scripts": {

@@ -3,7 +3,7 @@
 canisters:
   - name: notification_chat
     settings:
-      # Read by the notification library (vendor/identity-notifications).
+      # Read by the notification library (the identity-notifications crate).
       environment_variables:
         # The Internet Identity this canister sends through, and whose signed
         # caller info it trusts when it serves a notification's content.

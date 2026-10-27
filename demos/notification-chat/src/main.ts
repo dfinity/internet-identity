@@ -3,7 +3,10 @@
 // few seconds, a line to type in, a line to claim a name on, and a panel with
 // the notification library's delivery stats.
 
-import { AuthClient } from "@icp-sdk/auth/client";
+import {
+  AuthClient,
+  NotificationsUnsupportedError,
+} from "@icp-sdk/auth/client";
 import { Actor, HttpAgent, type Identity } from "@icp-sdk/core/agent";
 import { IDL } from "@icp-sdk/core/candid";
 import { Principal } from "@icp-sdk/core/principal";
@@ -623,12 +626,14 @@ authBtn.addEventListener("click", () => {
     // refuses) still signs the user in.
     const signedIn = client.signIn();
     const consent = client.requestNotificationConsent().then(
-      (granted) =>
+      ({ granted }) =>
         granted
           ? undefined
           : "Internet Identity will not notify you here, so you will only see messages on this page.",
       (error) =>
-        `Asking to notify failed (${describe(error)}), so you will only see messages on this page.`,
+        error instanceof NotificationsUnsupportedError
+          ? "This Internet Identity does not send notifications, so you will only see messages on this page."
+          : `Asking to notify failed (${describe(error)}), so you will only see messages on this page.`,
     );
     // The name Internet Identity holds for this identity, where it holds one
     // and the user agrees to share it. An identity signed in with a passkey

@@ -23,11 +23,11 @@ It is a project of its own inside this repository (its own Cargo workspace,
   hovering over it shows the principal, and somebody without a name is shown
   as their principal's ends. Names outlive an upgrade; the room does not.
 - **Send** stores the message and notifies every other member through the
-  [`identity-notifications`](vendor/identity-notifications) library. The
-  notification's title is the writer's name, its body is the message, and its
-  link is this app's origin, so acting on it opens the app. Notifications
-  carry no key, so each message is a notification of its own: none replaces
-  another, and a burst of messages is a burst of notifications.
+  [`identity-notifications`](https://crates.io/crates/identity-notifications)
+  library. The notification's title is the writer's name, its body is the
+  message, and its link is this app's origin, so acting on it opens the app.
+  Notifications carry no key, so each message is a notification of its own:
+  none replaces another, and a burst of messages is a burst of notifications.
 - The **messages** box shows who sent what and when; the **list on the right**
   shows who is in the room. The page reads the room every few seconds.
 - **Show notification stats** opens a panel that says what the canister is
@@ -77,17 +77,15 @@ icp canister call notification_chat get_api_doc '()' -e ic
 
 ## Layout
 
-| Path                            | What it is                                                                         |
-| ------------------------------- | ---------------------------------------------------------------------------------- |
-| `lib.rs`                        | The canister: the room's methods, the notification endpoints, and the frontend.    |
-| `room.rs`                       | The room itself, as plain state with unit tests.                                   |
-| `names.rs`                      | The rule that keeps claimed names unique, with unit tests.                         |
-| `api_doc.md`                    | What `get_api_doc` returns: the interface's semantics, for an agent.               |
-| `chat.did`                      | The Candid interface, exported from the code (`BLESS=1 cargo test` rewrites it).   |
-| `src/`                          | The frontend: one page, one script, one stylesheet, built with Vite.               |
-| `vendor/identity-notifications` | The notification library, vendored while its repository is internal.               |
-| `vendor/icp-sdk-auth-*.tgz`     | A build of `@icp-sdk/auth` with `requestNotificationConsent`, not yet published.   |
-| `build.sh`                      | Builds the frontend into `dist/`, then the canister into `notification_chat.wasm`. |
+| Path         | What it is                                                                         |
+| ------------ | ---------------------------------------------------------------------------------- |
+| `lib.rs`     | The canister: the room's methods, the notification endpoints, and the frontend.    |
+| `room.rs`    | The room itself, as plain state with unit tests.                                   |
+| `names.rs`   | The rule that keeps claimed names unique, with unit tests.                         |
+| `api_doc.md` | What `get_api_doc` returns: the interface's semantics, for an agent.               |
+| `chat.did`   | The Candid interface, exported from the code (`BLESS=1 cargo test` rewrites it).   |
+| `src/`       | The frontend: one page, one script, one stylesheet, built with Vite.               |
+| `build.sh`   | Builds the frontend into `dist/`, then the canister into `notification_chat.wasm`. |
 
 ## Building
 
