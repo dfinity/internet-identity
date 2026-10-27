@@ -11,6 +11,7 @@ import {
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
+import { rememberSpentFragment } from "$lib/utils/notifications/notificationAppKey";
 
 export type Screen =
   | { kind: "working" }
@@ -136,8 +137,16 @@ export const insideTheApp = async (
   const record = await ensureAppKey();
   const actor = await appKeyActor(record);
 
-  // The Home Screen entry replays the URL captured at install, key and all, so every launch after the first presents a key the canister has already spent.
-  const outcome = await spendTheFragment(decodeLinkToken(hash), record);
+  // The Home Screen entry replays the URL captured at install, key and all, so every
+  // launch after the first presents a key the canister has already spent. Answering it
+  // again costs an update call to be told what this app wrote down the first time.
+  const replayed = record.spentFragment === hash && record.appId !== undefined;
+  const outcome = replayed
+    ? null
+    : await spendTheFragment(decodeLinkToken(hash), record);
+  if (!replayed && hash !== "") {
+    await rememberSpentFragment(hash);
+  }
   if (outcome?.status === "failed") {
     return { kind: "failed", reason: outcome.reason };
   }
@@ -156,7 +165,7 @@ export const insideTheApp = async (
   if (anchors.length === 0 && outcome?.status === "token-refused") {
     return { kind: "stale-link" };
   }
-  return await settle(permission, actor, anchors);
+  return await settle(permission, actor, anchors, appId);
 };
 
 /** Where this launch lands, for a permission in whichever state it is in. */
@@ -164,6 +173,7 @@ const settle = async (
   permission: NotificationPermission,
   actor: Awaited<ReturnType<typeof appKeyActor>>,
   anchors: bigint[],
+  appId?: bigint,
 ): Promise<Screen> => {
   if (anchors.length === 0) {
     // Nothing to register for: what is registered is named for an anchor the app serves.
@@ -176,7 +186,7 @@ const settle = async (
     return { kind: "ask" };
   }
   // Registered on every launch and not only the one that linked: the push service hands out a new endpoint whenever it likes.
-  if (!(await registerForAnyAnchor(anchors, actor))) {
+  if (!(await registerForAnyAnchor(anchors, actor, appId))) {
     // Every identity pointing at this app has it switched off or is signed out; the app itself is intact.
     return { kind: "unlinked" };
   }
@@ -191,7 +201,7 @@ export const settleWithTheApp = async (
   const actor = await appKeyActor(record);
   const anchors =
     record.appId === undefined ? [] : await appAnchors(actor, record.appId);
-  return await settle(permission, actor, anchors);
+  return await settle(permission, actor, anchors, record.appId);
 };
 
 /** iOS Settings is the only place a refused permission can be lifted. */

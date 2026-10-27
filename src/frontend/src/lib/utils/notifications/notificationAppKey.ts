@@ -12,6 +12,10 @@ export interface AppKeyRecord {
   /** The record the canister gave this app, absent until it has linked once. Naming it on
    *  a later link joins the record it already has rather than taking a second one. */
   appId?: bigint;
+  /** The fragment this app last presented to the canister, token and all. iOS replays
+   *  the URL captured at install on every launch, so the same token arrives again and
+   *  again; one that is already recorded here has been answered and is not sent twice. */
+  spentFragment?: string;
 }
 
 /** `unreadable` is not `no-key`: this key is the app's only name to the canister, so each caller has to say what it does when it cannot tell. */
@@ -51,6 +55,31 @@ export const ensureAppKey = async (): Promise<AppKeyRecord> => {
       await idbSet(RECORD_KEY, record, APP_KEY_STORE);
       return record;
     }
+  }
+};
+
+/**
+ * Remembers the fragment just presented, so a launch replaying it sends nothing.
+ *
+ * Read back rather than written from the caller's copy: a link running in between was
+ * handed that same copy and has already written an `appId` into the stored one, which
+ * spreading a stale record would take away again.
+ */
+export const rememberSpentFragment = async (
+  fragment: string,
+): Promise<void> => {
+  try {
+    const stored = await readAppKey();
+    if (stored.kind !== "key") {
+      return;
+    }
+    await idbSet(
+      RECORD_KEY,
+      { ...stored.record, spentFragment: fragment },
+      APP_KEY_STORE,
+    );
+  } catch (error) {
+    console.error(error);
   }
 };
 

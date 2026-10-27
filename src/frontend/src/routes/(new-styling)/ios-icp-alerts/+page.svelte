@@ -46,6 +46,22 @@
   /** Unknown until mount, because the page prerenders and the answer is `window`'s.
    *  Guessing one shape and correcting it shows the wrong skeleton first. */
   let inTheApp = $state<boolean | undefined>(undefined);
+  /**
+   * Whether the wait has gone on long enough to be worth drawing.
+   *
+   * A launch with nothing to send is one query, and a skeleton that appears and leaves
+   * inside a couple of hundred milliseconds is a flash rather than an answer. Held back
+   * by that much, so the fast launch paints its real screen and nothing else, while a
+   * launch that does have an update call to make still says so.
+   */
+  let waitIsWorthDrawing = $state(false);
+  const SKELETON_AFTER_MS = 250;
+
+  /** Restarts the delay, for every path that puts the page back into `working`. */
+  const beginWaiting = () => {
+    waitIsWorthDrawing = false;
+    setTimeout(() => (waitIsWorthDrawing = true), SKELETON_AFTER_MS);
+  };
 
   const buttonGroup = "mt-7 flex flex-col gap-2.5";
   /** The two screens the Home Screen app opens on centre their one illustration and read from the middle out. */
@@ -84,6 +100,7 @@
   onMount(() => {
     void (async () => {
       host = window.location.host;
+      beginWaiting();
       const standalone = isStandalone();
       inTheApp = standalone;
       // The tab opened for an install holds this placeholder only until the minted URL
@@ -114,6 +131,7 @@
   /** Runs the launch again: settling from where a failure left off would skip the link and the anchors. */
   const retryLaunch = async () => {
     screen = { kind: "working" };
+    beginWaiting();
     screen = await launch();
   };
 
@@ -170,6 +188,7 @@
       return;
     }
     screen = { kind: "working" };
+    beginWaiting();
     screen = await settleFromSettings().catch(failed);
   };
 
@@ -319,6 +338,7 @@
     replacedLastSeen =
       replaced.kind === "app" ? replaced.app.last_seen_ns : undefined;
     screen = { kind: "working" };
+    beginWaiting();
     try {
       // Awaited, not fired: the canister refuses an install over a record that is still
       // answering, and an outstanding probe is the evidence that this one is not.
@@ -351,6 +371,7 @@
       return;
     }
     screen = { kind: "working" };
+    beginWaiting();
     try {
       // The record this browser points at may still claim to deliver, and the canister
       // takes an unanswered probe of its own as the evidence that it does not.
@@ -395,7 +416,12 @@
 >
   <div class="relative col-start-1 row-start-1 flex min-w-0 flex-col gap-5">
     <AuthPanel class="z-1">
-      {#if screen.kind === "working" || screen.kind === "elsewhere"}
+      {#if (screen.kind === "working" && !waitIsWorthDrawing) || inTheApp === undefined}
+        <!-- Nothing yet: either the launch is still inside the window a fast one fits
+             in, or the page has not read which document it is and would draw the wrong
+             shape. Both resolve into one of the arms below. -->
+        <div class="flex min-w-0 flex-1 flex-col items-stretch"></div>
+      {:else if screen.kind === "working" || screen.kind === "elsewhere"}
         <!-- `elsewhere` is on its way out of the page, so it waits here too.
              Shaped like the screen it is about to become, so settling moves nothing:
              centred around the notification in the app, bottom-aligned steps in a tab. -->
