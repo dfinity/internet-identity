@@ -386,10 +386,19 @@ const topUpPool = async (
  * and a pull then answers with nothing. That is the same answer as for something
  * expired, and the same thing to do about it.
  */
-const closeDismissed = async (context: WakeUpContext): Promise<void> => {
+const closeDismissed = async (
+  context: WakeUpContext,
+  /** The one this wake-up has just put on screen, which is never dismissed: its
+   *  content is released as soon as the delivery is reported, so a pull for it
+   *  answers nothing and would read as an app that had taken it back. */
+  justShown?: string,
+): Promise<void> => {
   const shown = await context.registration.getNotifications();
   await Promise.all(
     shown.map(async (one) => {
+      if (justShown !== undefined && one.tag === justShown) {
+        return;
+      }
       const ref = refOf(one.data);
       if (ref === undefined) {
         return;
@@ -456,6 +465,7 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
 
   const pending: Promise<unknown>[] = [];
   let shown = false;
+  let shownTag: string | undefined;
   for (const entry of queued) {
     if (entry === undefined) {
       continue;
@@ -466,6 +476,7 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
       pending,
     }).catch(() => false);
     if (shown) {
+      shownTag = tagOf(refFor(entry.identityNumber, entry.notification));
       break;
     }
   }
@@ -477,7 +488,7 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   }
 
   if (shown) {
-    sendAndForget(pending, closeDismissed(context));
+    sendAndForget(pending, closeDismissed(context, shownTag));
   } else {
     // Whether this wake-up still owes the user something depends on what is on
     // screen, and an app may have dismissed what is on screen.
