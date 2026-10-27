@@ -25,6 +25,7 @@
     failed,
     holdsTheInstallPlaceholder,
     insideTheApp,
+    launchWillWrite,
     insideTheBrowser,
     type Screen,
     settleFromSettings,
@@ -46,6 +47,34 @@
   /** Unknown until mount, because the page prerenders and the answer is `window`'s.
    *  Guessing one shape and correcting it shows the wrong skeleton first. */
   let inTheApp = $state<boolean | undefined>(undefined);
+  /**
+   * Whether this wait is worth drawing a skeleton for.
+   *
+   * A launch with nothing to send is one query, and a skeleton inside that is a flash
+   * rather than an answer. So the page asks first, from what this device has written
+   * down and without reaching the network, whether an update call is coming, and only
+   * draws the wait when one is.
+   */
+  let waitIsWorthDrawing = $state(false);
+  let waitBackstop: ReturnType<typeof setTimeout> | undefined;
+  /** However fast it was meant to be: a blank page held longer than this says less than
+   *  a skeleton does. */
+  const DRAW_ANYWAY_AFTER_MS = 1_000;
+
+  /** Asked again by every path that puts the page back into `working`. */
+  const beginWaiting = () => {
+    waitIsWorthDrawing = false;
+    clearTimeout(waitBackstop);
+    void launchWillWrite(window.location.hash).then((willWrite) => {
+      if (willWrite) {
+        waitIsWorthDrawing = true;
+      }
+    });
+    waitBackstop = setTimeout(
+      () => (waitIsWorthDrawing = true),
+      DRAW_ANYWAY_AFTER_MS,
+    );
+  };
 
   const buttonGroup = "mt-7 flex flex-col gap-2.5";
   /** The two screens the Home Screen app opens on centre their one illustration and read from the middle out. */
@@ -84,6 +113,7 @@
   onMount(() => {
     void (async () => {
       host = window.location.host;
+      beginWaiting();
       const standalone = isStandalone();
       inTheApp = standalone;
       // The tab opened for an install holds this placeholder only until the minted URL
@@ -114,6 +144,7 @@
   /** Runs the launch again: settling from where a failure left off would skip the link and the anchors. */
   const retryLaunch = async () => {
     screen = { kind: "working" };
+    beginWaiting();
     screen = await launch();
   };
 
@@ -170,6 +201,7 @@
       return;
     }
     screen = { kind: "working" };
+    beginWaiting();
     screen = await settleFromSettings().catch(failed);
   };
 
@@ -319,6 +351,7 @@
     replacedLastSeen =
       replaced.kind === "app" ? replaced.app.last_seen_ns : undefined;
     screen = { kind: "working" };
+    beginWaiting();
     try {
       // Awaited, not fired: the canister refuses an install over a record that is still
       // answering, and an outstanding probe is the evidence that this one is not.
@@ -351,6 +384,7 @@
       return;
     }
     screen = { kind: "working" };
+    beginWaiting();
     try {
       // The record this browser points at may still claim to deliver, and the canister
       // takes an unanswered probe of its own as the evidence that it does not.
@@ -383,6 +417,22 @@
     sizes="180x180"
     href="/ios-icp-alerts-icon-180.png"
   />
+  <!-- Both schemes, stated in the document rather than in a stylesheet. Until the CSS
+       that carries `color-scheme` has been fetched and applied, the browser has been
+       told nothing, assumes light, and paints a white canvas: between the launch
+       screen and the first styled frame, which both sit at #161616 in the dark, that
+       white is the flash. Declared here and the first frame is already right. -->
+  <meta name="color-scheme" content="light dark" />
+  <meta
+    name="theme-color"
+    media="(prefers-color-scheme: dark)"
+    content="#161616"
+  />
+  <meta
+    name="theme-color"
+    media="(prefers-color-scheme: light)"
+    content="#ffffff"
+  />
   <!-- iOS honours these as well as the manifest: the standalone launch, the Home Screen name and the status bar. -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content={NOTIFICATION_APP_NAME} />
@@ -395,7 +445,12 @@
 >
   <div class="relative col-start-1 row-start-1 flex min-w-0 flex-col gap-5">
     <AuthPanel class="z-1">
-      {#if screen.kind === "working" || screen.kind === "elsewhere"}
+      {#if (screen.kind === "working" && !waitIsWorthDrawing) || inTheApp === undefined}
+        <!-- Nothing yet: either the launch is still inside the window a fast one fits
+             in, or the page has not read which document it is and would draw the wrong
+             shape. Both resolve into one of the arms below. -->
+        <div class="flex min-w-0 flex-1 flex-col items-stretch"></div>
+      {:else if screen.kind === "working" || screen.kind === "elsewhere"}
         <!-- `elsewhere` is on its way out of the page, so it waits here too.
              Shaped like the screen it is about to become, so settling moves nothing:
              centred around the notification in the app, bottom-aligned steps in a tab. -->

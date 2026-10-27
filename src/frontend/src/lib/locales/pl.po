@@ -44,11 +44,17 @@ msgctxt "Browsers are grouped by platform, which cannot tell one device from sev
 msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
 msgstr "{count, plural, one {# przeglądarka na {platform}} few {# przeglądarki na {platform}} many {# przeglądarek na {platform}} other {# przeglądarki na {platform}}}"
 
+msgid "{count, plural, one {1 app selected} other {# apps selected}}"
+msgstr ""
+
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} z {capacity} zweryfikowanych adresów e-mail"
 
 msgid "{displayName} account"
 msgstr "Konto {displayName}"
+
+msgid "{domainInput} can't be used for SSO: {detail}"
+msgstr ""
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
 msgstr "Aplikacja SSO domeny {domainInput} nie zezwala na hybrydowy przepływ OAuth wymagany przez II. Poproś administratora SSO o włączenie response_type \"id_token code\"."
@@ -71,8 +77,20 @@ msgstr "{identityName} została usunięta z tego urządzenia."
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Osiągnąłeś/aś maksymalnie # konto dla pojedynczej aplikacji.} few {Osiągnąłeś/aś maksymalnie # konta dla pojedynczej aplikacji.} other {Osiągnąłeś/aś maksymalnie # kont dla pojedynczej aplikacji.}}"
 
+msgid "{name} has been removed."
+msgstr ""
+
+msgid "{NOTIFICATION_APP_NAME} is on your Home Screen but has not been opened yet. Open it once and notifications are on for this identity."
+msgstr ""
+
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# klucz dostępu} few {# klucze dostępu} other {# kluczy dostępu}}"
+
+msgid "{num, plural, one {1 app has been removed.} other {# apps have been removed.}}"
+msgstr ""
+
+msgid "{num, plural, one {Remove 1 app?} other {Remove # apps?}}"
+msgstr ""
 
 msgid "{providerName} {attribute}:"
 msgstr "{providerName} {attribute}:"
@@ -152,6 +170,9 @@ msgstr "Dostęp"
 msgid "Access methods"
 msgstr "Metody dostępu"
 
+msgid "Account"
+msgstr ""
+
 msgid "Account name"
 msgstr "Nazwa konta"
 
@@ -175,6 +196,12 @@ msgstr "Aktywowano"
 
 msgid "Active"
 msgstr "Aktywny"
+
+msgid "Add"
+msgstr ""
+
+msgid "Add {NOTIFICATION_APP_NAME} again"
+msgstr ""
 
 msgid "Add a recovery email"
 msgstr "Dodaj e-mail do odzyskiwania"
@@ -212,14 +239,26 @@ msgstr "Dodaj tożsamość"
 msgid "Add identity from another device"
 msgstr "Dodaj tożsamość z innego urządzenia"
 
+msgid "Add it again"
+msgstr ""
+
 msgid "Add new"
 msgstr "Dodaj nowe"
 
 msgid "Add or remove the ways you can sign in with your identity."
 msgstr "Dodaj lub usuń sposoby logowania za pomocą swojej tożsamości."
 
+msgid "Add this app again"
+msgstr ""
+
 msgid "Add this identity to another device"
 msgstr "Dodaj tę tożsamość do innego urządzenia"
+
+msgid "Add to Bookmarks"
+msgstr ""
+
+msgid "Add to Home Screen"
+msgstr ""
 
 msgid "Added by you"
 msgstr "Dodane przez Ciebie"
@@ -251,6 +290,12 @@ msgstr "Zezwolić lokalnym programom na połączenie?"
 msgid "Allow notifications"
 msgstr "Zezwól na powiadomienia"
 
+msgid "Allow Notifications"
+msgstr ""
+
+msgid "Allow them for this site in your browser settings, then turn this on again."
+msgstr ""
+
 msgid "Allow to access this info"
 msgstr "Zezwól na dostęp do tych informacji"
 
@@ -259,6 +304,9 @@ msgstr "Dozwolone"
 
 msgid "Allowing access"
 msgstr "Udzielanie dostępu"
+
+msgid "Almost there"
+msgstr ""
 
 msgid "Already connected"
 msgstr "Już połączono"
@@ -275,6 +323,12 @@ msgstr "Wprowadza również zmiany w Twoim imieniu."
 msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 msgstr "Konto połączone przez SSO loguje się przez domenę, z którą zostało połączone. To konto jest powiązane z tożsamością, więc nie może być użyte do utworzenia nowej."
 
+msgid "An app added from it cannot finish setting up. Remove it from your Home Screen and add it again from here."
+msgstr ""
+
+msgid "An internal error occurred"
+msgstr ""
+
 msgid "Any local program can connect"
 msgstr "Każdy lokalny program może się połączyć"
 
@@ -283,12 +337,6 @@ msgstr "Każdy program na tym komputerze może wysłać prośbę."
 
 msgid "Applications"
 msgstr "Aplikacje"
-
-msgid "Apps you sign in to will show up here."
-msgstr "Aplikacje, do których się logujesz, pojawią się tutaj."
-
-msgid "Apps you've signed in to with this identity."
-msgstr "Aplikacje, do których zalogowałeś/aś się za pomocą tej tożsamości."
 
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
@@ -302,6 +350,9 @@ msgstr "Ponieważ jesteś aktualnie zalogowany/a przy użyciu tej metody dostęp
 msgid "Ask questions and perform actions across your apps by chatting with AI."
 msgstr "Zadawaj pytania i wykonuj działania w swoich aplikacjach, rozmawiając z AI."
 
+msgid "Ask your administrator to check the provider's OAuth configuration."
+msgstr ""
+
 msgid "Associate an email address with your Internet Identity"
 msgstr "Powiąż adres e-mail z Twoją Internet Identity"
 
@@ -314,20 +365,29 @@ msgstr "Uwierzytelnianie..."
 msgid "Authentication failed"
 msgstr "Uwierzytelnianie nie powiodło się"
 
+msgid "Authentication method not found"
+msgstr ""
+
 msgid "Authentication successful"
 msgstr "Uwierzytelnianie zakończone sukcesem"
 
+msgid "Authorization invalid"
+msgstr ""
+
 msgid "Authorize new device"
 msgstr "Autoryzuj nowe urządzenie"
-
-msgid "Available accounts"
-msgstr "Dostępne konta"
 
 msgid "Back"
 msgstr "Wstecz"
 
 msgid "Back to sign-in options"
 msgstr "Powrót do opcji logowania"
+
+msgid "Back to the steps"
+msgstr ""
+
+msgid "Banners, Sounds, Badges"
+msgstr ""
 
 msgid "Before you continue"
 msgstr "Zanim kontynuujesz"
@@ -337,6 +397,9 @@ msgstr "Zablokowane"
 
 msgid "Body"
 msgstr "Treść"
+
+msgid "Bookmark"
+msgstr ""
 
 msgid "Bookmarks"
 msgstr "Zakładki"
@@ -377,14 +440,14 @@ msgstr "Sprawdź inne domeny:"
 msgid "Checking recovery phrase"
 msgstr "Sprawdzanie frazy odzyskiwania"
 
+msgid "Checking this device"
+msgstr ""
+
 msgid "Checking your order"
 msgstr "Sprawdzanie Twojego zamówienia"
 
 msgid "Checking..."
 msgstr "Sprawdzanie..."
-
-msgid "Choose an account"
-msgstr "Wybierz konto"
 
 msgid "Choose identity, currently {selectedIdentityLabel}"
 msgstr "Wybierz tożsamość, obecnie {selectedIdentityLabel}"
@@ -467,6 +530,9 @@ msgstr "Połączono"
 msgid "Connecting {mcpServer}…"
 msgstr "Łączenie z {mcpServer}…"
 
+msgid "Connecting to your organization"
+msgstr ""
+
 msgid "Connection closed"
 msgstr "Połączenie zamknięte"
 
@@ -506,6 +572,9 @@ msgstr "Skopiowano"
 msgid "Copied to clipboard"
 msgstr "Skopiowano do schowka"
 
+msgid "Copy"
+msgstr ""
+
 msgid "Copy error details"
 msgstr "Skopiuj szczegóły błędu"
 
@@ -517,6 +586,9 @@ msgstr "Kopiuj adres odbiorcy"
 
 msgid "Copy subject"
 msgstr "Kopiuj temat"
+
+msgid "Couldn't connect to your organization"
+msgstr ""
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Nie udało się załadować ustawień SSO z {domainInput}. Poproś administratora SSO o sprawdzenie, czy /.well-known/ii-openid-configuration jest dostępny."
@@ -617,11 +689,20 @@ msgstr "Dostosuj dostęp AI"
 msgid "Default"
 msgstr "Domyślny"
 
+msgid "Delivered securely through id.ai."
+msgstr ""
+
 msgid "Deny"
 msgstr "Odrzuć"
 
 msgid "Deny all"
 msgstr "Odmów wszystkiego"
+
+msgid "Deselect {name}"
+msgstr ""
+
+msgid "Device registration closed"
+msgstr ""
 
 msgid "Devices"
 msgstr "Urządzenia"
@@ -720,6 +801,9 @@ msgctxt "Used as an action word inviting the reader to try or feel something, e.
 msgid "Experience"
 msgstr "Odkryj"
 
+msgid "Expired JWT"
+msgstr ""
+
 msgid "Export JSON"
 msgstr "Eksportuj JSON"
 
@@ -735,11 +819,20 @@ msgstr "Polecane aplikacje"
 msgid "File"
 msgstr "Plik"
 
+msgid "Find {appName}"
+msgstr ""
+
+msgid "Find on Page"
+msgstr ""
+
 msgid "First seen"
 msgstr "Pierwszy raz widziana"
 
 msgid "First sign-in with {name}"
 msgstr "Pierwsze logowanie z {name}"
+
+msgid "Follow these steps to put a new one on your Home Screen:"
+msgstr ""
 
 msgid "Follow these steps to turn them back on:"
 msgstr "Wykonaj te kroki, aby je ponownie włączyć:"
@@ -785,6 +878,12 @@ msgstr "Generowanie frazy..."
 
 msgid "Get notifications from this app when something needs your attention. You can turn them off anytime."
 msgstr "Otrzymuj powiadomienia z tej aplikacji, gdy coś wymaga Twojej uwagi. Możesz je wyłączyć w dowolnym momencie."
+
+msgid "Get notified in this browser when your apps need you."
+msgstr ""
+
+msgid "Get notified on this device when your apps need you."
+msgstr ""
 
 msgid "Get started"
 msgstr "Rozpocznij"
@@ -864,8 +963,14 @@ msgstr "Zapisałem/am to"
 msgid "I'm using the official ICP CLI and I trust this device."
 msgstr "Używam oficjalnego ICP CLI i ufam temu urządzeniu."
 
+msgid "I've already added it"
+msgstr ""
+
 msgid "I've sent the email"
 msgstr "Wysłałem/am e-mail"
+
+msgid "ICP Alerts"
+msgstr ""
 
 msgid "Identities on this device"
 msgstr "Tożsamości na tym urządzeniu"
@@ -969,6 +1074,9 @@ msgstr "Nieprawidłowy kod. Sprawdź i spróbuj ponownie."
 msgid "Invalid domain"
 msgstr "Nieprawidłowa domena"
 
+msgid "Invalid metadata. {0}"
+msgstr ""
+
 msgid "Invalid recovery phrase"
 msgstr "Nieprawidłowa fraza odzyskiwania"
 
@@ -989,6 +1097,9 @@ msgstr "Wygląda na to, że otrzymano nieprawidłowe żądanie uwierzytelnienia.
 
 msgid "It seems like an invalid CLI authentication request was received."
 msgstr "Wygląda na to, że odebrano nieprawidłowe żądanie uwierzytelnienia CLI."
+
+msgid "It seems like registration is unavailable at this moment"
+msgstr ""
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Wygląda na to, że nie udało się nawiązać połączenia z usługą. Spróbuj użyć innej przeglądarki; jeśli problem będzie się powtarzał, skontaktuj się z pomocą techniczną."
@@ -1020,9 +1131,6 @@ msgstr "Język"
 msgid "Last used"
 msgstr "Ostatnio używane"
 
-msgid "Last visited"
-msgstr "Ostatnia wizyta"
-
 msgid "Last visited yesterday"
 msgstr "Ostatnia wizyta wczoraj"
 
@@ -1046,6 +1154,9 @@ msgstr "Pozwól AI uzyskać dostęp do Twoich aplikacji."
 
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "Zezwól narzędziom wiersza poleceń na tym urządzeniu na logowanie się do aplikacji przy użyciu Twojej tożsamości."
+
+msgid "Let your apps notify you"
+msgstr ""
 
 msgid "Let's get started"
 msgstr "Zacznijmy"
@@ -1101,8 +1212,14 @@ msgstr "Upewnij się, że adres URL pochodzi z zaufanego źródła."
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Upewnij się, że dodasz nową metodę dostępu, aby móc zalogować się następnym razem lub zresetować swoją frazę odzyskiwania."
 
+msgid "Manage"
+msgstr ""
+
 msgid "Manage {name}"
 msgstr "Zarządzaj {name}"
+
+msgid "Manage apps"
+msgstr ""
 
 msgid "Manage how other tools connect to your identity."
 msgstr "Zarządzaj sposobem łączenia się innych narzędzi z Twoją tożsamością."
@@ -1124,6 +1241,9 @@ msgstr "Zarządzaj swoją tożsamością Internet Identity"
 
 msgid "Manage your shareable emails. These should be different from your recovery email."
 msgstr "Zarządzaj swoimi udostępnialnymi adresami e-mail. Powinny być inne niż Twój adres e-mail do odzyskiwania."
+
+msgid "Markup"
+msgstr ""
 
 msgid "Maximum length is 32 characters."
 msgstr "Maksymalna długość to 32 znaki."
@@ -1161,6 +1281,12 @@ msgstr "Nazwa:"
 msgid "New message"
 msgstr "Nowa wiadomość"
 
+msgid "New Tab"
+msgstr ""
+
+msgid "No apps yet"
+msgstr ""
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Nie są udostępniane żadne dane Google, Microsoft ani Apple dotyczące aplikacji, w których logujesz się za pomocą Internet Identity."
 
@@ -1169,6 +1295,9 @@ msgstr "Brak adresów e-mail"
 
 msgid "No identity found"
 msgstr "Nie znaleziono tożsamości"
+
+msgid "No more additional accounts can be created"
+msgstr ""
 
 msgid "No passkey tests yet"
 msgstr "Brak jeszcze testów kluczy dostępu"
@@ -1200,6 +1329,9 @@ msgstr "Nie zaktualizowano"
 msgid "Not verified"
 msgstr "Nie zweryfikowano"
 
+msgid "Nothing can arrive here until it's set up again. Follow these steps:"
+msgstr ""
+
 msgid "Notification"
 msgstr "Powiadomienie"
 
@@ -1212,8 +1344,17 @@ msgstr "Powiadomienia"
 msgid "Notifications are blocked"
 msgstr "Powiadomienia są zablokowane"
 
+msgid "Notifications are on"
+msgstr ""
+
 msgid "Notifications blocked"
 msgstr "Powiadomienia zablokowane"
+
+msgid "Notifications couldn't be set up on this device. Turn them off and on again on {host} to retry."
+msgstr ""
+
+msgid "Notifications from your apps will show up on this device."
+msgstr ""
 
 msgid "Notifications unavailable"
 msgstr "Powiadomienia niedostępne"
@@ -1221,8 +1362,23 @@ msgstr "Powiadomienia niedostępne"
 msgid "now"
 msgstr "teraz"
 
+msgid "OAuth provider returned \"{0}\""
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
 msgid "Official · Hosted by DFINITY"
 msgstr "Oficjalny · Hostowany przez DFINITY"
+
+msgid "OISY Wallet · Payment received"
+msgstr ""
+
+msgid "On because you said this device already has the app. Turn this off and on again if it does not."
+msgstr ""
+
+msgid "On for this device"
+msgstr ""
 
 msgid "On this computer"
 msgstr "Na tym komputerze"
@@ -1230,17 +1386,50 @@ msgstr "Na tym komputerze"
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "Po włączeniu każde narzędzie wiersza poleceń na tym urządzeniu może używać Twojej tożsamości do logowania się do aplikacji."
 
+msgid "One more tap opens the app that sent you this notification."
+msgstr ""
+
 msgid "One or more words are wrong or out of order."
 msgstr "Jedno lub więcej słów jest nieprawidłowych lub w złej kolejności."
 
 msgid "Only add trusted connectors"
 msgstr "Dodawaj tylko zaufane konektory"
 
+msgid "Only apps you allow can notify you."
+msgstr ""
+
 msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
 msgstr "Kontynuuj tylko wtedy, gdy rozpoznajesz te domeny. Jeśli aplikacja lub przewodnik poprosił/-a cię o wpisanie nieznanej domeny, zatrzymaj się tutaj i użyj domeny podanej przez twoją organizację."
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Włącz to tylko dla oficjalnego <0>ICP CLI</0>. Jeśli nie masz pewności, zainstaluj je ponownie z <1>oficjalnego źródła</1>."
+
+msgid "Open {host}"
+msgstr ""
+
+msgid "Open {host} settings"
+msgstr ""
+
+msgid "Open {host} whenever you want to turn notifications on."
+msgstr ""
+
+msgid "Open {host}, sign in, and turn notifications on. It will show you how to add the app back."
+msgstr ""
+
+msgid "Open {host}, sign in, and turn notifications on. It will show you how to add the app."
+msgstr ""
+
+msgid "Open {name}"
+msgstr ""
+
+msgid "Open {NOTIFICATION_APP_NAME}"
+msgstr ""
+
+msgid "Open {NOTIFICATION_APP_NAME} and tap Allow when it asks you."
+msgstr ""
+
+msgid "Open as Web App"
+msgstr ""
 
 msgid "Open in browser"
 msgstr "Otwórz w przeglądarce"
@@ -1254,6 +1443,12 @@ msgstr "Otwórz w aplikacji pocztowej"
 msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
 msgstr "Otwórz Internet Identity w nowej karcie, aby zarządzać metodami dostępu i opcjami odzyskiwania."
 
+msgid "Open it from your Home Screen and allow notifications there."
+msgstr ""
+
+msgid "Open it once to finish"
+msgstr ""
+
 msgid "Open manage"
 msgstr "Otwórz zarządzanie"
 
@@ -1262,6 +1457,12 @@ msgstr "Otwórz menu"
 
 msgid "Open notification settings"
 msgstr "Otwórz ustawienia powiadomień"
+
+msgid "Open notifications"
+msgstr ""
+
+msgid "Open or manage apps you've granted permissions."
+msgstr ""
 
 msgid "Open permissions"
 msgstr "Otwórz uprawnienia"
@@ -1280,6 +1481,12 @@ msgstr "Otwórz uprawnienia witryny"
 
 msgid "Open site settings"
 msgstr "Otwórz ustawienia witryny"
+
+msgid "Open the menu"
+msgstr ""
+
+msgid "Operation canceled"
+msgstr ""
 
 msgid "Or sign in with another identity"
 msgstr "Lub zaloguj się inną tożsamością"
@@ -1323,11 +1530,17 @@ msgstr "Klucze dostępu wykorzystują klucze kryptograficzne przechowywane na Tw
 msgid "Password-free"
 msgstr "Bez hasła"
 
+msgid "Payments, votes and messages from the apps you use, right on this device."
+msgstr ""
+
 msgid "Permissions"
 msgstr "Uprawnienia"
 
 msgid "Permissions for {host}"
 msgstr "Uprawnienia dla {host}"
+
+msgid "Photos"
+msgstr ""
 
 msgid "Pick a recovery method below to sign back in."
 msgstr "Wybierz poniżej metodę odzyskiwania, aby zalogować się ponownie."
@@ -1364,6 +1577,9 @@ msgstr "Tylko pytania"
 
 msgid "Reachable MCP server"
 msgstr "Dostępny serwer MCP"
+
+msgid "Reading List"
+msgstr ""
 
 msgid "Real privacy"
 msgstr "Prawdziwa prywatność"
@@ -1413,6 +1629,9 @@ msgstr "Zapamiętać tę przeglądarkę?"
 msgid "Reminder"
 msgstr "Przypomnienie"
 
+msgid "Reminders"
+msgstr ""
+
 msgid "Remote server"
 msgstr "Zdalny serwer"
 
@@ -1422,8 +1641,17 @@ msgstr "Usuń"
 msgid "Remove {0}"
 msgstr "Usuń {0}"
 
+msgid "Remove {name}?"
+msgstr ""
+
 msgid "Remove and sign out"
 msgstr "Usuń i wyloguj się"
+
+msgid "Remove app"
+msgstr ""
+
+msgid "Remove apps"
+msgstr ""
 
 msgid "Remove email"
 msgstr "Usuń e-mail"
@@ -1440,6 +1668,12 @@ msgstr "Usunąć e-mail do odzyskiwania?"
 msgid "Remove the connector to revoke AI access."
 msgstr "Usuń konektor, aby cofnąć dostęp AI."
 
+msgid "Remove this app"
+msgstr ""
+
+msgid "Remove this app from your Home Screen, then open {host} and turn notifications on again to add it back."
+msgstr ""
+
 msgid "Removing and signing out..."
 msgstr "Usuwanie i wylogowywanie..."
 
@@ -1451,6 +1685,9 @@ msgstr "Usuwanie klucza dostępu..."
 
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 msgstr "Usunięcie tego klucza dostępu oznacza, że nie będziesz mógł/mogła go już używać do logowania. Zawsze możesz dodać nowy później."
+
+msgid "Removing..."
+msgstr ""
 
 msgid "Removing…"
 msgstr "Usuwanie…"
@@ -1557,6 +1794,9 @@ msgstr "Bezpieczne łączenie Twojej tożsamości z serwerem."
 msgid "See where you're signed in to apps and sign out remotely."
 msgstr "Sprawdź, gdzie jesteś zalogowany w aplikacjach, i wyloguj się zdalnie."
 
+msgid "Select {name}"
+msgstr ""
+
 msgid "Select <0>Blocked ×</0> to clear it."
 msgstr "Wybierz <0>Zablokowane ×</0>, aby to usunąć."
 
@@ -1571,6 +1811,9 @@ msgstr "Wybierz <0>Safari</0> › <1>Ustawienia…</1> na pasku menu."
 
 msgid "Select a passkey"
 msgstr "Wybierz klucz dostępu"
+
+msgid "Select apps to remove"
+msgstr ""
 
 msgid "Select each word in the correct order:"
 msgstr "Wybierz każde słowo w odpowiedniej kolejności:"
@@ -1593,14 +1836,20 @@ msgstr "Wysyłaj powiadomienia"
 msgid "Send the email below to confirm."
 msgstr "Wyślij poniższy e-mail, aby potwierdzić."
 
-msgid "Session duration"
-msgstr "Czas trwania sesji"
+msgid "Session"
+msgstr ""
 
 msgid "Session timed out"
 msgstr "Sesja wygasła"
 
 msgid "Set as default sign-in"
 msgstr "Ustaw jako domyślne logowanie"
+
+msgid "Set up {NOTIFICATION_APP_NAME}"
+msgstr ""
+
+msgid "Set up notifications"
+msgstr ""
 
 msgid "Set up recovery email"
 msgstr "Skonfiguruj e-mail do odzyskiwania"
@@ -1619,6 +1868,9 @@ msgstr "Ustawienia"
 
 msgid "Settings…"
 msgstr "Ustawienia…"
+
+msgid "Share"
+msgstr ""
 
 msgid "Share {label}"
 msgstr "Udostępnij {label}"
@@ -1674,6 +1926,12 @@ msgstr "Zaloguj się kluczem dostępu"
 msgid "Sign in with SSO"
 msgstr "Zaloguj się przez SSO"
 
+msgid "Sign in with the domain it is linked through: {registeredDomain}."
+msgstr ""
+
+msgid "Sign in with the domain it was originally linked through."
+msgstr ""
+
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Zaloguj się przy użyciu swojego konta {displayName} z dowolnego urządzenia."
 
@@ -1725,6 +1983,9 @@ msgstr "Logowanie..."
 msgid "Signing out…"
 msgstr "Wylogowywanie…"
 
+msgid "Signs you out and clears its settings."
+msgstr ""
+
 msgid "Simplify your sign-in"
 msgstr "Uprość logowanie"
 
@@ -1741,6 +2002,12 @@ msgstr "Coś jest nieprawidłowe."
 msgid "Something went wrong"
 msgstr "Coś poszło nie tak"
 
+msgid "Something went wrong during registration"
+msgstr ""
+
+msgid "Something went wrong during sign-in"
+msgstr ""
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Coś poszło nie tak podczas tworzenia delegacji. Spróbuj ponownie; jeśli problem będzie się powtarzał, skontaktuj się z pomocą techniczną."
 
@@ -1752,6 +2019,9 @@ msgstr "Coś poszło nie tak podczas udostępniania atrybutów. Spróbuj ponowni
 
 msgid "Something went wrong while signing in with your provider. Close this window and try again."
 msgstr "Coś poszło nie tak podczas logowania przez dostawcę. Zamknij to okno i spróbuj ponownie."
+
+msgid "Sounds & Haptics"
+msgstr ""
 
 msgid "Source code"
 msgstr "Kod źródłowy"
@@ -1767,6 +2037,9 @@ msgstr "Zacznij od nowa"
 
 msgid "Start the connection again from your MCP client. You can close this window."
 msgstr "Rozpocznij połączenie ponownie z klienta MCP. Możesz zamknąć to okno."
+
+msgid "Stay signed in for"
+msgstr ""
 
 msgid "Step 2 of 2"
 msgstr "Krok 2 z 2"
@@ -1846,17 +2119,32 @@ msgstr "Stuknij <0>Powiadomienia</0>."
 msgid "Tap <0>Permissions</0>."
 msgstr "Stuknij <0>Uprawnienia</0>."
 
+msgid "Tap Add to Home Screen"
+msgstr ""
+
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Dotknij <0>paska adresu</0> i <1>otwórz w przeglądarce</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Dotknij podświetlonego przycisku <0>wstecz</0>."
 
+msgid "Tap Share"
+msgstr ""
+
 msgid "Tap the highlighted <0>shield</0> icon."
 msgstr "Stuknij wyróżnioną ikonę <0>tarczy</0>."
 
 msgid "Tap the highlighted <0>site settings</0> icon."
 msgstr "Stuknij wyróżnioną ikonę <0>ustawień witryny</0>."
+
+msgid "Tap to see it in your wallet."
+msgstr ""
+
+msgid "Tap to select"
+msgstr ""
+
+msgid "Tap View More"
+msgstr ""
 
 msgid "Test passkey support"
 msgstr "Testuj obsługę kluczy dostępu"
@@ -1888,6 +2176,9 @@ msgstr "Logowanie CLI nie mogło zostać ukończone. Sprawdź CLI, aby uzyskać 
 msgid "The CLI uses your account in this app."
 msgstr "CLI używa Twojego konta w tej aplikacji."
 
+msgid "The delegation could not be found — please try again."
+msgstr ""
+
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "Strefa DNSSEC musi używać aktualnego algorytmu — RSA/SHA-256, RSA/SHA-512, ECDSA P-256 lub Ed25519. Przestarzałe algorytmy SHA-1 nie są obsługiwane."
 
@@ -1897,11 +2188,23 @@ msgstr "E-mail musi pochodzić bezpośrednio z podanego adresu. Aliasy i przekie
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Integracja z Google, Microsoft i Apple wykorzystuje standardowy protokół uwierzytelniania o nazwie OpenID. Jest to ten sam protokół, którego inne aplikacje używają do logowania się za pomocą Google."
 
+msgid "The interaction was canceled or timed out. Please try again."
+msgstr ""
+
+msgid "The JWT has expired — please try again in a few minutes."
+msgstr ""
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "Najbardziej niezawodna kopia zapasowa. Przechowywana wyłącznie przez Ciebie, na papierze. Nie jest zależna od żadnego konta, usługi ani dostawcy, i tylko Ty możesz jej używać, stracić lub ją zastąpić."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "Fraza została wprowadzona poprawnie, ale należy do produktu innego niż Internet Identity."
+
+msgid "There is nothing here to open."
+msgstr ""
+
+msgid "There was an error verifying your account — please try again."
+msgstr ""
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Wystąpił problem z połączeniem z aplikacją. Spróbuj użyć innej przeglądarki; jeśli problem się utrzyma, skontaktuj się z deweloperem."
@@ -1924,17 +2227,35 @@ msgstr "To konto {resolvedProviderName} jest już połączone z Internet Identit
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 msgstr "To konto {resolvedProviderName} nie jest jeszcze połączone z Internet Identity."
 
+msgid "This account has already been unlinked"
+msgstr ""
+
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "To konto jest już powiązane z Twoją tożsamością. Twoja aktywna metoda dostępu zostanie na nie przełączona."
 
+msgid "This account is already linked to another identity"
+msgstr ""
+
+msgid "This account is linked through a different SSO domain"
+msgstr ""
+
+msgid "This account isn't linked to an identity"
+msgstr ""
+
 msgid "this app"
 msgstr "ta aplikacja"
+
+msgid "This app can't be connected to your identity. Adding it again gives it what it needs:"
+msgstr ""
 
 msgid "This app has moved to the new Internet Identity"
 msgstr "Ta aplikacja została przeniesiona do nowego Internet Identity"
 
 msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
 msgstr "Ta aplikacja prosi o Twój adres e-mail. Możesz teraz zweryfikować adres e-mail i udostępnić go lub pominąć i kontynuować bez udostępniania."
+
+msgid "This app isn't connected"
+msgstr ""
 
 msgid "This browser"
 msgstr "Ta przeglądarka"
@@ -1960,11 +2281,20 @@ msgstr "To jest już Twój adres e-mail do odzyskiwania."
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "Jest to teraz domyślna metoda uwierzytelniania używana na tym urządzeniu."
 
+msgid "This is taking longer than usual."
+msgstr ""
+
 msgid "This is the access method you're currently signed in with."
 msgstr "Jest to metoda dostępu, za pomocą której jesteś aktualnie zalogowany/a."
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "To jest metoda odzyskiwania, za pomocą której jesteś aktualnie zalogowany/a."
+
+msgid "This link didn't work"
+msgstr ""
+
+msgid "This link has expired"
+msgstr ""
 
 msgid "This may take a few seconds"
 msgstr "Może to potrwać kilka sekund"
@@ -2017,6 +2347,12 @@ msgstr "Aby dokończyć konfigurowanie klucza dostępu, postępuj zgodnie z inst
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Aby AI mogło zadawać pytania i wykonywać działania w Twoich aplikacjach, dodaj zaufany <0>konektor MCP</0>."
 
+msgid "Too many attempts or time has expired."
+msgstr ""
+
+msgid "Touch and hold the {NOTIFICATION_APP_NAME} icon on your Home Screen, then tap Remove App."
+msgstr ""
+
 msgid "Trusted connector"
 msgstr "Zaufany konektor"
 
@@ -2025,6 +2361,9 @@ msgstr "Wypróbuj inny adres"
 
 msgid "Try again"
 msgstr "Spróbuj ponownie"
+
+msgid "Try again in {duration}"
+msgstr ""
 
 msgid "Turn on <0>Notifications</0>."
 msgstr "Włącz <0>Powiadomienia</0>."
@@ -2062,8 +2401,17 @@ msgstr "Zrozumienie Internet Identity"
 msgid "Undo"
 msgstr "Cofnij"
 
+msgid "Unexpected error"
+msgstr ""
+
+msgid "Unhandled error"
+msgstr ""
+
 msgid "Unknown"
 msgstr "Nieznany"
+
+msgid "Unknown error"
+msgstr ""
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
 msgstr "W przeciwieństwie do wielu systemów uwierzytelniania Web3, które wymagają ręcznego podpisywania każdej czynności, Internet Identity tworzy uwierzytelnione sesje dla każdej aplikacji. Zapewnia to zarówno bezpieczeństwo, jak i wygodę (bez wielokrotnego podpisywania), jednocześnie nadając każdej sesji własną tożsamość."
@@ -2088,9 +2436,6 @@ msgstr "Odblokuj, aby kontynuować"
 
 msgid "Unsupported browser"
 msgstr "Nieobsługiwana przeglądarka"
-
-msgid "until you have to sign in again"
-msgstr "do ponownego logowania"
 
 msgid "Unverified origin"
 msgstr "Niezweryfikowane pochodzenie"
@@ -2179,8 +2524,14 @@ msgstr "Weryfikowanie…"
 msgid "View"
 msgstr "Wyświetl"
 
+msgid "View More"
+msgstr ""
+
 msgid "View your last used identities"
 msgstr "Zobacz swoje ostatnio używane tożsamości"
+
+msgid "Waiting for permission"
+msgstr ""
 
 msgid "Waiting for your existing device"
 msgstr "Oczekiwanie na Twoje istniejące urządzenie"
@@ -2190,6 +2541,9 @@ msgstr "Oczekiwanie na Twoje nowe urządzenie"
 
 msgid "Waiting to receive…"
 msgstr "Oczekiwanie na odbiór…"
+
+msgid "Wallpaper"
+msgstr ""
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "Nie możemy jeszcze zweryfikować poczty z <0>{domain}</0>. Wypróbuj inny adres. Gmail, iCloud, Outlook, Fastmail i Proton wszystkie działają."
@@ -2236,6 +2590,9 @@ msgstr "Dlaczego to widzę?"
 msgid "Why isn't this supported?"
 msgstr "Dlaczego to nie jest obsługiwane?"
 
+msgid "Will be removed"
+msgstr ""
+
 msgid "with your identity in this app"
 msgstr "z Twoją tożsamością w tej aplikacji"
 
@@ -2278,6 +2635,12 @@ msgstr "Możesz ją dodać z powrotem w dowolnym momencie, logując się tym sam
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "Możesz ją dodać z powrotem w dowolnym momencie, logując się tym samym kluczem dostępu."
 
+msgid "You can close this page."
+msgstr ""
+
+msgid "You can close this tab"
+msgstr ""
+
 msgid "You can close this window."
 msgstr "Możesz zamknąć to okno."
 
@@ -2295,6 +2658,12 @@ msgstr "Możesz wrócić do swojego agenta."
 
 msgid "You can sign in again at any time."
 msgstr "Możesz zalogować się ponownie w dowolnym momencie."
+
+msgid "You can sign in to it again at any time."
+msgstr ""
+
+msgid "You can sign in to them again at any time."
+msgstr ""
 
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "Możesz jej teraz użyć do odzyskiwania, ale sprawdź, czy zapisałeś/aś ją poprawnie, aby móc na niej polegać później."
@@ -2320,6 +2689,24 @@ msgstr "Wcześniej zarejestrowano się przy użyciu innej metody dostępu."
 msgid "You unlinked this {resolvedProviderName} account from your identity."
 msgstr "Usunąłeś/aś powiązanie tego konta {resolvedProviderName} ze swoją tożsamością."
 
+msgid "You'll be signed out and its permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out and permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out and their permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out of {name} and it will no longer be able to notify you."
+msgstr ""
+
+msgid "You'll be signed out of these apps and they will no longer be able to notify you."
+msgstr ""
+
+msgid "You'll get alerts from your apps here."
+msgstr ""
+
 msgid "You're about to authorize a new device."
 msgstr "Zamierzasz autoryzować nowe urządzenie."
 
@@ -2331,6 +2718,9 @@ msgstr "Logowanie..."
 
 msgid "You're about to unlink your {providerName} account."
 msgstr "Zamierzasz usunąć powiązanie swojego konta {providerName}."
+
+msgid "You're all set"
+msgstr ""
 
 msgid "You're all set. Your identity has been created."
 msgstr "Wszystko gotowe. Twoja tożsamość została utworzona."
@@ -2346,6 +2736,12 @@ msgstr "Logujesz się jako <0>{name}</0>."
 
 msgid "You've already verified this email."
 msgstr "Ten adres e-mail został już zweryfikowany."
+
+msgid "You've been signed out and it can no longer notify you."
+msgstr ""
+
+msgid "You've been signed out and they can no longer notify you."
+msgstr ""
 
 msgid "You've never used this {resolvedProviderName} account with Internet Identity."
 msgstr "Nigdy nie używałeś/aś tego konta {resolvedProviderName} z Internet Identity."

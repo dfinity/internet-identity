@@ -6,32 +6,53 @@ import { NOTIFICATION_APP_PATH } from "../appPath";
 /** The page that hands the link over, inside the app's scope so it opens in the app. */
 const DOORWAY = `${NOTIFICATION_APP_PATH}/open`;
 
-/** The registration is shared with the browser that installed the app, but storage is not: an app key exists only in the app's own partition.
- * Storage that will not answer is taken for the app, since opening the link directly there strands the user in the in-app browser view. */
+/**
+ * The doorway exists for one platform. iOS gives a standalone app an in-app browser
+ * view for another origin, and nowhere else does, so nowhere else should be sent
+ * through a page whose only job is to hand a link to Safari.
+ *
+ * Checked first, because what is stored cannot answer this on its own: a desktop
+ * browser shares a storage partition with an installed app of the same origin, so a
+ * tab reads as the app there. On iOS the app has a partition of its own, which is
+ * what makes the stored answer meaningful at all.
+ */
+export const onIos = (): boolean =>
+  /iPhone|iPod|iPad/.test(navigator.userAgent);
+
 const isTheApp = async (): Promise<boolean> => {
+  if (!onIos()) {
+    return false;
+  }
   const stored = await readAppKey();
   switch (stored.kind) {
     case "key":
-      return true;
+      return stored.record.installed === true;
     case "no-key":
       return false;
     case "unreadable":
-      return true;
+      return false;
   }
 };
 
-/** What the doorway shows and where it sends them. The fragment never leaves the device, so the notification's own words travel in it. */
+/**
+ * Where a click should go, and which of the two jobs opening it is.
+ *
+ * `inTheApp` is the installed iOS app, which has one window and cannot open another
+ * origin without stranding the user in an in-app view: it is pointed at the doorway,
+ * a page of its own that hands the link to Safari. Anything else is a browser, which
+ * opens the app's link and needs none of that.
+ */
 export const openable = async (
   url: string,
   shown?: { title: string; body: string },
-): Promise<string> => {
+): Promise<{ url: string; inTheApp: boolean }> => {
   if (!url.startsWith("https:") || !(await isTheApp())) {
-    return url;
+    return { url, inTheApp: false };
   }
   const carried = new URLSearchParams({ url });
   if (shown !== undefined) {
     carried.set("title", shown.title);
     carried.set("body", shown.body);
   }
-  return `${DOORWAY}#${carried.toString()}`;
+  return { url: `${DOORWAY}#${carried.toString()}`, inTheApp: true };
 };

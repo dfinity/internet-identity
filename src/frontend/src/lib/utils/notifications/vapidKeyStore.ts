@@ -20,6 +20,12 @@ export interface StoredVapidKey {
   privateKey: CryptoKey;
   /** Uncompressed public key (65 bytes), the applicationServerKey. */
   publicKeyRaw: Uint8Array;
+  /** The app record this endpoint is already registered under, as the canister took it.
+   *  A subscription belongs to the app rather than to an identity, so identities coming
+   *  and going leave it standing. An endpoint survives a launch too, so registering it
+   *  again says nothing new; what replaces it is the permission being refused and
+   *  granted afresh, which mints another subscription. */
+  registeredForApp?: string;
 }
 
 export const storeVapidKey = (record: StoredVapidKey): Promise<void> =>
