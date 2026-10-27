@@ -81,7 +81,7 @@ const ORIGIN = "https://app.example";
 const SENDER = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
 
 const notification = {
-  origin: ORIGIN,
+  origin: [ORIGIN] as [] | [string],
   account_number: [] as [],
   canister_id: SENDER,
   id: BigInt(42),
