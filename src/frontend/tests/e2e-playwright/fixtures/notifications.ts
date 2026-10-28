@@ -169,7 +169,7 @@ export const armPushNotifications = async (
   options: PushBrowserOptions = {},
 ): Promise<void> => {
   await context.addInitScript(
-    ({ endpoint, initialPermission, stateKey }) => {
+    ({ endpoint, initialPermission, stateKey, p256dh, auth }) => {
       // A real browser keeps both for the origin, not for the page, and the ceremony
       // runs in a window opened after the scenario starts. Kept where that window
       // finds them, so "this browser is already set up" is reachable.
@@ -213,6 +213,12 @@ export const armPushNotifications = async (
               remember();
               return Promise.resolve(true);
             },
+            // A registration derives what seals its payloads from these, so a stub
+            // without them is one no identity can register from.
+            getKey: (name: string) =>
+              name === "auth"
+                ? new Uint8Array(auth).buffer
+                : new Uint8Array(p256dh).buffer,
           } as unknown as { endpoint: string };
           remember();
           return Promise.resolve(subscription);
@@ -271,6 +277,8 @@ export const armPushNotifications = async (
       endpoint: RELAY_ENDPOINT,
       initialPermission: options.permission ?? "default",
       stateKey: STATE_KEY,
+      p256dh: [...subscriberKeys().publicKey],
+      auth: [...AUTH_SECRET],
     },
   );
 
