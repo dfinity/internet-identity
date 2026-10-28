@@ -16,7 +16,6 @@ import { browserAppStatus } from "$lib/utils/notifications/appStatus";
 import { deviceHasDonorIdentity } from "./deviceApp";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
-import { loadVapidKey } from "./vapidKeyStore";
 import { recordPermission } from "./notificationDiagnostics";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
@@ -72,15 +71,10 @@ export const readBrowserPushState = async (): Promise<
       return { supported, permission };
     }
     const subscription = await currentDeviceSubscription();
-    const stored = await loadVapidKey();
-    const live =
-      subscription !== undefined &&
-      stored !== undefined &&
-      stored.endpoint === subscription.endpoint;
     return {
       supported,
       permission,
-      endpoint: live ? stored.endpoint : undefined,
+      endpoint: subscription?.endpoint,
     };
   } catch (error) {
     console.error(error);

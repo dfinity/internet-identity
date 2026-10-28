@@ -2,10 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mocked before the unit is imported: every one of these reaches for a browser
 // (IndexedDB, the push manager, WebCrypto) and what is under test is which of
 // them the registration decides to use.
-vi.mock("./vapidKeyStore", () => ({
-  loadVapidKey: vi.fn(),
-  storeVapidKey: vi.fn(() => Promise.resolve()),
-}));
 vi.mock("./pushSubscription", () => ({
   currentDeviceSubscription: vi.fn(),
   relayOriginOf: vi.fn(() => "https://relay.example"),
@@ -23,12 +19,14 @@ vi.mock("./payloadKeys", () => ({
     }),
 }));
 vi.mock("./vapidPool", () => ({
-  generateVapidKeypair: vi.fn(() =>
-    Promise.resolve({ publicKeyRaw: new Uint8Array([9]), privateKey: {} }),
-  ),
-  signJwtPool: vi.fn(() => Promise.resolve([new Uint8Array([1])])),
+  relayOriginOf: vi.fn(() => "https://relay.example"),
 }));
 vi.mock("./browserActor", () => ({
+  anonymousActor: vi.fn(() =>
+    Promise.resolve({
+      get_vapid_public_key: () => Promise.resolve([new Uint8Array(65)]),
+    }),
+  ),
   browserKeyActor: vi.fn(() => Promise.resolve({ set_webpush_subscription })),
 }));
 
@@ -36,11 +34,6 @@ import {
   ensureRegisteredDevice,
   registerForAnyAnchor,
 } from "./subscribeDevice";
-import {
-  loadVapidKey,
-  storeVapidKey,
-  type StoredVapidKey,
-} from "./vapidKeyStore";
 import { currentDeviceSubscription, subscribeToPush } from "./pushSubscription";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -54,16 +47,8 @@ const set_webpush_subscription = vi.hoisted(() =>
   vi.fn((_args: { endpoint: string }) => Promise.resolve({ Ok: null })),
 );
 
-const stored = vi.mocked(loadVapidKey);
 const live = vi.mocked(currentDeviceSubscription);
 const subscribe = vi.mocked(subscribeToPush);
-
-const heldKey = (endpoint: string) =>
-  ({
-    endpoint,
-    privateKey: {},
-    publicKeyRaw: new Uint8Array([9]),
-  }) as unknown as StoredVapidKey;
 
 describe("ensureRegisteredDevice", () => {
   beforeEach(() => {
@@ -74,7 +59,6 @@ describe("ensureRegisteredDevice", () => {
   // Subscribing drops the endpoint every other identity on this browser is
   // registered with, so a second identity has to register what is already there.
   it("registers the subscription this browser already holds", async () => {
-    stored.mockResolvedValue(heldKey(HELD));
     live.mockResolvedValue({ endpoint: HELD } as PushSubscription);
     await ensureRegisteredDevice(IDENTITY);
 
@@ -82,25 +66,6 @@ describe("ensureRegisteredDevice", () => {
     expect(set_webpush_subscription.mock.calls[0][0]).toMatchObject({
       endpoint: HELD,
     });
-  });
-
-  it("subscribes afresh when the key it holds names a dead endpoint", async () => {
-    stored.mockResolvedValue(heldKey(HELD));
-    live.mockResolvedValue(undefined);
-    await ensureRegisteredDevice(IDENTITY);
-
-    expect(subscribe).toHaveBeenCalledOnce();
-    expect(set_webpush_subscription.mock.calls[0][0]).toMatchObject({
-      endpoint: FRESH,
-    });
-  });
-
-  it("subscribes afresh for a browser that holds nothing", async () => {
-    stored.mockResolvedValue(undefined);
-    live.mockResolvedValue(undefined);
-    await ensureRegisteredDevice(IDENTITY);
-
-    expect(subscribe).toHaveBeenCalledOnce();
   });
 });
 
@@ -124,13 +89,10 @@ const refusing = (...anchors: bigint[]) =>
       : Promise.resolve({ Ok: null }),
   );
 
-const kept = vi.mocked(storeVapidKey);
-
-describe("registerForAnyAnchor", () => {
+const kept = describe("registerForAnyAnchor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     subscribe.mockResolvedValue({ endpoint: FRESH } as PushSubscription);
-    stored.mockResolvedValue(heldKey(HELD));
     live.mockResolvedValue({ endpoint: HELD } as PushSubscription);
     appCalls.mockResolvedValue({ Ok: null });
   });
@@ -157,7 +119,6 @@ describe("registerForAnyAnchor", () => {
   });
 
   it("mints one subscription for the whole walk", async () => {
-    stored.mockResolvedValue(undefined);
     live.mockResolvedValue(undefined);
     refusing(IDENTITY);
 
@@ -174,16 +135,6 @@ describe("registerForAnyAnchor", () => {
     await expect(registerForAnyAnchor([IDENTITY, OTHER], app)).resolves.toBe(
       false,
     );
-  });
-
-  it("keeps a minted key only once the canister has taken it", async () => {
-    stored.mockResolvedValue(undefined);
-    live.mockResolvedValue(undefined);
-    refusing(IDENTITY, OTHER);
-
-    await registerForAnyAnchor([IDENTITY, OTHER], app);
-
-    expect(kept).not.toHaveBeenCalled();
   });
 
   it.each([{ StaleJwtPool: null }, { InternalCanisterError: "no room" }])(

@@ -30,3 +30,12 @@ export const browserKeyActor = async (
     canisterId,
   });
 };
+
+/** An actor for what anyone may ask: the VAPID key is the same for every browser. */
+export const anonymousActor = (): Promise<ActorSubclass<_SERVICE>> =>
+  Promise.resolve(
+    Actor.createActor<_SERVICE>(internetIdentityIDL, {
+      agent: HttpAgent.createSync(agentOptions),
+      canisterId,
+    }),
+  );

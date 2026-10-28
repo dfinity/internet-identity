@@ -1,7 +1,7 @@
 // Browser-side Web Push subscription: register the push service worker, ask for
-// permission, and subscribe with the VAPID public key. The relay binds the subscription
-// to that key and accepts only pushes carrying a JWT signed by its private half (see
-// vapidPool).
+// permission, and subscribe with Internet Identity's own VAPID key. The relay binds the
+// subscription to that key and accepts only pushes carrying a JWT signed by its private
+// half, which is a threshold key the canister holds.
 //
 // The subscription's own p256dh and auth keys are what a wake-up's payload is sealed
 // against; see payloadKeys.

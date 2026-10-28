@@ -302,8 +302,7 @@ export interface PushRelay {
   /** Resolves once the canister has posted at least `count` wake-ups. */
   waitForWakeUps: (count: number) => Promise<void>;
   received: () => number;
-  /** What each wake-up carried, opened with the subscription's keys, in order, and
-   *  empty for one that carried nothing. One entry per wake-up received. */
+  /** What the wake-ups carried, opened with the subscription's keys, in order. */
   payloads: () => string[];
   /** The paths the canister posted wake-ups to, in order.
    *
@@ -342,12 +341,9 @@ export const startPushRelay = async (): Promise<PushRelay> => {
     request.on("end", () => {
       received += 1;
       paths.push(request.url ?? "");
-      // One entry per wake-up, empty where it carried nothing: a probe asks an app to
-      // prove it is there and names no notification, and a caller counting wake-ups has
-      // to find the same number of payloads or it delivers a stale one.
-      payloads.push(
-        chunks.length > 0 ? openPayload(Buffer.concat(chunks)) : "",
-      );
+      if (chunks.length > 0) {
+        payloads.push(openPayload(Buffer.concat(chunks)));
+      }
       if (gone) {
         // What a push service answers for a subscription that no longer exists.
         response.writeHead(410).end();

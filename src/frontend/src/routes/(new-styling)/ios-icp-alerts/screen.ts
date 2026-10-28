@@ -16,8 +16,6 @@ import {
   rememberInstalled,
   rememberSpentFragment,
 } from "$lib/utils/notifications/notificationAppKey";
-import { alreadyRegistered } from "$lib/utils/notifications/subscribeDevice";
-import { loadVapidKey } from "$lib/utils/notifications/vapidKeyStore";
 import { currentDeviceSubscription } from "$lib/utils/notifications/pushSubscription";
 
 export type Screen =
@@ -154,13 +152,8 @@ export const launchWillWrite = async (hash: string): Promise<boolean> => {
     if (hash !== "" && spentFragment !== hash) {
       return true;
     }
-    const key = await loadVapidKey();
-    if (key === undefined || !alreadyRegistered(key, appId)) {
-      return true;
-    }
-    // An endpoint the browser has replaced since is one it will register afresh.
-    const live = await currentDeviceSubscription();
-    return live?.endpoint !== key.endpoint;
+    // A browser holding no subscription is one that will make and register one.
+    return (await currentDeviceSubscription()) === undefined;
   } catch {
     return true;
   }

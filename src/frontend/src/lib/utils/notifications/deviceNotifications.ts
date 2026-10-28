@@ -1,13 +1,11 @@
 // Keeps this browser's push registration healthy. The device toggle owns the
 // subscription; per-app consent is a separate list and is never touched here.
 
-import { windowsRemaining } from "./vapidPool";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import {
   registerStoredDevice,
   subscribeAndRegisterDevice,
 } from "./subscribeDevice";
-import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { notificationsTurnedOff } from "./turnedOff";
 
@@ -18,10 +16,6 @@ export { currentDeviceSubscription };
  * subscription, so the canister stops knowing a dead endpoint. No-op for a browser
  * that never turned notifications on.
  *
- * Keeping the JWT pool stocked is the service worker's, on every wake-up (see
- * `poolRefill`). What is left here is the pool that has run out: the canister cannot
- * wake a browser whose pool is spent, so the worker would never get the chance to
- * sign another one.
  */
 export const reconcileDeviceNotifications = async (
   identityNumber: bigint,
@@ -34,28 +28,10 @@ export const reconcileDeviceNotifications = async (
     return;
   }
   const subscription = await currentDeviceSubscription();
-  const stored = await loadVapidKey();
-  if (subscription === undefined && stored === undefined) {
-    return;
-  }
 
-  // The canister knows this browser only if the live subscription matches the key we
-  // still hold. Anything else means subscribe and register afresh.
-  if (
-    subscription === undefined ||
-    stored === undefined ||
-    stored.endpoint !== subscription.endpoint
-  ) {
-    // Re-subscribing overwrites the same row, so a rotated endpoint needs no removal.
-    // Checked again first, for the same reason as below: the reads above are awaited.
-    if (await notificationsTurnedOff(identityNumber)) {
-      return;
-    }
-    await subscribeAndRegisterDevice(identityNumber);
-    return;
-  }
-
-  // The browser's subscription is sound, so what is left is this identity's own row.
+  // What the canister holds is what says whether this identity ever turned them on: a
+  // browser with neither a live subscription nor a registration never did, and
+  // subscribing for it here would turn them on by itself.
   // Signed as the browser, which is what the canister reads the registration off, so
   // a browser no sign-in has registered has nothing to ask about.
   let actor;
@@ -70,19 +46,17 @@ export const reconcileDeviceNotifications = async (
   const [status] = await actor.get_webpush_subscription_status({
     anchor_number: identityNumber,
   });
+  if (status === undefined && subscription === undefined) {
+    return;
+  }
   // Nothing registered is what a second identity on this browser looks like, and a
-  // different endpoint is what another identity's re-subscribe left behind. A pool
-  // with nothing left wants the same call, which signs a fresh one. Either way,
+  // different endpoint is what another identity's re-subscribe left behind. Either way,
   // register what the browser already holds rather than rotating it away.
-  const needsRegistering =
-    status === undefined ||
-    status.endpoint !== stored.endpoint ||
-    windowsRemaining({
-      poolLen: status.pool_len,
-      issuedAtNs: status.issued_at_ns,
-      nowNs: BigInt(Date.now()) * BigInt(1_000_000),
-    }) === 0;
-  if (!needsRegistering) {
+  if (
+    subscription !== undefined &&
+    status !== undefined &&
+    status.endpoint === subscription.endpoint
+  ) {
     return;
   }
   // Read again, because the switch in settings can have been pressed while the status
@@ -91,9 +65,12 @@ export const reconcileDeviceNotifications = async (
   if (await notificationsTurnedOff(identityNumber)) {
     return;
   }
-  const live = await currentDeviceSubscription();
-  if (live === undefined) {
+  // A browser that dropped its subscription makes a new one; one that still holds it
+  // registers what it holds, since re-subscribing would take the endpoint every other
+  // identity here is registered with.
+  if (subscription === undefined) {
+    await subscribeAndRegisterDevice(identityNumber);
     return;
   }
-  await registerStoredDevice(identityNumber, stored, live);
+  await registerStoredDevice(identityNumber, subscription);
 };

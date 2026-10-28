@@ -1,7 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-// vapidKeyStore opens an IndexedDB store at import; the resolver under test
-// never touches it. The decline cooldown is mocked so the logic stays pure.
-vi.mock("./vapidKeyStore", () => ({ loadVapidKey: vi.fn() }));
 vi.mock("./notificationDiagnostics", () => ({ recordPermission: vi.fn() }));
 vi.mock("$lib/utils/describeBrowser", () => ({
   browserAndSystem: vi.fn(() => ({
@@ -38,7 +35,6 @@ import {
 } from "./notificationState";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
-import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
 import type { NotificationAppInfo } from "$lib/generated/internet_identity_types";
@@ -160,11 +156,6 @@ describe("readBrowserPushState and readDeviceState", () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue({
       endpoint: ENDPOINT,
     } as PushSubscription);
-    vi.mocked(loadVapidKey).mockResolvedValue({
-      endpoint: ENDPOINT,
-      privateKey: {} as CryptoKey,
-      publicKeyRaw: new Uint8Array(),
-    });
   });
 
   it("is registered when the canister names the endpoint this browser holds", async () => {
@@ -207,21 +198,6 @@ describe("readBrowserPushState and readDeviceState", () => {
 
   /** The endpoint the browser holds is only ours while we still hold its key:
    *  anything else is another identity's re-subscribe. */
-  it("is not subscribed when the key we kept names another endpoint", async () => {
-    vi.mocked(loadVapidKey).mockResolvedValue({
-      endpoint: "https://relay.example/stale",
-      privateKey: {} as CryptoKey,
-      publicKeyRaw: new Uint8Array(),
-    });
-    await expect(readBrowserPushState()).resolves.toMatchObject({
-      endpoint: undefined,
-    });
-    await expect(deviceState()).resolves.toMatchObject({
-      subscribed: false,
-      registered: false,
-    });
-    expect(browserKeyActor).not.toHaveBeenCalled();
-  });
 
   /** Nothing is on screen yet when this runs, so a failure has to be a value the
    *  resolver can turn into a screen rather than a rejection with nowhere to go. */
@@ -257,11 +233,6 @@ describe("resolveOptIn", () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue({
       endpoint: ENDPOINT,
     } as PushSubscription);
-    vi.mocked(loadVapidKey).mockResolvedValue({
-      endpoint: ENDPOINT,
-      privateKey: {} as CryptoKey,
-      publicKeyRaw: new Uint8Array(),
-    });
     vi.mocked(browserKeyActor).mockResolvedValue({
       get_webpush_subscription_status: vi.fn(() =>
         Promise.resolve([
@@ -409,11 +380,6 @@ describe("readGranted", () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue({
       endpoint: ENDPOINT,
     } as PushSubscription);
-    vi.mocked(loadVapidKey).mockResolvedValue({
-      endpoint: ENDPOINT,
-      privateKey: {} as CryptoKey,
-      publicKeyRaw: new Uint8Array(),
-    });
     registeredOn(ENDPOINT);
   });
 
