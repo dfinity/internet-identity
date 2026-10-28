@@ -579,7 +579,6 @@ fn enable_notification_app(
         anchor_number,
         browser_id,
         NotificationEvent::NotificationsOn(identity),
-        notifications::dispatch::IdentityNotification::Probe,
         now_ns,
     ) {
         Some(probe) => Ok(probe),
@@ -675,7 +674,6 @@ fn probe_notification_app(
         request.anchor_number,
         browser_id,
         NotificationEvent::NotificationsOn(identity_for_notification(&anchor)),
-        notifications::dispatch::IdentityNotification::Probe,
         now_ns,
     )
     .ok_or(ProbeNotificationAppError::NotReachable)

@@ -311,13 +311,8 @@ fn fan_out_to_destinations(
                 continue;
             };
             let app = routed_app(storage, browser);
-            let address = match pending.kind {
-                IdentityNotification::News => wake_up_address(browser, app.as_ref(), now_ns),
-                IdentityNotification::Probe => app
-                    .as_ref()
-                    .and_then(|app| app_wake_up_address(browser, app, now_ns)),
-            };
-            let Some((subscription, jwt, target)) = address else {
+            let Some((subscription, jwt, target)) = wake_up_address(browser, app.as_ref(), now_ns)
+            else {
                 continue;
             };
             let queued = InboxNotification {
@@ -506,19 +501,6 @@ fn fan_out_to_browsers(
 /// It says something just happened, so one reaching a device a day later says nothing true.
 const IDENTITY_NOTIFICATION_TTL_NS: u64 = 60 * 60 * SECOND_NS;
 
-/// What one of Internet Identity's own notifications is for, and so where it may go.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum IdentityNotification {
-    /// It goes wherever this entry is delivered, its own registration included, which is
-    /// how an app's notification is addressed too. What every Internet Identity
-    /// notification beyond the install probe is addressed by; nothing builds one yet.
-    #[allow(dead_code)]
-    News,
-    /// It goes to the app's record and nowhere else. Its id is kept on the entry, so the
-    /// page watching is told about its own probe.
-    Probe,
-}
-
 /// Submits one of Internet Identity's own wake-ups for one entry. Silent where the entry
 /// cannot be woken or the identity's own share of the backlog is full.
 ///
@@ -529,7 +511,6 @@ pub(crate) fn notify_identity(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     event: NotificationEvent,
-    kind: IdentityNotification,
     now_ns: Timestamp,
 ) -> Option<NotificationId> {
     if !notifications_enabled() {
@@ -542,15 +523,15 @@ pub(crate) fn notify_identity(
             .iter()
             .find(|browser| browser.id == browser_id)?
             .clone();
-        // Read for the refusal alone: an entry with no address this kind can reach has
-        // nothing to be told, so nothing is queued for it. The address the post uses is
-        // resolved again when the pass expands this.
+        // Read for the refusal alone: an entry with no address has nothing to be told, so
+        // nothing is queued for it. The address the post uses is resolved again when the
+        // pass expands this.
         let app = routed_app(storage, &browser);
-        match kind {
-            IdentityNotification::News => wake_up_address(&browser, app.as_ref(), now_ns)?,
-            IdentityNotification::Probe => app_wake_up_address(&browser, app.as_ref()?, now_ns)?,
-        };
+        wake_up_address(&browser, app.as_ref(), now_ns)?;
 
+        // Asked before the event is handed over, which is the whole point of reading it
+        // off the event rather than off a second argument.
+        let proves_the_app_is_reachable = event.proves_the_app_is_reachable();
         let notification_id = storage.allocate_identity_notification_id();
         if !submit_identity_wake_up(
             PendingIdentityNotification {
@@ -558,7 +539,6 @@ pub(crate) fn notify_identity(
                 destination: Some(vec![browser_id]),
                 notification_id,
                 event,
-                kind,
                 urgency: Urgency::Normal,
                 expires_at_ns: Some(now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS)),
             },
@@ -570,7 +550,7 @@ pub(crate) fn notify_identity(
         // The ask goes on the record the answer lands on, now rather than when the pass
         // posts it: a second ask inside the window is handed this one back instead of
         // sending another to the same address.
-        if kind == IdentityNotification::Probe {
+        if proves_the_app_is_reachable {
             storage.set_notification_app_probe(app?.id, notification_id, now_ns);
         }
         Some(notification_id)
@@ -621,17 +601,6 @@ fn wake_up_address<'a>(
     };
     let (subscription, jwt) = authorized_wake_up(browser, subscription, now_ns)?;
     Some((subscription, jwt, target))
-}
-
-/// Where a wake-up aimed at the app goes. The entry's own registration is never used instead.
-fn app_wake_up_address<'a>(
-    browser: &Browser,
-    app: &'a NotificationApp,
-    now_ns: Timestamp,
-) -> Option<(&'a WebPushSubscription, String, DeliveryTarget)> {
-    let (subscription, jwt) =
-        authorized_wake_up(browser, app.webpush_subscription.as_ref()?, now_ns)?;
-    Some((subscription, jwt, DeliveryTarget::App(app.id)))
 }
 
 /// Liveness is the entry's, whichever address this is: the app has none of its own.
@@ -1014,7 +983,9 @@ mod tests {
         state::identity_backlog_mut(now_ns, |backlog| backlog.stats(now_ns).stored_total)
     }
 
-    fn probe(anchor_number: AnchorNumber, browser_id: BrowserId) -> Option<NotificationId> {
+    /// The one notification Internet Identity sends, which is also what proves a Home
+    /// Screen app is still installed.
+    fn notify(anchor_number: AnchorNumber, browser_id: BrowserId) -> Option<NotificationId> {
         notify_identity(
             anchor_number,
             browser_id,
@@ -1022,20 +993,6 @@ mod tests {
                 anchor_number,
                 name: None,
             }),
-            IdentityNotification::Probe,
-            SECOND_NS,
-        )
-    }
-
-    fn news(anchor_number: AnchorNumber, browser_id: BrowserId) -> Option<NotificationId> {
-        notify_identity(
-            anchor_number,
-            browser_id,
-            NotificationEvent::NotificationsOn(IdentityForNotification {
-                anchor_number,
-                name: None,
-            }),
-            IdentityNotification::News,
             SECOND_NS,
         )
     }
@@ -1050,9 +1007,9 @@ mod tests {
         let browser = browsers.first().copied().expect("one browser");
         route_through_an_app(recipient, browser, 9, None);
 
-        assert_eq!(probe(recipient, browser), None);
+        assert_eq!(notify(recipient, browser), None);
         assert!(queued(recipient, browser).is_empty());
-        assert!(news(recipient, browser).is_none());
+        assert!(notify(recipient, browser).is_none());
     }
 
     #[test]
@@ -1064,7 +1021,7 @@ mod tests {
         stored.disable_notification_app(browsers[0]);
         storage_borrow_mut(|storage| storage.write(stored)).expect("switching off");
 
-        assert_eq!(probe(recipient, browsers[0]), None);
+        assert_eq!(notify(recipient, browsers[0]), None);
         assert!(queued(recipient, browsers[0]).is_empty());
     }
 
@@ -1209,7 +1166,7 @@ mod tests {
 
         let quota = IDENTITY_BACKLOG.max_pending_per_group;
         for _ in 0..quota + 5 {
-            news(recipient, browsers[0]);
+            notify(recipient, browsers[0]);
         }
 
         assert_eq!(
@@ -1217,7 +1174,7 @@ mod tests {
             quota,
             "the loop is held at the identity's own quota"
         );
-        news(other, other_browsers[0]);
+        notify(other, other_browsers[0]);
         assert_eq!(
             identity_backlog_len(SECOND_NS),
             quota + 1,
@@ -1239,7 +1196,7 @@ mod tests {
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
         for (recipient, browser_id) in &identities {
             for _ in 0..IDENTITY_BACKLOG.max_pending_per_group {
-                news(*recipient, *browser_id);
+                notify(*recipient, *browser_id);
             }
         }
 
@@ -1325,7 +1282,7 @@ mod tests {
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
         let held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS);
-        news(recipient, browsers[0]);
+        notify(recipient, browsers[0]);
         assert!(plan_identity_pass(MAX_IDENTITY_POSTS_PER_PASS, SECOND_NS).is_empty());
 
         drop(held);

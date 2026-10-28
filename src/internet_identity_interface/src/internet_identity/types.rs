@@ -1508,6 +1508,21 @@ pub enum NotificationEvent {
     NotificationsOn(IdentityForNotification),
 }
 
+impl NotificationEvent {
+    /// Whether delivering this is also how a Home Screen app proves it is still
+    /// installed. The ask is recorded on the app's record so a second one inside the
+    /// window is handed the first one back.
+    ///
+    /// Answered per variant rather than passed alongside: a caller that could say
+    /// otherwise could say it wrongly.
+    pub fn proves_the_app_is_reachable(&self) -> bool {
+        match self {
+            // Switching delivery on is what it proves, so arriving is the proof.
+            NotificationEvent::NotificationsOn(_) => true,
+        }
+    }
+}
+
 /// Which identity a notification is about, in the terms the user knows it by.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdentityForNotification {
