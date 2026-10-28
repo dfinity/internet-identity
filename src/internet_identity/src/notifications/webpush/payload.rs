@@ -16,6 +16,7 @@ use hkdf::Hkdf;
 use sha2::Sha256;
 
 use super::validation::{PayloadIkm, PayloadKeyId};
+use internet_identity_interface::internet_identity::types::{AnchorNumber, InboxNotificationId};
 
 /// RFC 8188 §2.1: the salt the record's key and nonce are derived under.
 const SALT_LEN: usize = 16;
@@ -37,19 +38,32 @@ const MAX_BODY_LEN: usize = 4096;
 /// The `Content-Encoding` a relay and a browser both require of a payload.
 pub(crate) const CONTENT_ENCODING: &str = "aes128gcm";
 
+/// The salt a deposit's payload is sealed under: the identity and the name its inbox gave
+/// the entry, which together are what one deposit is.
+///
+/// A browser's keying material covers one inbox, so the entry's name alone would do. An
+/// app's covers every identity pointing at it, and one browser of each, so the identity is
+/// what keeps those apart. A wake-up re-posted for the same entry seals the same bytes
+/// under the same salt, which reveals nothing it has not already sent.
+pub(crate) fn salt_for(
+    anchor_number: AnchorNumber,
+    inbox_notification_id: InboxNotificationId,
+) -> u128 {
+    (u128::from(anchor_number) << 64) | u128::from(inbox_notification_id)
+}
+
 /// Seal `plaintext` for the browser that uploaded `payload_ikm`.
 ///
 /// `salt` is what keeps one subscription's payloads apart: the key and the nonce are both
-/// derived from it and the one IKM, so a salt used twice would seal twice under the same
-/// pair. Callers draw it from the subscription's own run and never rewind it.
+/// derived from it and the one IKM, so two payloads sealed under one salt would share
+/// both. Callers pass [`salt_for`], which names the deposit rather than counting.
 pub(crate) fn seal(
     payload_ikm: &PayloadIkm,
     payload_keyid: &PayloadKeyId,
-    salt: u64,
+    salt: u128,
     plaintext: &[u8],
 ) -> Result<Vec<u8>, String> {
-    let mut salt_bytes = [0u8; SALT_LEN];
-    salt_bytes[SALT_LEN - size_of::<u64>()..].copy_from_slice(&salt.to_be_bytes());
+    let salt_bytes = salt.to_be_bytes();
 
     let derived = Hkdf::<Sha256>::new(Some(&salt_bytes), payload_ikm.as_slice());
     let mut cek = [0u8; 16];
@@ -129,9 +143,7 @@ mod tests {
         let (payload_ikm, payload_keyid) = keys();
         let body = seal(&payload_ikm, &payload_keyid, 9, b"{}").expect("sealing");
 
-        let mut expected_salt = [0u8; SALT_LEN];
-        expected_salt[SALT_LEN - 1] = 9;
-        assert_eq!(&body[..SALT_LEN], &expected_salt);
+        assert_eq!(&body[..SALT_LEN], &9u128.to_be_bytes());
         assert_eq!(&body[SALT_LEN..SALT_LEN + 4], &RECORD_SIZE.to_be_bytes());
         assert_eq!(body[SALT_LEN + 4], 65);
         assert_eq!(&body[SALT_LEN + 5..HEADER_LEN], payload_keyid.as_slice());
@@ -145,6 +157,13 @@ mod tests {
         let plaintext = br#"{"anchor_number":10772,"inbox_notification_id":3}"#;
         let body = seal(&payload_ikm, &payload_keyid, 1, plaintext).expect("sealing");
         assert_eq!(open(&payload_ikm, &body), plaintext.to_vec());
+    }
+
+    #[test]
+    fn a_salt_names_one_deposit_of_one_identity() {
+        assert_ne!(salt_for(1, 2), salt_for(2, 1));
+        assert_eq!(salt_for(1, 2), salt_for(1, 2));
+        assert_ne!(salt_for(10772, 0), salt_for(10772, 1));
     }
 
     #[test]

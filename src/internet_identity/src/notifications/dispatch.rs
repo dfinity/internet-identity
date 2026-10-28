@@ -7,7 +7,9 @@ use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::backlog::identity::PendingIdentityNotification;
 use crate::notifications::browser_inbox;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
-use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
+use crate::notifications::webpush::{
+    clear_gone_subscription, payload, vapid_jwt, PayloadIkm, PayloadKeyId,
+};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, InboxNotification, WebPushSubscription};
@@ -17,7 +19,8 @@ use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, NotificationEvent, NotificationId, Timestamp, Urgency,
+    AnchorNumber, BrowserId, InboxNotificationId, NotificationEvent, NotificationId, Timestamp,
+    Urgency,
 };
 use std::cell::{Cell, RefCell};
 use std::convert::Infallible;
@@ -168,6 +171,8 @@ pub(crate) struct Delivery {
     pub(crate) notification: Option<InboxNotification>,
     pub(crate) endpoint: String,
     pub(crate) vapid_public_key: Vec<u8>,
+    /// The sealed payload naming the entry above, absent where the wake-up names none.
+    pub(crate) body: Option<Vec<u8>>,
     pub(crate) jwt: String,
     pub(crate) urgency: Urgency,
     /// Relay retention time, capped by the notification's remaining lifetime.
@@ -338,15 +343,18 @@ fn fan_out_to_destinations(
                     notification: None,
                     endpoint: subscription.endpoint.as_str().to_string(),
                     vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
+                    body: None,
                     jwt,
                     urgency: pending.urgency.clone(),
                     ttl_seconds: IDENTITY_NOTIFICATION_TTL_NS / SECOND_NS,
                 },
+                subscription.payload_ikm.clone(),
+                subscription.payload_keyid.clone(),
             ));
         }
 
         let mut wrote = false;
-        for (browser_id, queued, mut delivery) in planned {
+        for (browser_id, queued, mut delivery, payload_ikm, payload_keyid) in planned {
             let Some(queued) = queued else {
                 deliveries.push(delivery);
                 continue;
@@ -355,7 +363,15 @@ fn fan_out_to_destinations(
                 continue;
             };
             wrote = true;
-            delivery.notification = Some(browser_inbox::deposit(queue, next_id, queued, now_ns));
+            let deposited = browser_inbox::deposit(queue, next_id, queued, now_ns);
+            delivery.body = sealed_for(
+                &payload_ikm,
+                &payload_keyid,
+                delivery.anchor_number,
+                browser_id,
+                &deposited,
+            );
+            delivery.notification = Some(deposited);
             deliveries.push(delivery);
         }
         if wrote {
@@ -427,24 +443,33 @@ fn fan_out_to_browsers(
             .iter()
             .map(|browser| routed_app(storage, browser))
             .collect();
-        let woken: Vec<Delivery> = anchor
+        // The sealing keys travel with each wake-up: the deposit that names its entry
+        // happens below, after this borrow of the browsers has ended.
+        let woken: Vec<(Delivery, PayloadIkm, PayloadKeyId)> = anchor
             .browsers()
             .iter()
             .zip(apps.iter())
             .filter_map(|(browser, app)| {
                 let (subscription, jwt, target) = wake_up_address(browser, app.as_ref(), now_ns)?;
-                Some(Delivery {
-                    anchor_number: pending.anchor_number,
-                    browser_id: browser.id,
-                    target,
-                    // Filled in below, where the deposit names the entry for this browser.
-                    notification: None,
-                    endpoint: subscription.endpoint.as_str().to_string(),
-                    vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
-                    jwt,
-                    urgency: pending.urgency.clone(),
-                    ttl_seconds,
-                })
+                let payload_ikm = subscription.payload_ikm.clone();
+                let payload_keyid = subscription.payload_keyid.clone();
+                Some((
+                    Delivery {
+                        anchor_number: pending.anchor_number,
+                        browser_id: browser.id,
+                        target,
+                        // Filled in below, where the deposit names the entry for this browser.
+                        notification: None,
+                        endpoint: subscription.endpoint.as_str().to_string(),
+                        vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
+                        body: None,
+                        jwt,
+                        urgency: pending.urgency.clone(),
+                        ttl_seconds,
+                    },
+                    payload_ikm,
+                    payload_keyid,
+                ))
             })
             .collect();
         if woken.is_empty() {
@@ -452,17 +477,20 @@ fn fan_out_to_browsers(
         }
         let mut to_post = Vec::new();
         let mut queued_anywhere = false;
-        for mut delivery in woken {
+        for (mut delivery, payload_ikm, payload_keyid) in woken {
             let Some((queue, next_id)) = anchor.inbox_for_browser_mut(delivery.browser_id) else {
                 continue;
             };
             queued_anywhere = true;
-            delivery.notification = Some(browser_inbox::deposit(
-                queue,
-                next_id,
-                queued.clone(),
-                now_ns,
-            ));
+            let deposited = browser_inbox::deposit(queue, next_id, queued.clone(), now_ns);
+            delivery.body = sealed_for(
+                &payload_ikm,
+                &payload_keyid,
+                delivery.anchor_number,
+                delivery.browser_id,
+                &deposited,
+            );
+            delivery.notification = Some(deposited);
             to_post.push(delivery);
         }
         match storage.write(anchor) {
@@ -733,9 +761,44 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
     }
 }
 
+/// What the service worker is handed: the identity and inbox the entry sits in, and the
+/// name that inbox gave it. Enough to ask for that notification and no other.
+#[derive(serde::Serialize)]
+struct WakeUpPayload {
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    inbox_notification_id: InboxNotificationId,
+}
+
+/// Seals what names `deposited`. `None` where it could not be sealed, which leaves a
+/// wake-up carrying nothing rather than one carrying something the browser will not open.
+fn sealed_for(
+    payload_ikm: &PayloadIkm,
+    payload_keyid: &PayloadKeyId,
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    deposited: &InboxNotification,
+) -> Option<Vec<u8>> {
+    let named = serde_json::to_vec(&WakeUpPayload {
+        anchor_number,
+        browser_id,
+        inbox_notification_id: deposited.inbox_notification_id,
+    })
+    .inspect_err(|err| ic_cdk::println!("ERROR: could not write a wake-up's payload: {err}"))
+    .ok()?;
+    payload::seal(
+        payload_ikm,
+        payload_keyid,
+        payload::salt_for(anchor_number, deposited.inbox_notification_id),
+        &named,
+    )
+    .inspect_err(|err| ic_cdk::println!("ERROR: could not seal a wake-up's payload: {err}"))
+    .ok()
+}
+
 /// Build retention, urgency, and VAPID authorization headers.
 pub(crate) fn push_headers(delivery: &Delivery) -> Vec<(String, String)> {
-    vec![
+    let mut headers = vec![
         ("TTL".to_string(), delivery.ttl_seconds.to_string()),
         (
             "Urgency".to_string(),
@@ -749,7 +812,14 @@ pub(crate) fn push_headers(delivery: &Delivery) -> Vec<(String, String)> {
                 BASE64_URL_SAFE_NO_PAD.encode(&delivery.vapid_public_key)
             ),
         ),
-    ]
+    ];
+    if delivery.body.is_some() {
+        headers.push((
+            "Content-Encoding".to_string(),
+            payload::CONTENT_ENCODING.to_string(),
+        ));
+    }
+    headers
 }
 
 fn urgency_header(urgency: &Urgency) -> &'static str {
@@ -824,7 +894,7 @@ mod outcalls {
                 .into_iter()
                 .map(|(name, value)| HttpHeader { name, value })
                 .collect(),
-            body: None,
+            body: delivery.body.clone(),
             transform: None,
             is_replicated: Some(false),
         };

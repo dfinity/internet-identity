@@ -79,7 +79,6 @@ pub(crate) fn subscription_at(
             .expect("a pool of 64-byte signatures"),
         payload_ikm: PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
         payload_keyid: PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
-        next_payload_salt: 0,
     }
 }
 

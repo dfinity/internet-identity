@@ -184,9 +184,6 @@ pub struct WebPushSubscription {
     /// What a payload through this subscription is sealed with, derived by the browser.
     pub payload_ikm: PayloadIkm,
     pub payload_keyid: PayloadKeyId,
-    /// The salt the next payload takes. Never rewound: one salt per payload is what keeps
-    /// the key and nonce derived from the single IKM distinct.
-    pub next_payload_salt: u64,
 }
 
 impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
@@ -211,7 +208,6 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
             )?,
             payload_ikm: PayloadIkm::try_from(value.payload_ikm)?,
             payload_keyid: PayloadKeyId::try_from(value.payload_keyid)?,
-            next_payload_salt: value.next_payload_salt,
         })
     }
 }
@@ -234,7 +230,6 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
             },
             payload_ikm: value.payload_ikm.into_vec(),
             payload_keyid: value.payload_keyid.into_vec(),
-            next_payload_salt: value.next_payload_salt,
         }
     }
 }

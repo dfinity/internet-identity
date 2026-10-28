@@ -30,8 +30,4 @@ pub struct StorableWebPushSubscription {
     /// against (uncompressed SEC1 P-256, 65 bytes).
     #[cbor(n(5), with = "minicbor::bytes")]
     pub payload_keyid: Vec<u8>,
-    /// The salt the next payload through this subscription is sealed under. Distinct
-    /// salts give distinct keys and nonces from the one IKM, so this is never rewound.
-    #[n(6)]
-    pub next_payload_salt: u64,
 }

@@ -49,18 +49,14 @@ pub fn set_subscription(
 
     // The same endpoint is a pool replacement on a registration that is still live, so it
     // keeps its age and the pool has to move forward. Any other endpoint is a new one.
-    // The salt run carries over with the registration's age. A browser that re-subscribes
-    // at the same address may upload the same IKM, and rewinding the salt under it would
-    // seal two payloads with one key and nonce.
-    let (created_at_ns, next_payload_salt) = match anchor.webpush_subscription(browser_id) {
+    let created_at_ns = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_signatures.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            (registered.created_at_ns, registered.next_payload_salt)
+            registered.created_at_ns
         }
-        // Another address is another subscription, so its keys are new ones too.
-        _ => (now_ns, 0),
+        _ => now_ns,
     };
 
     write_subscription(
@@ -73,7 +69,6 @@ pub fn set_subscription(
             jwt_signatures,
             payload_ikm,
             payload_keyid,
-            next_payload_salt,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -230,7 +225,7 @@ fn set_app_subscription(
         SetWebPushSubscriptionError::InternalCanisterError(format!("no notification app {app_id}"))
     })?;
 
-    let (created_at_ns, next_payload_salt) = match registered {
+    let created_at_ns = match registered {
         // A pool that is running out is replaced at the same address, so the registration
         // keeps its age, and the new pool has to be newer: one signature covers one
         // elapsed window.
@@ -238,20 +233,18 @@ fn set_app_subscription(
             endpoint: registered_endpoint,
             created_at_ns: registered_created_at_ns,
             jwt_signatures: registered_pool,
-            next_payload_salt: registered_salt,
             ..
         }) if registered_endpoint == endpoint => {
             if jwt_issued_at_ns <= registered_pool.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            // Carried over for the same reason as above: the IKM may be unchanged.
-            (registered_created_at_ns, registered_salt)
+            registered_created_at_ns
         }
         // Another address is another registration, and the write below drops what was
         // queued through the one it leaves.
-        Some(_) => (now_ns, 0),
+        Some(_) => now_ns,
         // Never registered.
-        None => (now_ns, 0),
+        None => now_ns,
     };
 
     state::storage_borrow_mut(|storage| {
@@ -264,7 +257,6 @@ fn set_app_subscription(
                 jwt_signatures,
                 payload_ikm,
                 payload_keyid,
-                next_payload_salt,
             }),
             now_ns,
         )
