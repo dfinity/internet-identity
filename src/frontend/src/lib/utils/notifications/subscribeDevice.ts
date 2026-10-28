@@ -16,6 +16,7 @@ import {
   storeVapidKey,
   type StoredVapidKey,
 } from "./vapidKeyStore";
+import { payloadKeysForThisBrowser } from "./payloadKeys";
 import { browserKeyActor } from "./browserActor";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
@@ -44,6 +45,7 @@ export const registerStoredDevice = async (
     issuedAtNs,
   );
   const actor = caller ?? (await browserKeyActor(identityNumber));
+  const { payloadIkm, payloadKeyid } = await payloadKeysForThisBrowser();
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,
@@ -51,6 +53,8 @@ export const registerStoredDevice = async (
       vapid_public_key: publicKeyRaw,
       jwt_signatures: signatures,
       jwt_issued_at_ns: issuedAtNs,
+      payload_ikm: payloadIkm,
+      payload_keyid: payloadKeyid,
     })
     .then(throwCanisterError);
   return endpoint;

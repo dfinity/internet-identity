@@ -5,14 +5,17 @@
 // it never sits between the page and the network, and no precaching, so a stale
 // worker cannot serve a stale app.
 //
-// A push carries no body, since the payload is not sealed to the browser's keys: what
-// it is for is asked of the canister, and its content of the app that sent it. The
-// subscription is `userVisibleOnly`, which obliges a visible notification per push.
+// A push carries the identity, browser and inbox entry it was sent for, and nothing
+// else: the content is fetched from the app that sent it, with a delegation minted for
+// the purpose, so it never reaches the push service. The browser decrypts the payload
+// before this worker is woken. The subscription is `userVisibleOnly`, which obliges a
+// visible notification per push.
 
 import { reportOpened } from "$lib/utils/notifications/worker/notificationOpened";
 import {
   onWakeUp,
   showPlaceholder,
+  type WakeUpNaming,
 } from "$lib/utils/notifications/worker/wakeUp";
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
@@ -36,11 +39,37 @@ worker.addEventListener("activate", (event) => {
   event.waitUntil(worker.clients.claim());
 });
 
-// One wake-up at a time, whatever the browser delivers. `browser_get_next_notification`
-// is a query and claims nothing, so two pushes handled at once would both read the same
-// head, show the same notification, and leave the one behind it with no wake-up coming.
+// One wake-up at a time, whatever the browser delivers. Each handler sweeps the
+// registration and then decides whether it still owes the user a notification, and two
+// running at once would read each other's half-finished answer to that.
 // `waitUntil` extends this worker's life; it does not serialise its handlers.
 const enqueue = promiseQueue();
+
+/** What the push carried, or `undefined` where it carried nothing this worker can use. */
+const namingOf = (data: PushMessageData | null): WakeUpNaming | undefined => {
+  try {
+    const named: unknown = data?.json();
+    if (named === null || typeof named !== "object") {
+      return undefined;
+    }
+    const { anchor_number, browser_id, inbox_notification_id } =
+      named as Record<string, unknown>;
+    if (
+      typeof anchor_number !== "number" ||
+      typeof browser_id !== "number" ||
+      typeof inbox_notification_id !== "number"
+    ) {
+      return undefined;
+    }
+    return {
+      anchorNumber: BigInt(anchor_number),
+      browserId: browser_id,
+      inboxNotificationId: BigInt(inbox_notification_id),
+    };
+  } catch {
+    return undefined;
+  }
+};
 
 worker.addEventListener("push", (event) => {
   event.waitUntil(
@@ -51,7 +80,10 @@ worker.addEventListener("push", (event) => {
         await showPlaceholder(worker.registration);
         return;
       }
-      await onWakeUp({ registration: worker.registration });
+      await onWakeUp(
+        { registration: worker.registration },
+        namingOf(event.data),
+      );
     }),
   );
 });

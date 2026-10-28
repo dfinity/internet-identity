@@ -11,6 +11,15 @@ vi.mock("./pushSubscription", () => ({
   relayOriginOf: vi.fn(() => "https://relay.example"),
   subscribeToPush: vi.fn(() => Promise.resolve(FRESH)),
 }));
+// The derivation needs a real subscription and real WebCrypto ECDH; what it produces is
+// covered where it lives.
+vi.mock("./payloadKeys", () => ({
+  payloadKeysForThisBrowser: () =>
+    Promise.resolve({
+      payloadIkm: new Uint8Array(32).fill(9),
+      payloadKeyid: new Uint8Array(65).fill(4),
+    }),
+}));
 vi.mock("./vapidPool", () => ({
   generateVapidKeypair: vi.fn(() =>
     Promise.resolve({ publicKeyRaw: new Uint8Array([9]), privateKey: {} }),

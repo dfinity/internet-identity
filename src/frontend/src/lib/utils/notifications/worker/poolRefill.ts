@@ -14,6 +14,7 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
+import { payloadKeysForThisBrowser } from "../payloadKeys";
 import { loadVapidKey } from "../vapidKeyStore";
 import {
   JWT_POOL_REFRESH_THRESHOLD_WINDOWS,
@@ -64,6 +65,7 @@ export const refillJwtPool = async ({
     relayOriginOf(stored.endpoint),
     nowNs,
   );
+  const { payloadIkm, payloadKeyid } = await payloadKeysForThisBrowser();
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,
@@ -71,6 +73,8 @@ export const refillJwtPool = async ({
       vapid_public_key: stored.publicKeyRaw,
       jwt_signatures: signatures,
       jwt_issued_at_ns: nowNs,
+      payload_ikm: payloadIkm,
+      payload_keyid: payloadKeyid,
     })
     .then(throwCanisterError);
   return true;
