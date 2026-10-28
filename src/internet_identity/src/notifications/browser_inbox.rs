@@ -40,17 +40,16 @@ pub(crate) fn deposit(
     notification
 }
 
-/// A failed post means no wake-up is coming, so one entry goes with it: its own, or the
-/// oldest if a wake-up already took it. Nothing goes once it expired or whoever held the
-/// posted address registered elsewhere, since expiry or the new registration may have
-/// dropped it.
+/// A failed post means no wake-up is coming for the entry it named, so that entry goes
+/// with it and nothing else does: every deposit is named by the push that carries it, so
+/// a failure says nothing about the entries around it. Nothing goes once whoever held the
+/// posted address registered elsewhere, since the new registration may have dropped it.
 pub(crate) fn remove_after_failed_wake_up(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     target: DeliveryTarget,
     notification: &InboxNotification,
     endpoint: &str,
-    now_ns: Timestamp,
 ) {
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(anchor_number) else {
@@ -83,15 +82,12 @@ pub(crate) fn remove_after_failed_wake_up(
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
             return;
         };
-        match inbox.iter().position(|entry| entry == notification) {
-            Some(own) => {
-                inbox.remove(own);
-            }
-            None if notification.expires_at_ns > now_ns && !inbox.is_empty() => {
-                inbox.remove(0);
-            }
-            None => return,
-        }
+        // Already gone, so there is nothing owed: an entry that outlived its own wake-up
+        // was taken by one, and the entries beside it have wake-ups of their own.
+        let Some(own) = inbox.iter().position(|entry| entry == notification) else {
+            return;
+        };
+        inbox.remove(own);
         if let Err(err) = storage.write(anchor) {
             ic_cdk::println!("Failed to drop a notification whose wake-up failed: {err}");
         }
@@ -500,7 +496,6 @@ mod tests {
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
             APP_RELAY,
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), Vec::<u64>::new());
@@ -520,7 +515,6 @@ mod tests {
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
             APP_RELAY,
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), Vec::<u64>::new());
@@ -580,7 +574,6 @@ mod tests {
             DeliveryTarget::App(left_behind),
             &from_app(9, 60 * SECOND_NS),
             APP_RELAY,
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), vec![7]);
@@ -597,7 +590,6 @@ mod tests {
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
             "https://web.push.apple.com/b",
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), vec![7]);

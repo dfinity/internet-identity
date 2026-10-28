@@ -13,10 +13,12 @@
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes128Gcm, Nonce};
 use hkdf::Hkdf;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 
 use super::validation::{PayloadIkm, PayloadKeyId};
-use internet_identity_interface::internet_identity::types::{AnchorNumber, InboxNotificationId};
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, BrowserId, InboxNotificationId,
+};
 
 /// RFC 8188 §2.1: the salt the record's key and nonce are derived under.
 const SALT_LEN: usize = 16;
@@ -38,18 +40,30 @@ const MAX_BODY_LEN: usize = 4096;
 /// The `Content-Encoding` a relay and a browser both require of a payload.
 pub(crate) const CONTENT_ENCODING: &str = "aes128gcm";
 
-/// The salt a deposit's payload is sealed under: the identity and the name its inbox gave
-/// the entry, which together are what one deposit is.
+/// The salt a deposit's payload is sealed under: the identity, the browser whose inbox
+/// holds it, and the name that inbox gave the entry, which together are what one deposit
+/// is.
 ///
-/// A browser's keying material covers one inbox, so the entry's name alone would do. An
-/// app's covers every identity pointing at it, and one browser of each, so the identity is
-/// what keeps those apart. A wake-up re-posted for the same entry seals the same bytes
-/// under the same salt, which reveals nothing it has not already sent.
+/// All three, because keying material does not always cover one inbox. A Home Screen
+/// app's covers every identity pointing at it, and nothing stops two browsers of one
+/// identity pointing at the same app: ids are handed out per inbox, so both would reach
+/// the same number, and a salt naming only the identity and the id would repeat. The key
+/// and the nonce both follow from the salt, so a repeat is a reused nonce.
+///
+/// Hashed rather than packed: the three are 160 bits between them. A wake-up re-posted
+/// for the same entry seals the same bytes under the same salt, which reveals nothing it
+/// has not already sent.
 pub(crate) fn salt_for(
     anchor_number: AnchorNumber,
+    browser_id: BrowserId,
     inbox_notification_id: InboxNotificationId,
 ) -> u128 {
-    (u128::from(anchor_number) << 64) | u128::from(inbox_notification_id)
+    let digest = Sha256::new()
+        .chain_update(anchor_number.to_be_bytes())
+        .chain_update(browser_id.to_be_bytes())
+        .chain_update(inbox_notification_id.to_be_bytes())
+        .finalize();
+    u128::from_be_bytes(digest[..16].try_into().expect("a digest is 32 bytes"))
 }
 
 /// Seal `plaintext` for the browser that uploaded `payload_ikm`.
@@ -162,10 +176,18 @@ mod tests {
     }
 
     #[test]
-    fn a_salt_names_one_deposit_of_one_identity() {
-        assert_ne!(salt_for(1, 2), salt_for(2, 1));
-        assert_eq!(salt_for(1, 2), salt_for(1, 2));
-        assert_ne!(salt_for(10772, 0), salt_for(10772, 1));
+    fn a_salt_names_one_deposit_of_one_browser() {
+        assert_eq!(salt_for(1, 0, 2), salt_for(1, 0, 2));
+        assert_ne!(salt_for(1, 0, 2), salt_for(2, 0, 1));
+        assert_ne!(salt_for(10772, 0, 0), salt_for(10772, 0, 1));
+    }
+
+    /// Two browsers of one identity can point at the same Home Screen app, and then seal
+    /// with its one subscription. Their inboxes count from the same place, so without the
+    /// browser in the salt both would seal a different payload under one key and nonce.
+    #[test]
+    fn two_inboxes_at_the_same_id_do_not_share_a_salt() {
+        assert_ne!(salt_for(10772, 0, 1), salt_for(10772, 1, 1));
     }
 
     #[test]

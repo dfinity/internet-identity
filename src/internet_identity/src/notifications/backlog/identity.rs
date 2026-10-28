@@ -25,9 +25,8 @@ pub(crate) struct PendingIdentityNotification {
     /// what keeps the key uniform.
     pub(crate) notification_id: NotificationId,
     /// What the destinations are given to show, written onto their entries when the pass
-    /// expands this. Absent where the wake-up announces nothing new, which is a worker
-    /// being asked to come back for what its entry already holds.
-    pub(crate) event: Option<NotificationEvent>,
+    /// expands this.
+    pub(crate) event: NotificationEvent,
     /// Decides the address each entry is reached at when a pass expands this.
     pub(crate) kind: IdentityNotification,
     pub(crate) urgency: Urgency,
