@@ -69,7 +69,7 @@ pub(crate) fn subscription_at(endpoint: &str, created_at_ns: Timestamp) -> WebPu
         endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
         created_at_ns,
         payload_ikm: PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
-        payload_keyid: PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
+        payload_keyid: PayloadKeyId::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
     }
 }
 
@@ -103,7 +103,7 @@ pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {
 }
 
 /// A real, fixed SEC1 point: a length-only fixture cannot pass the curve check.
-pub(crate) fn valid_vapid_key() -> Vec<u8> {
+pub(crate) fn valid_sec1_point() -> Vec<u8> {
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
     secret
@@ -127,7 +127,7 @@ pub(super) fn request(
         anchor_number,
         endpoint: endpoint.to_string(),
         payload_ikm: ByteBuf::from(valid_payload_ikm()),
-        payload_keyid: ByteBuf::from(valid_vapid_key()),
+        payload_keyid: ByteBuf::from(valid_sec1_point()),
     }
 }
 
@@ -164,7 +164,7 @@ pub(super) fn try_subscribe_as(
         anchor_number,
         validated(anchor_number, endpoint),
         PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
-        PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
+        PayloadKeyId::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
         now_ns,
     )
 }

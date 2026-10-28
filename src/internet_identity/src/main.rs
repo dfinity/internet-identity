@@ -1728,6 +1728,16 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
+    // A browser subscribes with this key, so it has to be in hand before the first one
+    // asks rather than when the first wake-up goes out: nothing can be delivered to a
+    // browser that could not subscribe. Reading it is a call this hook cannot make, so it
+    // runs the moment the install returns, as the salt does.
+    if notifications::notifications_enabled() {
+        set_timer(
+            Duration::ZERO,
+            notifications::webpush::vapid_key::ensure_public_key,
+        );
+    }
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {

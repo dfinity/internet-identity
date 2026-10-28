@@ -133,7 +133,7 @@ pub(crate) fn test_setup() {
     storage_borrow_mut(|s| s.update_salt([7u8; 32]));
     // Asked of the management canister on a real deployment, which a test has none of.
     crate::state::persistent_state_mut(|p| {
-        p.vapid_public_key = Some(crate::notifications::webpush::fixtures::valid_vapid_key())
+        p.vapid_public_key = Some(crate::notifications::webpush::fixtures::valid_sec1_point())
     });
 }
 

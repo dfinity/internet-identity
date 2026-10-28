@@ -1,5 +1,5 @@
-//! The Web Push channel: what a browser registered, and the pool of VAPID JWTs that
-//! browser signed for it.
+//! The Web Push channel: what a browser registered, and the VAPID identity Internet
+//! Identity signs its wake-ups with.
 //!
 //! Callers reach this through `main.rs`, which validates and authorizes first, so
 //! everything here acts on a browser the caller has already been shown to be.
@@ -7,7 +7,6 @@
 pub(crate) mod payload;
 mod subscription;
 mod validation;
-pub(crate) mod vapid_jwt;
 pub(crate) mod vapid_key;
 
 #[cfg(test)]

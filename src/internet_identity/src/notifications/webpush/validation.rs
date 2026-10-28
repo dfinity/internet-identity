@@ -6,8 +6,8 @@ use url::Url;
 
 /// Relay endpoints run ~200-300 bytes; capped at 512 so the row stays small.
 const MAX_ENDPOINT_LEN: usize = 512;
-/// VAPID application server key: uncompressed SEC1 P-256, 65 bytes.
-const VAPID_PUBKEY_LEN: usize = 65;
+/// An uncompressed SEC1 point on P-256, which is what a subscription's own key is.
+const SEC1_P256_LEN: usize = 65;
 
 /// A relay address a push can be posted to: 1..=512 bytes, a URL, and a host to post it
 /// at.
@@ -121,7 +121,7 @@ impl TryFrom<Vec<u8>> for PayloadKeyId {
     fn try_from(payload_keyid: Vec<u8>) -> Result<Self, Self::Error> {
         validate_param_len(
             payload_keyid.len(),
-            VAPID_PUBKEY_LEN..=VAPID_PUBKEY_LEN,
+            SEC1_P256_LEN..=SEC1_P256_LEN,
             "payload_keyid",
         )?;
         if p256::PublicKey::from_sec1_bytes(&payload_keyid).is_err() {

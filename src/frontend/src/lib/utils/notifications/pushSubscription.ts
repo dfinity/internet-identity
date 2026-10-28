@@ -56,6 +56,6 @@ export const currentDeviceSubscription = async (): Promise<
   return (await registration?.pushManager.getSubscription()) ?? undefined;
 };
 
-// Defined in `vapidPool`, where the claim it fills is, and re-exported here for the
-// callers that reach it through this module.
-export { relayOriginOf } from "./vapidPool";
+/** `scheme://host[:port]` of a relay endpoint, which is what a push is addressed to. */
+export const relayOriginOf = (endpoint: string): string =>
+  new URL(endpoint).origin;

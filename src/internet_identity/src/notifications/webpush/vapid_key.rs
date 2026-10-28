@@ -75,6 +75,13 @@ const DERIVATION_PATH: Vec<Vec<u8>> = Vec::new();
 /// test signs with the same identity the network does.
 const KEY_NAME: &str = "key_1";
 
+/// The `aud` a JWT is signed for: RFC 8292 names the origin of the push resource, which
+/// is what the browser's own `new URL(endpoint).origin` answers.
+pub(crate) fn relay_origin_of(endpoint: &str) -> Option<String> {
+    let origin = url::Url::parse(endpoint).ok()?.origin();
+    origin.is_tuple().then(|| origin.ascii_serialization())
+}
+
 fn key_id() -> EcdsaKeyId {
     EcdsaKeyId {
         curve: EcdsaCurve::Secp256r1,

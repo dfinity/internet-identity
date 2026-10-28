@@ -121,7 +121,7 @@ pub(crate) fn seal(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::notifications::webpush::fixtures::valid_vapid_key;
+    use crate::notifications::webpush::fixtures::valid_sec1_point;
     use pretty_assertions::assert_eq;
 
     const HEADER_LEN: usize = SALT_LEN + 4 + 1 + 65;
@@ -129,7 +129,7 @@ mod tests {
     fn keys() -> (PayloadIkm, PayloadKeyId) {
         (
             PayloadIkm::try_from(vec![7u8; 32]).expect("32 bytes"),
-            PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
+            PayloadKeyId::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
         )
     }
 

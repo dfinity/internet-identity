@@ -7990,7 +7990,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         .push(queued_notification(7));
     storage.write(anchor).expect("queueing");
 
-    // The same address is a pool replacement, which keeps what is waiting.
+    // The same address is the same registration, which keeps what is waiting.
     storage
         .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 2_000)
         .expect("the record is there");

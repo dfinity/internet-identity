@@ -167,7 +167,7 @@ impl From<InboxNotification> for StorableInboxNotification {
     }
 }
 
-/// A browser's Web Push registration and the pool of VAPID JWTs it signed for it.
+/// A browser's Web Push registration: where to reach it, and what to seal for it.
 ///
 /// Held on the browser entry rather than on its own, so signing the browser out or
 /// letting the registry evict it takes the registration with it.

@@ -867,7 +867,7 @@ mod subscriptions {
     }
 }
 
-/// What a browser registered and the pool it signed, read through
+/// What a browser registered, read through
 /// `get_webpush_subscription_status`.
 mod subscription_status {
     use super::subscriptions::*;
@@ -1817,7 +1817,6 @@ mod probe {
         BrowserKey::new(browser_seed).successor().principal()
     }
 
-    /// A pool whose first window covers the time the test runs at. The pool is spent by
     fn probe(
         env: &PocketIc,
         canister_id: CanisterId,
@@ -2866,7 +2865,6 @@ mod turning_on {
         BrowserKey::new(browser_seed).successor().principal()
     }
 
-    /// A pool whose first window covers the time the test runs at. The pool is spent by
     fn turn_on(
         env: &PocketIc,
         canister_id: CanisterId,

@@ -8,9 +8,7 @@ use crate::notifications::backlog::identity::PendingIdentityNotification;
 use crate::notifications::browser_inbox;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::vapid_key;
-use crate::notifications::webpush::{
-    clear_gone_subscription, payload, vapid_jwt, PayloadIkm, PayloadKeyId,
-};
+use crate::notifications::webpush::{clear_gone_subscription, payload, PayloadIkm, PayloadKeyId};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::single_flight_cache::{self, Cached};
 use crate::state::{self, storage_borrow_mut};
@@ -724,7 +722,7 @@ fn authorized_wake_up<'a>(
     if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
         return None;
     }
-    let relay_origin = vapid_jwt::relay_origin_of(subscription.endpoint.as_str())?;
+    let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
     // Nothing waits on a signature. A relay we hold no JWT for leaves its notifications
     // where they are and the next pass asks again, by which time the fill this started
     // has landed.

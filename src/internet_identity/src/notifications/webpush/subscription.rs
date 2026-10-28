@@ -15,10 +15,8 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp, WebPushSubscriptionStatus,
 };
 
-/// Registers `browser_id` for Web Push, and is also how it replaces a pool that is
-/// running out. Idempotent: a browser that re-subscribes overwrites what it registered
-/// before, endpoint included.
-#[allow(clippy::too_many_arguments)]
+/// Registers `browser_id` for Web Push. Idempotent: a browser that re-subscribes
+/// overwrites what it registered before, endpoint included.
 pub fn set_subscription(
     key: NotificationKey,
     anchor_number: AnchorNumber,
@@ -37,8 +35,6 @@ pub fn set_subscription(
     };
     let anchor = state::anchor(anchor_number);
 
-    // The same endpoint is a pool replacement on a registration that is still live, so it
-    // keeps its age and the pool has to move forward. Any other endpoint is a new one.
     // The same address is the same registration, which keeps its age; a browser
     // re-registering there is replacing the keys a payload is sealed against.
     let created_at_ns = match anchor.webpush_subscription(browser_id) {
@@ -59,8 +55,7 @@ pub fn set_subscription(
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
 }
 
-/// Stops notifications to one browser, and with them the JWT pool it registered.
-/// Idempotent.
+/// Stops notifications to one browser. Idempotent.
 ///
 /// Takes the browser rather than reading it off the caller, since silencing one is done
 /// from another.
@@ -136,8 +131,7 @@ pub(crate) fn delivering_subscription<M: Memory + Clone>(
     dispatch::routed_app(storage, browser)?.webpush_subscription
 }
 
-/// What this browser is registered with, and how much of the pool it signed is left
-/// to cover.
+/// The address this browser is registered at.
 pub fn subscription_status(
     anchor_number: AnchorNumber,
     key: NotificationKey,
@@ -160,7 +154,7 @@ pub fn subscription_status(
 ///
 /// A queue is a list of wake-ups already posted to one endpoint. A registration that is
 /// removed, or replaced by a different endpoint, leaves nothing that could show them, so
-/// they go with it. A pool replacement on the same endpoint keeps them.
+/// they go with it. Re-registering the same endpoint keeps them.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
@@ -198,7 +192,7 @@ fn set_app_subscription(
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     // Read now rather than taking what authorizing the call happened to see: this decides
-    // whether the pool is being replaced at the same address, which the record owns.
+    // whether this is the same address as the registration it replaces, which the record owns.
     let NotificationApp {
         webpush_subscription: registered,
         ..
@@ -381,12 +375,8 @@ mod tests {
         assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
     }
 
-    /// The pool is spent by elapsed time, so one no newer than the pool already stored
-    /// would shorten the coverage the browser believes it has.
-    /// Replacing a pool that is running out goes through this same call, so a top-up
-    /// must leave the registration it lands on where it was.
-    /// Another endpoint is another registration, so the pool it arrives with answers to
-    /// nothing the one it replaces held.
+    /// Another address is another registration, so it answers to nothing the one it
+    /// replaces held, its age included.
     #[test]
     fn a_rotated_endpoint_starts_a_fresh_registration() {
         setup();
@@ -394,7 +384,7 @@ mod tests {
         subscribe(anchor_number, browsers[0], ENDPOINT, 5_000);
 
         try_subscribe(anchor_number, browsers[0], ROTATED, 1_000)
-            .expect("a rotated endpoint is not a pool replacement");
+            .expect("a rotated endpoint is a registration of its own");
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.endpoint.as_str(), ROTATED);
@@ -430,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn topping_up_the_pool_keeps_the_browser_inbox() {
+    fn re_registering_the_same_endpoint_keeps_the_browser_inbox() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
@@ -442,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn the_status_reports_the_endpoint_and_the_pool_that_was_registered() {
+    fn the_status_reports_the_endpoint_that_was_registered() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
@@ -520,7 +510,7 @@ mod tests {
             .expect("an app registers its subscription");
 
         try_subscribe_as(app_authorization(app_id), anchor_number, ROTATED, 1_000)
-            .expect("a rotated endpoint is not a pool replacement");
+            .expect("a rotated endpoint is a registration of its own");
 
         let stored = app(app_id).webpush_subscription.expect("a subscription");
         assert_eq!(stored.endpoint.as_str(), ROTATED);

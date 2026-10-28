@@ -1101,7 +1101,7 @@ pub struct NotificationConsentGrantedRequest {
 }
 
 /// Everything a browser uploads when it registers for Web Push, and how it replaces a
-/// pool that is running out: the same endpoint with a newer `jwt_issued_at_ns`.
+/// registration at the same endpoint, which keeps what is already queued for it.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SetWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,

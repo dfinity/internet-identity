@@ -18,9 +18,6 @@ vi.mock("./payloadKeys", () => ({
       payloadKeyid: new Uint8Array(65).fill(4),
     }),
 }));
-vi.mock("./vapidPool", () => ({
-  relayOriginOf: vi.fn(() => "https://relay.example"),
-}));
 vi.mock("./browserActor", () => ({
   anonymousActor: vi.fn(() =>
     Promise.resolve({

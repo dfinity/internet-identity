@@ -34,8 +34,6 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { notificationsTurnedOff } from "./turnedOff";
 
 const ENDPOINT = "https://relay.example/abc";
-/** A registration on `endpoint` whose pool of 30 windows was minted `daysAgo` ago. */
-/** A registered pool with `left` of its windows still to come. */
 /** What the canister answers for a browser it holds a registration for. */
 const registeredAt = (endpoint = ENDPOINT) => [{ endpoint }];
 
@@ -105,18 +103,8 @@ describe("reconcileDeviceNotifications", () => {
   });
 
   /**
-   * Topping up a pool that is running out belongs to the service worker, which does it
-   * on every wake-up and reaches a browser whose user does not come back here.
-   */
-
-  /**
-   * A pool with nothing left is this page's to fix: the canister cannot wake a browser
-   * whose pool is spent, so the worker would never get the chance to sign another.
-   */
-
-  /**
-   * The subscription and its VAPID key belong to the browser, not to one identity, so a
-   * second identity with no row of its own registers what is already there. Rotating
+   * The subscription belongs to the browser, not to one identity, so a second identity
+   * with no row of its own registers what is already there. Rotating
    * would unsubscribe the endpoint the first identity's row still names.
    */
   it("registers the browser's existing subscription for an identity with no row", async () => {

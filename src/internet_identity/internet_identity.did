@@ -1885,8 +1885,8 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
-// What a browser uploads when it registers for Web Push, and how it replaces a pool
-// that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+// What a browser uploads when it registers for Web Push. The same endpoint is a
+// registration at that endpoint again, which keeps what is already queued for it. Signed with the
 // browser key it signs in with, which is what says the subscription is this browser's.
 type SetWebPushSubscriptionRequest = record {
     anchor_number : UserNumber;
