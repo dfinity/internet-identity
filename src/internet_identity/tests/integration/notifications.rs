@@ -791,8 +791,6 @@ mod subscriptions {
         Ok(())
     }
 
-    /// One call both registers and tops up, so a browser replaying a pool it already
-    /// uploaded must not be able to walk its own coverage backwards.
     /// The caller's key is what names the row, so a key the registry has never seen
     /// cannot write one.
     #[test]
