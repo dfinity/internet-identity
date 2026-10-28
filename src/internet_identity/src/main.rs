@@ -45,9 +45,7 @@ use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
-use notifications::webpush::{
-    deliverable_endpoint, JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey,
-};
+use notifications::webpush::{deliverable_endpoint, PayloadIkm, PayloadKeyId, PushEndpoint};
 use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -341,6 +339,14 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 /// Authorized by the caller's own key: a browser writes its entry's subscription, an app
 /// writes its record's.
+/// The key a browser subscribes with and every push names. `None` until the canister has
+/// asked the management canister for it, which the first notification does.
+#[query]
+fn get_vapid_public_key() -> Option<ByteBuf> {
+    enabled_or::<()>(|_| ()).ok()?;
+    notifications::webpush::vapid_key::public_key().map(ByteBuf::from)
+}
+
 #[update]
 fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
@@ -348,54 +354,27 @@ fn set_webpush_subscription(
     let SetWebPushSubscriptionRequest {
         anchor_number,
         endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
         payload_ikm,
         payload_keyid,
     } = request;
     enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
 
     // Every field at once rather than the first to fail, so a browser doesn't go round
-    // five times to learn what one answer can say.
-    let (endpoint, vapid_public_key, jwt_signatures, payload_ikm, payload_keyid) = match (
+    // three times to learn what one answer can say.
+    let (endpoint, payload_ikm, payload_keyid) = match (
         PushEndpoint::try_from(endpoint.as_str())
             .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
-        VapidPublicKey::try_from(vapid_public_key.into_vec()),
-        JwtPool::try_new(
-            jwt_signatures
-                .into_iter()
-                .map(ByteBuf::into_vec)
-                .collect::<Vec<_>>(),
-            jwt_issued_at_ns,
-        ),
         PayloadIkm::try_from(payload_ikm.into_vec()),
         PayloadKeyId::try_from(payload_keyid.into_vec()),
     ) {
-        (
-            Ok(endpoint),
-            Ok(vapid_public_key),
-            Ok(jwt_signatures),
-            Ok(payload_ikm),
-            Ok(payload_keyid),
-        ) => (
-            endpoint,
-            vapid_public_key,
-            jwt_signatures,
-            payload_ikm,
-            payload_keyid,
-        ),
-        (endpoint, vapid_public_key, jwt_signatures, payload_ikm, payload_keyid) => {
-            let problems: Vec<String> = [
-                endpoint.err(),
-                vapid_public_key.err(),
-                jwt_signatures.err(),
-                payload_ikm.err(),
-                payload_keyid.err(),
-            ]
-            .into_iter()
-            .flatten()
-            .collect();
+        (Ok(endpoint), Ok(payload_ikm), Ok(payload_keyid)) => {
+            (endpoint, payload_ikm, payload_keyid)
+        }
+        (endpoint, payload_ikm, payload_keyid) => {
+            let problems: Vec<String> = [endpoint.err(), payload_ikm.err(), payload_keyid.err()]
+                .into_iter()
+                .flatten()
+                .collect();
             return Err(SetWebPushSubscriptionError::InternalCanisterError(
                 problems.join("; "),
             ));
@@ -409,8 +388,6 @@ fn set_webpush_subscription(
         key,
         anchor_number,
         endpoint,
-        vapid_public_key,
-        jwt_signatures,
         payload_ikm,
         payload_keyid,
         ic_cdk::api::time(),

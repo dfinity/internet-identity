@@ -1,7 +1,6 @@
 //! Turning a caller's Web Push request into one the channel can act on: a deployment
 //! that notifies at all, and fields the canister can deliver against.
 
-use internet_identity_interface::internet_identity::types::Timestamp;
 use std::ops::RangeInclusive;
 use url::Url;
 
@@ -9,10 +8,6 @@ use url::Url;
 const MAX_ENDPOINT_LEN: usize = 512;
 /// VAPID application server key: uncompressed SEC1 P-256, 65 bytes.
 const VAPID_PUBKEY_LEN: usize = 65;
-/// Raw ECDSA P-256 signature: r||s, 32 bytes each.
-pub(super) const JWT_SIG_LEN: usize = 64;
-/// One JWT per validity window; 30 covers ~30 days. Bounded to cap the row.
-const MAX_JWT_POOL_LEN: usize = 30;
 
 /// A relay address a push can be posted to: 1..=512 bytes, a URL, and a host to post it
 /// at.
@@ -71,39 +66,6 @@ pub fn deliverable_endpoint(endpoint: &PushEndpoint) -> Result<(), String> {
         return Ok(());
     }
     Err("endpoint must be an https:// URL".to_string())
-}
-
-/// The VAPID application server key, uncompressed SEC1 P-256.
-///
-/// Length plus curve validity. The key is echoed to the relay as VAPID `k=`, and a
-/// relay rejects a push whose `k` it cannot parse.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VapidPublicKey(Vec<u8>);
-
-impl VapidPublicKey {
-    pub fn as_slice(&self) -> &[u8] {
-        &self.0
-    }
-
-    pub fn into_vec(self) -> Vec<u8> {
-        self.0
-    }
-}
-
-impl TryFrom<Vec<u8>> for VapidPublicKey {
-    type Error = String;
-
-    fn try_from(vapid_public_key: Vec<u8>) -> Result<Self, Self::Error> {
-        validate_param_len(
-            vapid_public_key.len(),
-            VAPID_PUBKEY_LEN..=VAPID_PUBKEY_LEN,
-            "vapid_public_key",
-        )?;
-        if p256::PublicKey::from_sec1_bytes(&vapid_public_key).is_err() {
-            return Err("vapid_public_key is not a valid SEC1 P-256 point".to_string());
-        }
-        Ok(Self(vapid_public_key))
-    }
 }
 
 /// RFC 8291 §3.4 input keying material, derived by the browser from this subscription's
@@ -169,51 +131,6 @@ impl TryFrom<Vec<u8>> for PayloadKeyId {
     }
 }
 
-/// One JWT signature per validity window, in window order, and the instant they were
-/// signed at.
-///
-/// The two travel together because one signature covers one elapsed window: when the pool
-/// was minted is what says which window a given signature is for, so a pool without it
-/// means nothing.
-///
-/// The signatures themselves are not verified: garbage only breaks the uploader's own
-/// delivery, and 30 ECDSA verifications per subscribe isn't worth it.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct JwtPool {
-    signatures: Vec<Vec<u8>>,
-    issued_at_ns: Timestamp,
-}
-
-impl JwtPool {
-    /// Takes two values rather than one, which is the case an inherent constructor is
-    /// for: a `TryFrom` over a tuple would say less and read worse.
-    pub fn try_new(signatures: Vec<Vec<u8>>, issued_at_ns: Timestamp) -> Result<Self, String> {
-        validate_param_len(signatures.len(), 1..=MAX_JWT_POOL_LEN, "jwt_pool")?;
-        if let Some(bad) = signatures.iter().find(|sig| sig.len() != JWT_SIG_LEN) {
-            return Err(format!(
-                "each jwt signature must be {JWT_SIG_LEN} bytes, got {}",
-                bad.len()
-            ));
-        }
-        Ok(Self {
-            signatures,
-            issued_at_ns,
-        })
-    }
-
-    pub fn issued_at_ns(&self) -> Timestamp {
-        self.issued_at_ns
-    }
-
-    pub fn signatures(&self) -> &[Vec<u8>] {
-        &self.signatures
-    }
-
-    pub fn into_signatures(self) -> Vec<Vec<u8>> {
-        self.signatures
-    }
-}
-
 fn validate_param_len(
     observed_len_bytes: usize,
     allowed_range_bytes: RangeInclusive<usize>,
@@ -249,7 +166,6 @@ mod tests {
     use internet_identity_interface::internet_identity::types::{
         AnchorNumber, SetWebPushSubscriptionRequest,
     };
-    use serde_bytes::ByteBuf;
     const ANCHOR: AnchorNumber = 10_000;
 
     /// What `notifications_allow_insecure_endpoint` says, for a test that is about a
@@ -263,27 +179,10 @@ mod tests {
     /// Every field, the way the endpoint takes them: all three problems rather than the
     /// first.
     fn validate(request: SetWebPushSubscriptionRequest) -> Result<(), String> {
-        let SetWebPushSubscriptionRequest {
-            endpoint,
-            vapid_public_key,
-            jwt_signatures,
-            jwt_issued_at_ns,
-            ..
-        } = request;
-        let problems: Vec<String> = [
-            PushEndpoint::try_from(endpoint.as_str())
-                .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint))
-                .err(),
-            VapidPublicKey::try_from(vapid_public_key.into_vec()).err(),
-            JwtPool::try_new(
-                jwt_signatures
-                    .into_iter()
-                    .map(ByteBuf::into_vec)
-                    .collect::<Vec<_>>(),
-                jwt_issued_at_ns,
-            )
-            .err(),
-        ]
+        let SetWebPushSubscriptionRequest { endpoint, .. } = request;
+        let problems: Vec<String> = [PushEndpoint::try_from(endpoint.as_str())
+            .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint))
+            .err()]
         .into_iter()
         .flatten()
         .collect();
@@ -296,13 +195,13 @@ mod tests {
     #[test]
     fn accepts_what_a_browser_sends() {
         setup();
-        assert!(validate(request(ANCHOR, "https://relay.example/a", 0)).is_ok());
+        assert!(validate(request(ANCHOR, "https://relay.example/a")).is_ok());
     }
 
     #[test]
     fn refuses_an_endpoint_nothing_can_be_sent_to_in_confidence() {
         setup();
-        assert!(validate(request(ANCHOR, "http://relay.example/a", 0)).is_err());
+        assert!(validate(request(ANCHOR, "http://relay.example/a")).is_err());
     }
 
     /// A deployment whose relay is a local server has no certificate to offer.
@@ -310,8 +209,8 @@ mod tests {
     fn takes_a_loopback_one_where_the_deployment_says_it_has_no_relay() {
         setup();
         allow_insecure(true);
-        let loopback = validate(request(ANCHOR, "http://127.0.0.1:4711/push", 0));
-        let elsewhere = validate(request(ANCHOR, "http://relay.example/push", 0));
+        let loopback = validate(request(ANCHOR, "http://127.0.0.1:4711/push"));
+        let elsewhere = validate(request(ANCHOR, "http://relay.example/push"));
         allow_insecure(false);
 
         assert!(loopback.is_ok());
@@ -331,52 +230,11 @@ mod tests {
             "https://",
         ] {
             assert!(
-                validate(request(ANCHOR, endpoint, 0)).is_err(),
+                validate(request(ANCHOR, endpoint)).is_err(),
                 "{endpoint} must not be accepted"
             );
         }
         let too_long = format!("https://relay.example/{}", "x".repeat(MAX_ENDPOINT_LEN));
-        assert!(validate(request(ANCHOR, &too_long, 0)).is_err());
-    }
-
-    #[test]
-    fn vapid_key_must_be_a_real_point() {
-        setup();
-        for bad_key in [
-            vec![4u8; 10],
-            // Right length, not on the curve, so only the curve check rejects it.
-            vec![4u8; VAPID_PUBKEY_LEN],
-        ] {
-            let mut sent = request(ANCHOR, "https://relay.example/a", 0);
-            sent.vapid_public_key = ByteBuf::from(bad_key);
-            assert!(validate(sent).is_err());
-        }
-    }
-
-    #[test]
-    fn rejects_a_pool_that_is_empty_over_long_or_mis_sized() {
-        setup();
-        for bad_pool in [
-            vec![],
-            vec![vec![3u8; JWT_SIG_LEN]; MAX_JWT_POOL_LEN + 1],
-            vec![vec![3u8; 10]],
-        ] {
-            let mut sent = request(ANCHOR, "https://relay.example/a", 0);
-            sent.jwt_signatures = bad_pool.into_iter().map(ByteBuf::from).collect();
-            assert!(validate(sent).is_err());
-        }
-    }
-
-    #[test]
-    fn reports_every_invalid_field_at_once() {
-        setup();
-        let mut sent = request(ANCHOR, "", 0);
-        sent.vapid_public_key = ByteBuf::from(vec![4u8; 10]);
-        sent.jwt_signatures = vec![];
-
-        let Err(problems) = validate(sent) else {
-            panic!("three bad fields must be refused");
-        };
-        assert_eq!(problems.split("; ").count(), 3, "{problems}");
+        assert!(validate(request(ANCHOR, &too_long)).is_err());
     }
 }

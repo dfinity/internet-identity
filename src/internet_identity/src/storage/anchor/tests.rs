@@ -2349,10 +2349,8 @@ mod browser_tests {
     #[test]
     fn pointing_at_an_app_takes_the_browsers_own_address_and_what_it_was_sent() {
         let (mut anchor, id) = anchor_with_browser();
-        anchor.set_webpush_subscription(
-            id,
-            Some(subscription_at("https://push.example/one", 1_000, 1_000)),
-        );
+        anchor
+            .set_webpush_subscription(id, Some(subscription_at("https://push.example/one", 1_000)));
         anchor
             .notifications_for_browser_mut(id)
             .expect("a listed browser")

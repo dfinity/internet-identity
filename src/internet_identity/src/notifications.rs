@@ -131,6 +131,10 @@ pub(crate) fn test_setup() {
     use ic_stable_structures::VectorMemory;
     crate::state::storage_replace(Storage::new((0, 100), VectorMemory::default()));
     storage_borrow_mut(|s| s.update_salt([7u8; 32]));
+    // Asked of the management canister on a real deployment, which a test has none of.
+    crate::state::persistent_state_mut(|p| {
+        p.vapid_public_key = Some(crate::notifications::webpush::fixtures::valid_vapid_key())
+    });
 }
 
 #[cfg(test)]

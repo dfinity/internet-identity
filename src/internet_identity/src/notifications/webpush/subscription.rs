@@ -1,7 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::validation::{JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey};
+use super::validation::{PayloadIkm, PayloadKeyId, PushEndpoint};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
@@ -23,8 +23,6 @@ pub fn set_subscription(
     key: NotificationKey,
     anchor_number: AnchorNumber,
     endpoint: PushEndpoint,
-    vapid_public_key: VapidPublicKey,
-    jwt_signatures: JwtPool,
     payload_ikm: PayloadIkm,
     payload_keyid: PayloadKeyId,
     now_ns: Timestamp,
@@ -33,30 +31,18 @@ pub fn set_subscription(
     // The anchor named in the call is what authorized it, not where the subscription goes.
     let browser_id = match key {
         NotificationKey::App(app_id) => {
-            return set_app_subscription(
-                app_id,
-                endpoint,
-                vapid_public_key,
-                jwt_signatures,
-                payload_ikm,
-                payload_keyid,
-                now_ns,
-            )
+            return set_app_subscription(app_id, endpoint, payload_ikm, payload_keyid, now_ns)
         }
         NotificationKey::Browser(browser_id) => browser_id,
     };
     let anchor = state::anchor(anchor_number);
-    let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
 
     // The same endpoint is a pool replacement on a registration that is still live, so it
     // keeps its age and the pool has to move forward. Any other endpoint is a new one.
+    // The same address is the same registration, which keeps its age; a browser
+    // re-registering there is replacing the keys a payload is sealed against.
     let created_at_ns = match anchor.webpush_subscription(browser_id) {
-        Some(registered) if registered.endpoint == endpoint => {
-            if jwt_issued_at_ns <= registered.jwt_signatures.issued_at_ns() {
-                return Err(SetWebPushSubscriptionError::StaleJwtPool);
-            }
-            registered.created_at_ns
-        }
+        Some(registered) if registered.endpoint == endpoint => registered.created_at_ns,
         _ => now_ns,
     };
 
@@ -66,8 +52,6 @@ pub fn set_subscription(
         Some(WebPushSubscription {
             endpoint,
             created_at_ns,
-            vapid_public_key,
-            jwt_signatures,
             payload_ikm,
             payload_keyid,
         }),
@@ -168,8 +152,6 @@ pub fn subscription_status(
     };
     subscription.map(|registered| WebPushSubscriptionStatus {
         endpoint: registered.endpoint.as_str().to_string(),
-        pool_len: registered.jwt_signatures.signatures().len() as u32,
-        issued_at_ns: registered.jwt_signatures.issued_at_ns(),
     })
 }
 
@@ -211,13 +193,10 @@ fn write_subscription(
 fn set_app_subscription(
     app_id: NotificationAppId,
     endpoint: PushEndpoint,
-    vapid_public_key: VapidPublicKey,
-    jwt_signatures: JwtPool,
     payload_ikm: PayloadIkm,
     payload_keyid: PayloadKeyId,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
     // Read now rather than taking what authorizing the call happened to see: this decides
     // whether the pool is being replaced at the same address, which the record owns.
     let NotificationApp {
@@ -228,25 +207,14 @@ fn set_app_subscription(
     })?;
 
     let created_at_ns = match registered {
-        // A pool that is running out is replaced at the same address, so the registration
-        // keeps its age, and the new pool has to be newer: one signature covers one
-        // elapsed window.
         Some(WebPushSubscription {
             endpoint: registered_endpoint,
             created_at_ns: registered_created_at_ns,
-            jwt_signatures: registered_pool,
             ..
-        }) if registered_endpoint == endpoint => {
-            if jwt_issued_at_ns <= registered_pool.issued_at_ns() {
-                return Err(SetWebPushSubscriptionError::StaleJwtPool);
-            }
-            registered_created_at_ns
-        }
+        }) if registered_endpoint == endpoint => registered_created_at_ns,
         // Another address is another registration, and the write below drops what was
         // queued through the one it leaves.
-        Some(_) => now_ns,
-        // Never registered.
-        None => now_ns,
+        _ => now_ns,
     };
 
     state::storage_borrow_mut(|storage| {
@@ -255,8 +223,6 @@ fn set_app_subscription(
             Some(WebPushSubscription {
                 endpoint,
                 created_at_ns,
-                vapid_public_key,
-                jwt_signatures,
                 payload_ikm,
                 payload_keyid,
             }),
@@ -417,41 +383,8 @@ mod tests {
 
     /// The pool is spent by elapsed time, so one no newer than the pool already stored
     /// would shorten the coverage the browser believes it has.
-    #[test]
-    fn a_pool_no_newer_than_the_stored_one_is_refused() {
-        setup();
-        let (anchor_number, browsers) = anchor_with_browsers(1);
-        subscribe(anchor_number, browsers[0], ENDPOINT, 5_000);
-
-        for stale in [4_999, 5_000] {
-            assert_eq!(
-                try_subscribe(anchor_number, browsers[0], ENDPOINT, stale),
-                Err(SetWebPushSubscriptionError::StaleJwtPool),
-                "{stale} must not replace the pool minted at 5000"
-            );
-        }
-        assert_eq!(
-            stored_subscription(anchor_number, browsers[0])
-                .map(|s| s.jwt_signatures.issued_at_ns()),
-            Some(5_000)
-        );
-    }
-
     /// Replacing a pool that is running out goes through this same call, so a top-up
     /// must leave the registration it lands on where it was.
-    #[test]
-    fn topping_up_the_pool_keeps_the_registration_it_lands_on() {
-        setup();
-        let (anchor_number, browsers) = anchor_with_browsers(1);
-        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
-
-        subscribe(anchor_number, browsers[0], ENDPOINT, 9_000);
-
-        let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
-        assert_eq!(stored.created_at_ns, 1_000);
-        assert_eq!(stored.jwt_signatures.issued_at_ns(), 9_000);
-    }
-
     /// Another endpoint is another registration, so the pool it arrives with answers to
     /// nothing the one it replaces held.
     #[test]
@@ -518,8 +451,6 @@ mod tests {
             status(anchor_number, browsers[0]),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
-                pool_len: valid_pool().len() as u32,
-                issued_at_ns: 1_000,
             })
         );
 
@@ -574,35 +505,10 @@ mod tests {
             subscription_status(anchor_number, app_authorization(app_id)),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
-                pool_len: 3,
-                issued_at_ns: 1_000,
             })
         );
         // The browser is answered about its own entry, which the app's write left alone.
         assert_eq!(status(anchor_number, browsers[0]), None);
-    }
-
-    #[test]
-    fn an_app_pool_no_newer_than_the_stored_one_is_refused() {
-        setup();
-        let (anchor_number, browsers) = anchor_with_browsers(1);
-        let app_id = app_pointed_at_by(anchor_number, browsers[0], APP_KEY_SEED, 1_000);
-        try_subscribe_as(app_authorization(app_id), anchor_number, ENDPOINT, 5_000)
-            .expect("an app registers its subscription");
-
-        for stale in [4_999, 5_000] {
-            assert_eq!(
-                try_subscribe_as(app_authorization(app_id), anchor_number, ENDPOINT, stale),
-                Err(SetWebPushSubscriptionError::StaleJwtPool),
-                "{stale} must not replace the pool minted at 5000"
-            );
-        }
-        assert_eq!(
-            app(app_id)
-                .webpush_subscription
-                .map(|s| s.jwt_signatures.issued_at_ns()),
-            Some(5_000)
-        );
     }
 
     #[test]

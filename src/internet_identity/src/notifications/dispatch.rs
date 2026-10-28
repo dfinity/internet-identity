@@ -7,10 +7,12 @@ use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::backlog::identity::PendingIdentityNotification;
 use crate::notifications::browser_inbox;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::notifications::webpush::vapid_key;
 use crate::notifications::webpush::{
     clear_gone_subscription, payload, vapid_jwt, PayloadIkm, PayloadKeyId,
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
+use crate::single_flight_cache::{self, Cached};
 use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, InboxNotification, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
@@ -179,6 +181,33 @@ pub(crate) struct Delivery {
     pub(crate) ttl_seconds: u64,
 }
 
+thread_local! {
+    /// One JWT per relay, signed ahead of the one in hand lapsing.
+    static VAPID_JWTS: std::cell::RefCell<vapid_key::JwtCache> =
+        std::cell::RefCell::new(vapid_key::new_jwt_cache());
+}
+
+/// The JWT a relay is woken with, where one is in hand. A relay we hold none for starts a
+/// signature and answers nothing: those notifications keep their place and the next pass
+/// asks again.
+fn jwt_for(relay_origin: String) -> Option<String> {
+    match single_flight_cache::get(&VAPID_JWTS, relay_origin.clone()) {
+        Cached::Ready(jwt) => Some(jwt),
+        Cached::Pending => {
+            // Off-wasm nothing drives a detached fill, so a test drives it here and reads
+            // the answer in the same pass rather than arranging a second one.
+            #[cfg(test)]
+            {
+                single_flight_cache::run_detached();
+                if let Cached::Ready(jwt) = single_flight_cache::get(&VAPID_JWTS, relay_origin) {
+                    return Some(jwt);
+                }
+            }
+            None
+        }
+    }
+}
+
 /// Run a pass as soon as the budget allows: at once after a quiet spell, otherwise one
 /// interval after the last pass started. Does nothing while a pass is already due.
 pub(crate) fn schedule_pass(now_ns: Timestamp) {
@@ -292,6 +321,12 @@ fn fan_out_to_destinations(
     now_ns: Timestamp,
     deliveries: &mut Vec<Delivery>,
 ) {
+    // Every push names the key its subscription was made with, so without ours there is
+    // nothing to post. Asked for once; the next pass finds it.
+    let Some(vapid_public_key) = vapid_key::public_key() else {
+        vapid_key::ensure_public_key();
+        return;
+    };
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
             return;
@@ -335,7 +370,7 @@ fn fan_out_to_destinations(
                     target,
                     notification: None,
                     endpoint: subscription.endpoint.as_str().to_string(),
-                    vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
+                    vapid_public_key: vapid_public_key.clone(),
                     body: None,
                     jwt,
                     urgency: pending.urgency.clone(),
@@ -411,6 +446,12 @@ fn fan_out_to_browsers(
     now_ns: Timestamp,
     out: &mut Vec<Delivery>,
 ) {
+    // Every push names the key its subscription was made with, so without ours there is
+    // nothing to post. Asked for once; the next pass finds it.
+    let Some(vapid_public_key) = vapid_key::public_key() else {
+        vapid_key::ensure_public_key();
+        return;
+    };
     let pending = &taken.entry.item;
     let queued = InboxNotification {
         // Named by `deposit`, once per browser this is deposited for.
@@ -450,7 +491,7 @@ fn fan_out_to_browsers(
                         // Filled in below, where the deposit names the entry for this browser.
                         notification: None,
                         endpoint: subscription.endpoint.as_str().to_string(),
-                        vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
+                        vapid_public_key: vapid_public_key.clone(),
                         body: None,
                         jwt,
                         urgency: pending.urgency.clone(),
@@ -613,7 +654,10 @@ fn authorized_wake_up<'a>(
         return None;
     }
     let relay_origin = vapid_jwt::relay_origin_of(subscription.endpoint.as_str())?;
-    let jwt = vapid_jwt::assemble(subscription, &relay_origin, now_ns)?;
+    // Nothing waits on a signature. A relay we hold no JWT for leaves its notifications
+    // where they are and the next pass asks again, by which time the fill this started
+    // has landed.
+    let jwt = jwt_for(relay_origin)?;
     Some((subscription, jwt))
 }
 
@@ -953,7 +997,7 @@ mod tests {
                 storage
                     .set_notification_app_subscription(
                         app.id,
-                        Some(subscription_at(endpoint, 0, 0)),
+                        Some(subscription_at(endpoint, 0)),
                         0,
                     )
                     .expect("the record is there");
@@ -1138,17 +1182,6 @@ mod tests {
         assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
 
         assert_eq!(still_in_backlog(SECOND_NS), 0);
-    }
-
-    #[test]
-    fn a_browser_whose_signed_pool_has_run_out_is_skipped() {
-        setup();
-        let (recipient, browsers) = subscribed_recipient(1);
-        let spent = 3 * 24 * 60 * 60 * SECOND_NS;
-        submit(recipient, 7, spent + 10 * SECOND_NS);
-
-        assert!(plan_pass(MAX_POSTS_PER_PASS, spent + SECOND_NS).is_empty());
-        assert!(queued(recipient, browsers[0]).is_empty());
     }
 
     /// The queue is the ration: an identity holds only so many wake-ups of one kind, so

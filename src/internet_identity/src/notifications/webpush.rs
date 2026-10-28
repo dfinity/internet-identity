@@ -8,12 +8,11 @@ pub(crate) mod payload;
 mod subscription;
 mod validation;
 pub(crate) mod vapid_jwt;
+pub(crate) mod vapid_key;
 
 #[cfg(test)]
 pub(crate) mod fixtures;
 
 pub(crate) use subscription::{clear_gone_subscription, delivering_subscription};
 pub use subscription::{remove_subscription, set_subscription, subscription_status};
-pub use validation::{
-    deliverable_endpoint, JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey,
-};
+pub use validation::{deliverable_endpoint, PayloadIkm, PayloadKeyId, PushEndpoint};

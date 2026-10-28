@@ -118,6 +118,9 @@ pub struct PersistentState {
     // `.well-known/ic-domains` asset so the backend is reachable on its
     // custom domain.
     pub backend_origin: Option<String>,
+    /// That key's public half, uncompressed SEC1. Asked of the management canister once
+    /// and kept, because a browser subscribes with it and every push names it.
+    pub vapid_public_key: Option<Vec<u8>>,
     // Configuration for New Flow Origins
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
@@ -181,6 +184,7 @@ impl Default for PersistentState {
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
+            vapid_public_key: None,
             backend_origin: None,
             new_flow_origins: None,
             openid_configs: None,

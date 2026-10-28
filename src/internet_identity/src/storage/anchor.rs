@@ -1,9 +1,7 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
-use crate::notifications::webpush::{
-    JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey,
-};
+use crate::notifications::webpush::{PayloadIkm, PayloadKeyId, PushEndpoint};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
@@ -14,7 +12,6 @@ use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_inbox::{
     StorableInboxNotification, StorableNotificationEvent,
 };
-use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -178,9 +175,6 @@ impl From<InboxNotification> for StorableInboxNotification {
 pub struct WebPushSubscription {
     pub endpoint: PushEndpoint,
     pub created_at_ns: Timestamp,
-    pub vapid_public_key: VapidPublicKey,
-    /// Raw ECDSA P-256 signatures in window order, with the instant they were signed at.
-    pub jwt_signatures: JwtPool,
     /// What a payload through this subscription is sealed with, derived by the browser.
     pub payload_ikm: PayloadIkm,
     pub payload_keyid: PayloadKeyId,
@@ -196,16 +190,6 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
         Ok(WebPushSubscription {
             endpoint: PushEndpoint::try_from(value.endpoint.as_str())?,
             created_at_ns: value.created_at_ns,
-            vapid_public_key: VapidPublicKey::try_from(value.vapid_public_key)?,
-            jwt_signatures: JwtPool::try_new(
-                value
-                    .jwt_pool
-                    .signatures
-                    .into_iter()
-                    .map(Vec::from)
-                    .collect(),
-                value.jwt_pool.issued_at_ns,
-            )?,
             payload_ikm: PayloadIkm::try_from(value.payload_ikm)?,
             payload_keyid: PayloadKeyId::try_from(value.payload_keyid)?,
         })
@@ -214,20 +198,9 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
 
 impl From<WebPushSubscription> for StorableWebPushSubscription {
     fn from(value: WebPushSubscription) -> Self {
-        let issued_at_ns = value.jwt_signatures.issued_at_ns();
         StorableWebPushSubscription {
             endpoint: value.endpoint.into_string(),
             created_at_ns: value.created_at_ns,
-            vapid_public_key: value.vapid_public_key.into_vec(),
-            jwt_pool: StorableWebPushJwtPool {
-                signatures: value
-                    .jwt_signatures
-                    .into_signatures()
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
-                issued_at_ns,
-            },
             payload_ikm: value.payload_ikm.into_vec(),
             payload_keyid: value.payload_keyid.into_vec(),
         }

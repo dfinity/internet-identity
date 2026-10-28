@@ -1,8 +1,6 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
-use super::validation::{
-    JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey, JWT_SIG_LEN,
-};
+use super::validation::{PayloadIkm, PayloadKeyId, PushEndpoint};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -66,17 +64,10 @@ fn key(seed: u8) -> PublicKey {
 /// The key a Home Screen app generated in its own partition and presents on every call.
 /// A registration whose every field passes the shape its newtype asserts, which is the
 /// only kind storage can hand back.
-pub(crate) fn subscription_at(
-    endpoint: &str,
-    created_at_ns: Timestamp,
-    issued_at_ns: Timestamp,
-) -> WebPushSubscription {
+pub(crate) fn subscription_at(endpoint: &str, created_at_ns: Timestamp) -> WebPushSubscription {
     WebPushSubscription {
         endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
         created_at_ns,
-        vapid_public_key: VapidPublicKey::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
-        jwt_signatures: JwtPool::try_new(valid_pool(), issued_at_ns)
-            .expect("a pool of 64-byte signatures"),
         payload_ikm: PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
         payload_keyid: PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
     }
@@ -127,52 +118,23 @@ pub(crate) fn valid_payload_ikm() -> Vec<u8> {
     vec![9u8; 32]
 }
 
-pub(crate) fn valid_pool() -> Vec<Vec<u8>> {
-    vec![vec![3u8; JWT_SIG_LEN]; 3]
-}
-
 /// Well-formed defaults, so a field added to the request doesn't touch every test.
 pub(super) fn request(
     anchor_number: AnchorNumber,
     endpoint: &str,
-    jwt_issued_at_ns: Timestamp,
 ) -> SetWebPushSubscriptionRequest {
     SetWebPushSubscriptionRequest {
         anchor_number,
         endpoint: endpoint.to_string(),
-        vapid_public_key: ByteBuf::from(valid_vapid_key()),
-        jwt_signatures: valid_pool().into_iter().map(ByteBuf::from).collect(),
-        jwt_issued_at_ns,
         payload_ikm: ByteBuf::from(valid_payload_ikm()),
         payload_keyid: ByteBuf::from(valid_vapid_key()),
     }
 }
 
 /// Only validation can build these, so the fixture goes through it.
-pub(super) fn validated(
-    anchor_number: AnchorNumber,
-    endpoint: &str,
-    jwt_issued_at_ns: Timestamp,
-) -> (PushEndpoint, VapidPublicKey, JwtPool) {
-    let SetWebPushSubscriptionRequest {
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
-        ..
-    } = request(anchor_number, endpoint, jwt_issued_at_ns);
-    (
-        PushEndpoint::try_from(endpoint.as_str()).expect("the fixture endpoint validates"),
-        VapidPublicKey::try_from(vapid_public_key.into_vec()).expect("the fixture key validates"),
-        JwtPool::try_new(
-            jwt_signatures
-                .into_iter()
-                .map(ByteBuf::into_vec)
-                .collect::<Vec<_>>(),
-            jwt_issued_at_ns,
-        )
-        .expect("the fixture pool validates"),
-    )
+pub(super) fn validated(anchor_number: AnchorNumber, endpoint: &str) -> PushEndpoint {
+    let SetWebPushSubscriptionRequest { endpoint, .. } = request(anchor_number, endpoint);
+    PushEndpoint::try_from(endpoint.as_str()).expect("the fixture endpoint validates")
 }
 
 /// `set_subscription` for a test that has an anchor number rather than the anchor.
@@ -197,13 +159,10 @@ pub(super) fn try_subscribe_as(
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let (endpoint, vapid_public_key, jwt_signatures) = validated(anchor_number, endpoint, now_ns);
     super::set_subscription(
         key,
         anchor_number,
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
+        validated(anchor_number, endpoint),
         PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
         PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
         now_ns,
