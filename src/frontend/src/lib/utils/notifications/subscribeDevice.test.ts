@@ -26,7 +26,17 @@ vi.mock("./browserActor", () => ({
       get_vapid_public_key: () => Promise.resolve([new Uint8Array(65)]),
     }),
   ),
-  browserKeyActor: vi.fn(() => Promise.resolve({ set_webpush_subscription })),
+  browserKeyActor: vi.fn((identityNumber: bigint) =>
+    Promise.resolve({
+      set_webpush_subscription: (args: { endpoint: string }) =>
+        set_webpush_subscription({ ...args, anchor_number: identityNumber }),
+      get_webpush_subscription_status: () =>
+        Promise.resolve(registrationOf(identityNumber)),
+    }),
+  ),
+}));
+vi.mock("$lib/stores/browser-key.store", () => ({
+  registeredIdentityNumbers: () => Promise.resolve(signedInHere),
 }));
 
 import {
@@ -43,8 +53,18 @@ const IDENTITY = BigInt(10_000);
 
 /** The registration goes out under the browser key, not the identity's session. */
 const set_webpush_subscription = vi.hoisted(() =>
-  vi.fn((_args: { endpoint: string }) => Promise.resolve({ Ok: null })),
+  vi.fn((_args: { endpoint: string; anchor_number?: bigint }) =>
+    Promise.resolve({ Ok: null }),
+  ),
 );
+
+/** Every identity that has signed in on this browser, which is not the same set as the
+ *  identities that turned notifications on. */
+let signedInHere: bigint[] = [];
+/** The identities the canister holds a registration for, by anchor. */
+let registeredHere: bigint[] = [];
+const registrationOf = (identityNumber: bigint) =>
+  registeredHere.includes(identityNumber) ? [{ endpoint: HELD }] : [];
 
 const live = vi.mocked(currentDeviceSubscription);
 const subscribe = vi.mocked(subscribeToPush);
@@ -63,6 +83,8 @@ describe("ensureRegisteredDevice", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     subscribe.mockResolvedValue({ endpoint: FRESH } as PushSubscription);
+    signedInHere = [];
+    registeredHere = [];
   });
 
   // Subscribing drops the endpoint every other identity on this browser is
@@ -75,6 +97,48 @@ describe("ensureRegisteredDevice", () => {
     expect(set_webpush_subscription.mock.calls[0][0]).toMatchObject({
       endpoint: HELD,
     });
+  });
+
+  /**
+   * Subscribing took the endpoint they were registered with, so an identity left naming
+   * it reaches nothing and only its own owner visiting settings would ever find out.
+   */
+  it("moves the other identities that were registered here onto the new subscription", async () => {
+    live.mockResolvedValue(undefined);
+    signedInHere = [IDENTITY, OTHER];
+    registeredHere = [IDENTITY, OTHER];
+
+    await ensureRegisteredDevice(IDENTITY);
+
+    expect(
+      set_webpush_subscription.mock.calls.map((call) => call[0].anchor_number),
+    ).toEqual([IDENTITY, OTHER]);
+  });
+
+  /** Writing one here would turn notifications on in the name of someone who never asked. */
+  it("leaves an identity that holds no registration alone", async () => {
+    live.mockResolvedValue(undefined);
+    signedInHere = [IDENTITY, OTHER];
+    registeredHere = [IDENTITY];
+
+    await ensureRegisteredDevice(IDENTITY);
+
+    expect(
+      set_webpush_subscription.mock.calls.map((call) => call[0].anchor_number),
+    ).toEqual([IDENTITY]);
+  });
+
+  /** Nothing was taken from anyone, so there is nothing to move. */
+  it("leaves the others alone where it reused what this browser held", async () => {
+    live.mockResolvedValue(held());
+    signedInHere = [IDENTITY, OTHER];
+    registeredHere = [IDENTITY, OTHER];
+
+    await ensureRegisteredDevice(IDENTITY);
+
+    expect(
+      set_webpush_subscription.mock.calls.map((call) => call[0].anchor_number),
+    ).toEqual([IDENTITY]);
   });
 
   /**

@@ -12,6 +12,7 @@ import {
 import { vapidPublicKey } from "./vapidPublicKey";
 import { derivePayloadKeys } from "./payloadKeys";
 import { browserKeyActor } from "./browserActor";
+import { registeredIdentityNumbers } from "$lib/stores/browser-key.store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
   _SERVICE,
@@ -66,13 +67,60 @@ export const subscribeAndRegisterDevice = async (
  *
  * A subscription minted with any other application server key is one no push we sign
  * can reach, so reusing it would register an endpoint that is dead on arrival.
+ *
+ * `minted` says a new one replaced whatever was there, which is what obliges the caller
+ * to re-register every other identity this browser holds a key for.
  */
-const usableSubscription = async (): Promise<PushSubscription> => {
+const usableSubscription = async (): Promise<{
+  subscription: PushSubscription;
+  minted: boolean;
+}> => {
   const applicationServerKey = await vapidPublicKey();
   const held = await currentDeviceSubscription();
-  return held !== undefined && subscribedWith(held, applicationServerKey)
-    ? held
-    : subscribeToPush(applicationServerKey);
+  if (held !== undefined && subscribedWith(held, applicationServerKey)) {
+    return { subscription: held, minted: false };
+  }
+  return {
+    subscription: await subscribeToPush(applicationServerKey),
+    minted: true,
+  };
+};
+
+/**
+ * Moves every other identity that was registered on this browser onto `subscription`.
+ *
+ * Subscribing drops the endpoint they were registered with, so without this each one is
+ * left naming an address nothing is delivered to, and only its own owner going to
+ * settings would ever find out.
+ *
+ * Only an identity the canister already holds a registration for is moved: one that
+ * never turned notifications on, or turned them off again, has no registration to
+ * repair, and writing one here would turn them on in its owner's name. Theirs is a
+ * repair rather than what the caller asked for, so a refusal is left where it is.
+ */
+export const registerSiblings = async (
+  registered: bigint,
+  subscription: PushSubscription,
+): Promise<void> => {
+  const identityNumbers = await registeredIdentityNumbers().catch(() => []);
+  await Promise.all(
+    identityNumbers
+      .filter((identityNumber) => identityNumber !== registered)
+      .map(async (identityNumber) => {
+        try {
+          const actor = await browserKeyActor(identityNumber);
+          const [held] = await actor.get_webpush_subscription_status({
+            anchor_number: identityNumber,
+          });
+          if (held === undefined) {
+            return;
+          }
+          await registerStoredDevice(identityNumber, subscription, actor);
+        } catch {
+          // Left where it is: this identity's owner is not the one waiting on an answer.
+        }
+      }),
+  );
 };
 
 /**
@@ -83,9 +131,12 @@ const usableSubscription = async (): Promise<PushSubscription> => {
 export const ensureRegisteredDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
-  const live = await usableSubscription();
-  await registerStoredDevice(identityNumber, live);
-  return live.endpoint;
+  const { subscription, minted } = await usableSubscription();
+  await registerStoredDevice(identityNumber, subscription);
+  if (minted) {
+    await registerSiblings(identityNumber, subscription);
+  }
+  return subscription.endpoint;
 };
 
 /** `InvalidBrowserKey` is the anchor named not reaching the caller, which says nothing
@@ -108,7 +159,7 @@ export const registerForAnyAnchor = async (
   anchors: bigint[],
   caller: ActorSubclass<_SERVICE>,
 ): Promise<boolean> => {
-  const live = await usableSubscription();
+  const { subscription: live } = await usableSubscription();
 
   for (const anchor of anchors) {
     try {
