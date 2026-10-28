@@ -107,8 +107,6 @@ const anotherAnchorMayAnswer = (error: unknown): boolean => {
 export const registerForAnyAnchor = async (
   anchors: bigint[],
   caller: ActorSubclass<_SERVICE>,
-  /** The app record the subscription hangs on, where the caller knows it. */
-  appId?: bigint,
 ): Promise<boolean> => {
   const live = await usableSubscription();
 

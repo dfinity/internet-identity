@@ -113,7 +113,7 @@ const refusing = (...anchors: bigint[]) =>
       : Promise.resolve({ Ok: null }),
   );
 
-const kept = describe("registerForAnyAnchor", () => {
+describe("registerForAnyAnchor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     subscribe.mockResolvedValue({ endpoint: FRESH } as PushSubscription);

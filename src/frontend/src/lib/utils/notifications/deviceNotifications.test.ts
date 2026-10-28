@@ -37,11 +37,6 @@ const ENDPOINT = "https://relay.example/abc";
 /** What the canister answers for a browser it holds a registration for. */
 const registeredAt = (endpoint = ENDPOINT) => [{ endpoint }];
 
-const key = (endpoint = ENDPOINT) => ({
-  endpoint,
-  privateKey: {} as CryptoKey,
-  publicKeyRaw: new Uint8Array(),
-});
 const sub = (endpoint = ENDPOINT) => ({ endpoint }) as PushSubscription;
 
 const actor = () => ({
