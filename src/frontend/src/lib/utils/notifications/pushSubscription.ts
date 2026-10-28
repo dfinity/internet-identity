@@ -48,6 +48,28 @@ export const subscribeToPush = async (
   });
 };
 
+/**
+ * Whether this subscription was minted with `applicationServerKey`.
+ *
+ * A relay binds a subscription to the key it was made with and refuses a push whose
+ * `k=` is any other, so one made with a key we no longer sign with is dead however live
+ * it looks. What the browser remembers of the subscription is the only way to tell.
+ */
+export const subscribedWith = (
+  subscription: PushSubscription,
+  applicationServerKey: Uint8Array,
+): boolean => {
+  const minted = subscription.options.applicationServerKey;
+  if (minted === null || minted === undefined) {
+    return false;
+  }
+  const bytes = new Uint8Array(minted);
+  return (
+    bytes.length === applicationServerKey.length &&
+    bytes.every((byte, at) => byte === applicationServerKey[at])
+  );
+};
+
 /** This browser's current push subscription, or `undefined` if not subscribed. */
 export const currentDeviceSubscription = async (): Promise<
   PushSubscription | undefined

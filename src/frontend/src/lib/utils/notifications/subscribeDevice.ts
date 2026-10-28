@@ -4,7 +4,11 @@
 // the settings toggle, and the reconcile pass.
 
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
-import { currentDeviceSubscription, subscribeToPush } from "./pushSubscription";
+import {
+  currentDeviceSubscription,
+  subscribedWith,
+  subscribeToPush,
+} from "./pushSubscription";
 import { vapidPublicKey } from "./vapidPublicKey";
 import { derivePayloadKeys } from "./payloadKeys";
 import { browserKeyActor } from "./browserActor";
@@ -57,6 +61,21 @@ export const subscribeAndRegisterDevice = async (
 };
 
 /**
+ * The subscription this browser can be woken through: the one it already holds where
+ * that was minted with our key, and a fresh one otherwise.
+ *
+ * A subscription minted with any other application server key is one no push we sign
+ * can reach, so reusing it would register an endpoint that is dead on arrival.
+ */
+const usableSubscription = async (): Promise<PushSubscription> => {
+  const applicationServerKey = await vapidPublicKey();
+  const held = await currentDeviceSubscription();
+  return held !== undefined && subscribedWith(held, applicationServerKey)
+    ? held
+    : subscribeToPush(applicationServerKey);
+};
+
+/**
  * Registers this browser for `identityNumber`, reusing the subscription it already
  * holds. Only a browser without a usable one subscribes afresh, since subscribing
  * drops the endpoint every other identity on this browser is registered with.
@@ -64,9 +83,7 @@ export const subscribeAndRegisterDevice = async (
 export const ensureRegisteredDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
-  const live =
-    (await currentDeviceSubscription()) ??
-    (await subscribeToPush(await vapidPublicKey()));
+  const live = await usableSubscription();
   await registerStoredDevice(identityNumber, live);
   return live.endpoint;
 };
@@ -93,9 +110,7 @@ export const registerForAnyAnchor = async (
   /** The app record the subscription hangs on, where the caller knows it. */
   appId?: bigint,
 ): Promise<boolean> => {
-  const live =
-    (await currentDeviceSubscription()) ??
-    (await subscribeToPush(await vapidPublicKey()));
+  const live = await usableSubscription();
 
   for (const anchor of anchors) {
     try {
