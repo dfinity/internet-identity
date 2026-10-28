@@ -2751,8 +2751,8 @@ service : (opt InternetIdentityInit) -> {
     // Called by the service worker for the one it shows, while it fetches the content.
     browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 
-    // The key a browser subscribes with and every push names. Absent until the canister
-    // has asked the management canister for it, which the first notification does.
+    // The key a browser subscribes with and every push names. Absent only in the moment
+    // between the install returning and the answer to the read it starts.
     get_vapid_public_key : () -> (opt blob) query;
     // Called by the browser, or by the Home Screen app it points at: what the app
     // registers belongs to its own record, which every identity pointing at it is

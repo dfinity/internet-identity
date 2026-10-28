@@ -337,8 +337,8 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 // ---- Notifications: called by II's frontend / service worker ----
 
-/// The key a browser subscribes with and every push names. `None` until the canister has
-/// asked the management canister for it, which the first notification does.
+/// The key a browser subscribes with and every push names. `None` only in the moment
+/// between the install returning and the answer to the read it starts.
 #[query]
 fn get_vapid_public_key() -> Option<ByteBuf> {
     enabled_or::<()>(|_| ()).ok()?;
