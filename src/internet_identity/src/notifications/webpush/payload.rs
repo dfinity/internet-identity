@@ -11,7 +11,7 @@
 //! nothing the worker can log. What this module gets wrong is invisible from the client.
 
 use aes_gcm::aead::{Aead, KeyInit};
-use aes_gcm::{Aes128Gcm, Key, Nonce};
+use aes_gcm::{Aes128Gcm, Nonce};
 use hkdf::Hkdf;
 use sha2::Sha256;
 
@@ -79,8 +79,9 @@ pub(crate) fn seal(
     record.extend_from_slice(plaintext);
     record.push(LAST_RECORD_DELIMITER);
 
-    let ciphertext = Aes128Gcm::new(Key::<Aes128Gcm>::from_slice(&cek))
-        .encrypt(Nonce::from_slice(&nonce), record.as_slice())
+    let ciphertext = Aes128Gcm::new_from_slice(&cek)
+        .map_err(|err| format!("the derived key is not a key: {err}"))?
+        .encrypt(&Nonce::from(nonce), record.as_slice())
         .map_err(|_| "sealing the payload".to_string())?;
 
     let keyid = payload_keyid.as_slice();
@@ -131,8 +132,9 @@ mod tests {
         let mut nonce = [0u8; 12];
         derived.expand(NONCE_INFO, &mut nonce).expect("the nonce");
 
-        let mut opened = Aes128Gcm::new(Key::<Aes128Gcm>::from_slice(&cek))
-            .decrypt(Nonce::from_slice(&nonce), ciphertext)
+        let mut opened = Aes128Gcm::new_from_slice(&cek)
+            .expect("the derived key")
+            .decrypt(&Nonce::from(nonce), ciphertext)
             .expect("the record authenticates");
         assert_eq!(opened.pop(), Some(LAST_RECORD_DELIMITER));
         opened

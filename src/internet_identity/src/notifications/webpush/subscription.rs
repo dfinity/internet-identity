@@ -18,6 +18,7 @@ use internet_identity_interface::internet_identity::types::{
 /// Registers `browser_id` for Web Push, and is also how it replaces a pool that is
 /// running out. Idempotent: a browser that re-subscribes overwrites what it registered
 /// before, endpoint included.
+#[allow(clippy::too_many_arguments)]
 pub fn set_subscription(
     key: NotificationKey,
     anchor_number: AnchorNumber,
@@ -206,6 +207,7 @@ fn write_subscription(
 }
 
 /// What the Home Screen app registered, which is its record's and not any anchor's.
+#[allow(clippy::too_many_arguments)]
 fn set_app_subscription(
     app_id: NotificationAppId,
     endpoint: PushEndpoint,
