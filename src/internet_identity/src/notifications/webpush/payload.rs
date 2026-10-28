@@ -175,6 +175,48 @@ mod tests {
         assert_eq!(open(&payload_ikm, &first), open(&payload_ikm, &second));
     }
 
+    /// RFC 8291 Appendix A, whose inputs and output are reproduced here in full. A
+    /// derivation that round-trips against itself proves only that it is self-consistent;
+    /// this is what says it agrees with the specification the browser implements. It has
+    /// to, because a browser drops a payload it cannot open before waking the worker, so
+    /// a disagreement is invisible from the client.
+    #[test]
+    fn the_rfc_8291_example_seals_to_the_body_the_rfc_prints() {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
+
+        let decode = |value: &str| URL_SAFE_NO_PAD.decode(value).expect("base64url");
+        let payload_ikm =
+            PayloadIkm::try_from(decode("S4lYMb_L0FxCeq0WhDx813KgSYqU26kOyzWUdsXYyrg"))
+                .expect("the example's keying material");
+        let payload_keyid = PayloadKeyId::try_from(decode(
+            "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8",
+        ))
+        .expect("the example's ephemeral public key");
+        let salt = u128::from_be_bytes(
+            decode("DGv6ra1nlYgDCS1FRnbzlw")
+                .try_into()
+                .expect("16 octets"),
+        );
+
+        let body = seal(
+            &payload_ikm,
+            &payload_keyid,
+            salt,
+            b"When I grow up, I want to be a watermelon",
+        )
+        .expect("sealing the example");
+
+        assert_eq!(
+            body,
+            decode(concat!(
+                "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27ml",
+                "mlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPT",
+                "pK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN",
+            ))
+        );
+    }
+
     #[test]
     fn a_payload_past_what_a_relay_accepts_is_refused() {
         let (payload_ikm, payload_keyid) = keys();
