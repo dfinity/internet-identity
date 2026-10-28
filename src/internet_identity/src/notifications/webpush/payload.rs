@@ -249,27 +249,3 @@ mod tests {
         assert!(refused.contains("past the 4096"), "{refused}");
     }
 }
-
-#[cfg(test)]
-mod scratch {
-    use super::*;
-
-    #[test]
-    fn scratch_seal_for_the_e2e_fixture() {
-        let derived: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string("/tmp/claude-502/derived.json").expect("derived"),
-        )
-        .expect("json");
-        let ikm = hex::decode(derived["ikm"].as_str().unwrap()).unwrap();
-        let keyid = hex::decode(derived["keyid"].as_str().unwrap()).unwrap();
-        let body = seal(
-            &PayloadIkm::try_from(ikm).expect("ikm"),
-            &PayloadKeyId::try_from(keyid).expect("keyid"),
-            salt_for(10755, 3),
-            br#"{"anchor_number":10755,"browser_id":0,"inbox_notification_id":3}"#,
-        )
-        .expect("sealing");
-        std::fs::write("/tmp/claude-502/sealed.hex", hex::encode(&body)).expect("write");
-        println!("SEALED {} bytes", body.len());
-    }
-}

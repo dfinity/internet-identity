@@ -314,7 +314,10 @@ jobs:
       - name: Install PocketIC server
         uses: dfinity/pocketic@main
         with:
-          pocket-ic-server-version: "15.0.0"
+          # 16.1.0 or newer: the first server holding a threshold key over secp256r1,
+          # which is what Internet Identity signs its VAPID JWTs with. Keep in step with
+          # scripts/test-canisters.sh and the pocket-ic client in Cargo.toml.
+          pocket-ic-server-version: "16.1.0"
 
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
