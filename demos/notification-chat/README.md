@@ -17,25 +17,31 @@ It is a project of its own inside this repository (its own Cargo workspace,
   identity joins the room. **Sign out** leaves it.
 - **Names.** A name Internet Identity hands over at sign-in is claimed for the
   identity; an identity without one (a passkey alone carries none) can claim
-  one on the line next to its name, and either can change it later. Names are
-  unique among the names claimed, compared without regard to case: a second
-  Alice becomes `Alice_1`, a third `Alice_2`. Everywhere a name is shown,
-  hovering over it shows the principal, and somebody without a name is shown
-  as their principal's ends. Names outlive an upgrade; the room does not.
+  one from the menu under its name in the header, and either can change it
+  later. Names are unique among the names claimed, compared without regard to
+  case: a second Alice becomes `Alice_1`, a third `Alice_2`. Everywhere a name
+  is shown, hovering over it shows the principal, and somebody without a name
+  is shown as their principal's ends. Names outlive an upgrade; the room does
+  not.
 - **Send** stores the message and notifies every other member through the
   [`identity-notifications`](https://crates.io/crates/identity-notifications)
   library. The notification's title is the writer's name, its body is the
   message, and its link is this app's origin, so acting on it opens the app.
   Notifications carry no key, so each message is a notification of its own:
   none replaces another, and a burst of messages is a burst of notifications.
-- The **messages** box shows who sent what and when; the **list on the right**
-  shows who is in the room. The page reads the room every few seconds.
-- **Show notification stats** opens a panel that says what the canister is
-  configured to send for and through, warns when this page or the Internet
-  Identity it signs in with do not match, and shows the library's delivery
-  funnel: how many notifications were queued, accepted by Internet Identity,
-  shown by a browser, and acted on, plus what was dropped or deferred and the
-  backlog waiting to be sent.
+- The **conversation** fills the window and is the only thing that scrolls:
+  messages are grouped by sender and day, it opens at the newest, follows
+  new ones while you are at the end and otherwise keeps your place behind a
+  "New messages" pill. Your own messages show whether they are sending, sent,
+  or not sent (with a retry). The **people** in the room are listed beside
+  it, or, below 768px, in a drawer opened from the header. The page reads
+  the room every few seconds.
+- **Notification stats**, at the foot of the people list, opens a panel that
+  says what the canister is configured to send for and through, warns when
+  this page or the Internet Identity it signs in with do not match, and shows
+  the library's delivery funnel: how many notifications were queued, accepted
+  by Internet Identity, shown by a browser, and acted on, plus what was
+  dropped or deferred and the backlog waiting to be sent.
 
 Anyone signed in can join. The room holds 100 members and the 100 newest
 messages, and lives on the heap, so an upgrade empties it.

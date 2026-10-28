@@ -1099,6 +1099,17 @@ time {
   overscroll-behavior: contain;
 }
 
+.sk-member {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px var(--space-2);
+}
+
+.sk-member .sk-line {
+  flex: none;
+}
+
 .members-empty {
   padding: var(--space-4) var(--space-2);
   font-size: var(--text-sm);
