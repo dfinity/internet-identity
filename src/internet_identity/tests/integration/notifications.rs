@@ -674,8 +674,9 @@ mod subscriptions {
 
     pub(super) const ENDPOINT: &str = "https://push.example.com/aBcDeF";
 
-    /// An uncompressed SEC1 point on P-256, which is what a browser mints.
-    fn vapid_public_key() -> ByteBuf {
+    /// The subscription's own public key, an uncompressed SEC1 point on P-256, which the
+    /// browser sends as the payload's `keyid`.
+    fn subscription_public_key() -> ByteBuf {
         use p256::elliptic_curve::sec1::ToEncodedPoint;
         let key = p256::SecretKey::from_bytes(&[7u8; 32].into()).expect("bad scalar");
         ByteBuf::from(key.public_key().to_encoded_point(false).as_bytes().to_vec())
@@ -740,7 +741,7 @@ mod subscriptions {
             anchor_number: anchor,
             endpoint: endpoint.to_string(),
             payload_ikm: ByteBuf::from(vec![9u8; 32]),
-            payload_keyid: ByteBuf::from(vapid_public_key().into_vec()),
+            payload_keyid: subscription_public_key(),
         }
     }
 

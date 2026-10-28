@@ -337,8 +337,6 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 // ---- Notifications: called by II's frontend / service worker ----
 
-/// Authorized by the caller's own key: a browser writes its entry's subscription, an app
-/// writes its record's.
 /// The key a browser subscribes with and every push names. `None` until the canister has
 /// asked the management canister for it, which the first notification does.
 #[query]
@@ -347,6 +345,8 @@ fn get_vapid_public_key() -> Option<ByteBuf> {
     notifications::webpush::vapid_key::public_key().map(ByteBuf::from)
 }
 
+/// Authorized by the caller's own key: a browser writes its entry's subscription, an app
+/// writes its record's.
 #[update]
 fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,

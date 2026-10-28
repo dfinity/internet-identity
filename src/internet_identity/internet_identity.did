@@ -2747,11 +2747,13 @@ service : (opt InternetIdentityInit) -> {
 
     // Called by the service worker on a wake-up, signed with the browser key: the oldest
     // notification its browser has yet to show, passing over the ones it skips.
-    get_vapid_public_key : () -> (opt blob) query;
     browser_get_notification : (GetNotificationRequest) -> (variant { Ok : GetNotificationResponse; Err : GetNotificationError }) query;
     // Called by the service worker for the one it shows, while it fetches the content.
     browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 
+    // The key a browser subscribes with and every push names. Absent until the canister
+    // has asked the management canister for it, which the first notification does.
+    get_vapid_public_key : () -> (opt blob) query;
     // Called by the browser, or by the Home Screen app it points at: what the app
     // registers belongs to its own record, which every identity pointing at it is
     // delivered through, so the anchor named here is what authorized the call rather

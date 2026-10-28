@@ -137,17 +137,14 @@ const kept = describe("registerForAnyAnchor", () => {
     );
   });
 
-  it.each([{ StaleJwtPool: null }, { InternalCanisterError: "no room" }])(
-    "stops where no other identity can answer the refusal %s",
-    async (refusal) => {
-      appCalls.mockResolvedValue({ Err: refusal });
+  it("stops where no other identity can answer the refusal", async () => {
+    appCalls.mockResolvedValue({ Err: { InternalCanisterError: "no room" } });
 
-      await expect(
-        registerForAnyAnchor([IDENTITY, OTHER], app),
-      ).rejects.toThrow();
-      expect(appCalls).toHaveBeenCalledOnce();
-    },
-  );
+    await expect(
+      registerForAnyAnchor([IDENTITY, OTHER], app),
+    ).rejects.toThrow();
+    expect(appCalls).toHaveBeenCalledOnce();
+  });
 
   it("stops at a failure another identity cannot answer", async () => {
     appCalls.mockRejectedValue(new Error("offline"));

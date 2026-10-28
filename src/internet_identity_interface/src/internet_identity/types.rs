@@ -1124,8 +1124,6 @@ pub struct RemoveWebPushSubscriptionRequest {
 pub enum SetWebPushSubscriptionError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
-    /// The pool offered is not newer than the one this endpoint already holds. A pool
-    /// is spent by elapsed time, so taking an older one would shorten coverage.
     InternalCanisterError(String),
 }
 

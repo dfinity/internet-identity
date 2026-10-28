@@ -128,11 +128,7 @@ describe("readBrowserPushState and readDeviceState", () => {
   const reporting = (endpoint?: string) => {
     vi.mocked(browserKeyActor).mockResolvedValue({
       get_webpush_subscription_status: vi.fn(() =>
-        Promise.resolve(
-          endpoint === undefined
-            ? []
-            : [{ endpoint, pool_len: 30, issued_at_ns: BigInt(0) }],
-        ),
+        Promise.resolve(endpoint === undefined ? [] : [{ endpoint }]),
       ),
     } as unknown as ActorSubclass<_SERVICE>);
   };
@@ -235,9 +231,7 @@ describe("resolveOptIn", () => {
     } as PushSubscription);
     vi.mocked(browserKeyActor).mockResolvedValue({
       get_webpush_subscription_status: vi.fn(() =>
-        Promise.resolve([
-          { endpoint: ENDPOINT, pool_len: 30, issued_at_ns: BigInt(0) },
-        ]),
+        Promise.resolve([{ endpoint: ENDPOINT }]),
       ),
     } as unknown as ActorSubclass<_SERVICE>);
   });
@@ -365,11 +359,7 @@ describe("readGranted", () => {
   const registeredOn = (endpoint?: string) =>
     vi.mocked(browserKeyActor).mockResolvedValue({
       get_webpush_subscription_status: vi.fn(() =>
-        Promise.resolve(
-          endpoint === undefined
-            ? []
-            : [{ endpoint, pool_len: 30, issued_at_ns: BigInt(0) }],
-        ),
+        Promise.resolve(endpoint === undefined ? [] : [{ endpoint }]),
       ),
     } as unknown as ActorSubclass<_SERVICE>);
 
