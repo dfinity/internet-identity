@@ -274,7 +274,7 @@ impl From<StorableBrowser> for Browser {
                     })
                 })
                 .collect(),
-            next_inbox_notification_id: value.next_inbox_notification_id,
+            next_inbox_notification_id: value.next_inbox_notification_id.unwrap_or_default(),
             notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
@@ -294,7 +294,7 @@ impl From<Browser> for StorableBrowser {
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
-            next_inbox_notification_id: value.next_inbox_notification_id,
+            next_inbox_notification_id: Some(value.next_inbox_notification_id),
             notifications: (!value.notifications.is_empty()).then(|| {
                 value
                     .notifications
