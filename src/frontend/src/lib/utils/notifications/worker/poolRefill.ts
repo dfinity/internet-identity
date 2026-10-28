@@ -14,7 +14,7 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
-import { payloadKeysForThisBrowser } from "../payloadKeys";
+import { derivePayloadKeys } from "../payloadKeys";
 import { loadVapidKey } from "../vapidKeyStore";
 import {
   JWT_POOL_REFRESH_THRESHOLD_WINDOWS,
@@ -36,10 +36,13 @@ export const refillJwtPool = async ({
   actor,
   identityNumber,
   nowNs,
+  registration,
 }: {
   actor: ActorSubclass<_SERVICE>;
   identityNumber: bigint;
   nowNs: bigint;
+  /** This worker's own, which is where it reaches the subscription being renewed. */
+  registration: ServiceWorkerRegistration;
 }): Promise<boolean> => {
   const stored = await loadVapidKey();
   if (stored === undefined) {
@@ -65,7 +68,11 @@ export const refillJwtPool = async ({
     relayOriginOf(stored.endpoint),
     nowNs,
   );
-  const { payloadIkm, payloadKeyid } = await payloadKeysForThisBrowser();
+  const live = await registration.pushManager.getSubscription();
+  if (live === null) {
+    return false;
+  }
+  const { payloadIkm, payloadKeyid } = await derivePayloadKeys(live);
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,

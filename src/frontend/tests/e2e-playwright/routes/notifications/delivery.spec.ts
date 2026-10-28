@@ -129,7 +129,7 @@ test.describe("a notification the app sent", () => {
         timeout: 30_000,
       })
       .toBeGreaterThan(0);
-    await deliverPush(page, II_URL);
+    await deliverPush(page, II_URL, relay.payloads().at(-1) ?? "");
 
     // The first wake-up for an app has no delegation to read the content with, so
     // it shows a placeholder and mints one — which earns the second wake-up, from
@@ -147,7 +147,7 @@ test.describe("a notification the app sent", () => {
       .toBeGreaterThan(0);
 
     await relay.waitForWakeUps(2);
-    await deliverPush(page, II_URL);
+    await deliverPush(page, II_URL, relay.payloads().at(-1) ?? "");
 
     await expectOneMoreShown(before);
 

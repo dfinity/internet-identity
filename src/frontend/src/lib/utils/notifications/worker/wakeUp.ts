@@ -385,6 +385,7 @@ const topUpPool = async (
     actor,
     identityNumber: signing.identityNumber,
     nowNs: BigInt(Date.now()) * BigInt(1_000_000),
+    registration: context.registration,
   });
 };
 

@@ -3,8 +3,8 @@
 // to that key and accepts only pushes carrying a JWT signed by its private half (see
 // vapidPool).
 //
-// The subscription's own p256dh and auth keys are ignored, since the push carries no
-// body to encrypt.
+// The subscription's own p256dh and auth keys are what a wake-up's payload is sealed
+// against; see payloadKeys.
 
 import { bufFromBufLike } from "$lib/utils/utils";
 import { agentOptions, canisterId } from "$lib/globals";
@@ -38,15 +38,14 @@ const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
  */
 export const subscribeToPush = async (
   applicationServerKey: Uint8Array,
-): Promise<string> => {
+): Promise<PushSubscription> => {
   const registration = await registerServiceWorker();
   await (await registration.pushManager.getSubscription())?.unsubscribe();
   // `userVisibleOnly` is mandatory, and obliges the worker to show something per push.
-  const subscription = await registration.pushManager.subscribe({
+  return registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: bufFromBufLike(applicationServerKey),
   });
-  return subscription.endpoint;
 };
 
 /** This browser's current push subscription, or `undefined` if not subscribed. */

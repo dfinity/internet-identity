@@ -158,7 +158,7 @@ const expectTheAppToShow = async (
         // a canister that stopped posting has to fail this rather than be covered for.
         if (!shown.includes(body) && relay.received() > spent) {
           spent += 1;
-          await deliverPush(app.page, II_URL);
+          await deliverPush(app.page, II_URL, relay.payloads().at(-1) ?? "");
         }
         return shown;
       },
@@ -181,7 +181,7 @@ const answerTheProbe = async (
   sentBefore: number,
 ): Promise<void> => {
   await relay.waitForWakeUps(sentBefore + 1);
-  await deliverPush(app.page, II_URL);
+  await deliverPush(app.page, II_URL, relay.payloads().at(-1) ?? "");
 };
 
 /**
@@ -212,7 +212,7 @@ const expectDelivery = async (
       timeout: 30_000,
     })
     .toBeGreaterThan(0);
-  await deliverPush(app.page, II_URL);
+  await deliverPush(app.page, II_URL, relay.payloads().at(-1) ?? "");
   // Reporting, not asserting: it puts what is on screen in the output so a failure below
   // says whether the worker never ran or ran and could not read the app's text.
   await reportShown(app, "after the first wake-up");

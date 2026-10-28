@@ -5,8 +5,12 @@
 // A fresh ephemeral pair per upload means the material a registration is sealed under is
 // never the material an earlier one used.
 
-import { bufFromBufLike } from "$lib/utils/utils";
-import { currentDeviceSubscription } from "./pushSubscription";
+/** A view's own bytes, which is what WebCrypto's parameters are typed to take. */
+const bytesOf = (view: Uint8Array): ArrayBuffer =>
+  view.buffer.slice(
+    view.byteOffset,
+    view.byteOffset + view.byteLength,
+  ) as ArrayBuffer;
 
 /** RFC 8291 §3.4: `"WebPush: info"`, a zero octet, then the two public keys. */
 const INFO_PREFIX = new TextEncoder().encode("WebPush: info\0");
@@ -49,7 +53,7 @@ export const derivePayloadKeys = async (
   );
   const theirs = await crypto.subtle.importKey(
     "raw",
-    bufFromBufLike(subscriber),
+    bytesOf(subscriber),
     { name: "ECDH", namedCurve: "P-256" },
     false,
     [],
@@ -75,20 +79,11 @@ export const derivePayloadKeys = async (
         name: "HKDF",
         hash: "SHA-256",
         salt: authSecret,
-        info: bufFromBufLike(concat(INFO_PREFIX, subscriber, payloadKeyid)),
+        info: bytesOf(concat(INFO_PREFIX, subscriber, payloadKeyid)),
       },
       extracted,
       256,
     ),
   );
   return { payloadIkm, payloadKeyid };
-};
-
-/** Derives them for the subscription this browser holds now. */
-export const payloadKeysForThisBrowser = async (): Promise<PayloadKeys> => {
-  const subscription = await currentDeviceSubscription();
-  if (subscription === undefined) {
-    throw new Error("this browser holds no push subscription");
-  }
-  return derivePayloadKeys(subscription);
 };

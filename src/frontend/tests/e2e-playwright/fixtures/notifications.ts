@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createDecipheriv, createECDH, createHmac } from "node:crypto";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 /**
@@ -16,6 +17,85 @@ import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 /** Obviously not a relay, so a push that escaped the stub would fail loudly. */
 const RELAY_ENDPOINT = "https://push.e2e.invalid/subscription";
+
+/**
+ * The subscription keys a browser would have minted. Fixed rather than generated, so the
+ * page stub and the relay below can both name them without passing anything between.
+ *
+ * The canister seals a wake-up's payload against these, so the relay can open one the way
+ * the browser would, and what the worker is handed is what the canister actually sent.
+ */
+const SUBSCRIBER_PRIVATE_KEY = Buffer.alloc(32, 7);
+const AUTH_SECRET = Buffer.alloc(16, 3);
+
+const subscriberKeys = (): { publicKey: Buffer; privateKey: Buffer } => {
+  const ecdh = createECDH("prime256v1");
+  ecdh.setPrivateKey(SUBSCRIBER_PRIVATE_KEY);
+  return { publicKey: ecdh.getPublicKey(), privateKey: SUBSCRIBER_PRIVATE_KEY };
+};
+
+/** HKDF as RFC 8291 and RFC 8188 use it: one extract, one expand of a single block. */
+const hkdf = (
+  salt: Buffer,
+  ikm: Buffer,
+  info: Buffer,
+  length: number,
+): Buffer => {
+  const prk = createHmac("sha256", salt).update(ikm).digest();
+  return createHmac("sha256", prk)
+    .update(Buffer.concat([info, Buffer.from([1])]))
+    .digest()
+    .subarray(0, length);
+};
+
+/**
+ * Opens a sealed wake-up the way the browser does before waking the worker: the header
+ * says which salt and ephemeral key it was sealed under, and the rest follows from the
+ * subscription's own keys.
+ */
+const openPayload = (body: Buffer): string => {
+  const salt = body.subarray(0, 16);
+  const keyIdLength = body[20];
+  const keyId = body.subarray(21, 21 + keyIdLength);
+  const ciphertext = body.subarray(21 + keyIdLength);
+
+  const ecdh = createECDH("prime256v1");
+  ecdh.setPrivateKey(SUBSCRIBER_PRIVATE_KEY);
+  const shared = ecdh.computeSecret(keyId);
+
+  const ikm = hkdf(
+    AUTH_SECRET,
+    shared,
+    Buffer.concat([
+      Buffer.from("WebPush: info\0", "utf8"),
+      subscriberKeys().publicKey,
+      keyId,
+    ]),
+    32,
+  );
+  const cek = hkdf(
+    salt,
+    ikm,
+    Buffer.from("Content-Encoding: aes128gcm\0", "utf8"),
+    16,
+  );
+  const nonce = hkdf(
+    salt,
+    ikm,
+    Buffer.from("Content-Encoding: nonce\0", "utf8"),
+    12,
+  );
+
+  const tag = ciphertext.subarray(ciphertext.length - 16);
+  const decipher = createDecipheriv("aes-128-gcm", cek, nonce);
+  decipher.setAuthTag(tag);
+  const record = Buffer.concat([
+    decipher.update(ciphertext.subarray(0, ciphertext.length - 16)),
+    decipher.final(),
+  ]);
+  // RFC 8188 ends the last record's data with a delimiter octet.
+  return record.subarray(0, record.length - 1).toString("utf8");
+};
 
 export interface PushBrowserOptions {
   /**
@@ -214,6 +294,8 @@ export interface PushRelay {
   /** Resolves once the canister has posted at least `count` wake-ups. */
   waitForWakeUps: (count: number) => Promise<void>;
   received: () => number;
+  /** What the wake-ups carried, opened with the subscription's keys, in order. */
+  payloads: () => string[];
   /** The paths the canister posted wake-ups to, in order.
    *
    *  A browser registers the endpoint it was handed, so posting to one path rather than
@@ -244,11 +326,16 @@ export const startPushRelay = async (): Promise<PushRelay> => {
   let received = 0;
   let gone = false;
   const paths: string[] = [];
+  const payloads: string[] = [];
   const server = createServer((request, response) => {
-    request.resume();
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       received += 1;
       paths.push(request.url ?? "");
+      if (chunks.length > 0) {
+        payloads.push(openPayload(Buffer.concat(chunks)));
+      }
       if (gone) {
         // What a push service answers for a subscription that no longer exists.
         response.writeHead(410).end();
@@ -267,6 +354,7 @@ export const startPushRelay = async (): Promise<PushRelay> => {
     endpoint: `http://127.0.0.1:${RELAY_PORT}/push`,
     received: () => received,
     receivedPaths: () => [...paths],
+    payloads: () => [...payloads],
     reportGone: (report: boolean) => {
       gone = report;
     },
@@ -296,7 +384,13 @@ export const armRealWorkerPush = async (
 ): Promise<void> => {
   await context.grantPermissions(["notifications"], { origin });
 
-  await context.addInitScript((endpoint) => {
+  const keys = {
+    endpoint,
+    p256dh: [...subscriberKeys().publicKey],
+    auth: [...AUTH_SECRET],
+  };
+  await context.addInitScript((keys) => {
+    const { endpoint, p256dh, auth } = keys;
     let subscription: unknown = null;
     const fake = {
       endpoint,
@@ -305,7 +399,11 @@ export const armRealWorkerPush = async (
         subscription = null;
         return Promise.resolve(true);
       },
-      getKey: () => null,
+      // What the canister seals a payload against, as a real subscription hands them over.
+      getKey: (name: string) =>
+        name === "auth"
+          ? new Uint8Array(auth).buffer
+          : new Uint8Array(p256dh).buffer,
       toJSON: () => ({ endpoint }),
     };
     PushManager.prototype.subscribe = () => {
@@ -314,7 +412,7 @@ export const armRealWorkerPush = async (
     };
     PushManager.prototype.getSubscription = () =>
       Promise.resolve(subscription as PushSubscription | null);
-  }, endpoint);
+  }, keys);
 
   await armTheFeatureFlag(context);
 };
@@ -327,6 +425,8 @@ export const armRealWorkerPush = async (
 export const deliverPush = async (
   page: Page,
   origin: string,
+  /** What the wake-up carried. The relay hands this over opened, as the browser would. */
+  data: string,
 ): Promise<void> => {
   const session = await page.context().newCDPSession(page);
   const registrations: { registrationId: string; scopeURL: string }[] = [];
@@ -350,8 +450,7 @@ export const deliverPush = async (
   await session.send("ServiceWorker.deliverPushMessage", {
     origin,
     registrationId: registration?.registrationId ?? "",
-    // A wake-up carries nothing: what it is for is asked of the canister.
-    data: "",
+    data,
   });
   await session.detach();
 };
