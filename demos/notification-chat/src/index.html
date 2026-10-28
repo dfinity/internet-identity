@@ -2,53 +2,223 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- resizes-content: on Android the keyboard shrinks the layout, so the
+         composer stays above it; iOS is handled in main.ts. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="color-scheme" content="light dark" />
     <title>Notification chat</title>
     <link rel="stylesheet" href="./style.css" />
     <script type="module" src="./main.ts"></script>
   </head>
   <body>
-    <header>
-      <h1>Notification chat</h1>
-      <span id="me" class="me"></span>
-      <form id="claim" class="claim" hidden>
-        <input
-          id="name"
-          type="text"
-          placeholder="Claim a name"
-          maxlength="32"
-          autocomplete="off"
-        />
-        <button id="claim-btn" type="submit" disabled>Claim</button>
-      </form>
-      <button id="auth" class="auth" disabled>Loading…</button>
-    </header>
+    <div id="app" class="app">
+      <section id="chat" class="chat" aria-label="Conversation">
+        <header class="chat-header">
+          <div class="column header-row">
+            <div class="room">
+              <h1 class="room-name">Notification chat</h1>
+              <span id="people-summary" class="people-summary"
+                >Connecting…</span
+              >
+              <button
+                id="people-open"
+                class="people-open"
+                type="button"
+                aria-controls="people"
+                aria-expanded="false"
+              >
+                Connecting…
+              </button>
+            </div>
+            <div class="account">
+              <button
+                id="account"
+                class="account-btn"
+                type="button"
+                popovertarget="account-menu"
+                hidden
+              >
+                <span id="me-avatar" class="avatar" aria-hidden="true"></span>
+                <span id="me" class="me"></span>
+                <svg
+                  class="icon chevron"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <button id="auth" class="btn" type="button" disabled>
+                Loading…
+              </button>
+            </div>
+          </div>
+        </header>
 
-    <main>
-      <section class="chat">
-        <div id="messages" class="messages"></div>
-        <form id="compose" class="compose">
-          <input
-            id="text"
-            type="text"
-            placeholder="Sign in to chat"
-            maxlength="500"
-            autocomplete="off"
-            disabled
-          />
-          <button id="send" class="send" type="submit" disabled>Send</button>
-        </form>
+        <div class="timeline">
+          <div id="scroller" class="scroller">
+            <div id="messages" class="column messages" aria-busy="true">
+              <div class="skeleton" aria-hidden="true">
+                <div class="sk-group">
+                  <span class="sk sk-avatar"></span>
+                  <div class="sk-stack">
+                    <span class="sk sk-line w-20"></span>
+                    <span class="sk sk-bubble w-60"></span>
+                    <span class="sk sk-bubble w-40"></span>
+                  </div>
+                </div>
+                <div class="sk-group mine">
+                  <div class="sk-stack">
+                    <span class="sk sk-bubble w-45"></span>
+                  </div>
+                </div>
+                <div class="sk-group">
+                  <span class="sk sk-avatar"></span>
+                  <div class="sk-stack">
+                    <span class="sk sk-line w-25"></span>
+                    <span class="sk sk-bubble w-70"></span>
+                  </div>
+                </div>
+                <div class="sk-group mine">
+                  <div class="sk-stack">
+                    <span class="sk sk-bubble w-35"></span>
+                    <span class="sk sk-bubble w-55"></span>
+                  </div>
+                </div>
+              </div>
+              <p class="visually-hidden">Loading messages…</p>
+            </div>
+          </div>
+          <button id="jump" class="jump" type="button" hidden>
+            New messages
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12l7 7 7-7" />
+            </svg>
+          </button>
+        </div>
+
+        <footer class="composer-bar">
+          <div class="column">
+            <div id="notice" class="notice" hidden>
+              <p id="status" class="status"></p>
+              <button
+                id="status-dismiss"
+                class="icon-btn"
+                type="button"
+                aria-label="Dismiss"
+              >
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+            <form id="compose" class="compose">
+              <label class="visually-hidden" for="text">Message</label>
+              <textarea
+                id="text"
+                rows="1"
+                placeholder="Sign in to chat"
+                maxlength="500"
+                enterkeyhint="send"
+                autocomplete="off"
+                disabled
+              ></textarea>
+              <span id="counter" class="counter" hidden></span>
+              <button
+                id="send"
+                class="send"
+                type="submit"
+                aria-label="Send"
+                disabled
+              >
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+              </button>
+            </form>
+          </div>
+        </footer>
       </section>
-      <aside class="members">
-        <h2>In the room</h2>
-        <ul id="members"></ul>
-      </aside>
-    </main>
 
-    <footer>
-      <p id="status" class="status"></p>
-      <button id="stats-toggle">Show notification stats</button>
-      <div id="stats" class="stats" hidden></div>
-    </footer>
+      <aside id="people" class="sidebar" aria-label="People in the room">
+        <div class="sidebar-head">
+          <h2>People <span id="people-count" class="count"></span></h2>
+          <button
+            id="people-close"
+            class="icon-btn close"
+            type="button"
+            aria-label="Close"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <ul id="members" class="members" aria-busy="true">
+          <li class="sk-member" aria-hidden="true">
+            <span class="sk sk-avatar"></span
+            ><span class="sk sk-line w-60"></span>
+          </li>
+          <li class="sk-member" aria-hidden="true">
+            <span class="sk sk-avatar"></span
+            ><span class="sk sk-line w-45"></span>
+          </li>
+          <li class="sk-member" aria-hidden="true">
+            <span class="sk sk-avatar"></span
+            ><span class="sk sk-line w-55"></span>
+          </li>
+        </ul>
+        <section class="stats-panel">
+          <button
+            id="stats-toggle"
+            class="disclosure"
+            type="button"
+            aria-expanded="false"
+            aria-controls="stats"
+          >
+            Notification stats
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <div id="stats" class="stats" hidden></div>
+        </section>
+      </aside>
+      <div id="scrim" class="scrim"></div>
+    </div>
+
+    <div id="account-menu" class="menu" popover>
+      <div class="menu-head">
+        <span id="menu-avatar" class="avatar lg" aria-hidden="true"></span>
+        <div class="menu-who">
+          <p id="menu-name" class="menu-name"></p>
+          <p id="menu-principal" class="menu-principal"></p>
+        </div>
+      </div>
+      <form id="claim" class="claim" hidden>
+        <label for="name">Your name in the room</label>
+        <div class="field-row">
+          <input
+            id="name"
+            type="text"
+            placeholder="Claim a name"
+            maxlength="32"
+            autocomplete="off"
+          />
+          <button id="claim-btn" class="btn primary" type="submit" disabled>
+            Claim
+          </button>
+        </div>
+        <p class="hint">
+          Names are unique here: if yours is taken, you get the next free one,
+          such as Alice_1.
+        </p>
+      </form>
+    </div>
+
+    <p id="announcer" class="visually-hidden" aria-live="polite"></p>
   </body>
 </html>
