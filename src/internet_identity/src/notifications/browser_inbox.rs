@@ -12,40 +12,32 @@ use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, InboxNotification};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, NotificationToShow, Timestamp,
+    AnchorNumber, BrowserId, InboxNotificationId, NotificationToShow, Timestamp,
 };
 
 /// Most entries one inbox holds. A new one past it replaces the oldest.
 pub(crate) const CAPACITY: usize = 100;
 
-/// Whether a deposited entry calls for a wake-up of its own.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum WakeUp {
-    /// Nothing is on its way for this entry yet.
-    Needed,
-    /// The inbox was at [`CAPACITY`], so its oldest entry was dropped to fit this one.
-    /// That entry's wake-up was posted and never answered, so it is still coming, and
-    /// the worker will be handed this entry when it arrives.
-    AlreadyComing,
-}
-
-/// Put a notification behind the inbox's newest, dropping what expired first.
+/// Put a notification behind the inbox's newest, dropping what expired first, and name
+/// it so the wake-up announcing it can ask for that entry and no other.
+///
+/// Every deposit earns a wake-up of its own. An overflowing inbox used to lean on the
+/// wake-up of the entry it dropped, which only worked while the worker took whatever sat
+/// at the head; a wake-up now names an entry that would no longer be there.
 pub(crate) fn deposit(
     inbox: &mut Vec<InboxNotification>,
-    notification: InboxNotification,
+    next_id: &mut InboxNotificationId,
+    mut notification: InboxNotification,
     now_ns: Timestamp,
-) -> WakeUp {
+) -> InboxNotification {
+    notification.inbox_notification_id = *next_id;
+    *next_id = next_id.wrapping_add(1);
     inbox.retain(|entry| entry.expires_at_ns > now_ns);
-    let full = inbox.len() >= CAPACITY;
-    if full {
+    if inbox.len() >= CAPACITY {
         inbox.remove(0);
     }
-    inbox.push(notification);
-    if full {
-        WakeUp::AlreadyComing
-    } else {
-        WakeUp::Needed
-    }
+    inbox.push(notification.clone());
+    notification
 }
 
 /// A failed post means no wake-up is coming, so one entry goes with it: its own, or the
@@ -137,9 +129,10 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
 }
 
 /// The oldest entry the browser may still collect, passing over what it may not be handed.
-pub(crate) fn next_to_collect(
+pub(crate) fn collect(
     anchor: &Anchor,
     browser_id: BrowserId,
+    inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
 ) -> Option<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
@@ -147,7 +140,9 @@ pub(crate) fn next_to_collect(
         anchor
             .notifications_for_browser(browser_id)
             .iter()
-            .filter(|entry| entry.expires_at_ns > now_ns)
+            .filter(|entry| {
+                entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
+            })
             .find_map(|entry| {
                 if let Some(event) = entry.event.clone() {
                     return Some(NotificationToShow {
@@ -178,35 +173,21 @@ pub(crate) fn next_to_collect(
 /// Remove the entry the service worker collected. One already gone is no error: expiry,
 /// a full inbox or a failed wake-up may have dropped it first.
 ///
-/// Which app the entry belongs to is read off the entry rather than off the request.
+/// The id names one entry of one inbox, so nothing else is needed to tell it from an
+/// expired entry, or from another application's notification carrying the same sender id.
 pub(crate) fn remove_collected(
     mut anchor: Anchor,
     browser_id: BrowserId,
-    collected: &NotificationToShow,
+    inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
-        // Every part of what identifies an entry, origin included: a sender may queue
-        // the same id for two applications, and one that is expired or belongs to
-        // another one must not shadow the live entry being acknowledged.
-        // `next_to_collect` hands out only unexpired entries, so this searches the same
-        // set it does.
-        let collected_from = collected
-            .origin
-            .as_ref()
-            .and_then(|origin| storage.lookup_application_number_with_origin(origin));
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
             return Ok(());
         };
+        // `collect` hands out only unexpired entries, so this searches the same set.
         let Some(position) = inbox.iter().position(|entry| {
-            entry.sender == collected.canister_id
-                && entry.notification_id == collected.id
-                && entry.account_number == collected.account_number
-                && entry.expires_at_ns > now_ns
-                // Internet Identity's own is held with no application number and no origin.
-                && entry
-                    .application_number
-                    .is_none_or(|application_number| Some(application_number) == collected_from)
+            entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
         }) else {
             return Ok(());
         };
@@ -238,6 +219,9 @@ mod tests {
 
     fn entry(notification_id: u64, expires_at_ns: Timestamp) -> InboxNotification {
         InboxNotification {
+            // `deposit` names it; a fixture placed in an inbox by hand keeps the id it
+            // was built with.
+            inbox_notification_id: notification_id,
             application_number: Some(1),
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
@@ -254,11 +238,14 @@ mod tests {
     #[test]
     fn an_entry_is_added_behind_the_newest() {
         let mut inbox = Vec::new();
+        let mut next_id = 0;
 
         for id in 1..=3 {
-            assert_eq!(
-                deposit(&mut inbox, entry(id, 60 * SECOND_NS), SECOND_NS),
-                WakeUp::Needed
+            deposit(
+                &mut inbox,
+                &mut next_id,
+                entry(id, 60 * SECOND_NS),
+                SECOND_NS,
             );
         }
 
@@ -266,23 +253,90 @@ mod tests {
     }
 
     #[test]
+    fn each_deposit_takes_the_next_id_of_the_inbox_it_lands_in() {
+        let mut inbox = Vec::new();
+        let mut next_id = 7;
+
+        for id in 1..=3 {
+            let deposited = deposit(
+                &mut inbox,
+                &mut next_id,
+                entry(id, 60 * SECOND_NS),
+                SECOND_NS,
+            );
+            // What the wake-up announcing it names, which is also what is stored.
+            assert_eq!(
+                deposited.inbox_notification_id,
+                inbox.last().unwrap().inbox_notification_id
+            );
+        }
+
+        assert_eq!(
+            inbox
+                .iter()
+                .map(|one| one.inbox_notification_id)
+                .collect::<Vec<_>>(),
+            vec![7, 8, 9]
+        );
+        assert_eq!(next_id, 10);
+    }
+
+    /// The same notification reaching two devices is two entries, and a wake-up has to
+    /// name one of them rather than both.
+    #[test]
+    fn one_notification_deposited_twice_is_named_twice() {
+        let mut first = Vec::new();
+        let mut second = Vec::new();
+        let mut next_id = 0;
+
+        let to_first = deposit(
+            &mut first,
+            &mut next_id,
+            entry(1, 60 * SECOND_NS),
+            SECOND_NS,
+        );
+        let to_second = deposit(
+            &mut second,
+            &mut next_id,
+            entry(1, 60 * SECOND_NS),
+            SECOND_NS,
+        );
+
+        assert_ne!(
+            to_first.inbox_notification_id,
+            to_second.inbox_notification_id
+        );
+    }
+
+    #[test]
     fn adding_drops_what_expired_first() {
         let mut inbox = vec![entry(1, 2 * SECOND_NS), entry(2, 60 * SECOND_NS)];
+        let mut next_id = 3;
 
-        deposit(&mut inbox, entry(3, 60 * SECOND_NS), 2 * SECOND_NS);
+        deposit(
+            &mut inbox,
+            &mut next_id,
+            entry(3, 60 * SECOND_NS),
+            2 * SECOND_NS,
+        );
 
         assert_eq!(ids(&inbox), vec![2, 3]);
     }
 
     #[test]
-    fn a_full_inbox_replaces_its_oldest_and_needs_no_new_wake_up() {
+    fn a_full_inbox_replaces_its_oldest() {
         let mut inbox: Vec<_> = (0..CAPACITY as u64)
             .map(|id| entry(id, 60 * SECOND_NS))
             .collect();
+        let mut next_id = CAPACITY as u64;
 
-        let added = deposit(&mut inbox, entry(1_000, 60 * SECOND_NS), SECOND_NS);
+        deposit(
+            &mut inbox,
+            &mut next_id,
+            entry(1_000, 60 * SECOND_NS),
+            SECOND_NS,
+        );
 
-        assert_eq!(added, WakeUp::AlreadyComing);
         assert_eq!(inbox.len(), CAPACITY);
         assert_eq!(inbox.first().map(|one| one.notification_id), Some(1));
         assert_eq!(inbox.last().map(|one| one.notification_id), Some(1_000));
@@ -290,14 +344,19 @@ mod tests {
 
     /// A full inbox of expired entries is a free one.
     #[test]
-    fn a_full_inbox_of_expired_entries_takes_a_new_one_with_a_wake_up() {
+    fn a_full_inbox_of_expired_entries_takes_a_new_one() {
         let mut inbox: Vec<_> = (0..CAPACITY as u64)
             .map(|id| entry(id, 2 * SECOND_NS))
             .collect();
+        let mut next_id = CAPACITY as u64;
 
-        let added = deposit(&mut inbox, entry(1_000, 60 * SECOND_NS), 2 * SECOND_NS);
+        deposit(
+            &mut inbox,
+            &mut next_id,
+            entry(1_000, 60 * SECOND_NS),
+            2 * SECOND_NS,
+        );
 
-        assert_eq!(added, WakeUp::Needed);
         assert_eq!(ids(&inbox), vec![1_000]);
     }
 
@@ -353,12 +412,22 @@ mod tests {
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
 
+    /// The first entry `collect` still hands out. Production never asks this, since a
+    /// wake-up names its own entry, but what the filters let through is what these tests
+    /// are about.
     fn next(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
         now_ns: Timestamp,
     ) -> Option<NotificationToShow> {
-        next_to_collect(&anchor(anchor_number), browser_id, now_ns)
+        let anchor = anchor(anchor_number);
+        let ids: Vec<_> = anchor
+            .notifications_for_browser(browser_id)
+            .iter()
+            .map(|entry| entry.inbox_notification_id)
+            .collect();
+        ids.into_iter()
+            .find_map(|id| collect(&anchor, browser_id, id, now_ns))
     }
 
     fn next_id(
@@ -375,7 +444,8 @@ mod tests {
         notification: &NotificationToShow,
         now_ns: Timestamp,
     ) {
-        remove_collected(anchor(anchor_number), browser_id, notification, now_ns)
+        // Every fixture here is named after the sender id it carries.
+        remove_collected(anchor(anchor_number), browser_id, notification.id, now_ns)
             .expect("removing");
     }
 

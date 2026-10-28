@@ -1109,6 +1109,12 @@ pub struct SetWebPushSubscriptionRequest {
     pub vapid_public_key: ByteBuf,
     pub jwt_signatures: Vec<ByteBuf>,
     pub jwt_issued_at_ns: Timestamp,
+    /// RFC 8291 §3.4 input keying material, derived by the browser from this
+    /// subscription's keys and an ephemeral pair it mints for the purpose. The ECDH runs
+    /// there so it never has to run here.
+    pub payload_ikm: ByteBuf,
+    /// That ephemeral pair's public key, carried in every payload as `keyid`.
+    pub payload_keyid: ByteBuf,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1320,6 +1326,10 @@ pub struct WebPushSubscriptionStatus {
 /// notifications. The canisters sending for one origin share its id space.
 pub type NotificationId = u64;
 
+/// Internet Identity's own id for one entry in one browser's inbox, assigned when the
+/// entry is deposited. Unique within that inbox, which is what a wake-up names it by.
+pub type InboxNotificationId = u64;
+
 /// Orders an origin's entries against its own only, so marking everything
 /// `High` gains nothing. Web Push's levels, forwarded as sent.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1449,8 +1459,12 @@ pub enum NotificationDelegationError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct GetNextNotificationRequest {
+pub struct GetNotificationRequest {
     pub anchor_number: AnchorNumber,
+    /// Whose inbox holds it. An app's key signs for every browser pointing at the app,
+    /// so the browser cannot be taken from the caller alone.
+    pub browser_id: BrowserId,
+    pub inbox_notification_id: InboxNotificationId,
 }
 
 /// What a service worker shows for one wake-up: the app and account it is for, the
@@ -1504,12 +1518,12 @@ pub struct IdentityForNotification {
 
 /// `None` once nothing is left to show.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct GetNextNotificationResponse {
+pub struct GetNotificationResponse {
     pub notification: Option<NotificationToShow>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum GetNextNotificationError {
+pub enum GetNotificationError {
     /// The caller signs with no key of this identity, and none of an app it routes through.
     InvalidBrowserKey,
     InternalCanisterError(String),
@@ -1518,8 +1532,9 @@ pub enum GetNextNotificationError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct RemoveNotificationRequest {
     pub anchor_number: AnchorNumber,
-    /// As `browser_get_next_notification` returned it.
-    pub notification: NotificationToShow,
+    pub browser_id: BrowserId,
+    /// As the wake-up that announced it named it.
+    pub inbox_notification_id: InboxNotificationId,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

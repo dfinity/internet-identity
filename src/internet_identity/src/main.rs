@@ -45,7 +45,9 @@ use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
-use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
+use notifications::webpush::{
+    deliverable_endpoint, JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey,
+};
 use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -349,12 +351,14 @@ fn set_webpush_subscription(
         vapid_public_key,
         jwt_signatures,
         jwt_issued_at_ns,
+        payload_ikm,
+        payload_keyid,
     } = request;
     enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
 
     // Every field at once rather than the first to fail, so a browser doesn't go round
-    // three times to learn what one answer can say.
-    let (endpoint, vapid_public_key, jwt_signatures) = match (
+    // five times to learn what one answer can say.
+    let (endpoint, vapid_public_key, jwt_signatures, payload_ikm, payload_keyid) = match (
         PushEndpoint::try_from(endpoint.as_str())
             .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
         VapidPublicKey::try_from(vapid_public_key.into_vec()),
@@ -365,16 +369,33 @@ fn set_webpush_subscription(
                 .collect::<Vec<_>>(),
             jwt_issued_at_ns,
         ),
+        PayloadIkm::try_from(payload_ikm.into_vec()),
+        PayloadKeyId::try_from(payload_keyid.into_vec()),
     ) {
-        (Ok(endpoint), Ok(vapid_public_key), Ok(jwt_signatures)) => {
-            (endpoint, vapid_public_key, jwt_signatures)
-        }
-        (endpoint, vapid_public_key, jwt_signatures) => {
-            let problems: Vec<String> =
-                [endpoint.err(), vapid_public_key.err(), jwt_signatures.err()]
-                    .into_iter()
-                    .flatten()
-                    .collect();
+        (
+            Ok(endpoint),
+            Ok(vapid_public_key),
+            Ok(jwt_signatures),
+            Ok(payload_ikm),
+            Ok(payload_keyid),
+        ) => (
+            endpoint,
+            vapid_public_key,
+            jwt_signatures,
+            payload_ikm,
+            payload_keyid,
+        ),
+        (endpoint, vapid_public_key, jwt_signatures, payload_ikm, payload_keyid) => {
+            let problems: Vec<String> = [
+                endpoint.err(),
+                vapid_public_key.err(),
+                jwt_signatures.err(),
+                payload_ikm.err(),
+                payload_keyid.err(),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
             return Err(SetWebPushSubscriptionError::InternalCanisterError(
                 problems.join("; "),
             ));
@@ -390,6 +411,8 @@ fn set_webpush_subscription(
         endpoint,
         vapid_public_key,
         jwt_signatures,
+        payload_ikm,
+        payload_keyid,
         ic_cdk::api::time(),
     )
 }
@@ -843,6 +866,17 @@ fn notification_entry(
     Some((anchor, browser_id))
 }
 
+/// The anchor, where `browser_id` names the entry this key speaks for. An app's key signs
+/// for every browser pointing at it, so a named browser is checked rather than trusted.
+fn notification_entry_named(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+    browser_id: BrowserId,
+) -> Option<storage::anchor::Anchor> {
+    let (anchor, authorized) = notification_entry(anchor_number, key)?;
+    (authorized == browser_id).then_some(anchor)
+}
+
 /// Authorized by the browser key the caller signs with, or by the key of the Home Screen
 /// app that entry routes through.
 #[update]
@@ -908,20 +942,25 @@ fn get_notification_delegation(
 /// Authorized by the browser key the caller signs with, or by the key of the Home Screen
 /// app that entry routes through.
 #[query]
-fn browser_get_next_notification(
-    request: GetNextNotificationRequest,
-) -> Result<GetNextNotificationResponse, GetNextNotificationError> {
-    let GetNextNotificationRequest { anchor_number } = request;
-    enabled_or(GetNextNotificationError::InternalCanisterError)?;
+fn browser_get_notification(
+    request: GetNotificationRequest,
+) -> Result<GetNotificationResponse, GetNotificationError> {
+    let GetNotificationRequest {
+        anchor_number,
+        browser_id,
+        inbox_notification_id,
+    } = request;
+    enabled_or(GetNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
-        .map_err(|_| GetNextNotificationError::InvalidBrowserKey)?;
-    let (anchor, browser_id) = notification_entry(anchor_number, key)
-        .ok_or(GetNextNotificationError::InvalidBrowserKey)?;
+        .map_err(|_| GetNotificationError::InvalidBrowserKey)?;
+    let anchor = notification_entry_named(anchor_number, key, browser_id)
+        .ok_or(GetNotificationError::InvalidBrowserKey)?;
 
-    Ok(GetNextNotificationResponse {
-        notification: notifications::browser_inbox::next_to_collect(
+    Ok(GetNotificationResponse {
+        notification: notifications::browser_inbox::collect(
             &anchor,
             browser_id,
+            inbox_notification_id,
             ic_cdk::api::time(),
         ),
     })
@@ -934,13 +973,14 @@ fn browser_remove_notification(
 ) -> Result<RemoveNotificationResponse, RemoveNotificationError> {
     let RemoveNotificationRequest {
         anchor_number,
-        notification,
+        browser_id,
+        inbox_notification_id,
     } = request;
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
-    let (anchor, browser_id) =
-        notification_entry(anchor_number, key).ok_or(RemoveNotificationError::InvalidBrowserKey)?;
+    let anchor = notification_entry_named(anchor_number, key, browser_id)
+        .ok_or(RemoveNotificationError::InvalidBrowserKey)?;
 
     let now_ns = ic_cdk::api::time();
     // An acknowledgement is the only thing that tells us the app is still installed.
@@ -950,9 +990,14 @@ fn browser_remove_notification(
         });
     }
 
-    notifications::browser_inbox::remove_collected(anchor, browser_id, &notification, now_ns)
-        .map(|()| RemoveNotificationResponse {})
-        .map_err(RemoveNotificationError::InternalCanisterError)
+    notifications::browser_inbox::remove_collected(
+        anchor,
+        browser_id,
+        inbox_notification_id,
+        now_ns,
+    )
+    .map(|()| RemoveNotificationResponse {})
+    .map_err(RemoveNotificationError::InternalCanisterError)
 }
 
 #[update]

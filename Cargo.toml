@@ -45,6 +45,8 @@ serde = "1"
 serde_bytes = "0.11"
 serde_cbor = "0.11"
 sha2 = "0.10"
+hkdf = "0.12"
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
 rsa = "0.9.10"
 minicbor = "1.0.0"
 

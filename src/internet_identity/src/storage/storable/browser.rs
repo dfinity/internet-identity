@@ -28,13 +28,21 @@ pub struct StorableBrowser {
     /// written.
     #[n(6)]
     pub session_count: u32,
-    /// What this browser registered for Web Push, if anything.
-    #[n(7)]
-    pub webpush_subscription: Option<StorableWebPushSubscription>,
     /// The notification app record this browser points at, where it has one.
     #[n(8)]
     pub notification_app: Option<StorableNotificationAppRef>,
+    /// What this browser registered for Web Push, if anything.
+    ///
+    /// 7 held the registration before a push carried a payload, and 9 the inbox whose
+    /// entries were unnamed. Neither can be read into the shapes below, which require the
+    /// browser's sealing keys and an id per entry, so both were retired rather than
+    /// migrated: a browser re-registers and is whole again. Do not reuse either index.
+    #[n(10)]
+    pub webpush_subscription: Option<StorableWebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
-    #[n(9)]
+    #[n(11)]
     pub notifications: Option<Vec<StorableInboxNotification>>,
+    /// What the next entry deposited in that inbox is named.
+    #[n(12)]
+    pub next_inbox_notification_id: u64,
 }

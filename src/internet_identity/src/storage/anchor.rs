@@ -1,7 +1,9 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
-use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
+use crate::notifications::webpush::{
+    JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey,
+};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
@@ -109,6 +111,9 @@ pub struct Browser {
     pub webpush_subscription: Option<WebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
     pub notifications: Vec<InboxNotification>,
+    /// What the next entry deposited in that inbox is named. Never rewound, so an id is
+    /// not reused while a wake-up announcing the entry that held it is still in flight.
+    pub next_inbox_notification_id: InboxNotificationId,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
@@ -135,6 +140,10 @@ impl Browser {
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InboxNotification {
+    /// Ours, assigned at deposit and unique within the inbox holding it. A wake-up names
+    /// its entry by this, so the worker takes the notification the push was sent for
+    /// rather than whichever one happens to be at the head.
+    pub inbox_notification_id: InboxNotificationId,
     /// `None` where Internet Identity sent this itself.
     pub application_number: Option<ApplicationNumber>,
     /// The canister that sent it, which the service worker fetches the text from.
@@ -150,6 +159,7 @@ pub struct InboxNotification {
 impl From<InboxNotification> for StorableInboxNotification {
     fn from(value: InboxNotification) -> Self {
         StorableInboxNotification {
+            inbox_notification_id: value.inbox_notification_id,
             application_number: value.application_number,
             event: value.event.map(StorableNotificationEvent::from),
             sender: value.sender.as_slice().to_vec(),
@@ -171,6 +181,12 @@ pub struct WebPushSubscription {
     pub vapid_public_key: VapidPublicKey,
     /// Raw ECDSA P-256 signatures in window order, with the instant they were signed at.
     pub jwt_signatures: JwtPool,
+    /// What a payload through this subscription is sealed with, derived by the browser.
+    pub payload_ikm: PayloadIkm,
+    pub payload_keyid: PayloadKeyId,
+    /// The salt the next payload takes. Never rewound: one salt per payload is what keeps
+    /// the key and nonce derived from the single IKM distinct.
+    pub next_payload_salt: u64,
 }
 
 impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
@@ -193,6 +209,9 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                     .collect(),
                 value.jwt_pool.issued_at_ns,
             )?,
+            payload_ikm: PayloadIkm::try_from(value.payload_ikm)?,
+            payload_keyid: PayloadKeyId::try_from(value.payload_keyid)?,
+            next_payload_salt: value.next_payload_salt,
         })
     }
 }
@@ -213,8 +232,9 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                     .collect(),
                 issued_at_ns,
             },
-            // The entry holds it, so it is read here and never written.
-            notifications: None,
+            payload_ikm: value.payload_ikm.into_vec(),
+            payload_keyid: value.payload_keyid.into_vec(),
+            next_payload_salt: value.next_payload_salt,
         }
     }
 }
@@ -243,19 +263,13 @@ impl From<StorableBrowser> for Browser {
                     })
                     .ok()
             }),
-            // From the entry, or from the subscription for a record that carries it there.
             notifications: value
                 .notifications
-                .or_else(|| {
-                    value
-                        .webpush_subscription
-                        .as_ref()
-                        .and_then(|subscription| subscription.notifications.clone())
-                })
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|queued| {
                     Some(InboxNotification {
+                        inbox_notification_id: queued.inbox_notification_id,
                         application_number: queued.application_number,
                         event: queued.event.map(NotificationEvent::from),
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
@@ -265,6 +279,7 @@ impl From<StorableBrowser> for Browser {
                     })
                 })
                 .collect(),
+            next_inbox_notification_id: value.next_inbox_notification_id,
             notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
@@ -284,6 +299,7 @@ impl From<Browser> for StorableBrowser {
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
+            next_inbox_notification_id: value.next_inbox_notification_id,
             notifications: (!value.notifications.is_empty()).then(|| {
                 value
                     .notifications
@@ -1296,6 +1312,22 @@ impl Anchor {
             .map(|browser| &mut browser.notifications)
     }
 
+    /// The inbox together with the id its next entry takes, which a deposit needs both of.
+    pub fn inbox_for_browser_mut(
+        &mut self,
+        browser_id: BrowserId,
+    ) -> Option<(&mut Vec<InboxNotification>, &mut InboxNotificationId)> {
+        self.browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+            .map(|browser| {
+                (
+                    &mut browser.notifications,
+                    &mut browser.next_inbox_notification_id,
+                )
+            })
+    }
+
     /// Moves each browser's session count by what a write added to or took from it.
     ///
     /// A delta against a browser no entry holds is dropped: the cap can retire an entry
@@ -1430,6 +1462,7 @@ impl Anchor {
         let id = self.next_browser_id;
         self.next_browser_id = self.next_browser_id.saturating_add(1);
         self.browsers.push(Browser {
+            next_inbox_notification_id: 0,
             id,
             current_browser_key,
             next_browser_key,

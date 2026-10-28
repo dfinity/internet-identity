@@ -54,6 +54,13 @@ mod tests {
 
     fn subscription(windows: usize, issued_at_ns: Timestamp) -> WebPushSubscription {
         WebPushSubscription {
+            payload_ikm: crate::notifications::webpush::PayloadIkm::try_from(vec![9u8; 32])
+                .expect("32 bytes"),
+            payload_keyid: crate::notifications::webpush::PayloadKeyId::try_from(
+                crate::notifications::webpush::fixtures::valid_vapid_key(),
+            )
+            .expect("a SEC1 P-256 point"),
+            next_payload_salt: 0,
             endpoint: PushEndpoint::try_from("https://relay.example/wpush/abc")
                 .expect("a relay endpoint"),
             created_at_ns: issued_at_ns,

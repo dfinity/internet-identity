@@ -6785,12 +6785,7 @@ mod session_removal_tests {
     /// it signs as, which only the ceremony that created it knows.
     fn storage_with_sessions(
         browsers: &[u8],
-    ) -> (
-        Storage<VectorMemory>,
-        AnchorNumber,
-        u64,
-        Vec<Principal>,
-    ) {
+    ) -> (Storage<VectorMemory>, AnchorNumber, u64, Vec<Principal>) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
@@ -7010,9 +7005,9 @@ mod write_path_property_tests {
     use super::params_at;
     use super::record_use;
     use super::TEST_NOW;
-    use candid::Principal;
     use crate::storage::account::{AccountKey, AccountReference};
     use crate::storage::{CreateSessionParams, Storage};
+    use candid::Principal;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
@@ -7500,6 +7495,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
         .expect("registering a browser");
     let queued = |notification_id: u64| InboxNotification {
+        inbox_notification_id: 0,
         application_number: Some(4),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
@@ -7962,6 +7958,7 @@ fn forgetting_an_app_leaves_alone_a_browser_that_left_it_for_an_address_of_its_o
 
 fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNotification {
     crate::storage::anchor::InboxNotification {
+        inbox_notification_id: 0,
         application_number: Some(1),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
@@ -8149,6 +8146,7 @@ fn an_identity_notification_is_queued_without_an_application() {
         .notifications_for_browser_mut(0)
         .expect("a registered browser")
         .push(InboxNotification {
+            inbox_notification_id: 0,
             application_number: None,
             sender: Principal::from_slice(&[7; 10]),
             notification_id: 1,

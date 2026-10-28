@@ -1,7 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::validation::{JwtPool, PushEndpoint, VapidPublicKey};
+use super::validation::{JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
@@ -24,13 +24,23 @@ pub fn set_subscription(
     endpoint: PushEndpoint,
     vapid_public_key: VapidPublicKey,
     jwt_signatures: JwtPool,
+    payload_ikm: PayloadIkm,
+    payload_keyid: PayloadKeyId,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
     let browser_id = match key {
         NotificationKey::App(app_id) => {
-            return set_app_subscription(app_id, endpoint, vapid_public_key, jwt_signatures, now_ns)
+            return set_app_subscription(
+                app_id,
+                endpoint,
+                vapid_public_key,
+                jwt_signatures,
+                payload_ikm,
+                payload_keyid,
+                now_ns,
+            )
         }
         NotificationKey::Browser(browser_id) => browser_id,
     };
@@ -39,14 +49,18 @@ pub fn set_subscription(
 
     // The same endpoint is a pool replacement on a registration that is still live, so it
     // keeps its age and the pool has to move forward. Any other endpoint is a new one.
-    let created_at_ns = match anchor.webpush_subscription(browser_id) {
+    // The salt run carries over with the registration's age. A browser that re-subscribes
+    // at the same address may upload the same IKM, and rewinding the salt under it would
+    // seal two payloads with one key and nonce.
+    let (created_at_ns, next_payload_salt) = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_signatures.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            registered.created_at_ns
+            (registered.created_at_ns, registered.next_payload_salt)
         }
-        _ => now_ns,
+        // Another address is another subscription, so its keys are new ones too.
+        _ => (now_ns, 0),
     };
 
     write_subscription(
@@ -57,6 +71,9 @@ pub fn set_subscription(
             created_at_ns,
             vapid_public_key,
             jwt_signatures,
+            payload_ikm,
+            payload_keyid,
+            next_payload_salt,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -199,6 +216,8 @@ fn set_app_subscription(
     endpoint: PushEndpoint,
     vapid_public_key: VapidPublicKey,
     jwt_signatures: JwtPool,
+    payload_ikm: PayloadIkm,
+    payload_keyid: PayloadKeyId,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
@@ -211,7 +230,7 @@ fn set_app_subscription(
         SetWebPushSubscriptionError::InternalCanisterError(format!("no notification app {app_id}"))
     })?;
 
-    let created_at_ns = match registered {
+    let (created_at_ns, next_payload_salt) = match registered {
         // A pool that is running out is replaced at the same address, so the registration
         // keeps its age, and the new pool has to be newer: one signature covers one
         // elapsed window.
@@ -219,18 +238,20 @@ fn set_app_subscription(
             endpoint: registered_endpoint,
             created_at_ns: registered_created_at_ns,
             jwt_signatures: registered_pool,
+            next_payload_salt: registered_salt,
             ..
         }) if registered_endpoint == endpoint => {
             if jwt_issued_at_ns <= registered_pool.issued_at_ns() {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            registered_created_at_ns
+            // Carried over for the same reason as above: the IKM may be unchanged.
+            (registered_created_at_ns, registered_salt)
         }
         // Another address is another registration, and the write below drops what was
         // queued through the one it leaves.
-        Some(_) => now_ns,
+        Some(_) => (now_ns, 0),
         // Never registered.
-        None => now_ns,
+        None => (now_ns, 0),
     };
 
     state::storage_borrow_mut(|storage| {
@@ -241,6 +262,9 @@ fn set_app_subscription(
                 created_at_ns,
                 vapid_public_key,
                 jwt_signatures,
+                payload_ikm,
+                payload_keyid,
+                next_payload_salt,
             }),
             now_ns,
         )
@@ -273,6 +297,7 @@ mod tests {
             .notifications_for_browser_mut(browser_id)
             .expect("a registered browser")
             .push(crate::storage::anchor::InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,

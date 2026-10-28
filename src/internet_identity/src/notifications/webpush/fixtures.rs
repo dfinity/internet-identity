@@ -1,6 +1,8 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
-use super::validation::{JwtPool, PushEndpoint, VapidPublicKey, JWT_SIG_LEN};
+use super::validation::{
+    JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey, JWT_SIG_LEN,
+};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -75,6 +77,9 @@ pub(crate) fn subscription_at(
         vapid_public_key: VapidPublicKey::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
         jwt_signatures: JwtPool::try_new(valid_pool(), issued_at_ns)
             .expect("a pool of 64-byte signatures"),
+        payload_ikm: PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
+        payload_keyid: PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
+        next_payload_salt: 0,
     }
 }
 
@@ -118,6 +123,11 @@ pub(crate) fn valid_vapid_key() -> Vec<u8> {
         .to_vec()
 }
 
+/// The browser derives this; a fixture only has to be the right length.
+pub(crate) fn valid_payload_ikm() -> Vec<u8> {
+    vec![9u8; 32]
+}
+
 pub(crate) fn valid_pool() -> Vec<Vec<u8>> {
     vec![vec![3u8; JWT_SIG_LEN]; 3]
 }
@@ -134,6 +144,8 @@ pub(super) fn request(
         vapid_public_key: ByteBuf::from(valid_vapid_key()),
         jwt_signatures: valid_pool().into_iter().map(ByteBuf::from).collect(),
         jwt_issued_at_ns,
+        payload_ikm: ByteBuf::from(valid_payload_ikm()),
+        payload_keyid: ByteBuf::from(valid_vapid_key()),
     }
 }
 
@@ -193,6 +205,8 @@ pub(super) fn try_subscribe_as(
         endpoint,
         vapid_public_key,
         jwt_signatures,
+        PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
+        PayloadKeyId::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
         now_ns,
     )
 }

@@ -5,7 +5,7 @@
 use crate::admission_queue::{Admission, Taken};
 use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::backlog::identity::PendingIdentityNotification;
-use crate::notifications::browser_inbox::{self, WakeUp};
+use crate::notifications::browser_inbox;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
@@ -318,6 +318,8 @@ fn fan_out_to_destinations(
             // Absent where the wake-up announces nothing new, which is a worker being
             // asked to come back for what its entry already holds.
             let queued = pending.event.clone().map(|event| InboxNotification {
+                // Named by `deposit`, which is what draws from the inbox's own run of ids.
+                inbox_notification_id: 0,
                 application_number: None,
                 // Ours, so the worker signs to us for it rather than fetching it from an app.
                 sender: crate::storage::canister_id(),
@@ -349,14 +351,12 @@ fn fan_out_to_destinations(
                 deliveries.push(delivery);
                 continue;
             };
-            let Some(queue) = anchor.notifications_for_browser_mut(browser_id) else {
+            let Some((queue, next_id)) = anchor.inbox_for_browser_mut(browser_id) else {
                 continue;
             };
             wrote = true;
-            if browser_inbox::deposit(queue, queued.clone(), now_ns) == WakeUp::Needed {
-                delivery.notification = Some(queued);
-                deliveries.push(delivery);
-            }
+            delivery.notification = Some(browser_inbox::deposit(queue, next_id, queued, now_ns));
+            deliveries.push(delivery);
         }
         if wrote {
             if let Err(err) = storage.write(anchor) {
@@ -408,6 +408,8 @@ fn fan_out_to_browsers(
 ) {
     let pending = &taken.entry.item;
     let queued = InboxNotification {
+        // Named by `deposit`, once per browser this is deposited for.
+        inbox_notification_id: 0,
         application_number: Some(pending.application_number),
         event: None,
         sender: pending.sender,
@@ -435,7 +437,8 @@ fn fan_out_to_browsers(
                     anchor_number: pending.anchor_number,
                     browser_id: browser.id,
                     target,
-                    notification: Some(queued.clone()),
+                    // Filled in below, where the deposit names the entry for this browser.
+                    notification: None,
                     endpoint: subscription.endpoint.as_str().to_string(),
                     vapid_public_key: subscription.vapid_public_key.as_slice().to_vec(),
                     jwt,
@@ -449,14 +452,18 @@ fn fan_out_to_browsers(
         }
         let mut to_post = Vec::new();
         let mut queued_anywhere = false;
-        for delivery in woken {
-            let Some(queue) = anchor.notifications_for_browser_mut(delivery.browser_id) else {
+        for mut delivery in woken {
+            let Some((queue, next_id)) = anchor.inbox_for_browser_mut(delivery.browser_id) else {
                 continue;
             };
             queued_anywhere = true;
-            if browser_inbox::deposit(queue, queued.clone(), now_ns) == WakeUp::Needed {
-                to_post.push(delivery);
-            }
+            delivery.notification = Some(browser_inbox::deposit(
+                queue,
+                next_id,
+                queued.clone(),
+                now_ns,
+            ));
+            to_post.push(delivery);
         }
         match storage.write(anchor) {
             Ok(()) => {
@@ -1415,12 +1422,13 @@ mod tests {
     }
 
     #[test]
-    fn a_full_browser_inbox_takes_the_notification_without_a_new_wake_up() {
+    fn a_full_browser_inbox_drops_its_oldest_and_still_earns_a_wake_up() {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
         change_queue(recipient, browsers[0], |queue| {
             queue.extend((0..browser_inbox::CAPACITY as u64).map(|notification_id| {
                 InboxNotification {
+                    inbox_notification_id: notification_id,
                     application_number: Some(1),
                     sender: sender(),
                     notification_id,
@@ -1432,7 +1440,17 @@ mod tests {
         });
         submit(recipient, 1_000, 10 * SECOND_NS);
 
-        assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
+        // A wake-up names the entry it was posted for, so the one this deposit displaced
+        // cannot stand in for it and the new entry needs a wake-up of its own.
+        let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        assert_eq!(deliveries.len(), 1);
+        assert_eq!(
+            deliveries[0]
+                .notification
+                .as_ref()
+                .map(|one| one.notification_id),
+            Some(1_000)
+        );
 
         let left = queued(recipient, browsers[0]);
         assert_eq!(left.len(), browser_inbox::CAPACITY);
@@ -1537,6 +1555,7 @@ mod tests {
         assert_eq!(
             delivery.notification,
             Some(InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: sender(),
                 notification_id: 7,
