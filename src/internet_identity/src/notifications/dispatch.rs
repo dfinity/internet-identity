@@ -25,7 +25,6 @@ use internet_identity_interface::internet_identity::types::{
     Urgency,
 };
 use std::cell::{Cell, RefCell};
-use std::convert::Infallible;
 use std::time::Duration;
 
 const SECOND_NS: u64 = 1_000_000_000;
@@ -187,9 +186,25 @@ thread_local! {
         std::cell::RefCell::new(vapid_key::new_jwt_cache());
 }
 
+/// The JWT every one of these relays is woken with, or nothing where any is still being
+/// signed. All or none: a notification deposited for one browser and left in the backlog
+/// for another would be shown twice.
+fn jwts_for(relay_origins: &[String]) -> Option<Vec<String>> {
+    let mut jwts = Vec::with_capacity(relay_origins.len());
+    let mut waiting = false;
+    for origin in relay_origins {
+        // Every one is asked for, so their signatures run side by side rather than one
+        // pass apart.
+        match jwt_for(origin.clone()) {
+            Some(jwt) => jwts.push(jwt),
+            None => waiting = true,
+        }
+    }
+    (!waiting).then_some(jwts)
+}
+
 /// The JWT a relay is woken with, where one is in hand. A relay we hold none for starts a
-/// signature and answers nothing: those notifications keep their place and the next pass
-/// asks again.
+/// signature and answers nothing.
 fn jwt_for(relay_origin: String) -> Option<String> {
     match single_flight_cache::get(&VAPID_JWTS, relay_origin.clone()) {
         Cached::Ready(jwt) => Some(jwt),
@@ -302,34 +317,48 @@ pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Del
         if deliveries.len() >= budget {
             break;
         }
-        let taken = state::identity_backlog_mut(now_ns, |backlog| {
-            backlog.take_batch(1, now_ns, |batch| Ok::<_, Infallible>(batch.to_vec()))
-        })
-        .unwrap_or_default();
-        let Some(taken) = taken.first() else {
-            break;
-        };
-        fan_out_to_destinations(&taken.entry.item, now_ns, &mut deliveries);
+        let planned = state::identity_backlog_mut(now_ns, |backlog| {
+            backlog.take_batch(1, now_ns, |batch| {
+                let Some(taken) = batch.first() else {
+                    return Ok(None);
+                };
+                let mut planned = Vec::new();
+                if fan_out_to_destinations(&taken.entry.item, now_ns, &mut planned) {
+                    // Nothing was deposited and a signature is coming: leave it in the
+                    // backlog for the next pass rather than spending it on nothing.
+                    return Err(());
+                }
+                Ok(Some(planned))
+            })
+        });
+        match planned {
+            // An entry that woke nobody is still spent: only a signature on its way is
+            // reason to leave one where it is.
+            Ok(Some(planned)) => deliveries.extend(planned),
+            Ok(None) | Err(()) => break,
+        }
     }
     deliveries
 }
 
 /// One wake-up per entry the item names, at the address its kind reaches that entry by.
 /// An absent destination is every entry of the identity.
+/// Answers whether this notification is still waiting on something that is coming: the
+/// caller leaves it in the backlog rather than spending it.
 fn fan_out_to_destinations(
     pending: &PendingIdentityNotification,
     now_ns: Timestamp,
     deliveries: &mut Vec<Delivery>,
-) {
+) -> bool {
     // Every push names the key its subscription was made with, so without ours there is
     // nothing to post. Asked for once; the next pass finds it.
     let Some(vapid_public_key) = vapid_key::public_key() else {
         vapid_key::ensure_public_key();
-        return;
+        return true;
     };
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
-            return;
+            return false;
         };
         let destinations: Vec<BrowserId> = match &pending.destination {
             Some(named) => named.clone(),
@@ -346,7 +375,8 @@ fn fan_out_to_destinations(
                 continue;
             };
             let app = routed_app(storage, browser);
-            let Some((subscription, jwt, target)) = wake_up_address(browser, app.as_ref(), now_ns)
+            let Some((subscription, relay_origin, target)) =
+                wake_up_address(browser, app.as_ref(), now_ns)
             else {
                 continue;
             };
@@ -362,6 +392,7 @@ fn fan_out_to_destinations(
                 event: Some(pending.event.clone()),
             };
             planned.push((
+                relay_origin,
                 browser_id,
                 queued,
                 Delivery {
@@ -372,7 +403,8 @@ fn fan_out_to_destinations(
                     endpoint: subscription.endpoint.as_str().to_string(),
                     vapid_public_key: vapid_public_key.clone(),
                     body: None,
-                    jwt,
+                    // Filled in below, once every relay this reaches has one.
+                    jwt: String::new(),
                     urgency: pending.urgency.clone(),
                     ttl_seconds: IDENTITY_NOTIFICATION_TTL_NS / SECOND_NS,
                 },
@@ -381,8 +413,21 @@ fn fan_out_to_destinations(
             ));
         }
 
+        if planned.is_empty() {
+            return false;
+        }
+        // All or none, and before anything is deposited: an entry left in the backlog for
+        // one browser and deposited for another would be shown twice.
+        let relay_origins: Vec<String> = planned.iter().map(|one| one.0.clone()).collect();
+        let Some(jwts) = jwts_for(&relay_origins) else {
+            return true;
+        };
+
         let mut wrote = false;
-        for (browser_id, queued, mut delivery, payload_ikm, payload_keyid) in planned {
+        for ((_, browser_id, queued, mut delivery, payload_ikm, payload_keyid), jwt) in
+            planned.into_iter().zip(jwts)
+        {
+            delivery.jwt = jwt;
             let Some((queue, next_id)) = anchor.inbox_for_browser_mut(browser_id) else {
                 continue;
             };
@@ -403,7 +448,8 @@ fn fan_out_to_destinations(
                 ic_cdk::println!("Failed to queue what Internet Identity has to say: {err}");
             }
         }
-    });
+        false
+    })
 }
 
 /// Take notifications in backlog order and queue each for its recipient's browsers,
@@ -423,14 +469,26 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
         if deliveries.len() >= budget {
             break;
         }
-        let taken = state::notification_backlog_mut(now_ns, |backlog| {
-            backlog.take_batch(1, now_ns, |batch| Ok::<_, Infallible>(batch.to_vec()))
-        })
-        .unwrap_or_default();
-        let Some(taken) = taken.first() else {
-            break;
-        };
-        fan_out_to_browsers(taken, now_ns, &mut deliveries);
+        let planned = state::notification_backlog_mut(now_ns, |backlog| {
+            backlog.take_batch(1, now_ns, |batch| {
+                let Some(taken) = batch.first() else {
+                    return Ok(None);
+                };
+                let mut planned = Vec::new();
+                if fan_out_to_browsers(taken, now_ns, &mut planned) {
+                    // Nothing was deposited and a signature is coming: leave it in the
+                    // backlog for the next pass rather than spending it on nothing.
+                    return Err(());
+                }
+                Ok(Some(planned))
+            })
+        });
+        match planned {
+            // An entry that woke nobody is still spent: only a signature on its way is
+            // reason to leave one where it is.
+            Ok(Some(planned)) => deliveries.extend(planned),
+            Ok(None) | Err(()) => break,
+        }
     }
     deliveries
 }
@@ -441,16 +499,18 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
 ///
 /// Queued anywhere, the app has notified the identity, which is what its list of apps
 /// shows as last notified: from here on only that browser decides whether it is shown.
+/// Answers whether this notification is still waiting on something that is coming: the
+/// caller leaves it in the backlog rather than spending it.
 fn fan_out_to_browsers(
     taken: &Taken<StorableOriginSha256, PendingNotification>,
     now_ns: Timestamp,
     out: &mut Vec<Delivery>,
-) {
+) -> bool {
     // Every push names the key its subscription was made with, so without ours there is
     // nothing to post. Asked for once; the next pass finds it.
     let Some(vapid_public_key) = vapid_key::public_key() else {
         vapid_key::ensure_public_key();
-        return;
+        return true;
     };
     let pending = &taken.entry.item;
     let queued = InboxNotification {
@@ -466,7 +526,7 @@ fn fan_out_to_browsers(
     let ttl_seconds = queued.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
-            return;
+            return false;
         };
         let apps: Vec<Option<NotificationApp>> = anchor
             .browsers()
@@ -475,15 +535,17 @@ fn fan_out_to_browsers(
             .collect();
         // The sealing keys travel with each wake-up: the deposit that names its entry
         // happens below, after this borrow of the browsers has ended.
-        let woken: Vec<(Delivery, PayloadIkm, PayloadKeyId)> = anchor
+        let woken: Vec<(String, Delivery, PayloadIkm, PayloadKeyId)> = anchor
             .browsers()
             .iter()
             .zip(apps.iter())
             .filter_map(|(browser, app)| {
-                let (subscription, jwt, target) = wake_up_address(browser, app.as_ref(), now_ns)?;
+                let (subscription, relay_origin, target) =
+                    wake_up_address(browser, app.as_ref(), now_ns)?;
                 let payload_ikm = subscription.payload_ikm.clone();
                 let payload_keyid = subscription.payload_keyid.clone();
                 Some((
+                    relay_origin,
                     Delivery {
                         anchor_number: pending.anchor_number,
                         browser_id: browser.id,
@@ -493,7 +555,8 @@ fn fan_out_to_browsers(
                         endpoint: subscription.endpoint.as_str().to_string(),
                         vapid_public_key: vapid_public_key.clone(),
                         body: None,
-                        jwt,
+                        // Filled in below, once every relay this reaches has one.
+                        jwt: String::new(),
                         urgency: pending.urgency.clone(),
                         ttl_seconds,
                     },
@@ -503,11 +566,18 @@ fn fan_out_to_browsers(
             })
             .collect();
         if woken.is_empty() {
-            return;
+            return false;
         }
+        // All or none, and before anything is deposited: an entry left in the backlog for
+        // one browser and deposited for another would be shown twice.
+        let relay_origins: Vec<String> = woken.iter().map(|one| one.0.clone()).collect();
+        let Some(jwts) = jwts_for(&relay_origins) else {
+            return true;
+        };
         let mut to_post = Vec::new();
         let mut queued_anywhere = false;
-        for (mut delivery, payload_ikm, payload_keyid) in woken {
+        for ((_, mut delivery, payload_ikm, payload_keyid), jwt) in woken.into_iter().zip(jwts) {
+            delivery.jwt = jwt;
             let Some((queue, next_id)) = anchor.inbox_for_browser_mut(delivery.browser_id) else {
                 continue;
             };
@@ -536,7 +606,8 @@ fn fan_out_to_browsers(
             }
             Err(err) => ic_cdk::println!("Failed to queue a notification for its browsers: {err}"),
         }
-    });
+        false
+    })
 }
 
 /// It says something just happened, so one reaching a device a day later says nothing true.
@@ -657,8 +728,7 @@ fn authorized_wake_up<'a>(
     // Nothing waits on a signature. A relay we hold no JWT for leaves its notifications
     // where they are and the next pass asks again, by which time the fill this started
     // has landed.
-    let jwt = jwt_for(relay_origin)?;
-    Some((subscription, jwt))
+    Some((subscription, relay_origin))
 }
 
 /// The app this entry routes through, where it has one and wants it. A reference alone is
