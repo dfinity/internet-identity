@@ -268,10 +268,15 @@ fn signed_once_reachable(
 
 /// Asks whether anything answers at `relay_origin`, without delivering anything.
 ///
-/// `HEAD` on the origin itself rather than on a subscription's own endpoint: a `POST`
+/// `GET` on the origin itself rather than on a subscription's own endpoint: a `POST`
 /// there is a wake-up, and a relay that took one would deliver it. What comes back is
 /// read for the fact that it came back, so a `404` or a `405` answers the question as
 /// well as a `200` does.
+///
+/// Not `HEAD`, which would be the natural choice: Apple answers one `405` and then
+/// breaks the HTTP/2 stream, which a client stricter than `curl` reads as a failed
+/// request. That would mark Apple's own hosts unreachable and stop them ever being
+/// signed for. `GET` answers cleanly at every relay here.
 #[cfg(not(test))]
 async fn probe(relay_origin: &str) -> Result<u16, String> {
     use candid::Principal;
@@ -281,8 +286,10 @@ async fn probe(relay_origin: &str) -> Result<u16, String> {
 
     /// Unused cycles come back, so this is a ceiling rather than a price.
     const PROBE_CYCLES: u128 = 20_000_000_000;
-    /// Only the status is read; this is headroom for the headers carrying it.
-    const MAX_RESPONSE_BYTES: u64 = 2 * 1024;
+    /// Only the status is read, but the whole answer has to fit or the outcall fails and
+    /// a relay that is there reads as one that is not. The largest of the relays answers
+    /// a root `GET` in about 1.5KB, so this is several times what any of them sends.
+    const MAX_RESPONSE_BYTES: u64 = 8 * 1024;
 
     /// This SDK lacks `is_replicated`; set it explicitly to avoid one probe per replica.
     #[derive(candid::CandidType)]
@@ -299,7 +306,7 @@ async fn probe(relay_origin: &str) -> Result<u16, String> {
     let request = NonReplicatedHttpRequest {
         url: format!("{relay_origin}/"),
         max_response_bytes: Some(MAX_RESPONSE_BYTES),
-        method: HttpMethod::HEAD,
+        method: HttpMethod::GET,
         headers: Vec::new(),
         body: None,
         transform: None,
