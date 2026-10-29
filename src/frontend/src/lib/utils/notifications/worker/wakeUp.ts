@@ -105,6 +105,17 @@ const internetIdentityActor = ({
     }),
   );
 
+/** The id names one entry of one inbox, which is all an acknowledgement needs. */
+const forgetNamed = (
+  actor: ActorSubclass<_SERVICE>,
+  named: WakeUpNaming,
+): Promise<unknown> =>
+  actor.browser_remove_notification({
+    anchor_number: named.anchorNumber,
+    browser_id: named.browserId,
+    inbox_notification_id: named.inboxNotificationId,
+  });
+
 const refFor = (
   identityNumber: bigint,
   notification: NotificationToShow,
@@ -183,29 +194,40 @@ interface Queued {
   actor: ActorSubclass<_SERVICE>;
   identityNumber: bigint;
   notification: NotificationToShow;
+  named: WakeUpNaming;
 }
 
-/** What one identity has at the head of its queue. Reads only: a query, and nothing
- *  the canister remembers having answered. */
-const nextFor = async (
+/** What a wake-up names: the identity and browser whose inbox holds the entry, and the
+ *  name that inbox gave it. */
+export interface WakeUpNaming {
+  anchorNumber: bigint;
+  browserId: number;
+  inboxNotificationId: bigint;
+}
+
+/** What the entry a wake-up names turns out to be. Reads only: a query, and nothing the
+ *  canister remembers having answered. */
+const namedFor = async (
   context: WakeUpContext,
   signing: SigningIdentity,
+  named: WakeUpNaming,
 ): Promise<Queued | undefined> => {
-  const { identityNumber } = signing;
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     signing,
   );
-  const next = await actor.browser_get_next_notification({
-    anchor_number: identityNumber,
+  const found = await actor.browser_get_notification({
+    anchor_number: named.anchorNumber,
+    browser_id: named.browserId,
+    inbox_notification_id: named.inboxNotificationId,
   });
-  if ("Err" in next) {
+  if ("Err" in found) {
     return undefined;
   }
-  const notification = next.Ok.notification[0];
+  const notification = found.Ok.notification[0];
   if (notification === undefined) {
     return undefined;
   }
-  return { actor, identityNumber, notification };
+  return { actor, identityNumber: signing.identityNumber, notification, named };
 };
 
 /**
@@ -217,7 +239,7 @@ const nextFor = async (
  */
 const showQueued = async (
   context: WakeUpContext,
-  { actor, identityNumber, notification }: Queued,
+  { actor, identityNumber, notification, named }: Queued,
   {
     pending,
   }: {
@@ -234,13 +256,7 @@ const showQueued = async (
       // Opens this app rather than anywhere else: what it is about is here.
       url: NOTIFICATION_APP_PATH,
     });
-    sendAndForget(
-      pending,
-      actor.browser_remove_notification({
-        anchor_number: identityNumber,
-        notification,
-      }),
-    );
+    sendAndForget(pending, forgetNamed(actor, named));
     return true;
   }
 
@@ -279,14 +295,7 @@ const showQueued = async (
   const minted = held ?? (await mintWithin());
 
   /** Spends the entry this wake-up was for. */
-  const forget = (): void =>
-    sendAndForget(
-      pending,
-      actor.browser_remove_notification({
-        anchor_number: identityNumber,
-        notification,
-      }),
-    );
+  const forget = (): void => sendAndForget(pending, forgetNamed(actor, named));
 
   /** Shows what the app published under this entry, or closes what it has dropped. */
   const showFromApp = async (identity: Identity): Promise<boolean> => {
@@ -376,6 +385,7 @@ const topUpPool = async (
     actor,
     identityNumber: signing.identityNumber,
     nowNs: BigInt(Date.now()) * BigInt(1_000_000),
+    registration: context.registration,
   });
 };
 
@@ -423,14 +433,12 @@ const closeDismissed = async (context: WakeUpContext): Promise<void> => {
 };
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
-export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
+export const onWakeUp = async (
+  context: WakeUpContext,
+  /** Absent where the wake-up carried nothing, which leaves nothing to ask for. */
+  named: WakeUpNaming | undefined,
+): Promise<void> => {
   const signing = await (context.signing ?? signingIdentities)();
-  // One round trip each, side by side: a wake-up shows one notification, so asking
-  // the entries one after another would only make the screen wait on the answers it
-  // ends up throwing away.
-  const queued = await Promise.all(
-    signing.map((one) => nextFor(context, one).catch(() => undefined)),
-  );
 
   // Swept before anything is shown, and never after. Chrome reconciles its own
   // record of what is on screen when the registration is enumerated, and an
@@ -441,17 +449,17 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
 
   const pending: Promise<unknown>[] = [];
   let shown = false;
-  for (const entry of queued) {
-    if (entry === undefined) {
-      continue;
-    }
-    // The canister queues a wake-up per notification, so the ones passed over here
-    // keep their place and their own wake-up is still to come.
-    shown = await showQueued(context, entry, {
-      pending,
-    }).catch(() => false);
-    if (shown) {
-      break;
+  // The wake-up names the identity whose inbox holds the entry, so one of these keys
+  // signs for it and one call asks. A browser keeps a key per identity signed in; a
+  // Home Screen app's single key is paired with every identity that claimed it.
+  const signer =
+    named === undefined
+      ? undefined
+      : signing.find((one) => one.identityNumber === named.anchorNumber);
+  if (named !== undefined && signer !== undefined) {
+    const entry = await namedFor(context, signer, named).catch(() => undefined);
+    if (entry !== undefined) {
+      shown = await showQueued(context, entry, { pending }).catch(() => false);
     }
   }
 

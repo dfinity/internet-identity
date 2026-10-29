@@ -19,6 +19,9 @@ use minicbor::{Decode, Encode};
 pub struct StorableInboxNotification {
     #[n(0)]
     pub application_number: Option<StorableApplicationNumber>,
+    /// Ours, unique within the inbox holding it.
+    #[n(6)]
+    pub inbox_notification_id: u64,
     /// The app canister that sent it.
     #[cbor(n(1), with = "minicbor::bytes")]
     pub sender: Vec<u8>,
@@ -74,6 +77,7 @@ mod tests {
     fn a_queued_notification_round_trips_its_sender_as_bytes() {
         let queued = StorableInboxNotification {
             application_number: Some(u64::MAX),
+            inbox_notification_id: u64::MAX,
             sender: vec![0xff; Principal::MAX_LENGTH_IN_BYTES],
             notification_id: u64::MAX,
             expires_at_ns: u64::MAX,
@@ -83,7 +87,7 @@ mod tests {
         let mut bytes = Vec::new();
         minicbor::encode(&queued, &mut bytes).expect("encoding a queued notification");
 
-        assert_eq!(bytes.len(), 1 + (1 + 9) + (1 + 2 + 29) + 3 * (1 + 9));
+        assert_eq!(bytes.len(), 1 + (1 + 9) + (1 + 2 + 29) + 4 * (1 + 9));
         assert_eq!(
             minicbor::decode::<StorableInboxNotification>(&bytes).expect("decoding it"),
             queued

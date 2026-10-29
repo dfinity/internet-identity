@@ -1614,6 +1614,7 @@ mod browser_tests {
             .notifications_for_browser_mut(first)
             .expect("a listed browser")
             .push(InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -1643,6 +1644,7 @@ mod browser_tests {
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -2355,6 +2357,7 @@ mod browser_tests {
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -2397,6 +2400,7 @@ mod browser_tests {
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
@@ -2420,6 +2424,7 @@ mod browser_tests {
             .notifications_for_browser_mut(id)
             .expect("a listed browser")
             .push(InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,

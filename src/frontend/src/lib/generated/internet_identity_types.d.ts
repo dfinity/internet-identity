@@ -1081,21 +1081,6 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export type GetNextNotificationError = {
-    /**
-     * The caller signs with no key this identity is signed in from, and with no key of
-     * an app one of its browsers routes through.
-     */
-    'InvalidBrowserKey' : null
-  } |
-  { 'InternalCanisterError' : string };
-export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
-/**
- * Null once nothing is left to show.
- */
-export interface GetNextNotificationResponse {
-  'notification' : [] | [NotificationToShow],
-}
 /**
  * Asks what this browser's entry says about the app it points at, for a page that has
  * the browser key and no session.
@@ -1116,6 +1101,29 @@ export interface GetNotificationDelegationResponse {
    */
   'sender_info_signature' : Uint8Array | number[],
   'signed_delegation' : SignedDelegation,
+}
+export type GetNotificationError = {
+    /**
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+export interface GetNotificationRequest {
+  'inbox_notification_id' : InboxNotificationId,
+  /**
+   * Whose inbox holds it. An app's key signs for every browser pointing at the app, so
+   * the browser cannot be taken from the caller alone.
+   */
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Null once nothing is left to show.
+ */
+export interface GetNotificationResponse {
+  'notification' : [] | [NotificationToShow],
 }
 /**
  * Request for `get_sso_discovery_status`.
@@ -1345,6 +1353,12 @@ export type IdentityPropertiesReplaceError = {
       'space_available' : bigint,
     }
   };
+/**
+ * Internet Identity's own id for one entry in one browser's inbox, assigned when the entry
+ * is deposited and unique within that inbox. A wake-up names its entry by this, so the
+ * service worker shows the notification the push was sent for.
+ */
+export type InboxNotificationId = bigint;
 /**
  * Init arguments of II which can be supplied on install and upgrade.
  * 
@@ -2249,9 +2263,10 @@ export type RemoveNotificationError = {
   { 'InternalCanisterError' : string };
 export interface RemoveNotificationRequest {
   /**
-   * As browser_get_next_notification returned it.
+   * As the wake-up that announced it named it.
    */
-  'notification' : NotificationToShow,
+  'inbox_notification_id' : InboxNotificationId,
+  'browser_id' : number,
   'anchor_number' : UserNumber,
 }
 export type RemoveNotificationResponse = {};
@@ -2355,6 +2370,13 @@ export interface SetWebPushSubscriptionRequest {
   'jwt_signatures' : Array<Uint8Array | number[]>,
   'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
+  'payload_keyid' : Uint8Array | number[],
+  /**
+   * RFC 8291 input keying material, derived by the browser from this subscription's own
+   * keys and an ephemeral pair it mints for the purpose. The ECDH runs there so it never
+   * has to run here: sealing a payload costs two HKDFs and one AES-GCM.
+   */
+  'payload_ikm' : Uint8Array | number[],
   'vapid_public_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
@@ -2772,10 +2794,10 @@ export interface _SERVICE {
    * Called by the service worker on a wake-up, signed with the browser key: the oldest
    * notification its browser has yet to show, passing over the ones it skips.
    */
-  'browser_get_next_notification' : ActorMethod<
-    [GetNextNotificationRequest],
-    { 'Ok' : GetNextNotificationResponse } |
-      { 'Err' : GetNextNotificationError }
+  'browser_get_notification' : ActorMethod<
+    [GetNotificationRequest],
+    { 'Ok' : GetNotificationResponse } |
+      { 'Err' : GetNotificationError }
   >,
   /**
    * Called by the service worker for the one it shows, while it fetches the content.

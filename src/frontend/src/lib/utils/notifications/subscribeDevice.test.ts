@@ -9,7 +9,18 @@ vi.mock("./vapidKeyStore", () => ({
 vi.mock("./pushSubscription", () => ({
   currentDeviceSubscription: vi.fn(),
   relayOriginOf: vi.fn(() => "https://relay.example"),
-  subscribeToPush: vi.fn(() => Promise.resolve(FRESH)),
+  subscribeToPush: vi.fn(() =>
+    Promise.resolve({ endpoint: FRESH } as PushSubscription),
+  ),
+}));
+// The derivation needs a real subscription and real WebCrypto ECDH; what it produces is
+// covered where it lives.
+vi.mock("./payloadKeys", () => ({
+  derivePayloadKeys: () =>
+    Promise.resolve({
+      payloadIkm: new Uint8Array(32).fill(9),
+      payloadKeyid: new Uint8Array(65).fill(4),
+    }),
 }));
 vi.mock("./vapidPool", () => ({
   generateVapidKeypair: vi.fn(() =>
@@ -57,7 +68,7 @@ const heldKey = (endpoint: string) =>
 describe("ensureRegisteredDevice", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    subscribe.mockResolvedValue(FRESH);
+    subscribe.mockResolvedValue({ endpoint: FRESH } as PushSubscription);
   });
 
   // Subscribing drops the endpoint every other identity on this browser is
@@ -118,7 +129,7 @@ const kept = vi.mocked(storeVapidKey);
 describe("registerForAnyAnchor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    subscribe.mockResolvedValue(FRESH);
+    subscribe.mockResolvedValue({ endpoint: FRESH } as PushSubscription);
     stored.mockResolvedValue(heldKey(HELD));
     live.mockResolvedValue({ endpoint: HELD } as PushSubscription);
     appCalls.mockResolvedValue({ Ok: null });

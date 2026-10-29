@@ -7,7 +7,7 @@ import {
 import { test } from "../../fixtures";
 import {
   armRealWorkerPush,
-  deliverPush,
+  deliverNewPushes,
   shownByTheWorker,
   startPushRelay,
   type PushRelay,
@@ -126,41 +126,25 @@ const joinTheRoomAndLeave = async (page: Page): Promise<void> => {
 };
 
 /**
- * Waits for the app's own text, delivering wake-ups until it arrives.
+ * Waits for the app's own text to reach the screen, handing over the wake-ups it takes.
  *
- * How many wake-ups that takes is not fixed. A mint that answers inside the worker's
- * deadline shows the text on the wake-up that asked for it; one that overruns spends a
- * placeholder, and what replaces it is the wake-up the mint earned. Only a delivery
- * brings that one in, because the relay counts wake-ups rather than delivering them, so
- * waiting without delivering waits on a placeholder nothing can replace.
- *
- * A wake-up with nothing left to show is harmless here: the worker places a placeholder
- * only where the screen is empty, and by this point it is not.
+ * A notification takes one wake-up, the one naming the entry it was queued under: the
+ * worker mints the delegation it needs inside that push event and reads the app's text
+ * with it there. Which of the wake-ups the relay holds is that one is not known here, and
+ * the canister goes on posting while this waits, so each new one is handed over as a push
+ * service would.
  */
 const expectTheAppToShow = async (
   app: HomeScreenApp,
   relay: PushRelay,
-  /** Wake-ups already handed to the worker, so each delivery here spends one the
-   *  canister actually posted. */
-  bridged: number,
   body: string,
   message: string,
 ): Promise<void> => {
-  let spent = bridged;
   await expect
     .poll(
       async () => {
-        const shown = (await shownByTheWorker(app.context)).map(
-          (one) => one.body,
-        );
-        // A push the canister never posted is one a phone would never receive. The relay
-        // stands in for the push service, so only what reached it may be delivered, and
-        // a canister that stopped posting has to fail this rather than be covered for.
-        if (!shown.includes(body) && relay.received() > spent) {
-          spent += 1;
-          await deliverPush(app.page, II_URL);
-        }
-        return shown;
+        await deliverNewPushes(app.page, II_URL, relay);
+        return (await shownByTheWorker(app.context)).map((one) => one.body);
       },
       { message, timeout: 60_000 },
     )
@@ -181,7 +165,7 @@ const answerTheProbe = async (
   sentBefore: number,
 ): Promise<void> => {
   await relay.waitForWakeUps(sentBefore + 1);
-  await deliverPush(app.page, II_URL);
+  await deliverNewPushes(app.page, II_URL, relay);
 };
 
 /**
@@ -191,10 +175,9 @@ const answerTheProbe = async (
  * wake-up the canister ever posted and pointing an identity at the app posts one of its
  * own before any of this.
  *
- * Only the first wake-up is waited for. How many a notification takes is not fixed: a
- * mint that answers in time shows the app's own text on this one, and one that overruns
- * spends a placeholder and earns another, which `expectTheAppToShow` delivers. Waiting
- * for a second here would wait for one the canister never posts.
+ * One wake-up carries a notification the whole way: the mint happens inside the push
+ * event and the app's text is read with it there. Which wake-up that is is not known from
+ * here, so every one the relay is still holding undelivered is handed over.
  */
 const expectDelivery = async (
   app: HomeScreenApp,
@@ -212,12 +195,12 @@ const expectDelivery = async (
       timeout: 30_000,
     })
     .toBeGreaterThan(0);
-  await deliverPush(app.page, II_URL);
+  await deliverNewPushes(app.page, II_URL, relay);
   // Reporting, not asserting: it puts what is on screen in the output so a failure below
   // says whether the worker never ran or ran and could not read the app's text.
   await reportShown(app, "after the first wake-up");
 
-  await expectTheAppToShow(app, relay, sentSoFar + 1, text, message);
+  await expectTheAppToShow(app, relay, text, message);
 };
 
 /**
