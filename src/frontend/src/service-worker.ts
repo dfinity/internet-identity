@@ -17,7 +17,7 @@ import {
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/worker/shownNotification";
-import { openable } from "$lib/utils/notifications/worker/openTarget";
+import { onIos, openable } from "$lib/utils/notifications/worker/openTarget";
 import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
@@ -79,17 +79,59 @@ const appWindow = async (): Promise<WindowClient | undefined> => {
  * rather than taking it there, so the running window is pointed by hand. Only a
  * destination inside the app reuses one; anything else opens its own.
  */
-const pointAt = async (url: string): Promise<void> => {
-  const reuse = url.startsWith(NOTIFICATION_APP_PATH)
-    ? await appWindow()
-    : undefined;
-  if (reuse === undefined) {
+const pointAt = async (url: string, inTheApp: boolean): Promise<void> => {
+  if (!inTheApp) {
+    await worker.clients.openWindow(url);
+    return;
+  }
+
+  const window = await appWindow();
+  if (window === undefined) {
     await worker.clients.openWindow(url);
     return;
   }
   // Refused in some app views, where the page's own `hashchange` is what is left.
-  await reuse.navigate(url).catch(() => undefined);
-  await reuse.focus();
+  await window.navigate(url).catch(() => undefined);
+  await window.focus();
+};
+
+/**
+ * Opens what a click names, starting with what the click itself permits.
+ *
+ * A browser's permission to open a window belongs to the synchronous run of the
+ * click handler: anything awaited before `openWindow` spends it, and the click then
+ * opens nothing. So the ordinary path calls it first and asks questions afterwards.
+ * Only the installed iOS app needs to be told where to go before it can go there,
+ * and iOS is also the one platform that honours the call after the fact.
+ */
+const openOnClick = (
+  url: string,
+  shown: { title: string; body: string },
+): Promise<void> => {
+  if (!onIos()) {
+    return worker.clients.openWindow(url).then(
+      () => undefined,
+      () => undefined,
+    );
+  }
+  return (async () => {
+    const destination = await openable(url, shown);
+    await pointAt(destination.url, destination.inTheApp);
+  })();
+};
+
+/** Where a click with nothing to open goes: the app this worker belongs to. */
+const openTheApp = async (): Promise<void> => {
+  const clients = await worker.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  const open = clients.find((client) => client.url.startsWith(worker.origin));
+  if (open !== undefined) {
+    await open.focus();
+    return;
+  }
+  await worker.clients.openWindow("/");
 };
 
 worker.addEventListener("notificationclick", (event) => {
@@ -100,33 +142,18 @@ worker.addEventListener("notificationclick", (event) => {
     typeof event.notification.data?.url === "string"
       ? event.notification.data.url
       : undefined;
-  event.waitUntil(
-    (async () => {
-      // Opening comes first: the click is what permits a worker to open a window,
-      // and that permission does not survive an await on a canister call. The
-      // app's window cannot be focused instead, because `matchAll` sees this origin
-      // only and the link is the app's.
-      if (target !== undefined && url !== undefined) {
-        const destination = await openable(url, {
+  // Started here rather than inside `waitUntil`: the window has to be asked for
+  // while the click still permits it, which is this synchronous run and no later.
+  const opening =
+    target !== undefined && url !== undefined
+      ? openOnClick(url, {
           title: event.notification.title,
           body: event.notification.body,
-        });
-        // A refused window must not cost the app its report.
-        await pointAt(destination).catch(() => undefined);
-      } else {
-        const clients = await worker.clients.matchAll({
-          type: "window",
-          includeUncontrolled: true,
-        });
-        const open = clients.find((client) =>
-          client.url.startsWith(worker.origin),
-        );
-        if (open !== undefined) {
-          await open.focus();
-        } else {
-          await worker.clients.openWindow("/");
-        }
-      }
+        })
+      : openTheApp();
+  event.waitUntil(
+    (async () => {
+      await opening.catch(() => undefined);
 
       // Then the app learns its notification did its job. Nothing can act on a
       // failure here: a click has no caller to answer and nothing to come back for,

@@ -11,6 +11,14 @@ import {
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
+import {
+  readAppKey,
+  rememberInstalled,
+  rememberSpentFragment,
+} from "$lib/utils/notifications/notificationAppKey";
+import { alreadyRegistered } from "$lib/utils/notifications/subscribeDevice";
+import { loadVapidKey } from "$lib/utils/notifications/vapidKeyStore";
+import { currentDeviceSubscription } from "$lib/utils/notifications/pushSubscription";
 
 export type Screen =
   | { kind: "working" }
@@ -127,6 +135,37 @@ const spendTheFragment = async (
   }
 };
 
+/**
+ * Whether this launch has an update call to make, from what this device wrote down.
+ *
+ * Local reads only: the app record, the stored endpoint, and the subscription the
+ * browser holds. Nothing here subscribes and nothing reaches the network, so the page
+ * can ask before it paints. Anything it cannot read answers `true`, because a launch
+ * that might be about to wait should say so rather than sit on a blank screen.
+ */
+export const launchWillWrite = async (hash: string): Promise<boolean> => {
+  try {
+    const stored = await readAppKey();
+    if (stored.kind !== "key" || stored.record.appId === undefined) {
+      return true;
+    }
+    const { appId, spentFragment } = stored.record;
+    // A fragment this app has not already answered is one it will present.
+    if (hash !== "" && spentFragment !== hash) {
+      return true;
+    }
+    const key = await loadVapidKey();
+    if (key === undefined || !alreadyRegistered(key, appId)) {
+      return true;
+    }
+    // An endpoint the browser has replaced since is one it will register afresh.
+    const live = await currentDeviceSubscription();
+    return live?.endpoint !== key.endpoint;
+  } catch {
+    return true;
+  }
+};
+
 /** `onTokenSpent` runs for a token the canister took, so the page can drop it from the URL. */
 export const insideTheApp = async (
   hash: string,
@@ -134,10 +173,20 @@ export const insideTheApp = async (
   onTokenSpent: () => void,
 ): Promise<Screen> => {
   const record = await ensureAppKey();
+  // Only this page knows it is the installed app, and the worker cannot ask.
+  void rememberInstalled();
   const actor = await appKeyActor(record);
 
-  // The Home Screen entry replays the URL captured at install, key and all, so every launch after the first presents a key the canister has already spent.
-  const outcome = await spendTheFragment(decodeLinkToken(hash), record);
+  // The Home Screen entry replays the URL captured at install, key and all, so every
+  // launch after the first presents a key the canister has already spent. Answering it
+  // again costs an update call to be told what this app wrote down the first time.
+  const replayed = record.spentFragment === hash && record.appId !== undefined;
+  const outcome = replayed
+    ? null
+    : await spendTheFragment(decodeLinkToken(hash), record);
+  if (!replayed && hash !== "") {
+    await rememberSpentFragment(hash);
+  }
   if (outcome?.status === "failed") {
     return { kind: "failed", reason: outcome.reason };
   }
@@ -156,7 +205,7 @@ export const insideTheApp = async (
   if (anchors.length === 0 && outcome?.status === "token-refused") {
     return { kind: "stale-link" };
   }
-  return await settle(permission, actor, anchors);
+  return await settle(permission, actor, anchors, appId);
 };
 
 /** Where this launch lands, for a permission in whichever state it is in. */
@@ -164,6 +213,7 @@ const settle = async (
   permission: NotificationPermission,
   actor: Awaited<ReturnType<typeof appKeyActor>>,
   anchors: bigint[],
+  appId?: bigint,
 ): Promise<Screen> => {
   if (anchors.length === 0) {
     // Nothing to register for: what is registered is named for an anchor the app serves.
@@ -176,7 +226,7 @@ const settle = async (
     return { kind: "ask" };
   }
   // Registered on every launch and not only the one that linked: the push service hands out a new endpoint whenever it likes.
-  if (!(await registerForAnyAnchor(anchors, actor))) {
+  if (!(await registerForAnyAnchor(anchors, actor, appId))) {
     // Every identity pointing at this app has it switched off or is signed out; the app itself is intact.
     return { kind: "unlinked" };
   }
@@ -191,7 +241,7 @@ export const settleWithTheApp = async (
   const actor = await appKeyActor(record);
   const anchors =
     record.appId === undefined ? [] : await appAnchors(actor, record.appId);
-  return await settle(permission, actor, anchors);
+  return await settle(permission, actor, anchors, record.appId);
 };
 
 /** iOS Settings is the only place a refused permission can be lifted. */

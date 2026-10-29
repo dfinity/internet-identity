@@ -7,6 +7,7 @@
   import { Trans } from "$lib/components/locale";
   import { NOTIFICATION_APP_NAME } from "../appName";
   import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
+  import { isStandalone } from "../standalone";
   import NotificationMock from "../NotificationMock.svelte";
 
   let target = $state<string | undefined>(undefined);
@@ -41,19 +42,27 @@
 
   onMount(() => {
     let waited: ReturnType<typeof setTimeout> | undefined;
-    let handedOver = false;
-    let wentAway = false;
-    let returning: ReturnType<typeof setTimeout> | undefined;
 
     // iOS gives the app one window, so a second notification reaches this page as a
     // change of fragment rather than a fresh load, and mounting once would hand Safari
     // the previous notification's destination.
     const handOver = () => {
       clearTimeout(waited);
-      clearTimeout(returning);
       stillHere = false;
-      wentAway = false;
       const carrying = carried(window.location.hash);
+
+      // Taken out of the window before anything else, because iOS resumes a standalone
+      // app on whatever page its window was left on rather than at `start_url`. A
+      // fragment left here is a doorway the Home Screen icon can come back to, and the
+      // icon must never land on the hand-over offer. What it carries is already read.
+      if (window.location.hash !== "") {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
+
       target = carrying?.url;
       shown =
         carrying !== undefined && carrying.title !== ""
@@ -62,48 +71,63 @@
       if (target === undefined) {
         return;
       }
-      handedOver = true;
+      // A browser reaches this page only because a worker cannot open another origin
+      // directly, so there is nothing to hand over: it goes where the link points.
+      // The Safari scheme is the installed app's problem alone.
+      if (!isStandalone()) {
+        window.location.replace(target);
+        return;
+      }
       window.location.href = viaSafari(target);
       // Long enough that a handover which worked has already taken the page away.
       waited = setTimeout(() => (stillHere = true), 1_200);
     };
 
     /**
-     * Puts the window back on the app's own page once this one has done its job.
+     * Puts the window back on the app once this one has been left.
      *
-     * iOS does not take a resumed app back to `start_url`, so whatever this window was
-     * left on is what the Home Screen icon shows. Going away and coming back is what
-     * says Safari took the link; a window that never went has nothing to go back from
-     * and keeps its offer.
+     * The two ways back into a running app, Safari's chevron and the Home Screen icon,
+     * are the same foreground of the same window: nothing distinguishes them, so the
+     * offer cannot be kept for one without showing it to the other. The icon is the one
+     * that must never see it, so neither does.
+     *
+     * Forgotten on the way out rather than on the way back in, so a resume renders
+     * nothing from the notification even where iOS has throttled this page's timers,
+     * and the navigation below only has to finish the job.
      */
-    const settleBack = () => {
-      if (!handedOver) {
-        return;
-      }
-      if (document.visibilityState === "hidden") {
-        wentAway = true;
-        return;
-      }
-      if (!wentAway) {
-        return;
-      }
-      // A notification clicked while this window is surfaced arrives as a change of
-      // fragment; letting that land first keeps it from being replaced away.
-      returning = setTimeout(() => {
-        if (wentAway) {
-          window.location.replace(NOTIFICATION_APP_PATH);
-        }
-      }, 250);
+    const onHidden = () => {
+      clearTimeout(waited);
+      stillHere = false;
+      target = undefined;
+      shown = undefined;
     };
+
+    const onVisible = () => {
+      // A notification clicked while the app is backgrounded is navigated in and only
+      // then focused, so this page has already read and dropped its fragment by now.
+      // What is left is `target`, and `onHidden` clears it, so one that is still set
+      // was put there for this foreground rather than a previous one.
+      if (target !== undefined) {
+        return;
+      }
+      // The other order, where the navigation lands after the window is surfaced: the
+      // fragment is still in the URL, and that is a doorway to open, not one to leave.
+      if (carried(window.location.hash) !== undefined) {
+        return;
+      }
+      window.location.replace(NOTIFICATION_APP_PATH);
+    };
+
+    const onVisibilityChange = () =>
+      document.visibilityState === "hidden" ? onHidden() : onVisible();
 
     handOver();
     window.addEventListener("hashchange", handOver);
-    document.addEventListener("visibilitychange", settleBack);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       clearTimeout(waited);
-      clearTimeout(returning);
       window.removeEventListener("hashchange", handOver);
-      document.removeEventListener("visibilitychange", settleBack);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   });
 </script>

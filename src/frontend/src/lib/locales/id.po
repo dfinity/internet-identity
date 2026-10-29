@@ -44,11 +44,17 @@ msgctxt "Browsers are grouped by platform, which cannot tell one device from sev
 msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
 msgstr "{count, plural, one {# browser di perangkat {platform}} other {# browser di perangkat {platform}}}"
 
+msgid "{count, plural, one {1 app selected} other {# apps selected}}"
+msgstr ""
+
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} dari {capacity} email terverifikasi"
 
 msgid "{displayName} account"
 msgstr "Akun {displayName}"
+
+msgid "{domainInput} can't be used for SSO: {detail}"
+msgstr ""
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
 msgstr "Aplikasi SSO milik {domainInput} tidak mengizinkan alur hybrid OAuth yang dibutuhkan II. Minta admin SSO untuk mengaktifkan response_type \"id_token code\"."
@@ -71,8 +77,20 @@ msgstr "{identityName} telah dihapus dari perangkat ini."
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
 
+msgid "{name} has been removed."
+msgstr ""
+
+msgid "{NOTIFICATION_APP_NAME} is on your Home Screen but has not been opened yet. Open it once and notifications are on for this identity."
+msgstr ""
+
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, other {# Passkey}}"
+
+msgid "{num, plural, one {1 app has been removed.} other {# apps have been removed.}}"
+msgstr ""
+
+msgid "{num, plural, one {Remove 1 app?} other {Remove # apps?}}"
+msgstr ""
 
 msgid "{providerName} {attribute}:"
 msgstr "{attribute} {providerName}:"
@@ -152,6 +170,9 @@ msgstr "Akses"
 msgid "Access methods"
 msgstr "Metode akses"
 
+msgid "Account"
+msgstr ""
+
 msgid "Account name"
 msgstr "Nama akun"
 
@@ -175,6 +196,12 @@ msgstr "Diaktifkan"
 
 msgid "Active"
 msgstr "Aktif"
+
+msgid "Add"
+msgstr ""
+
+msgid "Add {NOTIFICATION_APP_NAME} again"
+msgstr ""
 
 msgid "Add a recovery email"
 msgstr "Tambahkan email pemulihan"
@@ -212,14 +239,26 @@ msgstr "Tambahkan identitas"
 msgid "Add identity from another device"
 msgstr "Tambahkan identitas dari perangkat lain"
 
+msgid "Add it again"
+msgstr ""
+
 msgid "Add new"
 msgstr "Tambah baru"
 
 msgid "Add or remove the ways you can sign in with your identity."
 msgstr "Tambahkan atau hapus cara Anda dapat masuk dengan identitas Anda."
 
+msgid "Add this app again"
+msgstr ""
+
 msgid "Add this identity to another device"
 msgstr "Tambahkan identitas ini ke perangkat lain"
+
+msgid "Add to Bookmarks"
+msgstr ""
+
+msgid "Add to Home Screen"
+msgstr ""
 
 msgid "Added by you"
 msgstr "Ditambahkan oleh Anda"
@@ -251,6 +290,12 @@ msgstr "Izinkan program lokal untuk terhubung?"
 msgid "Allow notifications"
 msgstr "Izinkan notifikasi"
 
+msgid "Allow Notifications"
+msgstr ""
+
+msgid "Allow them for this site in your browser settings, then turn this on again."
+msgstr ""
+
 msgid "Allow to access this info"
 msgstr "Izinkan untuk mengakses info ini"
 
@@ -259,6 +304,9 @@ msgstr "Diizinkan"
 
 msgid "Allowing access"
 msgstr "Mengizinkan akses"
+
+msgid "Almost there"
+msgstr ""
 
 msgid "Already connected"
 msgstr "Sudah terhubung"
@@ -275,6 +323,12 @@ msgstr "Juga melakukan perubahan atas nama Anda."
 msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 msgstr "Akun yang ditautkan melalui SSO masuk melalui domain yang digunakan untuk menautkannya. Akun ini ditautkan ke sebuah identitas, sehingga tidak dapat digunakan untuk membuat identitas baru."
 
+msgid "An app added from it cannot finish setting up. Remove it from your Home Screen and add it again from here."
+msgstr ""
+
+msgid "An internal error occurred"
+msgstr ""
+
 msgid "Any local program can connect"
 msgstr "Program lokal apa pun dapat terhubung"
 
@@ -283,12 +337,6 @@ msgstr "Program apa pun di komputer ini dapat meminta."
 
 msgid "Applications"
 msgstr "Aplikasi"
-
-msgid "Apps you sign in to will show up here."
-msgstr "Aplikasi yang Anda masuki akan muncul di sini."
-
-msgid "Apps you've signed in to with this identity."
-msgstr "Aplikasi yang telah Anda masuki dengan identitas ini."
 
 msgid "Are you sure?"
 msgstr "Apakah Anda yakin?"
@@ -302,6 +350,9 @@ msgstr "Karena Anda saat ini masuk dengan metode akses ini, Anda akan segera kel
 msgid "Ask questions and perform actions across your apps by chatting with AI."
 msgstr "Ajukan pertanyaan dan lakukan tindakan di seluruh aplikasi Anda dengan mengobrol bersama AI."
 
+msgid "Ask your administrator to check the provider's OAuth configuration."
+msgstr ""
+
 msgid "Associate an email address with your Internet Identity"
 msgstr "Kaitkan alamat email dengan Internet Identity Anda"
 
@@ -314,20 +365,29 @@ msgstr "Mengautentikasi..."
 msgid "Authentication failed"
 msgstr "Autentikasi gagal"
 
+msgid "Authentication method not found"
+msgstr ""
+
 msgid "Authentication successful"
 msgstr "Autentikasi berhasil"
 
+msgid "Authorization invalid"
+msgstr ""
+
 msgid "Authorize new device"
 msgstr "Otorisasi perangkat baru"
-
-msgid "Available accounts"
-msgstr "Akun yang tersedia"
 
 msgid "Back"
 msgstr "Kembali"
 
 msgid "Back to sign-in options"
 msgstr "Kembali ke opsi masuk"
+
+msgid "Back to the steps"
+msgstr ""
+
+msgid "Banners, Sounds, Badges"
+msgstr ""
 
 msgid "Before you continue"
 msgstr "Sebelum Anda melanjutkan"
@@ -337,6 +397,9 @@ msgstr "Diblokir"
 
 msgid "Body"
 msgstr "Isi"
+
+msgid "Bookmark"
+msgstr ""
 
 msgid "Bookmarks"
 msgstr "Bookmark"
@@ -377,14 +440,14 @@ msgstr "Lihat domain lainnya:"
 msgid "Checking recovery phrase"
 msgstr "Memeriksa frasa pemulihan"
 
+msgid "Checking this device"
+msgstr ""
+
 msgid "Checking your order"
 msgstr "Memeriksa pesanan Anda"
 
 msgid "Checking..."
 msgstr "Memeriksa..."
-
-msgid "Choose an account"
-msgstr "Pilih akun"
 
 msgid "Choose identity, currently {selectedIdentityLabel}"
 msgstr "Pilih identitas, saat ini {selectedIdentityLabel}"
@@ -467,6 +530,9 @@ msgstr "Terhubung"
 msgid "Connecting {mcpServer}…"
 msgstr "Menghubungkan {mcpServer}…"
 
+msgid "Connecting to your organization"
+msgstr ""
+
 msgid "Connection closed"
 msgstr "Koneksi terputus"
 
@@ -506,6 +572,9 @@ msgstr "Disalin"
 msgid "Copied to clipboard"
 msgstr "Disalin ke papan klip"
 
+msgid "Copy"
+msgstr ""
+
 msgid "Copy error details"
 msgstr "Salin detail kesalahan"
 
@@ -517,6 +586,9 @@ msgstr "Salin alamat penerima"
 
 msgid "Copy subject"
 msgstr "Salin subjek"
+
+msgid "Couldn't connect to your organization"
+msgstr ""
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Tidak dapat memuat pengaturan SSO dari {domainInput}. Minta admin SSO Anda untuk memastikan bahwa /.well-known/ii-openid-configuration dapat diakses."
@@ -617,11 +689,20 @@ msgstr "Sesuaikan akses AI"
 msgid "Default"
 msgstr "Default"
 
+msgid "Delivered securely through id.ai."
+msgstr ""
+
 msgid "Deny"
 msgstr "Tolak"
 
 msgid "Deny all"
 msgstr "Tolak semua"
+
+msgid "Deselect {name}"
+msgstr ""
+
+msgid "Device registration closed"
+msgstr ""
 
 msgid "Devices"
 msgstr "Perangkat"
@@ -720,6 +801,9 @@ msgctxt "Used as an action word inviting the reader to try or feel something, e.
 msgid "Experience"
 msgstr "Rasakan"
 
+msgid "Expired JWT"
+msgstr ""
+
 msgid "Export JSON"
 msgstr "Ekspor JSON"
 
@@ -735,11 +819,20 @@ msgstr "Aplikasi unggulan"
 msgid "File"
 msgstr "File"
 
+msgid "Find {appName}"
+msgstr ""
+
+msgid "Find on Page"
+msgstr ""
+
 msgid "First seen"
 msgstr "Pertama kali terlihat"
 
 msgid "First sign-in with {name}"
 msgstr "Pertama kali masuk dengan {name}"
+
+msgid "Follow these steps to put a new one on your Home Screen:"
+msgstr ""
 
 msgid "Follow these steps to turn them back on:"
 msgstr "Ikuti langkah-langkah ini untuk mengaktifkannya kembali:"
@@ -785,6 +878,12 @@ msgstr "Membuat frasa..."
 
 msgid "Get notifications from this app when something needs your attention. You can turn them off anytime."
 msgstr "Dapatkan notifikasi dari aplikasi ini saat ada yang membutuhkan perhatian Anda. Anda dapat menonaktifkannya kapan saja."
+
+msgid "Get notified in this browser when your apps need you."
+msgstr ""
+
+msgid "Get notified on this device when your apps need you."
+msgstr ""
 
 msgid "Get started"
 msgstr "Mulai"
@@ -864,8 +963,14 @@ msgstr "Saya sudah mencatatnya"
 msgid "I'm using the official ICP CLI and I trust this device."
 msgstr "Saya menggunakan ICP CLI resmi dan saya mempercayai perangkat ini."
 
+msgid "I've already added it"
+msgstr ""
+
 msgid "I've sent the email"
 msgstr "Saya sudah mengirim email"
+
+msgid "ICP Alerts"
+msgstr ""
 
 msgid "Identities on this device"
 msgstr "Identitas di perangkat ini"
@@ -969,6 +1074,9 @@ msgstr "Kode tidak valid. Silakan periksa dan coba lagi."
 msgid "Invalid domain"
 msgstr "Domain tidak valid"
 
+msgid "Invalid metadata. {0}"
+msgstr ""
+
 msgid "Invalid recovery phrase"
 msgstr "Frasa pemulihan tidak valid"
 
@@ -989,6 +1097,9 @@ msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 
 msgid "It seems like an invalid CLI authentication request was received."
 msgstr "Tampaknya permintaan autentikasi CLI yang tidak valid telah diterima."
+
+msgid "It seems like registration is unavailable at this moment"
+msgstr ""
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
@@ -1020,9 +1131,6 @@ msgstr "Bahasa"
 msgid "Last used"
 msgstr "Terakhir digunakan"
 
-msgid "Last visited"
-msgstr "Terakhir dikunjungi"
-
 msgid "Last visited yesterday"
 msgstr "Terakhir dikunjungi kemarin"
 
@@ -1046,6 +1154,9 @@ msgstr "Biarkan AI mengakses aplikasi Anda."
 
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "Izinkan alat baris perintah di perangkat ini masuk ke aplikasi menggunakan identitas Anda."
+
+msgid "Let your apps notify you"
+msgstr ""
 
 msgid "Let's get started"
 msgstr "Mari mulai"
@@ -1101,8 +1212,14 @@ msgstr "Pastikan URL berasal dari sumber yang Anda percaya."
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Pastikan untuk menambahkan metode akses baru agar Anda dapat masuk lain kali atau mengatur ulang frasa pemulihan Anda."
 
+msgid "Manage"
+msgstr ""
+
 msgid "Manage {name}"
 msgstr "Kelola {name}"
+
+msgid "Manage apps"
+msgstr ""
 
 msgid "Manage how other tools connect to your identity."
 msgstr "Kelola cara alat lain terhubung ke identitas Anda."
@@ -1124,6 +1241,9 @@ msgstr "Kelola Internet Identity Anda"
 
 msgid "Manage your shareable emails. These should be different from your recovery email."
 msgstr "Kelola email yang dapat dibagikan. Email ini harus berbeda dari email pemulihan Anda."
+
+msgid "Markup"
+msgstr ""
 
 msgid "Maximum length is 32 characters."
 msgstr "Panjang maksimum 32 karakter."
@@ -1161,6 +1281,12 @@ msgstr "Nama:"
 msgid "New message"
 msgstr "Pesan baru"
 
+msgid "New Tab"
+msgstr ""
+
+msgid "No apps yet"
+msgstr ""
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Tidak ada data yang dibagikan kepada Google, Microsoft, atau Apple mengenai aplikasi mana yang Anda masuk dengan Internet Identity."
 
@@ -1169,6 +1295,9 @@ msgstr "Belum ada email"
 
 msgid "No identity found"
 msgstr "Tidak ada identitas yang ditemukan"
+
+msgid "No more additional accounts can be created"
+msgstr ""
 
 msgid "No passkey tests yet"
 msgstr "Belum ada pengujian passkey"
@@ -1200,6 +1329,9 @@ msgstr "Belum ditingkatkan"
 msgid "Not verified"
 msgstr "Belum diverifikasi"
 
+msgid "Nothing can arrive here until it's set up again. Follow these steps:"
+msgstr ""
+
 msgid "Notification"
 msgstr "Notifikasi"
 
@@ -1212,8 +1344,17 @@ msgstr "Notifikasi"
 msgid "Notifications are blocked"
 msgstr "Notifikasi diblokir"
 
+msgid "Notifications are on"
+msgstr ""
+
 msgid "Notifications blocked"
 msgstr "Notifikasi diblokir"
+
+msgid "Notifications couldn't be set up on this device. Turn them off and on again on {host} to retry."
+msgstr ""
+
+msgid "Notifications from your apps will show up on this device."
+msgstr ""
 
 msgid "Notifications unavailable"
 msgstr "Notifikasi tidak tersedia"
@@ -1221,8 +1362,23 @@ msgstr "Notifikasi tidak tersedia"
 msgid "now"
 msgstr "sekarang"
 
+msgid "OAuth provider returned \"{0}\""
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
 msgid "Official · Hosted by DFINITY"
 msgstr "Resmi · Di-hosting oleh DFINITY"
+
+msgid "OISY Wallet · Payment received"
+msgstr ""
+
+msgid "On because you said this device already has the app. Turn this off and on again if it does not."
+msgstr ""
+
+msgid "On for this device"
+msgstr ""
 
 msgid "On this computer"
 msgstr "Di komputer ini"
@@ -1230,17 +1386,50 @@ msgstr "Di komputer ini"
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "Setelah diaktifkan, alat baris perintah apa pun di perangkat ini dapat menggunakan identitas Anda untuk masuk ke aplikasi."
 
+msgid "One more tap opens the app that sent you this notification."
+msgstr ""
+
 msgid "One or more words are wrong or out of order."
 msgstr "Satu atau lebih kata salah atau urutannya tidak tepat."
 
 msgid "Only add trusted connectors"
 msgstr "Hanya tambahkan konektor tepercaya"
 
+msgid "Only apps you allow can notify you."
+msgstr ""
+
 msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
 msgstr "Lanjutkan hanya jika Anda mengenali domain-domain ini. Jika aplikasi atau panduan meminta Anda memasukkan domain yang tidak Anda ketahui, berhenti di sini dan gunakan domain yang diberikan oleh organisasi Anda."
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Aktifkan ini hanya untuk <0>ICP CLI</0> resmi. Jika Anda tidak yakin, instal ulang dari <1>sumber resmi</1>."
+
+msgid "Open {host}"
+msgstr ""
+
+msgid "Open {host} settings"
+msgstr ""
+
+msgid "Open {host} whenever you want to turn notifications on."
+msgstr ""
+
+msgid "Open {host}, sign in, and turn notifications on. It will show you how to add the app back."
+msgstr ""
+
+msgid "Open {host}, sign in, and turn notifications on. It will show you how to add the app."
+msgstr ""
+
+msgid "Open {name}"
+msgstr ""
+
+msgid "Open {NOTIFICATION_APP_NAME}"
+msgstr ""
+
+msgid "Open {NOTIFICATION_APP_NAME} and tap Allow when it asks you."
+msgstr ""
+
+msgid "Open as Web App"
+msgstr ""
 
 msgid "Open in browser"
 msgstr "Buka di peramban"
@@ -1254,6 +1443,12 @@ msgstr "Buka di aplikasi email"
 msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
 msgstr "Buka Internet Identity di tab baru untuk mengelola metode akses dan opsi pemulihan Anda."
 
+msgid "Open it from your Home Screen and allow notifications there."
+msgstr ""
+
+msgid "Open it once to finish"
+msgstr ""
+
 msgid "Open manage"
 msgstr "Buka kelola"
 
@@ -1262,6 +1457,12 @@ msgstr "Buka menu"
 
 msgid "Open notification settings"
 msgstr "Buka pengaturan notifikasi"
+
+msgid "Open notifications"
+msgstr ""
+
+msgid "Open or manage apps you've granted permissions."
+msgstr ""
 
 msgid "Open permissions"
 msgstr "Buka izin"
@@ -1280,6 +1481,12 @@ msgstr "Buka izin situs"
 
 msgid "Open site settings"
 msgstr "Buka pengaturan situs"
+
+msgid "Open the menu"
+msgstr ""
+
+msgid "Operation canceled"
+msgstr ""
 
 msgid "Or sign in with another identity"
 msgstr "Atau masuk dengan identitas lain"
@@ -1323,11 +1530,17 @@ msgstr "Passkey menggunakan kunci kriptografis yang disimpan di perangkat Anda u
 msgid "Password-free"
 msgstr "Tanpa kata sandi"
 
+msgid "Payments, votes and messages from the apps you use, right on this device."
+msgstr ""
+
 msgid "Permissions"
 msgstr "Izin"
 
 msgid "Permissions for {host}"
 msgstr "Izin untuk {host}"
+
+msgid "Photos"
+msgstr ""
 
 msgid "Pick a recovery method below to sign back in."
 msgstr "Pilih metode pemulihan di bawah untuk masuk kembali."
@@ -1364,6 +1577,9 @@ msgstr "Hanya pertanyaan"
 
 msgid "Reachable MCP server"
 msgstr "Server MCP yang dapat dijangkau"
+
+msgid "Reading List"
+msgstr ""
 
 msgid "Real privacy"
 msgstr "Privasi sejati"
@@ -1413,6 +1629,9 @@ msgstr "Ingat browser ini?"
 msgid "Reminder"
 msgstr "Pengingat"
 
+msgid "Reminders"
+msgstr ""
+
 msgid "Remote server"
 msgstr "Server jarak jauh"
 
@@ -1422,8 +1641,17 @@ msgstr "Hapus"
 msgid "Remove {0}"
 msgstr "Hapus {0}"
 
+msgid "Remove {name}?"
+msgstr ""
+
 msgid "Remove and sign out"
 msgstr "Hapus dan keluar"
+
+msgid "Remove app"
+msgstr ""
+
+msgid "Remove apps"
+msgstr ""
 
 msgid "Remove email"
 msgstr "Hapus email"
@@ -1440,6 +1668,12 @@ msgstr "Hapus email pemulihan?"
 msgid "Remove the connector to revoke AI access."
 msgstr "Hapus konektor untuk mencabut akses AI."
 
+msgid "Remove this app"
+msgstr ""
+
+msgid "Remove this app from your Home Screen, then open {host} and turn notifications on again to add it back."
+msgstr ""
+
 msgid "Removing and signing out..."
 msgstr "Menghapus dan keluar..."
 
@@ -1451,6 +1685,9 @@ msgstr "Menghapus passkey..."
 
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 msgstr "Menghapus passkey ini berarti Anda tidak akan dapat menggunakannya untuk masuk lagi. Anda selalu dapat menambahkan yang baru nanti."
+
+msgid "Removing..."
+msgstr ""
 
 msgid "Removing…"
 msgstr "Menghapus…"
@@ -1557,6 +1794,9 @@ msgstr "Menghubungkan identitas Anda ke server dengan aman."
 msgid "See where you're signed in to apps and sign out remotely."
 msgstr "Lihat di mana Anda masuk ke aplikasi dan keluar dari jarak jauh."
 
+msgid "Select {name}"
+msgstr ""
+
 msgid "Select <0>Blocked ×</0> to clear it."
 msgstr "Pilih <0>Diblokir ×</0> untuk menghapusnya."
 
@@ -1571,6 +1811,9 @@ msgstr "Pilih <0>Safari</0> › <1>Pengaturan…</1> di bilah menu."
 
 msgid "Select a passkey"
 msgstr "Pilih passkey"
+
+msgid "Select apps to remove"
+msgstr ""
 
 msgid "Select each word in the correct order:"
 msgstr "Pilih setiap kata dalam urutan yang benar:"
@@ -1593,14 +1836,20 @@ msgstr "Kirim notifikasi"
 msgid "Send the email below to confirm."
 msgstr "Kirim email di bawah ini untuk mengonfirmasi."
 
-msgid "Session duration"
-msgstr "Durasi sesi"
+msgid "Session"
+msgstr ""
 
 msgid "Session timed out"
 msgstr "Sesi telah habis"
 
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
+
+msgid "Set up {NOTIFICATION_APP_NAME}"
+msgstr ""
+
+msgid "Set up notifications"
+msgstr ""
 
 msgid "Set up recovery email"
 msgstr "Siapkan email pemulihan"
@@ -1619,6 +1868,9 @@ msgstr "Pengaturan"
 
 msgid "Settings…"
 msgstr "Pengaturan…"
+
+msgid "Share"
+msgstr ""
 
 msgid "Share {label}"
 msgstr "Bagikan {label}"
@@ -1674,6 +1926,12 @@ msgstr "Masuk dengan passkey"
 msgid "Sign in with SSO"
 msgstr "Masuk dengan SSO"
 
+msgid "Sign in with the domain it is linked through: {registeredDomain}."
+msgstr ""
+
+msgid "Sign in with the domain it was originally linked through."
+msgstr ""
+
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Masuk dengan akun {displayName} Anda dari perangkat mana pun."
 
@@ -1725,6 +1983,9 @@ msgstr "Masuk..."
 msgid "Signing out…"
 msgstr "Sedang keluar…"
 
+msgid "Signs you out and clears its settings."
+msgstr ""
+
 msgid "Simplify your sign-in"
 msgstr "Sederhanakan proses masuk Anda"
 
@@ -1741,6 +2002,12 @@ msgstr "Ada yang tidak sesuai."
 msgid "Something went wrong"
 msgstr "Terjadi kesalahan"
 
+msgid "Something went wrong during registration"
+msgstr ""
+
+msgid "Something went wrong during sign-in"
+msgstr ""
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Terjadi kesalahan saat membuat delegasi Anda. Silakan coba lagi; jika masalah berlanjut, hubungi dukungan."
 
@@ -1752,6 +2019,9 @@ msgstr "Terjadi kesalahan saat berbagi atribut. Silakan coba lagi; jika masalah 
 
 msgid "Something went wrong while signing in with your provider. Close this window and try again."
 msgstr "Terjadi kesalahan saat masuk dengan penyedia Anda. Tutup jendela ini dan coba lagi."
+
+msgid "Sounds & Haptics"
+msgstr ""
 
 msgid "Source code"
 msgstr "Kode sumber"
@@ -1767,6 +2037,9 @@ msgstr "Mulai ulang"
 
 msgid "Start the connection again from your MCP client. You can close this window."
 msgstr "Mulai kembali koneksi dari klien MCP Anda. Anda dapat menutup jendela ini."
+
+msgid "Stay signed in for"
+msgstr ""
 
 msgid "Step 2 of 2"
 msgstr "Langkah 2 dari 2"
@@ -1846,17 +2119,32 @@ msgstr "Ketuk <0>Notifikasi</0>."
 msgid "Tap <0>Permissions</0>."
 msgstr "Ketuk <0>Izin</0>."
 
+msgid "Tap Add to Home Screen"
+msgstr ""
+
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Ketuk pada <0>bilah alamat</0> dan <1>buka di peramban</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Ketuk pada tombol <0>kembali</0> yang disorot."
 
+msgid "Tap Share"
+msgstr ""
+
 msgid "Tap the highlighted <0>shield</0> icon."
 msgstr "Ketuk ikon <0>perisai</0> yang disorot."
 
 msgid "Tap the highlighted <0>site settings</0> icon."
 msgstr "Ketuk ikon <0>pengaturan situs</0> yang disorot."
+
+msgid "Tap to see it in your wallet."
+msgstr ""
+
+msgid "Tap to select"
+msgstr ""
+
+msgid "Tap View More"
+msgstr ""
 
 msgid "Test passkey support"
 msgstr "Uji dukungan passkey"
@@ -1888,6 +2176,9 @@ msgstr "Masuk CLI tidak dapat diselesaikan. Periksa CLI untuk detailnya."
 msgid "The CLI uses your account in this app."
 msgstr "CLI menggunakan akun Anda di aplikasi ini."
 
+msgid "The delegation could not be found — please try again."
+msgstr ""
+
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "Zona DNSSEC harus menggunakan algoritma terkini — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, atau Ed25519. Algoritma SHA-1 yang sudah usang tidak didukung."
 
@@ -1897,11 +2188,23 @@ msgstr "Email harus berasal langsung dari alamat di atas. Alias dan penerus tida
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Integrasi dengan Google, Microsoft, dan Apple menggunakan protokol autentikasi standar yang disebut OpenID. Ini adalah protokol yang sama yang digunakan aplikasi lain untuk masuk dengan Google."
 
+msgid "The interaction was canceled or timed out. Please try again."
+msgstr ""
+
+msgid "The JWT has expired — please try again in a few minutes."
+msgstr ""
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "Cadangan paling andal. Disimpan sepenuhnya oleh Anda, di atas kertas. Tidak bergantung pada akun, layanan, atau penyedia mana pun, dan hanya Anda yang dapat menggunakannya, kehilangannya, atau menggantinya."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "Frasa dimasukkan dengan benar tetapi milik produk selain Internet Identity."
+
+msgid "There is nothing here to open."
+msgstr ""
+
+msgid "There was an error verifying your account — please try again."
+msgstr ""
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba peramban lain; jika masalah berlanjut, hubungi pengembang."
@@ -1924,17 +2227,35 @@ msgstr "Akun {resolvedProviderName} ini sudah terhubung ke Internet Identity."
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 msgstr "Akun {resolvedProviderName} ini belum terhubung ke Internet Identity."
 
+msgid "This account has already been unlinked"
+msgstr ""
+
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Akun ini sudah terhubung ke identitas Anda. Metode akses aktif Anda akan dialihkan ke akun ini."
 
+msgid "This account is already linked to another identity"
+msgstr ""
+
+msgid "This account is linked through a different SSO domain"
+msgstr ""
+
+msgid "This account isn't linked to an identity"
+msgstr ""
+
 msgid "this app"
 msgstr "aplikasi ini"
+
+msgid "This app can't be connected to your identity. Adding it again gives it what it needs:"
+msgstr ""
 
 msgid "This app has moved to the new Internet Identity"
 msgstr "Aplikasi ini telah pindah ke Internet Identity baru"
 
 msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
 msgstr "Aplikasi ini meminta alamat email Anda. Anda dapat memverifikasi alamat email Anda sekarang dan membagikannya, atau lewati dan lanjutkan tanpa berbagi."
+
+msgid "This app isn't connected"
+msgstr ""
 
 msgid "This browser"
 msgstr "Browser ini"
@@ -1960,11 +2281,20 @@ msgstr "Ini sudah menjadi email pemulihan Anda."
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "Ini sekarang menjadi metode default yang digunakan untuk autentikasi ke depan pada perangkat ini."
 
+msgid "This is taking longer than usual."
+msgstr ""
+
 msgid "This is the access method you're currently signed in with."
 msgstr "Ini adalah metode akses yang sedang Anda gunakan untuk masuk."
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Ini adalah metode pemulihan yang Anda gunakan untuk masuk saat ini."
+
+msgid "This link didn't work"
+msgstr ""
+
+msgid "This link has expired"
+msgstr ""
 
 msgid "This may take a few seconds"
 msgstr "Ini mungkin memakan waktu beberapa detik"
@@ -2017,6 +2347,12 @@ msgstr "Untuk menyelesaikan pengaturan passkey Anda, ikuti instruksi yang ditamp
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Untuk membiarkan AI mengajukan pertanyaan dan melakukan tindakan di seluruh aplikasi Anda, tambahkan <0>konektor MCP</0> yang Anda percaya."
 
+msgid "Too many attempts or time has expired."
+msgstr ""
+
+msgid "Touch and hold the {NOTIFICATION_APP_NAME} icon on your Home Screen, then tap Remove App."
+msgstr ""
+
 msgid "Trusted connector"
 msgstr "Konektor tepercaya"
 
@@ -2025,6 +2361,9 @@ msgstr "Coba alamat lain"
 
 msgid "Try again"
 msgstr "Coba lagi"
+
+msgid "Try again in {duration}"
+msgstr ""
 
 msgid "Turn on <0>Notifications</0>."
 msgstr "Aktifkan <0>Notifikasi</0>."
@@ -2062,8 +2401,17 @@ msgstr "Memahami Internet Identity"
 msgid "Undo"
 msgstr "Urungkan"
 
+msgid "Unexpected error"
+msgstr ""
+
+msgid "Unhandled error"
+msgstr ""
+
 msgid "Unknown"
 msgstr "Tidak diketahui"
+
+msgid "Unknown error"
+msgstr ""
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
 msgstr "Tidak seperti banyak sistem autentikasi Web3 yang memerlukan penandatanganan manual untuk setiap tindakan, Internet Identity membuat sesi terautentikasi per aplikasi. Hal ini memberikan keamanan sekaligus kenyamanan (tidak ada penandatanganan berulang) sambil tetap memberikan identitas tersendiri pada setiap sesi."
@@ -2088,9 +2436,6 @@ msgstr "Buka kunci untuk melanjutkan"
 
 msgid "Unsupported browser"
 msgstr "Peramban tidak didukung"
-
-msgid "until you have to sign in again"
-msgstr "hingga Anda harus masuk kembali"
 
 msgid "Unverified origin"
 msgstr "Asal tidak terverifikasi"
@@ -2179,8 +2524,14 @@ msgstr "Memverifikasi…"
 msgid "View"
 msgstr "Lihat"
 
+msgid "View More"
+msgstr ""
+
 msgid "View your last used identities"
 msgstr "Lihat identitas terakhir yang Anda gunakan"
+
+msgid "Waiting for permission"
+msgstr ""
 
 msgid "Waiting for your existing device"
 msgstr "Menunggu perangkat Anda yang ada"
@@ -2190,6 +2541,9 @@ msgstr "Menunggu perangkat baru Anda"
 
 msgid "Waiting to receive…"
 msgstr "Menunggu penerimaan…"
+
+msgid "Wallpaper"
+msgstr ""
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "Kami belum dapat memverifikasi email dari <0>{domain}</0>. Coba alamat lain. Gmail, iCloud, Outlook, Fastmail, dan Proton semuanya dapat digunakan."
@@ -2236,6 +2590,9 @@ msgstr "Mengapa saya melihat ini?"
 msgid "Why isn't this supported?"
 msgstr "Mengapa ini tidak didukung?"
 
+msgid "Will be removed"
+msgstr ""
+
 msgid "with your identity in this app"
 msgstr "dengan identitas Anda di aplikasi ini"
 
@@ -2278,6 +2635,12 @@ msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan ak
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan passkey yang sama."
 
+msgid "You can close this page."
+msgstr ""
+
+msgid "You can close this tab"
+msgstr ""
+
 msgid "You can close this window."
 msgstr "Anda dapat menutup jendela ini."
 
@@ -2295,6 +2658,12 @@ msgstr "Anda dapat kembali ke agen Anda."
 
 msgid "You can sign in again at any time."
 msgstr "Anda dapat masuk kembali kapan saja."
+
+msgid "You can sign in to it again at any time."
+msgstr ""
+
+msgid "You can sign in to them again at any time."
+msgstr ""
 
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "Anda dapat menggunakannya sekarang untuk pemulihan, tetapi pastikan Anda menyimpannya dengan benar agar dapat diandalkan nanti."
@@ -2320,6 +2689,24 @@ msgstr "Anda sebelumnya mendaftar dengan metode akses yang berbeda."
 msgid "You unlinked this {resolvedProviderName} account from your identity."
 msgstr "Anda memutuskan tautan akun {resolvedProviderName} ini dari identitas Anda."
 
+msgid "You'll be signed out and its permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out and permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out and their permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out of {name} and it will no longer be able to notify you."
+msgstr ""
+
+msgid "You'll be signed out of these apps and they will no longer be able to notify you."
+msgstr ""
+
+msgid "You'll get alerts from your apps here."
+msgstr ""
+
 msgid "You're about to authorize a new device."
 msgstr "Anda akan mengotorisasi perangkat baru."
 
@@ -2331,6 +2718,9 @@ msgstr "Anda akan masuk."
 
 msgid "You're about to unlink your {providerName} account."
 msgstr "Anda akan memutuskan tautan akun {providerName} Anda."
+
+msgid "You're all set"
+msgstr ""
 
 msgid "You're all set. Your identity has been created."
 msgstr "Semua siap. Identitas Anda telah dibuat."
@@ -2346,6 +2736,12 @@ msgstr "Anda masuk sebagai <0>{name}</0>."
 
 msgid "You've already verified this email."
 msgstr "Anda sudah memverifikasi email ini."
+
+msgid "You've been signed out and it can no longer notify you."
+msgstr ""
+
+msgid "You've been signed out and they can no longer notify you."
+msgstr ""
 
 msgid "You've never used this {resolvedProviderName} account with Internet Identity."
 msgstr "Anda belum pernah menggunakan akun {resolvedProviderName} ini dengan Internet Identity."

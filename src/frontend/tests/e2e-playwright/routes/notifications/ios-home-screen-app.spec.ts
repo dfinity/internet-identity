@@ -909,4 +909,63 @@ test.describe("notifications on a Home Screen app", () => {
 
     await relay.close();
   });
+
+  // The doorway is the page a notification opens inside the app, which then hands the
+  // link to Safari. iOS resumes a standalone app on whatever page its window was left
+  // on, so what matters here is that the doorway takes itself out of the window.
+  test("leaves the window on the app rather than on the doorway", async ({
+    browser,
+  }) => {
+    const phone = await browser.newContext({ userAgent: IPHONE_AGENT });
+    // What iOS answers in an installed web app, as `addToHomeScreen` does: without it
+    // the app's own page takes the in-browser path and leaves for `/`.
+    await phone.addInitScript(() => {
+      Object.defineProperty(navigator, "standalone", {
+        configurable: true,
+        value: true,
+      });
+    });
+    const page = await phone.newPage();
+
+    // Only `https:` is followed, and nothing fetches it: the hand-over is an iOS
+    // scheme that no test browser answers, so the destination is never reached.
+    const carried = new URLSearchParams({
+      url: "https://chat.example.com/#chat",
+      title: "Example App",
+      body: "New message",
+    });
+    await page.goto(`${II_URL}/ios-icp-alerts/open#${carried.toString()}`);
+
+    // Shown while the hand-over has not taken the page away, which it cannot here:
+    // `x-safari-https:` is an iOS scheme and nothing answers it in a test browser.
+    await expect(
+      page.getByRole("heading", { name: "Almost there" }),
+    ).toBeVisible({ timeout: 30_000 });
+
+    // Read into the page and then dropped, so there is no fragment left for a resumed
+    // window to render the offer from a second time.
+    expect(new URL(page.url()).hash).toBe("");
+
+    // A resume: the Home Screen icon and Safari's chevron are the same foreground of
+    // the same window, and the icon must never come back to the offer.
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "hidden",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "visible",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await page.waitForURL(`${II_URL}/ios-icp-alerts`, { timeout: 30_000 });
+    await expect(
+      page.getByRole("heading", { name: "Almost there" }),
+    ).not.toBeVisible();
+
+    await phone.close();
+  });
 });

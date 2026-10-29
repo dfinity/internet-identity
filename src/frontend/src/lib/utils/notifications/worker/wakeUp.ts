@@ -432,6 +432,13 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     signing.map((one) => nextFor(context, one).catch(() => undefined)),
   );
 
+  // Swept before anything is shown, and never after. Chrome reconciles its own
+  // record of what is on screen when the registration is enumerated, and an
+  // enumeration that lands before the browser has displayed a notification it was
+  // just given drops that notification from the record while the system goes on
+  // showing it. What is left is a banner whose click reaches nothing.
+  await closeDismissed(context).catch(() => undefined);
+
   const pending: Promise<unknown>[] = [];
   let shown = false;
   for (const entry of queued) {
@@ -454,12 +461,10 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     sendAndForget(pending, topUpPool(context, one));
   }
 
-  if (shown) {
-    sendAndForget(pending, closeDismissed(context));
-  } else {
+  if (!shown) {
     // Whether this wake-up still owes the user something depends on what is on
-    // screen, and an app may have dismissed what is on screen.
-    await closeDismissed(context).catch(() => undefined);
+    // screen. Nothing was shown under this wake-up, so enumerating here has nothing
+    // of its own to drop.
     // The browser is asked first; our own stamp covers iOS before 17.0, which answered an empty array.
     const onScreen =
       (await context.registration.getNotifications()).length > 0 ||

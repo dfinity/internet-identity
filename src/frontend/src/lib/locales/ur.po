@@ -44,11 +44,17 @@ msgctxt "Browsers are grouped by platform, which cannot tell one device from sev
 msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
 msgstr "{count, plural, one {{platform} پر # براؤزر} other {{platform} پر # براؤزر}}"
 
+msgid "{count, plural, one {1 app selected} other {# apps selected}}"
+msgstr ""
+
 msgid "{count} of {capacity} verified emails"
 msgstr "{capacity} میں سے {count} تصدیق شدہ ای میلیں"
 
 msgid "{displayName} account"
 msgstr "{displayName} اکاؤنٹ"
+
+msgid "{domainInput} can't be used for SSO: {detail}"
+msgstr ""
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
 msgstr "{domainInput} کی SSO ایپ اس ہائبرڈ OAuth فلو کی اجازت نہیں دیتی جس کی II کو ضرورت ہے۔ SSO ایڈمن سے کہیں کہ response_type \"id_token code\" فعال کریں۔"
@@ -71,8 +77,20 @@ msgstr "{identityName} کو اس آلے سے ہٹا دیا گیا ہے۔"
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹ کی حد تک پہنچ چکے ہیں۔} other {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹس کی حد تک پہنچ چکے ہیں۔}}"
 
+msgid "{name} has been removed."
+msgstr ""
+
+msgid "{NOTIFICATION_APP_NAME} is on your Home Screen but has not been opened yet. Open it once and notifications are on for this identity."
+msgstr ""
+
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# پاس کی} other {# پاس کیز}}"
+
+msgid "{num, plural, one {1 app has been removed.} other {# apps have been removed.}}"
+msgstr ""
+
+msgid "{num, plural, one {Remove 1 app?} other {Remove # apps?}}"
+msgstr ""
 
 msgid "{providerName} {attribute}:"
 msgstr "{providerName} {attribute}:"
@@ -152,6 +170,9 @@ msgstr "رسائی"
 msgid "Access methods"
 msgstr "رسائی کے طریقے"
 
+msgid "Account"
+msgstr ""
+
 msgid "Account name"
 msgstr "اکاؤنٹ کا نام"
 
@@ -175,6 +196,12 @@ msgstr "فعال ہو گیا"
 
 msgid "Active"
 msgstr "فعال"
+
+msgid "Add"
+msgstr ""
+
+msgid "Add {NOTIFICATION_APP_NAME} again"
+msgstr ""
 
 msgid "Add a recovery email"
 msgstr "ریکوری ای میل شامل کریں"
@@ -212,14 +239,26 @@ msgstr "شناخت شامل کریں"
 msgid "Add identity from another device"
 msgstr "کسی اور آلے سے شناخت شامل کریں"
 
+msgid "Add it again"
+msgstr ""
+
 msgid "Add new"
 msgstr "نیا شامل کریں"
 
 msgid "Add or remove the ways you can sign in with your identity."
 msgstr "اپنی شناخت کے ذریعے سائن اِن کرنے کے طریقے شامل کریں یا ہٹائیں۔"
 
+msgid "Add this app again"
+msgstr ""
+
 msgid "Add this identity to another device"
 msgstr "اس شناخت کو کسی اور آلے میں شامل کریں"
+
+msgid "Add to Bookmarks"
+msgstr ""
+
+msgid "Add to Home Screen"
+msgstr ""
 
 msgid "Added by you"
 msgstr "آپ کے ذریعے شامل کیا گیا"
@@ -251,6 +290,12 @@ msgstr "مقامی پروگراموں کو کنیکٹ کرنے کی اجازت �
 msgid "Allow notifications"
 msgstr "اطلاعات کی اجازت دیں"
 
+msgid "Allow Notifications"
+msgstr ""
+
+msgid "Allow them for this site in your browser settings, then turn this on again."
+msgstr ""
+
 msgid "Allow to access this info"
 msgstr "اس معلومات تک رسائی کی اجازت دیں"
 
@@ -259,6 +304,9 @@ msgstr "اجازت یافتہ"
 
 msgid "Allowing access"
 msgstr "رسائی کی اجازت دی جا رہی ہے"
+
+msgid "Almost there"
+msgstr ""
 
 msgid "Already connected"
 msgstr "پہلے سے منسلک"
@@ -275,6 +323,12 @@ msgstr "آپ کی جانب سے تبدیلیاں بھی کرتا ہے۔"
 msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 msgstr "SSO کے ذریعے منسلک اکاؤنٹ اس ڈومین کے ذریعے سائن ان ہوتا ہے جس سے وہ منسلک تھا۔ یہ اکاؤنٹ ایک شناخت سے منسلک ہے، اس لیے اسے نئی شناخت بنانے کے لیے استعمال نہیں کیا جا سکتا۔"
 
+msgid "An app added from it cannot finish setting up. Remove it from your Home Screen and add it again from here."
+msgstr ""
+
+msgid "An internal error occurred"
+msgstr ""
+
 msgid "Any local program can connect"
 msgstr "کوئی بھی مقامی پروگرام کنیکٹ ہو سکتا ہے"
 
@@ -283,12 +337,6 @@ msgstr "اس کمپیوٹر پر موجود کوئی بھی پروگرام در�
 
 msgid "Applications"
 msgstr "ایپلیکیشنز"
-
-msgid "Apps you sign in to will show up here."
-msgstr "جن ایپس میں آپ سائن اِن کرتے ہیں وہ یہاں نظر آئیں گی۔"
-
-msgid "Apps you've signed in to with this identity."
-msgstr "وہ ایپس جن میں آپ نے اس شناخت سے سائن اِن کیا۔"
 
 msgid "Are you sure?"
 msgstr "کیا آپ کو یقین ہے؟"
@@ -302,6 +350,9 @@ msgstr "چونکہ آپ فی الحال اس رسائی کے طریقے سے س�
 msgid "Ask questions and perform actions across your apps by chatting with AI."
 msgstr "AI کے ساتھ چیٹ کرتے ہوئے اپنی ایپس میں سوالات پوچھیں اور اعمال انجام دیں۔"
 
+msgid "Ask your administrator to check the provider's OAuth configuration."
+msgstr ""
+
 msgid "Associate an email address with your Internet Identity"
 msgstr "اپنی Internet Identity سے ایک ای میل پتہ منسلک کریں"
 
@@ -314,20 +365,29 @@ msgstr "تصدیق ہو رہی ہے..."
 msgid "Authentication failed"
 msgstr "تصدیق ناکام ہو گئی"
 
+msgid "Authentication method not found"
+msgstr ""
+
 msgid "Authentication successful"
 msgstr "تصدیق کامیاب رہی"
 
+msgid "Authorization invalid"
+msgstr ""
+
 msgid "Authorize new device"
 msgstr "نئے آلے کی توثیق کریں"
-
-msgid "Available accounts"
-msgstr "دستیاب اکاؤنٹس"
 
 msgid "Back"
 msgstr "واپس"
 
 msgid "Back to sign-in options"
 msgstr "سائن اِن کے آپشنز پر واپس جائیں"
+
+msgid "Back to the steps"
+msgstr ""
+
+msgid "Banners, Sounds, Badges"
+msgstr ""
 
 msgid "Before you continue"
 msgstr "آگے بڑھنے سے پہلے"
@@ -337,6 +397,9 @@ msgstr "بلاک شدہ"
 
 msgid "Body"
 msgstr "متن"
+
+msgid "Bookmark"
+msgstr ""
 
 msgid "Bookmarks"
 msgstr "بُک مارکس"
@@ -377,14 +440,14 @@ msgstr "دیگر ڈومینز دیکھیں:"
 msgid "Checking recovery phrase"
 msgstr "ریکوری فریز کی جانچ ہو رہی ہے"
 
+msgid "Checking this device"
+msgstr ""
+
 msgid "Checking your order"
 msgstr "آپ کے آرڈر کی جانچ ہو رہی ہے"
 
 msgid "Checking..."
 msgstr "جانچ ہو رہی ہے..."
-
-msgid "Choose an account"
-msgstr "اکاؤنٹ منتخب کریں"
 
 msgid "Choose identity, currently {selectedIdentityLabel}"
 msgstr "شناخت منتخب کریں، فی الحال {selectedIdentityLabel}"
@@ -467,6 +530,9 @@ msgstr "منسلک"
 msgid "Connecting {mcpServer}…"
 msgstr "{mcpServer} سے جوڑا جا رہا ہے…"
 
+msgid "Connecting to your organization"
+msgstr ""
+
 msgid "Connection closed"
 msgstr "رابطہ منقطع ہو گیا"
 
@@ -506,6 +572,9 @@ msgstr "کاپی ہو گیا"
 msgid "Copied to clipboard"
 msgstr "کلپ بورڈ پر کاپی ہو گیا"
 
+msgid "Copy"
+msgstr ""
+
 msgid "Copy error details"
 msgstr "ایرر کی تفصیلات کاپی کریں"
 
@@ -517,6 +586,9 @@ msgstr "وصول کنندہ کا پتہ کاپی کریں"
 
 msgid "Copy subject"
 msgstr "موضوع کاپی کریں"
+
+msgid "Couldn't connect to your organization"
+msgstr ""
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "{domainInput} سے SSO سیٹنگز لوڈ نہیں ہو سکیں۔ اپنے SSO ایڈمن سے کہیں کہ وہ یہ یقینی بنائے کہ /.well-known/ii-openid-configuration قابلِ رسائی ہے۔"
@@ -617,11 +689,20 @@ msgstr "AI رسائی حسب ضرورت بنائیں"
 msgid "Default"
 msgstr "ڈیفالٹ"
 
+msgid "Delivered securely through id.ai."
+msgstr ""
+
 msgid "Deny"
 msgstr "رد کریں"
 
 msgid "Deny all"
 msgstr "سب مسترد کریں"
+
+msgid "Deselect {name}"
+msgstr ""
+
+msgid "Device registration closed"
+msgstr ""
 
 msgid "Devices"
 msgstr "آلات"
@@ -720,6 +801,9 @@ msgctxt "Used as an action word inviting the reader to try or feel something, e.
 msgid "Experience"
 msgstr "محسوس کریں"
 
+msgid "Expired JWT"
+msgstr ""
+
 msgid "Export JSON"
 msgstr "JSON برآمد کریں"
 
@@ -735,11 +819,20 @@ msgstr "نمایاں ایپس"
 msgid "File"
 msgstr "فائل"
 
+msgid "Find {appName}"
+msgstr ""
+
+msgid "Find on Page"
+msgstr ""
+
 msgid "First seen"
 msgstr "پہلی بار نظر آیا"
 
 msgid "First sign-in with {name}"
 msgstr "{name} کے ساتھ پہلا سائن اِن"
+
+msgid "Follow these steps to put a new one on your Home Screen:"
+msgstr ""
 
 msgid "Follow these steps to turn them back on:"
 msgstr "انہیں دوبارہ فعال کرنے کے لیے یہ اقدامات کریں:"
@@ -785,6 +878,12 @@ msgstr "فریز تیار کیا جا رہا ہے..."
 
 msgid "Get notifications from this app when something needs your attention. You can turn them off anytime."
 msgstr "جب کسی چیز کو آپ کی توجہ کی ضرورت ہو تو اس ایپ سے اطلاعات حاصل کریں۔ آپ انہیں کسی بھی وقت بند کر سکتے ہیں۔"
+
+msgid "Get notified in this browser when your apps need you."
+msgstr ""
+
+msgid "Get notified on this device when your apps need you."
+msgstr ""
 
 msgid "Get started"
 msgstr "شروع کریں"
@@ -864,8 +963,14 @@ msgstr "میں نے اسے لکھ لیا ہے"
 msgid "I'm using the official ICP CLI and I trust this device."
 msgstr "میں سرکاری ICP CLI استعمال کر رہا/رہی ہوں اور اس آلے پر بھروسہ کرتا/کرتی ہوں۔"
 
+msgid "I've already added it"
+msgstr ""
+
 msgid "I've sent the email"
 msgstr "میں نے ای میل بھیج دی ہے"
+
+msgid "ICP Alerts"
+msgstr ""
 
 msgid "Identities on this device"
 msgstr "اس آلے پر شناختیں"
@@ -969,6 +1074,9 @@ msgstr "غلط کوڈ۔ براہِ کرم چیک کریں اور دوبارہ ک
 msgid "Invalid domain"
 msgstr "غلط ڈومین"
 
+msgid "Invalid metadata. {0}"
+msgstr ""
+
 msgid "Invalid recovery phrase"
 msgstr "غلط ریکوری فریز"
 
@@ -989,6 +1097,9 @@ msgstr "ایسا لگتا ہے کہ ایک غلط تصدیق کی درخواست
 
 msgid "It seems like an invalid CLI authentication request was received."
 msgstr "ایسا لگتا ہے کہ ایک غلط CLI تصدیق کی درخواست موصول ہوئی۔"
+
+msgid "It seems like registration is unavailable at this moment"
+msgstr ""
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "ایسا لگتا ہے کہ سروس کے ساتھ رابطہ قائم نہیں ہو سکا۔ دوسرا براؤزر آزمائیں؛ اگر مسئلہ برقرار رہے تو سپورٹ سے رابطہ کریں۔"
@@ -1020,9 +1131,6 @@ msgstr "زبان"
 msgid "Last used"
 msgstr "آخری بار استعمال ہوا"
 
-msgid "Last visited"
-msgstr "آخری دورہ"
-
 msgid "Last visited yesterday"
 msgstr "کل آخری دورہ"
 
@@ -1046,6 +1154,9 @@ msgstr "AI کو اپنی ایپس تک رسائی دیں۔"
 
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "اس آلے پر موجود کمانڈ لائن ٹولز کو آپ کی شناخت استعمال کرکے ایپس میں سائن اِن کرنے کی اجازت دیں۔"
+
+msgid "Let your apps notify you"
+msgstr ""
 
 msgid "Let's get started"
 msgstr "آئیے شروع کرتے ہیں"
@@ -1101,8 +1212,14 @@ msgstr "یقینی بنائیں کہ URL کسی قابلِ اعتماد ذریع
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "اس بات کو یقینی بنائیں کہ رسائی کا ایک نیا طریقہ شامل کریں تاکہ آپ اگلی بار سائن اِن کر سکیں یا اپنا ریکوری فریز ری سیٹ کر سکیں۔"
 
+msgid "Manage"
+msgstr ""
+
 msgid "Manage {name}"
 msgstr "{name} کا انتظام کریں"
+
+msgid "Manage apps"
+msgstr ""
 
 msgid "Manage how other tools connect to your identity."
 msgstr "یہ منظم کریں کہ دوسرے ٹولز آپ کی شناخت سے کیسے جڑتے ہیں۔"
@@ -1124,6 +1241,9 @@ msgstr "اپنی Internet Identity کا انتظام کریں"
 
 msgid "Manage your shareable emails. These should be different from your recovery email."
 msgstr "اپنی قابلِ شیئر ای میلز کا انتظام کریں۔ یہ آپ کی ریکوری ای میل سے مختلف ہونی چاہییں۔"
+
+msgid "Markup"
+msgstr ""
 
 msgid "Maximum length is 32 characters."
 msgstr "زیادہ سے زیادہ لمبائی 32 حروف ہے۔"
@@ -1161,6 +1281,12 @@ msgstr "نام:"
 msgid "New message"
 msgstr "نیا پیغام"
 
+msgid "New Tab"
+msgstr ""
+
+msgid "No apps yet"
+msgstr ""
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Google، Microsoft یا Apple کے ساتھ یہ معلومات شیئر نہیں کی جاتیں کہ آپ Internet Identity کے ذریعے کن ایپلیکیشنز میں لاگ اِن کرتے ہیں۔"
 
@@ -1169,6 +1295,9 @@ msgstr "ابھی تک کوئی ای میل نہیں"
 
 msgid "No identity found"
 msgstr "کوئی شناخت نہیں ملی"
+
+msgid "No more additional accounts can be created"
+msgstr ""
 
 msgid "No passkey tests yet"
 msgstr "ابھی تک کوئی پاس کی ٹیسٹ نہیں ہوا"
@@ -1200,6 +1329,9 @@ msgstr "اپ گریڈ نہیں ہوا"
 msgid "Not verified"
 msgstr "تصدیق نہیں ہوئی"
 
+msgid "Nothing can arrive here until it's set up again. Follow these steps:"
+msgstr ""
+
 msgid "Notification"
 msgstr "اطلاع"
 
@@ -1212,8 +1344,17 @@ msgstr "اطلاعات"
 msgid "Notifications are blocked"
 msgstr "اطلاعات بلاک ہیں"
 
+msgid "Notifications are on"
+msgstr ""
+
 msgid "Notifications blocked"
 msgstr "اطلاعات بلاک شدہ"
+
+msgid "Notifications couldn't be set up on this device. Turn them off and on again on {host} to retry."
+msgstr ""
+
+msgid "Notifications from your apps will show up on this device."
+msgstr ""
 
 msgid "Notifications unavailable"
 msgstr "اطلاعات دستیاب نہیں"
@@ -1221,8 +1362,23 @@ msgstr "اطلاعات دستیاب نہیں"
 msgid "now"
 msgstr "ابھی"
 
+msgid "OAuth provider returned \"{0}\""
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
 msgid "Official · Hosted by DFINITY"
 msgstr "سرکاری · DFINITY کی میزبانی میں"
+
+msgid "OISY Wallet · Payment received"
+msgstr ""
+
+msgid "On because you said this device already has the app. Turn this off and on again if it does not."
+msgstr ""
+
+msgid "On for this device"
+msgstr ""
 
 msgid "On this computer"
 msgstr "اس کمپیوٹر پر"
@@ -1230,17 +1386,50 @@ msgstr "اس کمپیوٹر پر"
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "ایک بار فعال ہونے کے بعد، اس آلے پر موجود کوئی بھی کمانڈ لائن ٹول آپ کی شناخت کا استعمال کرکے ایپس میں سائن اِن کر سکتا ہے۔"
 
+msgid "One more tap opens the app that sent you this notification."
+msgstr ""
+
 msgid "One or more words are wrong or out of order."
 msgstr "ایک یا زیادہ الفاظ غلط ہیں یا ترتیب درست نہیں ہے۔"
 
 msgid "Only add trusted connectors"
 msgstr "صرف قابلِ اعتماد کنیکٹرز شامل کریں"
 
+msgid "Only apps you allow can notify you."
+msgstr ""
+
 msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
 msgstr "صرف اس صورت میں جاری رکھیں اگر آپ ان ڈومینز کو پہچانتے ہیں۔ اگر کسی ایپ یا رہنما نے آپ کو ایسا ڈومین درج کرنے کو کہا جو آپ نہیں جانتے، تو یہاں رک جائیں اور اپنی تنظیم کا دیا ہوا ڈومین استعمال کریں۔"
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "یہ صرف سرکاری <0>ICP CLI</0> کے لیے فعال کریں۔ اگر آپ کو یقین نہیں، تو اسے <1>سرکاری ذریعے</1> سے دوبارہ انسٹال کریں۔"
+
+msgid "Open {host}"
+msgstr ""
+
+msgid "Open {host} settings"
+msgstr ""
+
+msgid "Open {host} whenever you want to turn notifications on."
+msgstr ""
+
+msgid "Open {host}, sign in, and turn notifications on. It will show you how to add the app back."
+msgstr ""
+
+msgid "Open {host}, sign in, and turn notifications on. It will show you how to add the app."
+msgstr ""
+
+msgid "Open {name}"
+msgstr ""
+
+msgid "Open {NOTIFICATION_APP_NAME}"
+msgstr ""
+
+msgid "Open {NOTIFICATION_APP_NAME} and tap Allow when it asks you."
+msgstr ""
+
+msgid "Open as Web App"
+msgstr ""
 
 msgid "Open in browser"
 msgstr "براؤزر میں کھولیں"
@@ -1254,6 +1443,12 @@ msgstr "میل ایپ میں کھولیں"
 msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
 msgstr "اپنے رسائی کے طریقوں اور ریکوری آپشنز کا انتظام کرنے کے لیے Internet Identity کو نئی ٹیب میں کھولیں۔"
 
+msgid "Open it from your Home Screen and allow notifications there."
+msgstr ""
+
+msgid "Open it once to finish"
+msgstr ""
+
 msgid "Open manage"
 msgstr "انتظام کھولیں"
 
@@ -1262,6 +1457,12 @@ msgstr "مینو کھولیں"
 
 msgid "Open notification settings"
 msgstr "اطلاع کی ترتیبات کھولیں"
+
+msgid "Open notifications"
+msgstr ""
+
+msgid "Open or manage apps you've granted permissions."
+msgstr ""
 
 msgid "Open permissions"
 msgstr "اجازتیں کھولیں"
@@ -1280,6 +1481,12 @@ msgstr "سائٹ کی اجازتیں کھولیں"
 
 msgid "Open site settings"
 msgstr "سائٹ کی ترتیبات کھولیں"
+
+msgid "Open the menu"
+msgstr ""
+
+msgid "Operation canceled"
+msgstr ""
 
 msgid "Or sign in with another identity"
 msgstr "یا کسی دوسری شناخت سے سائن اِن کریں"
@@ -1323,11 +1530,17 @@ msgstr "پاس کیز آپ کے آلے میں محفوظ چابیاں استعم
 msgid "Password-free"
 msgstr "پاس ورڈ کے بغیر"
 
+msgid "Payments, votes and messages from the apps you use, right on this device."
+msgstr ""
+
 msgid "Permissions"
 msgstr "اجازتیں"
 
 msgid "Permissions for {host}"
 msgstr "{host} کی اجازتیں"
+
+msgid "Photos"
+msgstr ""
 
 msgid "Pick a recovery method below to sign back in."
 msgstr "دوبارہ سائن اِن کرنے کے لیے نیچے سے ریکوری کا طریقہ منتخب کریں۔"
@@ -1364,6 +1577,9 @@ msgstr "صرف سوالات"
 
 msgid "Reachable MCP server"
 msgstr "قابلِ رسائی MCP سرور"
+
+msgid "Reading List"
+msgstr ""
 
 msgid "Real privacy"
 msgstr "حقیقی رازداری"
@@ -1413,6 +1629,9 @@ msgstr "یہ براؤزر یاد رکھیں؟"
 msgid "Reminder"
 msgstr "یاد دہانی"
 
+msgid "Reminders"
+msgstr ""
+
 msgid "Remote server"
 msgstr "ریموٹ سرور"
 
@@ -1422,8 +1641,17 @@ msgstr "ہٹائیں"
 msgid "Remove {0}"
 msgstr "{0} ہٹائیں"
 
+msgid "Remove {name}?"
+msgstr ""
+
 msgid "Remove and sign out"
 msgstr "ہٹائیں اور سائن آؤٹ کریں"
+
+msgid "Remove app"
+msgstr ""
+
+msgid "Remove apps"
+msgstr ""
 
 msgid "Remove email"
 msgstr "ای میل ہٹائیں"
@@ -1440,6 +1668,12 @@ msgstr "ریکوری ای میل ہٹائیں؟"
 msgid "Remove the connector to revoke AI access."
 msgstr "AI رسائی منسوخ کرنے کے لیے کنیکٹر ہٹائیں۔"
 
+msgid "Remove this app"
+msgstr ""
+
+msgid "Remove this app from your Home Screen, then open {host} and turn notifications on again to add it back."
+msgstr ""
+
 msgid "Removing and signing out..."
 msgstr "ہٹایا جا رہا ہے اور سائن آؤٹ ہو رہا ہے..."
 
@@ -1451,6 +1685,9 @@ msgstr "پاس کی ہٹائی جا رہی ہے..."
 
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 msgstr "اس پاس کی کو ہٹانے کا مطلب ہے کہ آپ اسے مزید سائن اِن کے لیے استعمال نہیں کر سکیں گے۔ آپ بعد میں کسی بھی وقت نئی پاس کی شامل کر سکتے ہیں۔"
+
+msgid "Removing..."
+msgstr ""
 
 msgid "Removing…"
 msgstr "ہٹایا جا رہا ہے…"
@@ -1557,6 +1794,9 @@ msgstr "آپ کی شناخت کو سرور سے محفوظ طریقے سے جو�
 msgid "See where you're signed in to apps and sign out remotely."
 msgstr "دیکھیں کہ آپ کہاں کہاں ایپس میں سائن اِن ہیں اور دور سے سائن آؤٹ کریں۔"
 
+msgid "Select {name}"
+msgstr ""
+
 msgid "Select <0>Blocked ×</0> to clear it."
 msgstr "اسے ہٹانے کے لیے <0>بلاک شدہ ×</0> منتخب کریں۔"
 
@@ -1571,6 +1811,9 @@ msgstr "مینو بار میں <0>Safari</0> › <1>ترتیبات…</1> منت
 
 msgid "Select a passkey"
 msgstr "پاس کی منتخب کریں"
+
+msgid "Select apps to remove"
+msgstr ""
 
 msgid "Select each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں منتخب کریں:"
@@ -1593,14 +1836,20 @@ msgstr "اطلاعات بھیجیں"
 msgid "Send the email below to confirm."
 msgstr "تصدیق کے لیے نیچے دی گئی ای میل بھیجیں۔"
 
-msgid "Session duration"
-msgstr "سیشن کی مدت"
+msgid "Session"
+msgstr ""
 
 msgid "Session timed out"
 msgstr "سیشن کا وقت ختم ہو گیا"
 
 msgid "Set as default sign-in"
 msgstr "ڈیفالٹ سائن اِن کے طور پر سیٹ کریں"
+
+msgid "Set up {NOTIFICATION_APP_NAME}"
+msgstr ""
+
+msgid "Set up notifications"
+msgstr ""
 
 msgid "Set up recovery email"
 msgstr "ریکوری ای میل ترتیب دیں"
@@ -1619,6 +1868,9 @@ msgstr "ترتیبات"
 
 msgid "Settings…"
 msgstr "ترتیبات…"
+
+msgid "Share"
+msgstr ""
 
 msgid "Share {label}"
 msgstr "{label} شیئر کریں"
@@ -1674,6 +1926,12 @@ msgstr "پاس کی سے سائن اِن کریں"
 msgid "Sign in with SSO"
 msgstr "SSO سے سائن اِن کریں"
 
+msgid "Sign in with the domain it is linked through: {registeredDomain}."
+msgstr ""
+
+msgid "Sign in with the domain it was originally linked through."
+msgstr ""
+
 msgid "Sign in with your {displayName} account from any device."
 msgstr "اپنے {displayName} اکاؤنٹ سے کسی بھی آلے سے سائن اِن کریں۔"
 
@@ -1725,6 +1983,9 @@ msgstr "سائن ان ہو رہا ہے..."
 msgid "Signing out…"
 msgstr "سائن آؤٹ ہو رہا ہے…"
 
+msgid "Signs you out and clears its settings."
+msgstr ""
+
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
 
@@ -1741,6 +2002,12 @@ msgstr "کچھ غلط ہے۔"
 msgid "Something went wrong"
 msgstr "کچھ غلط ہو گیا"
 
+msgid "Something went wrong during registration"
+msgstr ""
+
+msgid "Something went wrong during sign-in"
+msgstr ""
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "آپ کی ڈیلیگیشن بناتے وقت کچھ غلط ہو گیا۔ براہ کرم دوبارہ کوشش کریں؛ اگر مسئلہ برقرار رہے تو سپورٹ سے رابطہ کریں۔"
 
@@ -1752,6 +2019,9 @@ msgstr "ایٹریبیوٹس شیئر کرتے وقت کچھ غلط ہو گیا�
 
 msgid "Something went wrong while signing in with your provider. Close this window and try again."
 msgstr "آپ کے فراہم کنندہ کے ساتھ سائن اِن کرتے وقت کچھ غلط ہو گیا۔ یہ ونڈو بند کریں اور دوبارہ کوشش کریں۔"
+
+msgid "Sounds & Haptics"
+msgstr ""
 
 msgid "Source code"
 msgstr "سورس کوڈ"
@@ -1767,6 +2037,9 @@ msgstr "دوبارہ شروع کریں"
 
 msgid "Start the connection again from your MCP client. You can close this window."
 msgstr "اپنے MCP کلائنٹ سے رابطہ دوبارہ شروع کریں۔ آپ یہ ونڈو بند کر سکتے ہیں۔"
+
+msgid "Stay signed in for"
+msgstr ""
 
 msgid "Step 2 of 2"
 msgstr "مرحلہ ۲ از ۲"
@@ -1846,17 +2119,32 @@ msgstr "<0>اطلاعات</0> پر تھپتھپائیں۔"
 msgid "Tap <0>Permissions</0>."
 msgstr "<0>اجازتیں</0> پر تھپتھپائیں۔"
 
+msgid "Tap Add to Home Screen"
+msgstr ""
+
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "<0>ایڈریس بار</0> پر ٹیپ کریں اور <1>براؤزر میں کھولیں</1>۔"
 
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "نمایاں کیے گئے <0>واپس</0> بٹن پر ٹیپ کریں۔"
 
+msgid "Tap Share"
+msgstr ""
+
 msgid "Tap the highlighted <0>shield</0> icon."
 msgstr "نمایاں <0>شیلڈ</0> آئیکن پر تھپتھپائیں۔"
 
 msgid "Tap the highlighted <0>site settings</0> icon."
 msgstr "نمایاں <0>سائٹ کی ترتیبات</0> آئیکن پر تھپتھپائیں۔"
+
+msgid "Tap to see it in your wallet."
+msgstr ""
+
+msgid "Tap to select"
+msgstr ""
+
+msgid "Tap View More"
+msgstr ""
 
 msgid "Test passkey support"
 msgstr "پاس کی سپورٹ کو ٹیسٹ کریں"
@@ -1888,6 +2176,9 @@ msgstr "CLI سائن اِن مکمل نہیں ہو سکا۔ تفصیلات کے 
 msgid "The CLI uses your account in this app."
 msgstr "CLI اس ایپ میں آپ کا اکاؤنٹ استعمال کرتا ہے۔"
 
+msgid "The delegation could not be found — please try again."
+msgstr ""
+
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "DNSSEC زون کو ایک موجودہ الگورتھم استعمال کرنا ضروری ہے — RSA/SHA-256، RSA/SHA-512، ECDSA P-256، یا Ed25519۔ فرسودہ SHA-1 الگورتھم سپورٹ نہیں ہیں۔"
 
@@ -1897,11 +2188,23 @@ msgstr "ای میل براہ راست اوپر دیے گئے پتے سے آنی 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Google، Microsoft اور Apple کے ساتھ انٹیگریشن ایک معیاری تصدیقی پروٹوکول استعمال کرتی ہے جسے OpenID کہا جاتا ہے۔ یہی وہی پروٹوکول ہے جسے دیگر ایپلیکیشنز Google کے ساتھ لاگ اِن کے لیے استعمال کرتی ہیں۔"
 
+msgid "The interaction was canceled or timed out. Please try again."
+msgstr ""
+
+msgid "The JWT has expired — please try again in a few minutes."
+msgstr ""
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "سب سے قابلِ اعتماد بیک اپ۔ مکمل طور پر آپ کے ذریعے، کاغذ پر محفوظ۔ یہ کسی بھی اکاؤنٹ، سروس، یا فراہم کنندہ پر منحصر نہیں، اور صرف آپ ہی اسے استعمال، کھو، یا تبدیل کر سکتے ہیں۔"
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "فریز درست درج کی گئی ہے، لیکن یہ Internet Identity کے بجائے کسی اور پروڈکٹ سے متعلق ہے۔"
+
+msgid "There is nothing here to open."
+msgstr ""
+
+msgid "There was an error verifying your account — please try again."
+msgstr ""
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "ایپلیکیشن کے ساتھ منسلک ہونے میں مسئلہ پیش آیا۔ دوسرا براؤزر آزمائیں؛ اگر مسئلہ برقرار رہے تو ڈویلپر سے رابطہ کریں۔"
@@ -1924,17 +2227,35 @@ msgstr "یہ {resolvedProviderName} اکاؤنٹ پہلے سے ایک Internet I
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 msgstr "یہ {resolvedProviderName} اکاؤنٹ ابھی تک کسی Internet Identity سے منسلک نہیں ہے۔"
 
+msgid "This account has already been unlinked"
+msgstr ""
+
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "یہ اکاؤنٹ پہلے سے آپ کی شناخت سے منسلک ہے۔ آپ کا فعال رسائی طریقہ اس پر تبدیل کر دیا جائے گا۔"
 
+msgid "This account is already linked to another identity"
+msgstr ""
+
+msgid "This account is linked through a different SSO domain"
+msgstr ""
+
+msgid "This account isn't linked to an identity"
+msgstr ""
+
 msgid "this app"
 msgstr "یہ ایپ"
+
+msgid "This app can't be connected to your identity. Adding it again gives it what it needs:"
+msgstr ""
 
 msgid "This app has moved to the new Internet Identity"
 msgstr "یہ ایپ نئی Internet Identity پر منتقل ہو گئی ہے"
 
 msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
 msgstr "یہ ایپ آپ کا ای میل پتہ مانگ رہی ہے۔ آپ ابھی اپنے ای میل پتے کی تصدیق کر کے اسے شیئر کر سکتے ہیں، یا چھوڑیں اور شیئر کیے بغیر جاری رکھیں۔"
+
+msgid "This app isn't connected"
+msgstr ""
 
 msgid "This browser"
 msgstr "یہ براؤزر"
@@ -1960,11 +2281,20 @@ msgstr "یہ پہلے ہی آپ کی ریکوری ای میل ہے۔"
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "یہ اب اس آلے پر آگے تصدیق کے لیے استعمال ہونے والا ڈیفالٹ طریقہ ہے۔"
 
+msgid "This is taking longer than usual."
+msgstr ""
+
 msgid "This is the access method you're currently signed in with."
 msgstr "یہ وہ رسائی کا طریقہ ہے جس سے آپ فی الحال سائن اِن ہیں۔"
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "یہ وہ ریکوری طریقہ ہے جس سے آپ فی الحال سائن اِن ہیں۔"
+
+msgid "This link didn't work"
+msgstr ""
+
+msgid "This link has expired"
+msgstr ""
 
 msgid "This may take a few seconds"
 msgstr "اس میں کچھ سیکنڈ لگ سکتے ہیں"
@@ -2017,6 +2347,12 @@ msgstr "اپنی پاس کی سیٹ اپ مکمل کرنے کے لیے، اپن�
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "AI کو اپنی ایپس میں سوالات پوچھنے اور اعمال انجام دینے کی اجازت دینے کے لیے، ایک <0>MCP کنیکٹر</0> شامل کریں جس پر آپ اعتماد کرتے ہیں۔"
 
+msgid "Too many attempts or time has expired."
+msgstr ""
+
+msgid "Touch and hold the {NOTIFICATION_APP_NAME} icon on your Home Screen, then tap Remove App."
+msgstr ""
+
 msgid "Trusted connector"
 msgstr "قابلِ اعتماد کنیکٹر"
 
@@ -2025,6 +2361,9 @@ msgstr "کوئی اور پتہ آزمائیں"
 
 msgid "Try again"
 msgstr "دوبارہ کوشش کریں"
+
+msgid "Try again in {duration}"
+msgstr ""
 
 msgid "Turn on <0>Notifications</0>."
 msgstr "<0>اطلاعات</0> آن کریں۔"
@@ -2062,8 +2401,17 @@ msgstr "Internet Identity کو سمجھیں"
 msgid "Undo"
 msgstr "واپس کریں"
 
+msgid "Unexpected error"
+msgstr ""
+
+msgid "Unhandled error"
+msgstr ""
+
 msgid "Unknown"
 msgstr "نامعلوم"
+
+msgid "Unknown error"
+msgstr ""
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
 msgstr "بہت سے Web3 تصدیقی نظاموں کے برعکس جن میں ہر عمل کے لیے دستی دستخط کی ضرورت ہوتی ہے، Internet Identity ہر ایپلیکیشن کے لیے تصدیق شدہ سیشن بناتی ہے۔ یہ سیکیورٹی اور سہولت دونوں فراہم کرتی ہے (بار بار دستخط کی ضرورت نہیں) جبکہ ہر سیشن کو اپنی شناخت بھی دیتی ہے۔"
@@ -2088,9 +2436,6 @@ msgstr "جاری رکھنے کے لیے ان لاک کریں"
 
 msgid "Unsupported browser"
 msgstr "غیر معاون براؤزر"
-
-msgid "until you have to sign in again"
-msgstr "دوبارہ سائن اِن کرنے تک"
 
 msgid "Unverified origin"
 msgstr "غیر تصدیق شدہ اوریجن"
@@ -2179,8 +2524,14 @@ msgstr "تصدیق ہو رہی ہے…"
 msgid "View"
 msgstr "دیکھیں"
 
+msgid "View More"
+msgstr ""
+
 msgid "View your last used identities"
 msgstr "اپنی آخری بار استعمال شدہ شناختیں دیکھیں"
+
+msgid "Waiting for permission"
+msgstr ""
 
 msgid "Waiting for your existing device"
 msgstr "آپ کے موجودہ آلے کا انتظار ہے"
@@ -2190,6 +2541,9 @@ msgstr "آپ کے نئے آلے کا انتظار ہے"
 
 msgid "Waiting to receive…"
 msgstr "موصول ہونے کا انتظار ہے…"
+
+msgid "Wallpaper"
+msgstr ""
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "ہم ابھی <0>{domain}</0> سے میل کی تصدیق نہیں کر سکتے۔ کوئی اور پتہ آزمائیں۔ Gmail، iCloud، Outlook، Fastmail، اور Proton سب کام کرتے ہیں۔"
@@ -2236,6 +2590,9 @@ msgstr "میں یہ کیوں دیکھ رہا/رہی ہوں؟"
 msgid "Why isn't this supported?"
 msgstr "یہ کیوں معاون نہیں ہے؟"
 
+msgid "Will be removed"
+msgstr ""
+
 msgid "with your identity in this app"
 msgstr "اس ایپ میں آپ کی شناخت کے ساتھ"
 
@@ -2278,6 +2635,12 @@ msgstr "آپ اسی {provider} اکاؤنٹ سے سائن اِن کر کے اس�
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "آپ اسی پاس کی سے سائن اِن کر کے اسے کسی بھی وقت واپس شامل کر سکتے ہیں۔"
 
+msgid "You can close this page."
+msgstr ""
+
+msgid "You can close this tab"
+msgstr ""
+
 msgid "You can close this window."
 msgstr "آپ یہ ونڈو بند کر سکتے ہیں۔"
 
@@ -2295,6 +2658,12 @@ msgstr "آپ اپنے ایجنٹ پر واپس جا سکتے ہیں۔"
 
 msgid "You can sign in again at any time."
 msgstr "آپ کسی بھی وقت دوبارہ سائن اِن کر سکتے ہیں۔"
+
+msgid "You can sign in to it again at any time."
+msgstr ""
+
+msgid "You can sign in to them again at any time."
+msgstr ""
 
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "آپ اسے ابھی بازیافت کے لیے استعمال کر سکتے ہیں، لیکن تصدیق کریں کہ آپ نے اسے درست طریقے سے محفوظ کیا ہے تاکہ آپ بعد میں اس پر انحصار کر سکیں۔"
@@ -2320,6 +2689,24 @@ msgstr "آپ نے پہلے ایک مختلف رسائی طریقے سے سائن
 msgid "You unlinked this {resolvedProviderName} account from your identity."
 msgstr "آپ نے اس {resolvedProviderName} اکاؤنٹ کو اپنی شناخت سے ان لنک کر دیا ہے۔"
 
+msgid "You'll be signed out and its permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out and permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out and their permissions revoked."
+msgstr ""
+
+msgid "You'll be signed out of {name} and it will no longer be able to notify you."
+msgstr ""
+
+msgid "You'll be signed out of these apps and they will no longer be able to notify you."
+msgstr ""
+
+msgid "You'll get alerts from your apps here."
+msgstr ""
+
 msgid "You're about to authorize a new device."
 msgstr "آپ ایک نئے آلے کی توثیق کرنے والے ہیں۔"
 
@@ -2331,6 +2718,9 @@ msgstr "آپ سائن اِن کرنے والے ہیں۔"
 
 msgid "You're about to unlink your {providerName} account."
 msgstr "آپ اپنا {providerName} اکاؤنٹ ان لنک کرنے والے ہیں۔"
+
+msgid "You're all set"
+msgstr ""
 
 msgid "You're all set. Your identity has been created."
 msgstr "سب تیار ہے۔ آپ کی شناخت بن گئی ہے۔"
@@ -2346,6 +2736,12 @@ msgstr "آپ بطور <0>{name}</0> سائن اِن کر رہے ہیں۔"
 
 msgid "You've already verified this email."
 msgstr "آپ نے یہ ای میل پہلے ہی تصدیق کر لی ہے۔"
+
+msgid "You've been signed out and it can no longer notify you."
+msgstr ""
+
+msgid "You've been signed out and they can no longer notify you."
+msgstr ""
 
 msgid "You've never used this {resolvedProviderName} account with Internet Identity."
 msgstr "آپ نے یہ {resolvedProviderName} اکاؤنٹ Internet Identity کے ساتھ کبھی استعمال نہیں کیا۔"

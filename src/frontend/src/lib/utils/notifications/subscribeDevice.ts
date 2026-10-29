@@ -126,11 +126,35 @@ const anotherAnchorMayAnswer = (error: unknown): boolean => {
 
 /** Taking the first anchor alone would let a single identity whose reference is switched off end every launch.
  * One subscription for the whole walk: minting per anchor would hand out a new endpoint for each one. */
+/**
+ * Whether registering again would tell the canister anything it does not hold.
+ *
+ * The subscription is the app's, not an identity's: identities only point at the app
+ * record it hangs on. So an endpoint already registered under this app id is registered,
+ * however many identities have come or gone since, and the loop below would write back
+ * what is there.
+ */
+export const alreadyRegistered = (
+  subscription: StoredVapidKey,
+  appId: bigint | undefined,
+): boolean =>
+  appId !== undefined && subscription.registeredForApp === appId.toString();
+
 export const registerForAnyAnchor = async (
   anchors: bigint[],
   caller: ActorSubclass<_SERVICE>,
+  /** The app record the subscription hangs on, where the caller knows it. */
+  appId?: bigint,
 ): Promise<boolean> => {
   const { subscription, minted } = await deviceSubscription();
+
+  // An endpoint the canister already holds under this app is a call that would write
+  // back what is there. What replaces an endpoint is the permission being refused and
+  // granted again, and that mints a new subscription, which is `minted` above.
+  if (!minted && anchors.length > 0 && alreadyRegistered(subscription, appId)) {
+    return true;
+  }
+
   for (const anchor of anchors) {
     try {
       await registerStoredDevice(anchor, subscription, caller);
@@ -140,9 +164,14 @@ export const registerForAnyAnchor = async (
       }
       throw error;
     }
-    if (minted) {
-      await storeVapidKey(subscription);
-    }
+    // Written once the canister has taken it, so a launch that failed to register does
+    // not read as one that succeeded. Without an app id there is nothing to record it
+    // under, and the next launch registers again rather than guessing.
+    await storeVapidKey(
+      appId === undefined
+        ? subscription
+        : { ...subscription, registeredForApp: appId.toString() },
+    );
     return true;
   }
   return false;
