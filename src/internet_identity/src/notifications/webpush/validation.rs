@@ -106,6 +106,69 @@ impl TryFrom<Vec<u8>> for VapidPublicKey {
     }
 }
 
+/// RFC 8291 §3.4 input keying material, derived by the browser from this subscription's
+/// own keys and an ephemeral pair of its own, and uploaded so the canister can seal a
+/// payload without ever running the ECDH.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PayloadIkm(Vec<u8>);
+
+/// Length of the HKDF output RFC 8291 specifies.
+const PAYLOAD_IKM_LEN: usize = 32;
+
+impl PayloadIkm {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl TryFrom<Vec<u8>> for PayloadIkm {
+    type Error = String;
+
+    fn try_from(payload_ikm: Vec<u8>) -> Result<Self, Self::Error> {
+        validate_param_len(
+            payload_ikm.len(),
+            PAYLOAD_IKM_LEN..=PAYLOAD_IKM_LEN,
+            "payload_ikm",
+        )?;
+        Ok(Self(payload_ikm))
+    }
+}
+
+/// The browser's ephemeral public key, uncompressed SEC1 P-256. Carried in the payload
+/// header as `keyid`, which is what the browser derives its half of the IKM against.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PayloadKeyId(Vec<u8>);
+
+impl PayloadKeyId {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl TryFrom<Vec<u8>> for PayloadKeyId {
+    type Error = String;
+
+    fn try_from(payload_keyid: Vec<u8>) -> Result<Self, Self::Error> {
+        validate_param_len(
+            payload_keyid.len(),
+            VAPID_PUBKEY_LEN..=VAPID_PUBKEY_LEN,
+            "payload_keyid",
+        )?;
+        if p256::PublicKey::from_sec1_bytes(&payload_keyid).is_err() {
+            return Err("payload_keyid is not a valid SEC1 P-256 point".to_string());
+        }
+        Ok(Self(payload_keyid))
+    }
+}
+
 /// One JWT signature per validity window, in window order, and the instant they were
 /// signed at.
 ///

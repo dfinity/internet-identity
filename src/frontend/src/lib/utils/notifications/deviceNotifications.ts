@@ -91,5 +91,9 @@ export const reconcileDeviceNotifications = async (
   if (await notificationsTurnedOff(identityNumber)) {
     return;
   }
-  await registerStoredDevice(identityNumber, stored);
+  const live = await currentDeviceSubscription();
+  if (live === undefined) {
+    return;
+  }
+  await registerStoredDevice(identityNumber, stored, live);
 };

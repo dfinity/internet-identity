@@ -1,4 +1,3 @@
-use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::{Decode, Encode};
@@ -22,7 +21,13 @@ pub struct StorableWebPushSubscription {
     pub vapid_public_key: Vec<u8>,
     #[n(3)]
     pub jwt_pool: StorableWebPushJwtPool,
-    /// A queue some records carry here. The entry holds the queue, so this is read only.
-    #[n(4)]
-    pub notifications: Option<Vec<StorableInboxNotification>>,
+    /// RFC 8291 §3.4 input keying material, which the browser derived from this
+    /// subscription's own keys and an ephemeral pair of its own. Sealing a payload with it
+    /// costs two HKDFs and one AES-GCM, so the ECDH never runs here.
+    #[cbor(n(4), with = "minicbor::bytes")]
+    pub payload_ikm: Vec<u8>,
+    /// The browser's ephemeral public key, echoed as the `keyid` the browser derives
+    /// against (uncompressed SEC1 P-256, 65 bytes).
+    #[cbor(n(5), with = "minicbor::bytes")]
+    pub payload_keyid: Vec<u8>,
 }

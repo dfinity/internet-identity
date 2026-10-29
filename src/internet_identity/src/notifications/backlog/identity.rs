@@ -7,7 +7,7 @@
 //! away from every app.
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
-use crate::notifications::dispatch::{self, IdentityNotification};
+use crate::notifications::dispatch;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, NotificationEvent, NotificationId, Timestamp, Urgency,
 };
@@ -25,11 +25,8 @@ pub(crate) struct PendingIdentityNotification {
     /// what keeps the key uniform.
     pub(crate) notification_id: NotificationId,
     /// What the destinations are given to show, written onto their entries when the pass
-    /// expands this. Absent where the wake-up announces nothing new, which is a worker
-    /// being asked to come back for what its entry already holds.
-    pub(crate) event: Option<NotificationEvent>,
-    /// Decides the address each entry is reached at when a pass expands this.
-    pub(crate) kind: IdentityNotification,
+    /// expands this.
+    pub(crate) event: NotificationEvent,
     pub(crate) urgency: Urgency,
     pub(crate) expires_at_ns: Option<Timestamp>,
 }
@@ -37,12 +34,13 @@ pub(crate) struct PendingIdentityNotification {
 impl QueueItem for PendingIdentityNotification {
     /// The id alone: ids are allocated by the canister and never repeat, so dedup catches
     /// a genuine resubmission and nothing else. The destination is deliberately absent —
-    /// a worker looping on delegations submits fresh ids and is stopped by the quota.
+    /// a caller asking over and over submits fresh ids and is stopped by the quota.
     type Key = NotificationId;
 
-    /// Per kind, per identity, so a burst of one kind cannot take the whole of an
-    /// identity's allowance from its other wake-ups.
-    type Group = IdentityNotification;
+    /// Per kind of message, per identity, so a burst of one kind cannot take the whole
+    /// of an identity's allowance from its other wake-ups. Read off the event rather
+    /// than carried beside it, so the two cannot disagree.
+    type Group = std::mem::Discriminant<NotificationEvent>;
 
     const TURNS: &'static [usize] = &[4, 3, 2, 1];
 
@@ -51,7 +49,7 @@ impl QueueItem for PendingIdentityNotification {
     }
 
     fn group(&self) -> Self::Group {
-        self.kind
+        std::mem::discriminant(&self.event)
     }
 
     /// Lanes run most urgent first, which is the reverse of how the levels are
@@ -97,8 +95,8 @@ pub(crate) const IDENTITY_BACKLOG: QueueConfig = QueueConfig {
     // identities, and the point of the queue is that none of them dominates. Twenty
     // entries each carrying a wake-up plus a few events is about twenty-five.
     max_entries_per_sender: 64,
-    // Per kind, per identity. MAX_BROWSERS is 20 and a wake-up is per entry, so this is
-    // one kind's worth for every entry the identity has.
+    // Per kind of message, per identity. MAX_BROWSERS is 20 and a wake-up is per entry,
+    // so this is one kind's worth for every entry the identity has.
     max_pending_per_group: 20,
     pressure_cleared_below: DRAINED_PER_EXPIRY * 8 / 10,
     discard_entries_after_ns: EXPIRY_NS,

@@ -314,7 +314,10 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
-  const GetNextNotificationRequest = IDL.Record({
+  const InboxNotificationId = IDL.Nat64;
+  const GetNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+    'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
   });
   const IdentityForNotification = IDL.Record({
@@ -332,15 +335,16 @@ export const idlFactory = ({ IDL }) => {
     'event' : IDL.Opt(NotificationEvent),
     'account_number' : IDL.Opt(AccountNumber),
   });
-  const GetNextNotificationResponse = IDL.Record({
+  const GetNotificationResponse = IDL.Record({
     'notification' : IDL.Opt(NotificationToShow),
   });
-  const GetNextNotificationError = IDL.Variant({
+  const GetNotificationError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
   const RemoveNotificationRequest = IDL.Record({
-    'notification' : NotificationToShow,
+    'inbox_notification_id' : InboxNotificationId,
+    'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
   });
   const RemoveNotificationResponse = IDL.Record({});
@@ -1129,6 +1133,8 @@ export const idlFactory = ({ IDL }) => {
     'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
     'jwt_issued_at_ns' : IDL.Nat64,
     'anchor_number' : UserNumber,
+    'payload_keyid' : IDL.Vec(IDL.Nat8),
+    'payload_ikm' : IDL.Vec(IDL.Nat8),
     'vapid_public_key' : IDL.Vec(IDL.Nat8),
   });
   const SetWebPushSubscriptionError = IDL.Variant({
@@ -1367,12 +1373,12 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'browser_get_next_notification' : IDL.Func(
-        [GetNextNotificationRequest],
+    'browser_get_notification' : IDL.Func(
+        [GetNotificationRequest],
         [
           IDL.Variant({
-            'Ok' : GetNextNotificationResponse,
-            'Err' : GetNextNotificationError,
+            'Ok' : GetNotificationResponse,
+            'Err' : GetNotificationError,
           }),
         ],
         ['query'],

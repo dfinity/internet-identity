@@ -16,6 +16,7 @@ import {
   storeVapidKey,
   type StoredVapidKey,
 } from "./vapidKeyStore";
+import { derivePayloadKeys } from "./payloadKeys";
 import { browserKeyActor } from "./browserActor";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
@@ -34,6 +35,8 @@ import type {
 export const registerStoredDevice = async (
   identityNumber: bigint,
   { endpoint, privateKey, publicKeyRaw }: StoredVapidKey,
+  /** What the payload keys are derived from: the registration this call is about. */
+  subscription: PushSubscription,
   /** Who to call as. The Home Screen app signs as itself, and what it registers lands on its own record; everyone else signs as the browser key this sign-in registered. */
   caller?: ActorSubclass<_SERVICE>,
 ): Promise<string> => {
@@ -44,6 +47,7 @@ export const registerStoredDevice = async (
     issuedAtNs,
   );
   const actor = caller ?? (await browserKeyActor(identityNumber));
+  const { payloadIkm, payloadKeyid } = await derivePayloadKeys(subscription);
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,
@@ -51,6 +55,8 @@ export const registerStoredDevice = async (
       vapid_public_key: publicKeyRaw,
       jwt_signatures: signatures,
       jwt_issued_at_ns: issuedAtNs,
+      payload_ikm: payloadIkm,
+      payload_keyid: payloadKeyid,
     })
     .then(throwCanisterError);
   return endpoint;
@@ -67,16 +73,17 @@ export const subscribeAndRegisterDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
   const { publicKeyRaw, privateKey } = await generateVapidKeypair();
-  const endpoint = await subscribeToPush(publicKeyRaw);
-  const stored = { endpoint, privateKey, publicKeyRaw };
-  await registerStoredDevice(identityNumber, stored);
+  const subscription = await subscribeToPush(publicKeyRaw);
+  const stored = { endpoint: subscription.endpoint, privateKey, publicKeyRaw };
+  await registerStoredDevice(identityNumber, stored, subscription);
   await storeVapidKey(stored);
-  return endpoint;
+  return stored.endpoint;
 };
 
 /** `minted` says whether the subscription is fresh, because a fresh key belongs on disk only once the canister has taken the endpoint it was made for. */
 const deviceSubscription = async (): Promise<{
   subscription: StoredVapidKey;
+  live: PushSubscription;
   minted: boolean;
 }> => {
   const stored = await loadVapidKey();
@@ -86,11 +93,15 @@ const deviceSubscription = async (): Promise<{
     live !== undefined &&
     stored.endpoint === live.endpoint
   ) {
-    return { subscription: stored, minted: false };
+    return { subscription: stored, live, minted: false };
   }
   const { publicKeyRaw, privateKey } = await generateVapidKeypair();
-  const endpoint = await subscribeToPush(publicKeyRaw);
-  return { subscription: { endpoint, privateKey, publicKeyRaw }, minted: true };
+  const fresh = await subscribeToPush(publicKeyRaw);
+  return {
+    subscription: { endpoint: fresh.endpoint, privateKey, publicKeyRaw },
+    live: fresh,
+    minted: true,
+  };
 };
 
 /**
@@ -101,8 +112,8 @@ const deviceSubscription = async (): Promise<{
 export const ensureRegisteredDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
-  const { subscription, minted } = await deviceSubscription();
-  await registerStoredDevice(identityNumber, subscription);
+  const { subscription, live, minted } = await deviceSubscription();
+  await registerStoredDevice(identityNumber, subscription, live);
   if (minted) {
     await storeVapidKey(subscription);
   }
@@ -146,7 +157,7 @@ export const registerForAnyAnchor = async (
   /** The app record the subscription hangs on, where the caller knows it. */
   appId?: bigint,
 ): Promise<boolean> => {
-  const { subscription, minted } = await deviceSubscription();
+  const { subscription, live, minted } = await deviceSubscription();
 
   // An endpoint the canister already holds under this app is a call that would write
   // back what is there. What replaces an endpoint is the permission being refused and
@@ -157,7 +168,7 @@ export const registerForAnyAnchor = async (
 
   for (const anchor of anchors) {
     try {
-      await registerStoredDevice(anchor, subscription, caller);
+      await registerStoredDevice(anchor, subscription, live, caller);
     } catch (error) {
       if (anotherAnchorMayAnswer(error)) {
         continue;

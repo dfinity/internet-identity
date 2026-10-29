@@ -1,7 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::validation::{JwtPool, PushEndpoint, VapidPublicKey};
+use super::validation::{JwtPool, PayloadIkm, PayloadKeyId, PushEndpoint, VapidPublicKey};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
@@ -18,19 +18,30 @@ use internet_identity_interface::internet_identity::types::{
 /// Registers `browser_id` for Web Push, and is also how it replaces a pool that is
 /// running out. Idempotent: a browser that re-subscribes overwrites what it registered
 /// before, endpoint included.
+#[allow(clippy::too_many_arguments)]
 pub fn set_subscription(
     key: NotificationKey,
     anchor_number: AnchorNumber,
     endpoint: PushEndpoint,
     vapid_public_key: VapidPublicKey,
     jwt_signatures: JwtPool,
+    payload_ikm: PayloadIkm,
+    payload_keyid: PayloadKeyId,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
     let browser_id = match key {
         NotificationKey::App(app_id) => {
-            return set_app_subscription(app_id, endpoint, vapid_public_key, jwt_signatures, now_ns)
+            return set_app_subscription(
+                app_id,
+                endpoint,
+                vapid_public_key,
+                jwt_signatures,
+                payload_ikm,
+                payload_keyid,
+                now_ns,
+            )
         }
         NotificationKey::Browser(browser_id) => browser_id,
     };
@@ -57,6 +68,8 @@ pub fn set_subscription(
             created_at_ns,
             vapid_public_key,
             jwt_signatures,
+            payload_ikm,
+            payload_keyid,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -194,11 +207,14 @@ fn write_subscription(
 }
 
 /// What the Home Screen app registered, which is its record's and not any anchor's.
+#[allow(clippy::too_many_arguments)]
 fn set_app_subscription(
     app_id: NotificationAppId,
     endpoint: PushEndpoint,
     vapid_public_key: VapidPublicKey,
     jwt_signatures: JwtPool,
+    payload_ikm: PayloadIkm,
+    payload_keyid: PayloadKeyId,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
     let jwt_issued_at_ns = jwt_signatures.issued_at_ns();
@@ -241,6 +257,8 @@ fn set_app_subscription(
                 created_at_ns,
                 vapid_public_key,
                 jwt_signatures,
+                payload_ikm,
+                payload_keyid,
             }),
             now_ns,
         )
@@ -273,6 +291,7 @@ mod tests {
             .notifications_for_browser_mut(browser_id)
             .expect("a registered browser")
             .push(crate::storage::anchor::InboxNotification {
+                inbox_notification_id: 0,
                 application_number: Some(1),
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,

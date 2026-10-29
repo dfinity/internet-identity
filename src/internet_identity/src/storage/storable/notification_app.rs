@@ -26,11 +26,17 @@ pub struct StorableNotificationApp {
     pub last_used_ns: Timestamp,
     #[n(4)]
     pub anchors: BTreeSet<AnchorNumber>,
-    #[n(5)]
-    pub webpush_subscription: Option<StorableWebPushSubscription>,
     /// The last time an entry asked this app to prove it is still installed.
     #[n(6)]
     pub pending_probe: Option<StorablePendingProbe>,
+    /// What this app registered for Web Push, if anything.
+    ///
+    /// 5 held the registration before a push carried a payload, and it cannot be read
+    /// into the shape below, which requires the sealing keys the browser derives. It was
+    /// retired rather than migrated, as the browser entry's was: the app registers again
+    /// and is whole. Do not reuse it.
+    #[n(7)]
+    pub webpush_subscription: Option<StorableWebPushSubscription>,
 }
 
 /// A probe an entry sent to this record, and when it sent it.

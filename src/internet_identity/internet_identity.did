@@ -1894,6 +1894,11 @@ type SetWebPushSubscriptionRequest = record {
     vapid_public_key : blob;           // uncompressed SEC1 P-256, echoed to the relay as k=
     jwt_signatures : vec blob;         // one raw ECDSA signature per validity window
     jwt_issued_at_ns : nat64;
+    // RFC 8291 input keying material, derived by the browser from this subscription's own
+    // keys and an ephemeral pair it mints for the purpose. The ECDH runs there so it never
+    // has to run here: sealing a payload costs two HKDFs and one AES-GCM.
+    payload_ikm : blob;                // 32 bytes
+    payload_keyid : blob;              // that ephemeral pair's public key, uncompressed SEC1 P-256
 };
 
 type RemoveWebPushSubscriptionRequest = record {
@@ -2070,6 +2075,11 @@ type WebPushSubscriptionStatus = record {
 // one origin.
 type NotificationId = nat64;
 
+// Internet Identity's own id for one entry in one browser's inbox, assigned when the entry
+// is deposited and unique within that inbox. A wake-up names its entry by this, so the
+// service worker shows the notification the push was sent for.
+type InboxNotificationId = nat64;
+
 type Urgency = variant { VeryLow; Low; Normal; High };
 
 type Notification = record {
@@ -2154,8 +2164,12 @@ type NotificationDelegationError = variant {
 
 // ===== Notifications a browser has yet to show =====
 
-type GetNextNotificationRequest = record {
+type GetNotificationRequest = record {
     anchor_number : UserNumber;
+    // Whose inbox holds it. An app's key signs for every browser pointing at the app, so
+    // the browser cannot be taken from the caller alone.
+    browser_id : nat32;
+    inbox_notification_id : InboxNotificationId;
 };
 
 // What a service worker shows for one wake-up: the app and account it is for, the
@@ -2210,11 +2224,11 @@ type ProbeNotificationAppError = variant {
 };
 
 // Null once nothing is left to show.
-type GetNextNotificationResponse = record {
+type GetNotificationResponse = record {
     notification : opt NotificationToShow;
 };
 
-type GetNextNotificationError = variant {
+type GetNotificationError = variant {
     // The caller signs with no key this identity is signed in from, and with no key of
     // an app one of its browsers routes through.
     InvalidBrowserKey;
@@ -2223,8 +2237,9 @@ type GetNextNotificationError = variant {
 
 type RemoveNotificationRequest = record {
     anchor_number : UserNumber;
-    // As browser_get_next_notification returned it.
-    notification : NotificationToShow;
+    browser_id : nat32;
+    // As the wake-up that announced it named it.
+    inbox_notification_id : InboxNotificationId;
 };
 
 type RemoveNotificationResponse = record {};
@@ -2739,7 +2754,7 @@ service : (opt InternetIdentityInit) -> {
 
     // Called by the service worker on a wake-up, signed with the browser key: the oldest
     // notification its browser has yet to show, passing over the ones it skips.
-    browser_get_next_notification : (GetNextNotificationRequest) -> (variant { Ok : GetNextNotificationResponse; Err : GetNextNotificationError }) query;
+    browser_get_notification : (GetNotificationRequest) -> (variant { Ok : GetNotificationResponse; Err : GetNotificationError }) query;
     // Called by the service worker for the one it shows, while it fetches the content.
     browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 

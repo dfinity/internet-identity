@@ -3,7 +3,7 @@
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
-    browser_get_next_notification, browser_remove_notification, consent_granted,
+    browser_get_notification, browser_remove_notification, consent_granted,
     get_webpush_subscription_status, grant_consent, link_notification_app,
     prepare_notification_app_link, remove_webpush_subscription, revoke_consent,
 };
@@ -15,12 +15,12 @@ use canister_tests::framework::{
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
-    GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
+    AnchorNumber, BrowserBrand, BrowserDescription, BrowserId, FormFactor, GetNotificationError,
+    GetNotificationRequest, GetNotificationResponse, InboxNotificationId, InternetIdentityInit,
     LinkNotificationAppRequest, NotificationAppId, NotificationGrantConsentError,
-    NotificationRevokeConsentError, NotificationToShow, OperatingSystem,
-    PrepareAccountSessionRequest, PrepareNotificationAppLinkRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
+    NotificationRevokeConsentError, OperatingSystem, PrepareAccountSessionRequest,
+    PrepareNotificationAppLinkRequest, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse, RemoveWebPushSubscriptionError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -146,8 +146,8 @@ fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<
         ORIGIN.into()
     )?);
     assert!(matches!(
-        browser_get_next_notification(&env, canister_id, principal_1(), next_request(anchor))?,
-        Err(GetNextNotificationError::InternalCanisterError(_))
+        browser_get_notification(&env, canister_id, principal_1(), next_request(anchor))?,
+        Err(GetNotificationError::InternalCanisterError(_))
     ));
     assert!(matches!(
         browser_remove_notification(&env, canister_id, principal_1(), remove_request(anchor))?,
@@ -749,6 +749,8 @@ mod subscriptions {
             vapid_public_key: vapid_public_key(),
             jwt_signatures: jwt_pool(),
             jwt_issued_at_ns: ISSUED_AT_NS,
+            payload_ikm: ByteBuf::from(vec![9u8; 32]),
+            payload_keyid: ByteBuf::from(vapid_public_key().into_vec()),
         }
     }
 
@@ -1502,13 +1504,13 @@ mod browser_inbox {
         let (canister_id, anchor, browser, _) = install_with_browser(&env);
 
         assert_eq!(
-            browser_get_next_notification(
+            browser_get_notification(
                 &env,
                 canister_id,
                 key_holder(&browser).principal(),
                 next_request(anchor)
             )?,
-            Ok(GetNextNotificationResponse { notification: None })
+            Ok(GetNotificationResponse { notification: None })
         );
         Ok(())
     }
@@ -1536,8 +1538,8 @@ mod browser_inbox {
         let (canister_id, anchor, _, _) = install_with_browser(&env);
 
         assert_eq!(
-            browser_get_next_notification(&env, canister_id, principal_2(), next_request(anchor))?,
-            Err(GetNextNotificationError::InvalidBrowserKey)
+            browser_get_notification(&env, canister_id, principal_2(), next_request(anchor))?,
+            Err(GetNotificationError::InvalidBrowserKey)
         );
         assert_eq!(
             browser_remove_notification(&env, canister_id, principal_2(), remove_request(anchor))?,
@@ -2189,8 +2191,8 @@ mod shared_app {
         let (canister_id, first, _second, app) = install_with_shared_app(&env);
 
         assert_eq!(
-            browser_get_next_notification(&env, canister_id, app, next_request(first))?,
-            Ok(GetNextNotificationResponse { notification: None })
+            browser_get_notification(&env, canister_id, app, next_request(first))?,
+            Ok(GetNotificationResponse { notification: None })
         );
         assert_eq!(
             browser_remove_notification(&env, canister_id, app, remove_request(first))?,
@@ -2218,8 +2220,8 @@ mod shared_app {
         .expect("the switch returned Err");
 
         assert_eq!(
-            browser_get_next_notification(&env, canister_id, app, next_request(second))?,
-            Err(GetNextNotificationError::InvalidBrowserKey)
+            browser_get_notification(&env, canister_id, app, next_request(second))?,
+            Err(GetNotificationError::InvalidBrowserKey)
         );
         assert_eq!(
             browser_remove_notification(&env, canister_id, app, remove_request(second))?,
@@ -2677,8 +2679,8 @@ mod claims {
         }
 
         assert_eq!(
-            browser_get_next_notification(&env, canister_id, claiming, next_request(second))?,
-            Ok(GetNextNotificationResponse { notification: None }),
+            browser_get_notification(&env, canister_id, claiming, next_request(second))?,
+            Ok(GetNotificationResponse { notification: None }),
             "a claim queued a wake-up of its own"
         );
 
@@ -2695,8 +2697,8 @@ mod claims {
         .expect("the switch returned Err");
         run_dispatch_pass(&env);
 
-        let shown = browser_get_next_notification(&env, canister_id, app, next_request(second))?
-            .expect("browser_get_next_notification returned Err")
+        browser_get_notification(&env, canister_id, app, next_request(second))?
+            .expect("browser_get_notification returned Err")
             .notification
             .expect("switching delivery on queued one");
         browser_remove_notification(
@@ -2705,7 +2707,8 @@ mod claims {
             app,
             RemoveNotificationRequest {
                 anchor_number: second,
-                notification: shown,
+                browser_id: FIRST_BROWSER,
+                inbox_notification_id: FIRST_ENTRY,
             },
         )?
         .expect("browser_remove_notification returned Err");
@@ -2714,8 +2717,8 @@ mod claims {
             .expect("claim_notification_app returned Err");
 
         assert_eq!(
-            browser_get_next_notification(&env, canister_id, app, next_request(second))?,
-            Ok(GetNextNotificationResponse { notification: None }),
+            browser_get_notification(&env, canister_id, app, next_request(second))?,
+            Ok(GetNotificationResponse { notification: None }),
             "a replay queued another"
         );
         Ok(())
@@ -2732,20 +2735,24 @@ fn run_dispatch_pass(env: &PocketIc) {
     env.tick();
 }
 
-fn next_request(anchor_number: AnchorNumber) -> GetNextNotificationRequest {
-    GetNextNotificationRequest { anchor_number }
+/// Every flow here signs one browser in and sends it one notification, so the entry a
+/// wake-up would name is the first of the first browser's inbox.
+const FIRST_BROWSER: BrowserId = 0;
+const FIRST_ENTRY: InboxNotificationId = 0;
+
+fn next_request(anchor_number: AnchorNumber) -> GetNotificationRequest {
+    GetNotificationRequest {
+        anchor_number,
+        browser_id: FIRST_BROWSER,
+        inbox_notification_id: FIRST_ENTRY,
+    }
 }
 
 fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
     RemoveNotificationRequest {
         anchor_number,
-        notification: NotificationToShow {
-            origin: Some(ORIGIN.into()),
-            account_number: None,
-            canister_id: principal_2(),
-            id: 1,
-            event: None,
-        },
+        browser_id: FIRST_BROWSER,
+        inbox_notification_id: FIRST_ENTRY,
     }
 }
 

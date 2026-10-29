@@ -6,13 +6,13 @@ use internet_identity_interface::internet_identity::types::{
     AppRevokeNotificationConsentError, BrowserId, ClaimNotificationAppError,
     ClaimNotificationAppRequest, DisableNotificationAppError, DisableNotificationAppRequest,
     EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
-    GetNextNotificationError, GetNextNotificationRequest, GetNextNotificationResponse,
     GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
-    GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
-    LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
-    NotificationAppAnchorsRequest, NotificationAppStatus, NotificationConsentGrantedRequest,
-    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
-    NotificationId, NotificationRevokeConsentError, NotificationRevokeConsentRequest,
+    GetNotificationDelegationResponse, GetNotificationError, GetNotificationRequest,
+    GetNotificationResponse, GetWebPushSubscriptionStatusRequest, LinkNotificationAppError,
+    LinkNotificationAppRequest, LinkNotificationAppResponse, NotificationAppAnchorsRequest,
+    NotificationAppStatus, NotificationConsentGrantedRequest, NotificationDelegationError,
+    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationId,
+    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
     PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
     PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
     ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
@@ -244,17 +244,17 @@ pub fn get_notification_delegation(
     .map(|(x,)| x)
 }
 
-pub fn browser_get_next_notification(
+pub fn browser_get_notification(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: GetNextNotificationRequest,
-) -> Result<Result<GetNextNotificationResponse, GetNextNotificationError>, RejectResponse> {
+    request: GetNotificationRequest,
+) -> Result<Result<GetNotificationResponse, GetNotificationError>, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
         sender,
-        "browser_get_next_notification",
+        "browser_get_notification",
         (request,),
     )
     .map(|(x,)| x)
