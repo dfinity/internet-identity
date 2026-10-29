@@ -8,10 +8,6 @@ vi.mock("./pushSubscription", () => ({
   relayOriginOf: (endpoint: string) => new URL(endpoint).origin,
   requestNotificationPermission: vi.fn(),
 }));
-vi.mock("./vapidKeyStore", () => ({
-  loadVapidKey: vi.fn(),
-  purgeVapidKey: vi.fn(),
-}));
 vi.mock("./subscribeDevice", () => ({
   subscribeAndRegisterDevice: vi.fn(() =>
     Promise.resolve("https://relay.example/new"),
@@ -30,8 +26,6 @@ import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { reconcileDeviceNotifications } from "./deviceNotifications";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
-import { loadVapidKey } from "./vapidKeyStore";
-import { JWT_POOL_SIZE_WINDOWS } from "./vapidPool";
 import {
   registerStoredDevice,
   subscribeAndRegisterDevice,
@@ -40,28 +34,15 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { notificationsTurnedOff } from "./turnedOff";
 
 const ENDPOINT = "https://relay.example/abc";
-const DAY_NS = BigInt(24 * 60 * 60) * BigInt(1_000_000_000);
-/** A registration on `endpoint` whose pool of 30 windows was minted `daysAgo` ago. */
-/** A registered pool with `left` of its windows still to come. */
-const poolWithWindowsLeft = (left: number, endpoint = ENDPOINT) => [
-  {
-    endpoint,
-    pool_len: JWT_POOL_SIZE_WINDOWS,
-    issued_at_ns:
-      BigInt(Date.now()) * BigInt(1_000_000) -
-      BigInt(JWT_POOL_SIZE_WINDOWS - left) * DAY_NS,
-  },
-];
+/** What the canister answers for a browser it holds a registration for. */
+const registeredAt = (endpoint = ENDPOINT) => [{ endpoint }];
 
-const key = (endpoint = ENDPOINT) => ({
-  endpoint,
-  privateKey: {} as CryptoKey,
-  publicKeyRaw: new Uint8Array(),
-});
 const sub = (endpoint = ENDPOINT) => ({ endpoint }) as PushSubscription;
 
 const actor = () => ({
-  get_webpush_subscription_status: vi.fn(),
+  get_webpush_subscription_status: vi.fn<() => Promise<{ endpoint: string }[]>>(
+    () => Promise.resolve([]),
+  ),
   remove_webpush_subscription: vi.fn(() => Promise.resolve({ Ok: null })),
 });
 
@@ -83,7 +64,6 @@ describe("reconcileDeviceNotifications", () => {
   it("registers nothing for an identity that switched notifications off", async () => {
     vi.mocked(notificationsTurnedOff).mockResolvedValue(true);
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key("https://relay.example/old"));
     const a = actor();
     await run(a);
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
@@ -101,60 +81,29 @@ describe("reconcileDeviceNotifications", () => {
 
   it("does nothing for a browser that never enabled notifications", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(undefined);
-    vi.mocked(loadVapidKey).mockResolvedValue(undefined);
     const a = actor();
     await run(a);
+    // Holding neither a subscription nor a registration is what never having turned
+    // them on looks like, and subscribing here would turn them on by itself.
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
-    expect(a.get_webpush_subscription_status).not.toHaveBeenCalled();
-  });
-
-  it("leaves a freshly minted pool alone", async () => {
-    vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
-    const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(
-      poolWithWindowsLeft(29),
-    );
-    await run(a);
-    expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
-  });
-
-  /**
-   * Topping up a pool that is running out belongs to the service worker, which does it
-   * on every wake-up and reaches a browser whose user does not come back here.
-   */
-  it("leaves a pool that is merely running out to the service worker", async () => {
-    vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
-    const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(poolWithWindowsLeft(5));
-    await run(a);
     expect(registerStoredDevice).not.toHaveBeenCalled();
-    expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
 
-  /**
-   * A pool with nothing left is this page's to fix: the canister cannot wake a browser
-   * whose pool is spent, so the worker would never get the chance to sign another.
-   */
-  it("registers again where the pool has run out", async () => {
+  it("leaves a registration that already names this subscription alone", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(poolWithWindowsLeft(0));
+    a.get_webpush_subscription_status.mockResolvedValue(registeredAt());
     await run(a);
-    expect(registerStoredDevice).toHaveBeenCalledOnce();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
 
   /**
-   * The subscription and its VAPID key belong to the browser, not to one identity, so a
-   * second identity with no row of its own registers what is already there. Rotating
+   * The subscription belongs to the browser, not to one identity, so a second identity
+   * with no row of its own registers what is already there. Rotating
    * would unsubscribe the endpoint the first identity's row still names.
    */
   it("registers the browser's existing subscription for an identity with no row", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue([]);
     await run(a);
@@ -169,36 +118,35 @@ describe("reconcileDeviceNotifications", () => {
    */
   it("re-registers an identity another identity's re-subscribe left behind", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue(
-      poolWithWindowsLeft(29, "https://relay.example/someone-else"),
+      registeredAt("https://relay.example/someone-else"),
     );
     await run(a);
     expect(registerStoredDevice).toHaveBeenCalledOnce();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
 
-  /** The row is keyed by the browser, so re-subscribing overwrites the endpoint. */
+  /** The row is keyed by the browser, so registering again overwrites the endpoint. */
   it("re-registers a rotated endpoint in place, without unsubscribing", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(
       sub("https://relay.example/rotated"),
     );
-    vi.mocked(loadVapidKey).mockResolvedValue(key(ENDPOINT));
     const a = actor();
+    a.get_webpush_subscription_status.mockResolvedValue(registeredAt());
     await run(a);
     expect(a.remove_webpush_subscription).not.toHaveBeenCalled();
-    expect(subscribeAndRegisterDevice).toHaveBeenCalledOnce();
+    // The browser holds one, so it is registered rather than replaced: subscribing
+    // again would take the endpoint every other identity here is registered with.
+    expect(registerStoredDevice).toHaveBeenCalledOnce();
+    expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
 
   /** The browser the caller signs as is the browser the canister answers for. */
   it("asks as the browser, without naming one", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(
-      poolWithWindowsLeft(29),
-    );
+    a.get_webpush_subscription_status.mockResolvedValue(registeredAt());
     await run(a);
     expect(browserKeyActor).toHaveBeenCalledWith(BigInt(1));
     expect(a.get_webpush_subscription_status).toHaveBeenCalledWith({
@@ -208,7 +156,6 @@ describe("reconcileDeviceNotifications", () => {
 
   it("does nothing for a browser no sign-in has registered", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
     vi.mocked(browserKeyActor).mockRejectedValue(
       new UnregisteredBrowserError(),
@@ -220,8 +167,9 @@ describe("reconcileDeviceNotifications", () => {
 
   it("re-subscribes when the browser dropped its subscription", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(undefined);
-    vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
+    // A registration the canister still holds is what says this identity had them on.
+    a.get_webpush_subscription_status.mockResolvedValue(registeredAt());
     await run(a);
     expect(subscribeAndRegisterDevice).toHaveBeenCalledOnce();
   });

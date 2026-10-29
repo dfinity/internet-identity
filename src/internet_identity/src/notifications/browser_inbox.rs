@@ -469,11 +469,7 @@ mod tests {
         let app = app_for_key(app_key(9), 0);
         let app_id = storage_borrow_mut(|storage| {
             storage
-                .set_notification_app_subscription(
-                    app.id,
-                    Some(subscription_at(APP_RELAY, 0, 0)),
-                    0,
-                )
+                .set_notification_app_subscription(app.id, Some(subscription_at(APP_RELAY, 0)), 0)
                 .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
             stored.point_at_notification_app(browser_id, app.id);
@@ -549,7 +545,7 @@ mod tests {
             storage
                 .set_notification_app_subscription(
                     app.id,
-                    Some(subscription_at("https://web.push.apple.com/second", 0, 0)),
+                    Some(subscription_at("https://web.push.apple.com/second", 0)),
                     0,
                 )
                 .expect("the record is there");

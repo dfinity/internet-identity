@@ -1885,15 +1885,12 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
-// What a browser uploads when it registers for Web Push, and how it replaces a pool
-// that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+// What a browser uploads when it registers for Web Push. The same endpoint is a
+// registration at that endpoint again, which keeps what is already queued for it. Signed with the
 // browser key it signs in with, which is what says the subscription is this browser's.
 type SetWebPushSubscriptionRequest = record {
     anchor_number : UserNumber;
     endpoint : text;                   // the relay URL the browser was issued
-    vapid_public_key : blob;           // uncompressed SEC1 P-256, echoed to the relay as k=
-    jwt_signatures : vec blob;         // one raw ECDSA signature per validity window
-    jwt_issued_at_ns : nat64;
     // RFC 8291 input keying material, derived by the browser from this subscription's own
     // keys and an ephemeral pair it mints for the purpose. The ECDH runs there so it never
     // has to run here: sealing a payload costs two HKDFs and one AES-GCM.
@@ -1909,8 +1906,6 @@ type RemoveWebPushSubscriptionRequest = record {
 type SetWebPushSubscriptionError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
-    // The pool offered is not newer than the one this endpoint already holds.
-    StaleJwtPool;
     InternalCanisterError : text;
 };
 
@@ -2065,8 +2060,6 @@ type GetWebPushSubscriptionStatusRequest = record {
 // sign the next pool.
 type WebPushSubscriptionStatus = record {
     endpoint : text;        // compared against the one the browser holds
-    pool_len : nat32;       // windows covered, not a count of unused signatures
-    issued_at_ns : nat64;   // window i expires at issued_at_ns + (i + 1) * window
 };
 
 // ===== Notifications sent by an app =====
@@ -2758,6 +2751,9 @@ service : (opt InternetIdentityInit) -> {
     // Called by the service worker for the one it shows, while it fetches the content.
     browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 
+    // The key a browser subscribes with and every push names. Absent only in the moment
+    // between the install returning and the answer to the read it starts.
+    get_vapid_public_key : () -> (opt blob) query;
     // Called by the browser, or by the Home Screen app it points at: what the app
     // registers belongs to its own record, which every identity pointing at it is
     // delivered through, so the anchor named here is what authorized the call rather

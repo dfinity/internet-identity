@@ -16,7 +16,7 @@ cd "$SCRIPTS_DIR/.."
 REPO_ROOT="$PWD"
 
 # Match the e2e job in .github/workflows/canister-tests.yml
-LAUNCHER_TAG="v12.0.0-2026-04-16-04-20"
+LAUNCHER_TAG="v16.1.0-2026-10-22-03-29"
 OPENID_PORTS=(11105 11106 11107 11108 11109)
 DIRECT_OPENID_PORTS=(11105 11106)
 # 11108 is an Entra-style provider: pairwise `sub` (per client) + a stable `oid`,
@@ -133,9 +133,9 @@ ensure_prereqs() {
   fi
 }
 
-# v13 launchers ship a pocket-ic that rejects canister-sig delegations whose
-# subnet cert omits subnet_type — which breaks the OpenID/consent e2e tests.
-# Match the workflow's v12 pin until dfinity/ic#10226 lands in a launcher release.
+# Pinned rather than following releases/latest, and no older than v16.1.0: that is
+# the first launcher whose pocket-ic holds a threshold key over secp256r1, which is
+# what Internet Identity signs its VAPID JWTs with. Keep in step with the workflow.
 ensure_launcher() {
   local bin="$LAUNCHER_DIR/icp-cli-network-launcher"
   if [[ -x "$bin" ]]; then

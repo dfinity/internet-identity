@@ -16,7 +16,7 @@ import { continueAs } from "./app-sessions/helpers";
  *
  * The browser's notification and service-worker APIs are stubbed, since headless
  * Chromium has no push service behind them, so no scenario here covers the native
- * permission prompt or a real registration. The consent screen, the VAPID pool the
+ * permission prompt or a real registration. The consent screen, the keys the
  * browser signs and the rows the canister writes all run for real, and what the app is
  * told is read back from the canister.
  *

@@ -24,7 +24,6 @@ use internet_identity_interface::internet_identity::types::{
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
-use std::time::Duration;
 
 const ORIGIN: &str = "https://some-dapp.com";
 const GATEWAY: &str = "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app";
@@ -670,21 +669,17 @@ mod subscriptions {
         PrepareAccountSessionRequest, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError,
         SetWebPushSubscriptionRequest,
     };
-    use pretty_assertions::assert_eq;
+
     use serde_bytes::ByteBuf;
 
     pub(super) const ENDPOINT: &str = "https://push.example.com/aBcDeF";
-    pub(super) const ISSUED_AT_NS: u64 = 1_700_000_000_000_000_000;
 
-    /// An uncompressed SEC1 point on P-256, which is what a browser mints.
-    fn vapid_public_key() -> ByteBuf {
+    /// The subscription's own public key, an uncompressed SEC1 point on P-256, which the
+    /// browser sends as the payload's `keyid`.
+    fn subscription_public_key() -> ByteBuf {
         use p256::elliptic_curve::sec1::ToEncodedPoint;
         let key = p256::SecretKey::from_bytes(&[7u8; 32].into()).expect("bad scalar");
         ByteBuf::from(key.public_key().to_encoded_point(false).as_bytes().to_vec())
-    }
-
-    fn jwt_pool() -> Vec<ByteBuf> {
-        (0..30u8).map(|i| ByteBuf::from(vec![i; 64])).collect()
     }
 
     fn session_request(anchor: AnchorNumber, browser: &BrowserKey) -> PrepareAccountSessionRequest {
@@ -713,7 +708,6 @@ mod subscriptions {
         }
     }
 
-    /// Signs a browser in, which puts it in the registry a subscription is keyed by.
     pub(super) fn sign_browser_in(
         env: &PocketIc,
         canister_id: CanisterId,
@@ -746,16 +740,11 @@ mod subscriptions {
         SetWebPushSubscriptionRequest {
             anchor_number: anchor,
             endpoint: endpoint.to_string(),
-            vapid_public_key: vapid_public_key(),
-            jwt_signatures: jwt_pool(),
-            jwt_issued_at_ns: ISSUED_AT_NS,
             payload_ikm: ByteBuf::from(vec![9u8; 32]),
-            payload_keyid: ByteBuf::from(vapid_public_key().into_vec()),
+            payload_keyid: subscription_public_key(),
         }
     }
 
-    /// The browser key a registered browser keeps between sign-ins, and so signs its
-    /// subscription with.
     pub(super) fn key_holder(browser: &BrowserKey) -> BrowserKey {
         browser.successor()
     }
@@ -799,31 +788,6 @@ mod subscriptions {
         // Idempotent on purpose, since silencing a browser is done from another one.
         remove_webpush_subscription(&env, canister_id, principal_1(), anchor, browser_id)?
             .expect("a second unsubscribe should be a no-op, not an error");
-        Ok(())
-    }
-
-    /// One call both registers and tops up, so a browser replaying a pool it already
-    /// uploaded must not be able to walk its own coverage backwards.
-    #[test]
-    fn should_replace_the_pool_only_with_a_newer_one() -> Result<(), RejectResponse> {
-        let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
-        let caller = key_holder(&browser).principal();
-
-        set_webpush_subscription(&env, canister_id, caller, request(anchor, ENDPOINT))?
-            .expect("subscribe rejected");
-
-        let mut topped_up = request(anchor, ENDPOINT);
-        topped_up.jwt_issued_at_ns = ISSUED_AT_NS + 1;
-        set_webpush_subscription(&env, canister_id, caller, topped_up)?
-            .expect("a newer pool should replace the stored one");
-
-        let replayed =
-            set_webpush_subscription(&env, canister_id, caller, request(anchor, ENDPOINT))?;
-        assert!(
-            matches!(replayed, Err(SetWebPushSubscriptionError::StaleJwtPool)),
-            "{replayed:?}"
-        );
         Ok(())
     }
 
@@ -885,26 +849,6 @@ mod subscriptions {
     }
 
     #[test]
-    fn should_report_every_invalid_field_at_once() -> Result<(), RejectResponse> {
-        let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
-
-        let mut sent = request(anchor, "");
-        sent.vapid_public_key = ByteBuf::from(vec![4u8; 65]);
-        sent.jwt_signatures = vec![];
-
-        match set_webpush_subscription(&env, canister_id, key_holder(&browser).principal(), sent)? {
-            Err(SetWebPushSubscriptionError::InternalCanisterError(problems)) => {
-                // Failing on the first would send a browser round three times to
-                // learn what a single answer can say.
-                assert_eq!(problems.split("; ").count(), 3, "{problems:?}");
-            }
-            other => panic!("expected every field reported at once, got {other:?}"),
-        }
-        Ok(())
-    }
-
-    #[test]
     fn should_refuse_to_unsubscribe_for_an_anchor_the_caller_does_not_own(
     ) -> Result<(), RejectResponse> {
         let env = env();
@@ -923,7 +867,7 @@ mod subscriptions {
     }
 }
 
-/// What a browser registered and the pool it signed, read through
+/// What a browser registered, read through
 /// `get_webpush_subscription_status`.
 mod subscription_status {
     use super::subscriptions::*;
@@ -934,11 +878,9 @@ mod subscription_status {
     };
     use canister_tests::framework::BrowserKey;
     use internet_identity_interface::internet_identity::types::{
-        RevokeBrowserSessionsRequest, SetWebPushSubscriptionError, WebPushSubscriptionStatus,
+        RevokeBrowserSessionsRequest, WebPushSubscriptionStatus,
     };
     use pretty_assertions::assert_eq;
-
-    const LATER_NS: u64 = ISSUED_AT_NS + 1_000_000;
 
     fn subscribe(
         env: &PocketIc,
@@ -975,48 +917,6 @@ mod subscription_status {
         Ok(())
     }
 
-    #[test]
-    fn should_report_the_pool_a_browser_uploaded() -> Result<(), RejectResponse> {
-        let env = env();
-        let (canister_id, anchor, browser, _browser_id) = install_with_browser(&env);
-        subscribe(&env, canister_id, anchor, &browser)?;
-
-        let reported =
-            status(&env, canister_id, anchor, &browser)?.expect("no registration reported");
-        // The endpoint, so a browser can tell its own registration from one another
-        // identity's re-subscribe left behind. Then windows covered and issue time,
-        // not a count of unused signatures, which would sit at 30 forever.
-        assert_eq!(reported.endpoint, ENDPOINT);
-        assert_eq!(reported.pool_len, 30);
-        assert_eq!(reported.issued_at_ns, ISSUED_AT_NS);
-        Ok(())
-    }
-
-    #[test]
-    fn should_replace_the_pool_rather_than_grow_it() -> Result<(), RejectResponse> {
-        let env = env();
-        let (canister_id, anchor, browser, _browser_id) = install_with_browser(&env);
-        subscribe(&env, canister_id, anchor, &browser)?;
-
-        let mut topped_up = request(anchor, ENDPOINT);
-        topped_up.jwt_issued_at_ns = LATER_NS;
-        set_webpush_subscription(
-            &env,
-            canister_id,
-            key_holder(&browser).principal(),
-            topped_up,
-        )?
-        .expect("top-up rejected");
-
-        let reported = status(&env, canister_id, anchor, &browser)?.expect("no pool reported");
-        assert_eq!(
-            reported.pool_len, 30,
-            "the pool grew instead of being replaced"
-        );
-        assert_eq!(reported.issued_at_ns, LATER_NS);
-        Ok(())
-    }
-
     /// The registration rides on the browser entry in the anchor, and an upgrade that
     /// lost it would be unrecoverable after release.
     #[test]
@@ -1029,7 +929,7 @@ mod subscription_status {
 
         let reported = status(&env, canister_id, anchor, &browser)?
             .expect("the subscription did not survive the upgrade");
-        assert_eq!(reported.issued_at_ns, ISSUED_AT_NS);
+        assert_eq!(reported.endpoint, ENDPOINT);
         Ok(())
     }
 
@@ -1101,30 +1001,6 @@ mod subscription_status {
                 "{caller} was answered"
             );
         }
-        Ok(())
-    }
-
-    /// An access method authorizes the identity, not a browser of it, so a refused
-    /// caller must leave the pool the browser signed exactly where it was.
-    #[test]
-    fn should_leave_the_stored_pool_alone_when_the_caller_is_not_the_browser(
-    ) -> Result<(), RejectResponse> {
-        let env = env();
-        let (canister_id, anchor, browser, _browser_id) = install_with_browser(&env);
-        subscribe(&env, canister_id, anchor, &browser)?;
-
-        let mut topped_up = request(anchor, ENDPOINT);
-        topped_up.jwt_issued_at_ns = LATER_NS;
-        for caller in [principal_1(), principal_2(), BrowserKey::new(9).principal()] {
-            let refused = set_webpush_subscription(&env, canister_id, caller, topped_up.clone())?;
-            assert!(
-                matches!(refused, Err(SetWebPushSubscriptionError::InvalidBrowserKey)),
-                "{refused:?}"
-            );
-        }
-
-        let reported = status(&env, canister_id, anchor, &browser)?.expect("no pool reported");
-        assert_eq!(reported.issued_at_ns, ISSUED_AT_NS);
         Ok(())
     }
 }
@@ -1933,26 +1809,12 @@ mod probe {
     };
     use internet_identity_interface::internet_identity::types::{
         NotificationId, ProbeNotificationAppError, ProbeNotificationAppRequest,
-        SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
     /// The key a browser is left holding after the sign-in `browser_seed` names.
     fn browser(browser_seed: u8) -> Principal {
         BrowserKey::new(browser_seed).successor().principal()
-    }
-
-    /// A pool whose first window covers the time the test runs at. The pool is spent by
-    /// elapsed time, so one issued at a fixed instant signs nothing.
-    fn pool_issued_now(
-        env: &PocketIc,
-        anchor: AnchorNumber,
-        endpoint: &str,
-    ) -> SetWebPushSubscriptionRequest {
-        SetWebPushSubscriptionRequest {
-            jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
-            ..request(anchor, endpoint)
-        }
     }
 
     fn probe(
@@ -1977,7 +1839,7 @@ mod probe {
     ) -> (CanisterId, AnchorNumber, AnchorNumber, Principal) {
         let (canister_id, first, second) = install_with_two_anchors(env);
         let (app, _) = link_app(env, canister_id, first, 1, 100);
-        set_webpush_subscription(env, canister_id, app, pool_issued_now(env, first, ENDPOINT))
+        set_webpush_subscription(env, canister_id, app, request(first, ENDPOINT))
             .expect("set_webpush_subscription rejected")
             .expect("set_webpush_subscription returned Err");
         (canister_id, first, second, app)
@@ -2020,13 +1882,8 @@ mod probe {
         let env = env();
         let (canister_id, first, _) = install_with_two_anchors(&env);
         link_app(&env, canister_id, first, 1, 100);
-        set_webpush_subscription(
-            &env,
-            canister_id,
-            browser(1),
-            pool_issued_now(&env, first, ENDPOINT),
-        )?
-        .expect("set_webpush_subscription returned Err");
+        set_webpush_subscription(&env, canister_id, browser(1), request(first, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
 
         assert_eq!(
             probe(&env, canister_id, browser(1), first)?,
@@ -2106,14 +1963,13 @@ mod shared_app {
     use super::*;
     use canister_tests::api::internet_identity::api_v2::identity_info;
     use canister_tests::api::internet_identity::notifications::{
-        claim_notification_app, disable_notification_app, enable_notification_app,
-        get_notification_app_status, get_webpush_subscription_status, set_webpush_subscription,
+        claim_notification_app, disable_notification_app, get_notification_app_status,
+        get_webpush_subscription_status, set_webpush_subscription,
     };
     use internet_identity_interface::internet_identity::types::{
         BrowserInfo, ClaimNotificationAppRequest, DisableNotificationAppError,
-        DisableNotificationAppRequest, EnableNotificationAppRequest,
-        GetNotificationAppStatusRequest, NotificationAppInfo, NotificationAppStatus,
-        SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+        DisableNotificationAppRequest, GetNotificationAppStatusRequest, NotificationAppInfo,
+        NotificationAppStatus, SetWebPushSubscriptionError,
     };
     use pretty_assertions::assert_eq;
 
@@ -2303,75 +2159,6 @@ mod shared_app {
     /// Turning the app off is one identity's choice about delivery and never a
     /// subscription removal: the subscription is the app's and shared, so removing it
     /// would silence everyone else too.
-    #[test]
-    fn should_turn_one_identity_off_and_leave_the_others_delivering() -> Result<(), RejectResponse>
-    {
-        let env = env();
-        let (canister_id, first, second, app) = install_with_shared_app(&env);
-        set_webpush_subscription(
-            &env,
-            canister_id,
-            app,
-            SetWebPushSubscriptionRequest {
-                // The pool is spent by elapsed time, so one issued at a fixed instant
-                // signs nothing and switching back on would find no wake-up address.
-                jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
-                ..request(first, ENDPOINT)
-            },
-        )?
-        .expect("set_webpush_subscription returned Err");
-
-        disable_notification_app(
-            &env,
-            canister_id,
-            browser(SECOND_BROWSER_SEED),
-            DisableNotificationAppRequest {
-                anchor_number: second,
-            },
-        )?
-        .expect("the switch returned Err");
-        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-        let turned_off = linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?;
-        assert!(!turned_off.enabled);
-        assert!(turned_off.subscribed, "the app's registration is untouched");
-        let still_on = linked(&env, canister_id, browser(FIRST_BROWSER_SEED), first)?;
-        assert!(still_on.enabled);
-        assert!(still_on.subscribed);
-        // Read for the identity that still routes through it: an identity that switched
-        // the app off does not route through it any more, so the app cannot ask as that
-        // one. What the switch must not touch is the registration itself, and the
-        // browser's own read above says it is still there.
-        assert_eq!(
-            get_webpush_subscription_status(&env, canister_id, app, first)?
-                .expect("the app reads its own registration")
-                .endpoint,
-            ENDPOINT
-        );
-
-        // The identity's own view of its browsers says the same thing.
-        assert_eq!(
-            browsers_of(&env, canister_id, principal_2(), second)?[0].notification_app,
-            Some(turned_off)
-        );
-
-        // The reference outlived the switch, so asking again is switching it back on
-        // rather than installing anything.
-        enable_notification_app(
-            &env,
-            canister_id,
-            browser(SECOND_BROWSER_SEED),
-            EnableNotificationAppRequest {
-                anchor_number: second,
-            },
-        )?
-        .expect("the switch returned Err");
-        let turned_back_on = linked(&env, canister_id, browser(SECOND_BROWSER_SEED), second)?;
-        assert!(turned_back_on.enabled);
-        assert!(turned_back_on.subscribed);
-        Ok(())
-    }
-
     /// Both entry points are the browser's own, so an app and a stranger are told the
     /// same thing: the read answers nothing, and the write says the key it was signed
     /// with is no browser of this identity rather than claiming the browser points at no
@@ -2495,15 +2282,13 @@ mod shared_app {
 }
 
 mod claims {
-    use super::subscriptions::{request, ENDPOINT};
+
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        claim_notification_app, enable_notification_app, notification_app_anchors,
-        set_webpush_subscription,
+        claim_notification_app, notification_app_anchors,
     };
     use internet_identity_interface::internet_identity::types::{
-        ClaimNotificationAppError, ClaimNotificationAppRequest, EnableNotificationAppRequest,
-        NotificationAppAnchorsRequest, SetWebPushSubscriptionRequest,
+        ClaimNotificationAppError, ClaimNotificationAppRequest, NotificationAppAnchorsRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -2646,95 +2431,10 @@ mod claims {
         }
         Ok(())
     }
-
-    /// Taking an app over queues nothing: the identity that claimed it has not asked for
-    /// delivery, and its own answer on the opt-in screen is what says so. A token stays
-    /// claimable for its half hour, so a replay must not queue a second one: every one of
-    /// those is a paid wake-up, and past the queue's limit each evicts a real notification.
-    #[test]
-    fn should_queue_one_notification_however_often_a_token_is_spent() -> Result<(), RejectResponse>
-    {
-        let env = env();
-        let (canister_id, first, second) = install_with_two_anchors(&env);
-        let (app, _) = link_app(&env, canister_id, first, 1, 100);
-        // Nothing is queued for an entry nothing can be posted to, so the app has to be
-        // delivering for the replay to have anything to duplicate.
-        set_webpush_subscription(
-            &env,
-            canister_id,
-            app,
-            SetWebPushSubscriptionRequest {
-                // A stale pool JWT has no wake-up address, and then nothing is queued at all.
-                jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
-                ..request(first, ENDPOINT)
-            },
-        )?
-        .expect("set_webpush_subscription returned Err");
-        let expires_at_ns = expires_at(&env);
-        let claiming = BrowserKey::new(2).successor().principal();
-
-        for _ in 0..3 {
-            claim(&env, canister_id, (second, 2), (first, 1), expires_at_ns)?
-                .expect("claim_notification_app returned Err");
-        }
-
-        assert_eq!(
-            browser_get_notification(&env, canister_id, claiming, next_request(second))?,
-            Ok(GetNotificationResponse { notification: None }),
-            "a claim queued a wake-up of its own"
-        );
-
-        // Switching delivery on is what queues one, and it is the app's to take: it is
-        // posted to the app's address, so a browser caller is never answered with it.
-        enable_notification_app(
-            &env,
-            canister_id,
-            claiming,
-            EnableNotificationAppRequest {
-                anchor_number: second,
-            },
-        )?
-        .expect("the switch returned Err");
-        run_dispatch_pass(&env);
-
-        browser_get_notification(&env, canister_id, app, next_request(second))?
-            .expect("browser_get_notification returned Err")
-            .notification
-            .expect("switching delivery on queued one");
-        browser_remove_notification(
-            &env,
-            canister_id,
-            app,
-            RemoveNotificationRequest {
-                anchor_number: second,
-                browser_id: FIRST_BROWSER,
-                inbox_notification_id: FIRST_ENTRY,
-            },
-        )?
-        .expect("browser_remove_notification returned Err");
-
-        claim(&env, canister_id, (second, 2), (first, 1), expires_at_ns)?
-            .expect("claim_notification_app returned Err");
-
-        assert_eq!(
-            browser_get_notification(&env, canister_id, app, next_request(second))?,
-            Ok(GetNotificationResponse { notification: None }),
-            "a replay queued another"
-        );
-        Ok(())
-    }
 }
 
 /// Runs the dispatcher's next pass.
 ///
-/// What Internet Identity has to say is written onto the entries it is for when the pass
-/// expands its backlog item, the same way an application's notifications are, so a test
-/// that reads a queue straight after asking reads it before anything was put there.
-fn run_dispatch_pass(env: &PocketIc) {
-    env.advance_time(Duration::from_secs(1));
-    env.tick();
-}
-
 /// Every flow here signs one browser in and sends it one notification, so the entry a
 /// wake-up would name is the first of the first browser's inbox.
 const FIRST_BROWSER: BrowserId = 0;
@@ -3157,26 +2857,12 @@ mod turning_on {
     use internet_identity_interface::internet_identity::types::{
         EnableNotificationAppError, EnableNotificationAppRequest, GetNotificationAppStatusRequest,
         NotificationAppInfo, NotificationAppStatus, NotificationId, ProbeNotificationAppRequest,
-        SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
 
     /// The key a browser is left holding after the sign-in `browser_seed` names.
     fn browser(browser_seed: u8) -> Principal {
         BrowserKey::new(browser_seed).successor().principal()
-    }
-
-    /// A pool whose first window covers the time the test runs at. The pool is spent by
-    /// elapsed time, so one issued at a fixed instant signs nothing.
-    fn pool_issued_now(
-        env: &PocketIc,
-        anchor: AnchorNumber,
-        endpoint: &str,
-    ) -> SetWebPushSubscriptionRequest {
-        SetWebPushSubscriptionRequest {
-            jwt_issued_at_ns: env.get_time().as_nanos_since_unix_epoch(),
-            ..request(anchor, endpoint)
-        }
     }
 
     fn turn_on(
@@ -3221,13 +2907,8 @@ mod turning_on {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
         let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
-        set_webpush_subscription(
-            &env,
-            canister_id,
-            app,
-            pool_issued_now(&env, anchor, ENDPOINT),
-        )?
-        .expect("set_webpush_subscription returned Err");
+        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
 
         let queued = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
             .expect("the switch returned Err");
@@ -3275,13 +2956,8 @@ mod turning_on {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
         let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
-        set_webpush_subscription(
-            &env,
-            canister_id,
-            app,
-            pool_issued_now(&env, anchor, ENDPOINT),
-        )?
-        .expect("set_webpush_subscription returned Err");
+        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("set_webpush_subscription returned Err");
 
         let first = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
             .expect("the switch returned Err");

@@ -30,7 +30,6 @@ import {
   reportNotificationReceived,
 } from "./appNotifications";
 import { allowedLink, fetchAlternativeOrigins } from "./notificationLink";
-import { refillJwtPool } from "./poolRefill";
 import { loadPullIdentity, mintPullIdentity } from "./pullDelegation";
 import {
   dataOf,
@@ -372,23 +371,6 @@ const showQueued = async (
   return await showFromApp(minted);
 };
 
-/** Signs a fresh pool of wake-up authorizations where the stored one is running out.
- *  Nothing depends on it: the notification is already shown. */
-const topUpPool = async (
-  context: WakeUpContext,
-  signing: SigningIdentity,
-): Promise<void> => {
-  const actor = await (context.internetIdentity ?? internetIdentityActor)(
-    signing,
-  );
-  await refillJwtPool({
-    actor,
-    identityNumber: signing.identityNumber,
-    nowNs: BigInt(Date.now()) * BigInt(1_000_000),
-    registration: context.registration,
-  });
-};
-
 /**
  * Close what the apps have dismissed since it was shown.
  *
@@ -461,12 +443,6 @@ export const onWakeUp = async (
     if (entry !== undefined) {
       shown = await showQueued(context, entry, { pending }).catch(() => false);
     }
-  }
-
-  // The pool of signed wake-up authorizations is spent by elapsed time, and a
-  // browser whose user never opens the page again would let it run out.
-  for (const one of signing) {
-    sendAndForget(pending, topUpPool(context, one));
   }
 
   if (!shown) {

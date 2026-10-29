@@ -1,5 +1,11 @@
 import { createServer } from "node:http";
-import { createDecipheriv, createECDH, createHmac } from "node:crypto";
+import {
+  createDecipheriv,
+  createECDH,
+  createHmac,
+  createPublicKey,
+  verify as verifySignature,
+} from "node:crypto";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 /**
@@ -9,8 +15,8 @@ import { expect, type BrowserContext, type Page } from "@playwright/test";
  * `pushManager.subscribe` never resolves. `Notification`, `navigator.serviceWorker`
  * and the push manager are all replaced here, so nothing downstream covers the native
  * permission prompt or a real service-worker registration. What does run for real is
- * II's side: the consent screen, the VAPID pool the browser signs and the rows the
- * canister writes.
+ * II's side: the consent screen, the subscription keys the browser derives and the rows
+ * the canister writes.
  *
  * Asserts nothing about the endpoint, which is a relay URL nothing is ever sent to.
  */
@@ -285,6 +291,83 @@ export const armPushNotifications = async (
   await armTheFeatureFlag(context);
 };
 
+/** The SPKI wrapper of an uncompressed P-256 point, so a raw `k=` becomes a key object. */
+const P256_SPKI_PREFIX = Buffer.from(
+  "3059301306072a8648ce3d020106082a8648ce3d030107034200",
+  "hex",
+);
+
+/**
+ * What a push service checks before it accepts anything (RFC 8292 §2): an ES256 JWT for
+ * the origin it was posted to, unexpired, verifying against the key the header names.
+ *
+ * A relay that skips this takes a wake-up no real one would, so a push the canister
+ * signed wrong would reach the worker here and nowhere else.
+ *
+ * Answers why it refused, or nothing where it would have accepted.
+ */
+const refuseVapid = (
+  authorization: string | undefined,
+  audience: string,
+): string | undefined => {
+  if (authorization === undefined) {
+    return "the push carried no Authorization header";
+  }
+  const header = /^vapid t=([^,\s]+), *k=([^,\s]+)$/.exec(authorization);
+  if (header === null) {
+    return `the Authorization header is not RFC 8292: ${authorization}`;
+  }
+  const [, token, applicationServerKey] = header;
+  const [protectedHeader, claims, signature] = token.split(".");
+  if (signature === undefined) {
+    return `the JWT is not three parts: ${token}`;
+  }
+  const read = (part: string): unknown =>
+    JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
+
+  const { alg } = read(protectedHeader) as { alg?: string };
+  if (alg !== "ES256") {
+    return `the JWT is signed with ${String(alg)}, not ES256`;
+  }
+  const { aud, exp, sub } = read(claims) as {
+    aud?: string;
+    exp?: number;
+    sub?: string;
+  };
+  if (aud !== audience) {
+    return `the JWT is for ${String(aud)}, not ${audience}`;
+  }
+  if (exp === undefined || exp * 1000 <= Date.now()) {
+    return `the JWT expired at ${String(exp)}`;
+  }
+  if (sub === undefined) {
+    return "the JWT names no sub to contact the sender by";
+  }
+
+  try {
+    const key = createPublicKey({
+      key: Buffer.concat([
+        P256_SPKI_PREFIX,
+        Buffer.from(applicationServerKey, "base64url"),
+      ]),
+      format: "der",
+      type: "spki",
+    });
+    // Raw r||s, which is what ES256 is and what the canister's threshold key answers with.
+    const verified = verifySignature(
+      "sha256",
+      Buffer.from(`${protectedHeader}.${claims}`),
+      { key, dsaEncoding: "ieee-p1363" },
+      Buffer.from(signature, "base64url"),
+    );
+    return verified
+      ? undefined
+      : "the JWT does not verify against the key it names";
+  } catch (error) {
+    return `k= is not a P-256 point: ${String(error)}`;
+  }
+};
+
 /**
  * A push service, on this machine.
  *
@@ -302,8 +385,7 @@ export interface PushRelay {
   /** Resolves once the canister has posted at least `count` wake-ups. */
   waitForWakeUps: (count: number) => Promise<void>;
   received: () => number;
-  /** What each wake-up carried, opened with the subscription's keys, in order, and
-   *  empty for one that carried nothing. One entry per wake-up received. */
+  /** What the wake-ups carried, opened with the subscription's keys, in order. */
   payloads: () => string[];
   /** The paths the canister posted wake-ups to, in order.
    *
@@ -320,6 +402,14 @@ export interface PushRelay {
    * back dead is the only evidence there is.
    */
   reportGone: (gone: boolean) => void;
+  /**
+   * Why this relay turned a wake-up away, one entry per refusal, in order.
+   *
+   * Empty is the only acceptable state: a refusal here is a push a real relay would
+   * have dropped too, and `waitForWakeUps` says so rather than letting the scenario
+   * read on past it.
+   */
+  refusals: () => string[];
   close: () => Promise<void>;
 }
 
@@ -336,18 +426,24 @@ export const startPushRelay = async (): Promise<PushRelay> => {
   let gone = false;
   const paths: string[] = [];
   const payloads: string[] = [];
+  const refusals: string[] = [];
+  const audience = `http://127.0.0.1:${RELAY_PORT}`;
   const server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       received += 1;
       paths.push(request.url ?? "");
-      // One entry per wake-up, empty where it carried nothing: a probe asks an app to
-      // prove it is there and names no notification, and a caller counting wake-ups has
-      // to find the same number of payloads or it delivers a stale one.
-      payloads.push(
-        chunks.length > 0 ? openPayload(Buffer.concat(chunks)) : "",
-      );
+      const refusal = refuseVapid(request.headers.authorization, audience);
+      if (refusal !== undefined) {
+        refusals.push(refusal);
+        // What a push service answers a sender it cannot authorize.
+        response.writeHead(403).end();
+        return;
+      }
+      if (chunks.length > 0) {
+        payloads.push(openPayload(Buffer.concat(chunks)));
+      }
       if (gone) {
         // What a push service answers for a subscription that no longer exists.
         response.writeHead(410).end();
@@ -370,6 +466,7 @@ export const startPushRelay = async (): Promise<PushRelay> => {
     reportGone: (report: boolean) => {
       gone = report;
     },
+    refusals: () => [...refusals],
     waitForWakeUps: async (count) => {
       await expect
         .poll(() => received, {
@@ -377,6 +474,7 @@ export const startPushRelay = async (): Promise<PushRelay> => {
           timeout: 30_000,
         })
         .toBeGreaterThanOrEqual(count);
+      expect(refusals, "the relay refused a wake-up").toEqual([]);
     },
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };

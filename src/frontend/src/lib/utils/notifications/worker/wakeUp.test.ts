@@ -12,7 +12,6 @@ const reportNotificationReceived = vi.fn((_call: unknown) => Promise.resolve());
 const fetchAppMetadata = vi.fn((): Promise<{ name?: string } | undefined> =>
   Promise.resolve(undefined),
 );
-const refillJwtPool = vi.fn((_options: unknown) => Promise.resolve(false));
 const fetchAlternativeOrigins = vi.fn(() => Promise.resolve([] as string[]));
 
 const createSync = vi.fn((_options: unknown) => ({}));
@@ -47,9 +46,6 @@ vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
 vi.mock("$lib/utils/notifications/worker/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
   mintPullIdentity: () => mintPullIdentity(),
-}));
-vi.mock("$lib/utils/notifications/worker/poolRefill", () => ({
-  refillJwtPool: (options: unknown) => refillJwtPool(options),
 }));
 vi.mock("$lib/utils/notifications/worker/appNotifications", () => ({
   fetchNotificationContent: (call: unknown) => fetchNotificationContent(call),
@@ -599,20 +595,5 @@ describe("onWakeUp", () => {
     // turn comes with its own.
     expect(shown.showNotification).toHaveBeenCalledOnce();
     expect(reportNotificationReceived).toHaveBeenCalledOnce();
-  });
-
-  it("does not fail a wake-up that showed its notification", async () => {
-    const shown = registration();
-    refillJwtPool.mockRejectedValue(new Error("no"));
-
-    await onWakeUp(
-      {
-        registration: shown,
-        internetIdentity: internetIdentity([notification]).factory,
-      },
-      NAMED,
-    );
-
-    expect(shown.shown).toHaveLength(1);
   });
 });

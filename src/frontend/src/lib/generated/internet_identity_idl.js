@@ -737,11 +737,7 @@ export const idlFactory = ({ IDL }) => {
   const GetWebPushSubscriptionStatusRequest = IDL.Record({
     'anchor_number' : UserNumber,
   });
-  const WebPushSubscriptionStatus = IDL.Record({
-    'endpoint' : IDL.Text,
-    'issued_at_ns' : IDL.Nat64,
-    'pool_len' : IDL.Nat32,
-  });
+  const WebPushSubscriptionStatus = IDL.Record({ 'endpoint' : IDL.Text });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -1130,17 +1126,13 @@ export const idlFactory = ({ IDL }) => {
   });
   const SetWebPushSubscriptionRequest = IDL.Record({
     'endpoint' : IDL.Text,
-    'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
-    'jwt_issued_at_ns' : IDL.Nat64,
     'anchor_number' : UserNumber,
     'payload_keyid' : IDL.Vec(IDL.Nat8),
     'payload_ikm' : IDL.Vec(IDL.Nat8),
-    'vapid_public_key' : IDL.Vec(IDL.Nat8),
   });
   const SetWebPushSubscriptionError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
-    'StaleJwtPool' : IDL.Null,
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
   const SmtpEnvelope = IDL.Record({
@@ -1617,6 +1609,11 @@ export const idlFactory = ({ IDL }) => {
     'get_sso_discovery_status' : IDL.Func(
         [GetSsoDiscoveryStatusRequest],
         [SsoDiscoveryStatus],
+        ['query'],
+      ),
+    'get_vapid_public_key' : IDL.Func(
+        [],
+        [IDL.Opt(IDL.Vec(IDL.Nat8))],
         ['query'],
       ),
     'get_webpush_subscription_status' : IDL.Func(

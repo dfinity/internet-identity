@@ -7509,7 +7509,6 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://relay.example/a",
                 0,
-                0,
             )),
         );
     }
@@ -7787,7 +7786,6 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://web.push.apple.com/one",
                 2_000,
-                2_000,
             )),
             2_000,
         )
@@ -7969,7 +7967,7 @@ fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNot
 }
 
 fn app_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
-    crate::notifications::webpush::fixtures::subscription_at(endpoint, 1_000, 1_000)
+    crate::notifications::webpush::fixtures::subscription_at(endpoint, 1_000)
 }
 
 #[test]
@@ -7992,7 +7990,7 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         .push(queued_notification(7));
     storage.write(anchor).expect("queueing");
 
-    // The same address is a pool replacement, which keeps what is waiting.
+    // The same address is the same registration, which keeps what is waiting.
     storage
         .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 2_000)
         .expect("the record is there");
@@ -8076,7 +8074,6 @@ fn an_entry_delivers_through_the_app_it_points_at() {
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://web.push.apple.com/one",
                 1_000,
-                1_000,
             )),
             1_000,
         )
@@ -8108,7 +8105,6 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
             app.id,
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://web.push.apple.com/one",
-                1_000,
                 1_000,
             )),
             1_000,

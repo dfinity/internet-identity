@@ -2353,13 +2353,7 @@ export type SetWebPushSubscriptionError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string } |
-  {
-    /**
-     * The pool offered is not newer than the one this endpoint already holds.
-     */
-    'StaleJwtPool' : null
-  };
+  { 'InternalCanisterError' : string };
 /**
  * What a browser uploads when it registers for Web Push, and how it replaces a pool
  * that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
@@ -2367,8 +2361,6 @@ export type SetWebPushSubscriptionError = {
  */
 export interface SetWebPushSubscriptionRequest {
   'endpoint' : string,
-  'jwt_signatures' : Array<Uint8Array | number[]>,
-  'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
   'payload_keyid' : Uint8Array | number[],
   /**
@@ -2377,7 +2369,6 @@ export interface SetWebPushSubscriptionRequest {
    * has to run here: sealing a payload costs two HKDFs and one AES-GCM.
    */
   'payload_ikm' : Uint8Array | number[],
-  'vapid_public_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
@@ -2618,11 +2609,7 @@ export interface WebAuthnCredential {
  * still live from one another identity's re-subscribe left behind, and knows when to
  * sign the next pool.
  */
-export interface WebPushSubscriptionStatus {
-  'endpoint' : string,
-  'issued_at_ns' : bigint,
-  'pool_len' : number,
-}
+export interface WebPushSubscriptionStatus { 'endpoint' : string }
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
@@ -2790,10 +2777,6 @@ export interface _SERVICE {
     { 'Ok' : AuthnMethodConfirmationCode } |
       { 'Err' : AuthnMethodRegisterError }
   >,
-  /**
-   * Called by the service worker on a wake-up, signed with the browser key: the oldest
-   * notification its browser has yet to show, passing over the ones it skips.
-   */
   'browser_get_notification' : ActorMethod<
     [GetNotificationRequest],
     { 'Ok' : GetNotificationResponse } |
@@ -3071,6 +3054,11 @@ export interface _SERVICE {
     [GetSsoDiscoveryStatusRequest],
     SsoDiscoveryStatus
   >,
+  /**
+   * Called by the service worker on a wake-up, signed with the browser key: the oldest
+   * notification its browser has yet to show, passing over the ones it skips.
+   */
+  'get_vapid_public_key' : ActorMethod<[], [] | [Uint8Array | number[]]>,
   'get_webpush_subscription_status' : ActorMethod<
     [GetWebPushSubscriptionStatusRequest],
     [] | [WebPushSubscriptionStatus]

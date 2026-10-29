@@ -1,7 +1,7 @@
 // Browser-side Web Push subscription: register the push service worker, ask for
-// permission, and subscribe with the VAPID public key. The relay binds the subscription
-// to that key and accepts only pushes carrying a JWT signed by its private half (see
-// vapidPool).
+// permission, and subscribe with Internet Identity's own VAPID key. The relay binds the
+// subscription to that key and accepts only pushes carrying a JWT signed by its private
+// half, which is a threshold key the canister holds.
 //
 // The subscription's own p256dh and auth keys are what a wake-up's payload is sealed
 // against; see payloadKeys.
@@ -48,6 +48,28 @@ export const subscribeToPush = async (
   });
 };
 
+/**
+ * Whether this subscription was minted with `applicationServerKey`.
+ *
+ * A relay binds a subscription to the key it was made with and refuses a push whose
+ * `k=` is any other, so one made with a key we no longer sign with is dead however live
+ * it looks. What the browser remembers of the subscription is the only way to tell.
+ */
+export const subscribedWith = (
+  subscription: PushSubscription,
+  applicationServerKey: Uint8Array,
+): boolean => {
+  const minted = subscription.options.applicationServerKey;
+  if (minted === null || minted === undefined) {
+    return false;
+  }
+  const bytes = new Uint8Array(minted);
+  return (
+    bytes.length === applicationServerKey.length &&
+    bytes.every((byte, at) => byte === applicationServerKey[at])
+  );
+};
+
 /** This browser's current push subscription, or `undefined` if not subscribed. */
 export const currentDeviceSubscription = async (): Promise<
   PushSubscription | undefined
@@ -56,6 +78,6 @@ export const currentDeviceSubscription = async (): Promise<
   return (await registration?.pushManager.getSubscription()) ?? undefined;
 };
 
-// Defined in `vapidPool`, where the claim it fills is, and re-exported here for the
-// callers that reach it through this module.
-export { relayOriginOf } from "./vapidPool";
+/** `scheme://host[:port]` of a relay endpoint, which is what a push is addressed to. */
+export const relayOriginOf = (endpoint: string): string =>
+  new URL(endpoint).origin;
