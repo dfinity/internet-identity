@@ -131,12 +131,9 @@ test.describe("a notification the app sent", () => {
       .toBeGreaterThan(0);
     await deliverPush(page, II_URL, relay.payloads()[0] ?? "");
 
-    // The first wake-up for an app has no delegation to read the content with, so
-    // it shows a placeholder and mints one — which earns the second wake-up, from
-    // Internet Identity rather than from the test. Minting is what earns it, so
-    // the second wake-up can be posted before the worker has finished storing
-    // what it minted; a push service takes long enough that it does not, and the
-    // test waits for the same reason.
+    // One wake-up is the whole of it. A browser with no delegation for this app mints
+    // one inside the push event and reads the content with it there, so nothing comes
+    // back for a second turn.
     const onInternetIdentity = await context.newPage();
     await onInternetIdentity.goto(II_URL);
     await expect
@@ -145,9 +142,6 @@ test.describe("a notification the app sent", () => {
         timeout: 30_000,
       })
       .toBeGreaterThan(0);
-
-    await relay.waitForWakeUps(2);
-    await deliverPush(page, II_URL, relay.payloads()[1] ?? "");
 
     await expectOneMoreShown(before);
 

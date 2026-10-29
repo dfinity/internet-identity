@@ -17,7 +17,11 @@ import {
 } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { transformSignedDelegation } from "$lib/utils/utils";
+import {
+  retryFor,
+  throwCanisterError,
+  transformSignedDelegation,
+} from "$lib/utils/utils";
 import { config } from "../workerConfig";
 
 const PULL_STORE = createStore("ii-notification-pull", "delegations");
@@ -87,8 +91,11 @@ export const loadPullIdentity = async ({
 /**
  * Asks Internet Identity for a delegation for this app and account and keeps it.
  *
- * The prepare call is what earns the worker another wake-up, so a caller that cannot
- * show the notification yet may stop here and show it on the next one.
+ * Preparing is an update and fetching is a query over what it signed, so the signature
+ * is not certified yet when the query goes out directly after. Fetching is retried for
+ * the same reason every other delegation in this codebase is: the first answer is often
+ * `Err` and a later one is not. One wake-up carries a notification the whole way, so
+ * there is no second one to try again on.
  */
 export const mintPullIdentity = async ({
   actor,
@@ -114,19 +121,23 @@ export const mintPullIdentity = async ({
     return undefined;
   }
 
-  const fetched = await actor.get_notification_delegation({
-    anchor_number: identityNumber,
-    origin: target.origin,
-    account_number: accountNumber as [] | [bigint],
-    session_key: sessionKey,
-    expiration: prepared.Ok.expiration,
-  });
-  if ("Err" in fetched) {
+  const fetched = await retryFor(5, () =>
+    actor
+      .get_notification_delegation({
+        anchor_number: identityNumber,
+        origin: target.origin,
+        account_number: accountNumber as [] | [bigint],
+        session_key: sessionKey,
+        expiration: prepared.Ok.expiration,
+      })
+      .then(throwCanisterError),
+  ).catch(() => undefined);
+  if (fetched === undefined) {
     return undefined;
   }
 
   const chain = DelegationChain.fromDelegations(
-    [transformSignedDelegation(fetched.Ok.signed_delegation)],
+    [transformSignedDelegation(fetched.signed_delegation)],
     new Uint8Array(prepared.Ok.user_key),
   );
   const stored: StoredPull = {
@@ -134,7 +145,7 @@ export const mintPullIdentity = async ({
     chain: JSON.parse(JSON.stringify(chain.toJSON())),
     expiration: prepared.Ok.expiration,
     senderInfo: new Uint8Array(prepared.Ok.sender_info),
-    senderInfoSignature: new Uint8Array(fetched.Ok.sender_info_signature),
+    senderInfoSignature: new Uint8Array(fetched.sender_info_signature),
   };
   await idbSet(storageKey(identityNumber, target), stored, PULL_STORE).catch(
     () => {
