@@ -95,23 +95,18 @@ type ReachabilityCache = SingleFlightCache<String, u16, String>;
 /// probe budget, and the cache is only here to stop re-probing what has already answered.
 const REACHABILITY_MAX_ORIGINS: usize = 256;
 
-/// How long an answer stands before it is asked for again. Long, because what it tests
-/// changes on the scale of a relay operator retiring a host, and a wake-up to a host that
-/// has since gone simply fails, which costs the one notification and nothing else.
-const REACHABILITY_FRESH_FOR_SECS: u64 = 24 * 60 * 60;
-
-/// How long the answer in hand goes on being served while the next probe runs.
-const REACHABILITY_STALE_FOR_SECS: u64 = 24 * 60 * 60;
-
-/// For a known relay's subdomains this window is the one that costs an attacker: it is
-/// how long a failure marker and its backoff survive before the backoff resets, so an
-/// invented name stays parked for a day rather than being retried.
-const SUBDOMAIN_REACHABILITY_STALE_IF_ERROR_FOR_SECS: u64 = 24 * 60 * 60;
-
-/// For everything else the same window is kept short. A probe there filters nothing an
-/// attacker cannot pass anyway, so a long marker would only hold out a small relay that
-/// had an outage.
-const UNKNOWN_REACHABILITY_STALE_IF_ERROR_FOR_SECS: u64 = 60 * 60;
+/// How long an answer stands before it is asked for again, and how long one goes on
+/// being served while the next probe runs.
+///
+/// These also set how long a *failed* probe is remembered, because a failure marker lives
+/// `fresh_for + stale_if_error_for` and its backoff is capped by that life: a relay that
+/// has been down accumulates failures, and the longest it is then held off after coming
+/// back is the marker's own lifetime. An hour apiece keeps that bound at two hours, which
+/// is why neither is set to the day a reachability answer would otherwise be good for.
+/// Re-asking costs one `HEAD` per origin per hour, which the probe budget barely notices.
+const REACHABILITY_FRESH_FOR_SECS: u64 = 60 * 60;
+const REACHABILITY_STALE_FOR_SECS: u64 = 60 * 60;
+const REACHABILITY_STALE_IF_ERROR_FOR_SECS: u64 = 60 * 60;
 
 const REACHABILITY_RETRY_BASE_SECS: u64 = 60;
 const REACHABILITY_RETRY_MULTIPLIER: u64 = 2;
@@ -165,28 +160,20 @@ thread_local! {
         vapid_key::new_jwt_cache(KNOWN_JWT_MAX_RELAYS, &KNOWN_SIGNING_LIMIT),
     );
 
-    static SUBDOMAIN_REACHABILITY: RefCell<ReachabilityCache> = RefCell::new(
-        new_reachability_cache(
-            SUBDOMAIN_REACHABILITY_STALE_IF_ERROR_FOR_SECS,
-            &SUBDOMAIN_PROBE_LIMIT,
-        ),
-    );
+    static SUBDOMAIN_REACHABILITY: RefCell<ReachabilityCache> =
+        RefCell::new(new_reachability_cache(&SUBDOMAIN_PROBE_LIMIT));
     static SUBDOMAIN_JWTS: RefCell<JwtCache> = RefCell::new(
         vapid_key::new_jwt_cache(SUBDOMAIN_JWT_MAX_RELAYS, &SUBDOMAIN_SIGNING_LIMIT),
     );
 
-    static UNKNOWN_REACHABILITY: RefCell<ReachabilityCache> = RefCell::new(
-        new_reachability_cache(
-            UNKNOWN_REACHABILITY_STALE_IF_ERROR_FOR_SECS,
-            &UNKNOWN_PROBE_LIMIT,
-        ),
-    );
+    static UNKNOWN_REACHABILITY: RefCell<ReachabilityCache> =
+        RefCell::new(new_reachability_cache(&UNKNOWN_PROBE_LIMIT));
     static UNKNOWN_JWTS: RefCell<JwtCache> = RefCell::new(
         vapid_key::new_jwt_cache(UNKNOWN_JWT_MAX_RELAYS, &UNKNOWN_SIGNING_LIMIT),
     );
 }
 
-fn new_reachability_cache(stale_if_error_for: u64, limiter: Limiter) -> ReachabilityCache {
+fn new_reachability_cache(limiter: Limiter) -> ReachabilityCache {
     SingleFlightCache::new(
         move |relay_origin: String| async move {
             // No slot, no probe: abandoning records nothing, so the origin keeps whatever
@@ -206,7 +193,7 @@ fn new_reachability_cache(stale_if_error_for: u64, limiter: Limiter) -> Reachabi
         CacheConfig {
             fresh_for: REACHABILITY_FRESH_FOR_SECS,
             stale_for: REACHABILITY_STALE_FOR_SECS,
-            stale_if_error_for,
+            stale_if_error_for: REACHABILITY_STALE_IF_ERROR_FOR_SECS,
             max_entries: REACHABILITY_MAX_ORIGINS,
             backoff: RetryBackoff::new(REACHABILITY_RETRY_BASE_SECS, REACHABILITY_RETRY_MULTIPLIER),
             abandon_fill_after: REACHABILITY_ABANDON_FILL_AFTER_SECS,
@@ -214,18 +201,30 @@ fn new_reachability_cache(stale_if_error_for: u64, limiter: Limiter) -> Reachabi
     )
 }
 
-/// The JWT to wake `relay_origin` with, where one is in hand.
-///
-/// `Pending` covers both halves of the answer: an origin still being probed and one still
-/// being signed for say the same thing to a caller, which is to leave the notification in
-/// the backlog and ask again on the next pass.
-pub(crate) fn signed_jwt(relay_origin: String) -> Cached<SignedJwt> {
+/// What Internet Identity can do about one relay origin right now.
+#[derive(Clone, Debug)]
+pub(crate) enum RelayToken {
+    /// A live token: post the wake-up.
+    Ready(SignedJwt),
+    /// A probe or a signature is still running. Leave the notification in the backlog and
+    /// ask again on the next pass.
+    Pending,
+    /// Nothing answered at this origin and the probe is parked, so there is no prospect of
+    /// posting here. Told apart from `Pending` because waiting on it is waiting on nothing:
+    /// a caller leaves this destination out rather than holding a notification back for it.
+    Unreachable,
+}
+
+/// The token to wake `relay_origin` with, or why there is none.
+pub(crate) fn signed_jwt(relay_origin: String) -> RelayToken {
     // Off-wasm nothing drives a detached fill, so a test drives it here and reads the
     // answer in the pass that asked. A probe and a signature are two fills in sequence,
     // and neither starts until the lookup before it has landed.
     #[cfg(test)]
     for _ in 0..2 {
-        if let answer @ Cached::Ready(_) = look_up(relay_origin.clone()) {
+        if let answer @ (RelayToken::Ready(_) | RelayToken::Unreachable) =
+            look_up(relay_origin.clone())
+        {
             return answer;
         }
         single_flight_cache::run_detached();
@@ -233,9 +232,12 @@ pub(crate) fn signed_jwt(relay_origin: String) -> Cached<SignedJwt> {
     look_up(relay_origin)
 }
 
-fn look_up(relay_origin: String) -> Cached<SignedJwt> {
+fn look_up(relay_origin: String) -> RelayToken {
     match tier_of(&relay_origin) {
-        Tier::Known => single_flight_cache::get(&KNOWN_JWTS, relay_origin),
+        Tier::Known => match single_flight_cache::get(&KNOWN_JWTS, relay_origin) {
+            Cached::Ready(jwt) => RelayToken::Ready(jwt),
+            Cached::Pending => RelayToken::Pending,
+        },
         Tier::KnownSubdomain => {
             signed_once_reachable(&SUBDOMAIN_REACHABILITY, &SUBDOMAIN_JWTS, relay_origin)
         }
@@ -249,10 +251,18 @@ fn signed_once_reachable(
     reachability: &'static LocalKey<RefCell<ReachabilityCache>>,
     jwts: &'static LocalKey<RefCell<JwtCache>>,
     relay_origin: String,
-) -> Cached<SignedJwt> {
+) -> RelayToken {
     match single_flight_cache::get(reachability, relay_origin.clone()) {
-        Cached::Ready(_) => single_flight_cache::get(jwts, relay_origin),
-        Cached::Pending => Cached::Pending,
+        Cached::Ready(_) => match single_flight_cache::get(jwts, relay_origin) {
+            Cached::Ready(jwt) => RelayToken::Ready(jwt),
+            Cached::Pending => RelayToken::Pending,
+        },
+        // A probe that failed and is now parked is the cache's only way of saying nothing
+        // answered here; `retry_at` is what tells that apart from a probe still running.
+        Cached::Pending => match single_flight_cache::retry_at(reachability, &relay_origin) {
+            Some(_) => RelayToken::Unreachable,
+            None => RelayToken::Pending,
+        },
     }
 }
 

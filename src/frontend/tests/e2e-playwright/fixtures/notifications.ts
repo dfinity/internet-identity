@@ -432,6 +432,13 @@ export const startPushRelay = async (): Promise<PushRelay> => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
+      if (request.method === "HEAD") {
+        // Internet Identity asking whether anything is here before it signs for this
+        // origin. It carries no authorization and delivers nothing, so it is answered
+        // without counting as a wake-up or being held to a push's rules.
+        response.writeHead(200).end();
+        return;
+      }
       received += 1;
       paths.push(request.url ?? "");
       const refusal = refuseVapid(request.headers.authorization, audience);
