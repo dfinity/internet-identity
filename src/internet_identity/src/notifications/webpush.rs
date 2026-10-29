@@ -5,6 +5,7 @@
 //! everything here acts on a browser the caller has already been shown to be.
 
 pub(crate) mod payload;
+pub(crate) mod relays;
 mod subscription;
 mod validation;
 pub(crate) mod vapid_key;

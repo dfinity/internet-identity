@@ -7,10 +7,10 @@ use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::backlog::identity::PendingIdentityNotification;
 use crate::notifications::browser_inbox;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
-use crate::notifications::webpush::vapid_key;
-use crate::notifications::webpush::{clear_gone_subscription, payload, PayloadIkm, PayloadKeyId};
+use crate::notifications::webpush::{
+    clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId,
+};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
-use crate::single_flight_cache::{self, Cached};
 use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, InboxNotification, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
@@ -178,25 +178,24 @@ pub(crate) struct Delivery {
     pub(crate) ttl_seconds: u64,
 }
 
-thread_local! {
-    /// One JWT per relay, signed ahead of the one in hand lapsing.
-    static VAPID_JWTS: std::cell::RefCell<vapid_key::JwtCache> =
-        std::cell::RefCell::new(vapid_key::new_jwt_cache());
-}
-
-/// The JWT every one of these relays is woken with, or nothing where any is still being
-/// signed. All or none: a notification deposited for one browser and left in the backlog
-/// for another would be shown twice.
-fn jwts_for(relay_origins: &[String], now_ns: Timestamp) -> Option<Vec<String>> {
+/// The JWT for each of these relays, aligned with them, or nothing where any is still
+/// being probed or signed for. All or none: a notification deposited for one browser and
+/// left in the backlog for another would be shown twice.
+///
+/// An entry is `None` where nothing answers at that relay. That destination is past
+/// waiting for, so the caller leaves it out and posts to the rest, rather than holding a
+/// notification back from reachable browsers until it expires.
+fn jwts_for(relay_origins: &[String], now_ns: Timestamp) -> Option<Vec<Option<String>>> {
     let now_secs = now_ns / SECOND_NS;
     let mut jwts = Vec::with_capacity(relay_origins.len());
     let mut waiting = false;
     for origin in relay_origins {
-        // Every one is asked for, so their signatures run side by side rather than one
-        // pass apart.
-        match jwt_for(origin.clone(), now_secs) {
-            Some(jwt) => jwts.push(jwt),
-            None => waiting = true,
+        // Every one is asked for, so their probes and signatures run side by side rather
+        // than one pass apart.
+        match relays::signed_jwt(origin.clone()) {
+            relays::RelayToken::Ready(jwt) => jwts.push(live_token(jwt, now_secs)),
+            relays::RelayToken::Unreachable => jwts.push(None),
+            relays::RelayToken::Pending => waiting = true,
         }
     }
     (!waiting).then_some(jwts)
@@ -206,31 +205,11 @@ fn jwts_for(relay_origins: &[String], now_ns: Timestamp) -> Option<Vec<String>> 
 /// planning a wake-up and the relay reading it is not posted.
 const JWT_SPENT_WITHIN_SECS: u64 = 10;
 
-/// The JWT a relay is woken with, where a live one is in hand. A relay we hold none for
-/// starts a signature and answers nothing.
-///
-/// One past its expiry answers nothing either: the cache decides when to refetch, the
-/// token decides when it dies, and posting a dead one costs the notification rather than
-/// delaying it.
-fn jwt_for(relay_origin: String, now_secs: u64) -> Option<String> {
-    let live = |jwt: vapid_key::SignedJwt| {
-        (jwt.expires_at_secs > now_secs.saturating_add(JWT_SPENT_WITHIN_SECS)).then_some(jwt.token)
-    };
-    match single_flight_cache::get(&VAPID_JWTS, relay_origin.clone()) {
-        Cached::Ready(jwt) => live(jwt),
-        Cached::Pending => {
-            // Off-wasm nothing drives a detached fill, so a test drives it here and reads
-            // the answer in the same pass rather than arranging a second one.
-            #[cfg(test)]
-            {
-                single_flight_cache::run_detached();
-                if let Cached::Ready(jwt) = single_flight_cache::get(&VAPID_JWTS, relay_origin) {
-                    return live(jwt);
-                }
-            }
-            None
-        }
-    }
+/// The token to post with, where it still has long enough left to be read. The cache
+/// decides when to refetch, the token decides when it dies, and posting a dead one costs
+/// the notification rather than delaying it.
+fn live_token(jwt: vapid_key::SignedJwt, now_secs: u64) -> Option<String> {
+    (jwt.expires_at_secs > now_secs.saturating_add(JWT_SPENT_WITHIN_SECS)).then_some(jwt.token)
 }
 
 /// Run a pass as soon as the budget allows: at once after a quiet spell, otherwise one
@@ -437,6 +416,12 @@ fn fan_out_to_destinations(
         for ((_, browser_id, queued, mut delivery, payload_ikm, payload_keyid), jwt) in
             planned.into_iter().zip(jwts)
         {
+            // Nothing answers at this browser's relay, so it is left out of the fan-out
+            // rather than deposited for: it cannot be woken, and the entry it would sit
+            // behind would never be shown.
+            let Some(jwt) = jwt else {
+                continue;
+            };
             delivery.jwt = jwt;
             let Some((queue, next_id)) = anchor.inbox_for_browser_mut(browser_id) else {
                 continue;
@@ -587,6 +572,10 @@ fn fan_out_to_browsers(
         let mut to_post = Vec::new();
         let mut queued_anywhere = false;
         for ((_, mut delivery, payload_ikm, payload_keyid), jwt) in woken.into_iter().zip(jwts) {
+            // Nothing answers at this browser's relay; see the identity fan-out.
+            let Some(jwt) = jwt else {
+                continue;
+            };
             delivery.jwt = jwt;
             let Some((queue, next_id)) = anchor.inbox_for_browser_mut(delivery.browser_id) else {
                 continue;
