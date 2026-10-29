@@ -187,13 +187,14 @@ thread_local! {
 /// The JWT every one of these relays is woken with, or nothing where any is still being
 /// signed. All or none: a notification deposited for one browser and left in the backlog
 /// for another would be shown twice.
-fn jwts_for(relay_origins: &[String]) -> Option<Vec<String>> {
+fn jwts_for(relay_origins: &[String], now_ns: Timestamp) -> Option<Vec<String>> {
+    let now_secs = now_ns / SECOND_NS;
     let mut jwts = Vec::with_capacity(relay_origins.len());
     let mut waiting = false;
     for origin in relay_origins {
         // Every one is asked for, so their signatures run side by side rather than one
         // pass apart.
-        match jwt_for(origin.clone()) {
+        match jwt_for(origin.clone(), now_secs) {
             Some(jwt) => jwts.push(jwt),
             None => waiting = true,
         }
@@ -201,11 +202,22 @@ fn jwts_for(relay_origins: &[String]) -> Option<Vec<String>> {
     (!waiting).then_some(jwts)
 }
 
-/// The JWT a relay is woken with, where one is in hand. A relay we hold none for starts a
-/// signature and answers nothing.
-fn jwt_for(relay_origin: String) -> Option<String> {
+/// A token is refused this close to its expiry, so one that lapses between the pass
+/// planning a wake-up and the relay reading it is not posted.
+const JWT_SPENT_WITHIN_SECS: u64 = 10;
+
+/// The JWT a relay is woken with, where a live one is in hand. A relay we hold none for
+/// starts a signature and answers nothing.
+///
+/// One past its expiry answers nothing either: the cache decides when to refetch, the
+/// token decides when it dies, and posting a dead one costs the notification rather than
+/// delaying it.
+fn jwt_for(relay_origin: String, now_secs: u64) -> Option<String> {
+    let live = |jwt: vapid_key::SignedJwt| {
+        (jwt.expires_at_secs > now_secs.saturating_add(JWT_SPENT_WITHIN_SECS)).then_some(jwt.token)
+    };
     match single_flight_cache::get(&VAPID_JWTS, relay_origin.clone()) {
-        Cached::Ready(jwt) => Some(jwt),
+        Cached::Ready(jwt) => live(jwt),
         Cached::Pending => {
             // Off-wasm nothing drives a detached fill, so a test drives it here and reads
             // the answer in the same pass rather than arranging a second one.
@@ -213,7 +225,7 @@ fn jwt_for(relay_origin: String) -> Option<String> {
             {
                 single_flight_cache::run_detached();
                 if let Cached::Ready(jwt) = single_flight_cache::get(&VAPID_JWTS, relay_origin) {
-                    return Some(jwt);
+                    return live(jwt);
                 }
             }
             None
@@ -417,7 +429,7 @@ fn fan_out_to_destinations(
         // All or none, and before anything is deposited: an entry left in the backlog for
         // one browser and deposited for another would be shown twice.
         let relay_origins: Vec<String> = planned.iter().map(|one| one.0.clone()).collect();
-        let Some(jwts) = jwts_for(&relay_origins) else {
+        let Some(jwts) = jwts_for(&relay_origins, now_ns) else {
             return true;
         };
 
@@ -569,7 +581,7 @@ fn fan_out_to_browsers(
         // All or none, and before anything is deposited: an entry left in the backlog for
         // one browser and deposited for another would be shown twice.
         let relay_origins: Vec<String> = woken.iter().map(|one| one.0.clone()).collect();
-        let Some(jwts) = jwts_for(&relay_origins) else {
+        let Some(jwts) = jwts_for(&relay_origins, now_ns) else {
             return true;
         };
         let mut to_post = Vec::new();

@@ -119,8 +119,24 @@ const HEADER_B64: &str = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9";
 /// Operator contact for the RFC 8292 `sub` claim.
 const VAPID_SUBJECT: &str = "https://id.ai";
 
+/// A signed VAPID JWT and the second it stops being accepted.
+///
+/// The expiry travels with the token because it is the token's own, fixed before signing
+/// and unrelated to how long the signing took or how long a cache has held it. A caller
+/// asks the token whether it is still good rather than inferring it from windows kept
+/// somewhere else.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct SignedJwt {
+    pub(crate) token: String,
+    pub(crate) expires_at_secs: u64,
+}
+
 /// Signs one JWT for `relay_origin`, expiring `lifetime_secs` from now.
-async fn sign_jwt(relay_origin: &str, now_secs: u64, lifetime_secs: u64) -> Result<String, String> {
+async fn sign_jwt(
+    relay_origin: &str,
+    now_secs: u64,
+    lifetime_secs: u64,
+) -> Result<SignedJwt, String> {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine;
 
@@ -134,10 +150,10 @@ async fn sign_jwt(relay_origin: &str, now_secs: u64, lifetime_secs: u64) -> Resu
     // Off-wasm there is no management canister to sign with, so the hash stands in for
     // the signature: everything a relay reads but the signature itself is still built.
     #[cfg(test)]
-    return Ok(format!(
-        "{signing_input}.{}",
-        URL_SAFE_NO_PAD.encode(&message_hash)
-    ));
+    return Ok(SignedJwt {
+        token: format!("{signing_input}.{}", URL_SAFE_NO_PAD.encode(&message_hash)),
+        expires_at_secs: exp,
+    });
 
     #[cfg(not(test))]
     let (answer,): (SignWithEcdsaResponse,) = ic_cdk::api::call::call_with_payment128(
@@ -155,10 +171,13 @@ async fn sign_jwt(relay_origin: &str, now_secs: u64, lifetime_secs: u64) -> Resu
 
     // ES256 is the raw pair, which is what the management canister answers with.
     #[cfg(not(test))]
-    Ok(format!(
-        "{signing_input}.{}",
-        URL_SAFE_NO_PAD.encode(&answer.signature)
-    ))
+    Ok(SignedJwt {
+        token: format!(
+            "{signing_input}.{}",
+            URL_SAFE_NO_PAD.encode(&answer.signature)
+        ),
+        expires_at_secs: exp,
+    })
 }
 
 /// The second a JWT is signed in. Off-wasm the canister clock cannot be read, and what a
@@ -185,6 +204,11 @@ const JWT_FRESH_FOR_SECS: u64 = JWT_LIFETIME_SECS / 2;
 /// How long the one in hand goes on being served while its successor is signed. Ends
 /// before the lifetime does, so nothing is ever posted that a relay would refuse.
 const JWT_STALE_FOR_SECS: u64 = JWT_LIFETIME_SECS / 2 - 30;
+
+/// The cache may not keep a token past its life: a hit inside `fresh_for` is served with
+/// no refresh, so a token that expired while still fresh would be refused on every pass
+/// until the window elapsed, and nothing would ask for another.
+const _: () = assert!(JWT_FRESH_FOR_SECS + JWT_STALE_FOR_SECS <= JWT_LIFETIME_SECS);
 
 /// Relays we hold a JWT for. Bounded because the set follows the endpoints registered.
 const JWT_MAX_RELAYS: usize = 32;
@@ -219,12 +243,19 @@ pub(crate) fn ensure_public_key() {
         FETCHING_PUBLIC_KEY.with(|one| one.set(false));
         match fetched {
             Ok(key) => crate::state::persistent_state_mut(|p| p.vapid_public_key = Some(key)),
-            Err(err) => ic_cdk::println!("ERROR: could not read our VAPID public key: {err}"),
+            // Not retried: the key is derived from public inputs, so the one documented
+            // failure is the subnet not holding `key_1` over secp256r1, which no amount
+            // of asking changes. Until it does, no browser can subscribe and
+            // `get_vapid_public_key` answers nothing.
+            Err(err) => ic_cdk::println!(
+                "ERROR: no VAPID key, so notifications cannot be delivered from this \
+                 subnet: {err}"
+            ),
         }
     });
 }
 
-pub(crate) type JwtCache = SingleFlightCache<String, String, String>;
+pub(crate) type JwtCache = SingleFlightCache<String, SignedJwt, String>;
 
 pub(crate) fn new_jwt_cache() -> JwtCache {
     SingleFlightCache::new(
