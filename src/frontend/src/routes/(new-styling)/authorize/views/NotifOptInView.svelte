@@ -6,8 +6,12 @@
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
+  import { startAppInstall } from "./notifInstall";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
-  import { turnOnNotifications } from "$lib/utils/notifications/enableNotifications";
+  import {
+    turnOnNotifications,
+    type EnableNotificationsResult,
+  } from "$lib/utils/notifications/enableNotifications";
   import {
     readBrowserPushState,
     readDeviceState,
@@ -16,6 +20,7 @@
   } from "$lib/utils/notifications/notificationState";
   import {
     clearFailure,
+    failureMessage,
     recordFailure,
   } from "$lib/utils/notifications/notificationDiagnostics";
   import { handleError } from "$lib/components/utils/error";
@@ -36,7 +41,9 @@
     device: DeviceNotificationState;
     /** Whether this app already holds consent from this identity. */
     consented: boolean;
-    /** Continues sign-in: after enabling, allowing or skipping. */
+    /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
+    installFirst: boolean;
+    /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
 
@@ -48,6 +55,7 @@
     actor,
     device,
     consented,
+    installFirst,
     onDone,
   }: Props = $props();
 
@@ -55,7 +63,41 @@
   // and being refused, with the reason for the question already on screen. A new
   // request arrives as a new context, which remounts this component.
   let variant = $state<"enable" | "blocked">("enable");
+
+  /** Whether answering installs the app rather than claiming the one this device has. Moves only one way: a claim that finds nothing published leaves the install as what is left. */
+  let needsInstall = $state(installFirst);
+
+  /** The consent this press records, awaited before sign-in hands back so a grant still in flight would not have the app told no. */
+  let granting = $state<Promise<void> | undefined>(undefined);
+
+  /** True while a press is still doing what it started. */
   let busy = $state(false);
+
+  /** The steps are walked in a tab of their own and this one settles sign-in behind
+   *  them, so the press leaves nothing else on screen.
+   *
+   *  Settling is what hands sign-in back, which takes this page with it, and the tab
+   *  that was opened is pointed at the install from here: settling first would tear the
+   *  page down with the URL still being minted and leave that tab on its placeholder for
+   *  good. So the mint is waited for, and only the handing back comes after it. */
+  const startInstall = () => {
+    if (busy) {
+      return;
+    }
+    busy = true;
+    const started = startAppInstall({
+      identityNumber,
+      origin,
+      actor,
+      consented,
+    });
+    granting = started.granted;
+    // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
+    void started.url.then(
+      () => settleSignIn(),
+      () => settleSignIn(),
+    );
+  };
 
   /**
    * Reports a failure and leaves the user where they are, with the button live again.
@@ -67,19 +109,57 @@
    */
   const reportFailure = (error: unknown) => {
     if (isCanisterError(error)) {
-      recordFailure("register-failed", messageOf(error));
+      recordFailure("register-failed", failureMessage(error));
       handleError(error);
       return;
     }
-    recordFailure("subscribe-failed", messageOf(error));
+    recordFailure("subscribe-failed", failureMessage(error));
     toaster.error({
       title: $t`Notifications unavailable`,
-      description: messageOf(error),
+      description: failureMessage(error),
     });
   };
 
-  const messageOf = (error: unknown): string =>
-    error instanceof Error ? error.message : String(error);
+  /** The app is told whether it may notify this identity as sign-in hands back, so a grant still in flight would have it told no. */
+  const settleSignIn = async (): Promise<void> => {
+    try {
+      await granting;
+      clearFailure();
+      onDone();
+    } catch (error) {
+      variant = "enable";
+      reportFailure(error);
+    } finally {
+      busy = false;
+    }
+  };
+
+  /** Every arm answers and none falls through, so a status this screen has never seen cannot reach the path that settles sign-in. */
+  const enabledBy = (result: EnableNotificationsResult): boolean => {
+    switch (result.status) {
+      case "enabled":
+        return true;
+      case "denied":
+        recordFailure("permission-denied");
+        variant = "blocked";
+        return false;
+      case "unanswered":
+        // Nothing was read about this device's app, so the reason is shown and Allow stays in front of the user.
+        toaster.error({
+          title: $t`Notifications unavailable`,
+          description: result.reason,
+        });
+        return false;
+      case "install-required":
+        // The app published nothing this browser could read, so the install is what answering means.
+        needsInstall = true;
+        return false;
+      case "dismissed":
+        // The permission is still `default`, so the prompt can be raised again.
+        // Stay where the user is, with Allow still in front of them.
+        return false;
+    }
+  };
 
   /** Runs what is left to do for `current`, which a retry reads afresh. */
   const runEnable = async (current: DeviceNotificationState): Promise<void> => {
@@ -92,14 +172,7 @@
         device: current,
         consented,
       });
-      if (result.status === "denied") {
-        recordFailure("permission-denied");
-        variant = "blocked";
-        return;
-      }
-      if (result.status === "dismissed") {
-        // The permission is still `default`, so the prompt can be raised again.
-        // Stay where the user is, with Allow still in front of them.
+      if (!enabledBy(result)) {
         return;
       }
       clearFailure();
@@ -163,8 +236,8 @@
     {appLogo}
     {origin}
     {busy}
-    onEnable={() => void runEnable(device)}
-    onSkip={onDone}
+    onEnable={needsInstall ? startInstall : () => void runEnable(device)}
+    onSkip={() => onDone()}
   />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
@@ -183,7 +256,11 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button class="btn btn-tertiary btn-xl" onclick={onDone} disabled={busy}>
+      <button
+        class="btn btn-tertiary btn-xl"
+        onclick={() => onDone()}
+        disabled={busy}
+      >
         {$t`Not now`}
       </button>
     </div>

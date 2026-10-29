@@ -1,5 +1,6 @@
 use crate::authz_utils::{
-    check_authorization, check_authz_and_record_activity, AuthorizationError, IdentityUpdateError,
+    check_authorization, check_authz_and_record_activity, AuthorizationError, AuthorizedSession,
+    IdentityUpdateError,
 };
 use crate::browser_key::verify_browser_keys;
 use crate::delegation::{
@@ -15,7 +16,6 @@ use candid::Principal;
 use ic_canister_sig_creation::signature_map::CanisterSigInputs;
 use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
 use ic_cdk::api::time;
-use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
@@ -351,29 +351,41 @@ fn get_account_principal_for_origin(
 /// requestable by the app.
 pub const APP_DELEGATION_TTL_NS: u64 = 5 * MINUTE_NS;
 
+/// Starts a delegation the app can call canisters with as the user's account at this
+/// origin, answering the key to call under and when it expires. The app fetches the
+/// delegation itself with [`app_get_delegation`].
 pub fn app_prepare_delegation(
+    session: AuthorizedSession,
     request: AppPrepareDelegationRequest,
+    now: Timestamp,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
-    let now = time();
     let AuthorizedSession {
-        locator,
-        account,
-        session,
-    } = authorize_session(now)?;
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
+        valid_till_ns,
+        read_only,
+    } = session;
+    let locator = SessionLocator {
+        anchor_number,
+        origin,
+        account_number,
+        session_id,
+    };
+    let account = storage_borrow(|storage| storage.read_account(&locator.account_key()))
+        .ok_or(AppSessionError::NoSuchSession)?;
 
     // Everything that can refuse, before the stamp. Returning `Err` on the IC commits
     // whatever was written before it — only a trap rolls back — so a stamp above this
     // would leave the session recorded as used while the caller is told the call failed.
     // All three depend on values already in hand, so there is nothing to gain by
     // computing them later.
-    let expiration = u64::min(
-        now.saturating_add(APP_DELEGATION_TTL_NS),
-        session.valid_till_ns,
-    );
+    let expiration = u64::min(now.saturating_add(APP_DELEGATION_TTL_NS), valid_till_ns);
     let seed = account_seed(&account)?;
-    let access = DelegationAccess::from_read_only(session.read_only);
+    let access = DelegationAccess::from_read_only(read_only);
 
-    // A session revoked between `authorize_session` above and this stamp is a race, not
+    // A session revoked between the endpoint's authorization and this stamp is a race, not
     // an internal fault: the answer is the one the caller would have got a moment
     // earlier.
     storage_borrow_mut(|storage| storage.record_session_use(&locator, now)).map_err(
@@ -403,26 +415,43 @@ pub fn app_prepare_delegation(
     })
 }
 
+/// Fetches the delegation prepared for the caller's session, which the app then calls
+/// canisters with as the user. `NoSuchDelegation` where this key and expiration were
+/// never prepared.
 pub fn app_get_delegation(
+    session: AuthorizedSession,
     request: AppGetDelegationRequest,
+    now: Timestamp,
 ) -> Result<SignedDelegation, AppSessionError> {
-    let now = time();
     let AuthorizedSession {
-        account, session, ..
-    } = authorize_session(now)?;
+        anchor_number,
+        origin,
+        account_number,
+        valid_till_ns,
+        read_only,
+        ..
+    } = session;
+    let account = storage_borrow(|storage| {
+        storage.read_account(&AccountKey {
+            anchor_number,
+            origin,
+            account_number,
+        })
+    })
+    .ok_or(AppSessionError::NoSuchSession)?;
 
     // An expiration this canister would never have signed, which means one the caller
     // did not get from `app_prepare_delegation`: that returns
     // `min(now + APP_DELEGATION_TTL_NS, session.valid_till_ns)`, and `now` has only
     // advanced since, so the value it handed out cannot exceed either bound here.
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
-        || request.expiration > session.valid_till_ns
+        || request.expiration > valid_till_ns
     {
         return Err(AppSessionError::NoSuchDelegation);
     }
 
     let seed = account_seed(&account)?;
-    let access = DelegationAccess::from_read_only(session.read_only);
+    let access = DelegationAccess::from_read_only(read_only);
     let permissions = access.permissions();
 
     state::assets_and_signatures(|certified_assets, sigs| {
@@ -447,82 +476,9 @@ pub fn app_get_delegation(
         },
         signature: ByteBuf::from(signature),
     })
-    // The session is live — `authorize_session` above said so — so a signature that is
-    // not there was never added for these parameters.
+    // The session is live — authorizing it said so — so a signature that is not there was
+    // never added for these parameters.
     .map_err(|_| AppSessionError::NoSuchDelegation)
-}
-
-/// A live session the caller has been proved to be, and where it lives.
-///
-/// Only [`authorize_session`] constructs one, so holding it is the evidence rather than
-/// three values a caller gathered: the principal lookup and the liveness check have both
-/// happened, and no field can be here without them.
-struct AuthorizedSession {
-    locator: SessionLocator,
-    account: Account,
-    session: Session,
-}
-
-/// Authenticates a refresh from `caller()` alone.
-///
-/// The session index is keyed by the principal a session's chain is rooted at, so a hit is
-/// itself the proof that the caller is that session: nothing is named in the request and
-/// nothing is attached to it.
-fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionError> {
-    let (locator, account, session) = find_caller_session()?;
-    // Either bound: a session past its lifetime and one nobody has used for longer
-    // than it was allowed are equally gone, and a refresh is the thing that finds out.
-    if session.is_expired_or_idle(now) {
-        return Err(AppSessionError::NoSuchSession);
-    }
-    Ok(AuthorizedSession {
-        locator,
-        account,
-        session,
-    })
-}
-
-/// Whether the calling session is still usable, for the II frontend's silent re-auth
-/// path. Advisory: a query reply is not certified, and the refresh path enforces the
-/// same conditions on every mint regardless of the answer here.
-pub fn check_session() -> bool {
-    authorize_session(time()).is_ok()
-}
-
-/// Signs the caller's own session out. A caller cannot produce another session's
-/// principal, so the seed match is the whole authorization.
-///
-/// Idempotent: a session that is not there is `Ok`, because the caller wanted it gone and
-/// it is gone, and they could not tell a pruned session from one that never existed
-/// anyway. Only a storage failure comes back as an error — an app is never handed a
-/// refusal whose only sane response is to do nothing.
-pub fn app_revoke_session(now: Timestamp) -> Result<(), AppSessionError> {
-    // Found rather than authorized, so a session that is present and past its bounds is
-    // not refused: it is still the caller's to sign out, and refusing would leave its
-    // record and index entry behind.
-    let Ok((locator, _, _)) = find_caller_session() else {
-        return Ok(());
-    };
-    match storage_borrow_mut(|storage| storage.revoke_session(&locator, now)) {
-        Ok(()) | Err(StorageError::SessionNotFound { .. }) => Ok(()),
-        Err(err) => Err(AppSessionError::InternalCanisterError(err.to_string())),
-    }
-}
-
-/// The caller's session as stored, without asking whether it is still live.
-fn find_caller_session() -> Result<(SessionLocator, Account, Session), AppSessionError> {
-    let locator = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
-        .ok_or(AppSessionError::NoSuchSession)?;
-
-    let (account, session) = storage_borrow(|storage| {
-        Some((
-            storage.read_account(&locator.account_key())?,
-            storage.read_session(&locator)?,
-        ))
-    })
-    .ok_or(AppSessionError::NoSuchSession)?;
-
-    Ok((locator, account, session))
 }
 
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {

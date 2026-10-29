@@ -1,15 +1,17 @@
-import { Actor, AnonymousIdentity, HttpAgent } from "@icp-sdk/core/agent";
-import { IDL } from "@icp-sdk/core/candid";
-import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
-import { Principal } from "@icp-sdk/core/principal";
-import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { expect, type Page } from "@playwright/test";
 import { test } from "../../fixtures";
 import {
   armRealWorkerPush,
   deliverPush,
+  shownByTheWorker,
   startPushRelay,
 } from "../../fixtures/notifications";
+import {
+  APP_URL,
+  counted,
+  expectOneMoreShown,
+  someoneElseSends,
+} from "../../fixtures/chatRoom";
 import { II_URL } from "../../utils";
 import { continueAs } from "../authorize/app-sessions/helpers";
 
@@ -29,83 +31,6 @@ import { continueAs } from "../authorize/app-sessions/helpers";
  * opened once somebody has acted on it, so the assertions are the app's own view
  * of its funnel.
  */
-
-const TEST_APP_CANISTER = readCanisterId({ canisterName: "test_app" });
-
-/// The app as the local gateway serves it, which is the one origin both this
-/// browser and the canister can reach: Internet Identity reads the app's sender
-/// list over an outcall, and `nice-name.com` resolves in the browser alone.
-const APP_URL = `http://${TEST_APP_CANISTER}.localhost:8000`;
-
-const Counts = IDL.Record({
-  queued: IDL.Nat64,
-  accepted: IDL.Nat64,
-  received: IDL.Nat64,
-  opened: IDL.Nat64,
-  dropped: IDL.Nat64,
-  deferred: IDL.Nat64,
-});
-const chatIdl = () =>
-  IDL.Service({
-    chat_join: IDL.Func([], [IDL.Opt(IDL.Principal)], []),
-    chat_send: IDL.Func([IDL.Text], [], []),
-    notification_metrics: IDL.Func(
-      [],
-      [
-        IDL.Record({
-          hours: IDL.Vec(IDL.Record({ start: IDL.Nat64, counts: Counts })),
-          funnels: IDL.Vec(IDL.Record({ name: IDL.Text, counts: Counts })),
-          backlog: IDL.Nat64,
-          misconfigured: IDL.Opt(IDL.Reserved),
-        }),
-      ],
-      ["query"],
-    ),
-  });
-
-interface Counts {
-  received: bigint;
-  opened: bigint;
-}
-
-interface ChatService {
-  chat_join: () => Promise<[] | [Principal]>;
-  chat_send: (text: string) => Promise<void>;
-  notification_metrics: () => Promise<{
-    hours: { start: bigint; counts: Counts }[];
-  }>;
-}
-
-/// The replica as this process reaches it. The browser resolves every host to
-/// the dev server through a launch flag, which is no help out here.
-const REPLICA_URL = process.env.REPLICA_URL ?? "http://localhost:8000";
-
-const chatActor = async (identity: AnonymousIdentity | Ed25519KeyIdentity) => {
-  const agent = await HttpAgent.create({
-    host: REPLICA_URL,
-    identity,
-    shouldFetchRootKey: true,
-    verifyQuerySignatures: false,
-  });
-  return Actor.createActor<ChatService>(chatIdl, {
-    agent,
-    canisterId: Principal.fromText(TEST_APP_CANISTER),
-  });
-};
-
-/** What the app has counted, summed over the hours it has. */
-const counted = async (): Promise<{ received: bigint; opened: bigint }> => {
-  const metrics = await (
-    await chatActor(new AnonymousIdentity())
-  ).notification_metrics();
-  return metrics.hours.reduce(
-    (total, hour) => ({
-      received: total.received + hour.counts.received,
-      opened: total.opened + hour.counts.opened,
-    }),
-    { received: BigInt(0), opened: BigInt(0) },
-  );
-};
 
 /** The pull delegations this browser holds, as Internet Identity's own storage. */
 const delegationsHeld = (page: Page): Promise<string[]> =>
@@ -128,21 +53,6 @@ const delegationsHeld = (page: Page): Promise<string[]> =>
         open.onerror = () => resolve([]);
       }),
   );
-
-/** What the worker has on screen, as the browser holds it. */
-const shownByTheWorker = async (
-  page: Page,
-): Promise<{ title: string; body: string }[]> => {
-  const [worker] = page.context().serviceWorkers();
-  if (worker === undefined) {
-    return [];
-  }
-  return await worker.evaluate(async () => {
-    const scope = self as unknown as ServiceWorkerGlobalScope;
-    const shown = await scope.registration.getNotifications();
-    return shown.map((one) => ({ title: one.title, body: one.body }));
-  });
-};
 
 /** Acting on the notification the worker has on screen, as a click would. */
 const clickTheNotification = async (page: Page): Promise<void> => {
@@ -207,8 +117,7 @@ test.describe("a notification the app sent", () => {
     const before = await counted();
 
     // Somebody else sends: a sender is never notified of their own message.
-    const sender = await chatActor(Ed25519KeyIdentity.generate());
-    await sender.chat_send("dinner at six?");
+    await someoneElseSends("dinner at six?");
 
     // Internet Identity's own dispatch reaches the relay, and the relay standing
     // in for a push service is the only hop this test bridges by hand.
@@ -240,28 +149,29 @@ test.describe("a notification the app sent", () => {
     await relay.waitForWakeUps(2);
     await deliverPush(page, II_URL);
 
-    await expect
-      .poll(async () => (await counted()).received, {
-        message: "the app was never told its notification was shown",
-        timeout: 30_000,
-      })
-      .toBe(before.received + BigInt(1));
+    await expectOneMoreShown(before);
 
     await expect
-      .poll(async () => (await shownByTheWorker(page)).map((one) => one.body), {
-        message: "the app's own text never reached the screen",
-        timeout: 15_000,
-      })
+      .poll(
+        async () =>
+          (await shownByTheWorker(page.context())).map((one) => one.body),
+        {
+          message: "the app's own text never reached the screen",
+          timeout: 15_000,
+        },
+      )
       .toContain("dinner at six?");
 
     await clickTheNotification(page);
 
+    // At least, not exactly: the counters are the canister's own and every scenario
+    // sharing this room adds to them.
     await expect
       .poll(async () => (await counted()).opened, {
         message: "the app was never told its notification was acted on",
         timeout: 30_000,
       })
-      .toBe(before.opened + BigInt(1));
+      .toBeGreaterThanOrEqual(before.opened + BigInt(1));
 
     await relay.close();
   });

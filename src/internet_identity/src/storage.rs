@@ -104,6 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
+use crate::notifications::installed_app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -111,7 +112,7 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
+use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -121,6 +122,10 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::notification_app::{
+    StorableNotificationApp, StorableNotificationAppId, StorableNotificationAppRef,
+};
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -237,6 +242,9 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
+const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
+const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
+const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 39u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -328,6 +336,17 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
+
+/// The Home Screen apps installed from this canister's browsers, one record per app.
+const NOTIFICATION_APP_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATION_APP_MEMORY_INDEX);
+
+/// Monotonic [`NotificationAppId`] allocator: an id is retired with its record, never reissued.
+const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
+    MemoryId::new(NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX);
+
+/// Monotonic allocator for Internet Identity's own notification ids.
+const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID: MemoryId =
+    MemoryId::new(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -465,6 +484,16 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the session-id allocator.
     next_session_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the notification app records.
+    notification_app_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    notification_app_memory:
+        StableBTreeMap<StorableNotificationAppId, StorableNotificationApp, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the notification app id allocator.
+    next_notification_app_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    next_notification_app_id_memory: StableCell<StorableNotificationAppId, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the identity notification id allocator.
+    next_identity_notification_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    next_identity_notification_id_memory: StableCell<NotificationId, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -609,6 +638,11 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
+        let notification_app_memory = memory_manager.get(NOTIFICATION_APP_MEMORY_ID);
+        let next_notification_app_id_memory =
+            memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
+        let next_identity_notification_id_memory =
+            memory_manager.get(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -701,6 +735,21 @@ impl<M: Memory + Clone> Storage<M> {
             next_session_id_memory_wrapper: MemoryWrapper::new(next_session_id_memory.clone()),
             next_session_id_memory: StableCell::init(next_session_id_memory, 0)
                 .expect("next_session_id_memory"),
+            notification_app_memory_wrapper: MemoryWrapper::new(notification_app_memory.clone()),
+            notification_app_memory: StableBTreeMap::init(notification_app_memory),
+            next_notification_app_id_memory_wrapper: MemoryWrapper::new(
+                next_notification_app_id_memory.clone(),
+            ),
+            next_notification_app_id_memory: StableCell::init(next_notification_app_id_memory, 0)
+                .expect("next_notification_app_id_memory"),
+            next_identity_notification_id_memory_wrapper: MemoryWrapper::new(
+                next_identity_notification_id_memory.clone(),
+            ),
+            next_identity_notification_id_memory: StableCell::init(
+                next_identity_notification_id_memory,
+                0,
+            )
+            .expect("next_identity_notification_id_memory"),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -937,6 +986,7 @@ impl<M: Memory + Clone> Storage<M> {
             previous_passkey_credentials,
             previous_recovery_keys,
             previous_email_recovery,
+            previous_browsers,
         ) = if let Some(StorableAnchor {
             // The following fields need to be compared with the previous anchor
             openid_credentials,
@@ -944,11 +994,12 @@ impl<M: Memory + Clone> Storage<M> {
             recovery_keys,
             email_recovery,
 
+            browsers,
+
             // The following fields do not require merging.
             created_at_ns: _,
             name: _,
             verified_emails: _,
-            browsers: _,
             next_browser_id: _,
             session_count: _,
         }) = previous_anchor_maybe
@@ -958,10 +1009,11 @@ impl<M: Memory + Clone> Storage<M> {
                 passkey_credentials.unwrap_or_default(),
                 recovery_keys.unwrap_or_default(),
                 email_recovery.unwrap_or_default(),
+                browsers.unwrap_or_default(),
             )
         } else {
             // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
-            (vec![], vec![], vec![], vec![])
+            (vec![], vec![], vec![], vec![], vec![])
         };
         // `storable_anchor.verified_emails` is not synced through any
         // reverse-lookup index — verified emails are addressable only
@@ -997,6 +1049,12 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             &previous_passkey_credentials,
             &current_passkey_credentials,
+        );
+
+        self.sync_notification_apps_with_anchor(
+            anchor_number,
+            &previous_browsers,
+            storable_anchor.browsers.as_deref().unwrap_or_default(),
         );
 
         // The reverse address index for email recovery: map
@@ -1453,6 +1511,265 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert(hash, anchor_number);
         }
         Ok(())
+    }
+
+    /// Keeps each app record's anchor list in step with the apps this anchor's browsers
+    /// point at, and deletes a record the last browser has just stopped pointing at. The
+    /// list is also the reference count.
+    fn sync_notification_apps_with_anchor(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous_browsers: &[StorableBrowser],
+        current_browsers: &[StorableBrowser],
+    ) {
+        let apps_of = |browsers: &[StorableBrowser]| {
+            browsers
+                .iter()
+                .filter_map(|browser| match browser.notification_app {
+                    Some(StorableNotificationAppRef::Linked(app_id, _)) => Some(app_id),
+                    _ => None,
+                })
+                .collect::<BTreeSet<_>>()
+        };
+        let previous = apps_of(previous_browsers);
+        let current = apps_of(current_browsers);
+
+        for app_id in previous.difference(&current) {
+            let Some(mut app) = self.notification_app_memory.get(app_id) else {
+                // There is no reference left to count down and nothing here can rebuild
+                // one, so the write carries on: an anchor must not fail over bookkeeping
+                // it cannot fix.
+                ic_cdk::println!(
+                    "ERROR: Anchor number {} stopped pointing at notification app {}, which has \
+                     no record.",
+                    anchor_number,
+                    app_id,
+                );
+                continue;
+            };
+            app.anchors.remove(&anchor_number);
+            if app.anchors.is_empty() {
+                self.delete_notification_app(*app_id);
+                continue;
+            }
+            self.notification_app_memory.insert(*app_id, app);
+        }
+
+        for app_id in current.difference(&previous) {
+            let Some(mut app) = self.notification_app_memory.get(app_id) else {
+                ic_cdk::println!(
+                    "ERROR: Anchor number {} began pointing at notification app {}, which has \
+                     no record.",
+                    anchor_number,
+                    app_id,
+                );
+                continue;
+            };
+            if !app.anchors.insert(anchor_number) {
+                continue;
+            }
+            self.notification_app_memory.insert(*app_id, app);
+        }
+    }
+
+    /// Stores what the app has registered for Web Push, and stamps its liveness.
+    ///
+    /// The only writer is the app itself. A browser pointing at it turns its own
+    /// delivery off by clearing the `enabled` flag on its reference, through
+    /// `Anchor::disable_notification_app`, never by clearing this: the subscription
+    /// belongs to the app and every other identity delivers through it.
+    ///
+    /// Errors where `app_id` names no record, so a caller never reports a registration
+    /// that was dropped.
+    pub fn set_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let stored = self
+            .notification_app_memory
+            .get(&app_id)
+            .ok_or(StorageError::NotificationAppNotFound { app_id })?;
+        // The record is read back only to keep its own fields.
+        let mut app = NotificationApp::from(stored);
+        // Keep what is queued only where the registration is replaced at the same address.
+        // Anything else leaves it announced to an address nothing listens on, and a full
+        // queue posts no wake-up for what arrives after it.
+        let same_address = matches!(
+            (app.webpush_subscription.as_ref(), subscription.as_ref()),
+            (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
+        );
+        app.webpush_subscription = subscription;
+        app.last_used_ns = now;
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
+        if !same_address {
+            self.clear_queues_routed_through(app_id);
+        }
+        Ok(())
+    }
+
+    /// Drops what every browser routing through `app_id` had waiting.
+    /// Left in place, entries nobody can show would suppress every wake-up until they expire.
+    fn clear_queues_routed_through(&mut self, app_id: NotificationAppId) {
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let Ok(mut anchor) = self.read(anchor_number) else {
+                ic_cdk::println!(
+                    "Failed to read anchor {anchor_number} to clear what app {app_id} queued"
+                );
+                continue;
+            };
+            // Every entry pointing at the record, not only those it delivered for:
+            // Internet Identity's own go to the app's address whatever the entry
+            // registered for itself, so they die with that address even where the rest
+            // of the queue does not.
+            let pointing: Vec<BrowserId> = anchor
+                .browsers()
+                .iter()
+                .filter(|browser| browser.is_pointing_at(app_id))
+                .map(|browser| browser.id)
+                .collect();
+            let mut cleared = false;
+            for browser_id in pointing {
+                cleared |= anchor.clear_notifications_for_browser(browser_id);
+            }
+            if !cleared {
+                continue;
+            }
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
+                );
+            }
+        }
+    }
+
+    /// Stamps that the app `app_id` names has just called, which is the only evidence
+    /// there is that an installed app still exists. Only the app it belongs to counts.
+    pub fn stamp_notification_app_use(
+        &mut self,
+        app_id: NotificationAppId,
+        app_principal: Principal,
+        now: Timestamp,
+    ) {
+        let Some(mut app) = self.notification_app_of(app_id, app_principal) else {
+            return;
+        };
+        app.last_used_ns = now;
+        self.notification_app_memory
+            .insert(app.id, StorableNotificationApp::from(app));
+    }
+
+    /// Counted rather than taken from the clock: block time is the same for every message
+    /// in a round, and an acknowledgement matches by id. Saturates at the ceiling.
+    pub fn allocate_identity_notification_id(&mut self) -> NotificationId {
+        let id = *self.next_identity_notification_id_memory.get();
+        let _ = self
+            .next_identity_notification_id_memory
+            .set(id.saturating_add(1));
+        id
+    }
+
+    /// Records that an entry has just asked `app_id` to prove it is still installed.
+    ///
+    /// Kept on the record rather than on the entry that asked, because the answer lands
+    /// here: an app answers by calling, which moves `last_used`. One ask at a time serves
+    /// every identity pointing at it, which is also what stops a device with many
+    /// identities buying one outcall per entry.
+    pub fn set_notification_app_probe(
+        &mut self,
+        app_id: NotificationAppId,
+        notification_id: NotificationId,
+        now: Timestamp,
+    ) {
+        // The ask is kept so an answer can be recognised.
+        let Some(mut app) = self.notification_app(app_id) else {
+            return;
+        };
+        app.pending_probe = Some(PendingProbe {
+            notification_id,
+            asked_at_ns: now,
+        });
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
+    }
+
+    /// The record `app_id` names, if it is still there.
+    pub fn notification_app(&self, app_id: NotificationAppId) -> Option<NotificationApp> {
+        self.notification_app_memory
+            .get(&app_id)
+            .map(NotificationApp::from)
+    }
+
+    /// The anchors pointing at `app_id`, in ascending order and stable across calls.
+    pub fn anchors_with_notification_app(&self, app_id: NotificationAppId) -> Vec<AnchorNumber> {
+        self.notification_app_memory
+            .get(&app_id)
+            .map(|app| app.anchors.into_iter().collect())
+            .unwrap_or_default()
+    }
+
+    /// Forgets a record. Its id is retired with it.
+    fn delete_notification_app(&mut self, app_id: NotificationAppId) {
+        if self.notification_app_memory.remove(&app_id).is_none() {
+            // An id is handed out with the record it names and retired with it, so an id
+            // reaching here names a record.
+            ic_cdk::println!(
+                "ERROR: Notification app {} has no record to forget.",
+                app_id,
+            );
+        }
+    }
+
+    /// Drops every reference to `app_id`, and with it what that record's address was
+    /// carrying for the entries it delivered to.
+    ///
+    /// `Err` where an anchor could not be read or written, naming the first that failed.
+    /// Every other anchor is still attempted, so a failure here is a partial one and the
+    /// references that were dropped stay dropped.
+    pub fn forget_notification_app(
+        &mut self,
+        app_id: NotificationAppId,
+    ) -> Result<(), StorageError> {
+        let mut failure = None;
+        for anchor_number in self.anchors_with_notification_app(app_id) {
+            let mut anchor = match self.read(anchor_number) {
+                Ok(anchor) => anchor,
+                Err(err) => {
+                    ic_cdk::println!(
+                        "Failed to read anchor {anchor_number} to drop notification app {app_id}"
+                    );
+                    failure = failure.or(Some(err));
+                    continue;
+                }
+            };
+            anchor.drop_notification_app(app_id);
+            if let Err(err) = self.write(anchor) {
+                ic_cdk::println!(
+                    "Failed to drop notification app {app_id} from anchor {anchor_number}: {err}"
+                );
+                failure = failure.or(Some(err));
+            }
+        }
+        match failure {
+            Some(err) => Err(err),
+            None => Ok(()),
+        }
+    }
+
+    /// Forgets a record no anchor points at. The record is committed with the reply even
+    /// where that reply is an `Err`.
+    ///
+    /// A reference outlives the record it names, so a browser can leave one that is
+    /// already gone: nothing to forget is an answer here, not a fault.
+    pub(crate) fn delete_notification_app_if_unreferenced(&mut self, app_id: NotificationAppId) {
+        if !self.anchors_with_notification_app(app_id).is_empty() {
+            return;
+        }
+        if self.notification_app_memory.contains_key(&app_id) {
+            self.delete_notification_app(app_id);
+        }
     }
 
     fn sync_anchor_with_passkey_pubkey_index(
@@ -3015,8 +3332,12 @@ impl<M: Memory + Clone> Storage<M> {
         let browser_ids: Vec<BrowserId> =
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
-            if let Some(queue) = anchor.notifications_mut(browser_id) {
-                queue.retain(|queued| !forgotten.contains(&queued.application_number));
+            if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
+                queue.retain(|queued| {
+                    queued
+                        .application_number
+                        .is_none_or(|number| !forgotten.contains(&number))
+                });
             }
         }
 
@@ -3298,6 +3619,72 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(session_id)
     }
 
+    /// Refuses at the ceiling rather than saturating: a reissued id would hand a browser
+    /// that still points at a deleted record someone else's app.
+    fn allocate_notification_app_id(&mut self) -> Result<NotificationAppId, StorageError> {
+        let app_id = *self.next_notification_app_id_memory.get();
+        self.next_notification_app_id_memory
+            .set(
+                app_id
+                    .checked_add(1)
+                    .ok_or(StorageError::NotificationAppIdOverflow)?,
+            )
+            .map_err(|_| StorageError::ErrorUpdatingNotificationAppIdAllocator)?;
+        Ok(app_id)
+    }
+
+    /// The record `app_id` names, but only where `app_principal` is the caller it belongs
+    /// to. An id is public and allocated in sequence, so every caller naming one is
+    /// checked against the principal the record was created for.
+    pub fn notification_app_of(
+        &self,
+        app_id: NotificationAppId,
+        app_principal: Principal,
+    ) -> Option<NotificationApp> {
+        self.notification_app(app_id)
+            .filter(|app| app.principal == app_principal)
+    }
+
+    /// The record `app_principal` links with: the one `known` names where the app still
+    /// holds its id and the record is its own, a fresh one otherwise. Stamped either way,
+    /// so this writes on every call.
+    ///
+    /// An app that lost its id links as a new one rather than taking over a record it can
+    /// no longer name, which costs it the anchors already pointing at the old record. The
+    /// alternative, finding the record from the principal, is the index this replaces.
+    pub fn ensure_notification_app(
+        &mut self,
+        app_principal: Principal,
+        known: Option<NotificationAppId>,
+        now: Timestamp,
+    ) -> Result<NotificationApp, StorageError> {
+        if let Some(app) = known.and_then(|app_id| self.notification_app_of(app_id, app_principal))
+        {
+            let app = NotificationApp {
+                last_used_ns: now,
+                ..app
+            };
+            self.notification_app_memory
+                .insert(app.id, StorableNotificationApp::from(app.clone()));
+            return Ok(app);
+        }
+        let app = NotificationApp {
+            id: self.allocate_notification_app_id()?,
+            principal: app_principal,
+            created_at_ns: now,
+            last_used_ns: now,
+            // The anchor pointing at it is added by the write that points it.
+            anchors: BTreeSet::new(),
+            // Registered by the app once it has permission.
+            webpush_subscription: None,
+            // Written the first time an entry asks it to prove it is still installed.
+            pending_probe: None,
+        };
+        self.notification_app_memory
+            .insert(app.id, StorableNotificationApp::from(app.clone()));
+        Ok(app)
+    }
+
     /// Creates the session `prepare_account_session` mints an identity from, replacing
     /// whatever this browser already held at this account.
     pub fn create_session(
@@ -3486,9 +3873,12 @@ impl<M: Memory + Clone> Storage<M> {
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
-        // A browser the identity signed out of must stop being notified for it. The
-        // entry itself stays, so that signing back in is not a new browser.
+        // A browser the identity signed out of must stop being notified for it. The entry
+        // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
+        if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
+            queue.clear();
+        }
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -3735,17 +4125,24 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Ends one session, index entry and count included.
+    /// Ends the session a principal signs as, index entry and count included.
     ///
-    /// The key names one session by its id, so a key for a session that was replaced since
-    /// is [`StorageError::SessionNotFound`] rather than taking its successor down with it.
-    /// One pass removes it and says whether there was anything to remove, so the walk that
-    /// checked and the walk that removed are the same walk.
+    /// A principal the index does not lead to is `Ok`: revoking asks for the session to be
+    /// gone, and it is. The id comes from the index rather than the caller, so a principal
+    /// whose session was replaced since cannot take its successor down with it.
+    ///
+    /// One pass removes the session and says whether there was anything to remove, so the
+    /// walk that checked and the walk that removed are the same walk.
     pub fn revoke_session(
         &mut self,
-        key: &SessionLocator,
+        principal: Principal,
         now: Timestamp,
     ) -> Result<(), StorageError> {
+        let Some(key) = self.lookup_session_with_principal(principal) else {
+            return Ok(());
+        };
+        let key = &key;
+
         let not_found = || StorageError::SessionNotFound {
             anchor_number: key.anchor_number,
             session_id: key.session_id,
@@ -4336,6 +4733,18 @@ impl<M: Memory + Clone> Storage<M> {
                 self.next_application_number_memory_wrapper.size(),
             ),
             (
+                "notification_app".to_string(),
+                self.notification_app_memory_wrapper.size(),
+            ),
+            (
+                "next_notification_app_id".to_string(),
+                self.next_notification_app_id_memory_wrapper.size(),
+            ),
+            (
+                "next_identity_notification_id".to_string(),
+                self.next_identity_notification_id_memory_wrapper.size(),
+            ),
+            (
                 "lookup_session_with_principal".to_string(),
                 self.lookup_session_with_principal_memory_wrapper.size(),
             ),
@@ -4407,14 +4816,14 @@ pub struct CreateSessionParams {
 }
 
 #[cfg(not(test))]
-fn canister_id() -> Principal {
+pub(crate) fn canister_id() -> Principal {
     ic_cdk::id()
 }
 
 /// `ic_cdk::id()` traps outside a canister, so the unit tests derive principals against
 /// a fixed canister id.
 #[cfg(test)]
-fn canister_id() -> Principal {
+pub(crate) fn canister_id() -> Principal {
     Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 7, 1, 1])
 }
 /// Which of the counters derived from a reference list a delta is applied to.
@@ -4792,6 +5201,14 @@ pub enum StorageError {
     /// identity.
     SessionIdOverflow,
     ErrorUpdatingSessionIdAllocator,
+    /// No record under the id a write named. Its ids are never reissued, so a record
+    /// that is gone is gone for good.
+    NotificationAppNotFound {
+        app_id: NotificationAppId,
+    },
+    /// Refused rather than saturated, so an id is never reissued.
+    NotificationAppIdOverflow,
+    ErrorUpdatingNotificationAppIdAllocator,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -4911,6 +5328,15 @@ impl fmt::Display for StorageError {
             Self::SessionIdOverflow => write!(f, "No session ids left to allocate"),
             Self::ErrorUpdatingSessionIdAllocator => {
                 write!(f, "Error updating the session id allocator")
+            }
+            Self::NotificationAppNotFound { app_id } => {
+                write!(f, "no notification app record {app_id}")
+            }
+            Self::NotificationAppIdOverflow => {
+                write!(f, "No notification app ids left to allocate")
+            }
+            Self::ErrorUpdatingNotificationAppIdAllocator => {
+                write!(f, "Error updating the notification app id allocator")
             }
             Self::UnstorableAccountReferenceList {
                 anchor_number,

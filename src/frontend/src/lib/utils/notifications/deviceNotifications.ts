@@ -9,6 +9,7 @@ import {
 } from "./subscribeDevice";
 import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+import { notificationsTurnedOff } from "./turnedOff";
 
 export { currentDeviceSubscription };
 
@@ -28,6 +29,10 @@ export const reconcileDeviceNotifications = async (
   if (!isPushSupported() || Notification.permission !== "granted") {
     return;
   }
+  // The switch in settings takes this identity's registration away; registering it again here is what would make turning notifications off not stay off.
+  if (await notificationsTurnedOff(identityNumber)) {
+    return;
+  }
   const subscription = await currentDeviceSubscription();
   const stored = await loadVapidKey();
   if (subscription === undefined && stored === undefined) {
@@ -42,6 +47,10 @@ export const reconcileDeviceNotifications = async (
     stored.endpoint !== subscription.endpoint
   ) {
     // Re-subscribing overwrites the same row, so a rotated endpoint needs no removal.
+    // Checked again first, for the same reason as below: the reads above are awaited.
+    if (await notificationsTurnedOff(identityNumber)) {
+      return;
+    }
     await subscribeAndRegisterDevice(identityNumber);
     return;
   }
@@ -73,7 +82,14 @@ export const reconcileDeviceNotifications = async (
       issuedAtNs: status.issued_at_ns,
       nowNs: BigInt(Date.now()) * BigInt(1_000_000),
     }) === 0;
-  if (needsRegistering) {
-    await registerStoredDevice(identityNumber, stored);
+  if (!needsRegistering) {
+    return;
   }
+  // Read again, because the switch in settings can have been pressed while the status
+  // query was in flight, and registering here would quietly undo an Off the user has
+  // already been told succeeded.
+  if (await notificationsTurnedOff(identityNumber)) {
+    return;
+  }
+  await registerStoredDevice(identityNumber, stored);
 };

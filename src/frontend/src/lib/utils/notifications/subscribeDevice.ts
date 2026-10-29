@@ -3,7 +3,8 @@
 // is kept (see vapidKeyStore) so the pool can be refreshed later without a new
 // subscription. Shared by opt-in, the settings toggle, and the reconcile pass.
 
-import { throwCanisterError } from "$lib/utils/utils";
+import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+import { millisToNanos } from "$lib/utils/time";
 import { generateVapidKeypair, signJwtPool } from "./vapidPool";
 import {
   currentDeviceSubscription,
@@ -16,6 +17,11 @@ import {
   type StoredVapidKey,
 } from "./vapidKeyStore";
 import { browserKeyActor } from "./browserActor";
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import type {
+  _SERVICE,
+  SetWebPushSubscriptionError,
+} from "$lib/generated/internet_identity_types";
 
 /**
  * Registers a subscription this browser already holds with `identityNumber`, signing a
@@ -28,14 +34,16 @@ import { browserKeyActor } from "./browserActor";
 export const registerStoredDevice = async (
   identityNumber: bigint,
   { endpoint, privateKey, publicKeyRaw }: StoredVapidKey,
+  /** Who to call as. The Home Screen app signs as itself, and what it registers lands on its own record; everyone else signs as the browser key this sign-in registered. */
+  caller?: ActorSubclass<_SERVICE>,
 ): Promise<string> => {
-  const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
+  const issuedAtNs = millisToNanos(Date.now());
   const signatures = await signJwtPool(
     privateKey,
     relayOriginOf(endpoint),
     issuedAtNs,
   );
-  const actor = await browserKeyActor(identityNumber);
+  const actor = caller ?? (await browserKeyActor(identityNumber));
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,
@@ -66,6 +74,25 @@ export const subscribeAndRegisterDevice = async (
   return endpoint;
 };
 
+/** `minted` says whether the subscription is fresh, because a fresh key belongs on disk only once the canister has taken the endpoint it was made for. */
+const deviceSubscription = async (): Promise<{
+  subscription: StoredVapidKey;
+  minted: boolean;
+}> => {
+  const stored = await loadVapidKey();
+  const live = await currentDeviceSubscription();
+  if (
+    stored !== undefined &&
+    live !== undefined &&
+    stored.endpoint === live.endpoint
+  ) {
+    return { subscription: stored, minted: false };
+  }
+  const { publicKeyRaw, privateKey } = await generateVapidKeypair();
+  const endpoint = await subscribeToPush(publicKeyRaw);
+  return { subscription: { endpoint, privateKey, publicKeyRaw }, minted: true };
+};
+
 /**
  * Registers this browser for `identityNumber`, reusing the subscription it already
  * holds. Only a browser without a usable one subscribes afresh, since subscribing
@@ -74,11 +101,49 @@ export const subscribeAndRegisterDevice = async (
 export const ensureRegisteredDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
-  const stored = await loadVapidKey();
-  const subscription = await currentDeviceSubscription();
-  return stored !== undefined &&
-    subscription !== undefined &&
-    stored.endpoint === subscription.endpoint
-    ? registerStoredDevice(identityNumber, stored)
-    : subscribeAndRegisterDevice(identityNumber);
+  const { subscription, minted } = await deviceSubscription();
+  await registerStoredDevice(identityNumber, subscription);
+  if (minted) {
+    await storeVapidKey(subscription);
+  }
+  return subscription.endpoint;
+};
+
+/** `InvalidBrowserKey` is the anchor named not reaching the caller, which says nothing about the next one.
+ * `StaleJwtPool` is about the endpoint, which every anchor shares, so the anchors after this one would be refused for the same reason. */
+const anotherAnchorMayAnswer = (error: unknown): boolean => {
+  if (!isCanisterError<SetWebPushSubscriptionError>(error)) {
+    return false;
+  }
+  switch (error.type) {
+    case "InvalidBrowserKey":
+      return true;
+    case "StaleJwtPool":
+    case "InternalCanisterError":
+      return false;
+  }
+};
+
+/** Taking the first anchor alone would let a single identity whose reference is switched off end every launch.
+ * One subscription for the whole walk: minting per anchor would hand out a new endpoint for each one. */
+export const registerForAnyAnchor = async (
+  anchors: bigint[],
+  caller: ActorSubclass<_SERVICE>,
+): Promise<boolean> => {
+  const { subscription, minted } = await deviceSubscription();
+  for (const anchor of anchors) {
+    try {
+      await registerStoredDevice(anchor, subscription, caller);
+    } catch (error) {
+      if (anotherAnchorMayAnswer(error)) {
+        continue;
+      }
+      throw error;
+    }
+    if (minted) {
+      await storeVapidKey(subscription);
+    }
+    return true;
+  }
+  return false;
 };

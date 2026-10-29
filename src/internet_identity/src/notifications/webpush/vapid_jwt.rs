@@ -23,11 +23,11 @@ pub(crate) fn assemble(
     relay_origin: &str,
     now_ns: Timestamp,
 ) -> Option<String> {
-    let issued_at_ns = subscription.jwt_issued_at_ns;
+    let issued_at_ns = subscription.jwt_signatures.issued_at_ns();
     now_ns.checked_sub(issued_at_ns)?;
     let index =
         ((now_ns / SECOND_NS - issued_at_ns / SECOND_NS) / (WINDOW_NS / SECOND_NS)) as usize;
-    let signature = subscription.jwt_signatures.get(index)?;
+    let signature = subscription.jwt_signatures.signatures().get(index)?;
     let exp_secs = (issued_at_ns + (index as u64 + 1) * WINDOW_NS) / SECOND_NS;
 
     let aud = serde_json::to_string(relay_origin).ok()?;
@@ -48,17 +48,22 @@ pub(crate) fn relay_origin_of(endpoint: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notifications::webpush::fixtures::valid_vapid_key;
+    use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
     use pretty_assertions::assert_eq;
 
     fn subscription(windows: usize, issued_at_ns: Timestamp) -> WebPushSubscription {
         WebPushSubscription {
-            endpoint: "https://relay.example/wpush/abc".to_string(),
+            endpoint: PushEndpoint::try_from("https://relay.example/wpush/abc")
+                .expect("a relay endpoint"),
             created_at_ns: issued_at_ns,
-            vapid_public_key: vec![4u8; 65],
-            jwt_signatures: (0..windows).map(|window| vec![window as u8; 64]).collect(),
-            jwt_issued_at_ns: issued_at_ns,
-            notifications: Vec::new(),
-            woken_again_at_ns: None,
+            vapid_public_key: VapidPublicKey::try_from(valid_vapid_key())
+                .expect("a SEC1 P-256 point"),
+            jwt_signatures: JwtPool::try_new(
+                (0..windows).map(|window| vec![window as u8; 64]).collect(),
+                issued_at_ns,
+            )
+            .expect("a pool of 64-byte signatures"),
         }
     }
 

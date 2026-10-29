@@ -400,6 +400,7 @@ const P256_SPKI_HEADER: [u8; 26] = [
 
 const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
+const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
 
 impl BrowserKey {
     pub fn new(seed: u8) -> Self {
@@ -440,6 +441,24 @@ impl BrowserKey {
     /// tells one browser from another.
     pub fn principal(&self) -> Principal {
         Principal::self_authenticating(self.public_key())
+    }
+
+    /// The token the identity that has the app signs for another identity on the device,
+    /// which that identity spends to point its own browser at the same app.
+    pub fn sign_claim_token(
+        &self,
+        offering_anchor_number: AnchorNumber,
+        claiming_anchor_number: AnchorNumber,
+        expires_at_ns: Timestamp,
+    ) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let mut message = NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(&offering_anchor_number.to_be_bytes());
+        message.extend_from_slice(&claiming_anchor_number.to_be_bytes());
+        message.extend_from_slice(&expires_at_ns.to_be_bytes());
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
     }
 
     fn sign_with(&self, domain: &[u8], session_key: &SessionKey, other: &PublicKey) -> ByteBuf {
