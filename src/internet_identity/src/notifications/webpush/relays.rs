@@ -41,14 +41,13 @@ const KNOWN_RELAY_ORIGINS: [&str; 3] = [
     "https://web.push.apple.com",
 ];
 
-/// Domains where the relay operator alone decides what resolves. Apple tells senders to
-/// allow any subdomain of `push.apple.com` and states that it does not publish which
-/// names exist, because they change — so the hosts can be recognised but not listed.
-///
-/// Microsoft is absent on purpose. WNS publishes no host pattern that can be checked, and
-/// a guessed suffix here would hand whoever guessed it the protected tier, so a Windows
-/// subscription is treated as [`Tier::Unknown`] until a real endpoint supplies the name.
-const KNOWN_RELAY_SUFFIXES: [&str; 1] = [".push.apple.com"];
+/// Domains where the relay operator alone decides what resolves. Each operator publishes
+/// the domain and declines to publish the names under it, so these are recognised rather
+/// than listed: Apple tells senders to allow any subdomain of `push.apple.com` because
+/// the names change, and Microsoft says the subdomain of a channel URI is subject to
+/// change and is not to be read, while telling a sender to check the URI is under
+/// `notify.windows.com` and to push to no other domain.
+const KNOWN_RELAY_SUFFIXES: [&str; 2] = [".notify.windows.com", ".push.apple.com"];
 
 /// Which population an origin belongs to.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -334,7 +333,12 @@ mod tests {
 
     #[test]
     fn takes_a_subdomain_of_a_known_relay_on_its_own_tier() {
-        assert_eq!(tier_of("https://web2.push.apple.com"), Tier::KnownSubdomain);
+        for origin in [
+            "https://web2.push.apple.com",
+            "https://db5p.notify.windows.com",
+        ] {
+            assert_eq!(tier_of(origin), Tier::KnownSubdomain, "{origin}");
+        }
     }
 
     #[test]
@@ -344,6 +348,10 @@ mod tests {
             "https://web.push.apple.com.example",
             "https://push.apple.com.example",
             "https://apple.com",
+            "https://evilnotify.windows.com",
+            "https://db5p.notify.windows.com.example",
+            "https://notify.windows.com.example",
+            "https://windows.com",
         ] {
             assert_eq!(tier_of(origin), Tier::Unknown, "{origin}");
         }
