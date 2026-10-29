@@ -298,11 +298,15 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), R
     // this is much faster than 500 individual registrations
     for i in 0..25u16 {
         let mut authn_method = test_authn_method();
-        // unique pubkey for each anchor registration
+        // unique pubkey and credential id for each anchor registration
         if let AuthnMethod::WebAuthn(ref mut webauthn) = authn_method.authn_method {
             let mut pubkey = vec![0u8; 32];
             pubkey[0..2].copy_from_slice(&i.to_le_bytes());
             webauthn.pubkey = ByteBuf::from(pubkey);
+
+            let mut cred_id = vec![0u8; 64];
+            cred_id[0..2].copy_from_slice(&i.to_le_bytes());
+            webauthn.credential_id = ByteBuf::from(cred_id);
         }
 
         let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
