@@ -467,6 +467,31 @@ export const deliverPush = async (
   await session.detach();
 };
 
+/** How much of each relay's payloads {@link deliverNewPushes} has handed over. */
+const alreadyDelivered = new WeakMap<PushRelay, number>();
+
+/**
+ * Hands the worker every wake-up the relay has taken and not been asked to deliver yet.
+ *
+ * A push service delivers each wake-up it is posted, and only the one naming an entry can
+ * show that entry. Which of the ones a relay holds that is cannot be worked out from
+ * here: the canister posts wake-ups of its own whenever an identity is pointed at an app,
+ * and the relay listens on one port for every scenario, so it also takes in wake-ups for
+ * subscriptions earlier scenarios registered. Singling one out by its position among
+ * those hands over a wake-up for something else and leaves the awaited one undelivered.
+ */
+export const deliverNewPushes = async (
+  page: Page,
+  origin: string,
+  relay: PushRelay,
+): Promise<void> => {
+  const posted = relay.payloads();
+  for (const payload of posted.slice(alreadyDelivered.get(relay) ?? 0)) {
+    await deliverPush(page, origin, payload);
+  }
+  alreadyDelivered.set(relay, posted.length);
+};
+
 /** What the worker registered in this context has on screen, as the browser holds it. */
 export const shownByTheWorker = async (
   context: BrowserContext,

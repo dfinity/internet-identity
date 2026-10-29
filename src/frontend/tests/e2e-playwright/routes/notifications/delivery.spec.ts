@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { test } from "../../fixtures";
 import {
   armRealWorkerPush,
-  deliverPush,
+  deliverNewPushes,
   shownByTheWorker,
   startPushRelay,
 } from "../../fixtures/notifications";
@@ -116,12 +116,16 @@ test.describe("a notification the app sent", () => {
     // what it counted on top of whatever was there.
     const before = await counted();
 
+    // Counted from just before the send: turning notifications on posts a wake-up of
+    // Internet Identity's own, so the relay is already holding one by this point.
+    const sentSoFar = relay.received();
+
     // Somebody else sends: a sender is never notified of their own message.
     await someoneElseSends("dinner at six?");
 
     // Internet Identity's own dispatch reaches the relay, and the relay standing
     // in for a push service is the only hop this test bridges by hand.
-    await relay.waitForWakeUps(1);
+    await relay.waitForWakeUps(sentSoFar + 1);
     // Keep what the worker says to itself, so a failure names the step.
     await expect
       .poll(() => page.context().serviceWorkers().length, {
@@ -129,7 +133,10 @@ test.describe("a notification the app sent", () => {
         timeout: 30_000,
       })
       .toBeGreaterThan(0);
-    await deliverPush(page, II_URL, relay.payloads()[0] ?? "");
+    // Every wake-up the relay has taken, because turning notifications on posts one of
+    // Internet Identity's own and only the wake-up naming the message's entry can read
+    // the app's text.
+    await deliverNewPushes(page, II_URL, relay);
 
     // One wake-up is the whole of it. A browser with no delegation for this app mints
     // one inside the push event and reads the content with it there, so nothing comes
@@ -137,10 +144,16 @@ test.describe("a notification the app sent", () => {
     const onInternetIdentity = await context.newPage();
     await onInternetIdentity.goto(II_URL);
     await expect
-      .poll(async () => (await delegationsHeld(onInternetIdentity)).length, {
-        message: "the worker never minted a delegation to read the app with",
-        timeout: 30_000,
-      })
+      .poll(
+        async () => {
+          await deliverNewPushes(page, II_URL, relay);
+          return (await delegationsHeld(onInternetIdentity)).length;
+        },
+        {
+          message: "the worker never minted a delegation to read the app with",
+          timeout: 30_000,
+        },
+      )
       .toBeGreaterThan(0);
 
     await expectOneMoreShown(before);

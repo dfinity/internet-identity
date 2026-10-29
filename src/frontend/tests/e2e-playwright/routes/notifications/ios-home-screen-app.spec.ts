@@ -7,7 +7,7 @@ import {
 import { test } from "../../fixtures";
 import {
   armRealWorkerPush,
-  deliverPush,
+  deliverNewPushes,
   shownByTheWorker,
   startPushRelay,
   type PushRelay,
@@ -126,21 +126,26 @@ const joinTheRoomAndLeave = async (page: Page): Promise<void> => {
 };
 
 /**
- * Waits for the app's own text to reach the screen.
+ * Waits for the app's own text to reach the screen, handing over the wake-ups it takes.
  *
- * A notification takes one wake-up, already delivered by the caller: the worker mints the
- * delegation it needs inside that push event and reads the app's text with it there. So
- * there is nothing left to deliver here, and a mint that overruns the worker's deadline
- * leaves a placeholder nothing replaces — which is a failure, not something to wait out.
+ * A notification takes one wake-up, the one naming the entry it was queued under: the
+ * worker mints the delegation it needs inside that push event and reads the app's text
+ * with it there. Which of the wake-ups the relay holds is that one is not known here, and
+ * the canister goes on posting while this waits, so each new one is handed over as a push
+ * service would.
  */
 const expectTheAppToShow = async (
   app: HomeScreenApp,
+  relay: PushRelay,
   body: string,
   message: string,
 ): Promise<void> => {
   await expect
     .poll(
-      async () => (await shownByTheWorker(app.context)).map((one) => one.body),
+      async () => {
+        await deliverNewPushes(app.page, II_URL, relay);
+        return (await shownByTheWorker(app.context)).map((one) => one.body);
+      },
       { message, timeout: 60_000 },
     )
     .toContain(body);
@@ -160,7 +165,7 @@ const answerTheProbe = async (
   sentBefore: number,
 ): Promise<void> => {
   await relay.waitForWakeUps(sentBefore + 1);
-  await deliverPush(app.page, II_URL, relay.payloads()[sentBefore] ?? "");
+  await deliverNewPushes(app.page, II_URL, relay);
 };
 
 /**
@@ -171,7 +176,8 @@ const answerTheProbe = async (
  * own before any of this.
  *
  * One wake-up carries a notification the whole way: the mint happens inside the push
- * event and the app's text is read with it there.
+ * event and the app's text is read with it there. Which wake-up that is is not known from
+ * here, so every one the relay is still holding undelivered is handed over.
  */
 const expectDelivery = async (
   app: HomeScreenApp,
@@ -189,12 +195,12 @@ const expectDelivery = async (
       timeout: 30_000,
     })
     .toBeGreaterThan(0);
-  await deliverPush(app.page, II_URL, relay.payloads()[sentSoFar] ?? "");
+  await deliverNewPushes(app.page, II_URL, relay);
   // Reporting, not asserting: it puts what is on screen in the output so a failure below
   // says whether the worker never ran or ran and could not read the app's text.
   await reportShown(app, "after the first wake-up");
 
-  await expectTheAppToShow(app, text, message);
+  await expectTheAppToShow(app, relay, text, message);
 };
 
 /**
