@@ -166,6 +166,28 @@ const DEFAULT_ENTRY_SIZE: u16 = 4096;
 const EMPTY_SALT: [u8; 32] = [0; 32];
 const GB: u64 = 1 << 30;
 
+/// TEMPORARY, used only by the passkey index audit: the credential id that legacy pin-flow
+/// devices are stored with (see the conversion of `Anchor` into `StorableAnchor`). Many
+/// anchors share it by design.
+const DUMMY_PASSKEY_CREDENTIAL_ID: [u8; 4] = [0xde, 0xad, 0xbe, 0xef];
+
+/// TEMPORARY, used only by the passkey index audit: counts one distinct key of
+/// `anchor_number` that the index maps to `indexed_anchor`.
+/// `other_holds_key` is only asked when the index names another anchor.
+fn count_passkey_index_audit_key(
+    counts: &mut PasskeyIndexAuditCounts,
+    anchor_number: AnchorNumber,
+    indexed_anchor: Option<AnchorNumber>,
+    other_holds_key: impl FnOnce(AnchorNumber) -> bool,
+) {
+    match indexed_anchor {
+        None => counts.not_indexed += 1,
+        Some(indexed) if indexed == anchor_number => counts.indexed_to_anchor += 1,
+        Some(other) if other_holds_key(other) => counts.indexed_to_other_holder += 1,
+        Some(_) => counts.indexed_to_non_holder += 1,
+    }
+}
+
 /// MemoryManager parameters.
 const ANCHOR_MEMORY_INDEX: u8 = 0u8;
 const ARCHIVE_BUFFER_MEMORY_INDEX: u8 = 1u8;
@@ -1922,6 +1944,91 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn lookup_anchor_with_device_credential(&self, key: &CredentialId) -> Option<AnchorNumber> {
         self.lookup_anchor_with_passkey_credential_memory
             .get(&key.clone().into())
+    }
+
+    /// TEMPORARY: one batch of a read-only check of the passkey pubkey and credential-id
+    /// indices against the passkeys stored in the anchors. Examines the stored anchors in
+    /// ascending order from `start`, at most `max_anchors` of them, and stops early once
+    /// `out_of_budget` returns true. At least one anchor is examined per batch, whatever
+    /// `max_anchors` and `out_of_budget` say, so every batch makes progress.
+    ///
+    /// Returns the totals of this batch and the anchor number the next batch starts from,
+    /// or `None` once every stored anchor has been examined.
+    ///
+    /// Writes nothing. Writes between batches can make the totals slightly inconsistent,
+    /// which is fine for a check that only needs the order of magnitude of any gaps.
+    pub fn audit_passkey_indices_batch(
+        &self,
+        start: AnchorNumber,
+        max_anchors: u64,
+        out_of_budget: impl Fn() -> bool,
+    ) -> (PasskeyIndexAuditTotals, Option<AnchorNumber>) {
+        let mut totals = PasskeyIndexAuditTotals::default();
+
+        for (anchor_number, storable_anchor) in self.stable_anchor_memory.range(start..) {
+            if totals.anchors > 0 && (totals.anchors >= max_anchors || out_of_budget()) {
+                return (totals, Some(anchor_number));
+            }
+            totals.anchors += 1;
+
+            let passkeys = storable_anchor.passkey_credentials.unwrap_or_default();
+            totals.passkeys += passkeys.len() as u64;
+
+            let principals = passkeys
+                .iter()
+                .map(|passkey| Principal::self_authenticating(&passkey.pubkey))
+                .collect::<BTreeSet<_>>();
+            for principal in principals {
+                let indexed_anchor = self
+                    .lookup_anchor_with_passkey_pubkey_hash_memory
+                    .get(&principal);
+                count_passkey_index_audit_key(
+                    &mut totals.pubkey_index,
+                    anchor_number,
+                    indexed_anchor,
+                    |other| {
+                        self.anchor_holds_passkey(other, |passkey| {
+                            Principal::self_authenticating(&passkey.pubkey) == principal
+                        })
+                    },
+                );
+            }
+
+            let (dummy_credential_ids, credential_ids): (Vec<_>, Vec<_>) = passkeys
+                .iter()
+                .map(|passkey| passkey.credential_id.as_slice())
+                .partition(|credential_id| *credential_id == DUMMY_PASSKEY_CREDENTIAL_ID);
+            totals.dummy_credential_ids += dummy_credential_ids.len() as u64;
+            for credential_id in credential_ids.into_iter().collect::<BTreeSet<_>>() {
+                let indexed_anchor = self.lookup_anchor_with_passkey_credential_memory.get(
+                    &StorableCredentialId::from_bytes(Cow::Borrowed(credential_id)),
+                );
+                count_passkey_index_audit_key(
+                    &mut totals.credential_id_index,
+                    anchor_number,
+                    indexed_anchor,
+                    |other| {
+                        self.anchor_holds_passkey(other, |passkey| {
+                            passkey.credential_id == credential_id
+                        })
+                    },
+                );
+            }
+        }
+
+        (totals, None)
+    }
+
+    /// Whether the stored anchor `anchor_number` has a passkey matching `matches`.
+    fn anchor_holds_passkey(
+        &self,
+        anchor_number: AnchorNumber,
+        matches: impl Fn(&StorablePasskeyCredential) -> bool,
+    ) -> bool {
+        self.stable_anchor_memory
+            .get(&anchor_number)
+            .and_then(|storable_anchor| storable_anchor.passkey_credentials)
+            .is_some_and(|passkeys| passkeys.iter().any(matches))
     }
 
     /// The origin of an app II still holds.
