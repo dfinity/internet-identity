@@ -35,6 +35,17 @@ pub fn set_subscription(
     };
     let anchor = state::anchor(anchor_number);
 
+    // Signing a browser out clears what it was registered with, and the entry keeps its
+    // keys so that it can sign in again. Those keys must not be able to put the
+    // registration back: a browser the identity signed out of stays signed out, whoever
+    // asks. `routed_app` already refuses to deliver through an app on the same ground.
+    if anchor
+        .browser(browser_id)
+        .is_none_or(|browser| browser.session_count == 0)
+    {
+        return Err(SetWebPushSubscriptionError::InvalidBrowserKey);
+    }
+
     // The same address is the same registration, which keeps its age; a browser
     // re-registering there is replacing the keys a payload is sealed against.
     let created_at_ns = match anchor.webpush_subscription(browser_id) {
@@ -460,16 +471,34 @@ mod tests {
     }
 
     /// The registration hangs off a browser entry, so one the registry does not list
-    /// has nothing to hang it on.
+    /// has nothing to hang it on and is told so.
     #[test]
     fn a_browser_the_registry_does_not_list_registers_nothing() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         let unlisted = browsers[0] + 1;
 
-        subscribe(anchor_number, unlisted, "https://relay.example/a", 1_000);
-
+        assert_eq!(
+            try_subscribe(anchor_number, unlisted, "https://relay.example/a", 1_000),
+            Err(SetWebPushSubscriptionError::InvalidBrowserKey)
+        );
         assert_eq!(stored_endpoint(anchor_number, unlisted), None);
+    }
+
+    /// Signing a browser out clears what it was registered with, and its keys stay so it
+    /// can sign in again. They must not be able to put the registration back.
+    #[test]
+    fn a_browser_signed_out_of_everything_registers_nothing() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+        sign_browser_out(anchor_number, browsers[0]);
+
+        assert_eq!(
+            try_subscribe(anchor_number, browsers[0], ENDPOINT, 2_000),
+            Err(SetWebPushSubscriptionError::InvalidBrowserKey)
+        );
+        assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
     }
 
     /// A seed no browser of a fixture anchor is registered under, so an app key is its own.
