@@ -7,10 +7,11 @@ use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::backlog::identity::PendingIdentityNotification;
 use crate::notifications::browser_inbox;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
-use crate::notifications::webpush::vapid_key;
-use crate::notifications::webpush::{clear_gone_subscription, payload, PayloadIkm, PayloadKeyId};
+use crate::notifications::webpush::{
+    clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId,
+};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
-use crate::single_flight_cache::{self, Cached};
+use crate::single_flight_cache::Cached;
 use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, InboxNotification, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
@@ -178,12 +179,6 @@ pub(crate) struct Delivery {
     pub(crate) ttl_seconds: u64,
 }
 
-thread_local! {
-    /// One JWT per relay, signed ahead of the one in hand lapsing.
-    static VAPID_JWTS: std::cell::RefCell<vapid_key::JwtCache> =
-        std::cell::RefCell::new(vapid_key::new_jwt_cache());
-}
-
 /// The JWT every one of these relays is woken with, or nothing where any is still being
 /// signed. All or none: a notification deposited for one browser and left in the backlog
 /// for another would be shown twice.
@@ -207,30 +202,17 @@ fn jwts_for(relay_origins: &[String], now_ns: Timestamp) -> Option<Vec<String>> 
 const JWT_SPENT_WITHIN_SECS: u64 = 10;
 
 /// The JWT a relay is woken with, where a live one is in hand. A relay we hold none for
-/// starts a signature and answers nothing.
+/// answers nothing, having set whatever it still needs going — a probe, a signature, or
+/// both — for a later pass to pick up.
 ///
 /// One past its expiry answers nothing either: the cache decides when to refetch, the
 /// token decides when it dies, and posting a dead one costs the notification rather than
 /// delaying it.
 fn jwt_for(relay_origin: String, now_secs: u64) -> Option<String> {
-    let live = |jwt: vapid_key::SignedJwt| {
-        (jwt.expires_at_secs > now_secs.saturating_add(JWT_SPENT_WITHIN_SECS)).then_some(jwt.token)
+    let Cached::Ready(jwt) = relays::signed_jwt(relay_origin) else {
+        return None;
     };
-    match single_flight_cache::get(&VAPID_JWTS, relay_origin.clone()) {
-        Cached::Ready(jwt) => live(jwt),
-        Cached::Pending => {
-            // Off-wasm nothing drives a detached fill, so a test drives it here and reads
-            // the answer in the same pass rather than arranging a second one.
-            #[cfg(test)]
-            {
-                single_flight_cache::run_detached();
-                if let Cached::Ready(jwt) = single_flight_cache::get(&VAPID_JWTS, relay_origin) {
-                    return live(jwt);
-                }
-            }
-            None
-        }
-    }
+    (jwt.expires_at_secs > now_secs.saturating_add(JWT_SPENT_WITHIN_SECS)).then_some(jwt.token)
 }
 
 /// Run a pass as soon as the budget allows: at once after a quiet spell, otherwise one

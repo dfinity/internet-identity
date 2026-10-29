@@ -210,9 +210,6 @@ const JWT_STALE_FOR_SECS: u64 = JWT_LIFETIME_SECS / 2 - 30;
 /// until the window elapsed, and nothing would ask for another.
 const _: () = assert!(JWT_FRESH_FOR_SECS + JWT_STALE_FOR_SECS <= JWT_LIFETIME_SECS);
 
-/// Relays we hold a JWT for. Bounded because the set follows the endpoints registered.
-const JWT_MAX_RELAYS: usize = 32;
-
 const JWT_RETRY_BASE_SECS: u64 = 2;
 const JWT_RETRY_MULTIPLIER: u64 = 2;
 
@@ -257,9 +254,20 @@ pub(crate) fn ensure_public_key() {
 
 pub(crate) type JwtCache = SingleFlightCache<String, SignedJwt, String>;
 
-pub(crate) fn new_jwt_cache() -> JwtCache {
+/// A cache signing for one population of relay origins, holding at most `max_entries` of
+/// them and drawing its signatures from `limiter`.
+///
+/// Both are the caller's because they are what keeps one population off another's back:
+/// a cache of its own is a set of tokens nothing else can evict, and a budget of its own
+/// is a share of signing nothing else can take.
+pub(crate) fn new_jwt_cache(max_entries: usize, limiter: crate::concurrency::Limiter) -> JwtCache {
     SingleFlightCache::new(
-        |relay_origin: String| async move {
+        move |relay_origin: String| async move {
+            // No slot, no signature: abandoning records nothing, so the origin keeps the
+            // token it had and is signed for once the budget frees.
+            let Some(_permit) = crate::concurrency::acquire(limiter) else {
+                return FillOutcome::Abandoned;
+            };
             let now_secs = now_secs();
             match sign_jwt(&relay_origin, now_secs, JWT_LIFETIME_SECS).await {
                 Ok(jwt) => FillOutcome::Ready(jwt),
@@ -273,7 +281,7 @@ pub(crate) fn new_jwt_cache() -> JwtCache {
             fresh_for: JWT_FRESH_FOR_SECS,
             stale_for: JWT_STALE_FOR_SECS,
             stale_if_error_for: JWT_STALE_FOR_SECS,
-            max_entries: JWT_MAX_RELAYS,
+            max_entries,
             backoff: RetryBackoff::new(JWT_RETRY_BASE_SECS, JWT_RETRY_MULTIPLIER),
             abandon_fill_after: JWT_ABANDON_FILL_AFTER_SECS,
         },
