@@ -52,6 +52,11 @@ pub(crate) fn anchor_with_browsers(count: u8) -> (AnchorNumber, Vec<BrowserId>) 
                 id
             })
             .collect();
+        // Signed in, which is how a browser reaches any of this: a key alone registers
+        // nothing, and signing out takes the registration with it.
+        for browser in &mut anchor.browsers {
+            browser.session_count = 1;
+        }
         storage.write(anchor).expect("writing a fresh anchor");
         (anchor_number, ids)
     })
@@ -218,6 +223,21 @@ pub(crate) fn stored_subscription(
     anchor(anchor_number)
         .webpush_subscription(browser_id)
         .cloned()
+}
+
+/// Signs `browser_id` out of everything, as revoking its sessions from another browser
+/// does: the registration goes, the entry and its keys stay.
+pub(super) fn sign_browser_out(anchor_number: AnchorNumber, browser_id: BrowserId) {
+    storage_borrow_mut(|storage| {
+        let mut anchor = storage.read(anchor_number).expect("the test anchor");
+        anchor.set_webpush_subscription(browser_id, None);
+        for browser in &mut anchor.browsers {
+            if browser.id == browser_id {
+                browser.session_count = 0;
+            }
+        }
+        storage.write(anchor).expect("signing the browser out");
+    });
 }
 
 pub(super) fn stored_endpoint(
