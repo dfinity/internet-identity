@@ -2432,7 +2432,7 @@ mod openid_api {
         // domain + origin) goes through the SSO gate; everything else (a direct
         // provider or an ungated SSO login) through the plain OpenID verify —
         // mirroring the `sso_`/`openid_prepare_delegation` split on the auth side.
-        let credential = match (discovery_domain.as_ref(), arg.origin.as_deref()) {
+        let mut credential = match (discovery_domain.as_ref(), arg.origin.as_deref()) {
             (Some(domain), Some(origin)) => {
                 openid::prefetch_sso(Some(domain));
                 match openid::verify_sso_for_registration(&arg.jwt, &arg.salt, domain, origin) {
@@ -2450,6 +2450,7 @@ mod openid_api {
                 Err(err) => return OpenIdResult::Err(err),
             },
         };
+        credential.set_apple_full_name(arg.apple_full_name.clone());
         // Config issuer for the authorization key / operation log: the
         // configured provider's (template) issuer, or the concrete JWT issuer for
         // an SSO credential, which carries its own `sso_domain` for scope routing.
@@ -2471,19 +2472,22 @@ mod openid_api {
         jwt: String,
         salt: [u8; 32],
         discovery_domain: Option<String>,
+        apple_full_name: Option<String>,
     ) -> OpenIdResult<(), OpenIdCredentialAddError> {
         let discovery_domain = match openid::parse_discovery_domain(discovery_domain.as_deref()) {
             Ok(discovery_domain) => discovery_domain,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
         openid::prefetch_sso(discovery_domain.as_ref());
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref()) {
+        let mut openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref())
+        {
             Ok(openid::Cached::Ready(credential)) => credential,
             // SSO discovery/JWKS isn't cached yet; the fetch is in flight. The
             // frontend retries the call.
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
+        openid_credential.set_apple_full_name(apple_full_name);
         let now_ns = ic_cdk::api::time();
         let outcome = anchor_operation_with_authz_check(identity_number, |anchor| {
             add_openid_credential(anchor, openid_credential, now_ns)
@@ -2524,6 +2528,7 @@ mod openid_api {
         salt: [u8; 32],
         session_key: SessionKey,
         discovery_domain: Option<String>,
+        apple_full_name: Option<String>,
     ) -> OpenIdResult<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         // Drive the SSO discovery/JWKS fetches (if any) on this update, then
         // read the result. A cold cache reads `Pending`; the frontend polls
@@ -2550,7 +2555,7 @@ mod openid_api {
             // Update anchor with latest OpenID credential from JWT so latest information is stored,
             // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
             let mut anchor = state::anchor(anchor_number);
-            update_openid_credential(&mut anchor, openid_credential.clone())
+            update_openid_credential(&mut anchor, openid_credential.clone(), apple_full_name)
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
             state::storage_borrow_mut(|storage| storage.write(anchor))
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
@@ -2721,7 +2726,7 @@ mod openid_api {
 
             // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
             let mut anchor = state::anchor(anchor_number);
-            update_openid_credential(&mut anchor, identity.credential.clone())
+            update_openid_credential(&mut anchor, identity.credential.clone(), None)
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
             state::storage_borrow_mut(|storage| storage.write(anchor))
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;

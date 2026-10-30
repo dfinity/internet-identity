@@ -1782,6 +1782,12 @@ export interface OpenIDRegFinishArg {
    * provider (Google / Microsoft / Apple). Selects the JWK source.
    */
   'discovery_domain' : [] | [string],
+  /**
+   * The user's name that Apple sent beside the JWT, in the authorization
+   * response of the user's first sign-in; Apple keeps it out of the JWT.
+   * Ignored for any other provider.
+   */
+  'apple_full_name' : [] | [string],
 }
 export interface OpenIdConfig {
   'auth_uri' : string,
@@ -3285,14 +3291,20 @@ export interface _SERVICE {
       { 'Err' : NotificationRevokeConsentError }
   >,
   /**
-   * The trailing `opt text` is the SSO discovery domain (null for a direct
-   * provider). For SSO sign-ins a cold discovery/JWKS cache yields the
-   * `Pending` result arm — a retry signal, not an error: the caller re-calls
-   * the method (and for delegations, polls `openid_get_delegation`, re-calling
-   * `openid_prepare_delegation` on a `Pending` poll result).
+   * The first `opt text` of each method below is the SSO discovery domain
+   * (null for a direct provider). For SSO sign-ins a cold discovery/JWKS
+   * cache yields the `Pending` result arm — a retry signal, not an error: the
+   * caller re-calls the method (and for delegations, polls
+   * `openid_get_delegation`, re-calling `openid_prepare_delegation` on a
+   * `Pending` poll result).
+   * 
+   * The second `opt text` of `openid_credential_add` and
+   * `openid_prepare_delegation` is the user's name that Apple sent beside the
+   * JWT, as in `OpenIDRegFinishArg.apple_full_name`. Apple sends it only once,
+   * so a sign-in without it keeps the name already stored.
    */
   'openid_credential_add' : ActorMethod<
-    [IdentityNumber, JWT, Salt, [] | [string]],
+    [IdentityNumber, JWT, Salt, [] | [string], [] | [string]],
     { 'Ok' : null } |
       { 'Err' : OpenIdCredentialAddError } |
       { 'Pending' : null }
@@ -3319,7 +3331,7 @@ export interface _SERVICE {
       { 'Pending' : null }
   >,
   'openid_prepare_delegation' : ActorMethod<
-    [JWT, Salt, SessionKey, [] | [string]],
+    [JWT, Salt, SessionKey, [] | [string], [] | [string]],
     { 'Ok' : OpenIdPrepareDelegationResponse } |
       { 'Err' : OpenIdDelegationError } |
       { 'Pending' : null }

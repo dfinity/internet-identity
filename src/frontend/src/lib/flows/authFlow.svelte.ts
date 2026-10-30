@@ -41,6 +41,7 @@ import {
   decodeJWT,
   extractIssuerTemplateClaims,
   findConfig,
+  fullNameBesideToken,
   selectAuthScopes,
 } from "$lib/utils/openID";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
@@ -990,6 +991,7 @@ export class AuthFlow {
     identityNumber: bigint;
     decodedJwt: ReturnType<typeof decodeJWT>;
   }> => {
+    const fullName = fullNameBesideToken(jwt);
     try {
       // An SSO discovery / JWKS cache that's cold (or has since been evicted)
       // reports `Pending`; retry until it warms instead of failing the signup.
@@ -1002,6 +1004,7 @@ export class AuthFlow {
             discovery_domain:
               discoveryDomain !== undefined ? [discoveryDomain] : [],
             origin: this.#sso !== undefined ? [this.#sso.origin] : [],
+            apple_full_name: fullName !== undefined ? [fullName] : [],
           }),
         ).then(throwCanisterError);
       } catch (error) {

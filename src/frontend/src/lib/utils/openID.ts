@@ -21,14 +21,22 @@ export class CallbackPopupClosedError extends Error {}
  * frontend — via `BroadcastChannel` in the popup flow, via the
  * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
  * Carries either the token or the IdP's RFC 6749 error report, plus the
- * CSRF `state` in both cases.
+ * CSRF `state` in both cases. With the token comes the user's `full_name`
+ * when the IdP sent it beside the token (see {@link fullNameBesideToken}).
  *
- * The canister serializes an absent `error_description` as JSON `null`
- * rather than omitting the key, so the schema accepts `null` and normalizes
- * it to `undefined`.
+ * The canister serializes an absent `full_name` or `error_description` as
+ * JSON `null` rather than omitting the key, so the schema accepts `null` and
+ * normalizes it to `undefined`.
  */
 const CallbackPayloadSchema = z.union([
-  z.object({ id_token: z.string(), state: z.string() }),
+  z.object({
+    id_token: z.string(),
+    state: z.string(),
+    full_name: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? undefined),
+  }),
   z.object({
     error: z.string(),
     error_description: z
@@ -51,6 +59,7 @@ const CallbackFieldsSchema = z
   .object({
     state: z.string().optional().catch(undefined),
     id_token: z.string().optional().catch(undefined),
+    full_name: z.string().nullish().catch(undefined),
     error: z.string().optional().catch(undefined),
     error_description: z.string().nullish().catch(undefined),
   })
@@ -317,8 +326,29 @@ export const createRedirectURL = (
 };
 
 /**
+ * Names that IdPs sent beside an ID token instead of in it, keyed by that
+ * token. Only Apple does: it keeps the user's name out of its ID tokens and
+ * sends it once, in the authorization response of the user's first sign-in
+ * to II, which the canister's POST /callback page hands over with the token.
+ *
+ * Keyed by token rather than returned with it, so the name follows the token
+ * through every flow that passes the token on (sign-up, sign-in, linking, the
+ * same-tab resume) without each of them carrying it along.
+ */
+const fullNamesBesideTokens = new Map<string, string>();
+
+/**
+ * The user's name the IdP sent beside `jwt` rather than in it, if any. Only
+ * Apple does, see {@link fullNamesBesideTokens}; the canister takes it as the
+ * credential's name for Apple only.
+ */
+export const fullNameBesideToken = (jwt: string): string | undefined =>
+  fullNamesBesideTokens.get(jwt);
+
+/**
  * Validate the callback payload delivered by the canister's POST /callback
- * landing page and extract the `id_token`.
+ * landing page and extract the `id_token`. A `full_name` that came with it is
+ * kept for {@link fullNameBesideToken}.
  *
  * Exported so `requestWithPopup`, `resumeOpenId` and tests can share a
  * single source of truth for how a callback payload is interpreted. The
@@ -337,7 +367,7 @@ export const extractIdTokenFromCallback = (
   callback: unknown,
   expectedState: string,
 ): string => {
-  const { state, id_token, error, error_description } =
+  const { state, id_token, full_name, error, error_description } =
     CallbackFieldsSchema.parse(callback);
   if (state !== expectedState) {
     throw new Error("Invalid state");
@@ -347,6 +377,9 @@ export const extractIdTokenFromCallback = (
   }
   if (id_token === undefined) {
     throw new Error("No token received");
+  }
+  if (full_name !== undefined && full_name !== null) {
+    fullNamesBesideTokens.set(id_token, full_name);
   }
   return id_token;
 };
@@ -589,6 +622,10 @@ export const requestJWT = async (
 
 /**
  * Decode a JWT token so it can be compared with others
+ *
+ * `name` falls back to the name the IdP sent beside the token (see
+ * {@link fullNameBesideToken}), so an Apple user's name reads like a Google
+ * user's.
  * @param token to decode
  * @returns common claims
  */
@@ -617,7 +654,7 @@ export const decodeJWT = (
     // Login hint is usually preferred_username else fall back to email or even sub
     loginHint: preferred_username ?? email ?? sub,
     // Additional optional metadata claims
-    name,
+    name: name ?? fullNameBesideToken(token),
     email,
     ...rest,
   };
