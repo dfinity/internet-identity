@@ -95,79 +95,89 @@ pub struct ChallengeInfo {
 
 pub type ChallengeKey = String;
 
-#[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
-pub struct PersistentState {
-    // Information related to the archive
-    pub archive_state: ArchiveState,
-    // Amount of cycles that need to be attached when II creates a canister
-    pub canister_creation_cycles_cost: u64,
-    // Configuration for the rate limit on `register`, if any.
-    pub registration_rate_limit: RateLimitConfig,
-    // Daily and monthly active anchor statistics
-    pub active_anchor_stats: ActivityStats<ActiveAnchorCounter>,
-    // Daily and monthly active anchor statistics (filtered by domain)
-    pub domain_active_anchor_stats: ActivityStats<DomainActiveAnchorCounter>,
-    // Daily and monthly active authentication methods on the II domains.
-    pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
-    // Configuration of the captcha challenge during registration flow
-    pub captcha_config: CaptchaConfig,
-    // Configuration for Related Origins Requests
-    pub related_origins: Option<Vec<String>>,
-    // Origin of the II backend canister (e.g. "https://backend.id.ai", no
-    // trailing slash). Served — alongside the related origins — in the
-    // `.well-known/ic-domains` asset so the backend is reachable on its
-    // custom domain.
-    pub backend_origin: Option<String>,
-    // Configuration for New Flow Origins
-    pub new_flow_origins: Option<Vec<String>>,
-    // Configurations for OpenID clients
-    pub openid_configs: Option<Vec<OpenIdConfig>>,
-    // Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
-    // loopback hosts (localhost/127.0.0.1) so e2e can use http mock IdPs. `None`/
-    // `Some(false)` (the default) require https for every discovery host;
-    // non-loopback always requires https. See `sso::validate_discovery_domain`.
-    pub sso_allow_insecure_discovery: Option<bool>,
-    // Deploy flag relaxing the `https` requirement for sender-list outcalls to
-    // loopback hosts (localhost/127.0.0.1) so e2e and local development can serve
-    // the list over http. `None`/`Some(false)` (the default) require https for every
-    // notifying origin; non-loopback always requires https. See
-    // `notifications::validation`.
-    pub notifications_allow_insecure_sender_list: Option<bool>,
-    /// Lets a browser register a plain-http push endpoint, for a deployment whose
-    /// relay is a local server rather than a push service. Never set in production:
-    /// a wake-up carries the browser's authorization, and http hands it to anyone
-    /// on the path.
-    pub notifications_allow_insecure_endpoint: Option<bool>,
-    // SSO provider configs managed via add_discoverable_oidc_config update call.
-    pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
-    // Configuration for Web Analytics tool
-    pub analytics_config: Option<AnalyticsConfig>,
-    // Key into the event_data BTreeMap where the 24h tracking window starts.
-    // This key is used to remove old entries from the 24h event aggregations.
-    // If it is `none`, then the 24h window starts from the newest entry in the event_data
-    // BTreeMap minus 24h.
-    pub event_stats_24h_start: Option<EventKey>,
-    pub enable_dapps_explorer: Option<bool>,
-    pub is_production: Option<bool>,
-    pub dummy_auth: Option<DummyAuthConfig>,
-    /// Deploy flag for the legacy DNSSEC email-recovery path. `None`/`Some(false)`
-    /// => DoH-only; `Some(true)` re-enables it. Read via
-    /// `crate::email_recovery::dnssec_email_recovery_enabled`.
-    pub enable_dnssec_email_recovery: Option<bool>,
-    /// DNSSEC verification config (trust anchors). Survives upgrades when an
-    /// upgrade arg omits it. Consumed by the email-recovery DKIM/DMARC flow
-    /// in later PRs and by any future feature that needs DNSSEC-verified
-    /// DNS — see `docs/ongoing/email-recovery.md` §7.5.
-    pub dnssec_config: Option<DnssecConfig>,
-    /// DoH (DNS-over-HTTPS) fallback config. Allowlists domains for
-    /// which the canister may fetch DKIM/DMARC TXT records via HTTP
-    /// outcalls when no DNSSEC chain is available — see
-    /// `docs/ongoing/email-recovery.md` §7.6.
-    pub doh_config: Option<DohConfig>,
-    pub mcp_official_url: Option<String>,
-    /// Deploy flag for the notifications feature. `None`/`Some(false)` => disabled; `Some(true)` => enabled.
-    pub notifications_enabled: Option<bool>,
+// The install-arg `DohConfig` is stored as received. The Candid and serde
+// derives name it in generated code that no item-level attribute reaches, so
+// the allow scopes this one-struct module.
+// disallowed-types: removed by C1
+#[allow(clippy::disallowed_types)]
+mod persistent_state {
+    use super::*;
+
+    #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
+    pub struct PersistentState {
+        // Information related to the archive
+        pub archive_state: ArchiveState,
+        // Amount of cycles that need to be attached when II creates a canister
+        pub canister_creation_cycles_cost: u64,
+        // Configuration for the rate limit on `register`, if any.
+        pub registration_rate_limit: RateLimitConfig,
+        // Daily and monthly active anchor statistics
+        pub active_anchor_stats: ActivityStats<ActiveAnchorCounter>,
+        // Daily and monthly active anchor statistics (filtered by domain)
+        pub domain_active_anchor_stats: ActivityStats<DomainActiveAnchorCounter>,
+        // Daily and monthly active authentication methods on the II domains.
+        pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
+        // Configuration of the captcha challenge during registration flow
+        pub captcha_config: CaptchaConfig,
+        // Configuration for Related Origins Requests
+        pub related_origins: Option<Vec<String>>,
+        // Origin of the II backend canister (e.g. "https://backend.id.ai", no
+        // trailing slash). Served — alongside the related origins — in the
+        // `.well-known/ic-domains` asset so the backend is reachable on its
+        // custom domain.
+        pub backend_origin: Option<String>,
+        // Configuration for New Flow Origins
+        pub new_flow_origins: Option<Vec<String>>,
+        // Configurations for OpenID clients
+        pub openid_configs: Option<Vec<OpenIdConfig>>,
+        // Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+        // loopback hosts (localhost/127.0.0.1) so e2e can use http mock IdPs. `None`/
+        // `Some(false)` (the default) require https for every discovery host;
+        // non-loopback always requires https. See `sso::validate_discovery_domain`.
+        pub sso_allow_insecure_discovery: Option<bool>,
+        // Deploy flag relaxing the `https` requirement for sender-list outcalls to
+        // loopback hosts (localhost/127.0.0.1) so e2e and local development can serve
+        // the list over http. `None`/`Some(false)` (the default) require https for every
+        // notifying origin; non-loopback always requires https. See
+        // `notifications::validation`.
+        pub notifications_allow_insecure_sender_list: Option<bool>,
+        /// Lets a browser register a plain-http push endpoint, for a deployment whose
+        /// relay is a local server rather than a push service. Never set in production:
+        /// a wake-up carries the browser's authorization, and http hands it to anyone
+        /// on the path.
+        pub notifications_allow_insecure_endpoint: Option<bool>,
+        // SSO provider configs managed via add_discoverable_oidc_config update call.
+        pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
+        // Configuration for Web Analytics tool
+        pub analytics_config: Option<AnalyticsConfig>,
+        // Key into the event_data BTreeMap where the 24h tracking window starts.
+        // This key is used to remove old entries from the 24h event aggregations.
+        // If it is `none`, then the 24h window starts from the newest entry in the event_data
+        // BTreeMap minus 24h.
+        pub event_stats_24h_start: Option<EventKey>,
+        pub enable_dapps_explorer: Option<bool>,
+        pub is_production: Option<bool>,
+        pub dummy_auth: Option<DummyAuthConfig>,
+        /// Deploy flag for the legacy DNSSEC email-recovery path. `None`/`Some(false)`
+        /// => DoH-only; `Some(true)` re-enables it. Read via
+        /// `crate::email_recovery::dnssec_email_recovery_enabled`.
+        pub enable_dnssec_email_recovery: Option<bool>,
+        /// DNSSEC verification config (trust anchors). Survives upgrades when an
+        /// upgrade arg omits it. Consumed by the email-recovery DKIM/DMARC flow
+        /// in later PRs and by any future feature that needs DNSSEC-verified
+        /// DNS — see `docs/ongoing/email-recovery.md` §7.5.
+        pub dnssec_config: Option<DnssecConfig>,
+        /// DoH (DNS-over-HTTPS) fallback config. Allowlists domains for
+        /// which the canister may fetch DKIM/DMARC TXT records via HTTP
+        /// outcalls when no DNSSEC chain is available — see
+        /// `docs/ongoing/email-recovery.md` §7.6.
+        pub doh_config: Option<DohConfig>,
+        pub mcp_official_url: Option<String>,
+        /// Deploy flag for the notifications feature. `None`/`Some(false)` => disabled; `Some(true)` => enabled.
+        pub notifications_enabled: Option<bool>,
+    }
 }
+pub use persistent_state::PersistentState;
 
 impl Default for PersistentState {
     fn default() -> Self {

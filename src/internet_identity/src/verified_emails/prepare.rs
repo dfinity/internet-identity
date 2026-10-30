@@ -3,6 +3,8 @@ use crate::email_inbound::{
     VERIFIED_EMAIL_NONCE_PREFIX,
 };
 use crate::state;
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
@@ -13,6 +15,8 @@ use internet_identity_interface::internet_identity::types::{AnchorNumber, Author
 /// `authorization_key` is the method that passed `check_authorization`
 /// — pinned so finalize re-auths the device/OpenID/recovery credential
 /// itself, not a short-lived temp-key principal.
+// disallowed-types: removed by C3
+#[allow(clippy::disallowed_types)]
 pub async fn prepare_add_verified_email(
     anchor: AnchorNumber,
     dns_input: EmailChallengeDnsInput,

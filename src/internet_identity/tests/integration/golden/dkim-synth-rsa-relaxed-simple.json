@@ -1,0 +1,63 @@
+{
+  "fixture": "synth-rsa-relaxed-simple.eml",
+  "route": "Doh",
+  "now_unix": 1777972889,
+  "smtp_request_validate": "Ok",
+  "smtp_request_variants": {
+    "missing_envelope": {
+      "smtp_request_validate": "Err(555)",
+      "smtp_request": "Err(555)"
+    },
+    "two_recipients": {
+      "smtp_request_validate": "Err(551)",
+      "smtp_request": "Err(551)"
+    },
+    "unknown_mailbox": {
+      "smtp_request_validate": "Err(550)",
+      "smtp_request": "Err(550)"
+    },
+    "foreign_domain": {
+      "smtp_request_validate": "Err(550)",
+      "smtp_request": "Err(550)"
+    },
+    "setup_mailbox": {
+      "smtp_request_validate": "Ok",
+      "smtp_request": "Ok"
+    },
+    "oversize_header_value": {
+      "smtp_request_validate": "Err(555)",
+      "smtp_request": "Err(555)"
+    }
+  },
+  "prepare_delegation": "Ok",
+  "smtp_request_as_captured": {
+    "response": "Ok",
+    "polled": {
+      "status": "Pending",
+      "diagnostics": {
+        "message_id": null,
+        "reason_code": "Pending",
+        "verification_path": "Doh"
+      }
+    }
+  },
+  "smtp_request_nonce_subject": {
+    "response": "Ok",
+    "polled": {
+      "status": "ResolvingDoh",
+      "diagnostics": {
+        "message_id": "synth-rsa-relaxed-simple.eml",
+        "reason_code": "ResolvingDoh",
+        "verification_path": "Doh"
+      }
+    }
+  },
+  "polled_after_doh_resolution": {
+    "status": "Failed(EmailVerificationFailed: signature did not validate against public key)",
+    "diagnostics": {
+      "message_id": "synth-rsa-relaxed-simple.eml",
+      "reason_code": "Failed:EmailVerificationFailed",
+      "verification_path": "Doh"
+    }
+  }
+}

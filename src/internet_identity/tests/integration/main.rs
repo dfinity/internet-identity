@@ -4,6 +4,9 @@
 //!
 //! See https://matklad.github.io/2021/02/27/delete-cargo-integration-tests.html#Implications for more details.
 
+// disallowed-types: permanent, integration tests are Candid clients
+#![allow(clippy::disallowed_types)]
+
 mod accounts;
 mod activity_stats;
 mod aggregation_stats;
@@ -15,6 +18,7 @@ mod config;
 mod delegation;
 mod delegation_ingress;
 mod email_recovery;
+mod golden;
 mod http;
 mod mcp;
 mod notifications;
