@@ -191,8 +191,31 @@ export const PUSH_NOTIFICATIONS = createFeatureFlagStore(
   },
 );
 
+/// Run Sign in with Apple as a same-tab redirect instead of a popup on WebKit
+/// browsers (Safari, and every browser on iOS and iPadOS). Safari hands a
+/// `window.open` to an Apple ID authorization URL over to the system's
+/// Sign in with Apple dialog, and the popup the frontend is waiting on never
+/// delivers the callback, so the sign-in ends as "Interaction canceled". A
+/// same-tab navigation goes through the same system dialog and comes back
+/// into the app with the callback. See `openIdSameTabRedirect.ts`.
+export const APPLE_SAME_TAB_REDIRECT = createFeatureFlagStore(
+  "APPLE_SAME_TAB_REDIRECT",
+  true,
+);
+
+/// Run EVERY OpenID provider as a same-tab redirect, in every browser. Off by
+/// default: a debugging and testing switch (the e2e suite flips it on to
+/// exercise the same-tab path on Chromium), and an escape hatch should popups
+/// turn out to be broken more widely than for Apple on WebKit.
+export const OPENID_SAME_TAB_REDIRECT = createFeatureFlagStore(
+  "OPENID_SAME_TAB_REDIRECT",
+  false,
+);
+
 export default {
   PUSH_NOTIFICATIONS,
+  APPLE_SAME_TAB_REDIRECT,
+  OPENID_SAME_TAB_REDIRECT,
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
