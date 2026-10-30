@@ -19,75 +19,17 @@
 //! Our `SignedRRset.rdata` field is already populated with the
 //! canonical per-record RDATA bytes — in production by the front-end
 //! (which uses dnspython's `to_wire(canonicalize=True)` semantics),
-//! in tests by the captured fixtures in `test_vectors/dnssec/`. This
-//! module's responsibilities are therefore:
+//! in tests by the captured fixtures in `test_vectors/dnssec/` — and
+//! every owner and signer name is a [`DnsName`], so this module's
+//! responsibilities are:
 //!
-//! 1. lower-case the owner name (RFC 4034 §6.2),
-//! 2. sort the RDATAs (RFC 4034 §6.3),
-//! 3. assemble the byte sequence that the RRSIG signs (RFC 4034
+//! 1. sort the RDATAs (RFC 4034 §6.3),
+//! 2. assemble the byte sequence that the RRSIG signs (RFC 4034
 //!    §3.1.8.1), and
-//! 4. assemble the byte sequence that the DS digest is computed over
+//! 3. assemble the byte sequence that the DS digest is computed over
 //!    (RFC 4034 §5.1.4).
 
-use super::types::{Rrsig, SignedRRset};
-
-/// Return the canonical wire form of a DNS name: every ASCII label
-/// byte lower-cased, with the original length octets preserved
-/// (RFC 4034 §6.2).
-///
-/// On wire, a name is a sequence of `(length, label_bytes…)` tuples
-/// terminated by a zero-length label (RFC 1035 §3.1). RFC 1035 §4.1.4
-/// also defines compression pointers — a length octet whose top two
-/// bits are `11` indicates a 14-bit offset back into the message.
-/// Compression pointers MUST NOT appear in canonical form
-/// (RFC 4034 §6.2), so if we see one (or a length octet with any of
-/// the top two bits set, since `10` / `01` are reserved) we pass the
-/// remaining bytes through unchanged: the downstream signature check
-/// will then fail, which is the fail-closed outcome we want for an
-/// invalid input.
-pub fn canonicalize_name(wire: &[u8]) -> Vec<u8> {
-    /// Top two bits of a label length octet — `11` is a compression
-    /// pointer (RFC 1035 §4.1.4), `10` / `01` are reserved. None of
-    /// these are valid in canonical form (RFC 4034 §6.2).
-    const TOP_BITS_MASK: u8 = 0xC0;
-
-    let mut out = Vec::with_capacity(wire.len());
-    let mut i = 0;
-    while i < wire.len() {
-        let len_octet = wire[i];
-
-        // Compression pointer or reserved length — invalid in
-        // canonical form. Pass through and let the signature check
-        // fail.
-        if len_octet & TOP_BITS_MASK != 0 {
-            out.extend_from_slice(&wire[i..]);
-            return out;
-        }
-
-        out.push(len_octet);
-
-        // Root label / end of name.
-        if len_octet == 0 {
-            return out;
-        }
-
-        let label_len = len_octet as usize;
-        let label_start = i + 1;
-        let label_end = label_start + label_len;
-
-        // Truncated input — same fail-closed treatment as above.
-        if label_end > wire.len() {
-            out.extend_from_slice(&wire[label_start..]);
-            return out;
-        }
-
-        for &b in &wire[label_start..label_end] {
-            out.push(b.to_ascii_lowercase());
-        }
-        i = label_end;
-    }
-    out
-}
+use super::types::{DnsName, Rrsig, SignedRRset};
 
 /// Serialise the RRSIG's fixed RDATA fields followed by the canonical
 /// form of the signer's name. This is the `RRSIG_RDATA` prefix of
@@ -107,7 +49,7 @@ pub fn rrsig_rdata_for_signing(rrsig: &Rrsig) -> Vec<u8> {
     /// 2 + 1 + 1 + 4 + 4 + 4 + 2 = 18.
     const FIXED_FIELDS_LEN: usize = 18;
 
-    let canonical_signer = canonicalize_name(&rrsig.signer_name.0);
+    let canonical_signer = rrsig.signer_name.as_wire();
     let mut out = Vec::with_capacity(FIXED_FIELDS_LEN + canonical_signer.len());
     out.extend_from_slice(&rrsig.type_covered.to_be_bytes());
     out.push(rrsig.algorithm);
@@ -116,7 +58,7 @@ pub fn rrsig_rdata_for_signing(rrsig: &Rrsig) -> Vec<u8> {
     out.extend_from_slice(&rrsig.expiration.to_be_bytes());
     out.extend_from_slice(&rrsig.inception.to_be_bytes());
     out.extend_from_slice(&rrsig.key_tag.to_be_bytes());
-    out.extend_from_slice(&canonical_signer);
+    out.extend_from_slice(canonical_signer);
     debug_assert_eq!(
         out.len(),
         FIXED_FIELDS_LEN + canonical_signer.len(),
@@ -131,15 +73,14 @@ pub fn rrsig_rdata_for_signing(rrsig: &Rrsig) -> Vec<u8> {
 /// owner_name | TYPE (u16) | CLASS (u16) | original_TTL (u32) | RDLENGTH (u16) | RDATA
 /// ```
 ///
-/// Both `name_canonical` and `rdata` are expected to already be in
-/// canonical form — `name_canonical` from `canonicalize_name`, `rdata`
-/// from whatever produced the `SignedRRset` (production: front-end;
+/// `rdata` is expected to already be in canonical form, from
+/// whatever produced the `SignedRRset` (production: front-end;
 /// tests: captured fixtures). The `original_ttl` from the RRSIG is
 /// used instead of the RRset's currently-cached TTL, because
 /// RFC 4034 §6.2 step 3 requires the TTL used in canonical form to
 /// be the one stamped into the RRSIG at signing time (a resolver may
 /// have decremented the cached TTL between then and now).
-fn rr_canonical(name_canonical: &[u8], rtype: u16, original_ttl: u32, rdata: &[u8]) -> Vec<u8> {
+fn rr_canonical(name: &DnsName, rtype: u16, original_ttl: u32, rdata: &[u8]) -> Vec<u8> {
     /// Sum of the four fixed-width fields between the owner name and
     /// the RDATA in canonical form (TYPE | CLASS | TTL | RDLENGTH):
     /// 2 + 2 + 4 + 2 = 10 (RFC 1035 §3.2.1 + RFC 4034 §6.2).
@@ -149,6 +90,7 @@ fn rr_canonical(name_canonical: &[u8], rtype: u16, original_ttl: u32, rdata: &[u
     /// every record we look at is class IN.
     const CLASS_IN: u16 = 1;
 
+    let name_canonical = name.as_wire();
     let mut out = Vec::with_capacity(name_canonical.len() + FIXED_HEADER_LEN + rdata.len());
     out.extend_from_slice(name_canonical);
     out.extend_from_slice(&rtype.to_be_bytes());
@@ -176,8 +118,6 @@ fn rr_canonical(name_canonical: &[u8], rtype: u16, original_ttl: u32, rdata: &[u
 /// (RFC 4034 §6.3 — left-justified octet comparison, shorter sorts
 /// before longer when one is a prefix of the other).
 pub fn build_signed_data(rrset: &SignedRRset) -> Vec<u8> {
-    let canonical_name = canonicalize_name(&rrset.name.0);
-
     // RFC 4034 §6.3 canonical RR ordering. Rust's `Vec<u8>` cmp is
     // already left-justified octet comparison with the right
     // tie-breaker (shorter before longer), so a direct sort matches
@@ -188,7 +128,7 @@ pub fn build_signed_data(rrset: &SignedRRset) -> Vec<u8> {
     let mut out = rrsig_rdata_for_signing(&rrset.rrsig);
     for rdata in canonical_rdatas {
         out.extend_from_slice(&rr_canonical(
-            &canonical_name,
+            &rrset.name,
             rrset.rtype,
             rrset.rrsig.original_ttl,
             rdata,
@@ -208,10 +148,10 @@ pub fn build_signed_data(rrset: &SignedRRset) -> Vec<u8> {
 /// (which is also the owner of the DS RRset in the parent zone, by
 /// definition). `dnskey_rdata` is the entire DNSKEY RDATA, i.e.
 /// `Flags | Protocol | Algorithm | Public Key`.
-pub fn ds_digest_input(child_zone_name: &[u8], dnskey_rdata: &[u8]) -> Vec<u8> {
-    let canonical_name = canonicalize_name(child_zone_name);
+pub fn ds_digest_input(child_zone_name: &DnsName, dnskey_rdata: &[u8]) -> Vec<u8> {
+    let canonical_name = child_zone_name.as_wire();
     let mut out = Vec::with_capacity(canonical_name.len() + dnskey_rdata.len());
-    out.extend_from_slice(&canonical_name);
+    out.extend_from_slice(canonical_name);
     out.extend_from_slice(dnskey_rdata);
     out
 }
@@ -221,31 +161,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn canonicalize_name_lowercases_labels() {
-        // "Example.COM." in wire form: 7 'E' 'x' 'a' 'm' 'p' 'l' 'e' 3 'C' 'O' 'M' 0
-        let wire = b"\x07Example\x03COM\x00";
-        assert_eq!(canonicalize_name(wire), b"\x07example\x03com\x00".to_vec());
-    }
-
-    #[test]
-    fn canonicalize_name_root_stays_root() {
-        assert_eq!(canonicalize_name(b"\x00"), vec![0u8]);
-    }
-
-    #[test]
-    fn canonicalize_name_passes_through_compression_pointer() {
-        // Length octet with top two bits set = compression pointer
-        // (RFC 1035 §4.1.4). Canonical form forbids these; we pass
-        // through unchanged and rely on the downstream signature
-        // check to fail.
-        let wire = b"\xc0\x12";
-        assert_eq!(canonicalize_name(wire), wire.to_vec());
-    }
-
-    #[test]
     fn rr_canonical_layout_matches_rfc_4034() {
         // owner=root, type=DNSKEY(48), TTL=3600, RDATA="abc".
-        let rr = rr_canonical(b"\x00", 48, 3600, b"abc");
+        let root = DnsName::from_wire(b"\x00").unwrap();
+        let rr = rr_canonical(&root, 48, 3600, b"abc");
         let mut expected = Vec::new();
         expected.extend_from_slice(b"\x00"); // canonical owner name
         expected.extend_from_slice(&48u16.to_be_bytes()); // TYPE = DNSKEY
