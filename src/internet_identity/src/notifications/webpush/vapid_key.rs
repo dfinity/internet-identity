@@ -219,6 +219,20 @@ const JWT_ABANDON_FILL_AFTER_SECS: u64 = 60;
 
 /// Our public key, where it has been asked for. A browser cannot subscribe before this
 /// lands, and a push cannot name a key we do not hold.
+/// The key, fetching and keeping it where this deployment has not got one yet.
+///
+/// For a caller that can wait, which [`ensure_public_key`] exists because a query cannot.
+/// Derived from public inputs and the same forever, so the first caller to need it pays
+/// for every later one.
+pub(crate) async fn held_public_key() -> Result<Vec<u8>, String> {
+    if let Some(held) = public_key() {
+        return Ok(held);
+    }
+    let fetched = fetch_public_key().await?;
+    crate::state::persistent_state_mut(|p| p.vapid_public_key = Some(fetched.clone()));
+    Ok(fetched)
+}
+
 pub(crate) fn public_key() -> Option<Vec<u8>> {
     crate::state::persistent_state(|p| p.vapid_public_key.clone())
 }
@@ -243,7 +257,7 @@ pub(crate) fn ensure_public_key() {
             // Not retried: the key is derived from public inputs, so the one documented
             // failure is the subnet not holding `key_1` over secp256r1, which no amount
             // of asking changes. Until it does, no browser can subscribe and
-            // `get_vapid_public_key` answers nothing.
+            // `get_notification_keys` answers the error this reports.
             Err(err) => ic_cdk::println!(
                 "ERROR: no VAPID key, so notifications cannot be delivered from this \
                  subnet: {err}"

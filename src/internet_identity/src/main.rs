@@ -351,7 +351,7 @@ async fn get_notification_keys(
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| GetNotificationKeysError::InvalidBrowserKey)?;
 
-    let vapid_public_key = notifications::webpush::vapid_key::fetch_public_key()
+    let vapid_public_key = notifications::webpush::vapid_key::held_public_key()
         .await
         .map_err(GetNotificationKeysError::InternalCanisterError)?;
 
