@@ -1116,7 +1116,14 @@ export type GetNotificationKeysError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string };
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The randomness these keys are derived from is being drawn. Asking put that draw in
+     * flight, so call again.
+     */
+    'TryAgain' : null
+  };
 export interface GetNotificationRequest {
   'inbox_notification_id' : InboxNotificationId,
   /**

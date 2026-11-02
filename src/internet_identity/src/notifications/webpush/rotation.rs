@@ -64,7 +64,7 @@ pub(crate) fn pass_sender(pass_bytes: &[u8; 32]) -> p256::SecretKey {
         .chain_update(pass_bytes)
         .finalize()
         .into();
-    super::randomness::secret_key_from(&scalar)
+    super::seed_pool::secret_key_from(&scalar)
 }
 
 /// What one destination seals with, carried on the wake-up from the moment it is planned.

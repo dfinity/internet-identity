@@ -2,7 +2,7 @@
 //! registry.
 
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
-use super::{payload, randomness, transport};
+use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
@@ -139,7 +139,7 @@ fn spend_pending(
         sealed_auth,
     )
     .map_err(|_| SetWebPushSubscriptionError::TransportKeyExpired)?;
-    let sender = randomness::secret_key_from(&pending.sender_seed);
+    let sender = seed_pool::secret_key_from(&pending.sender_seed);
     let (payload_ikm, payload_keyid) = payload::derive_ikm(&sender, &subscriber_key, &auth)
         .map_err(SetWebPushSubscriptionError::InternalCanisterError)?;
 

@@ -1157,6 +1157,9 @@ pub struct NotificationKeys {
 pub enum GetNotificationKeysError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
+    /// The randomness these keys are derived from is being drawn. Asking put that draw
+    /// in flight, so call again.
+    TryAgain,
     InternalCanisterError(String),
 }
 

@@ -302,7 +302,7 @@ fn run_pass(armed: u64, now_ns: Timestamp) {
 #[cfg(not(test))]
 fn post_pass(mut deliveries: Vec<Delivery>, now_ns: Timestamp) {
     ic_cdk::spawn(async move {
-        match crate::notifications::webpush::randomness::raw_rand().await {
+        match crate::notifications::webpush::seed_pool::raw_rand().await {
             Ok(pass_bytes) => {
                 seal_pass(&mut deliveries, &pass_bytes, now_ns);
                 for delivery in deliveries {

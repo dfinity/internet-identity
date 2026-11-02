@@ -5,9 +5,9 @@
 //! everything here acts on a browser the caller has already been shown to be.
 
 pub(crate) mod payload;
-pub(crate) mod randomness;
 pub(crate) mod relays;
 pub(crate) mod rotation;
+pub(crate) mod seed_pool;
 mod subscription;
 pub(crate) mod transport;
 mod validation;

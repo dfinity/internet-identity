@@ -19,8 +19,6 @@ use p256::elliptic_curve::sec1::ToEncodedPoint;
 use sha2::Sha256;
 
 use super::validation::{AuthSecret, SealedAuth, SubscriberKey};
-use crate::authz_utils::NotificationKey;
-use internet_identity_interface::internet_identity::types::AnchorNumber;
 
 const SECOND_NS: u64 = 1_000_000_000;
 
@@ -34,24 +32,9 @@ pub(crate) const PENDING_TTL_NS: u64 = 5 * 60 * SECOND_NS;
 /// RFC 8291 §3.4 binds the two public keys into the derivation, and so does this.
 const INFO_PREFIX: &[u8] = b"II webpush transport\0";
 
-/// Who a fetch is for, as bytes the derivation can mix in. Tagged and carrying the
-/// identity, because a browser id is handed out per identity, so two of them reach 1.
-pub(crate) fn caller_bytes(anchor_number: AnchorNumber, key: NotificationKey) -> Vec<u8> {
-    let (tag, id) = match key {
-        NotificationKey::Browser(id) => (0u8, u64::from(id)),
-        NotificationKey::App(id) => (1u8, id),
-    };
-    [
-        &[tag][..],
-        &anchor_number.to_be_bytes()[..],
-        &id.to_be_bytes()[..],
-    ]
-    .concat()
-}
-
 /// The public half a browser encrypts to, uncompressed SEC1.
 pub(crate) fn public_key_of(transport_scalar: &[u8; 32]) -> Vec<u8> {
-    super::randomness::secret_key_from(transport_scalar)
+    super::seed_pool::secret_key_from(transport_scalar)
         .public_key()
         .to_encoded_point(false)
         .as_bytes()
@@ -68,7 +51,7 @@ pub(crate) fn open(
     browser_key: &SubscriberKey,
     sealed: &SealedAuth,
 ) -> Result<AuthSecret, String> {
-    let transport = super::randomness::secret_key_from(transport_scalar);
+    let transport = super::seed_pool::secret_key_from(transport_scalar);
     let theirs = p256::PublicKey::from_sec1_bytes(browser_key.as_slice())
         .map_err(|_| "the browser's transport key is not a P-256 point".to_string())?;
 
@@ -105,7 +88,7 @@ pub(crate) fn seal_auth(
     browser_scalar: &[u8; 32],
     auth: &[u8],
 ) -> (SubscriberKey, SealedAuth) {
-    let browser = super::randomness::secret_key_from(browser_scalar);
+    let browser = super::seed_pool::secret_key_from(browser_scalar);
     let browser_public = browser
         .public_key()
         .to_encoded_point(false)
@@ -176,24 +159,5 @@ mod tests {
         let (other_browser_key, _) = sealed_by_browser(&transport_public, &[6u8; 32], &[4u8; 16]);
 
         assert!(open(&transport_scalar, &other_browser_key, &sealed).is_err());
-    }
-
-    /// Browser ids are handed out per identity, so without the identity in the mix two
-    /// of them would derive the same transport key.
-    #[test]
-    fn two_identities_do_not_derive_the_same_bytes() {
-        assert_ne!(
-            caller_bytes(10_000, NotificationKey::Browser(1)),
-            caller_bytes(10_001, NotificationKey::Browser(1))
-        );
-    }
-
-    /// A browser and an app can hold the same number, and are not the same caller.
-    #[test]
-    fn a_browser_and_an_app_at_one_number_do_not_derive_the_same_bytes() {
-        assert_ne!(
-            caller_bytes(10_000, NotificationKey::Browser(1)),
-            caller_bytes(10_000, NotificationKey::App(1))
-        );
     }
 }

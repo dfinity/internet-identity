@@ -714,6 +714,7 @@ export const idlFactory = ({ IDL }) => {
   const GetNotificationKeysError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'TryAgain' : IDL.Null,
   });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,

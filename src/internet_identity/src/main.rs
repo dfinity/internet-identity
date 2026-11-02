@@ -357,22 +357,20 @@ async fn get_notification_keys(
         .map_err(GetNotificationKeysError::InternalCanisterError)?;
 
     let now_ns = ic_cdk::api::time();
-    let bytes = notifications::webpush::randomness::call_bytes(
-        &notifications::webpush::transport::caller_bytes(anchor_number, key),
-        now_ns,
-    )
-    .await
-    .map_err(GetNotificationKeysError::InternalCanisterError)?;
+    // Nothing pooled to derive from yet, which only happens when nobody has subscribed
+    // for a while. Asking for it put the draw in flight, so the browser's retry finds it.
+    let seeds = notifications::webpush::seed_pool::seeds_for(anchor_number, key, now_ns)
+        .ok_or(GetNotificationKeysError::TryAgain)?;
 
     let transport_public_key =
-        notifications::webpush::transport::public_key_of(&bytes.transport_scalar);
+        notifications::webpush::transport::public_key_of(&seeds.transport_scalar);
     // Held on the registration the subscribe will write, which is the only call that can
     // spend it.
     notifications::webpush::start_subscription(
         key,
         anchor_number,
-        bytes.transport_scalar,
-        bytes.sender_seed,
+        seeds.transport_scalar,
+        seeds.sender_seed,
         now_ns,
     )
     .map_err(GetNotificationKeysError::InternalCanisterError)?;
