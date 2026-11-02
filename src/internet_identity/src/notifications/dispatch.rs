@@ -173,6 +173,9 @@ pub(crate) struct Delivery {
     pub(crate) vapid_public_key: Vec<u8>,
     /// The sealed payload naming the entry above, absent where the wake-up names none.
     pub(crate) body: Option<Vec<u8>>,
+    /// What this destination seals with, read once when the pass planned it. A refresh
+    /// replaces it before anything is sealed.
+    pub(crate) sealing: Option<rotation::SealingKeys>,
     pub(crate) jwt: String,
     pub(crate) urgency: Urgency,
     /// Relay retention time, capped by the notification's remaining lifetime.
@@ -428,6 +431,7 @@ fn fan_out_to_destinations(
                     endpoint: subscription.endpoint.as_str().to_string(),
                     vapid_public_key: vapid_public_key.clone(),
                     body: None,
+                    sealing: Some(rotation::SealingKeys::from(subscription)),
                     // Filled in below, once every relay this reaches has one.
                     jwt: String::new(),
                     urgency: pending.urgency.clone(),
@@ -575,6 +579,7 @@ fn fan_out_to_browsers(
                         endpoint: subscription.endpoint.as_str().to_string(),
                         vapid_public_key: vapid_public_key.clone(),
                         body: None,
+                        sealing: Some(rotation::SealingKeys::from(subscription)),
                         // Filled in below, once every relay this reaches has one.
                         jwt: String::new(),
                         urgency: pending.urgency.clone(),
@@ -848,33 +853,43 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
         .iter()
         .filter(|delivery| delivery.notification.is_some())
         .filter_map(|delivery| {
-            let destination = destination_of(delivery);
-            rotation::sealing_keys(destination)
-                .map(|(_, _, last_rotated_ns)| (destination, last_rotated_ns))
+            let sealing = delivery.sealing.as_ref()?;
+            Some((destination_of(delivery), sealing.last_rotated_ns))
         })
         .collect();
 
     if !candidates.is_empty() {
         let sender = rotation::pass_sender(pass_bytes);
         for destination in rotation::stalest(candidates, rotation::ROTATIONS_PER_PASS) {
-            if let Err(err) = rotation::refresh(destination, &sender, now_ns) {
-                ic_cdk::println!("Could not refresh what a subscription seals with: {err}");
+            match rotation::refresh(destination, &sender, now_ns) {
+                // Onto every wake-up for that registration, not only the one that was
+                // picked: two browsers through one app share it, and a stale copy left on
+                // the others would seal against a key the header no longer names.
+                Ok(Some(refreshed)) => {
+                    for delivery in deliveries
+                        .iter_mut()
+                        .filter(|delivery| destination_of(delivery) == destination)
+                    {
+                        delivery.sealing = Some(refreshed.clone());
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    ic_cdk::println!("Could not refresh what a subscription seals with: {err}")
+                }
             }
         }
     }
 
     for (index, delivery) in deliveries.iter_mut().enumerate() {
-        let Some(deposited) = delivery.notification.clone() else {
-            continue;
-        };
-        let Some((payload_ikm, payload_keyid, _)) =
-            rotation::sealing_keys(destination_of(delivery))
+        let (Some(deposited), Some(sealing)) =
+            (delivery.notification.clone(), delivery.sealing.clone())
         else {
             continue;
         };
         delivery.body = sealed_for(
-            &payload_ikm,
-            &payload_keyid,
+            &sealing.payload_ikm,
+            &sealing.payload_keyid,
             delivery.anchor_number,
             delivery.browser_id,
             &deposited,

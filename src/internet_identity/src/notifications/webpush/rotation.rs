@@ -67,16 +67,27 @@ pub(crate) fn pass_sender(pass_bytes: &[u8; 32]) -> p256::SecretKey {
     super::randomness::secret_key_from(&scalar)
 }
 
-/// What `destination` seals with, and when that was last derived.
-pub(crate) fn sealing_keys(
-    destination: Destination,
-) -> Option<(PayloadIkm, PayloadKeyId, Timestamp)> {
-    let registered = read(destination)?;
-    Some((
-        registered.payload_ikm,
-        registered.payload_keyid,
-        registered.last_rotated_ns,
-    ))
+/// What one destination seals with, carried on the wake-up from the moment it is planned.
+///
+/// Carried rather than read back at sealing time: a pass holds up to
+/// [`MAX_POSTS_PER_PASS`](crate::notifications::dispatch::MAX_POSTS_PER_PASS) wake-ups,
+/// and reading each one's anchor again to find what has not changed would cost more than
+/// the refreshes the pass is budgeted for.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct SealingKeys {
+    pub payload_ikm: PayloadIkm,
+    pub payload_keyid: PayloadKeyId,
+    pub last_rotated_ns: Timestamp,
+}
+
+impl From<&WebPushSubscription> for SealingKeys {
+    fn from(registered: &WebPushSubscription) -> Self {
+        Self {
+            payload_ikm: registered.payload_ikm.clone(),
+            payload_keyid: registered.payload_keyid.clone(),
+            last_rotated_ns: registered.last_rotated_ns,
+        }
+    }
 }
 
 /// Derives fresh keying material against `sender` and writes it back.
@@ -87,16 +98,18 @@ pub(crate) fn refresh(
     destination: Destination,
     sender: &p256::SecretKey,
     now_ns: Timestamp,
-) -> Result<(), String> {
+) -> Result<Option<SealingKeys>, String> {
     let Some(mut registered) = read(destination) else {
-        return Ok(());
+        return Ok(None);
     };
     let (payload_ikm, payload_keyid) =
         payload::derive_ikm(sender, &registered.subscriber_key, &registered.auth)?;
     registered.payload_ikm = payload_ikm;
     registered.payload_keyid = payload_keyid;
     registered.last_rotated_ns = now_ns;
-    write(destination, registered, now_ns)
+    let refreshed = SealingKeys::from(&registered);
+    write(destination, registered, now_ns)?;
+    Ok(Some(refreshed))
 }
 
 /// Reads the registration `target` names, rather than the one this browser happens to
