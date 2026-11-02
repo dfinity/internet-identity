@@ -75,9 +75,11 @@ pub(crate) async fn call_bytes(browser_key: &[u8], now_ns: Timestamp) -> Result<
 
 /// Replaces the pool behind a caller that was served a stale value.
 ///
-/// A failure clears the flag and leaves the old value in place: the next caller tries
-/// again, and one that arrives past [`MAX_AGE_NS`] draws for itself. A flag left set by a
-/// failed draw would wedge every later refresh.
+/// A `raw_rand` that answers an error clears the flag and leaves the old value in place,
+/// so the next caller past [`REFRESH_AFTER_NS`] tries again. One that never answers at
+/// all, or a trap in the continuation, leaves the flag set and no later refresh starts.
+/// That costs speed rather than correctness: once the pool is past [`MAX_AGE_NS`],
+/// [`draw`] stops consulting the flag and every caller draws inline.
 fn spawn_draw() {
     if DRAWING.get() {
         return;
