@@ -866,10 +866,12 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
                 // picked: two browsers through one app share it, and a stale copy left on
                 // the others would seal against a key the header no longer names.
                 Ok(Some(refreshed)) => {
-                    for delivery in deliveries
-                        .iter_mut()
-                        .filter(|delivery| destination_of(delivery) == destination)
-                    {
+                    // On the registration, not the destination: a Home Screen app's is
+                    // shared, and the wake-ups through it come from different identities
+                    // and different browsers.
+                    for delivery in deliveries.iter_mut().filter(|delivery| {
+                        destination_of(delivery).registration() == destination.registration()
+                    }) {
                         delivery.sealing = Some(refreshed.clone());
                     }
                 }
@@ -1803,6 +1805,70 @@ mod tests {
         );
         assert_eq!(queued(recipient, browsers[0]), vec![7]);
         assert_eq!(queued(recipient, browsers[1]), vec![7]);
+    }
+
+    /// Two identities' browsers can point at one Home Screen app, and they share its
+    /// registration. A refresh has to land on both wake-ups: the header names the sender
+    /// key the material was derived against, so a stale copy left on the second would
+    /// seal against a key its own header no longer names, which the browser silently
+    /// fails to open.
+    #[test]
+    fn a_refresh_reaches_every_wake_up_through_one_app() {
+        setup();
+        let app = {
+            let (first, browsers) = anchor_with_browsers(1);
+            let app = route_through_an_app(first, browsers[0], 9, Some(APP_RELAY));
+            submit(first, 7, 10 * SECOND_NS);
+            app
+        };
+        let (second, browsers) = anchor_with_browsers(1);
+        route_through_an_app(second, browsers[0], 9, None);
+        submit(second, 7, 10 * SECOND_NS);
+
+        let mut deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        assert_eq!(deliveries.len(), 2, "one wake-up per identity");
+        assert!(
+            deliveries
+                .iter()
+                .all(|delivery| delivery.target == DeliveryTarget::App(app)),
+            "both through the one app"
+        );
+        let before = deliveries[0].sealing.clone().expect("planned with keys");
+
+        seal_pass(&mut deliveries, &[3u8; 32], 2 * SECOND_NS);
+
+        let first = deliveries[0].sealing.clone().expect("keys");
+        let second = deliveries[1].sealing.clone().expect("keys");
+        assert_ne!(first, before, "the pass refreshed the registration");
+        assert_eq!(
+            first, second,
+            "and both wake-ups carry what it refreshed to"
+        );
+        assert!(
+            deliveries.iter().all(|delivery| delivery.body.is_some()),
+            "both sealed"
+        );
+    }
+
+    /// Each wake-up in a pass gets its own salt, since the key and the nonce both follow
+    /// from it and two payloads under one would share a keystream.
+    #[test]
+    fn two_wake_ups_in_one_pass_are_sealed_under_different_salts() {
+        setup();
+        let (recipient, browsers) = anchor_with_browsers(2);
+        subscribe(recipient, browsers[0], RELAY, 0);
+        subscribe(recipient, browsers[1], ROTATED, 0);
+        submit(recipient, 7, 10 * SECOND_NS);
+
+        let mut deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        seal_pass(&mut deliveries, &[3u8; 32], 2 * SECOND_NS);
+
+        let salts: Vec<Vec<u8>> = deliveries
+            .iter()
+            .map(|delivery| delivery.body.clone().expect("sealed")[..16].to_vec())
+            .collect();
+        assert_eq!(salts.len(), 2);
+        assert_ne!(salts[0], salts[1]);
     }
 
     #[test]

@@ -44,7 +44,7 @@ impl Destination {
     /// The registration this destination refreshes, which is not the destination itself:
     /// a Home Screen app's record is shared by every browser pointing at it, so two of
     /// them in one pass are one thing to refresh and one scalar multiplication, not two.
-    fn registration(self) -> (Option<NotificationAppId>, AnchorNumber, BrowserId) {
+    pub(crate) fn registration(self) -> (Option<NotificationAppId>, AnchorNumber, BrowserId) {
         match self.target {
             DeliveryTarget::App(app_id) => (Some(app_id), 0, 0),
             DeliveryTarget::Browser => (None, self.anchor_number, self.browser_id),
