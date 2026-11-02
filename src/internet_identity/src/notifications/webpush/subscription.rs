@@ -18,9 +18,9 @@ use internet_identity_interface::internet_identity::types::{
 
 /// Records the key a fetch just minted, against the registration that will spend it.
 ///
-/// Whatever was registered rides along: a browser re-subscribing at the address it is
-/// already at keeps that registration's age and its queue, and both are read off what it
-/// had before this call.
+/// This replaces whatever was registered, so a browser with one in flight is not
+/// delivered to until the subscribe lands. That is the whole gap: the browser asks for
+/// these keys only when it is about to register an address the canister does not have.
 pub fn start_subscription(
     key: NotificationKey,
     anchor_number: AnchorNumber,
@@ -28,28 +28,18 @@ pub fn start_subscription(
     sender_seed: [u8; 32],
     now_ns: Timestamp,
 ) -> Result<(), String> {
-    let pending = |held: Option<WebPushSubscription>| {
-        WebPushSubscription::Pending(PendingTransport {
-            transport_scalar,
-            sender_seed,
-            minted_at_ns: now_ns,
-            replacing: held.and_then(WebPushSubscription::into_ready).map(Box::new),
-        })
-    };
+    let pending = WebPushSubscription::Pending(PendingTransport {
+        transport_scalar,
+        sender_seed,
+        minted_at_ns: now_ns,
+    });
     match key {
-        NotificationKey::App(app_id) => {
-            let held = storage_borrow(|storage| storage.notification_app(app_id))
-                .ok_or_else(|| format!("no notification app {app_id}"))?
-                .webpush_subscription;
-            storage_borrow_mut(|storage| {
-                storage.set_notification_app_subscription(app_id, Some(pending(held)), now_ns)
-            })
-            .map_err(|err| format!("{err}"))
-        }
+        NotificationKey::App(app_id) => storage_borrow_mut(|storage| {
+            storage.set_notification_app_subscription(app_id, Some(pending), now_ns)
+        })
+        .map_err(|err| format!("{err}")),
         NotificationKey::Browser(browser_id) => {
-            let anchor = state::anchor(anchor_number);
-            let held = anchor.webpush_subscription(browser_id).cloned();
-            write_subscription(anchor, browser_id, Some(pending(held)))
+            write_subscription(state::anchor(anchor_number), browser_id, Some(pending))
         }
     }
 }
@@ -143,13 +133,9 @@ fn spend_pending(
     let (payload_ikm, payload_keyid) = payload::derive_ikm(&sender, &subscriber_key, &auth)
         .map_err(SetWebPushSubscriptionError::InternalCanisterError)?;
 
-    let created_at_ns = match pending.replacing.as_deref() {
-        Some(held) if held.endpoint == endpoint => held.created_at_ns,
-        _ => now_ns,
-    };
     Ok(ReadySubscription {
         endpoint,
-        created_at_ns,
+        created_at_ns: now_ns,
         payload_ikm,
         payload_keyid,
         subscriber_key,
@@ -278,19 +264,18 @@ fn write_subscription(
     // Keep what is queued only where the registration is replaced at the same address.
     // Anything else leaves it announced to an address nothing listens on, and a full
     // queue posts no wake-up for what arrives after it.
-    // Through a pending registration to the address it is holding open, because a
-    // subscribe passes through one: comparing against a record that has no endpoint yet
-    // would read as a move and clear the queue on every fetch.
+    // Only a ready registration has an address, so a subscribe passing through pending
+    // reads as a move and takes the queue with it. That is correct for every way one is
+    // reached: a browser only re-registers when the push service handed it a different
+    // endpoint, and what was announced to the old one can never be shown.
     let same_address = matches!(
         (
             anchor
                 .webpush_subscription(browser_id)
-                .and_then(WebPushSubscription::standing_endpoint),
-            subscription
-                .as_ref()
-                .and_then(WebPushSubscription::standing_endpoint),
+                .and_then(WebPushSubscription::ready),
+            subscription.as_ref().and_then(WebPushSubscription::ready),
         ),
-        (Some(registered), Some(replacing)) if registered == replacing
+        (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
     );
     if !same_address {
         if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
@@ -384,22 +369,6 @@ mod tests {
         );
         assert!(status(anchor_number, browsers[0]).is_none());
         assert!(stored_subscription(anchor_number, browsers[0]).is_none());
-    }
-
-    /// A browser re-registering where it already is passes through the pending state, and
-    /// what was queued for that address has to survive the trip.
-    #[test]
-    fn re_subscribing_at_the_same_address_keeps_its_age_and_its_queue() {
-        setup();
-        let (anchor_number, browsers) = anchor_with_browsers(1);
-        try_subscribe(anchor_number, browsers[0], ENDPOINT, 500).expect("the first subscribe");
-        queue_one(anchor_number, browsers[0]);
-
-        try_subscribe(anchor_number, browsers[0], ENDPOINT, 9_000).expect("re-subscribing");
-
-        let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
-        assert_eq!(stored.created_at_ns, 500, "the same address keeps its age");
-        assert_eq!(queued(anchor_number, browsers[0]), 1, "and its queue");
     }
 
     /// A different address is a different registration, so what was announced to the old
@@ -661,18 +630,6 @@ mod tests {
         subscribe(anchor_number, browsers[0], ROTATED, 2_000);
 
         assert_eq!(queued(anchor_number, browsers[0]), 0);
-    }
-
-    #[test]
-    fn re_registering_the_same_endpoint_keeps_the_browser_inbox() {
-        setup();
-        let (anchor_number, browsers) = anchor_with_browsers(1);
-        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
-        queue_one(anchor_number, browsers[0]);
-
-        subscribe(anchor_number, browsers[0], ENDPOINT, 9_000);
-
-        assert_eq!(queued(anchor_number, browsers[0]), 1);
     }
 
     #[test]

@@ -22,10 +22,6 @@ pub enum StorableWebPushSubscription {
         sender_seed: Vec<u8>,
         #[n(2)]
         minted_at_ns: StorableTimestamp,
-        /// What was registered when this fetch arrived, so a re-subscribe at the same
-        /// address keeps its age and its queue.
-        #[n(3)]
-        replacing: Option<Box<StorableWebPushSubscription>>,
     },
     /// Subscribed, and what a wake-up is posted and sealed against.
     #[n(1)]

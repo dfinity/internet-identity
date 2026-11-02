@@ -193,13 +193,6 @@ pub struct PendingTransport {
     /// held as a seed until then because a prompt the user denies never sends one.
     pub sender_seed: [u8; 32],
     pub minted_at_ns: Timestamp,
-    /// What this browser was registered with when the fetch arrived, where it was
-    /// registered at all.
-    ///
-    /// Kept because a re-subscribe passes through here: a browser replacing its
-    /// registration at the same address keeps that registration's age and whatever is
-    /// queued for it, and both of those are read off what it had before.
-    pub replacing: Option<Box<ReadySubscription>>,
 }
 
 /// Where to reach a browser, and what to seal for it.
@@ -234,20 +227,6 @@ impl WebPushSubscription {
         }
     }
 
-    /// The address this delivers to, or is holding open while a subscribe runs.
-    ///
-    /// A subscribe passes through `Pending`, so whether a registration is moving address
-    /// is read through one rather than against it: otherwise every key fetch looks like a
-    /// move, and what is queued for the old address is thrown away.
-    pub fn standing_endpoint(&self) -> Option<&PushEndpoint> {
-        match self {
-            WebPushSubscription::Ready(ready) => Some(&ready.endpoint),
-            WebPushSubscription::Pending(pending) => {
-                pending.replacing.as_deref().map(|held| &held.endpoint)
-            }
-        }
-    }
-
     pub fn pending(&self) -> Option<&PendingTransport> {
         match self {
             WebPushSubscription::Pending(pending) => Some(pending),
@@ -273,22 +252,10 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                 transport_scalar,
                 sender_seed,
                 minted_at_ns,
-                replacing,
             } => Ok(WebPushSubscription::Pending(PendingTransport {
                 transport_scalar: scalar_of(transport_scalar, "transport_scalar")?,
                 sender_seed: scalar_of(sender_seed, "sender_seed")?,
                 minted_at_ns,
-                replacing: replacing
-                    .map(|stored| {
-                        WebPushSubscription::try_from(*stored)
-                            .and_then(|held| {
-                                held.into_ready().ok_or_else(|| {
-                                    "a pending registration replaces a ready one".to_string()
-                                })
-                            })
-                            .map(Box::new)
-                    })
-                    .transpose()?,
             })),
             StorableWebPushSubscription::Ready {
                 endpoint,
@@ -318,11 +285,6 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 transport_scalar: pending.transport_scalar.to_vec(),
                 sender_seed: pending.sender_seed.to_vec(),
                 minted_at_ns: pending.minted_at_ns,
-                replacing: pending.replacing.map(|held| {
-                    Box::new(StorableWebPushSubscription::from(
-                        WebPushSubscription::Ready(*held),
-                    ))
-                }),
             },
             WebPushSubscription::Ready(ready) => StorableWebPushSubscription::Ready {
                 endpoint: ready.endpoint.into_string(),

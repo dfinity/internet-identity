@@ -1621,18 +1621,16 @@ impl<M: Memory + Clone> Storage<M> {
         // Keep what is queued only where the registration is replaced at the same address.
         // Anything else leaves it announced to an address nothing listens on, and a full
         // queue posts no wake-up for what arrives after it.
-        // Through a pending registration to the address it holds open, since a subscribe
-        // passes through one and a fetch is not a move.
+        // Only a ready registration has an address, so a subscribe passing through
+        // pending reads as a move and takes the queue with it.
         let same_address = matches!(
             (
                 app.webpush_subscription
                     .as_ref()
-                    .and_then(WebPushSubscription::standing_endpoint),
-                subscription
-                    .as_ref()
-                    .and_then(WebPushSubscription::standing_endpoint),
+                    .and_then(WebPushSubscription::ready),
+                subscription.as_ref().and_then(WebPushSubscription::ready),
             ),
-            (Some(registered), Some(replacing)) if registered == replacing
+            (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
         );
         app.webpush_subscription = subscription;
         if let Some(now) = used_at_ns {
