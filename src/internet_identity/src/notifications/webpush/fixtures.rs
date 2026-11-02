@@ -229,7 +229,7 @@ pub(super) fn point_at_app(
 }
 
 /// The record as it stands, which is where an app's own subscription lives.
-pub(super) fn app(app_id: NotificationAppId) -> NotificationApp {
+pub(crate) fn app(app_id: NotificationAppId) -> NotificationApp {
     storage_borrow(|storage| storage.notification_app(app_id)).expect("reading the app record")
 }
 

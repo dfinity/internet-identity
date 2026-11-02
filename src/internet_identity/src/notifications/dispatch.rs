@@ -1858,6 +1858,36 @@ mod tests {
         );
     }
 
+    /// Whether a Home Screen app has called is the whole of the evidence that it is still
+    /// installed: deleting one tells the canister nothing and the push service goes on
+    /// accepting wake-ups for it. A pass refreshing what that app seals with is this
+    /// canister's own work, so it must not look like the app was heard from, or no probe
+    /// could ever go unanswered and a deleted app would never be found out.
+    #[test]
+    fn refreshing_an_app_does_not_say_the_app_called() {
+        setup();
+        let (recipient, browsers) = anchor_with_browsers(1);
+        let app_id = route_through_an_app(recipient, browsers[0], 9, Some(APP_RELAY));
+        submit(recipient, 7, 10 * SECOND_NS);
+        let before = crate::notifications::webpush::fixtures::app(app_id).last_used_ns;
+
+        let mut deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        assert_eq!(deliveries.len(), 1);
+        let sealed_with = deliveries[0].sealing.clone().expect("planned with keys");
+        seal_pass(&mut deliveries, &[3u8; 32], 5 * SECOND_NS);
+
+        assert_ne!(
+            deliveries[0].sealing.clone().expect("keys"),
+            sealed_with,
+            "the pass refreshed what the app seals with"
+        );
+        assert_eq!(
+            crate::notifications::webpush::fixtures::app(app_id).last_used_ns,
+            before,
+            "and said nothing about the app having called"
+        );
+    }
+
     /// Each wake-up in a pass gets its own salt, since the key and the nonce both follow
     /// from it and two payloads under one would share a keystream.
     #[test]

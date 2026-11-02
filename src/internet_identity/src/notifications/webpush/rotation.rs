@@ -108,7 +108,7 @@ pub(crate) fn refresh(
     registered.payload_keyid = payload_keyid;
     registered.last_rotated_ns = now_ns;
     let refreshed = SealingKeys::from(&registered);
-    write(destination, registered, now_ns)?;
+    write(destination, registered)?;
     Ok(Some(refreshed))
 }
 
@@ -127,17 +127,14 @@ fn read(destination: Destination) -> Option<ReadySubscription> {
     }
 }
 
-fn write(
-    destination: Destination,
-    registered: ReadySubscription,
-    now_ns: Timestamp,
-) -> Result<(), String> {
+fn write(destination: Destination, registered: ReadySubscription) -> Result<(), String> {
     match destination.target {
+        // Without stamping the record as used: a refresh is this canister's work, and an
+        // app that has not called is how a deleted one is told apart from a live one.
         DeliveryTarget::App(app_id) => storage_borrow_mut(|storage| {
-            storage.set_notification_app_subscription(
+            storage.refresh_notification_app_subscription(
                 app_id,
                 Some(WebPushSubscription::Ready(registered)),
-                now_ns,
             )
         })
         .map_err(|err| format!("{err}")),

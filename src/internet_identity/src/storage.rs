@@ -1587,6 +1587,31 @@ impl<M: Memory + Clone> Storage<M> {
         subscription: Option<WebPushSubscription>,
         now: Timestamp,
     ) -> Result<(), StorageError> {
+        self.write_notification_app_subscription(app_id, subscription, Some(now))
+    }
+
+    /// Replaces what an app's payloads are sealed with, leaving `last_used_ns` where it
+    /// is.
+    ///
+    /// A refresh is this canister's own work rather than a call from the app, and whether
+    /// the app has called is the whole of the evidence that it is still installed:
+    /// deleting a Home Screen app tells the canister nothing and the push service goes on
+    /// accepting for it. Stamping here would say a deleted app had just been heard from,
+    /// and no probe could ever go unanswered.
+    pub fn refresh_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+    ) -> Result<(), StorageError> {
+        self.write_notification_app_subscription(app_id, subscription, None)
+    }
+
+    fn write_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+        used_at_ns: Option<Timestamp>,
+    ) -> Result<(), StorageError> {
         let stored = self
             .notification_app_memory
             .get(&app_id)
@@ -1610,7 +1635,9 @@ impl<M: Memory + Clone> Storage<M> {
             (Some(registered), Some(replacing)) if registered == replacing
         );
         app.webpush_subscription = subscription;
-        app.last_used_ns = now;
+        if let Some(now) = used_at_ns {
+            app.last_used_ns = now;
+        }
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
         if !same_address {
