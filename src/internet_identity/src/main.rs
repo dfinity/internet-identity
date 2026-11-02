@@ -347,35 +347,50 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 #[update]
 async fn prepare_webpush_subscription(
     anchor_number: AnchorNumber,
-) -> Result<PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionError> {
-    enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError)?;
-    let key = check_browser_or_notification_app_authorization(anchor_number)
-        .map_err(|_| PrepareWebPushSubscriptionError::InvalidBrowserKey)?;
+) -> PrepareWebPushSubscriptionResult {
+    if let Err(err) = enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError) {
+        return PrepareWebPushSubscriptionResult::Err(err);
+    }
+    let Ok(key) = check_browser_or_notification_app_authorization(anchor_number) else {
+        return PrepareWebPushSubscriptionResult::Err(
+            PrepareWebPushSubscriptionError::InvalidBrowserKey,
+        );
+    };
 
-    let vapid_public_key = notifications::webpush::vapid_key::held_public_key()
-        .await
-        .map_err(PrepareWebPushSubscriptionError::InternalCanisterError)?;
+    let vapid_public_key = match notifications::webpush::vapid_key::held_public_key().await {
+        Ok(key) => key,
+        Err(err) => {
+            return PrepareWebPushSubscriptionResult::Err(
+                PrepareWebPushSubscriptionError::InternalCanisterError(err),
+            )
+        }
+    };
 
     let now_ns = ic_cdk::api::time();
-    // Nothing pooled to derive from yet, which only happens when nobody has subscribed
-    // for a while. Asking for it put the draw in flight, so the browser's retry finds it.
-    let seeds = notifications::webpush::seed_pool::seeds_for(anchor_number, key, now_ns)
-        .ok_or(PrepareWebPushSubscriptionError::TryAgain)?;
+    // Nothing pooled to derive from yet, which only happens when nobody has subscribed for
+    // a while. Asking for it put the draw in flight, so a caller coming back finds it.
+    let Some(seeds) = notifications::webpush::seed_pool::seeds_for(anchor_number, key, now_ns)
+    else {
+        return PrepareWebPushSubscriptionResult::Pending;
+    };
 
     let transport_public_key =
         notifications::webpush::transport::public_key_of(&seeds.transport_scalar);
     // Held on the registration the subscribe will write, which is the only call that can
     // spend it.
-    notifications::webpush::start_subscription(
+    if let Err(err) = notifications::webpush::start_subscription(
         key,
         anchor_number,
         seeds.transport_scalar,
         seeds.sender_seed,
         now_ns,
-    )
-    .map_err(PrepareWebPushSubscriptionError::InternalCanisterError)?;
+    ) {
+        return PrepareWebPushSubscriptionResult::Err(
+            PrepareWebPushSubscriptionError::InternalCanisterError(err),
+        );
+    }
 
-    Ok(PrepareWebPushSubscriptionResponse {
+    PrepareWebPushSubscriptionResult::Ok(PrepareWebPushSubscriptionResponse {
         vapid_public_key: ByteBuf::from(vapid_public_key),
         transport_public_key: ByteBuf::from(transport_public_key),
     })

@@ -1086,7 +1086,6 @@ export const idlFactory = ({ IDL }) => {
   const PrepareWebPushSubscriptionError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
-    'TryAgain' : IDL.Null,
   });
   const ProbeNotificationAppRequest = IDL.Record({
     'anchor_number' : UserNumber,
@@ -1943,6 +1942,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareWebPushSubscriptionResponse,
             'Err' : PrepareWebPushSubscriptionError,
+            'Pending' : IDL.Null,
           }),
         ],
         [],

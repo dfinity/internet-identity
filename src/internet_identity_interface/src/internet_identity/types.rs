@@ -1153,13 +1153,22 @@ pub struct PrepareWebPushSubscriptionResponse {
     pub transport_public_key: ByteBuf,
 }
 
+/// What `prepare_webpush_subscription` answers.
+///
+/// `Pending` is a retry signal rather than an error: the keys are derived from randomness
+/// the canister keeps pooled, a pool nobody has subscribed through for a while has none
+/// to serve, and asking is what puts the draw in flight. The caller re-calls the method.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareWebPushSubscriptionResult {
+    Ok(PrepareWebPushSubscriptionResponse),
+    Pending,
+    Err(PrepareWebPushSubscriptionError),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum PrepareWebPushSubscriptionError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
-    /// The randomness these keys are derived from is being drawn. Asking put that draw
-    /// in flight, so call again.
-    TryAgain,
     InternalCanisterError(String),
 }
 

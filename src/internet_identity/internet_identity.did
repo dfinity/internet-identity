@@ -1914,9 +1914,6 @@ type PrepareWebPushSubscriptionResponse = record {
 type PrepareWebPushSubscriptionError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
-    // The randomness these keys are derived from is being drawn. Asking put that draw in
-    // flight, so call again.
-    TryAgain;
     InternalCanisterError : text;
 };
 
@@ -2785,7 +2782,9 @@ service : (opt InternetIdentityInit) -> {
     // An update call, because a query reply is signed by one replica. One that answered
     // with a VAPID key of its own choosing would bind the subscription to it permanently,
     // and the browser has nothing to check the answer against.
-    prepare_webpush_subscription : (UserNumber) -> (variant { Ok : PrepareWebPushSubscriptionResponse; Err : PrepareWebPushSubscriptionError });
+    // A cold randomness pool yields the `Pending` result arm — a retry signal, not an
+    // error: asking put the draw in flight, so the caller re-calls the method.
+    prepare_webpush_subscription : (UserNumber) -> (variant { Ok : PrepareWebPushSubscriptionResponse; Pending; Err : PrepareWebPushSubscriptionError });
     // Called by the browser, or by the Home Screen app it points at: what the app
     // registers belongs to its own record, which every identity pointing at it is
     // delivered through, so the anchor named here is what authorized the call rather

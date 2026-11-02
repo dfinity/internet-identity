@@ -2157,14 +2157,7 @@ export type PrepareWebPushSubscriptionError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string } |
-  {
-    /**
-     * The randomness these keys are derived from is being drawn. Asking put that draw in
-     * flight, so call again.
-     */
-    'TryAgain' : null
-  };
+  { 'InternalCanisterError' : string };
 /**
  * Both keys a browser needs before it can subscribe.
  */
@@ -3480,11 +3473,14 @@ export interface _SERVICE {
    * An update call, because a query reply is signed by one replica. One that answered
    * with a VAPID key of its own choosing would bind the subscription to it permanently,
    * and the browser has nothing to check the answer against.
+   * A cold randomness pool yields the `Pending` result arm — a retry signal, not an
+   * error: asking put the draw in flight, so the caller re-calls the method.
    */
   'prepare_webpush_subscription' : ActorMethod<
     [UserNumber],
     { 'Ok' : PrepareWebPushSubscriptionResponse } |
-      { 'Err' : PrepareWebPushSubscriptionError }
+      { 'Err' : PrepareWebPushSubscriptionError } |
+      { 'Pending' : null }
   >,
   /**
    * Called by the browser, which watches for the answer leaving its own queue: that

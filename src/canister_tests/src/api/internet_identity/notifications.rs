@@ -15,10 +15,11 @@ use internet_identity_interface::internet_identity::types::{
     NotificationRevokeConsentError, NotificationRevokeConsentRequest,
     PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
     PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    PrepareWebPushSubscriptionError, PrepareWebPushSubscriptionResponse, ProbeNotificationAppError,
-    ProbeNotificationAppRequest, RemoveNotificationError, RemoveNotificationRequest,
-    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
-    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionResult,
+    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
+    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
+    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+    WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -159,10 +160,7 @@ pub fn prepare_webpush_subscription(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: AnchorNumber,
-) -> Result<
-    Result<PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionError>,
-    RejectResponse,
-> {
+) -> Result<PrepareWebPushSubscriptionResult, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -238,8 +236,8 @@ fn prepared_keys(
 ) -> Option<PrepareWebPushSubscriptionResponse> {
     for _ in 0..PREPARE_ATTEMPTS {
         match prepare_webpush_subscription(env, canister_id, sender, anchor_number) {
-            Ok(Ok(keys)) => return Some(keys),
-            Ok(Err(PrepareWebPushSubscriptionError::TryAgain)) => continue,
+            Ok(PrepareWebPushSubscriptionResult::Ok(keys)) => return Some(keys),
+            Ok(PrepareWebPushSubscriptionResult::Pending) => continue,
             _ => return None,
         }
     }

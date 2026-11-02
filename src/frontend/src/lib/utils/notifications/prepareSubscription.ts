@@ -9,7 +9,8 @@
 // canister drops it as soon as that subscribe spends it, so a held copy would be a key
 // the next call could not use.
 
-import { retryFor, throwCanisterError } from "$lib/utils/utils";
+import { throwCanisterError } from "$lib/utils/utils";
+import { retryWhilePending } from "$lib/utils/openidPoll";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 
@@ -20,32 +21,22 @@ export interface SubscriptionKeys {
   transportPublicKey: Uint8Array;
 }
 
-const askOnce = async (
+/**
+ * Asks `actor` for the keys `identityNumber`'s next subscribe needs.
+ *
+ * The canister derives both from randomness it keeps pooled, and a pool nobody has
+ * subscribed through for a while has none to serve. It answers `Pending` and draws, so
+ * the ask is re-issued until the draw lands, the same as a cold SSO discovery cache.
+ */
+export const prepareSubscription = async (
   identityNumber: bigint,
   actor: ActorSubclass<_SERVICE>,
 ): Promise<SubscriptionKeys> => {
-  const keys = await actor
-    .prepare_webpush_subscription(identityNumber)
-    .then(throwCanisterError);
+  const keys = await retryWhilePending(() =>
+    actor.prepare_webpush_subscription(identityNumber),
+  ).then(throwCanisterError);
   return {
     vapidPublicKey: new Uint8Array(keys.vapid_public_key),
     transportPublicKey: new Uint8Array(keys.transport_public_key),
   };
 };
-
-/** Enough asks to outlast the rounds the canister's own draw takes to come back. */
-const ATTEMPTS = 4;
-
-/**
- * Asks `actor` for the keys `identityNumber`'s next subscribe needs.
- *
- * The canister derives both from randomness it keeps pooled, and a pool nobody has
- * subscribed through for a while has none to serve. The first ask puts the draw in
- * flight and is told to come back; the reply to it lands a round or two later, which is
- * what the backoff between asks is waiting out.
- */
-export const prepareSubscription = (
-  identityNumber: bigint,
-  actor: ActorSubclass<_SERVICE>,
-): Promise<SubscriptionKeys> =>
-  retryFor(ATTEMPTS, () => askOnce(identityNumber, actor));
