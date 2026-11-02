@@ -660,6 +660,15 @@ pub fn lookup_device_key(
     .map(|(x,)| x)
 }
 
+/// Hidden, temporary endpoint: the totals of the read-only passkey index audit.
+pub fn passkey_index_audit_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<types::PasskeyIndexAuditStatus, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "passkey_index_audit_status", ()).map(|(x,)| x)
+}
+
 pub fn prepare_attributes(
     env: &PocketIc,
     canister_id: CanisterId,
