@@ -87,10 +87,7 @@ export const sealSubscriptionAuth = async (
 
   // The canister's key first and this one second, which is the order it rebuilds in.
   const info = concat(INFO_PREFIX, transportPublicKey, transportKey);
-  const derive = async (
-    label: Uint8Array,
-    bits: number,
-  ): Promise<ArrayBuffer> =>
+  const derive = (label: Uint8Array, bits: number): Promise<ArrayBuffer> =>
     crypto.subtle.deriveBits(
       {
         name: "HKDF",
