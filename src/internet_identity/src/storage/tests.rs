@@ -255,6 +255,55 @@ fn should_read_previous_write() {
     assert_eq!(anchor, read_anchor);
 }
 
+/// The rewrite is what clears a registration stored under a field id this build no
+/// longer reads, so it has to reach every anchor however many batches that takes.
+#[test]
+fn rewriting_walks_every_anchor_across_batches() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 10_010), memory);
+    for _ in 0..5 {
+        let anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+        storage.write(anchor).expect("writing a fresh anchor");
+    }
+
+    // Two at a time, so the walk has to resume rather than finish in one go.
+    let mut start = 10_000;
+    let mut written = 0;
+    let mut batches = 0;
+    loop {
+        let (count, resume_at) = storage.rewrite_anchors_batch(start, 2, || false);
+        written += count;
+        batches += 1;
+        match resume_at {
+            Some(next) => start = next,
+            None => break,
+        }
+        assert!(
+            batches < 10,
+            "the walk should finish, not go round for ever"
+        );
+    }
+
+    assert_eq!(written, 5, "every anchor was written back");
+    assert!(batches > 1, "and it took more than one batch");
+    for anchor_number in 10_000..10_005 {
+        assert!(
+            storage.read(anchor_number).is_ok(),
+            "anchor {anchor_number} still reads after being rewritten"
+        );
+    }
+}
+
+/// Nothing to walk is not a reason to walk for ever.
+#[test]
+fn rewriting_an_empty_range_finishes_at_once() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 10_010), memory);
+    let (written, resume_at) = storage.rewrite_anchors_batch(10_000, 200, || false);
+    assert_eq!(written, 0);
+    assert!(resume_at.is_none());
+}
+
 #[test]
 fn should_not_write_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();

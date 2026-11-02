@@ -1803,6 +1803,93 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // nothing, and its totals are heap state, so every upgrade starts it over. Remove it
     // once its totals have been read on mainnet.
     init_passkey_index_audit_timer();
+
+    // Every registration this build cannot read is left behind by one that stored it
+    // somewhere else. Reading and writing each record back is what drops it.
+    init_notification_rewrite_timer();
+}
+
+/// Re-encodes every anchor and Home Screen app record under this build.
+///
+/// A registration is stored under a field id, and this build's is not the one a record
+/// written before it used, so reading drops what sits at the old id and writing back
+/// persists the record without it. That leaves no subscription this build cannot open and
+/// no bytes it will never read again.
+///
+/// Batched off a timer for the same reason the audit beside it is: the write is over every
+/// anchor, which is far more than one message can afford.
+const NOTIFICATION_REWRITE_BACKOFF: Duration = Duration::from_secs(1);
+
+/// Smaller than the audit's, because this writes every record it touches.
+const NOTIFICATION_REWRITE_BATCH_SIZE: u64 = 200;
+
+const NOTIFICATION_REWRITE_INSTRUCTION_BUDGET: u64 = 10_000_000_000;
+
+#[derive(Clone, Copy, Debug, Default)]
+struct NotificationRewriteStatus {
+    next_anchor_number: AnchorNumber,
+    anchors_written: u64,
+    is_done: bool,
+}
+
+thread_local! {
+    static NOTIFICATION_REWRITE_STATUS: RefCell<NotificationRewriteStatus> =
+        RefCell::new(NotificationRewriteStatus::default());
+    static NOTIFICATION_REWRITE_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+fn init_notification_rewrite_timer() {
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        NOTIFICATION_REWRITE_BACKOFF,
+        run_notification_rewrite_batch,
+    );
+    NOTIFICATION_REWRITE_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
+}
+
+fn clear_notification_rewrite_timer() {
+    NOTIFICATION_REWRITE_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(timer_id) = id_slot.take() {
+            ic_cdk_timers::clear_timer(timer_id);
+        }
+    });
+}
+
+fn run_notification_rewrite_batch() {
+    let Some(start) = NOTIFICATION_REWRITE_STATUS
+        .with_borrow(|status| (!status.is_done).then_some(status.next_anchor_number))
+    else {
+        clear_notification_rewrite_timer();
+        return;
+    };
+
+    let (written, resume_at) = state::storage_borrow_mut(|storage| {
+        storage.rewrite_anchors_batch(start, NOTIFICATION_REWRITE_BATCH_SIZE, || {
+            ic_cdk::api::instruction_counter() > NOTIFICATION_REWRITE_INSTRUCTION_BUDGET
+        })
+    });
+
+    let status = NOTIFICATION_REWRITE_STATUS.with_borrow_mut(|status| {
+        status.anchors_written += written;
+        match resume_at {
+            Some(next_anchor_number) => status.next_anchor_number = next_anchor_number,
+            None => status.is_done = true,
+        }
+        *status
+    });
+
+    if status.is_done {
+        // Once, at the end: there is one record per installed app, not one per identity.
+        let apps = state::storage_borrow_mut(|storage| storage.rewrite_notification_apps());
+        clear_notification_rewrite_timer();
+        ic_cdk::println!(
+            "Notification record rewrite COMPLETED: {} anchors, {apps} apps",
+            status.anchors_written
+        );
+    }
 }
 
 const PASSKEY_INDEX_AUDIT_BACKOFF: Duration = Duration::from_secs(1);

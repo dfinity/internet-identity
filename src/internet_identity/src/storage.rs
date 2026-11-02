@@ -1993,6 +1993,62 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Writes nothing. Writes between batches can make the totals slightly inconsistent,
     /// which is fine for a check that only needs the order of magnitude of any gaps.
+    /// Reads every anchor from `start` and writes it straight back, so each is
+    /// re-encoded by the code doing the writing.
+    ///
+    /// Answers how many were written and where to resume, or `None` once the range is
+    /// exhausted. Fields this build does not know are dropped by the read, which is what
+    /// clears a registration left at an index this build no longer uses.
+    pub fn rewrite_anchors_batch(
+        &mut self,
+        start: AnchorNumber,
+        max_anchors: u64,
+        out_of_budget: impl Fn() -> bool,
+    ) -> (u64, Option<AnchorNumber>) {
+        // Collected before any write, because the range borrows the memory a write takes.
+        let mut batch = Vec::new();
+        let mut resume_at = None;
+        for (anchor_number, _) in self.stable_anchor_memory.range(start..) {
+            if !batch.is_empty() && (batch.len() as u64 >= max_anchors || out_of_budget()) {
+                resume_at = Some(anchor_number);
+                break;
+            }
+            batch.push(anchor_number);
+        }
+
+        let mut written = 0;
+        for anchor_number in batch {
+            match self
+                .read(anchor_number)
+                .and_then(|anchor| self.write(anchor))
+            {
+                Ok(()) => written += 1,
+                Err(err) => ic_cdk::println!("Could not rewrite anchor {anchor_number}: {err}"),
+            }
+        }
+        (written, resume_at)
+    }
+
+    /// The same for every Home Screen app record. There is one per installed app rather
+    /// than one per identity, so this does not need splitting across batches.
+    pub fn rewrite_notification_apps(&mut self) -> u64 {
+        let app_ids: Vec<NotificationAppId> = self
+            .notification_app_memory
+            .iter()
+            .map(|(id, _)| id)
+            .collect();
+        let mut written = 0;
+        for app_id in app_ids {
+            let Some(app) = self.notification_app(app_id) else {
+                continue;
+            };
+            self.notification_app_memory
+                .insert(app_id, StorableNotificationApp::from(app));
+            written += 1;
+        }
+        written
+    }
+
     pub fn audit_passkey_indices_batch(
         &self,
         start: AnchorNumber,
