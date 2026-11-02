@@ -1145,7 +1145,7 @@ pub enum SetWebPushSubscriptionError {
 /// which could hand over a VAPID key of its own choosing, and a subscription binds to that
 /// key permanently.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct NotificationKeys {
+pub struct PrepareWebPushSubscriptionResponse {
     /// Internet Identity's own VAPID public key, uncompressed SEC1 P-256.
     pub vapid_public_key: ByteBuf,
     /// Minted for this caller and this attempt, uncompressed SEC1 P-256. Its private half
@@ -1154,7 +1154,7 @@ pub struct NotificationKeys {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum GetNotificationKeysError {
+pub enum PrepareWebPushSubscriptionError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
     /// The randomness these keys are derived from is being drawn. Asking put that draw

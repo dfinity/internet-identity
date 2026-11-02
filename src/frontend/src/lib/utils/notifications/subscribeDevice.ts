@@ -10,7 +10,10 @@ import {
   subscribedWith,
   subscribeToPush,
 } from "./pushSubscription";
-import { notificationKeys, type NotificationKeys } from "./notificationKeys";
+import {
+  prepareSubscription,
+  type SubscriptionKeys,
+} from "./prepareSubscription";
 import { sealSubscriptionAuth } from "./transportSeal";
 import { browserKeyActor } from "./browserActor";
 import { registeredIdentityNumbers } from "$lib/stores/browser-key.store";
@@ -46,7 +49,7 @@ export const registerStoredDevice = async (
   /** Who to call as. The Home Screen app signs as itself, and what it registers lands on its own record; everyone else signs as the browser key this sign-in registered. */
   caller?: ActorSubclass<_SERVICE>,
   /** Keys already fetched for this identity, where the caller needed the VAPID half first. */
-  fetched?: NotificationKeys,
+  fetched?: SubscriptionKeys,
 ): Promise<string> => {
   const actor = caller ?? (await browserKeyActor(identityNumber));
   // Nothing to do where the canister already holds this address. Re-registering would
@@ -61,7 +64,7 @@ export const registerStoredDevice = async (
   // Its own fetch where none was handed down: the transport key is minted per caller and
   // spent by one subscribe, so no two registrations can share one.
   const { transportPublicKey } =
-    fetched ?? (await notificationKeys(identityNumber, actor));
+    fetched ?? (await prepareSubscription(identityNumber, actor));
   const { p256dh, transportKey, sealedAuth } = await sealSubscriptionAuth(
     subscription,
     transportPublicKey,
@@ -89,7 +92,7 @@ export const subscribeAndRegisterDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
   const actor = await browserKeyActor(identityNumber);
-  const keys = await notificationKeys(identityNumber, actor);
+  const keys = await prepareSubscription(identityNumber, actor);
   const subscription = await subscribeToPush(keys.vapidPublicKey);
   await registerStoredDevice(identityNumber, subscription, actor, keys);
   return subscription.endpoint;
@@ -106,7 +109,7 @@ export const subscribeAndRegisterDevice = async (
  * to re-register every other identity this browser holds a key for.
  */
 const usableSubscription = async (
-  keys: NotificationKeys,
+  keys: SubscriptionKeys,
 ): Promise<{
   subscription: PushSubscription;
   minted: boolean;
@@ -169,7 +172,7 @@ export const ensureRegisteredDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
   const actor = await browserKeyActor(identityNumber);
-  const keys = await notificationKeys(identityNumber, actor);
+  const keys = await prepareSubscription(identityNumber, actor);
   const { subscription, minted } = await usableSubscription(keys);
   // They are siblings: every identity here registers the same subscription under its own
   // browser key, and the one that asked is distinguished only in that its answer is the
@@ -226,7 +229,7 @@ export const registerForAnyAnchor = async (
   }
 
   const { subscription: live } = await usableSubscription(
-    await notificationKeys(first, caller),
+    await prepareSubscription(first, caller),
   );
 
   for (const anchor of anchors) {

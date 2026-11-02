@@ -9,14 +9,11 @@
 // canister drops it as soon as that subscribe spends it, so a held copy would be a key
 // the next call could not use.
 
-import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+import { retryFor, throwCanisterError } from "$lib/utils/utils";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type {
-  _SERVICE,
-  GetNotificationKeysError,
-} from "$lib/generated/internet_identity_types";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
 
-export interface NotificationKeys {
+export interface SubscriptionKeys {
   /** Internet Identity's own VAPID public key, which a browser subscribes with. */
   vapidPublicKey: Uint8Array;
   /** Minted for this caller and this attempt. */
@@ -26,9 +23,9 @@ export interface NotificationKeys {
 const askOnce = async (
   identityNumber: bigint,
   actor: ActorSubclass<_SERVICE>,
-): Promise<NotificationKeys> => {
+): Promise<SubscriptionKeys> => {
   const keys = await actor
-    .get_notification_keys(identityNumber)
+    .prepare_webpush_subscription(identityNumber)
     .then(throwCanisterError);
   return {
     vapidPublicKey: new Uint8Array(keys.vapid_public_key),
@@ -36,23 +33,19 @@ const askOnce = async (
   };
 };
 
+/** Enough asks to outlast the rounds the canister's own draw takes to come back. */
+const ATTEMPTS = 4;
+
 /**
  * Asks `actor` for the keys `identityNumber`'s next subscribe needs.
  *
  * The canister derives both from randomness it keeps pooled, and a pool nobody has
- * subscribed through for a while has none to serve. It answers `TryAgain` and draws,
- * so the second ask is the one that finds it drawn.
+ * subscribed through for a while has none to serve. The first ask puts the draw in
+ * flight and is told to come back; the reply to it lands a round or two later, which is
+ * what the backoff between asks is waiting out.
  */
-export const notificationKeys = (
+export const prepareSubscription = (
   identityNumber: bigint,
   actor: ActorSubclass<_SERVICE>,
-): Promise<NotificationKeys> =>
-  askOnce(identityNumber, actor).catch((error: unknown) => {
-    if (
-      !isCanisterError<GetNotificationKeysError>(error) ||
-      error.type !== "TryAgain"
-    ) {
-      throw error;
-    }
-    return askOnce(identityNumber, actor);
-  });
+): Promise<SubscriptionKeys> =>
+  retryFor(ATTEMPTS, () => askOnce(identityNumber, actor));

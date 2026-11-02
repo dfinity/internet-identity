@@ -707,15 +707,6 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
-  const NotificationKeys = IDL.Record({
-    'vapid_public_key' : IDL.Vec(IDL.Nat8),
-    'transport_public_key' : IDL.Vec(IDL.Nat8),
-  });
-  const GetNotificationKeysError = IDL.Variant({
-    'InvalidBrowserKey' : IDL.Null,
-    'InternalCanisterError' : IDL.Text,
-    'TryAgain' : IDL.Null,
-  });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -1087,6 +1078,15 @@ export const idlFactory = ({ IDL }) => {
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
+  });
+  const PrepareWebPushSubscriptionResponse = IDL.Record({
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'transport_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const PrepareWebPushSubscriptionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'TryAgain' : IDL.Null,
   });
   const ProbeNotificationAppRequest = IDL.Record({
     'anchor_number' : UserNumber,
@@ -1602,16 +1602,6 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'get_notification_keys' : IDL.Func(
-        [UserNumber],
-        [
-          IDL.Variant({
-            'Ok' : NotificationKeys,
-            'Err' : GetNotificationKeysError,
-          }),
-        ],
-        [],
-      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -1943,6 +1933,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareSessionDelegation,
             'Err' : SessionDelegationError,
+          }),
+        ],
+        [],
+      ),
+    'prepare_webpush_subscription' : IDL.Func(
+        [UserNumber],
+        [
+          IDL.Variant({
+            'Ok' : PrepareWebPushSubscriptionResponse,
+            'Err' : PrepareWebPushSubscriptionError,
           }),
         ],
         [],

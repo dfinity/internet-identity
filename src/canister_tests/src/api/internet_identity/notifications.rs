@@ -7,18 +7,18 @@ use internet_identity_interface::internet_identity::types::{
     ClaimNotificationAppRequest, DisableNotificationAppError, DisableNotificationAppRequest,
     EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
     GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
-    GetNotificationDelegationResponse, GetNotificationError, GetNotificationKeysError,
-    GetNotificationRequest, GetNotificationResponse, GetWebPushSubscriptionStatusRequest,
-    LinkNotificationAppError, LinkNotificationAppRequest, LinkNotificationAppResponse,
-    NotificationAppAnchorsRequest, NotificationAppStatus, NotificationConsentGrantedRequest,
-    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
-    NotificationId, NotificationKeys, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
-    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
-    PrepareNotificationDelegationResponse, ProbeNotificationAppError, ProbeNotificationAppRequest,
-    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
-    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError,
-    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    GetNotificationDelegationResponse, GetNotificationError, GetNotificationRequest,
+    GetNotificationResponse, GetWebPushSubscriptionStatusRequest, LinkNotificationAppError,
+    LinkNotificationAppRequest, LinkNotificationAppResponse, NotificationAppAnchorsRequest,
+    NotificationAppStatus, NotificationConsentGrantedRequest, NotificationDelegationError,
+    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationId,
+    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
+    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
+    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
+    PrepareWebPushSubscriptionError, PrepareWebPushSubscriptionResponse, ProbeNotificationAppError,
+    ProbeNotificationAppRequest, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
+    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -154,18 +154,21 @@ pub fn app_revoke_notification_consent(
     .map(|(x,)| x)
 }
 
-pub fn get_notification_keys(
+pub fn prepare_webpush_subscription(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: AnchorNumber,
-) -> Result<Result<NotificationKeys, GetNotificationKeysError>, RejectResponse> {
+) -> Result<
+    Result<PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionError>,
+    RejectResponse,
+> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "get_notification_keys",
+        "prepare_webpush_subscription",
         (anchor_number,),
     )
     .map(|(x,)| x)
@@ -218,6 +221,31 @@ pub fn seal_auth(transport_public_key: &[u8], auth: &[u8]) -> (ByteBuf, ByteBuf)
     (ByteBuf::from(browser_public), ByteBuf::from(ciphertext))
 }
 
+/// The keys, asking again where the canister is still drawing the randomness it derives
+/// them from.
+///
+/// A cold pool answers `TryAgain` and puts that draw in flight. The reply to it lands a
+/// round or two later, so the asks before that are told to come back too. The browser
+/// does the same.
+/// Enough to outlast the rounds a `raw_rand` reply takes to come back.
+const PREPARE_ATTEMPTS: usize = 5;
+
+fn prepared_keys(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+) -> Option<PrepareWebPushSubscriptionResponse> {
+    for _ in 0..PREPARE_ATTEMPTS {
+        match prepare_webpush_subscription(env, canister_id, sender, anchor_number) {
+            Ok(Ok(keys)) => return Some(keys),
+            Ok(Err(PrepareWebPushSubscriptionError::TryAgain)) => continue,
+            _ => return None,
+        }
+    }
+    None
+}
+
 /// Subscribes the way a browser does: fetch the keys, encrypt `auth` to the transport key
 /// the canister just minted for this caller, then send.
 ///
@@ -231,7 +259,7 @@ pub fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
 ) -> Result<Result<(), SetWebPushSubscriptionError>, RejectResponse> {
     let mut request = request;
-    if let Ok(Ok(keys)) = get_notification_keys(env, canister_id, sender, request.anchor_number) {
+    if let Some(keys) = prepared_keys(env, canister_id, sender, request.anchor_number) {
         let (transport_key, sealed_auth) = seal_auth(&keys.transport_public_key, &TEST_AUTH_SECRET);
         request.transport_key = transport_key;
         request.sealed_auth = sealed_auth;

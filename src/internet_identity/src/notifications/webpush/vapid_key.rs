@@ -257,7 +257,7 @@ pub(crate) fn ensure_public_key() {
             // Not retried: the key is derived from public inputs, so the one documented
             // failure is the subnet not holding `key_1` over secp256r1, which no amount
             // of asking changes. Until it does, no browser can subscribe and
-            // `get_notification_keys` answers the error this reports.
+            // `prepare_webpush_subscription` answers the error this reports.
             Err(err) => ic_cdk::println!(
                 "ERROR: no VAPID key, so notifications cannot be delivered from this \
                  subnet: {err}"

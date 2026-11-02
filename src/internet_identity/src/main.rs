@@ -345,22 +345,22 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 /// a VAPID key of its own choosing would bind the subscription to it permanently, and the
 /// browser has nothing to check the answer against.
 #[update]
-async fn get_notification_keys(
+async fn prepare_webpush_subscription(
     anchor_number: AnchorNumber,
-) -> Result<NotificationKeys, GetNotificationKeysError> {
-    enabled_or(GetNotificationKeysError::InternalCanisterError)?;
+) -> Result<PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionError> {
+    enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
-        .map_err(|_| GetNotificationKeysError::InvalidBrowserKey)?;
+        .map_err(|_| PrepareWebPushSubscriptionError::InvalidBrowserKey)?;
 
     let vapid_public_key = notifications::webpush::vapid_key::held_public_key()
         .await
-        .map_err(GetNotificationKeysError::InternalCanisterError)?;
+        .map_err(PrepareWebPushSubscriptionError::InternalCanisterError)?;
 
     let now_ns = ic_cdk::api::time();
     // Nothing pooled to derive from yet, which only happens when nobody has subscribed
     // for a while. Asking for it put the draw in flight, so the browser's retry finds it.
     let seeds = notifications::webpush::seed_pool::seeds_for(anchor_number, key, now_ns)
-        .ok_or(GetNotificationKeysError::TryAgain)?;
+        .ok_or(PrepareWebPushSubscriptionError::TryAgain)?;
 
     let transport_public_key =
         notifications::webpush::transport::public_key_of(&seeds.transport_scalar);
@@ -373,9 +373,9 @@ async fn get_notification_keys(
         seeds.sender_seed,
         now_ns,
     )
-    .map_err(GetNotificationKeysError::InternalCanisterError)?;
+    .map_err(PrepareWebPushSubscriptionError::InternalCanisterError)?;
 
-    Ok(NotificationKeys {
+    Ok(PrepareWebPushSubscriptionResponse {
         vapid_public_key: ByteBuf::from(vapid_public_key),
         transport_public_key: ByteBuf::from(transport_public_key),
     })

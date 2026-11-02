@@ -21,8 +21,8 @@ vi.mock("./transportSeal", () => ({
       sealedAuth: new Uint8Array(32).fill(6),
     }),
 }));
-vi.mock("./notificationKeys", () => ({
-  notificationKeys: () =>
+vi.mock("./prepareSubscription", () => ({
+  prepareSubscription: () =>
     Promise.resolve({
       vapidPublicKey: new Uint8Array(65),
       transportPublicKey: new Uint8Array(65).fill(7),

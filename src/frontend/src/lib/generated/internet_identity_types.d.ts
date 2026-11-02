@@ -1110,20 +1110,6 @@ export type GetNotificationError = {
     'InvalidBrowserKey' : null
   } |
   { 'InternalCanisterError' : string };
-export type GetNotificationKeysError = {
-    /**
-     * The caller signs with no key this identity is signed in from.
-     */
-    'InvalidBrowserKey' : null
-  } |
-  { 'InternalCanisterError' : string } |
-  {
-    /**
-     * The randomness these keys are derived from is being drawn. Asking put that draw in
-     * flight, so call again.
-     */
-    'TryAgain' : null
-  };
 export interface GetNotificationRequest {
   'inbox_notification_id' : InboxNotificationId,
   /**
@@ -1747,13 +1733,6 @@ export interface NotificationGrantConsentRequest {
  * one origin.
  */
 export type NotificationId = bigint;
-/**
- * Both keys a browser needs before it can subscribe.
- */
-export interface NotificationKeys {
-  'vapid_public_key' : Uint8Array | number[],
-  'transport_public_key' : Uint8Array | number[],
-}
 export type NotificationRevokeConsentError = {
     'InternalCanisterError' : string
   } |
@@ -2172,6 +2151,27 @@ export interface PrepareSessionDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
 }
+export type PrepareWebPushSubscriptionError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The randomness these keys are derived from is being drawn. Asking put that draw in
+     * flight, so call again.
+     */
+    'TryAgain' : null
+  };
+/**
+ * Both keys a browser needs before it can subscribe.
+ */
+export interface PrepareWebPushSubscriptionResponse {
+  'vapid_public_key' : Uint8Array | number[],
+  'transport_public_key' : Uint8Array | number[],
+}
 /**
  * The prepared id alias contains two (still unsigned) credentials in JWT format,
  * certifying the id alias for the issuer resp. the relying party.
@@ -2378,7 +2378,7 @@ export type SetWebPushSubscriptionError = {
   {
     /**
      * Nothing here can open sealed_auth: the transport key it was encrypted to has
-     * expired, or a later get_notification_keys from this browser replaced it. Fetch the
+     * expired, or a later prepare_webpush_subscription from this browser replaced it. Fetch the
      * keys again and re-send.
      */
     'TransportKeyExpired' : null
@@ -2393,7 +2393,7 @@ export interface SetWebPushSubscriptionRequest {
    * The subscription's 16-byte auth secret under AES-128-GCM, 32 bytes with its tag.
    * Encrypted because an ingress call is not confidential, and (endpoint, p256dh, auth)
    * is all a forged push the browser will decrypt needs. It is encrypted to the
-   * transport key get_notification_keys minted for this caller, whose private half
+   * transport key prepare_webpush_subscription minted for this caller, whose private half
    * never leaves the canister and is dropped as soon as this call spends it.
    */
   'sealed_auth' : Uint8Array | number[],
@@ -3088,21 +3088,6 @@ export interface _SERVICE {
     { 'Ok' : GetNotificationDelegationResponse } |
       { 'Err' : NotificationDelegationError }
   >,
-  /**
-   * The key a browser subscribes with and every push names. Absent only in the moment
-   * between the install returning and the answer to the read it starts.
-   * Both keys a browser needs before it subscribes: the one every push is signed with,
-   * and a one-shot key it encrypts this subscription's auth secret to.
-   * 
-   * An update call, because a query reply is signed by one replica. One that answered
-   * with a VAPID key of its own choosing would bind the subscription to it permanently,
-   * and the browser has nothing to check the answer against.
-   */
-  'get_notification_keys' : ActorMethod<
-    [UserNumber],
-    { 'Ok' : NotificationKeys } |
-      { 'Err' : GetNotificationKeysError }
-  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
@@ -3485,6 +3470,21 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
+  >,
+  /**
+   * The key a browser subscribes with and every push names. Absent only in the moment
+   * between the install returning and the answer to the read it starts.
+   * Both keys a browser needs before it subscribes: the one every push is signed with,
+   * and a one-shot key it encrypts this subscription's auth secret to.
+   * 
+   * An update call, because a query reply is signed by one replica. One that answered
+   * with a VAPID key of its own choosing would bind the subscription to it permanently,
+   * and the browser has nothing to check the answer against.
+   */
+  'prepare_webpush_subscription' : ActorMethod<
+    [UserNumber],
+    { 'Ok' : PrepareWebPushSubscriptionResponse } |
+      { 'Err' : PrepareWebPushSubscriptionError }
   >,
   /**
    * Called by the browser, which watches for the answer leaving its own queue: that
