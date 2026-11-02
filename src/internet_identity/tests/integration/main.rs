@@ -19,6 +19,7 @@ mod http;
 mod mcp;
 mod notifications;
 mod openid;
+mod passkey_index_audit;
 mod rollback;
 mod session_delegation;
 mod sessions;
