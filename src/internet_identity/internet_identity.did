@@ -1891,11 +1891,30 @@ type NotificationConsentGrantedRequest = record {
 type SetWebPushSubscriptionRequest = record {
     anchor_number : UserNumber;
     endpoint : text;                   // the relay URL the browser was issued
-    // RFC 8291 input keying material, derived by the browser from this subscription's own
-    // keys and an ephemeral pair it mints for the purpose. The ECDH runs there so it never
-    // has to run here: sealing a payload costs two HKDFs and one AES-GCM.
-    payload_ikm : blob;                // 32 bytes
-    payload_keyid : blob;              // that ephemeral pair's public key, uncompressed SEC1 P-256
+    // The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+    // nothing without a private scalar and forges nothing without the auth secret.
+    p256dh : blob;                     // 65 bytes
+    // The public half of the pair the browser minted to encrypt the auth secret with,
+    // uncompressed SEC1 P-256. The canister needs it to run its half of the agreement.
+    transport_key : blob;              // 65 bytes
+    // The subscription's 16-byte auth secret under AES-128-GCM, 32 bytes with its tag.
+    // Encrypted because an ingress call is not confidential, and (endpoint, p256dh, auth)
+    // is all a forged push the browser will decrypt needs. It is encrypted to the
+    // transport key get_notification_keys minted for this caller, whose private half
+    // never leaves the canister and is dropped as soon as this call spends it.
+    sealed_auth : blob;                // 32 bytes
+};
+
+// Both keys a browser needs before it can subscribe.
+type NotificationKeys = record {
+    vapid_public_key : blob;           // uncompressed SEC1 P-256
+    transport_public_key : blob;       // minted for this caller and this attempt
+};
+
+type GetNotificationKeysError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
 };
 
 type RemoveWebPushSubscriptionRequest = record {
@@ -1906,6 +1925,10 @@ type RemoveWebPushSubscriptionRequest = record {
 type SetWebPushSubscriptionError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
+    // Nothing here can open sealed_auth: the transport key it was encrypted to has
+    // expired, or a later get_notification_keys from this browser replaced it. Fetch the
+    // keys again and re-send.
+    TransportKeyExpired;
     InternalCanisterError : text;
 };
 
@@ -2753,7 +2776,13 @@ service : (opt InternetIdentityInit) -> {
 
     // The key a browser subscribes with and every push names. Absent only in the moment
     // between the install returning and the answer to the read it starts.
-    get_vapid_public_key : () -> (opt blob) query;
+    // Both keys a browser needs before it subscribes: the one every push is signed with,
+    // and a one-shot key it encrypts this subscription's auth secret to.
+    //
+    // An update call, because a query reply is signed by one replica. One that answered
+    // with a VAPID key of its own choosing would bind the subscription to it permanently,
+    // and the browser has nothing to check the answer against.
+    get_notification_keys : (UserNumber) -> (variant { Ok : NotificationKeys; Err : GetNotificationKeysError });
     // Called by the browser, or by the Home Screen app it points at: what the app
     // registers belongs to its own record, which every identity pointing at it is
     // delivered through, so the anchor named here is what authorized the call rather

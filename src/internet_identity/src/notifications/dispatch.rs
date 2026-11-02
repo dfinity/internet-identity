@@ -7,6 +7,7 @@ use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::backlog::identity::PendingIdentityNotification;
 use crate::notifications::browser_inbox;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
+use crate::notifications::webpush::rotation;
 use crate::notifications::webpush::{
     clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId,
 };
@@ -151,7 +152,7 @@ fn record_post_outcome(outcome: PostOutcome) {
 
 /// Which registration a wake-up was posted to, carried with the post because the entry may
 /// point somewhere else by the time an answer comes back.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum DeliveryTarget {
     /// The entry's own registration.
     Browser,
@@ -276,8 +277,9 @@ fn run_pass(armed: u64, now_ns: Timestamp) {
     // backlog plans against whatever is left of the budget.
     let identity = plan_identity_pass(MAX_IDENTITY_POSTS_PER_PASS, now_ns);
     let app = plan_pass(MAX_POSTS_PER_PASS.saturating_sub(identity.len()), now_ns);
-    for delivery in identity.into_iter().chain(app) {
-        outcalls::spawn_post(delivery);
+    let deliveries: Vec<Delivery> = identity.into_iter().chain(app).collect();
+    if !deliveries.is_empty() {
+        post_pass(deliveries, now_ns);
     }
     let work_left =
         state::notification_backlog_mut(now_ns, |backlog| backlog.stats(now_ns).stored_total > 0)
@@ -286,6 +288,40 @@ fn run_pass(armed: u64, now_ns: Timestamp) {
             });
     if work_left {
         schedule_pass(now_ns);
+    }
+}
+
+/// Seals this pass's wake-ups against randomness of its own, then posts them.
+///
+/// The draw happens here and nowhere else: a pass with nothing to send asks for nothing,
+/// and one that does gets bytes no other pass has had, which is what keeps two passes
+/// from sealing under the same salt when their indices both start at zero.
+#[cfg(not(test))]
+fn post_pass(mut deliveries: Vec<Delivery>, now_ns: Timestamp) {
+    ic_cdk::spawn(async move {
+        match crate::notifications::webpush::randomness::raw_rand().await {
+            Ok(pass_bytes) => {
+                seal_pass(&mut deliveries, &pass_bytes, now_ns);
+                for delivery in deliveries {
+                    outcalls::spawn_post(delivery);
+                }
+            }
+            // The entries are deposited either way, so what could not be posted is
+            // announced by the next wake-up these browsers get rather than lost.
+            Err(err) => ic_cdk::println!(
+                "A pass could not draw its randomness, so nothing was posted: {err}"
+            ),
+        }
+    });
+}
+
+/// As above, for tests, which have no executor to spawn onto and no management canister
+/// to draw from. Fixed bytes stand in for the draw; everything after it is the same code.
+#[cfg(test)]
+fn post_pass(mut deliveries: Vec<Delivery>, now_ns: Timestamp) {
+    seal_pass(&mut deliveries, &[0u8; 32], now_ns);
+    for delivery in deliveries {
+        outcalls::spawn_post(delivery);
     }
 }
 
@@ -397,8 +433,6 @@ fn fan_out_to_destinations(
                     urgency: pending.urgency.clone(),
                     ttl_seconds: IDENTITY_NOTIFICATION_TTL_NS / SECOND_NS,
                 },
-                subscription.payload_ikm.clone(),
-                subscription.payload_keyid.clone(),
             ));
         }
 
@@ -413,9 +447,7 @@ fn fan_out_to_destinations(
         };
 
         let mut wrote = false;
-        for ((_, browser_id, queued, mut delivery, payload_ikm, payload_keyid), jwt) in
-            planned.into_iter().zip(jwts)
-        {
+        for ((_, browser_id, queued, mut delivery), jwt) in planned.into_iter().zip(jwts) {
             // Nothing answers at this browser's relay, so it is left out of the fan-out
             // rather than deposited for: it cannot be woken, and the entry it would sit
             // behind would never be shown.
@@ -428,13 +460,8 @@ fn fan_out_to_destinations(
             };
             wrote = true;
             let deposited = browser_inbox::deposit(queue, next_id, queued, now_ns);
-            delivery.body = sealed_for(
-                &payload_ikm,
-                &payload_keyid,
-                delivery.anchor_number,
-                browser_id,
-                &deposited,
-            );
+            // The body is sealed once the pass is planned, because what it is sealed with
+            // may be refreshed first and the salt comes from the pass rather than the entry.
             delivery.notification = Some(deposited);
             deliveries.push(delivery);
         }
@@ -530,15 +557,13 @@ fn fan_out_to_browsers(
             .collect();
         // The sealing keys travel with each wake-up: the deposit that names its entry
         // happens below, after this borrow of the browsers has ended.
-        let woken: Vec<(String, Delivery, PayloadIkm, PayloadKeyId)> = anchor
+        let woken: Vec<(String, Delivery)> = anchor
             .browsers()
             .iter()
             .zip(apps.iter())
             .filter_map(|(browser, app)| {
                 let (subscription, relay_origin, target) =
                     wake_up_address(browser, app.as_ref(), now_ns)?;
-                let payload_ikm = subscription.payload_ikm.clone();
-                let payload_keyid = subscription.payload_keyid.clone();
                 Some((
                     relay_origin,
                     Delivery {
@@ -555,8 +580,6 @@ fn fan_out_to_browsers(
                         urgency: pending.urgency.clone(),
                         ttl_seconds,
                     },
-                    payload_ikm,
-                    payload_keyid,
                 ))
             })
             .collect();
@@ -571,7 +594,7 @@ fn fan_out_to_browsers(
         };
         let mut to_post = Vec::new();
         let mut queued_anywhere = false;
-        for ((_, mut delivery, payload_ikm, payload_keyid), jwt) in woken.into_iter().zip(jwts) {
+        for ((_, mut delivery), jwt) in woken.into_iter().zip(jwts) {
             // Nothing answers at this browser's relay; see the identity fan-out.
             let Some(jwt) = jwt else {
                 continue;
@@ -582,13 +605,6 @@ fn fan_out_to_browsers(
             };
             queued_anywhere = true;
             let deposited = browser_inbox::deposit(queue, next_id, queued.clone(), now_ns);
-            delivery.body = sealed_for(
-                &payload_ikm,
-                &payload_keyid,
-                delivery.anchor_number,
-                delivery.browser_id,
-                &deposited,
-            );
             delivery.notification = Some(deposited);
             to_post.push(delivery);
         }
@@ -806,6 +822,7 @@ fn sealed_for(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     deposited: &InboxNotification,
+    salt: u128,
 ) -> Option<Vec<u8>> {
     let named = serde_json::to_vec(&WakeUpPayload {
         anchor_number,
@@ -814,14 +831,64 @@ fn sealed_for(
     })
     .inspect_err(|err| ic_cdk::println!("ERROR: could not write a wake-up's payload: {err}"))
     .ok()?;
-    payload::seal(
-        payload_ikm,
-        payload_keyid,
-        payload::salt_for(anchor_number, browser_id, deposited.inbox_notification_id),
-        &named,
-    )
-    .inspect_err(|err| ic_cdk::println!("ERROR: could not seal a wake-up's payload: {err}"))
-    .ok()
+    payload::seal(payload_ikm, payload_keyid, salt, &named)
+        .inspect_err(|err| ic_cdk::println!("ERROR: could not seal a wake-up's payload: {err}"))
+        .ok()
+}
+
+/// Seals every wake-up this pass is about to post, refreshing the stalest keying material
+/// on the way past.
+///
+/// Separate from planning because both halves need the pass's own random bytes, which are
+/// drawn once the pass knows it has something to send. The refresh comes first, so a
+/// subscription picked for it seals with the key it was just given rather than the one it
+/// arrived with.
+fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timestamp) {
+    let candidates: Vec<(rotation::Destination, Timestamp)> = deliveries
+        .iter()
+        .filter(|delivery| delivery.notification.is_some())
+        .filter_map(|delivery| {
+            let destination = destination_of(delivery);
+            rotation::sealing_keys(destination)
+                .map(|(_, _, last_rotated_ns)| (destination, last_rotated_ns))
+        })
+        .collect();
+
+    if !candidates.is_empty() {
+        let sender = rotation::pass_sender(pass_bytes);
+        for destination in rotation::stalest(candidates, rotation::ROTATIONS_PER_PASS) {
+            if let Err(err) = rotation::refresh(destination, &sender, now_ns) {
+                ic_cdk::println!("Could not refresh what a subscription seals with: {err}");
+            }
+        }
+    }
+
+    for (index, delivery) in deliveries.iter_mut().enumerate() {
+        let Some(deposited) = delivery.notification.clone() else {
+            continue;
+        };
+        let Some((payload_ikm, payload_keyid, _)) =
+            rotation::sealing_keys(destination_of(delivery))
+        else {
+            continue;
+        };
+        delivery.body = sealed_for(
+            &payload_ikm,
+            &payload_keyid,
+            delivery.anchor_number,
+            delivery.browser_id,
+            &deposited,
+            payload::salt_at(pass_bytes, index),
+        );
+    }
+}
+
+fn destination_of(delivery: &Delivery) -> rotation::Destination {
+    rotation::Destination {
+        anchor_number: delivery.anchor_number,
+        browser_id: delivery.browser_id,
+        target: delivery.target,
+    }
 }
 
 /// Build retention, urgency, and VAPID authorization headers.

@@ -707,6 +707,14 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
+  const NotificationKeys = IDL.Record({
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'transport_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const GetNotificationKeysError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -1125,14 +1133,16 @@ export const idlFactory = ({ IDL }) => {
     }),
   });
   const SetWebPushSubscriptionRequest = IDL.Record({
+    'sealed_auth' : IDL.Vec(IDL.Nat8),
     'endpoint' : IDL.Text,
     'anchor_number' : UserNumber,
-    'payload_keyid' : IDL.Vec(IDL.Nat8),
-    'payload_ikm' : IDL.Vec(IDL.Nat8),
+    'p256dh' : IDL.Vec(IDL.Nat8),
+    'transport_key' : IDL.Vec(IDL.Nat8),
   });
   const SetWebPushSubscriptionError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'TransportKeyExpired' : IDL.Null,
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
   const SmtpEnvelope = IDL.Record({
@@ -1591,6 +1601,16 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'get_notification_keys' : IDL.Func(
+        [UserNumber],
+        [
+          IDL.Variant({
+            'Ok' : NotificationKeys,
+            'Err' : GetNotificationKeysError,
+          }),
+        ],
+        [],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -1609,11 +1629,6 @@ export const idlFactory = ({ IDL }) => {
     'get_sso_discovery_status' : IDL.Func(
         [GetSsoDiscoveryStatusRequest],
         [SsoDiscoveryStatus],
-        ['query'],
-      ),
-    'get_vapid_public_key' : IDL.Func(
-        [],
-        [IDL.Opt(IDL.Vec(IDL.Nat8))],
         ['query'],
       ),
     'get_webpush_subscription_status' : IDL.Func(

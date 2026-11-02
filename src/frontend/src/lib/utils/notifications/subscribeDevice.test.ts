@@ -11,21 +11,24 @@ vi.mock("./pushSubscription", () => ({
   subscribedWith: (subscription: PushSubscription, key: Uint8Array) =>
     String(subscription.options.applicationServerKey) === String(key),
 }));
-// The derivation needs a real subscription and real WebCrypto ECDH; what it produces is
-// covered where it lives.
-vi.mock("./payloadKeys", () => ({
-  derivePayloadKeys: () =>
+// Sealing needs a real subscription and real WebCrypto ECDH; what it produces is covered
+// where it lives.
+vi.mock("./transportSeal", () => ({
+  sealSubscriptionAuth: () =>
     Promise.resolve({
-      payloadIkm: new Uint8Array(32).fill(9),
-      payloadKeyid: new Uint8Array(65).fill(4),
+      p256dh: new Uint8Array(65).fill(4),
+      transportKey: new Uint8Array(65).fill(5),
+      sealedAuth: new Uint8Array(32).fill(6),
+    }),
+}));
+vi.mock("./notificationKeys", () => ({
+  notificationKeys: () =>
+    Promise.resolve({
+      vapidPublicKey: new Uint8Array(65),
+      transportPublicKey: new Uint8Array(65).fill(7),
     }),
 }));
 vi.mock("./browserActor", () => ({
-  anonymousActor: vi.fn(() =>
-    Promise.resolve({
-      get_vapid_public_key: () => Promise.resolve([new Uint8Array(65)]),
-    }),
-  ),
   browserKeyActor: vi.fn((identityNumber: bigint) =>
     Promise.resolve({
       set_webpush_subscription: (args: { endpoint: string }) =>

@@ -1,7 +1,10 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::validation::{PayloadIkm, PayloadKeyId, PushEndpoint};
+use super::validation::{
+    AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SealedAuth, SubscriberKey,
+};
+use super::{payload, randomness, transport};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
@@ -17,19 +20,45 @@ use internet_identity_interface::internet_identity::types::{
 
 /// Registers `browser_id` for Web Push. Idempotent: a browser that re-subscribes
 /// overwrites what it registered before, endpoint included.
+///
+/// `auth` arrives encrypted to the transport key this caller's key fetch minted, so the
+/// first thing here is to open it, and the second is to derive what the subscription will
+/// be sealed with. Deriving now rather than on the first dispatch pass is what keeps the
+/// rotation budget a question of freshness: a pass that cannot afford to refresh a
+/// subscription can still send to it, because it already has a key.
 pub fn set_subscription(
     key: NotificationKey,
     anchor_number: AnchorNumber,
     endpoint: PushEndpoint,
-    payload_ikm: PayloadIkm,
-    payload_keyid: PayloadKeyId,
+    subscriber_key: SubscriberKey,
+    browser_transport_key: SubscriberKey,
+    sealed_auth: SealedAuth,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
+    let pending = transport::take(transport::Caller { anchor_number, key }, now_ns)
+        .ok_or(SetWebPushSubscriptionError::TransportKeyExpired)?;
+    let auth = transport::open(
+        &pending.transport_scalar,
+        &browser_transport_key,
+        &sealed_auth,
+    )
+    .map_err(|_| SetWebPushSubscriptionError::TransportKeyExpired)?;
+    let sender = randomness::secret_key_from(&pending.sender_seed);
+    let (payload_ikm, payload_keyid) = payload::derive_ikm(&sender, &subscriber_key, &auth)
+        .map_err(SetWebPushSubscriptionError::InternalCanisterError)?;
     // What the Home Screen app registers belongs to its record rather than to this entry.
     // The anchor named in the call is what authorized it, not where the subscription goes.
     let browser_id = match key {
         NotificationKey::App(app_id) => {
-            return set_app_subscription(app_id, endpoint, payload_ikm, payload_keyid, now_ns)
+            return set_app_subscription(
+                app_id,
+                endpoint,
+                subscriber_key,
+                auth,
+                payload_ikm,
+                payload_keyid,
+                now_ns,
+            )
         }
         NotificationKey::Browser(browser_id) => browser_id,
     };
@@ -61,6 +90,9 @@ pub fn set_subscription(
             created_at_ns,
             payload_ikm,
             payload_keyid,
+            subscriber_key,
+            auth,
+            last_rotated_ns: now_ns,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -198,6 +230,8 @@ fn write_subscription(
 fn set_app_subscription(
     app_id: NotificationAppId,
     endpoint: PushEndpoint,
+    subscriber_key: SubscriberKey,
+    auth: AuthSecret,
     payload_ikm: PayloadIkm,
     payload_keyid: PayloadKeyId,
     now_ns: Timestamp,
@@ -230,6 +264,9 @@ fn set_app_subscription(
                 created_at_ns,
                 payload_ikm,
                 payload_keyid,
+                subscriber_key,
+                auth,
+                last_rotated_ns: now_ns,
             }),
             now_ns,
         )

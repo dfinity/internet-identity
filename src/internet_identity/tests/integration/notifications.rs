@@ -737,11 +737,14 @@ mod subscriptions {
     }
 
     pub(super) fn request(anchor: AnchorNumber, endpoint: &str) -> SetWebPushSubscriptionRequest {
+        // `transport_key` and `sealed_auth` are placeholders: the api wrapper fetches the
+        // keys and fills both in, so every test here subscribes the way a browser does.
         SetWebPushSubscriptionRequest {
             anchor_number: anchor,
             endpoint: endpoint.to_string(),
-            payload_ikm: ByteBuf::from(vec![9u8; 32]),
-            payload_keyid: subscription_public_key(),
+            p256dh: subscription_public_key(),
+            transport_key: subscription_public_key(),
+            sealed_auth: ByteBuf::from(vec![0u8; 32]),
         }
     }
 

@@ -1110,6 +1110,13 @@ export type GetNotificationError = {
     'InvalidBrowserKey' : null
   } |
   { 'InternalCanisterError' : string };
+export type GetNotificationKeysError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
 export interface GetNotificationRequest {
   'inbox_notification_id' : InboxNotificationId,
   /**
@@ -1733,6 +1740,13 @@ export interface NotificationGrantConsentRequest {
  * one origin.
  */
 export type NotificationId = bigint;
+/**
+ * Both keys a browser needs before it can subscribe.
+ */
+export interface NotificationKeys {
+  'vapid_public_key' : Uint8Array | number[],
+  'transport_public_key' : Uint8Array | number[],
+}
 export type NotificationRevokeConsentError = {
     'InternalCanisterError' : string
   } |
@@ -2353,22 +2367,41 @@ export type SetWebPushSubscriptionError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string };
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing here can open sealed_auth: the transport key it was encrypted to has
+     * expired, or a later get_notification_keys from this browser replaced it. Fetch the
+     * keys again and re-send.
+     */
+    'TransportKeyExpired' : null
+  };
 /**
- * What a browser uploads when it registers for Web Push, and how it replaces a pool
- * that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+ * What a browser uploads when it registers for Web Push. The same endpoint is a
+ * registration at that endpoint again, which keeps what is already queued for it. Signed with the
  * browser key it signs in with, which is what says the subscription is this browser's.
  */
 export interface SetWebPushSubscriptionRequest {
+  /**
+   * The subscription's 16-byte auth secret under AES-128-GCM, 32 bytes with its tag.
+   * Encrypted because an ingress call is not confidential, and (endpoint, p256dh, auth)
+   * is all a forged push the browser will decrypt needs. It is encrypted to the
+   * transport key get_notification_keys minted for this caller, whose private half
+   * never leaves the canister and is dropped as soon as this call spends it.
+   */
+  'sealed_auth' : Uint8Array | number[],
   'endpoint' : string,
   'anchor_number' : UserNumber,
-  'payload_keyid' : Uint8Array | number[],
   /**
-   * RFC 8291 input keying material, derived by the browser from this subscription's own
-   * keys and an ephemeral pair it mints for the purpose. The ECDH runs there so it never
-   * has to run here: sealing a payload costs two HKDFs and one AES-GCM.
+   * The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+   * nothing without a private scalar and forges nothing without the auth secret.
    */
-  'payload_ikm' : Uint8Array | number[],
+  'p256dh' : Uint8Array | number[],
+  /**
+   * The public half of the pair the browser minted to encrypt the auth secret with,
+   * uncompressed SEC1 P-256. The canister needs it to run its half of the agreement.
+   */
+  'transport_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
@@ -2777,6 +2810,10 @@ export interface _SERVICE {
     { 'Ok' : AuthnMethodConfirmationCode } |
       { 'Err' : AuthnMethodRegisterError }
   >,
+  /**
+   * Called by the service worker on a wake-up, signed with the browser key: the oldest
+   * notification its browser has yet to show, passing over the ones it skips.
+   */
   'browser_get_notification' : ActorMethod<
     [GetNotificationRequest],
     { 'Ok' : GetNotificationResponse } |
@@ -3044,6 +3081,21 @@ export interface _SERVICE {
     { 'Ok' : GetNotificationDelegationResponse } |
       { 'Err' : NotificationDelegationError }
   >,
+  /**
+   * The key a browser subscribes with and every push names. Absent only in the moment
+   * between the install returning and the answer to the read it starts.
+   * Both keys a browser needs before it subscribes: the one every push is signed with,
+   * and a one-shot key it encrypts this subscription's auth secret to.
+   * 
+   * An update call, because a query reply is signed by one replica. One that answered
+   * with a VAPID key of its own choosing would bind the subscription to it permanently,
+   * and the browser has nothing to check the answer against.
+   */
+  'get_notification_keys' : ActorMethod<
+    [UserNumber],
+    { 'Ok' : NotificationKeys } |
+      { 'Err' : GetNotificationKeysError }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
@@ -3054,11 +3106,6 @@ export interface _SERVICE {
     [GetSsoDiscoveryStatusRequest],
     SsoDiscoveryStatus
   >,
-  /**
-   * Called by the service worker on a wake-up, signed with the browser key: the oldest
-   * notification its browser has yet to show, passing over the ones it skips.
-   */
-  'get_vapid_public_key' : ActorMethod<[], [] | [Uint8Array | number[]]>,
   'get_webpush_subscription_status' : ActorMethod<
     [GetWebPushSubscriptionStatusRequest],
     [] | [WebPushSubscriptionStatus]

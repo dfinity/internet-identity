@@ -5,8 +5,11 @@
 //! everything here acts on a browser the caller has already been shown to be.
 
 pub(crate) mod payload;
+pub(crate) mod randomness;
 pub(crate) mod relays;
+pub(crate) mod rotation;
 mod subscription;
+pub(crate) mod transport;
 mod validation;
 pub(crate) mod vapid_key;
 
@@ -15,4 +18,7 @@ pub(crate) mod fixtures;
 
 pub(crate) use subscription::{clear_gone_subscription, delivering_subscription};
 pub use subscription::{remove_subscription, set_subscription, subscription_status};
-pub use validation::{deliverable_endpoint, PayloadIkm, PayloadKeyId, PushEndpoint};
+pub use validation::{
+    deliverable_endpoint, AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SealedAuth,
+    SubscriberKey,
+};

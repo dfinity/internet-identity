@@ -45,7 +45,7 @@ use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
-use notifications::webpush::{deliverable_endpoint, PayloadIkm, PayloadKeyId, PushEndpoint};
+use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
 use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -337,12 +337,47 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 // ---- Notifications: called by II's frontend / service worker ----
 
-/// The key a browser subscribes with and every push names. `None` only in the moment
-/// between the install returning and the answer to the read it starts.
-#[query]
-fn get_vapid_public_key() -> Option<ByteBuf> {
-    enabled_or::<()>(|_| ()).ok()?;
-    notifications::webpush::vapid_key::public_key().map(ByteBuf::from)
+/// Both keys a browser needs before it can subscribe: the one every push is signed with,
+/// and a one-shot key it encrypts this subscription's `auth` secret to.
+///
+/// An update call, because a query reply is signed by one replica. One that answered with
+/// a VAPID key of its own choosing would bind the subscription to it permanently, and the
+/// browser has nothing to check the answer against.
+#[update]
+async fn get_notification_keys(
+    anchor_number: AnchorNumber,
+) -> Result<NotificationKeys, GetNotificationKeysError> {
+    enabled_or(GetNotificationKeysError::InternalCanisterError)?;
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| GetNotificationKeysError::InvalidBrowserKey)?;
+
+    let vapid_public_key = notifications::webpush::vapid_key::fetch_public_key()
+        .await
+        .map_err(GetNotificationKeysError::InternalCanisterError)?;
+
+    let now_ns = ic_cdk::api::time();
+    let caller = notifications::webpush::transport::Caller { anchor_number, key };
+    let bytes = notifications::webpush::randomness::call_bytes(
+        &notifications::webpush::transport::caller_bytes(caller),
+        now_ns,
+    )
+    .await
+    .map_err(GetNotificationKeysError::InternalCanisterError)?;
+
+    let transport_public_key =
+        notifications::webpush::transport::public_key_of(&bytes.transport_scalar);
+    // Held for the subscribe that follows, which is the only call that can spend it.
+    notifications::webpush::transport::remember(
+        caller,
+        bytes.transport_scalar,
+        bytes.sender_seed,
+        now_ns,
+    );
+
+    Ok(NotificationKeys {
+        vapid_public_key: ByteBuf::from(vapid_public_key),
+        transport_public_key: ByteBuf::from(transport_public_key),
+    })
 }
 
 /// Authorized by the caller's own key: a browser writes its entry's subscription, an app
@@ -354,27 +389,34 @@ fn set_webpush_subscription(
     let SetWebPushSubscriptionRequest {
         anchor_number,
         endpoint,
-        payload_ikm,
-        payload_keyid,
+        p256dh,
+        transport_key,
+        sealed_auth,
     } = request;
     enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
 
     // Every field at once rather than the first to fail, so a browser doesn't go round
-    // three times to learn what one answer can say.
-    let (endpoint, payload_ikm, payload_keyid) = match (
+    // four times to learn what one answer can say.
+    let (endpoint, p256dh, transport_key, sealed_auth) = match (
         PushEndpoint::try_from(endpoint.as_str())
             .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
-        PayloadIkm::try_from(payload_ikm.into_vec()),
-        PayloadKeyId::try_from(payload_keyid.into_vec()),
+        SubscriberKey::try_from(p256dh.into_vec()),
+        SubscriberKey::try_from(transport_key.into_vec()),
+        SealedAuth::try_from(sealed_auth.into_vec()),
     ) {
-        (Ok(endpoint), Ok(payload_ikm), Ok(payload_keyid)) => {
-            (endpoint, payload_ikm, payload_keyid)
+        (Ok(endpoint), Ok(p256dh), Ok(transport_key), Ok(sealed_auth)) => {
+            (endpoint, p256dh, transport_key, sealed_auth)
         }
-        (endpoint, payload_ikm, payload_keyid) => {
-            let problems: Vec<String> = [endpoint.err(), payload_ikm.err(), payload_keyid.err()]
-                .into_iter()
-                .flatten()
-                .collect();
+        (endpoint, p256dh, transport_key, sealed_auth) => {
+            let problems: Vec<String> = [
+                endpoint.err(),
+                p256dh.err(),
+                transport_key.err(),
+                sealed_auth.err(),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
             return Err(SetWebPushSubscriptionError::InternalCanisterError(
                 problems.join("; "),
             ));
@@ -388,8 +430,9 @@ fn set_webpush_subscription(
         key,
         anchor_number,
         endpoint,
-        payload_ikm,
-        payload_keyid,
+        p256dh,
+        transport_key,
+        sealed_auth,
         ic_cdk::api::time(),
     )
 }

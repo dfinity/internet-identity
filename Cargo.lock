@@ -560,10 +560,12 @@ dependencies = [
 name = "canister_tests"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "base64 0.22.1",
  "candid",
  "flate2",
  "hex",
+ "hkdf",
  "ic-cdk 0.16.1",
  "ic-representation-independent-hash",
  "ic-verifiable-credentials",
@@ -1129,6 +1131,7 @@ dependencies = [
  "ff 0.13.1",
  "generic-array",
  "group 0.13.0",
+ "hkdf",
  "pkcs8",
  "rand_core 0.6.4",
  "sec1",

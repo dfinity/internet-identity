@@ -13,13 +13,25 @@ pub struct StorableWebPushSubscription {
     /// Written per (re-)subscribe, so the manage screen can say since when.
     #[n(1)]
     pub created_at_ns: StorableTimestamp,
-    /// RFC 8291 §3.4 input keying material, which the browser derived from this
-    /// subscription's own keys and an ephemeral pair of its own. Sealing a payload with it
-    /// costs two HKDFs and one AES-GCM, so the ECDH never runs here.
+    /// RFC 8291 §3.4 input keying material, derived here from `subscriber_key`, `auth`
+    /// and a sender key belonging to the pass that last refreshed it. Sealing a payload
+    /// with it costs two HKDFs and one AES-GCM, so the ECDH runs only on a refresh.
     #[cbor(n(4), with = "minicbor::bytes")]
     pub payload_ikm: Vec<u8>,
-    /// The browser's ephemeral public key, echoed as the `keyid` the browser derives
-    /// against (uncompressed SEC1 P-256, 65 bytes).
+    /// The public half of that sender key, carried as the `keyid` the browser derives its
+    /// own half against (uncompressed SEC1 P-256, 65 bytes).
     #[cbor(n(5), with = "minicbor::bytes")]
     pub payload_keyid: Vec<u8>,
+    /// The subscription's own `p256dh`, kept because every refresh runs the ECDH against
+    /// it again.
+    #[cbor(n(6), with = "minicbor::bytes")]
+    pub subscriber_key: Vec<u8>,
+    /// The subscription's `auth` secret, which arrived encrypted and is the salt of every
+    /// derivation of `payload_ikm`.
+    #[cbor(n(7), with = "minicbor::bytes")]
+    pub auth: Vec<u8>,
+    /// When `payload_ikm` was last derived. A pass refreshes the oldest stamps among its
+    /// own destinations, so this is what puts one at the back of that queue.
+    #[n(8)]
+    pub last_rotated_ns: StorableTimestamp,
 }

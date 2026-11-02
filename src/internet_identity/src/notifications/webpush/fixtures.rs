@@ -1,6 +1,8 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
-use super::validation::{PayloadIkm, PayloadKeyId, PushEndpoint};
+use super::validation::{
+    AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SealedAuth, SubscriberKey,
+};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -75,6 +77,9 @@ pub(crate) fn subscription_at(endpoint: &str, created_at_ns: Timestamp) -> WebPu
         created_at_ns,
         payload_ikm: PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
         payload_keyid: PayloadKeyId::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
+        subscriber_key: SubscriberKey::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
+        auth: AuthSecret::try_from(valid_auth()).expect("16 bytes"),
+        last_rotated_ns: created_at_ns,
     }
 }
 
@@ -118,9 +123,36 @@ pub(crate) fn valid_sec1_point() -> Vec<u8> {
         .to_vec()
 }
 
-/// The browser derives this; a fixture only has to be the right length.
+/// Derived on subscribe; a fixture only has to be the right length.
 pub(crate) fn valid_payload_ikm() -> Vec<u8> {
     vec![9u8; 32]
+}
+
+/// The subscription's own `auth` secret, which RFC 8291 puts at 16 bytes.
+pub(crate) fn valid_auth() -> Vec<u8> {
+    vec![4u8; 16]
+}
+
+/// What a key fetch would have left behind, so a test subscribe has a transport key to
+/// have been encrypted to.
+fn pending_for(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+    now_ns: Timestamp,
+) -> (SubscriberKey, SealedAuth) {
+    const TRANSPORT_SCALAR: [u8; 32] = [11u8; 32];
+    const SENDER_SEED: [u8; 32] = [12u8; 32];
+    super::transport::remember(
+        super::transport::Caller { anchor_number, key },
+        TRANSPORT_SCALAR,
+        SENDER_SEED,
+        now_ns,
+    );
+    super::transport::seal_auth(
+        &super::transport::public_key_of(&TRANSPORT_SCALAR),
+        &[13u8; 32],
+        &valid_auth(),
+    )
 }
 
 /// Well-formed defaults, so a field added to the request doesn't touch every test.
@@ -131,8 +163,9 @@ pub(super) fn request(
     SetWebPushSubscriptionRequest {
         anchor_number,
         endpoint: endpoint.to_string(),
-        payload_ikm: ByteBuf::from(valid_payload_ikm()),
-        payload_keyid: ByteBuf::from(valid_sec1_point()),
+        p256dh: ByteBuf::from(valid_sec1_point()),
+        transport_key: ByteBuf::from(valid_sec1_point()),
+        sealed_auth: ByteBuf::from(vec![0u8; 32]),
     }
 }
 
@@ -164,12 +197,14 @@ pub(super) fn try_subscribe_as(
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
+    let (transport_key, sealed_auth) = pending_for(anchor_number, key, now_ns);
     super::set_subscription(
         key,
         anchor_number,
         validated(anchor_number, endpoint),
-        PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
-        PayloadKeyId::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
+        SubscriberKey::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
+        transport_key,
+        sealed_auth,
         now_ns,
     )
 }

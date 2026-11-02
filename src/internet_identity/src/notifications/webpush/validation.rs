@@ -131,6 +131,90 @@ impl TryFrom<Vec<u8>> for PayloadKeyId {
     }
 }
 
+/// RFC 8291 §2: the 16-byte authentication secret the browser generated with its
+/// subscription. It is the salt of the derivation that produces the keying material, and
+/// the only secret among the four things a forged push needs, so it reaches the canister
+/// encrypted and is held here rather than on the wire.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuthSecret(Vec<u8>);
+
+const AUTH_SECRET_LEN: usize = 16;
+
+impl AuthSecret {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl TryFrom<Vec<u8>> for AuthSecret {
+    type Error = String;
+
+    fn try_from(auth: Vec<u8>) -> Result<Self, Self::Error> {
+        validate_param_len(auth.len(), AUTH_SECRET_LEN..=AUTH_SECRET_LEN, "auth")?;
+        Ok(Self(auth))
+    }
+}
+
+/// An uncompressed SEC1 point on P-256: the subscription's own `p256dh`, or the public
+/// half of the pair a browser mints to encrypt `auth` with.
+///
+/// Checked to be on the curve, because both enter a scalar multiplication against a key
+/// this canister holds, and an off-curve point is how one of those is extracted.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubscriberKey(Vec<u8>);
+
+impl SubscriberKey {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl TryFrom<Vec<u8>> for SubscriberKey {
+    type Error = String;
+
+    fn try_from(key: Vec<u8>) -> Result<Self, Self::Error> {
+        validate_param_len(key.len(), SEC1_P256_LEN..=SEC1_P256_LEN, "p256dh")?;
+        if p256::PublicKey::from_sec1_bytes(&key).is_err() {
+            return Err("p256dh is not a valid SEC1 P-256 point".to_string());
+        }
+        Ok(Self(key))
+    }
+}
+
+/// `auth` as it crosses ingress: AES-128-GCM over 16 bytes, so the ciphertext and its tag
+/// are 32 together.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SealedAuth(Vec<u8>);
+
+const SEALED_AUTH_LEN: usize = AUTH_SECRET_LEN + 16;
+
+impl SealedAuth {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl TryFrom<Vec<u8>> for SealedAuth {
+    type Error = String;
+
+    fn try_from(sealed: Vec<u8>) -> Result<Self, Self::Error> {
+        validate_param_len(
+            sealed.len(),
+            SEALED_AUTH_LEN..=SEALED_AUTH_LEN,
+            "sealed_auth",
+        )?;
+        Ok(Self(sealed))
+    }
+}
+
 fn validate_param_len(
     observed_len_bytes: usize,
     allowed_range_bytes: RangeInclusive<usize>,

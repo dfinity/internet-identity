@@ -1,7 +1,8 @@
-// Subscribes this browser to push and registers it with the canister: subscribe with
-// Internet Identity's own VAPID key, then set_webpush_subscription. Nothing is kept on
-// this side, because the key that authorizes a push is the canister's. Shared by opt-in,
-// the settings toggle, and the reconcile pass.
+// Subscribes this browser to push and registers it with the canister: ask for the keys,
+// subscribe with Internet Identity's own VAPID key, encrypt this subscription's auth
+// secret to the one-shot transport key that came with it, then set_webpush_subscription.
+// Nothing is kept on this side, because the key that authorizes a push is the canister's.
+// Shared by opt-in, the settings toggle, and the reconcile pass.
 
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import {
@@ -9,8 +10,8 @@ import {
   subscribedWith,
   subscribeToPush,
 } from "./pushSubscription";
-import { vapidPublicKey } from "./vapidPublicKey";
-import { derivePayloadKeys } from "./payloadKeys";
+import { notificationKeys, type NotificationKeys } from "./notificationKeys";
+import { sealSubscriptionAuth } from "./transportSeal";
 import { browserKeyActor } from "./browserActor";
 import { registeredIdentityNumbers } from "$lib/stores/browser-key.store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
@@ -32,15 +33,25 @@ export const registerStoredDevice = async (
   subscription: PushSubscription,
   /** Who to call as. The Home Screen app signs as itself, and what it registers lands on its own record; everyone else signs as the browser key this sign-in registered. */
   caller?: ActorSubclass<_SERVICE>,
+  /** Keys already fetched for this identity, where the caller needed the VAPID half first. */
+  fetched?: NotificationKeys,
 ): Promise<string> => {
   const actor = caller ?? (await browserKeyActor(identityNumber));
-  const { payloadIkm, payloadKeyid } = await derivePayloadKeys(subscription);
+  // Its own fetch where none was handed down: the transport key is minted per caller and
+  // spent by one subscribe, so no two registrations can share one.
+  const { transportPublicKey } =
+    fetched ?? (await notificationKeys(identityNumber, actor));
+  const { p256dh, transportKey, sealedAuth } = await sealSubscriptionAuth(
+    subscription,
+    transportPublicKey,
+  );
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,
       endpoint: subscription.endpoint,
-      payload_ikm: payloadIkm,
-      payload_keyid: payloadKeyid,
+      p256dh,
+      transport_key: transportKey,
+      sealed_auth: sealedAuth,
     })
     .then(throwCanisterError);
   return subscription.endpoint;
@@ -56,8 +67,10 @@ export const registerStoredDevice = async (
 export const subscribeAndRegisterDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
-  const subscription = await subscribeToPush(await vapidPublicKey());
-  await registerStoredDevice(identityNumber, subscription);
+  const actor = await browserKeyActor(identityNumber);
+  const keys = await notificationKeys(identityNumber, actor);
+  const subscription = await subscribeToPush(keys.vapidPublicKey);
+  await registerStoredDevice(identityNumber, subscription, actor, keys);
   return subscription.endpoint;
 };
 
@@ -71,17 +84,18 @@ export const subscribeAndRegisterDevice = async (
  * `minted` says a new one replaced whatever was there, which is what obliges the caller
  * to re-register every other identity this browser holds a key for.
  */
-const usableSubscription = async (): Promise<{
+const usableSubscription = async (
+  keys: NotificationKeys,
+): Promise<{
   subscription: PushSubscription;
   minted: boolean;
 }> => {
-  const applicationServerKey = await vapidPublicKey();
   const held = await currentDeviceSubscription();
-  if (held !== undefined && subscribedWith(held, applicationServerKey)) {
+  if (held !== undefined && subscribedWith(held, keys.vapidPublicKey)) {
     return { subscription: held, minted: false };
   }
   return {
-    subscription: await subscribeToPush(applicationServerKey),
+    subscription: await subscribeToPush(keys.vapidPublicKey),
     minted: true,
   };
 };
@@ -133,13 +147,15 @@ export const registerSiblings = async (
 export const ensureRegisteredDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
-  const { subscription, minted } = await usableSubscription();
+  const actor = await browserKeyActor(identityNumber);
+  const keys = await notificationKeys(identityNumber, actor);
+  const { subscription, minted } = await usableSubscription(keys);
   // They are siblings: every identity here registers the same subscription under its own
   // browser key, and the one that asked is distinguished only in that its answer is the
   // one being waited on. Started together, so a failure of that one cannot leave the
   // others on an endpoint this browser has already dropped.
   const [asked] = await Promise.allSettled([
-    registerStoredDevice(identityNumber, subscription),
+    registerStoredDevice(identityNumber, subscription, actor, keys),
     ...(minted ? [registerSiblings(identityNumber, subscription)] : []),
   ]);
   if (asked.status === "rejected") {
@@ -157,6 +173,10 @@ const anotherAnchorMayAnswer = (error: unknown): boolean => {
   switch (error.type) {
     case "InvalidBrowserKey":
       return true;
+    // The transport key is this browser's, not this anchor's, so the next anchor would
+    // find it gone too: the remedy is a fresh fetch, which the next call does anyway.
+    case "TransportKeyExpired":
+      return false;
     case "InternalCanisterError":
       return false;
   }
@@ -168,7 +188,13 @@ export const registerForAnyAnchor = async (
   anchors: bigint[],
   caller: ActorSubclass<_SERVICE>,
 ): Promise<boolean> => {
-  const { subscription: live } = await usableSubscription();
+  const [first] = anchors;
+  if (first === undefined) {
+    return false;
+  }
+  const { subscription: live } = await usableSubscription(
+    await notificationKeys(first, caller),
+  );
 
   for (const anchor of anchors) {
     try {

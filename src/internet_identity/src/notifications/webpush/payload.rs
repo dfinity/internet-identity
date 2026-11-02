@@ -1,10 +1,10 @@
 //! Sealing what a wake-up carries: RFC 8291 message encryption in RFC 8188's `aes128gcm`
 //! framing.
 //!
-//! The costly half of RFC 8291 is the ECDH, and it does not run here. The browser runs it
-//! against its own subscription keys and an ephemeral pair it mints for the purpose, and
-//! uploads the resulting input keying material, so a payload costs two HKDF expansions and
-//! one AES-GCM over a few dozen bytes.
+//! The costly half of RFC 8291 is the ECDH, and it does not run per push. It runs when a
+//! subscription's keying material is first derived and when a pass refreshes it, so what
+//! a push costs is one hash for the salt, two HKDF expansions and one AES-GCM over a few
+//! dozen bytes.
 //!
 //! The browser decrypts before the service worker is woken, so a body that does not
 //! authenticate is dropped by the browser rather than delivered: no push event, and
@@ -15,13 +15,19 @@ use aes_gcm::{Aes128Gcm, Nonce};
 use hkdf::Hkdf;
 use sha2::{Digest, Sha256};
 
-use super::validation::{PayloadIkm, PayloadKeyId};
-use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, InboxNotificationId,
-};
+use p256::ecdh::diffie_hellman;
+use p256::elliptic_curve::sec1::ToEncodedPoint;
+
+use super::validation::{AuthSecret, PayloadIkm, PayloadKeyId, SubscriberKey};
+
+/// RFC 8291 §3.4: what the keying material's derivation is labelled with.
+const IKM_INFO_PREFIX: &[u8] = b"WebPush: info\0";
 
 /// RFC 8188 §2.1: the salt the record's key and nonce are derived under.
 const SALT_LEN: usize = 16;
+
+/// An uncompressed SEC1 point on P-256.
+const SEC1_P256_LEN: usize = 65;
 
 /// Record size, RFC 8188 §2.1. One record holds everything a wake-up names, so this only
 /// has to be larger than the body it frames.
@@ -40,28 +46,57 @@ const MAX_BODY_LEN: usize = 4096;
 /// The `Content-Encoding` a relay and a browser both require of a payload.
 pub(crate) const CONTENT_ENCODING: &str = "aes128gcm";
 
-/// The salt a deposit's payload is sealed under: the identity, the browser whose inbox
-/// holds it, and the name that inbox gave the entry, which together are what one deposit
-/// is.
+/// RFC 8291 §3.4: the keying material every payload for one subscription is sealed under,
+/// and the `keyid` a header carries so the browser can derive its own half.
 ///
-/// All three, because keying material does not always cover one inbox. A Home Screen
-/// app's covers every identity pointing at it, and nothing stops two browsers of one
-/// identity pointing at the same app: ids are handed out per inbox, so both would reach
-/// the same number, and a salt naming only the identity and the id would repeat. The key
-/// and the nonce both follow from the salt, so a repeat is a reused nonce.
+/// This is the expensive half of the specification, and its output changes only when
+/// `sender` does, which is why a pass keeps the result rather than running it per push.
+pub(crate) fn derive_ikm(
+    sender: &p256::SecretKey,
+    subscriber_key: &SubscriberKey,
+    auth: &AuthSecret,
+) -> Result<(PayloadIkm, PayloadKeyId), String> {
+    let theirs = p256::PublicKey::from_sec1_bytes(subscriber_key.as_slice())
+        .map_err(|_| "p256dh is not a P-256 point".to_string())?;
+    let shared = diffie_hellman(sender.to_nonzero_scalar(), theirs.as_affine());
+    let sender_public = sender
+        .public_key()
+        .to_encoded_point(false)
+        .as_bytes()
+        .to_vec();
+
+    // The subscription's key first and the sender's second, which is the order the
+    // browser reconstructs it in.
+    let mut info = Vec::with_capacity(IKM_INFO_PREFIX.len() + 2 * SEC1_P256_LEN);
+    info.extend_from_slice(IKM_INFO_PREFIX);
+    info.extend_from_slice(subscriber_key.as_slice());
+    info.extend_from_slice(&sender_public);
+
+    let mut ikm = [0u8; 32];
+    Hkdf::<Sha256>::new(Some(auth.as_slice()), &shared.raw_secret_bytes()[..])
+        .expand(&info, &mut ikm)
+        .map_err(|err| format!("deriving the keying material: {err}"))?;
+
+    Ok((
+        PayloadIkm::try_from(ikm.to_vec())?,
+        PayloadKeyId::try_from(sender_public)?,
+    ))
+}
+
+/// The salt one push is sealed under: this pass's own random bytes and the push's place
+/// in that pass.
 ///
-/// Hashed rather than packed: the three are 160 bits between them. A wake-up re-posted
-/// for the same entry seals the same bytes under the same salt, which reveals nothing it
-/// has not already sent.
-pub(crate) fn salt_for(
-    anchor_number: AnchorNumber,
-    browser_id: BrowserId,
-    inbox_notification_id: InboxNotificationId,
-) -> u128 {
+/// The key and the nonce both follow from the salt and the keying material, so two pushes
+/// sharing one would share a keystream. Each half covers a direction the other cannot:
+/// the index separates the pushes of one pass, and the bytes separate one pass from every
+/// other, which the index cannot do because it starts again each time. A pass therefore
+/// draws its own bytes, and nothing cached may stand in for them.
+///
+/// Hashed rather than packed, so the 16 bytes a header carries depend on all 36.
+pub(crate) fn salt_at(pass_bytes: &[u8; 32], index: usize) -> u128 {
     let digest = Sha256::new()
-        .chain_update(anchor_number.to_be_bytes())
-        .chain_update(browser_id.to_be_bytes())
-        .chain_update(inbox_notification_id.to_be_bytes())
+        .chain_update(pass_bytes)
+        .chain_update((index as u64).to_be_bytes())
         .finalize();
     u128::from_be_bytes(digest[..16].try_into().expect("a digest is 32 bytes"))
 }
@@ -70,7 +105,7 @@ pub(crate) fn salt_for(
 ///
 /// `salt` is what keeps one subscription's payloads apart: the key and the nonce are both
 /// derived from it and the one IKM, so two payloads sealed under one salt would share
-/// both. Callers pass [`salt_for`], which names the deposit rather than counting.
+/// both. Callers pass [`salt_at`].
 pub(crate) fn seal(
     payload_ikm: &PayloadIkm,
     payload_keyid: &PayloadKeyId,
@@ -175,19 +210,23 @@ mod tests {
         assert_eq!(open(&payload_ikm, &body), plaintext.to_vec());
     }
 
+    /// Within a pass the index is what separates two pushes.
     #[test]
-    fn a_salt_names_one_deposit_of_one_browser() {
-        assert_eq!(salt_for(1, 0, 2), salt_for(1, 0, 2));
-        assert_ne!(salt_for(1, 0, 2), salt_for(2, 0, 1));
-        assert_ne!(salt_for(10772, 0, 0), salt_for(10772, 0, 1));
+    fn two_places_in_one_pass_do_not_share_a_salt() {
+        let pass = [7u8; 32];
+        assert_ne!(salt_at(&pass, 0), salt_at(&pass, 1));
     }
 
-    /// Two browsers of one identity can point at the same Home Screen app, and then seal
-    /// with its one subscription. Their inboxes count from the same place, so without the
-    /// browser in the salt both would seal a different payload under one key and nonce.
+    /// Across passes the index is no help, because it starts again at zero. The bytes are
+    /// the whole of what keeps two passes apart.
     #[test]
-    fn two_inboxes_at_the_same_id_do_not_share_a_salt() {
-        assert_ne!(salt_for(10772, 0, 1), salt_for(10772, 1, 1));
+    fn the_same_place_in_two_passes_does_not_share_a_salt() {
+        assert_ne!(salt_at(&[7u8; 32], 0), salt_at(&[8u8; 32], 0));
+    }
+
+    #[test]
+    fn a_salt_is_the_same_for_the_same_pass_and_place() {
+        assert_eq!(salt_at(&[7u8; 32], 3), salt_at(&[7u8; 32], 3));
     }
 
     #[test]
@@ -239,6 +278,66 @@ mod tests {
                 "pK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN",
             ))
         );
+    }
+
+    /// RFC 8291 Appendix A again, this time the derivation that produces the keying
+    /// material the test above seals with. Together they cover the whole schedule against
+    /// the specification the browser implements.
+    ///
+    /// Worth pinning to the RFC rather than to a round trip: a browser drops a payload it
+    /// cannot open before it wakes the service worker, so a derivation that disagrees
+    /// with the specification fails silently and looks like no notification at all.
+    #[test]
+    fn the_rfc_8291_example_derives_the_keying_material_the_rfc_prints() {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
+
+        let decode = |value: &str| URL_SAFE_NO_PAD.decode(value).expect("base64url");
+        let sender =
+            p256::SecretKey::from_slice(&decode("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw"))
+                .expect("the example's application server key");
+        let subscriber_key = SubscriberKey::try_from(decode(
+            "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+        ))
+        .expect("the example's subscription key");
+        let auth = AuthSecret::try_from(decode("BTBZMqHH6r4Tts7J_aSIgg"))
+            .expect("the example's auth secret");
+
+        let (payload_ikm, payload_keyid) =
+            derive_ikm(&sender, &subscriber_key, &auth).expect("deriving");
+
+        assert_eq!(
+            payload_ikm.as_slice(),
+            decode("S4lYMb_L0FxCeq0WhDx813KgSYqU26kOyzWUdsXYyrg")
+        );
+        assert_eq!(
+            payload_keyid.as_slice(),
+            decode("BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8")
+        );
+    }
+
+    /// A refresh is a new sender key against the same subscription, so both halves have
+    /// to move: keeping the old `keyid` would point the browser at a key that no longer
+    /// derives this material.
+    #[test]
+    fn a_new_sender_key_derives_new_material_and_a_new_key_id() {
+        let subscriber_key = SubscriberKey::try_from(valid_sec1_point()).expect("a point");
+        let auth = AuthSecret::try_from(vec![4u8; 16]).expect("16 bytes");
+        let first = derive_ikm(
+            &p256::SecretKey::from_slice(&[3u8; 32]).expect("a scalar"),
+            &subscriber_key,
+            &auth,
+        )
+        .expect("deriving");
+        let second = derive_ikm(
+            &p256::SecretKey::from_slice(&[5u8; 32]).expect("a scalar"),
+            &subscriber_key,
+            &auth,
+        )
+        .expect("deriving");
+
+        assert_ne!(first.0.as_slice(), second.0.as_slice());
+        assert_ne!(first.1.as_slice(), second.1.as_slice());
     }
 
     #[test]

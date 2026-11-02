@@ -4,7 +4,7 @@
 // half, which is a threshold key the canister holds.
 //
 // The subscription's own p256dh and auth keys are what a wake-up's payload is sealed
-// against; see payloadKeys.
+// against; see transportSeal.
 
 import { bufFromBufLike } from "$lib/utils/utils";
 import { agentOptions, canisterId } from "$lib/globals";

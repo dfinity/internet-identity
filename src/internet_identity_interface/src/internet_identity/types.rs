@@ -1106,12 +1106,19 @@ pub struct NotificationConsentGrantedRequest {
 pub struct SetWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,
     pub endpoint: String,
-    /// RFC 8291 §3.4 input keying material, derived by the browser from this
-    /// subscription's keys and an ephemeral pair it mints for the purpose. The ECDH runs
-    /// there so it never has to run here.
-    pub payload_ikm: ByteBuf,
-    /// That ephemeral pair's public key, carried in every payload as `keyid`.
-    pub payload_keyid: ByteBuf,
+    /// The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+    /// nothing without a private scalar and forges nothing without `auth`.
+    pub p256dh: ByteBuf,
+    /// The public half of the pair the browser minted to encrypt `auth` with, uncompressed
+    /// SEC1 P-256. Sent because the canister needs it to run its half of the agreement.
+    pub transport_key: ByteBuf,
+    /// The subscription's 16-byte `auth` secret under AES-128-GCM, 32 bytes with its tag.
+    ///
+    /// Encrypted because an ingress call is not confidential, and `(endpoint, p256dh,
+    /// auth)` is all a forged push the browser will decrypt needs. What stands in for the
+    /// private channel RFC 8291 assumes is the transport key this caller's key fetch
+    /// minted, which exists only inside the canister and only until this call lands.
+    pub sealed_auth: ByteBuf,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1122,6 +1129,32 @@ pub struct RemoveWebPushSubscriptionRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SetWebPushSubscriptionError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// Nothing here can open `sealed_auth`: the transport key it was encrypted to has
+    /// expired, or a later key fetch from this browser replaced it. Fetch the keys again
+    /// and re-send.
+    TransportKeyExpired,
+    InternalCanisterError(String),
+}
+
+/// What a browser needs before it can subscribe: the key every push is signed with, and
+/// the one-shot key it encrypts `auth` to.
+///
+/// Answered by an update call rather than a query. A query reply is signed by one replica,
+/// which could hand over a VAPID key of its own choosing, and a subscription binds to that
+/// key permanently.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationKeys {
+    /// Internet Identity's own VAPID public key, uncompressed SEC1 P-256.
+    pub vapid_public_key: ByteBuf,
+    /// Minted for this caller and this attempt, uncompressed SEC1 P-256. Its private half
+    /// never leaves the canister and is dropped as soon as a subscribe spends it.
+    pub transport_public_key: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum GetNotificationKeysError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
     InternalCanisterError(String),

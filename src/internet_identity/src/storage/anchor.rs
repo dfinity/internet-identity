@@ -1,7 +1,9 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
-use crate::notifications::webpush::{PayloadIkm, PayloadKeyId, PushEndpoint};
+use crate::notifications::webpush::{
+    AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SubscriberKey,
+};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
@@ -175,9 +177,15 @@ impl From<InboxNotification> for StorableInboxNotification {
 pub struct WebPushSubscription {
     pub endpoint: PushEndpoint,
     pub created_at_ns: Timestamp,
-    /// What a payload through this subscription is sealed with, derived by the browser.
+    /// What a payload through this subscription is sealed with, derived here.
     pub payload_ikm: PayloadIkm,
     pub payload_keyid: PayloadKeyId,
+    /// What the ECDH of every refresh runs against.
+    pub subscriber_key: SubscriberKey,
+    /// The salt of every derivation of `payload_ikm`.
+    pub auth: AuthSecret,
+    /// When `payload_ikm` was last derived.
+    pub last_rotated_ns: Timestamp,
 }
 
 impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
@@ -192,6 +200,9 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
             created_at_ns: value.created_at_ns,
             payload_ikm: PayloadIkm::try_from(value.payload_ikm)?,
             payload_keyid: PayloadKeyId::try_from(value.payload_keyid)?,
+            subscriber_key: SubscriberKey::try_from(value.subscriber_key)?,
+            auth: AuthSecret::try_from(value.auth)?,
+            last_rotated_ns: value.last_rotated_ns,
         })
     }
 }
@@ -203,6 +214,9 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
             created_at_ns: value.created_at_ns,
             payload_ikm: value.payload_ikm.into_vec(),
             payload_keyid: value.payload_keyid.into_vec(),
+            subscriber_key: value.subscriber_key.into_vec(),
+            auth: value.auth.into_vec(),
+            last_rotated_ns: value.last_rotated_ns,
         }
     }
 }
