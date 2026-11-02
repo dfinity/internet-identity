@@ -8,7 +8,7 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::account::AccountReference;
 use crate::storage::account::{Account, AccountKey};
-use crate::storage::anchor::{Anchor, Device, MAX_BROWSERS};
+use crate::storage::anchor::{Anchor, Device, WebPushSubscription, MAX_BROWSERS};
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::{AccountReferenceListWrite, AccountReferenceWrite};
@@ -7795,6 +7795,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     assert_eq!(
         stored
             .webpush_subscription
+            .and_then(WebPushSubscription::into_ready)
             .map(|subscription| subscription.endpoint.into_string()),
         Some("https://web.push.apple.com/one".to_string())
     );

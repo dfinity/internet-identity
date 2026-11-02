@@ -10,7 +10,7 @@
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, InboxNotification};
+use crate::storage::anchor::{Anchor, InboxNotification, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, InboxNotificationId, NotificationToShow, Timestamp,
 };
@@ -58,6 +58,7 @@ pub(crate) fn remove_after_failed_wake_up(
         let posted_to = match target {
             DeliveryTarget::Browser => anchor
                 .webpush_subscription(browser_id)
+                .and_then(WebPushSubscription::ready)
                 .map(|registered| registered.endpoint.as_str().to_string()),
             DeliveryTarget::App(app_id) => {
                 // The app's address stands for this entry only while the entry still
@@ -73,6 +74,7 @@ pub(crate) fn remove_after_failed_wake_up(
                 storage
                     .notification_app(app_id)
                     .and_then(|app| app.webpush_subscription)
+                    .and_then(WebPushSubscription::into_ready)
                     .map(|registered| registered.endpoint.into_string())
             }
         };
@@ -558,6 +560,7 @@ mod tests {
         assert_eq!(
             storage_borrow(|storage| storage.notification_app(left_behind))
                 .and_then(|app| app.webpush_subscription)
+                .and_then(WebPushSubscription::into_ready)
                 .map(|registered| registered.endpoint.into_string()),
             Some(APP_RELAY.to_string()),
             "the app this entry left should keep its address"

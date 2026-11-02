@@ -17,7 +17,9 @@ pub(crate) mod vapid_key;
 pub(crate) mod fixtures;
 
 pub(crate) use subscription::{clear_gone_subscription, delivering_subscription};
-pub use subscription::{remove_subscription, set_subscription, subscription_status};
+pub use subscription::{
+    remove_subscription, set_subscription, start_subscription, subscription_status,
+};
 pub use validation::{
     deliverable_endpoint, AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SealedAuth,
     SubscriberKey,

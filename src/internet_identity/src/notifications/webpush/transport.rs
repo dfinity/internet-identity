@@ -17,102 +17,33 @@ use hkdf::Hkdf;
 use p256::ecdh::diffie_hellman;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
 use sha2::Sha256;
-use std::cell::RefCell;
-use std::collections::HashMap;
 
 use super::validation::{AuthSecret, SealedAuth, SubscriberKey};
 use crate::authz_utils::NotificationKey;
-use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
+use internet_identity_interface::internet_identity::types::AnchorNumber;
 
 const SECOND_NS: u64 = 1_000_000_000;
 
 /// How long a transport key waits for the subscribe it was minted for. The gap is a user
 /// deciding on the browser's permission prompt, so it is minutes rather than seconds.
-const PENDING_TTL_NS: u64 = 5 * 60 * SECOND_NS;
-
-/// What the heap gives to subscribes in flight. Entries are ~70 bytes and live five
-/// minutes; this caps what a flood of key fetches can hold at once, since expiring them
-/// by age alone bounds nothing inside the window.
-const MAX_PENDING: usize = 10_000;
+///
+/// Nothing sweeps on this: a registration waiting past it is simply refused and replaced
+/// by the next fetch, and the registration it is holding open goes on delivering.
+pub(crate) const PENDING_TTL_NS: u64 = 5 * 60 * SECOND_NS;
 
 /// RFC 8291 §3.4 binds the two public keys into the derivation, and so does this.
 const INFO_PREFIX: &[u8] = b"II webpush transport\0";
 
-/// What a key fetch left behind for the subscribe that follows it.
-#[derive(Clone)]
-pub(crate) struct Pending {
-    /// The private half of the key the browser encrypted `auth` to.
-    pub transport_scalar: [u8; 32],
-    /// Expanded into this subscription's first sender key once a subscribe arrives, and
-    /// held as a seed until then because a prompt the user denies never sends one.
-    pub sender_seed: [u8; 32],
-    pub minted_at_ns: Timestamp,
-}
-
-/// Who a pending record belongs to. The anchor is part of it because a browser id is
-/// handed out per identity, so two identities both reach browser 1.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct Caller {
-    pub anchor_number: AnchorNumber,
-    pub key: NotificationKey,
-}
-
-thread_local! {
-    /// Not stable memory: losing these on an upgrade costs a subscribe a retry, which is
-    /// cheaper than writing a five-minute secret to a durable store.
-    static PENDING: RefCell<HashMap<Caller, Pending>> = RefCell::new(HashMap::new());
-}
-
-/// Holds what the subscribe will need, replacing whatever this browser left before.
-///
-/// One browser has one in flight: a second fetch means the browser is starting again, and
-/// it will encrypt to the key that second fetch answered with.
-pub(crate) fn remember(
-    caller: Caller,
-    transport_scalar: [u8; 32],
-    sender_seed: [u8; 32],
-    now_ns: Timestamp,
-) {
-    PENDING.with_borrow_mut(|pending| {
-        pending.retain(|_, held| now_ns.saturating_sub(held.minted_at_ns) <= PENDING_TTL_NS);
-        if pending.len() >= MAX_PENDING && !pending.contains_key(&caller) {
-            let oldest = pending
-                .iter()
-                .min_by_key(|(_, held)| held.minted_at_ns)
-                .map(|(caller, _)| *caller);
-            if let Some(oldest) = oldest {
-                pending.remove(&oldest);
-            }
-        }
-        pending.insert(
-            caller,
-            Pending {
-                transport_scalar,
-                sender_seed,
-                minted_at_ns: now_ns,
-            },
-        );
-    });
-}
-
-/// Takes what this browser's key fetch left, which can only be spent once.
-pub(crate) fn take(caller: Caller, now_ns: Timestamp) -> Option<Pending> {
-    PENDING.with_borrow_mut(|pending| {
-        let held = pending.remove(&caller)?;
-        (now_ns.saturating_sub(held.minted_at_ns) <= PENDING_TTL_NS).then_some(held)
-    })
-}
-
-/// The caller a pending record belongs to, as bytes the derivation can mix in. Tagged,
-/// so a browser and an app that happen to share a number are still distinct.
-pub(crate) fn caller_bytes(caller: Caller) -> Vec<u8> {
-    let (tag, id) = match caller.key {
+/// Who a fetch is for, as bytes the derivation can mix in. Tagged and carrying the
+/// identity, because a browser id is handed out per identity, so two of them reach 1.
+pub(crate) fn caller_bytes(anchor_number: AnchorNumber, key: NotificationKey) -> Vec<u8> {
+    let (tag, id) = match key {
         NotificationKey::Browser(id) => (0u8, u64::from(id)),
         NotificationKey::App(id) => (1u8, id),
     };
     [
         &[tag][..],
-        &caller.anchor_number.to_be_bytes()[..],
+        &anchor_number.to_be_bytes()[..],
         &id.to_be_bytes()[..],
     ]
     .concat()
@@ -214,20 +145,6 @@ mod tests {
 
     use seal_auth as sealed_by_browser;
 
-    const BROWSER: Caller = Caller {
-        anchor_number: 10_000,
-        key: NotificationKey::Browser(1),
-    };
-    const OTHER: Caller = Caller {
-        anchor_number: 10_000,
-        key: NotificationKey::Browser(2),
-    };
-    /// The same browser number under another identity, which is a different caller.
-    const SAME_NUMBER_ELSEWHERE: Caller = Caller {
-        anchor_number: 10_001,
-        key: NotificationKey::Browser(1),
-    };
-
     #[test]
     fn what_the_browser_sealed_is_what_the_canister_opens() {
         let transport_scalar = [9u8; 32];
@@ -261,45 +178,22 @@ mod tests {
         assert!(open(&transport_scalar, &other_browser_key, &sealed).is_err());
     }
 
-    #[test]
-    fn a_pending_record_is_spent_once() {
-        remember(BROWSER, [1u8; 32], [2u8; 32], 0);
-        assert!(take(BROWSER, 0).is_some());
-        assert!(take(BROWSER, 0).is_none());
-    }
-
-    #[test]
-    fn a_second_fetch_replaces_what_the_first_left() {
-        remember(BROWSER, [1u8; 32], [2u8; 32], 0);
-        remember(BROWSER, [3u8; 32], [4u8; 32], 0);
-        let held = take(BROWSER, 0).expect("the second");
-        assert_eq!(held.transport_scalar, [3u8; 32]);
-    }
-
-    #[test]
-    fn a_pending_record_past_its_window_is_gone() {
-        remember(BROWSER, [1u8; 32], [2u8; 32], 0);
-        assert!(take(BROWSER, PENDING_TTL_NS + 1).is_none());
-    }
-
-    /// Browser ids are handed out per identity, so without the anchor one identity's
-    /// subscribe would spend another's transport key.
-    #[test]
-    fn the_same_browser_number_under_another_identity_is_another_caller() {
-        remember(BROWSER, [1u8; 32], [2u8; 32], 0);
-        assert!(take(SAME_NUMBER_ELSEWHERE, 0).is_none());
-        assert!(take(BROWSER, 0).is_some());
-    }
-
+    /// Browser ids are handed out per identity, so without the identity in the mix two
+    /// of them would derive the same transport key.
     #[test]
     fn two_identities_do_not_derive_the_same_bytes() {
-        assert_ne!(caller_bytes(BROWSER), caller_bytes(SAME_NUMBER_ELSEWHERE));
+        assert_ne!(
+            caller_bytes(10_000, NotificationKey::Browser(1)),
+            caller_bytes(10_001, NotificationKey::Browser(1))
+        );
     }
 
+    /// A browser and an app can hold the same number, and are not the same caller.
     #[test]
-    fn one_browser_does_not_take_another_s_key() {
-        remember(BROWSER, [1u8; 32], [2u8; 32], 0);
-        assert!(take(OTHER, 0).is_none());
-        assert!(take(BROWSER, 0).is_some());
+    fn a_browser_and_an_app_at_one_number_do_not_derive_the_same_bytes() {
+        assert_ne!(
+            caller_bytes(10_000, NotificationKey::Browser(1)),
+            caller_bytes(10_000, NotificationKey::App(1))
+        );
     }
 }

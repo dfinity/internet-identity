@@ -16,7 +16,7 @@ use super::validation::{PayloadIkm, PayloadKeyId};
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::installed_app::NotificationAppId;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::WebPushSubscription;
+use crate::storage::anchor::{ReadySubscription, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{AnchorNumber, BrowserId, Timestamp};
 
 /// How many subscriptions one pass refreshes. A pass that refreshes anything spends
@@ -80,8 +80,8 @@ pub(crate) struct SealingKeys {
     pub last_rotated_ns: Timestamp,
 }
 
-impl From<&WebPushSubscription> for SealingKeys {
-    fn from(registered: &WebPushSubscription) -> Self {
+impl From<&ReadySubscription> for SealingKeys {
+    fn from(registered: &ReadySubscription) -> Self {
         Self {
             payload_ikm: registered.payload_ikm.clone(),
             payload_keyid: registered.payload_keyid.clone(),
@@ -115,31 +115,39 @@ pub(crate) fn refresh(
 /// Reads the registration `target` names, rather than the one this browser happens to
 /// deliver through now. A browser that holds its own and also points at an app would
 /// otherwise be read from one and written to the other.
-fn read(destination: Destination) -> Option<WebPushSubscription> {
+fn read(destination: Destination) -> Option<ReadySubscription> {
     match destination.target {
-        DeliveryTarget::App(app_id) => {
-            storage_borrow(|storage| storage.notification_app(app_id))?.webpush_subscription
-        }
+        DeliveryTarget::App(app_id) => storage_borrow(|storage| storage.notification_app(app_id))?
+            .webpush_subscription
+            .and_then(WebPushSubscription::into_ready),
         DeliveryTarget::Browser => state::anchor(destination.anchor_number)
             .webpush_subscription(destination.browser_id)
+            .and_then(WebPushSubscription::ready)
             .cloned(),
     }
 }
 
 fn write(
     destination: Destination,
-    registered: WebPushSubscription,
+    registered: ReadySubscription,
     now_ns: Timestamp,
 ) -> Result<(), String> {
     match destination.target {
         DeliveryTarget::App(app_id) => storage_borrow_mut(|storage| {
-            storage.set_notification_app_subscription(app_id, Some(registered), now_ns)
+            storage.set_notification_app_subscription(
+                app_id,
+                Some(WebPushSubscription::Ready(registered)),
+                now_ns,
+            )
         })
         .map_err(|err| format!("{err}")),
         DeliveryTarget::Browser => {
             let mut anchor = storage_borrow(|storage| storage.read(destination.anchor_number))
                 .map_err(|err| format!("{err}"))?;
-            anchor.set_webpush_subscription(destination.browser_id, Some(registered));
+            anchor.set_webpush_subscription(
+                destination.browser_id,
+                Some(WebPushSubscription::Ready(registered)),
+            );
             storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
         }
     }

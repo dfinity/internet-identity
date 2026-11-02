@@ -20,6 +20,18 @@ import type {
   SetWebPushSubscriptionError,
 } from "$lib/generated/internet_identity_types";
 
+/** Whether the canister already has `identityNumber` registered at this address. */
+const registeredAt = async (
+  actor: ActorSubclass<_SERVICE>,
+  identityNumber: bigint,
+  subscription: PushSubscription,
+): Promise<boolean> => {
+  const [held] = await actor.get_webpush_subscription_status({
+    anchor_number: identityNumber,
+  });
+  return held?.endpoint === subscription.endpoint;
+};
+
 /**
  * Registers a subscription this browser already holds with `identityNumber`.
  *
@@ -37,6 +49,15 @@ export const registerStoredDevice = async (
   fetched?: NotificationKeys,
 ): Promise<string> => {
   const actor = caller ?? (await browserKeyActor(identityNumber));
+  // Nothing to do where the canister already holds this address. Re-registering would
+  // mint a transport key and run the whole derivation to arrive at the record it already
+  // has, and the Home Screen app comes through here on every launch.
+  if (
+    fetched === undefined &&
+    (await registeredAt(actor, identityNumber, subscription))
+  ) {
+    return subscription.endpoint;
+  }
   // Its own fetch where none was handed down: the transport key is minted per caller and
   // spent by one subscribe, so no two registrations can share one.
   const { transportPublicKey } =
@@ -192,6 +213,18 @@ export const registerForAnyAnchor = async (
   if (first === undefined) {
     return false;
   }
+  // Before anything is fetched, because every launch of the installed app comes through
+  // here and the push service usually hands back the address it already gave us. An
+  // anchor already registered at it needs no key, no derivation and no write.
+  const held = await currentDeviceSubscription();
+  if (held !== undefined) {
+    for (const anchor of anchors) {
+      if (await registeredAt(caller, anchor, held)) {
+        return true;
+      }
+    }
+  }
+
   const { subscription: live } = await usableSubscription(
     await notificationKeys(first, caller),
   );

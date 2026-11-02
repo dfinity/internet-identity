@@ -169,12 +169,42 @@ impl From<InboxNotification> for StorableInboxNotification {
     }
 }
 
-/// A browser's Web Push registration: where to reach it, and what to seal for it.
+/// A browser's Web Push registration, in whichever of its two states it is in.
 ///
 /// Held on the browser entry rather than on its own, so signing the browser out or
 /// letting the registry evict it takes the registration with it.
+///
+/// A subscribe takes two calls: the first mints the key the browser encrypts its `auth`
+/// secret to and leaves the private half here, the second spends it. A browser replacing
+/// its subscription passes back through [`Pending`](WebPushSubscription::Pending), so
+/// nothing reads one of these without asking for the ready half.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WebPushSubscription {
+pub enum WebPushSubscription {
+    Pending(PendingTransport),
+    Ready(ReadySubscription),
+}
+
+/// What a key fetch left behind for the subscribe that follows it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingTransport {
+    /// The private half of the key the browser encrypts `auth` to.
+    pub transport_scalar: [u8; 32],
+    /// Expanded into this subscription's first sender key once a subscribe arrives, and
+    /// held as a seed until then because a prompt the user denies never sends one.
+    pub sender_seed: [u8; 32],
+    pub minted_at_ns: Timestamp,
+    /// What this browser was registered with when the fetch arrived, where it was
+    /// registered at all.
+    ///
+    /// Kept because a re-subscribe passes through here: a browser replacing its
+    /// registration at the same address keeps that registration's age and whatever is
+    /// queued for it, and both of those are read off what it had before.
+    pub replacing: Option<Box<ReadySubscription>>,
+}
+
+/// Where to reach a browser, and what to seal for it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReadySubscription {
     pub endpoint: PushEndpoint,
     pub created_at_ns: Timestamp,
     /// What a payload through this subscription is sealed with, derived here.
@@ -188,6 +218,49 @@ pub struct WebPushSubscription {
     pub last_rotated_ns: Timestamp,
 }
 
+impl WebPushSubscription {
+    /// What can be delivered to, which a subscription waiting on its subscribe is not.
+    pub fn ready(&self) -> Option<&ReadySubscription> {
+        match self {
+            WebPushSubscription::Ready(ready) => Some(ready),
+            WebPushSubscription::Pending(_) => None,
+        }
+    }
+
+    pub fn into_ready(self) -> Option<ReadySubscription> {
+        match self {
+            WebPushSubscription::Ready(ready) => Some(ready),
+            WebPushSubscription::Pending(_) => None,
+        }
+    }
+
+    /// The address this delivers to, or is holding open while a subscribe runs.
+    ///
+    /// A subscribe passes through `Pending`, so whether a registration is moving address
+    /// is read through one rather than against it: otherwise every key fetch looks like a
+    /// move, and what is queued for the old address is thrown away.
+    pub fn standing_endpoint(&self) -> Option<&PushEndpoint> {
+        match self {
+            WebPushSubscription::Ready(ready) => Some(&ready.endpoint),
+            WebPushSubscription::Pending(pending) => {
+                pending.replacing.as_deref().map(|held| &held.endpoint)
+            }
+        }
+    }
+
+    pub fn pending(&self) -> Option<&PendingTransport> {
+        match self {
+            WebPushSubscription::Pending(pending) => Some(pending),
+            WebPushSubscription::Ready(_) => None,
+        }
+    }
+}
+
+/// A scalar read back from a row this canister wrote.
+fn scalar_of(bytes: Vec<u8>, dbg_name: &str) -> Result<[u8; 32], String> {
+    <[u8; 32]>::try_from(bytes.as_slice()).map_err(|_| format!("{dbg_name} is not 32 bytes"))
+}
+
 impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
     type Error = String;
 
@@ -195,28 +268,71 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
     /// the only way one refuses is a row that is not what it claims to be — which is the
     /// same failure as CBOR that will not decode, and belongs to the read.
     fn try_from(value: StorableWebPushSubscription) -> Result<Self, Self::Error> {
-        Ok(WebPushSubscription {
-            endpoint: PushEndpoint::try_from(value.endpoint.as_str())?,
-            created_at_ns: value.created_at_ns,
-            payload_ikm: PayloadIkm::try_from(value.payload_ikm)?,
-            payload_keyid: PayloadKeyId::try_from(value.payload_keyid)?,
-            subscriber_key: SubscriberKey::try_from(value.subscriber_key)?,
-            auth: AuthSecret::try_from(value.auth)?,
-            last_rotated_ns: value.last_rotated_ns,
-        })
+        match value {
+            StorableWebPushSubscription::Pending {
+                transport_scalar,
+                sender_seed,
+                minted_at_ns,
+                replacing,
+            } => Ok(WebPushSubscription::Pending(PendingTransport {
+                transport_scalar: scalar_of(transport_scalar, "transport_scalar")?,
+                sender_seed: scalar_of(sender_seed, "sender_seed")?,
+                minted_at_ns,
+                replacing: replacing
+                    .map(|stored| {
+                        WebPushSubscription::try_from(*stored)
+                            .and_then(|held| {
+                                held.into_ready().ok_or_else(|| {
+                                    "a pending registration replaces a ready one".to_string()
+                                })
+                            })
+                            .map(Box::new)
+                    })
+                    .transpose()?,
+            })),
+            StorableWebPushSubscription::Ready {
+                endpoint,
+                created_at_ns,
+                payload_ikm,
+                payload_keyid,
+                subscriber_key,
+                auth,
+                last_rotated_ns,
+            } => Ok(WebPushSubscription::Ready(ReadySubscription {
+                endpoint: PushEndpoint::try_from(endpoint.as_str())?,
+                created_at_ns,
+                payload_ikm: PayloadIkm::try_from(payload_ikm)?,
+                payload_keyid: PayloadKeyId::try_from(payload_keyid)?,
+                subscriber_key: SubscriberKey::try_from(subscriber_key)?,
+                auth: AuthSecret::try_from(auth)?,
+                last_rotated_ns,
+            })),
+        }
     }
 }
 
 impl From<WebPushSubscription> for StorableWebPushSubscription {
     fn from(value: WebPushSubscription) -> Self {
-        StorableWebPushSubscription {
-            endpoint: value.endpoint.into_string(),
-            created_at_ns: value.created_at_ns,
-            payload_ikm: value.payload_ikm.into_vec(),
-            payload_keyid: value.payload_keyid.into_vec(),
-            subscriber_key: value.subscriber_key.into_vec(),
-            auth: value.auth.into_vec(),
-            last_rotated_ns: value.last_rotated_ns,
+        match value {
+            WebPushSubscription::Pending(pending) => StorableWebPushSubscription::Pending {
+                transport_scalar: pending.transport_scalar.to_vec(),
+                sender_seed: pending.sender_seed.to_vec(),
+                minted_at_ns: pending.minted_at_ns,
+                replacing: pending.replacing.map(|held| {
+                    Box::new(StorableWebPushSubscription::from(
+                        WebPushSubscription::Ready(*held),
+                    ))
+                }),
+            },
+            WebPushSubscription::Ready(ready) => StorableWebPushSubscription::Ready {
+                endpoint: ready.endpoint.into_string(),
+                created_at_ns: ready.created_at_ns,
+                payload_ikm: ready.payload_ikm.into_vec(),
+                payload_keyid: ready.payload_keyid.into_vec(),
+                subscriber_key: ready.subscriber_key.into_vec(),
+                auth: ready.auth.into_vec(),
+                last_rotated_ns: ready.last_rotated_ns,
+            },
         }
     }
 }

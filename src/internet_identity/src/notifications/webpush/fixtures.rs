@@ -6,7 +6,7 @@ use super::validation::{
 use crate::authz_utils::NotificationKey;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, WebPushSubscription};
+use crate::storage::anchor::{Anchor, ReadySubscription, WebPushSubscription};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, BrowserId, FormFactor, OperatingSystem,
@@ -72,7 +72,7 @@ fn key(seed: u8) -> PublicKey {
 /// A registration whose every field passes the shape its newtype asserts, which is the
 /// only kind storage can hand back.
 pub(crate) fn subscription_at(endpoint: &str, created_at_ns: Timestamp) -> WebPushSubscription {
-    WebPushSubscription {
+    WebPushSubscription::Ready(ReadySubscription {
         endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
         created_at_ns,
         payload_ikm: PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
@@ -80,7 +80,7 @@ pub(crate) fn subscription_at(endpoint: &str, created_at_ns: Timestamp) -> WebPu
         subscriber_key: SubscriberKey::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
         auth: AuthSecret::try_from(valid_auth()).expect("16 bytes"),
         last_rotated_ns: created_at_ns,
-    }
+    })
 }
 
 pub(crate) fn app_key(seed: u8) -> PublicKey {
@@ -142,12 +142,8 @@ fn pending_for(
 ) -> (SubscriberKey, SealedAuth) {
     const TRANSPORT_SCALAR: [u8; 32] = [11u8; 32];
     const SENDER_SEED: [u8; 32] = [12u8; 32];
-    super::transport::remember(
-        super::transport::Caller { anchor_number, key },
-        TRANSPORT_SCALAR,
-        SENDER_SEED,
-        now_ns,
-    );
+    super::start_subscription(key, anchor_number, TRANSPORT_SCALAR, SENDER_SEED, now_ns)
+        .expect("the key fetch records what the subscribe spends");
     super::transport::seal_auth(
         &super::transport::public_key_of(&TRANSPORT_SCALAR),
         &[13u8; 32],
@@ -251,7 +247,20 @@ pub(crate) fn subscribe(
     try_subscribe(anchor_number, browser_id, endpoint, now_ns).expect("writing a subscription");
 }
 
+/// What this browser can be delivered to, which is what every test here asserts on. A
+/// registration waiting on its subscribe reports nothing, as it does to any caller.
 pub(crate) fn stored_subscription(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+) -> Option<ReadySubscription> {
+    anchor(anchor_number)
+        .webpush_subscription(browser_id)
+        .and_then(WebPushSubscription::ready)
+        .cloned()
+}
+
+/// The registration in whichever state it is in, for a test about the states themselves.
+pub(crate) fn stored_registration(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
 ) -> Option<WebPushSubscription> {

@@ -167,9 +167,15 @@ const appCalls = vi.fn(
     Promise.resolve({ Ok: null }),
 );
 
+/** Nothing registered, so the walk below does the registering these tests are about. */
+const appStatus = vi.fn(
+  (_args: { anchor_number: bigint }): Promise<unknown[]> => Promise.resolve([]),
+);
+
 /** The Home Screen app's own actor, which is what it signs these calls as. */
 const app = {
   set_webpush_subscription: appCalls,
+  get_webpush_subscription_status: appStatus,
 } as unknown as ActorSubclass<_SERVICE>;
 
 /** The anchors the canister refuses, which both come back as a key that reaches no browser. */
@@ -186,6 +192,24 @@ describe("registerForAnyAnchor", () => {
     subscribe.mockResolvedValue({ endpoint: FRESH } as PushSubscription);
     live.mockResolvedValue(held());
     appCalls.mockResolvedValue({ Ok: null });
+    appStatus.mockResolvedValue([]);
+  });
+
+  // The installed app comes through here on every launch, and the push service usually
+  // hands back the address it already gave us. Registering again would mint a transport
+  // key and run the whole derivation to land on the record the canister already holds.
+  it("writes nothing where an identity is already registered at this address", async () => {
+    live.mockResolvedValue(held());
+    appStatus.mockImplementation(({ anchor_number }) =>
+      Promise.resolve(anchor_number === IDENTITY ? [{ endpoint: HELD }] : []),
+    );
+
+    await expect(registerForAnyAnchor([IDENTITY, OTHER], app)).resolves.toBe(
+      true,
+    );
+
+    expect(appCalls).not.toHaveBeenCalled();
+    expect(subscribe).not.toHaveBeenCalled();
   });
 
   it("registers under the first identity the canister accepts", async () => {

@@ -13,7 +13,7 @@ use crate::notifications::webpush::{
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
-use crate::storage::anchor::{Browser, InboxNotification, WebPushSubscription};
+use crate::storage::anchor::{Browser, InboxNotification, ReadySubscription, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::Storage;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -712,7 +712,7 @@ fn wake_up_address<'a>(
     browser: &'a Browser,
     app: Option<&'a NotificationApp>,
     now_ns: Timestamp,
-) -> Option<(&'a WebPushSubscription, String, DeliveryTarget)> {
+) -> Option<(&'a ReadySubscription, String, DeliveryTarget)> {
     // Only the flag is read here, never the session count: an entry that is merely signed
     // out is still an entry the user left switched on. An install that has not completed
     // has no app to reach and no flag to read.
@@ -721,12 +721,20 @@ fn wake_up_address<'a>(
         Some(NotificationAppRef::Linked { enabled: false, .. }) => return None,
         Some(NotificationAppRef::Linked { .. }) | None => {}
     }
-    let (subscription, target) = match browser.webpush_subscription.as_ref() {
+    // Only the ready half on either side: a registration still waiting on the subscribe
+    // that spends its transport key has no address to post to.
+    let (subscription, target) = match browser
+        .webpush_subscription
+        .as_ref()
+        .and_then(WebPushSubscription::ready)
+    {
         Some(own) => (own, DeliveryTarget::Browser),
         None => {
             let app = app?;
             (
-                app.webpush_subscription.as_ref()?,
+                app.webpush_subscription
+                    .as_ref()
+                    .and_then(WebPushSubscription::ready)?,
                 DeliveryTarget::App(app.id),
             )
         }
@@ -738,9 +746,9 @@ fn wake_up_address<'a>(
 /// Liveness is the entry's, whichever address this is: the app has none of its own.
 fn authorized_wake_up<'a>(
     browser: &Browser,
-    subscription: &'a WebPushSubscription,
+    subscription: &'a ReadySubscription,
     now_ns: Timestamp,
-) -> Option<(&'a WebPushSubscription, String)> {
+) -> Option<(&'a ReadySubscription, String)> {
     if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
         return None;
     }

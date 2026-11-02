@@ -357,9 +357,8 @@ async fn get_notification_keys(
         .map_err(GetNotificationKeysError::InternalCanisterError)?;
 
     let now_ns = ic_cdk::api::time();
-    let caller = notifications::webpush::transport::Caller { anchor_number, key };
     let bytes = notifications::webpush::randomness::call_bytes(
-        &notifications::webpush::transport::caller_bytes(caller),
+        &notifications::webpush::transport::caller_bytes(anchor_number, key),
         now_ns,
     )
     .await
@@ -367,13 +366,16 @@ async fn get_notification_keys(
 
     let transport_public_key =
         notifications::webpush::transport::public_key_of(&bytes.transport_scalar);
-    // Held for the subscribe that follows, which is the only call that can spend it.
-    notifications::webpush::transport::remember(
-        caller,
+    // Held on the registration the subscribe will write, which is the only call that can
+    // spend it.
+    notifications::webpush::start_subscription(
+        key,
+        anchor_number,
         bytes.transport_scalar,
         bytes.sender_seed,
         now_ns,
-    );
+    )
+    .map_err(GetNotificationKeysError::InternalCanisterError)?;
 
     Ok(NotificationKeys {
         vapid_public_key: ByteBuf::from(vapid_public_key),
