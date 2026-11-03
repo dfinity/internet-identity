@@ -299,18 +299,14 @@ fn seal_and_post(mut deliveries: Vec<Delivery>, pass_bytes: &[u8; 32], now_ns: T
     }
 }
 
-/// Take Internet Identity's own wake-ups in backlog order, expanding each into one post
-/// per entry it names. Taken one at a time, so a pass stops at its budget.
+/// The loop both halves of a pass run: take one item at a time, expand it into the posts
+/// its entries name, and stop at the budget or at [`MAX_TAKEN_PER_PASS`] items, so items
+/// that wake nothing cannot run on.
 ///
-/// Counts items rather than the posts they expand into, exactly as the app half does.
-/// The real gate on over-committing is the permit a post has to acquire before it leaves,
-/// which settles what it cannot get as rejected.
-/// The loop both halves of a pass run: take one item at a time, stop at the budget, and
-/// never take more than [`MAX_TAKEN_PER_PASS`], so items that wake nothing cannot run on.
-///
-/// The budget is checked before each take, so the last item taken may expand past it. The
-/// real gate on over-committing is the permit a post has to acquire before it leaves,
-/// which settles what it cannot get as rejected.
+/// The budget counts posts rather than the items they came from, and is checked before
+/// each take, so the last item taken may expand past it. The real gate on over-committing
+/// is the permit a post has to acquire before it leaves, which settles what it cannot get
+/// as rejected.
 fn plan_from_backlog(
     max_posts: usize,
     mut take_one: impl FnMut() -> Result<Option<Vec<Delivery>>, ()>,
