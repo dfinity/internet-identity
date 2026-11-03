@@ -186,13 +186,12 @@ pub fn check_notification_app_authorization(
 ///
 /// Notifications belong to an identity, which points at browsers, which may point at an
 /// app. The app is what shows them, so it is what asks for them, acknowledges them and
-/// registers for them, but what it acts on is still the entry: that is where they are
-/// queued and which identity they are for.
+/// registers for them, but what it acts on is still a browser: that is where they are
+/// deposited and which identity they are for.
 ///
-/// Answers which key it was and nothing more. Which entry that key acts on, delivery
-/// being switched off included, and what is stored against it, are lookups the caller
-/// makes for itself against a read of its own, so nothing here is carried past the point
-/// where it was true.
+/// Answers which key it was and nothing more. Which browser that key acts on is
+/// [`browser_the_key_acts_on`], read against storage as the call acts rather than
+/// carried out of here.
 pub fn check_browser_or_notification_app_authorization(
     anchor_number: AnchorNumber,
 ) -> Result<NotificationKey, AuthorizationError> {
@@ -221,6 +220,34 @@ pub fn check_browser_or_notification_app_authorization(
 pub enum NotificationKey {
     Browser(BrowserId),
     App(NotificationAppId),
+}
+
+/// The browser a notification call acts on: the one that signed it, or the one whose
+/// wake-ups route through the app that did.
+///
+/// Read here rather than carried out of the check above, so what a call acts on is what
+/// is stored when it acts rather than what was stored when it was let in.
+pub fn browser_the_key_acts_on(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+) -> Option<(Anchor, BrowserId)> {
+    let anchor = state::anchor(anchor_number);
+    let browser_id = match key {
+        NotificationKey::Browser(browser_id) => Some(browser_id),
+        NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
+    }?;
+    Some((anchor, browser_id))
+}
+
+/// The anchor, where the key speaks for the browser the request names. An app's key signs
+/// for every browser pointing at it, so the one named is checked rather than trusted.
+pub fn anchor_if_key_acts_on(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+    browser_id: BrowserId,
+) -> Option<Anchor> {
+    let (anchor, acts_on) = browser_the_key_acts_on(anchor_number, key)?;
+    (acts_on == browser_id).then_some(anchor)
 }
 
 /// Which of this identity's browsers the caller is signing as.
