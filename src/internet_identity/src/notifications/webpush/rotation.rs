@@ -40,14 +40,26 @@ pub(crate) struct Destination {
     pub target: DeliveryTarget,
 }
 
+/// What a refresh writes to, which is not the destination itself: a Home Screen app's
+/// record is shared by every browser pointing at it, so two of them in one pass are one
+/// thing to refresh and one scalar multiplication, not two.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum RegistrationId {
+    App(NotificationAppId),
+    Browser {
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    },
+}
+
 impl Destination {
-    /// The registration this destination refreshes, which is not the destination itself:
-    /// a Home Screen app's record is shared by every browser pointing at it, so two of
-    /// them in one pass are one thing to refresh and one scalar multiplication, not two.
-    pub(crate) fn registration(self) -> (Option<NotificationAppId>, AnchorNumber, BrowserId) {
+    pub(crate) fn registration(self) -> RegistrationId {
         match self.target {
-            DeliveryTarget::App(app_id) => (Some(app_id), 0, 0),
-            DeliveryTarget::Browser => (None, self.anchor_number, self.browser_id),
+            DeliveryTarget::App(app_id) => RegistrationId::App(app_id),
+            DeliveryTarget::Browser => RegistrationId::Browser {
+                anchor_number: self.anchor_number,
+                browser_id: self.browser_id,
+            },
         }
     }
 }

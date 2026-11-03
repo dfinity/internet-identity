@@ -124,44 +124,43 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
     });
 }
 
-/// The oldest entry the browser may still collect, passing over what it may not be handed.
-pub(crate) fn collect(
+/// The entry this id names, where it has not expired and the identity still allows the
+/// origin it came from. An id is unique within its inbox, so there is one or none.
+pub(crate) fn notification_named(
     anchor: &Anchor,
     browser_id: BrowserId,
     inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
 ) -> Option<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
+    let entry = anchor
+        .notifications_for_browser(browser_id)
+        .iter()
+        .find(|entry| {
+            entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
+        })?;
+    // Ours carries the event and names no app, so there is no origin to resolve and no
+    // consent to read: the words for it are written in the service worker.
+    if let Some(event) = entry.event.clone() {
+        return Some(NotificationToShow {
+            origin: None,
+            account_number: None,
+            canister_id: entry.sender,
+            id: entry.notification_id,
+            event: Some(event),
+        });
+    }
     storage_borrow(|storage| {
-        anchor
-            .notifications_for_browser(browser_id)
-            .iter()
-            .filter(|entry| {
-                entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
-            })
-            .find_map(|entry| {
-                if let Some(event) = entry.event.clone() {
-                    return Some(NotificationToShow {
-                        origin: None,
-                        account_number: None,
-                        canister_id: entry.sender,
-                        id: entry.notification_id,
-                        event: Some(event),
-                    });
-                }
-                let origin =
-                    storage.lookup_origin_with_application_number(entry.application_number?)?;
-                let notification = NotificationToShow {
-                    origin: Some(origin.clone()),
-                    account_number: entry.account_number,
-                    canister_id: entry.sender,
-                    id: entry.notification_id,
-                    event: None,
-                };
-                storage
-                    .read_anchor_application_config(anchor_number, &origin)
-                    .filter(|config| config.notifications_allowed())
-                    .map(|_| notification)
+        let origin = storage.lookup_origin_with_application_number(entry.application_number?)?;
+        storage
+            .read_anchor_application_config(anchor_number, &origin)
+            .filter(|config| config.notifications_allowed())
+            .map(|_| NotificationToShow {
+                origin: Some(origin.clone()),
+                account_number: entry.account_number,
+                canister_id: entry.sender,
+                id: entry.notification_id,
+                event: None,
             })
     })
 }
@@ -201,6 +200,7 @@ mod tests {
         anchor, app_for_key, app_key, setup, subscribe, APP_RELAY,
     };
     use crate::notifications::write_notifications_decision;
+    use crate::SECOND_NS;
 
     fn app_origin(origin: &str) -> ApplicationOrigin {
         ApplicationOrigin::try_from(origin).expect("a bare origin")
@@ -210,8 +210,6 @@ mod tests {
         IdentityForNotification, NotificationEvent,
     };
     use pretty_assertions::assert_eq;
-
-    const SECOND_NS: u64 = 1_000_000_000;
 
     fn entry(notification_id: u64, expires_at_ns: Timestamp) -> InboxNotification {
         InboxNotification {
@@ -423,7 +421,7 @@ mod tests {
             .map(|entry| entry.inbox_notification_id)
             .collect();
         ids.into_iter()
-            .find_map(|id| collect(&anchor, browser_id, id, now_ns))
+            .find_map(|id| notification_named(&anchor, browser_id, id, now_ns))
     }
 
     fn next_id(

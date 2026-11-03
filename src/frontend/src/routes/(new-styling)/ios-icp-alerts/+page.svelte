@@ -32,7 +32,8 @@
     settleWithTheApp,
   } from "./screen";
   import { openInSafari } from "./openInSafari";
-  import { watchForInstall, watchProbe } from "./watchInstall";
+  import { watchForInstall } from "./watchInstall";
+  import { watchProbe } from "$lib/utils/notifications/watchProbe";
   import { NOTIFICATION_APP_NAME } from "./appName";
   import AppsGridMock from "./AppsGridMock.svelte";
   import NotificationMock from "./NotificationMock.svelte";

@@ -23,6 +23,7 @@
 //! and [`crate::single_flight_cache`] parks that marker under backoff, so a name that
 //! does not resolve is not re-probed on every pass.
 
+use internet_identity_interface::internet_identity::types::Timestamp;
 use std::cell::RefCell;
 use std::thread::LocalKey;
 
@@ -85,10 +86,9 @@ fn tier_of(relay_origin: &str) -> Tier {
     }
 }
 
-/// What a probe learns: the status the relay answered with. Any status at all is the
-/// whole of it — a relay answering `404` for a path it has no subscription at has still
-/// proved it is there, which is the only question being asked.
-type ReachabilityCache = SingleFlightCache<String, u16, String>;
+/// That the relay answered at all, which is the only question a probe asks: one
+/// answering `404` for a path it has no subscription at has still proved it is there.
+type ReachabilityCache = SingleFlightCache<String, (), String>;
 
 /// Origins held per reachability cache. Sized for the hosts a relay operator actually
 /// runs, not against a flood: a new name defeats any size, so what bounds a flood is the
@@ -183,7 +183,11 @@ fn new_reachability_cache(limiter: Limiter) -> ReachabilityCache {
                 return FillOutcome::Abandoned;
             };
             match probe(&relay_origin).await {
-                Ok(status) => FillOutcome::Ready(status),
+                // The status is not kept: that it answered at all is the whole answer.
+                Ok(status) => {
+                    ic_cdk::println!("INFO: {relay_origin} answered a probe with {status}");
+                    FillOutcome::Ready(())
+                }
                 Err(err) => {
                     ic_cdk::println!("INFO: no relay answered at {relay_origin}: {err}");
                     FillOutcome::Failed(err)
@@ -215,12 +219,59 @@ pub(crate) enum RelayToken {
     Unreachable,
 }
 
+/// The JWT for each of these relays, aligned with them, or nothing where any is still
+/// being probed or signed for. All or none: a notification deposited for one browser and
+/// left in the backlog for another would be shown twice.
+///
+/// An entry is `None` where nothing answers at that relay. That destination is past
+/// waiting for, so the caller leaves it out and posts to the rest, rather than holding a
+/// notification back from reachable browsers until it expires.
+pub(crate) fn live_tokens_for(
+    relay_origins: &[String],
+    now_ns: Timestamp,
+) -> Option<Vec<Option<String>>> {
+    let now_secs = now_ns / crate::SECOND_NS;
+    let mut jwts = Vec::with_capacity(relay_origins.len());
+    let mut waiting = false;
+    for origin in relay_origins {
+        // Every one is asked for, so their probes and signatures run side by side rather
+        // than one pass apart.
+        // Off-wasm nothing drives a detached fill, so a test drives it and reads the
+        // answer in the pass that asked.
+        #[cfg(test)]
+        let token = settled_relay_token(origin.clone());
+        #[cfg(not(test))]
+        let token = relay_token(origin.clone());
+        match token {
+            RelayToken::Ready(jwt) => jwts.push(live_token(jwt, now_secs)),
+            RelayToken::Unreachable => jwts.push(None),
+            RelayToken::Pending => waiting = true,
+        }
+    }
+    (!waiting).then_some(jwts)
+}
+
+/// A token is refused this close to its expiry, so one that lapses between the pass
+/// planning a wake-up and the relay reading it is not posted.
+const JWT_SPENT_WITHIN_SECS: u64 = 10;
+
+/// The token to post with, where it still has long enough left to be read. The cache
+/// decides when to refetch, the token decides when it dies, and posting a dead one costs
+/// the notification rather than delaying it.
+fn live_token(jwt: SignedJwt, now_secs: u64) -> Option<String> {
+    (jwt.expires_at_secs > now_secs.saturating_add(JWT_SPENT_WITHIN_SECS)).then_some(jwt.token)
+}
+
 /// The token to wake `relay_origin` with, or why there is none.
-pub(crate) fn signed_jwt(relay_origin: String) -> RelayToken {
-    // Off-wasm nothing drives a detached fill, so a test drives it here and reads the
-    // answer in the pass that asked. A probe and a signature are two fills in sequence,
-    // and neither starts until the lookup before it has landed.
-    #[cfg(test)]
+#[cfg(not(test))]
+fn relay_token(relay_origin: String) -> RelayToken {
+    look_up(relay_origin)
+}
+
+/// As above, driving the fills a test has no executor for. A probe and a signature are
+/// two in sequence, and neither starts until the lookup before it has landed.
+#[cfg(test)]
+fn settled_relay_token(relay_origin: String) -> RelayToken {
     for _ in 0..2 {
         if let answer @ (RelayToken::Ready(_) | RelayToken::Unreachable) =
             look_up(relay_origin.clone())

@@ -204,7 +204,7 @@ export const armPushNotifications = async (
 
       const pushManager = {
         getSubscription: () => Promise.resolve(subscription),
-        subscribe: () => {
+        subscribe: (options?: { applicationServerKey?: BufferSource }) => {
           // The real one rejects rather than resolving unsubscribed, and II
           // treats the rejection as the user refusing.
           if (permission !== "granted") {
@@ -225,6 +225,14 @@ export const armPushNotifications = async (
               name === "auth"
                 ? new Uint8Array(auth).buffer
                 : new Uint8Array(p256dh).buffer,
+            // `subscribedWith` reads this to tell a subscription minted with our VAPID
+            // key from one left by another, so a stub without it sends every identity
+            // down the mint-a-fresh-one path and the reuse this fixture exists to cover
+            // is never taken.
+            options: {
+              userVisibleOnly: true,
+              applicationServerKey: options?.applicationServerKey,
+            },
           } as unknown as { endpoint: string };
           remember();
           return Promise.resolve(subscription);
@@ -510,8 +518,13 @@ export const armRealWorkerPush = async (
   await context.addInitScript((keys) => {
     const { endpoint, p256dh, auth } = keys;
     let subscription: unknown = null;
-    const fake = {
+    const fake: { endpoint: string; options: Record<string, unknown> } & Record<
+      string,
+      unknown
+    > = {
       endpoint,
+      // `applicationServerKey` is filled in by `subscribe` below, which is what
+      // `subscribedWith` reads to tell this subscription from one another key minted.
       options: { userVisibleOnly: true },
       unsubscribe: () => {
         subscription = null;
@@ -524,10 +537,16 @@ export const armRealWorkerPush = async (
           : new Uint8Array(p256dh).buffer,
       toJSON: () => ({ endpoint }),
     };
-    PushManager.prototype.subscribe = () => {
+    PushManager.prototype.subscribe = ((options?: {
+      applicationServerKey?: BufferSource;
+    }) => {
+      fake.options = {
+        userVisibleOnly: true,
+        applicationServerKey: options?.applicationServerKey,
+      };
       subscription = fake;
       return Promise.resolve(fake as unknown as PushSubscription);
-    };
+    }) as typeof PushManager.prototype.subscribe;
     PushManager.prototype.getSubscription = () =>
       Promise.resolve(subscription as PushSubscription | null);
   }, keys);

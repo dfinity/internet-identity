@@ -17,6 +17,7 @@ use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, InboxNotification, ReadySubscription, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::Storage;
+use crate::SECOND_NS;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use ic_stable_structures::Memory;
@@ -26,8 +27,6 @@ use internet_identity_interface::internet_identity::types::{
 };
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
-
-const SECOND_NS: u64 = 1_000_000_000;
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(1);
 
@@ -167,54 +166,19 @@ pub(crate) struct Delivery {
     pub(crate) browser_id: BrowserId,
     /// Which registration the endpoint below belongs to.
     pub(crate) target: DeliveryTarget,
-    /// The browser queue entry this wake-up announces, or `None` where it announces
-    /// nothing new: a second wake-up for an entry the service worker already has.
+    /// The inbox entry this wake-up announces, named by the deposit that stored it.
     pub(crate) notification: Option<InboxNotification>,
     pub(crate) endpoint: String,
-    pub(crate) vapid_public_key: Vec<u8>,
-    /// The sealed payload naming the entry above, absent where the wake-up names none.
+    /// The sealed payload naming the entry above. `None` only where sealing failed, and
+    /// such a wake-up is dropped rather than posted.
     pub(crate) body: Option<Vec<u8>>,
     /// What this destination seals with, read once when the pass planned it. A refresh
     /// replaces it before anything is sealed.
-    pub(crate) sealing: Option<rotation::SealingKeys>,
+    pub(crate) sealing: rotation::SealingKeys,
     pub(crate) jwt: String,
     pub(crate) urgency: Urgency,
     /// Relay retention time, capped by the notification's remaining lifetime.
     pub(crate) ttl_seconds: u64,
-}
-
-/// The JWT for each of these relays, aligned with them, or nothing where any is still
-/// being probed or signed for. All or none: a notification deposited for one browser and
-/// left in the backlog for another would be shown twice.
-///
-/// An entry is `None` where nothing answers at that relay. That destination is past
-/// waiting for, so the caller leaves it out and posts to the rest, rather than holding a
-/// notification back from reachable browsers until it expires.
-fn jwts_for(relay_origins: &[String], now_ns: Timestamp) -> Option<Vec<Option<String>>> {
-    let now_secs = now_ns / SECOND_NS;
-    let mut jwts = Vec::with_capacity(relay_origins.len());
-    let mut waiting = false;
-    for origin in relay_origins {
-        // Every one is asked for, so their probes and signatures run side by side rather
-        // than one pass apart.
-        match relays::signed_jwt(origin.clone()) {
-            relays::RelayToken::Ready(jwt) => jwts.push(live_token(jwt, now_secs)),
-            relays::RelayToken::Unreachable => jwts.push(None),
-            relays::RelayToken::Pending => waiting = true,
-        }
-    }
-    (!waiting).then_some(jwts)
-}
-
-/// A token is refused this close to its expiry, so one that lapses between the pass
-/// planning a wake-up and the relay reading it is not posted.
-const JWT_SPENT_WITHIN_SECS: u64 = 10;
-
-/// The token to post with, where it still has long enough left to be read. The cache
-/// decides when to refetch, the token decides when it dies, and posting a dead one costs
-/// the notification rather than delaying it.
-fn live_token(jwt: vapid_key::SignedJwt, now_secs: u64) -> Option<String> {
-    (jwt.expires_at_secs > now_secs.saturating_add(JWT_SPENT_WITHIN_SECS)).then_some(jwt.token)
 }
 
 /// Run a pass as soon as the budget allows: at once after a quiet spell, otherwise one
@@ -341,10 +305,21 @@ fn seal_and_post(mut deliveries: Vec<Delivery>, pass_bytes: &[u8; 32], now_ns: T
 /// Counts items rather than the posts they expand into, exactly as the app half does.
 /// The real gate on over-committing is the permit a post has to acquire before it leaves,
 /// which settles what it cannot get as rejected.
-pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
+/// The loop both halves of a pass run: take one item at a time, stop at the budget, and
+/// never take more than [`MAX_TAKEN_PER_PASS`], so items that wake nothing cannot run on.
+///
+/// The budget is checked before each take, so the last item taken may expand past it. The
+/// real gate on over-committing is the permit a post has to acquire before it leaves,
+/// which settles what it cannot get as rejected.
+fn plan_from_backlog(
+    max_posts: usize,
+    mut take_one: impl FnMut() -> Result<Option<Vec<Delivery>>, ()>,
+) -> Vec<Delivery> {
     if !notifications_enabled() {
         return Vec::new();
     }
+    // Planning past the outcall budget would queue entries for browsers whose wake-up is
+    // then refused a slot, so the pass takes on no more than it can post.
     let budget = max_posts.min(post_capacity());
 
     let mut deliveries = Vec::new();
@@ -352,7 +327,19 @@ pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Del
         if deliveries.len() >= budget {
             break;
         }
-        let planned = state::identity_backlog_mut(now_ns, |backlog| {
+        match take_one() {
+            // An item that woke nobody is still spent: only a signature on its way is
+            // reason to leave one where it is.
+            Ok(Some(planned)) => deliveries.extend(planned),
+            Ok(None) | Err(()) => break,
+        }
+    }
+    deliveries
+}
+
+pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
+    plan_from_backlog(max_posts, || {
+        state::identity_backlog_mut(now_ns, |backlog| {
             backlog.take_batch(1, now_ns, |batch| {
                 let Some(taken) = batch.first() else {
                     return Ok(None);
@@ -365,15 +352,8 @@ pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Del
                 }
                 Ok(Some(planned))
             })
-        });
-        match planned {
-            // An entry that woke nobody is still spent: only a signature on its way is
-            // reason to leave one where it is.
-            Ok(Some(planned)) => deliveries.extend(planned),
-            Ok(None) | Err(()) => break,
-        }
-    }
-    deliveries
+        })
+    })
 }
 
 /// One wake-up per entry the item names, at the address its kind reaches that entry by.
@@ -387,10 +367,10 @@ fn fan_out_to_destinations(
 ) -> bool {
     // Every push names the key its subscription was made with, so without ours there is
     // nothing to post. Asked for once; the next pass finds it.
-    let Some(vapid_public_key) = vapid_key::public_key() else {
+    if vapid_key::public_key().is_none() {
         vapid_key::ensure_public_key();
         return true;
-    };
+    }
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
             return false;
@@ -436,9 +416,8 @@ fn fan_out_to_destinations(
                     target,
                     notification: None,
                     endpoint: subscription.endpoint.as_str().to_string(),
-                    vapid_public_key: vapid_public_key.clone(),
                     body: None,
-                    sealing: Some(rotation::SealingKeys::from(subscription)),
+                    sealing: rotation::SealingKeys::from(subscription),
                     // Filled in below, once every relay this reaches has one.
                     jwt: String::new(),
                     urgency: pending.urgency.clone(),
@@ -453,7 +432,7 @@ fn fan_out_to_destinations(
         // All or none, and before anything is deposited: an entry left in the backlog for
         // one browser and deposited for another would be shown twice.
         let relay_origins: Vec<String> = planned.iter().map(|one| one.0.clone()).collect();
-        let Some(jwts) = jwts_for(&relay_origins, now_ns) else {
+        let Some(jwts) = relays::live_tokens_for(&relay_origins, now_ns) else {
             return true;
         };
 
@@ -492,20 +471,8 @@ fn fan_out_to_destinations(
 /// returning the wake-ups to post. Taken one at a time, so a pass stops at its budget,
 /// and never more than [`MAX_TAKEN_PER_PASS`], so ones that wake nothing cannot run on.
 pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
-    if !notifications_enabled() {
-        return Vec::new();
-    }
-
-    // Planning past the outcall budget would queue entries for browsers whose wake-up
-    // is then refused a slot, so the pass takes on no more than it can post.
-    let budget = max_posts.min(post_capacity());
-
-    let mut deliveries = Vec::new();
-    for _ in 0..MAX_TAKEN_PER_PASS {
-        if deliveries.len() >= budget {
-            break;
-        }
-        let planned = state::notification_backlog_mut(now_ns, |backlog| {
+    plan_from_backlog(max_posts, || {
+        state::notification_backlog_mut(now_ns, |backlog| {
             backlog.take_batch(1, now_ns, |batch| {
                 let Some(taken) = batch.first() else {
                     return Ok(None);
@@ -518,15 +485,8 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
                 }
                 Ok(Some(planned))
             })
-        });
-        match planned {
-            // An entry that woke nobody is still spent: only a signature on its way is
-            // reason to leave one where it is.
-            Ok(Some(planned)) => deliveries.extend(planned),
-            Ok(None) | Err(()) => break,
-        }
-    }
-    deliveries
+        })
+    })
 }
 
 /// Queue the notification for every browser that can be woken, preparing a wake-up
@@ -544,10 +504,10 @@ fn fan_out_to_browsers(
 ) -> bool {
     // Every push names the key its subscription was made with, so without ours there is
     // nothing to post. Asked for once; the next pass finds it.
-    let Some(vapid_public_key) = vapid_key::public_key() else {
+    if vapid_key::public_key().is_none() {
         vapid_key::ensure_public_key();
         return true;
-    };
+    }
     let pending = &taken.entry.item;
     let queued = InboxNotification {
         // Named by `deposit`, once per browser this is deposited for.
@@ -587,9 +547,8 @@ fn fan_out_to_browsers(
                         // Filled in below, where the deposit names the entry for this browser.
                         notification: None,
                         endpoint: subscription.endpoint.as_str().to_string(),
-                        vapid_public_key: vapid_public_key.clone(),
                         body: None,
-                        sealing: Some(rotation::SealingKeys::from(subscription)),
+                        sealing: rotation::SealingKeys::from(subscription),
                         // Filled in below, once every relay this reaches has one.
                         jwt: String::new(),
                         urgency: pending.urgency.clone(),
@@ -604,7 +563,7 @@ fn fan_out_to_browsers(
         // All or none, and before anything is deposited: an entry left in the backlog for
         // one browser and deposited for another would be shown twice.
         let relay_origins: Vec<String> = woken.iter().map(|one| one.0.clone()).collect();
-        let Some(jwts) = jwts_for(&relay_origins, now_ns) else {
+        let Some(jwts) = relays::live_tokens_for(&relay_origins, now_ns) else {
             return true;
         };
         let mut to_post = Vec::new();
@@ -869,11 +828,7 @@ fn sealed_for(
 fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timestamp) {
     let candidates: Vec<(rotation::Destination, Timestamp)> = deliveries
         .iter()
-        .filter(|delivery| delivery.notification.is_some())
-        .filter_map(|delivery| {
-            let sealing = delivery.sealing.as_ref()?;
-            Some((destination_of(delivery), sealing.last_rotated_ns))
-        })
+        .map(|delivery| (destination_of(delivery), delivery.sealing.last_rotated_ns))
         .collect();
 
     if !candidates.is_empty() {
@@ -890,7 +845,7 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
                     for delivery in deliveries.iter_mut().filter(|delivery| {
                         destination_of(delivery).registration() == destination.registration()
                     }) {
-                        delivery.sealing = Some(refreshed.clone());
+                        delivery.sealing = refreshed.clone();
                     }
                 }
                 Ok(None) => {}
@@ -902,11 +857,10 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
     }
 
     for (index, delivery) in deliveries.iter_mut().enumerate() {
-        let (Some(deposited), Some(sealing)) =
-            (delivery.notification.clone(), delivery.sealing.clone())
-        else {
+        let Some(deposited) = delivery.notification.clone() else {
             continue;
         };
+        let sealing = delivery.sealing.clone();
         delivery.body = sealed_for(
             &sealing.payload_ikm,
             &sealing.payload_keyid,
@@ -939,7 +893,7 @@ pub(crate) fn push_headers(delivery: &Delivery) -> Vec<(String, String)> {
             format!(
                 "vapid t={}, k={}",
                 delivery.jwt,
-                BASE64_URL_SAFE_NO_PAD.encode(&delivery.vapid_public_key)
+                BASE64_URL_SAFE_NO_PAD.encode(vapid_key::public_key().unwrap_or_default())
             ),
         ),
     ];
@@ -1697,7 +1651,7 @@ mod tests {
             format!(
                 "vapid t={}, k={}",
                 delivery.jwt,
-                BASE64_URL_SAFE_NO_PAD.encode(&delivery.vapid_public_key)
+                BASE64_URL_SAFE_NO_PAD.encode(vapid_key::public_key().unwrap_or_default())
             )
         );
     }
@@ -1851,12 +1805,12 @@ mod tests {
                 .all(|delivery| delivery.target == DeliveryTarget::App(app)),
             "both through the one app"
         );
-        let before = deliveries[0].sealing.clone().expect("planned with keys");
+        let before = deliveries[0].sealing.clone();
 
         seal_pass(&mut deliveries, &[3u8; 32], 2 * SECOND_NS);
 
-        let first = deliveries[0].sealing.clone().expect("keys");
-        let second = deliveries[1].sealing.clone().expect("keys");
+        let first = deliveries[0].sealing.clone();
+        let second = deliveries[1].sealing.clone();
         assert_ne!(first, before, "the pass refreshed the registration");
         assert_eq!(
             first, second,
@@ -1883,11 +1837,11 @@ mod tests {
 
         let mut deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
         assert_eq!(deliveries.len(), 1);
-        let sealed_with = deliveries[0].sealing.clone().expect("planned with keys");
+        let sealed_with = deliveries[0].sealing.clone();
         seal_pass(&mut deliveries, &[3u8; 32], 5 * SECOND_NS);
 
         assert_ne!(
-            deliveries[0].sealing.clone().expect("keys"),
+            deliveries[0].sealing.clone(),
             sealed_with,
             "the pass refreshed what the app seals with"
         );

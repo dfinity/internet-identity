@@ -661,7 +661,7 @@ mod subscriptions {
     use super::*;
     use canister_tests::api::internet_identity::api_v2::prepare_account_session;
     use canister_tests::api::internet_identity::notifications::{
-        remove_webpush_subscription, set_webpush_subscription,
+        remove_webpush_subscription, subscribe_webpush,
     };
     use canister_tests::framework::BrowserKey;
     use internet_identity_interface::internet_identity::types::{
@@ -762,7 +762,7 @@ mod subscriptions {
         sign_browser_in(&env, canister_id, anchor, &browser);
 
         assert!(matches!(
-            set_webpush_subscription(
+            subscribe_webpush(
                 &env,
                 canister_id,
                 key_holder(&browser).principal(),
@@ -778,7 +778,7 @@ mod subscriptions {
         let env = env();
         let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
 
-        set_webpush_subscription(
+        subscribe_webpush(
             &env,
             canister_id,
             key_holder(&browser).principal(),
@@ -802,7 +802,7 @@ mod subscriptions {
         let (canister_id, anchor, _browser, _) = install_with_browser(&env);
 
         let stranger = BrowserKey::new(9);
-        let refused = set_webpush_subscription(
+        let refused = subscribe_webpush(
             &env,
             canister_id,
             stranger.principal(),
@@ -822,7 +822,7 @@ mod subscriptions {
         let env = env();
         let (canister_id, anchor, browser, _) = install_with_browser(&env);
 
-        let refused = set_webpush_subscription(
+        let refused = subscribe_webpush(
             &env,
             canister_id,
             browser.principal(),
@@ -843,7 +843,7 @@ mod subscriptions {
         let (canister_id, anchor, _browser, _) = install_with_browser(&env);
 
         let refused =
-            set_webpush_subscription(&env, canister_id, principal_1(), request(anchor, ENDPOINT))?;
+            subscribe_webpush(&env, canister_id, principal_1(), request(anchor, ENDPOINT))?;
         assert!(
             matches!(refused, Err(SetWebPushSubscriptionError::InvalidBrowserKey)),
             "{refused:?}"
@@ -877,7 +877,7 @@ mod subscription_status {
     use super::*;
     use canister_tests::api::internet_identity::api_v2::revoke_browser_sessions;
     use canister_tests::api::internet_identity::notifications::{
-        get_webpush_subscription_status, set_webpush_subscription,
+        get_webpush_subscription_status, subscribe_webpush,
     };
     use canister_tests::framework::BrowserKey;
     use internet_identity_interface::internet_identity::types::{
@@ -891,7 +891,7 @@ mod subscription_status {
         anchor: AnchorNumber,
         browser: &BrowserKey,
     ) -> Result<(), RejectResponse> {
-        set_webpush_subscription(
+        subscribe_webpush(
             env,
             canister_id,
             key_holder(browser).principal(),
@@ -1016,7 +1016,7 @@ mod pull_delegation {
     };
     use canister_tests::api::internet_identity::notifications::{
         get_notification_delegation, prepare_notification_delegation, remove_webpush_subscription,
-        revoke_consent, set_webpush_subscription,
+        revoke_consent, subscribe_webpush,
     };
     use canister_tests::framework::{verify_delegation, verify_icrc3_attributes};
     use internet_identity_interface::internet_identity::types::{
@@ -1057,14 +1057,14 @@ mod pull_delegation {
         BrowserId,
     ) {
         let (canister_id, anchor, browser, browser_id) = install_with_browser(env);
-        set_webpush_subscription(
+        subscribe_webpush(
             env,
             canister_id,
             key_holder(&browser).principal(),
             super::subscriptions::request(anchor, ENDPOINT),
         )
-        .expect("set_webpush_subscription rejected")
-        .expect("set_webpush_subscription returned Err");
+        .expect("the subscribe was rejected")
+        .expect("the subscribe returned Err");
         grant_consent(env, canister_id, principal_1(), anchor, ORIGIN.into())
             .expect("grant_consent rejected")
             .expect("grant_consent returned Err");
@@ -1487,7 +1487,7 @@ mod installing_over_an_app {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        disable_notification_app, set_webpush_subscription,
+        disable_notification_app, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
         DisableNotificationAppError, DisableNotificationAppRequest, PrepareNotificationAppLinkError,
@@ -1522,8 +1522,8 @@ mod installing_over_an_app {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
         let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
-        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
-            .expect("set_webpush_subscription returned Err");
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
 
         assert_eq!(
             prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200)?,
@@ -1573,8 +1573,8 @@ mod installing_over_an_app {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
         let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
-        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
-            .expect("set_webpush_subscription returned Err");
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
         disable_notification_app(
             &env,
             canister_id,
@@ -1808,7 +1808,7 @@ mod probe {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        probe_notification_app, set_webpush_subscription,
+        probe_notification_app, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
         NotificationId, ProbeNotificationAppError, ProbeNotificationAppRequest,
@@ -1842,9 +1842,9 @@ mod probe {
     ) -> (CanisterId, AnchorNumber, AnchorNumber, Principal) {
         let (canister_id, first, second) = install_with_two_anchors(env);
         let (app, _) = link_app(env, canister_id, first, 1, 100);
-        set_webpush_subscription(env, canister_id, app, request(first, ENDPOINT))
-            .expect("set_webpush_subscription rejected")
-            .expect("set_webpush_subscription returned Err");
+        subscribe_webpush(env, canister_id, app, request(first, ENDPOINT))
+            .expect("the subscribe was rejected")
+            .expect("the subscribe returned Err");
         (canister_id, first, second, app)
     }
 
@@ -1885,8 +1885,8 @@ mod probe {
         let env = env();
         let (canister_id, first, _) = install_with_two_anchors(&env);
         link_app(&env, canister_id, first, 1, 100);
-        set_webpush_subscription(&env, canister_id, browser(1), request(first, ENDPOINT))?
-            .expect("set_webpush_subscription returned Err");
+        subscribe_webpush(&env, canister_id, browser(1), request(first, ENDPOINT))?
+            .expect("the subscribe returned Err");
 
         assert_eq!(
             probe(&env, canister_id, browser(1), first)?,
@@ -1967,7 +1967,7 @@ mod shared_app {
     use canister_tests::api::internet_identity::api_v2::identity_info;
     use canister_tests::api::internet_identity::notifications::{
         claim_notification_app, disable_notification_app, get_notification_app_status,
-        get_webpush_subscription_status, set_webpush_subscription,
+        get_webpush_subscription_status, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
         BrowserInfo, ClaimNotificationAppRequest, DisableNotificationAppError,
@@ -2121,8 +2121,8 @@ mod shared_app {
             assert!(info.enabled);
         }
 
-        set_webpush_subscription(&env, canister_id, app, request(first, ENDPOINT))?
-            .expect("set_webpush_subscription returned Err");
+        subscribe_webpush(&env, canister_id, app, request(first, ENDPOINT))?
+            .expect("the subscribe returned Err");
 
         for anchor in [first, second] {
             let registered = get_webpush_subscription_status(&env, canister_id, app, anchor)?
@@ -2149,7 +2149,7 @@ mod shared_app {
         let (app, _) = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, 100);
 
         assert_eq!(
-            set_webpush_subscription(&env, canister_id, app, request(second, ENDPOINT))?,
+            subscribe_webpush(&env, canister_id, app, request(second, ENDPOINT))?,
             Err(SetWebPushSubscriptionError::InvalidBrowserKey)
         );
         assert_eq!(
@@ -2468,7 +2468,7 @@ mod app_link {
     use candid::Principal;
     use canister_tests::api::internet_identity::notifications::{
         get_webpush_subscription_status, link_notification_app, prepare_notification_app_link,
-        set_webpush_subscription,
+        subscribe_webpush,
     };
     use canister_tests::framework::BrowserKey;
     use internet_identity_interface::internet_identity::types::{
@@ -2594,7 +2594,7 @@ mod app_link {
         let env = env();
         let (canister_id, anchor) = install_with_browser(&env);
         let key = BrowserKey::new(BROWSER_SEED);
-        set_webpush_subscription(
+        subscribe_webpush(
             &env,
             canister_id,
             key_holder(&key).principal(),
@@ -2855,7 +2855,7 @@ mod turning_on {
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
         enable_notification_app, get_notification_app_status, probe_notification_app,
-        set_webpush_subscription,
+        subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
         EnableNotificationAppError, EnableNotificationAppRequest, GetNotificationAppStatusRequest,
@@ -2910,8 +2910,8 @@ mod turning_on {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
         let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
-        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
-            .expect("set_webpush_subscription returned Err");
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
 
         let queued = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
             .expect("the switch returned Err");
@@ -2959,8 +2959,8 @@ mod turning_on {
         let env = env();
         let (canister_id, anchor, _) = install_with_two_anchors(&env);
         let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
-        set_webpush_subscription(&env, canister_id, app, request(anchor, ENDPOINT))?
-            .expect("set_webpush_subscription returned Err");
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
 
         let first = turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
             .expect("the switch returned Err");

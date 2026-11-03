@@ -11,6 +11,7 @@
 //! asymmetric cipher and it is RSA-OAEP, whose keypair a canister cannot mint per attempt.
 //! These three the browser has natively, and the delivery side already carries the curve.
 
+use crate::SECOND_NS;
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes128Gcm, Nonce};
 use hkdf::Hkdf;
@@ -19,8 +20,6 @@ use p256::elliptic_curve::sec1::ToEncodedPoint;
 use sha2::Sha256;
 
 use super::validation::{AuthSecret, SealedAuth, SubscriberKey};
-
-const SECOND_NS: u64 = 1_000_000_000;
 
 /// How long a transport key waits for the subscribe it was minted for. The gap is a user
 /// deciding on the browser's permission prompt, so it is minutes rather than seconds.

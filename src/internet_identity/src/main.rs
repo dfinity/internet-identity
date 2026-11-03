@@ -95,6 +95,7 @@ mod verified_emails;
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
+pub const SECOND_NS: u64 = secs_to_nanos(1);
 const MINUTE_NS: u64 = secs_to_nanos(60);
 const HOUR_NS: u64 = 60 * MINUTE_NS;
 const DAY_NS: u64 = 24 * HOUR_NS;
@@ -991,7 +992,7 @@ fn browser_get_notification(
         .ok_or(GetNotificationError::InvalidBrowserKey)?;
 
     Ok(GetNotificationResponse {
-        notification: notifications::browser_inbox::collect(
+        notification: notifications::browser_inbox::notification_named(
             &anchor,
             browser_id,
             inbox_notification_id,

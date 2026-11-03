@@ -4,7 +4,7 @@ import {
   enableApp,
 } from "$lib/utils/notifications/appStatus";
 import { disableApp } from "./appEnabled";
-import { watchProbe } from "../../../routes/(new-styling)/ios-icp-alerts/watchInstall";
+import { watchProbe } from "$lib/utils/notifications/watchProbe";
 
 /** Two polls. Nothing tells a canister that a Home Screen app was deleted, so the only
  *  answer is the app's own: one interval would call a live app dead whenever the worker

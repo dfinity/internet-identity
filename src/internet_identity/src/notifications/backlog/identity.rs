@@ -8,6 +8,7 @@
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
+use crate::SECOND_NS;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, NotificationEvent, NotificationId, Timestamp, Urgency,
 };
@@ -72,7 +73,6 @@ impl QueueItem for PendingIdentityNotification {
 /// Senders are identities, so the turns the structure takes are turns between identities.
 pub(crate) type IdentityBacklog = AdmissionQueue<AnchorNumber, PendingIdentityNotification>;
 
-const SECOND_NS: u64 = 1_000_000_000;
 const MINUTE_NS: u64 = 60 * SECOND_NS;
 
 /// Shorter than the hour one of these is worth showing for once it reaches a device: a

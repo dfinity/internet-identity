@@ -244,13 +244,28 @@ fn prepared_keys(
     None
 }
 
-/// Subscribes the way a browser does: fetch the keys, encrypt `auth` to the transport key
-/// the canister just minted for this caller, then send.
-///
-/// A key fetch that is refused leaves the request exactly as the caller built it, so a
-/// test about `set_webpush_subscription` being refused still sees its own refusal rather
-/// than one from the fetch.
+/// The raw call, with the request exactly as the caller built it.
 pub fn set_webpush_subscription(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: SetWebPushSubscriptionRequest,
+) -> Result<Result<(), SetWebPushSubscriptionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "set_webpush_subscription",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+/// A whole subscribe: fetch the keys, seal `auth` to the transport key the canister just
+/// minted for this caller, and send. A fetch that is refused leaves the request as it
+/// was, so a test about the subscribe being refused sees its own refusal.
+pub fn subscribe_webpush(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -262,15 +277,7 @@ pub fn set_webpush_subscription(
         request.transport_key = transport_key;
         request.sealed_auth = sealed_auth;
     }
-    call_candid_as(
-        env,
-        canister_id,
-        RawEffectivePrincipal::None,
-        sender,
-        "set_webpush_subscription",
-        (request,),
-    )
-    .map(|(x,)| x)
+    set_webpush_subscription(env, canister_id, sender, request)
 }
 
 pub fn remove_webpush_subscription(

@@ -24,8 +24,8 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 export interface BrowserPushState {
   supported: boolean;
   permission: NotificationPermission;
-  /** The endpoint the browser and the signing key we kept agree on, or `undefined`
-   * where there is no live subscription to the key we hold. */
+  /** The endpoint this browser's push subscription names, or `undefined` where it
+   * holds none. */
   endpoint?: string;
 }
 
@@ -34,7 +34,8 @@ export interface BrowserDeviceState {
   source: "browser";
   supported: boolean;
   permission: NotificationPermission;
-  /** This browser holds a live subscription for the signing key we still keep. */
+  /** This browser holds a push subscription. Which key it was minted with is
+   * `subscribedWith`'s question, not this one's. */
   subscribed: boolean;
   /** The canister holds that same subscription under this identity. A second identity
    * on a subscribed browser is not registered until it registers for itself, and one

@@ -28,13 +28,8 @@ import {
 } from "./appNotifications";
 import { allowedLink, fetchAlternativeOrigins } from "./notificationLink";
 import { loadPullIdentity, mintPullIdentity } from "./pullDelegation";
-import {
-  dataOf,
-  refOf,
-  tagOf,
-  type NotificationRef,
-} from "./shownNotification";
-import { recordShown, shownRecently } from "./shownRecord";
+import { dataOf, refOf, tagOf, type NotificationRef } from "./notificationRef";
+import { recordShown, shownRecently } from "./recentlyShown";
 import { identityNotificationText } from "./identityNotification";
 import { NOTIFICATION_APP_PATH } from "../appPath";
 

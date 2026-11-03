@@ -19,10 +19,7 @@ import {
 } from "$lib/utils/notifications/worker/wakeUp";
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
-import {
-  refOf,
-  urlOf,
-} from "$lib/utils/notifications/worker/shownNotification";
+import { refOf, urlOf } from "$lib/utils/notifications/worker/notificationRef";
 import {
   openOnClick,
   openTheApp,
