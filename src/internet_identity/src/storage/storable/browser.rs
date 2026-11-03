@@ -46,8 +46,6 @@ pub struct StorableBrowser {
     /// 11 is empty on such an entry, so its run of ids starts where a fresh one does.
     #[n(12)]
     pub next_inbox_notification_id: Option<u64>,
-    // RETIRED, never reuse. 7 held the Web Push registration before a push carried a
-    // payload, 9 the inbox before its entries were named. Neither can be read into 10
-    // and 11, which need sealing keys and an id per entry, so a record written at
-    // either is dropped and the browser registers again.
+    // #[n(7)] RETIRED, never reuse: the Web Push registration before a push carried a payload.
+    // #[n(9)] RETIRED, never reuse: the inbox before its entries were named.
 }

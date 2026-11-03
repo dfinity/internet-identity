@@ -32,9 +32,7 @@ pub struct StorableNotificationApp {
     /// What this app registered for Web Push, if anything.
     #[n(7)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
-    // RETIRED, never reuse. 5 held the Web Push registration before a push carried a
-    // payload, which cannot be read into 7 because it has no sealing keys, so such a
-    // record is dropped and the app registers again.
+    // #[n(5)] RETIRED, never reuse: the Web Push registration before a push carried a payload.
 }
 
 /// A probe an entry sent to this record, and when it sent it.
