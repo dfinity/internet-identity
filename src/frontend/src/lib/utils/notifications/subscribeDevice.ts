@@ -20,6 +20,7 @@ import { registeredIdentityNumbers } from "$lib/stores/browser-key.store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
   _SERVICE,
+  PrepareWebPushSubscriptionError,
   SetWebPushSubscriptionError,
 } from "$lib/generated/internet_identity_types";
 
@@ -176,9 +177,14 @@ export const ensureRegisteredDevice = async (
 };
 
 /** `InvalidBrowserKey` is the anchor named not reaching the caller, which says nothing
- * about the next one. */
+ * about the next one. Both halves of a registration answer it, because both are
+ * authorized by the anchor they name. */
 const anotherAnchorMayAnswer = (error: unknown): boolean => {
-  if (!isCanisterError<SetWebPushSubscriptionError>(error)) {
+  if (
+    !isCanisterError<
+      SetWebPushSubscriptionError | PrepareWebPushSubscriptionError
+    >(error)
+  ) {
     return false;
   }
   switch (error.type) {
@@ -199,10 +205,6 @@ export const registerForAnyAnchor = async (
   anchors: bigint[],
   caller: ActorSubclass<_SERVICE>,
 ): Promise<boolean> => {
-  const [first] = anchors;
-  if (first === undefined) {
-    return false;
-  }
   // Before anything is fetched, because every launch of the installed app comes through
   // here and the push service usually hands back the address it already gave us. An
   // anchor already registered at it needs no key, no derivation and no write.
@@ -215,20 +217,20 @@ export const registerForAnyAnchor = async (
     }
   }
 
-  const keys = await prepareSubscription(first, caller);
-  const { subscription: live } = await usableSubscription(keys);
-
+  // Both halves name an anchor and both are authorized through it, so both belong to
+  // the walk: an identity that has unlinked the app refuses the key fetch exactly as it
+  // refuses the registration, and says nothing about the next one.
+  let live: PushSubscription | undefined;
   for (const anchor of anchors) {
     try {
-      // Handed down for the anchor they were fetched for, which saves it a status query
-      // and a second prepare: that one would mint another transport key, derive another
-      // sender key, and empty every inbox routed through this app a second time.
-      await registerStoredDevice(
-        anchor,
-        live,
-        caller,
-        anchor === first ? keys : undefined,
-      );
+      const keys = await prepareSubscription(anchor, caller);
+      // Once for the whole walk. Subscribing again would hand out a new endpoint and
+      // drop the one the anchors already refused through.
+      live ??= (await usableSubscription(keys)).subscription;
+      // Handed down rather than fetched again: a second fetch would mint another
+      // transport key, derive another sender key, and empty every inbox routed through
+      // this app a second time.
+      await registerStoredDevice(anchor, live, caller, keys);
     } catch (error) {
       if (anotherAnchorMayAnswer(error)) {
         continue;
