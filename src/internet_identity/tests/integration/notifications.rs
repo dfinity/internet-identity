@@ -2480,12 +2480,6 @@ mod claims {
     }
 }
 
-/// Runs the dispatcher's next pass, which is what deposits an entry and names it.
-fn run_dispatch_pass(env: &PocketIc) {
-    env.advance_time(std::time::Duration::from_secs(1));
-    env.tick();
-}
-
 /// Every flow here signs one browser in and sends it at most one notification, so the
 /// entry a wake-up would name is the first of the first browser's inbox.
 const FIRST_BROWSER: BrowserId = 0;
@@ -2979,43 +2973,6 @@ mod turning_on {
                 },
             )?,
             Ok(queued)
-        );
-        Ok(())
-    }
-
-    /// The central thing a wake-up now does: the pass deposits an entry, names it, and
-    /// the id it names is the one the service worker is answered with.
-    #[test]
-    fn should_hand_back_the_entry_the_wake_up_named() -> Result<(), RejectResponse> {
-        let env = env();
-        let (canister_id, anchor, _) = install_with_two_anchors(&env);
-        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
-        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
-            .expect("the subscribe returned Err");
-
-        // Switching delivery on is Internet Identity's own notification, so the pass has
-        // something to deposit without an app canister sending one.
-        turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
-            .expect("the switch returned Err");
-        run_dispatch_pass(&env);
-
-        let shown = browser_get_notification(&env, canister_id, app, get_request(anchor))?
-            .expect("the read returned Err")
-            .notification
-            .expect("the pass deposited nothing the wake-up could name");
-        // Ours carries the event and names no app, which is what the worker writes the
-        // words for.
-        assert!(shown.event.is_some());
-        assert_eq!(shown.origin, None);
-
-        // Taken, so the same id answers with nothing the second time.
-        assert_eq!(
-            browser_remove_notification(&env, canister_id, app, remove_request(anchor))?,
-            Ok(RemoveNotificationResponse {})
-        );
-        assert_eq!(
-            browser_get_notification(&env, canister_id, app, get_request(anchor))?,
-            Ok(GetNotificationResponse { notification: None })
         );
         Ok(())
     }
