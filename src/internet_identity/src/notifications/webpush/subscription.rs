@@ -5,6 +5,7 @@ use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
 use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::{self, DeliveryTarget};
+use crate::notifications::installed_app::NotificationAppRef;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -210,15 +211,25 @@ pub(crate) fn delivering_subscription<M: Memory + Clone>(
     anchor: &Anchor,
     browser_id: BrowserId,
 ) -> Option<ReadySubscription> {
+    let browser = anchor
+        .browsers()
+        .iter()
+        .find(|browser| browser.id == browser_id)?;
+    // A browser has one route, and an install nobody has opened yet is that route being
+    // handed over: completing it drops whatever address this browser registered for
+    // itself and clears what was waiting there. Nothing is delivered in between, and a
+    // dispatch pass refuses the same browser on the same ground.
+    if matches!(
+        browser.notification_app,
+        Some(NotificationAppRef::Pending { .. })
+    ) {
+        return None;
+    }
     // Only the ready half: a registration still waiting on the subscribe that spends its
     // transport key has no endpoint to post to and nothing to seal with.
     if let Some(own) = anchor.webpush_subscription(browser_id) {
         return own.ready().cloned();
     }
-    let browser = anchor
-        .browsers()
-        .iter()
-        .find(|browser| browser.id == browser_id)?;
     dispatch::routed_app(storage, browser)?
         .webpush_subscription
         .and_then(WebPushSubscription::into_ready)
@@ -246,37 +257,20 @@ pub fn subscription_status(
         })
 }
 
-/// Writes what this browser registered, and clears what was waiting where that address
-/// is going away.
+/// Writes what this browser registered, and empties the inbox the old address leaves.
 ///
-/// A queue is a list of wake-ups already posted to one endpoint. A registration that is
-/// removed, or replaced by a different endpoint, leaves nothing that could show them, so
-/// they go with it. Re-registering the same endpoint keeps them.
+/// An inbox holds wake-ups already posted to one address. Every write here takes that
+/// address away: a prepare replaces the registration with a pending one, a subscribe
+/// spends that pending one, and signing out drops it. None can still show what was
+/// announced before, and entries nothing will show would fill the inbox against what
+/// arrives next.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    // Keep what is queued only where the registration is replaced at the same address.
-    // Anything else leaves it announced to an address nothing listens on, and a full
-    // queue posts no wake-up for what arrives after it.
-    // Only a ready registration has an address, so a subscribe passing through pending
-    // reads as a move and takes the queue with it. That is correct for every way one is
-    // reached: a browser only re-registers when the push service handed it a different
-    // endpoint, and what was announced to the old one can never be shown.
-    let same_address = matches!(
-        (
-            anchor
-                .webpush_subscription(browser_id)
-                .and_then(WebPushSubscription::ready),
-            subscription.as_ref().and_then(WebPushSubscription::ready),
-        ),
-        (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
-    );
-    if !same_address {
-        if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
-            queue.clear();
-        }
+    if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
+        inbox.clear();
     }
     let left = anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;

@@ -77,7 +77,3 @@ export const currentDeviceSubscription = async (): Promise<
   const registration = await navigator.serviceWorker.getRegistration();
   return (await registration?.pushManager.getSubscription()) ?? undefined;
 };
-
-/** `scheme://host[:port]` of a relay endpoint, which is what a push is addressed to. */
-export const relayOriginOf = (endpoint: string): string =>
-  new URL(endpoint).origin;

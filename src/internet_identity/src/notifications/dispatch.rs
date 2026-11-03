@@ -301,15 +301,10 @@ fn run_pass(armed: u64, now_ns: Timestamp) {
 /// and one that does gets bytes no other pass has had, which is what keeps two passes
 /// from sealing under the same salt when their indices both start at zero.
 #[cfg(not(test))]
-fn post_pass(mut deliveries: Vec<Delivery>, now_ns: Timestamp) {
+fn post_pass(deliveries: Vec<Delivery>, now_ns: Timestamp) {
     ic_cdk::spawn(async move {
         match crate::notifications::webpush::seed_pool::raw_rand().await {
-            Ok(pass_bytes) => {
-                seal_pass(&mut deliveries, &pass_bytes, now_ns);
-                for delivery in deliveries {
-                    outcalls::spawn_post(delivery);
-                }
-            }
+            Ok(pass_bytes) => seal_and_post(deliveries, &pass_bytes, now_ns),
             // The entries are deposited either way, so what could not be posted is
             // announced by the next wake-up these browsers get rather than lost.
             Err(err) => ic_cdk::println!(
@@ -320,11 +315,22 @@ fn post_pass(mut deliveries: Vec<Delivery>, now_ns: Timestamp) {
 }
 
 /// As above, for tests, which have no executor to spawn onto and no management canister
-/// to draw from. Fixed bytes stand in for the draw; everything after it is the same code.
+/// to draw from. Fixed bytes stand in for the draw, and nothing else differs.
 #[cfg(test)]
-fn post_pass(mut deliveries: Vec<Delivery>, now_ns: Timestamp) {
-    seal_pass(&mut deliveries, &[0u8; 32], now_ns);
+fn post_pass(deliveries: Vec<Delivery>, now_ns: Timestamp) {
+    seal_and_post(deliveries, &[0u8; 32], now_ns);
+}
+
+/// A wake-up carries the entry it announces, so one that could not be sealed is one the
+/// service worker can do nothing with: it is not posted, and its entry is taken out of
+/// the inbox rather than left to block what arrives next.
+fn seal_and_post(mut deliveries: Vec<Delivery>, pass_bytes: &[u8; 32], now_ns: Timestamp) {
+    seal_pass(&mut deliveries, pass_bytes, now_ns);
     for delivery in deliveries {
+        if delivery.body.is_none() {
+            settle(&delivery, PostOutcome::Rejected);
+            continue;
+        }
         outcalls::spawn_post(delivery);
     }
 }
@@ -451,7 +457,7 @@ fn fan_out_to_destinations(
             return true;
         };
 
-        let mut wrote = false;
+        let mut to_post = Vec::new();
         for ((_, browser_id, queued, mut delivery), jwt) in planned.into_iter().zip(jwts) {
             // Nothing answers at this browser's relay, so it is left out of the fan-out
             // rather than deposited for: it cannot be woken, and the entry it would sit
@@ -463,16 +469,19 @@ fn fan_out_to_destinations(
             let Some((queue, next_id)) = anchor.inbox_for_browser_mut(browser_id) else {
                 continue;
             };
-            wrote = true;
             let deposited = browser_inbox::deposit(queue, next_id, queued, now_ns);
             // The body is sealed once the pass is planned, because what it is sealed with
             // may be refreshed first and the salt comes from the pass rather than the entry.
             delivery.notification = Some(deposited);
-            deliveries.push(delivery);
+            to_post.push(delivery);
         }
-        if wrote {
-            if let Err(err) = storage.write(anchor) {
-                ic_cdk::println!("Failed to queue what Internet Identity has to say: {err}");
+        // Posted only once the deposits are persisted, as the app half does: a wake-up
+        // names an entry, and one naming an entry a failed write never stored is one the
+        // service worker can ask nothing for.
+        match storage.write(anchor) {
+            Ok(()) => deliveries.extend(to_post),
+            Err(err) => {
+                ic_cdk::println!("Failed to queue what Internet Identity has to say: {err}")
             }
         }
         false

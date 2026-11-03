@@ -1618,11 +1618,11 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         // The record is read back only to keep its own fields.
         let mut app = NotificationApp::from(stored);
-        // Keep what is queued only where the registration is replaced at the same address.
-        // Anything else leaves it announced to an address nothing listens on, and a full
-        // queue posts no wake-up for what arrives after it.
-        // Only a ready registration has an address, so a subscribe passing through
-        // pending reads as a move and takes the queue with it.
+        // What is waiting survives only a rewrite of the same address, which is what a
+        // rotation refresh does. A subscribe cannot reach it: that passes through a
+        // pending registration, which has no address to compare. Anything else leaves
+        // entries announced to an address nothing listens on, and a full inbox posts no
+        // wake-up for what arrives after them.
         let same_address = matches!(
             (
                 app.webpush_subscription

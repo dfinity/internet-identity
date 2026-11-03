@@ -82,23 +82,6 @@ export const registerStoredDevice = async (
 };
 
 /**
- * Mints a subscription and a VAPID key for this browser, then registers it. Assumes
- * notification permission is already granted. `subscribeToPush` drops any prior
- * subscription, so this replaces one rather than adding to it, and every other
- * identity's stored row is left naming an endpoint that is gone: only call it where
- * the browser has no usable subscription of its own.
- */
-export const subscribeAndRegisterDevice = async (
-  identityNumber: bigint,
-): Promise<string> => {
-  const actor = await browserKeyActor(identityNumber);
-  const keys = await prepareSubscription(identityNumber, actor);
-  const subscription = await subscribeToPush(keys.vapidPublicKey);
-  await registerStoredDevice(identityNumber, subscription, actor, keys);
-  return subscription.endpoint;
-};
-
-/**
  * The subscription this browser can be woken through: the one it already holds where
  * that was minted with our key, and a fresh one otherwise.
  *
@@ -138,7 +121,7 @@ const usableSubscription = async (
  * rule belongs. Theirs is a repair rather than what the caller asked for, so a refusal
  * is left where it is.
  */
-export const registerSiblings = async (
+const registerSiblings = async (
   registered: bigint,
   subscription: PushSubscription,
 ): Promise<void> => {

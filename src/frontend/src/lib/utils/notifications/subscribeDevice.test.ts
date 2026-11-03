@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // them the registration decides to use.
 vi.mock("./pushSubscription", () => ({
   currentDeviceSubscription: vi.fn(),
-  relayOriginOf: vi.fn(() => "https://relay.example"),
   subscribeToPush: vi.fn(() =>
     Promise.resolve({ endpoint: FRESH } as PushSubscription),
   ),
