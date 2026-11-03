@@ -29,6 +29,7 @@ import {
 import { allowedLink, fetchAlternativeOrigins } from "./notificationLink";
 import { loadPullIdentity, mintPullIdentity } from "./pullDelegation";
 import { dataOf, refOf, tagOf, type NotificationRef } from "./notificationRef";
+import { isTheApp } from "./openTarget";
 import { recordShown, shownRecently } from "./recentlyShown";
 import { identityNotificationText } from "./identityNotification";
 import { NOTIFICATION_APP_PATH } from "../appPath";
@@ -227,7 +228,7 @@ const show = async (
     body: shown.body,
     icon: shown.icon,
     tag,
-    data: dataOf(ref, shown.url),
+    data: dataOf(ref, shown.url, await isTheApp()),
   });
   await recordShown();
 };

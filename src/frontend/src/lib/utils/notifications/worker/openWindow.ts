@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { onIos, openable } from "./openTarget";
+import { doorwayFor } from "./openTarget";
 import { NOTIFICATION_APP_PATH } from "../appPath";
 
 /** The app's own window, which is the only one reused: a page on this origin that is not
@@ -42,25 +42,25 @@ const pointAt = async (
  * Opens what a click names.
  *
  * A browser's permission to open a window belongs to the synchronous run of the click
- * handler: anything awaited before `openWindow` spends it. So the ordinary path calls it
- * first and asks questions afterwards. Only the installed iOS app has to be told where
- * to go before it can go there, and iOS is also the one platform that honours the call
- * after the fact.
+ * handler: anything awaited before `openWindow` spends it. `inTheApp` is therefore
+ * settled when the notification is shown and carried on it, so nothing here has to ask.
+ * Only the installed iOS app has to be told where to go before it can go there, and iOS
+ * is also the one platform that honours the call after the fact.
  */
 export const openOnClick = (
   worker: ServiceWorkerGlobalScope,
   url: string,
   shown: { title: string; body: string },
+  inTheApp: boolean,
 ): Promise<void> => {
-  if (!onIos()) {
+  const doorway = inTheApp ? doorwayFor(url, shown) : undefined;
+  if (doorway === undefined) {
     return worker.clients.openWindow(url).then(
       () => undefined,
       () => undefined,
     );
   }
-  return openable(url, shown).then(({ url, inTheApp }) =>
-    pointAt(worker, url, inTheApp),
-  );
+  return pointAt(worker, doorway, true);
 };
 
 /** Where a click with nothing to open goes: the app this worker belongs to. */

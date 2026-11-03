@@ -7,24 +7,19 @@ import { NOTIFICATION_APP_PATH } from "../appPath";
 const DOORWAY = `${NOTIFICATION_APP_PATH}/open`;
 
 /**
- * The doorway exists for one platform. iOS gives a standalone app an in-app browser
- * view for another origin, and nowhere else does, so nowhere else should be sent
- * through a page whose only job is to hand a link to Safari.
+ * Whether this worker belongs to the installed iOS app, which is the one place the
+ * doorway exists for: iOS gives a standalone app an in-app browser view for another
+ * origin, and nowhere else does.
  *
- * What a user agent can say on its own, which is everything but an iPad in desktop
- * mode: that one sends a Mac agent, and the touch points that give it away are not on
- * a worker's navigator. `isTheApp` reads the page's own answer instead.
- */
-export const onIos = (): boolean =>
-  /iPhone|iPod|iPad/.test(navigator.userAgent);
-
-/**
  * Both halves come from the record the app's own page wrote, because neither can be read
  * here. A desktop browser shares a storage partition with an installed app of the same
  * origin, so the marker alone would make a tab read as the app; and the user agent alone
  * calls an iPad in desktop mode a Mac, so it would leave that app out.
+ *
+ * Asked while a notification is being shown rather than when one is clicked, because a
+ * click cannot wait for a promise without spending its permission to open a window.
  */
-const isTheApp = async (): Promise<boolean> => {
+export const isTheApp = async (): Promise<boolean> => {
   const stored = await readAppKey();
   switch (stored.kind) {
     case "key":
@@ -37,24 +32,23 @@ const isTheApp = async (): Promise<boolean> => {
 };
 
 /**
- * Where a click should go, and which of the two jobs opening it is.
+ * The doorway's own address for `url`, for the installed app alone: it has one window
+ * and cannot open another origin without stranding the user in an in-app view, so it is
+ * pointed at a page of its own that hands the link to Safari.
  *
- * `inTheApp` is the installed iOS app, which has one window and cannot open another
- * origin without stranding the user in an in-app view: it is pointed at the doorway,
- * a page of its own that hands the link to Safari. Anything else is a browser, which
- * opens the app's link and needs none of that.
+ * `undefined` where there is nothing to hand over, which a browser opens directly.
  */
-export const openable = async (
+export const doorwayFor = (
   url: string,
   shown?: { title: string; body: string },
-): Promise<{ url: string; inTheApp: boolean }> => {
-  if (!url.startsWith("https:") || !(await isTheApp())) {
-    return { url, inTheApp: false };
+): string | undefined => {
+  if (!url.startsWith("https:")) {
+    return undefined;
   }
   const carried = new URLSearchParams({ url });
   if (shown !== undefined) {
     carried.set("title", shown.title);
     carried.set("body", shown.body);
   }
-  return { url: `${DOORWAY}#${carried.toString()}`, inTheApp: true };
+  return `${DOORWAY}#${carried.toString()}`;
 };

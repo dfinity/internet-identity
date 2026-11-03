@@ -527,9 +527,7 @@ fn prepare_notification_app_link(
     }) = anchor.notification_app(browser_id)
     {
         let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .is_some_and(|app| {
-                app.is_subscribed() && !app.probe_went_unanswered(now)
-            });
+            .is_some_and(|app| app.is_subscribed() && !app.probe_went_unanswered(now));
         if still_answering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
         }

@@ -19,7 +19,11 @@ import {
 } from "$lib/utils/notifications/worker/wakeUp";
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
-import { refOf, urlOf } from "$lib/utils/notifications/worker/notificationRef";
+import {
+  inTheAppOf,
+  refOf,
+  urlOf,
+} from "$lib/utils/notifications/worker/notificationRef";
 import {
   openOnClick,
   openTheApp,
@@ -73,10 +77,15 @@ worker.addEventListener("notificationclick", (event) => {
   // the click still permits it, which is this synchronous run and no later.
   const opening =
     ref !== undefined && url !== undefined
-      ? openOnClick(worker, url, {
-          title: event.notification.title,
-          body: event.notification.body,
-        })
+      ? openOnClick(
+          worker,
+          url,
+          {
+            title: event.notification.title,
+            body: event.notification.body,
+          },
+          inTheAppOf(event.notification.data),
+        )
       : openTheApp(worker);
   event.waitUntil(
     (async () => {

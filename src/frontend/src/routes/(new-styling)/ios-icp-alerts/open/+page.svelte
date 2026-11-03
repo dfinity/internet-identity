@@ -63,7 +63,7 @@
         );
       }
 
-      // `openable` builds a link to this page for the installed app alone, so anything
+      // `doorwayFor` builds a link to this page for the installed app alone, so anything
       // else arrived on one somebody else wrote. Following it would send a visitor off
       // this origin on a link they did not choose, so nothing here is acted on and the
       // page shows that it has nothing to open.

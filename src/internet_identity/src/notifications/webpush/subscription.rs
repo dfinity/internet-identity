@@ -38,9 +38,7 @@ pub fn start_subscription(
         NotificationKey::App(app_id) => storage_borrow_mut(|storage| {
             storage.set_notification_app_subscription(app_id, Some(pending), now_ns)
         })
-        .map_err(|err| {
-            PrepareWebPushSubscriptionError::InternalCanisterError(format!("{err}"))
-        }),
+        .map_err(|err| PrepareWebPushSubscriptionError::InternalCanisterError(format!("{err}"))),
         NotificationKey::Browser(browser_id) => {
             let anchor = state::anchor(anchor_number);
             // This writes the entry's registration and empties its inbox, so it is
