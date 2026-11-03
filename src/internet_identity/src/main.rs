@@ -883,6 +883,34 @@ fn link_notification_app(
     })
 }
 
+/// The browser this key is delivered through: the one that signed the call, or the one
+/// whose wake-ups route through the app that did, delivery switched on.
+///
+/// Read here rather than carried out of the authorization, so what a call acts on is what
+/// is stored when it acts rather than what was stored when it was let in.
+fn delivering_browser(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+) -> Option<(storage::anchor::Anchor, BrowserId)> {
+    let anchor = state::anchor(anchor_number);
+    let browser_id = match key {
+        NotificationKey::Browser(browser_id) => Some(browser_id),
+        NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
+    }?;
+    Some((anchor, browser_id))
+}
+
+/// The anchor, where the key is delivered through the browser the request names. An app's
+/// key signs for every browser pointing at it, so the one named is checked, not trusted.
+fn anchor_delivering_to(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+    browser_id: BrowserId,
+) -> Option<storage::anchor::Anchor> {
+    let (anchor, delivering) = delivering_browser(anchor_number, key)?;
+    (delivering == browser_id).then_some(anchor)
+}
+
 /// Authorized by the browser key the caller signs with, or by the key of the Home Screen
 /// app that entry routes through.
 #[update]
@@ -900,7 +928,7 @@ fn prepare_notification_delegation(
     enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
-    let (anchor, browser_id) = authz_utils::browser_the_key_acts_on(request.anchor_number, key)
+    let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::prepare(
@@ -931,7 +959,7 @@ fn get_notification_delegation(
     enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
-    let (anchor, browser_id) = authz_utils::browser_the_key_acts_on(request.anchor_number, key)
+    let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::get(
@@ -959,7 +987,7 @@ fn browser_get_notification(
     enabled_or(GetNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| GetNotificationError::InvalidBrowserKey)?;
-    let anchor = authz_utils::anchor_if_key_acts_on(anchor_number, key, browser_id)
+    let anchor = anchor_delivering_to(anchor_number, key, browser_id)
         .ok_or(GetNotificationError::InvalidBrowserKey)?;
 
     Ok(GetNotificationResponse {
@@ -985,7 +1013,7 @@ fn browser_remove_notification(
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
-    let anchor = authz_utils::anchor_if_key_acts_on(anchor_number, key, browser_id)
+    let anchor = anchor_delivering_to(anchor_number, key, browser_id)
         .ok_or(RemoveNotificationError::InvalidBrowserKey)?;
 
     let now_ns = ic_cdk::api::time();
