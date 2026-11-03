@@ -1100,15 +1100,24 @@ pub struct NotificationConsentGrantedRequest {
     pub origin: FrontendHostname,
 }
 
-/// Everything a browser uploads when it registers for Web Push, and how it replaces a
-/// pool that is running out: the same endpoint with a newer `jwt_issued_at_ns`.
+/// Everything a browser uploads when it registers for Web Push.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SetWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,
     pub endpoint: String,
-    pub vapid_public_key: ByteBuf,
-    pub jwt_signatures: Vec<ByteBuf>,
-    pub jwt_issued_at_ns: Timestamp,
+    /// The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+    /// nothing without a private scalar and forges nothing without `auth`.
+    pub p256dh: ByteBuf,
+    /// The public half of the pair the browser minted to encrypt `auth` with, uncompressed
+    /// SEC1 P-256. Sent because the canister needs it to run its half of the agreement.
+    pub transport_key: ByteBuf,
+    /// The subscription's 16-byte `auth` secret under AES-128-GCM, 32 bytes with its tag.
+    ///
+    /// Encrypted because an ingress call is not confidential, and `(endpoint, p256dh,
+    /// auth)` is all a forged push the browser will decrypt needs. What stands in for the
+    /// private channel RFC 8291 assumes is the transport key this caller's key fetch
+    /// minted, which exists only inside the canister and only until this call lands.
+    pub sealed_auth: ByteBuf,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1121,9 +1130,44 @@ pub struct RemoveWebPushSubscriptionRequest {
 pub enum SetWebPushSubscriptionError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
-    /// The pool offered is not newer than the one this endpoint already holds. A pool
-    /// is spent by elapsed time, so taking an older one would shorten coverage.
-    StaleJwtPool,
+    /// Nothing here can open `sealed_auth`: the transport key it was encrypted to has
+    /// expired, or a later key fetch from this browser replaced it. Fetch the keys again
+    /// and re-send.
+    TransportKeyExpired,
+    InternalCanisterError(String),
+}
+
+/// What a browser needs before it can subscribe: the key every push is signed with, and
+/// the one-shot key it encrypts `auth` to.
+///
+/// Answered by an update call rather than a query. A query reply is signed by one replica,
+/// which could hand over a VAPID key of its own choosing, and a subscription binds to that
+/// key permanently.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareWebPushSubscriptionResponse {
+    /// Internet Identity's own VAPID public key, uncompressed SEC1 P-256.
+    pub vapid_public_key: ByteBuf,
+    /// Minted for this caller and this attempt, uncompressed SEC1 P-256. Its private half
+    /// never leaves the canister and is dropped as soon as a subscribe spends it.
+    pub transport_public_key: ByteBuf,
+}
+
+/// What `prepare_webpush_subscription` answers.
+///
+/// `Pending` is a retry signal rather than an error: the keys are derived from randomness
+/// the canister keeps pooled, a pool nobody has subscribed through for a while has none
+/// to serve, and asking is what puts the draw in flight. The caller re-calls the method.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareWebPushSubscriptionResult {
+    Ok(PrepareWebPushSubscriptionResponse),
+    Pending,
+    Err(PrepareWebPushSubscriptionError),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareWebPushSubscriptionError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
     InternalCanisterError(String),
 }
 
@@ -1300,25 +1344,21 @@ pub struct GetWebPushSubscriptionStatusRequest {
 }
 
 /// What a browser is registered with, so the frontend can tell a registration that is
-/// still live from one another identity's re-subscribe left behind, and knows when to
-/// sign the next pool.
+/// still live from one another identity's re-subscribe left behind.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct WebPushSubscriptionStatus {
     /// The relay endpoint this browser is registered with. Compared against the one the
     /// browser holds: a registration naming any other endpoint is stale.
     pub endpoint: String,
-    /// Windows the stored pool covers, from `issued_at_ns`. Not a count of unused
-    /// signatures: a signature is picked by index and never removed, so a count would
-    /// sit at the pool size forever.
-    pub pool_len: u32,
-    /// When the browser minted this pool; window `i` expires at
-    /// `issued_at_ns + (i + 1) * window`.
-    pub issued_at_ns: Timestamp,
 }
 
 /// Scoped to `(origin, recipient)`: the same id sent to two recipients is two
 /// notifications. The canisters sending for one origin share its id space.
 pub type NotificationId = u64;
+
+/// Internet Identity's own id for one entry in one browser's inbox, assigned when the
+/// entry is deposited. Unique within that inbox, which is what a wake-up names it by.
+pub type InboxNotificationId = u64;
 
 /// Orders an origin's entries against its own only, so marking everything
 /// `High` gains nothing. Web Push's levels, forwarded as sent.
@@ -1449,8 +1489,12 @@ pub enum NotificationDelegationError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct GetNextNotificationRequest {
+pub struct GetNotificationRequest {
     pub anchor_number: AnchorNumber,
+    /// Whose inbox holds it. An app's key signs for every browser pointing at the app,
+    /// so the browser cannot be taken from the caller alone.
+    pub browser_id: BrowserId,
+    pub inbox_notification_id: InboxNotificationId,
 }
 
 /// What a service worker shows for one wake-up: the app and account it is for, the
@@ -1504,12 +1548,12 @@ pub struct IdentityForNotification {
 
 /// `None` once nothing is left to show.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct GetNextNotificationResponse {
+pub struct GetNotificationResponse {
     pub notification: Option<NotificationToShow>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum GetNextNotificationError {
+pub enum GetNotificationError {
     /// The caller signs with no key of this identity, and none of an app it routes through.
     InvalidBrowserKey,
     InternalCanisterError(String),
@@ -1518,8 +1562,9 @@ pub enum GetNextNotificationError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct RemoveNotificationRequest {
     pub anchor_number: AnchorNumber,
-    /// As `browser_get_next_notification` returned it.
-    pub notification: NotificationToShow,
+    pub browser_id: BrowserId,
+    /// As the wake-up that announced it named it.
+    pub inbox_notification_id: InboxNotificationId,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

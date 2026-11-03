@@ -15,7 +15,6 @@ vi.mock("$lib/utils/notifications/appStatus", () => ({
   browserAppStatus: vi.fn(),
 }));
 vi.mock("./browserActor", () => ({ browserKeyActor: vi.fn() }));
-vi.mock("./turnedOff", () => ({ clearNotificationsOff: vi.fn() }));
 vi.mock("./turnOnAndProve", () => ({ turnOnAndProve: vi.fn() }));
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
@@ -33,7 +32,6 @@ import {
 import { claimDeviceApp } from "./deviceApp";
 import { turnOnAndProve } from "./turnOnAndProve";
 import { browserKeyActor } from "./browserActor";
-import { clearNotificationsOff } from "./turnedOff";
 
 const register = vi.mocked(ensureRegisteredDevice);
 const permission = vi.mocked(requestNotificationPermission);
@@ -126,8 +124,6 @@ describe("turnOnNotifications", () => {
     expect(register.mock.invocationCallOrder[0]).toBeLessThan(
       grant.mock.invocationCallOrder[0],
     );
-    // Asking for them here takes back whatever the switch in settings said.
-    expect(clearNotificationsOff).toHaveBeenCalledWith(IDENTITY);
     expect(grant).toHaveBeenCalledWith({
       anchor_number: IDENTITY,
       origin: ORIGIN,

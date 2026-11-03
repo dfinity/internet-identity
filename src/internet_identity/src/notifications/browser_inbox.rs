@@ -10,55 +10,44 @@
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, InboxNotification};
+use crate::storage::anchor::{Anchor, InboxNotification, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, NotificationToShow, Timestamp,
+    AnchorNumber, BrowserId, InboxNotificationId, NotificationToShow, Timestamp,
 };
 
 /// Most entries one inbox holds. A new one past it replaces the oldest.
 pub(crate) const CAPACITY: usize = 100;
 
-/// Whether a deposited entry calls for a wake-up of its own.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum WakeUp {
-    /// Nothing is on its way for this entry yet.
-    Needed,
-    /// The inbox was at [`CAPACITY`], so its oldest entry was dropped to fit this one.
-    /// That entry's wake-up was posted and never answered, so it is still coming, and
-    /// the worker will be handed this entry when it arrives.
-    AlreadyComing,
-}
-
-/// Put a notification behind the inbox's newest, dropping what expired first.
+/// Put a notification behind the inbox's newest, dropping what expired first, and name
+/// it so the wake-up announcing it can ask for that entry and no other.
+///
+/// Every deposit earns a wake-up of its own, including one that overflows the inbox.
 pub(crate) fn deposit(
     inbox: &mut Vec<InboxNotification>,
-    notification: InboxNotification,
+    next_id: &mut InboxNotificationId,
+    mut notification: InboxNotification,
     now_ns: Timestamp,
-) -> WakeUp {
+) -> InboxNotification {
+    notification.inbox_notification_id = *next_id;
+    *next_id = next_id.wrapping_add(1);
     inbox.retain(|entry| entry.expires_at_ns > now_ns);
-    let full = inbox.len() >= CAPACITY;
-    if full {
+    if inbox.len() >= CAPACITY {
         inbox.remove(0);
     }
-    inbox.push(notification);
-    if full {
-        WakeUp::AlreadyComing
-    } else {
-        WakeUp::Needed
-    }
+    inbox.push(notification.clone());
+    notification
 }
 
-/// A failed post means no wake-up is coming, so one entry goes with it: its own, or the
-/// oldest if a wake-up already took it. Nothing goes once it expired or whoever held the
-/// posted address registered elsewhere, since expiry or the new registration may have
-/// dropped it.
+/// A failed post means no wake-up is coming for the entry it named, so that entry goes
+/// with it and nothing else does: every deposit is named by the push that carries it, so
+/// a failure says nothing about the entries around it. Nothing goes once whoever held the
+/// posted address registered elsewhere, since the new registration may have dropped it.
 pub(crate) fn remove_after_failed_wake_up(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     target: DeliveryTarget,
     notification: &InboxNotification,
     endpoint: &str,
-    now_ns: Timestamp,
 ) {
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(anchor_number) else {
@@ -67,6 +56,7 @@ pub(crate) fn remove_after_failed_wake_up(
         let posted_to = match target {
             DeliveryTarget::Browser => anchor
                 .webpush_subscription(browser_id)
+                .and_then(WebPushSubscription::ready)
                 .map(|registered| registered.endpoint.as_str().to_string()),
             DeliveryTarget::App(app_id) => {
                 // The app's address stands for this entry only while the entry still
@@ -82,6 +72,7 @@ pub(crate) fn remove_after_failed_wake_up(
                 storage
                     .notification_app(app_id)
                     .and_then(|app| app.webpush_subscription)
+                    .and_then(WebPushSubscription::into_ready)
                     .map(|registered| registered.endpoint.into_string())
             }
         };
@@ -91,15 +82,12 @@ pub(crate) fn remove_after_failed_wake_up(
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
             return;
         };
-        match inbox.iter().position(|entry| entry == notification) {
-            Some(own) => {
-                inbox.remove(own);
-            }
-            None if notification.expires_at_ns > now_ns && !inbox.is_empty() => {
-                inbox.remove(0);
-            }
-            None => return,
-        }
+        // Already gone, so there is nothing owed: an entry that outlived its own wake-up
+        // was taken by one, and the entries beside it have wake-ups of their own.
+        let Some(own) = inbox.iter().position(|entry| entry == notification) else {
+            return;
+        };
+        inbox.remove(own);
         if let Err(err) = storage.write(anchor) {
             ic_cdk::println!("Failed to drop a notification whose wake-up failed: {err}");
         }
@@ -136,41 +124,43 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
     });
 }
 
-/// The oldest entry the browser may still collect, passing over what it may not be handed.
-pub(crate) fn next_to_collect(
+/// The entry this id names, where it has not expired and the identity still allows the
+/// origin it came from. An id is unique within its inbox, so there is one or none.
+pub(crate) fn notification_named(
     anchor: &Anchor,
     browser_id: BrowserId,
+    inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
 ) -> Option<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
+    let entry = anchor
+        .notifications_for_browser(browser_id)
+        .iter()
+        .find(|entry| {
+            entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
+        })?;
+    // Ours carries the event and names no app, so there is no origin to resolve and no
+    // consent to read: the words for it are written in the service worker.
+    if let Some(event) = entry.event.clone() {
+        return Some(NotificationToShow {
+            origin: None,
+            account_number: None,
+            canister_id: entry.sender,
+            id: entry.notification_id,
+            event: Some(event),
+        });
+    }
     storage_borrow(|storage| {
-        anchor
-            .notifications_for_browser(browser_id)
-            .iter()
-            .filter(|entry| entry.expires_at_ns > now_ns)
-            .find_map(|entry| {
-                if let Some(event) = entry.event.clone() {
-                    return Some(NotificationToShow {
-                        origin: None,
-                        account_number: None,
-                        canister_id: entry.sender,
-                        id: entry.notification_id,
-                        event: Some(event),
-                    });
-                }
-                let origin =
-                    storage.lookup_origin_with_application_number(entry.application_number?)?;
-                let notification = NotificationToShow {
-                    origin: Some(origin.clone()),
-                    account_number: entry.account_number,
-                    canister_id: entry.sender,
-                    id: entry.notification_id,
-                    event: None,
-                };
-                storage
-                    .read_anchor_application_config(anchor_number, &origin)
-                    .filter(|config| config.notifications_allowed())
-                    .map(|_| notification)
+        let origin = storage.lookup_origin_with_application_number(entry.application_number?)?;
+        storage
+            .read_anchor_application_config(anchor_number, &origin)
+            .filter(|config| config.notifications_allowed())
+            .map(|_| NotificationToShow {
+                origin: Some(origin.clone()),
+                account_number: entry.account_number,
+                canister_id: entry.sender,
+                id: entry.notification_id,
+                event: None,
             })
     })
 }
@@ -178,35 +168,21 @@ pub(crate) fn next_to_collect(
 /// Remove the entry the service worker collected. One already gone is no error: expiry,
 /// a full inbox or a failed wake-up may have dropped it first.
 ///
-/// Which app the entry belongs to is read off the entry rather than off the request.
+/// The id names one entry of one inbox, so nothing else is needed to tell it from an
+/// expired entry, or from another application's notification carrying the same sender id.
 pub(crate) fn remove_collected(
     mut anchor: Anchor,
     browser_id: BrowserId,
-    collected: &NotificationToShow,
+    inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
-        // Every part of what identifies an entry, origin included: a sender may queue
-        // the same id for two applications, and one that is expired or belongs to
-        // another one must not shadow the live entry being acknowledged.
-        // `next_to_collect` hands out only unexpired entries, so this searches the same
-        // set it does.
-        let collected_from = collected
-            .origin
-            .as_ref()
-            .and_then(|origin| storage.lookup_application_number_with_origin(origin));
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
             return Ok(());
         };
+        // `collect` hands out only unexpired entries, so this searches the same set.
         let Some(position) = inbox.iter().position(|entry| {
-            entry.sender == collected.canister_id
-                && entry.notification_id == collected.id
-                && entry.account_number == collected.account_number
-                && entry.expires_at_ns > now_ns
-                // Internet Identity's own is held with no application number and no origin.
-                && entry
-                    .application_number
-                    .is_none_or(|application_number| Some(application_number) == collected_from)
+            entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
         }) else {
             return Ok(());
         };
@@ -224,6 +200,7 @@ mod tests {
         anchor, app_for_key, app_key, setup, subscribe, APP_RELAY,
     };
     use crate::notifications::write_notifications_decision;
+    use crate::SECOND_NS;
 
     fn app_origin(origin: &str) -> ApplicationOrigin {
         ApplicationOrigin::try_from(origin).expect("a bare origin")
@@ -234,10 +211,11 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
 
-    const SECOND_NS: u64 = 1_000_000_000;
-
     fn entry(notification_id: u64, expires_at_ns: Timestamp) -> InboxNotification {
         InboxNotification {
+            // `deposit` names it; a fixture placed in an inbox by hand keeps the id it
+            // was built with.
+            inbox_notification_id: notification_id,
             application_number: Some(1),
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
@@ -254,11 +232,14 @@ mod tests {
     #[test]
     fn an_entry_is_added_behind_the_newest() {
         let mut inbox = Vec::new();
+        let mut next_id = 0;
 
         for id in 1..=3 {
-            assert_eq!(
-                deposit(&mut inbox, entry(id, 60 * SECOND_NS), SECOND_NS),
-                WakeUp::Needed
+            deposit(
+                &mut inbox,
+                &mut next_id,
+                entry(id, 60 * SECOND_NS),
+                SECOND_NS,
             );
         }
 
@@ -266,23 +247,90 @@ mod tests {
     }
 
     #[test]
+    fn each_deposit_takes_the_next_id_of_the_inbox_it_lands_in() {
+        let mut inbox = Vec::new();
+        let mut next_id = 7;
+
+        for id in 1..=3 {
+            let deposited = deposit(
+                &mut inbox,
+                &mut next_id,
+                entry(id, 60 * SECOND_NS),
+                SECOND_NS,
+            );
+            // What the wake-up announcing it names, which is also what is stored.
+            assert_eq!(
+                deposited.inbox_notification_id,
+                inbox.last().unwrap().inbox_notification_id
+            );
+        }
+
+        assert_eq!(
+            inbox
+                .iter()
+                .map(|one| one.inbox_notification_id)
+                .collect::<Vec<_>>(),
+            vec![7, 8, 9]
+        );
+        assert_eq!(next_id, 10);
+    }
+
+    /// The same notification reaching two devices is two entries, and a wake-up has to
+    /// name one of them rather than both.
+    #[test]
+    fn one_notification_deposited_twice_is_named_twice() {
+        let mut first = Vec::new();
+        let mut second = Vec::new();
+        let mut next_id = 0;
+
+        let to_first = deposit(
+            &mut first,
+            &mut next_id,
+            entry(1, 60 * SECOND_NS),
+            SECOND_NS,
+        );
+        let to_second = deposit(
+            &mut second,
+            &mut next_id,
+            entry(1, 60 * SECOND_NS),
+            SECOND_NS,
+        );
+
+        assert_ne!(
+            to_first.inbox_notification_id,
+            to_second.inbox_notification_id
+        );
+    }
+
+    #[test]
     fn adding_drops_what_expired_first() {
         let mut inbox = vec![entry(1, 2 * SECOND_NS), entry(2, 60 * SECOND_NS)];
+        let mut next_id = 3;
 
-        deposit(&mut inbox, entry(3, 60 * SECOND_NS), 2 * SECOND_NS);
+        deposit(
+            &mut inbox,
+            &mut next_id,
+            entry(3, 60 * SECOND_NS),
+            2 * SECOND_NS,
+        );
 
         assert_eq!(ids(&inbox), vec![2, 3]);
     }
 
     #[test]
-    fn a_full_inbox_replaces_its_oldest_and_needs_no_new_wake_up() {
+    fn a_full_inbox_replaces_its_oldest() {
         let mut inbox: Vec<_> = (0..CAPACITY as u64)
             .map(|id| entry(id, 60 * SECOND_NS))
             .collect();
+        let mut next_id = CAPACITY as u64;
 
-        let added = deposit(&mut inbox, entry(1_000, 60 * SECOND_NS), SECOND_NS);
+        deposit(
+            &mut inbox,
+            &mut next_id,
+            entry(1_000, 60 * SECOND_NS),
+            SECOND_NS,
+        );
 
-        assert_eq!(added, WakeUp::AlreadyComing);
         assert_eq!(inbox.len(), CAPACITY);
         assert_eq!(inbox.first().map(|one| one.notification_id), Some(1));
         assert_eq!(inbox.last().map(|one| one.notification_id), Some(1_000));
@@ -290,14 +338,19 @@ mod tests {
 
     /// A full inbox of expired entries is a free one.
     #[test]
-    fn a_full_inbox_of_expired_entries_takes_a_new_one_with_a_wake_up() {
+    fn a_full_inbox_of_expired_entries_takes_a_new_one() {
         let mut inbox: Vec<_> = (0..CAPACITY as u64)
             .map(|id| entry(id, 2 * SECOND_NS))
             .collect();
+        let mut next_id = CAPACITY as u64;
 
-        let added = deposit(&mut inbox, entry(1_000, 60 * SECOND_NS), 2 * SECOND_NS);
+        deposit(
+            &mut inbox,
+            &mut next_id,
+            entry(1_000, 60 * SECOND_NS),
+            2 * SECOND_NS,
+        );
 
-        assert_eq!(added, WakeUp::Needed);
         assert_eq!(ids(&inbox), vec![1_000]);
     }
 
@@ -353,20 +406,30 @@ mod tests {
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
 
-    fn next(
+    /// The first entry `collect` still hands out. Production never asks this, since a
+    /// wake-up names its own entry, but what the filters let through is what these tests
+    /// are about.
+    fn first_collectable(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
         now_ns: Timestamp,
     ) -> Option<NotificationToShow> {
-        next_to_collect(&anchor(anchor_number), browser_id, now_ns)
+        let anchor = anchor(anchor_number);
+        let ids: Vec<_> = anchor
+            .notifications_for_browser(browser_id)
+            .iter()
+            .map(|entry| entry.inbox_notification_id)
+            .collect();
+        ids.into_iter()
+            .find_map(|id| notification_named(&anchor, browser_id, id, now_ns))
     }
 
-    fn next_id(
+    fn first_collectable_id(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
         now_ns: Timestamp,
     ) -> Option<u64> {
-        next(anchor_number, browser_id, now_ns).map(|one| one.id)
+        first_collectable(anchor_number, browser_id, now_ns).map(|one| one.id)
     }
 
     fn remove(
@@ -375,7 +438,8 @@ mod tests {
         notification: &NotificationToShow,
         now_ns: Timestamp,
     ) {
-        remove_collected(anchor(anchor_number), browser_id, notification, now_ns)
+        // Every fixture here is named after the sender id it carries.
+        remove_collected(anchor(anchor_number), browser_id, notification.id, now_ns)
             .expect("removing");
     }
 
@@ -403,11 +467,7 @@ mod tests {
         let app = app_for_key(app_key(9), 0);
         let app_id = storage_borrow_mut(|storage| {
             storage
-                .set_notification_app_subscription(
-                    app.id,
-                    Some(subscription_at(APP_RELAY, 0, 0)),
-                    0,
-                )
+                .set_notification_app_subscription(app.id, Some(subscription_at(APP_RELAY, 0)), 0)
                 .expect("the record is there");
             let mut stored = storage.read(anchor_number).expect("reading the anchor");
             stored.point_at_notification_app(browser_id, app.id);
@@ -430,7 +490,6 @@ mod tests {
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
             APP_RELAY,
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), Vec::<u64>::new());
@@ -450,7 +509,6 @@ mod tests {
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
             APP_RELAY,
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), Vec::<u64>::new());
@@ -485,7 +543,7 @@ mod tests {
             storage
                 .set_notification_app_subscription(
                     app.id,
-                    Some(subscription_at("https://web.push.apple.com/second", 0, 0)),
+                    Some(subscription_at("https://web.push.apple.com/second", 0)),
                     0,
                 )
                 .expect("the record is there");
@@ -498,6 +556,7 @@ mod tests {
         assert_eq!(
             storage_borrow(|storage| storage.notification_app(left_behind))
                 .and_then(|app| app.webpush_subscription)
+                .and_then(WebPushSubscription::into_ready)
                 .map(|registered| registered.endpoint.into_string()),
             Some(APP_RELAY.to_string()),
             "the app this entry left should keep its address"
@@ -510,7 +569,6 @@ mod tests {
             DeliveryTarget::App(left_behind),
             &from_app(9, 60 * SECOND_NS),
             APP_RELAY,
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), vec![7]);
@@ -527,7 +585,6 @@ mod tests {
             DeliveryTarget::App(app_id),
             &from_app(7, 60 * SECOND_NS),
             "https://web.push.apple.com/b",
-            2 * SECOND_NS,
         );
 
         assert_eq!(left_for(anchor_number, browser_id), vec![7]);
@@ -544,7 +601,8 @@ mod tests {
                 from_app(1, 60 * SECOND_NS),
             ],
         );
-        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the oldest is shown");
+        let shown = first_collectable(anchor_number, browser_id, 2 * SECOND_NS)
+            .expect("the oldest is shown");
         assert!(shown.event.is_some());
 
         let crafted = NotificationToShow {
@@ -585,7 +643,8 @@ mod tests {
             ],
         );
 
-        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the event is shown");
+        let shown = first_collectable(anchor_number, browser_id, 2 * SECOND_NS)
+            .expect("the event is shown");
         assert_eq!(shown.id, 1);
         assert!(shown.event.is_some());
         assert_eq!(shown.origin, None);
@@ -593,11 +652,14 @@ mod tests {
         remove(anchor_number, browser_id, &shown, 2 * SECOND_NS);
 
         assert_eq!(left_for(anchor_number, browser_id), vec![2]);
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            Some(2)
+        );
     }
 
     #[test]
-    fn the_next_is_the_oldest_and_nothing_is_removed() {
+    fn the_first_collectable_is_the_oldest_and_nothing_is_removed() {
         let (anchor_number, browser_id) = signed_in();
         let for_account = InboxNotification {
             account_number: Some(3),
@@ -610,7 +672,7 @@ mod tests {
         );
 
         assert_eq!(
-            next(anchor_number, browser_id, 2 * SECOND_NS),
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS),
             Some(NotificationToShow {
                 origin: Some(ORIGIN.to_string()),
                 account_number: Some(3),
@@ -623,25 +685,32 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_inbox_has_no_next() {
+    fn an_empty_inbox_has_nothing_collectable() {
         let (anchor_number, browser_id) = signed_in();
 
-        assert_eq!(next_id(anchor_number, browser_id, SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, SECOND_NS),
+            None
+        );
     }
 
     #[test]
-    fn the_next_one_comes_once_what_was_collected_is_removed() {
+    fn the_one_behind_comes_once_what_was_collected_is_removed() {
         let (anchor_number, browser_id) = signed_in();
         put(
             anchor_number,
             browser_id,
             [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
         );
-        let collected = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a next one");
+        let collected =
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("one to collect");
 
         remove(anchor_number, browser_id, &collected, 2 * SECOND_NS);
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(8));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            Some(8)
+        );
     }
 
     #[test]
@@ -653,7 +722,10 @@ mod tests {
             [from_app(1, 2 * SECOND_NS), from_app(2, 60 * SECOND_NS)],
         );
 
-        assert_eq!(next_id(anchor_number, browser_id, 3 * SECOND_NS), Some(2));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 3 * SECOND_NS),
+            Some(2)
+        );
     }
 
     #[test]
@@ -669,7 +741,10 @@ mod tests {
             [unknown, from_app(2, 60 * SECOND_NS)],
         );
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            Some(2)
+        );
     }
 
     #[test]
@@ -679,7 +754,10 @@ mod tests {
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), false, SECOND_NS)
             .expect("revoking consent");
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            None
+        );
     }
 
     #[test]
@@ -691,12 +769,15 @@ mod tests {
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, SECOND_NS)
             .expect("granting consent again");
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            None
+        );
         assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
     #[test]
-    fn a_signed_out_browser_has_no_next() {
+    fn a_signed_out_browser_has_nothing_collectable() {
         let (anchor_number, browser_id) = signed_in();
         put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         storage_borrow_mut(|storage| {
@@ -704,7 +785,10 @@ mod tests {
         })
         .expect("signing the browser out");
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            None
+        );
         assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
@@ -716,7 +800,8 @@ mod tests {
             browser_id,
             [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
         );
-        let seven = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
+        let seven =
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
 
         remove(anchor_number, browser_id, &seven, 2 * SECOND_NS);
 
@@ -735,7 +820,8 @@ mod tests {
             browser_id,
             [from_app(7, 60 * SECOND_NS), for_account],
         );
-        let without_account = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
+        let without_account =
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
 
         remove(anchor_number, browser_id, &without_account, 2 * SECOND_NS);
 

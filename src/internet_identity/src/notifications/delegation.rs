@@ -16,7 +16,6 @@ use crate::delegation::{
     der_encode_canister_sig_key,
 };
 use crate::notifications::consent_granted_for;
-use crate::notifications::dispatch;
 use crate::origin::ApplicationOrigin;
 use crate::state::{self, storage_borrow};
 use crate::storage::account::{Account, AccountKey};
@@ -137,10 +136,6 @@ pub fn prepare(
         });
     });
     update_root_hash();
-
-    // The service worker asks for a delegation because it could not show what it was
-    // woken for, so it needs waking again now that it can.
-    dispatch::wake_again(anchor_number, browser_id, now_ns);
 
     Ok(PrepareNotificationDelegationResponse {
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),

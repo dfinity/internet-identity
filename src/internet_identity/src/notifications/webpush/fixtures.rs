@@ -1,10 +1,12 @@
 //! Shared Web Push registration and dispatch test fixtures.
 
-use super::validation::{JwtPool, PushEndpoint, VapidPublicKey, JWT_SIG_LEN};
+use super::validation::{
+    AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SealedAuth, SubscriberKey,
+};
 use crate::authz_utils::NotificationKey;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, WebPushSubscription};
+use crate::storage::anchor::{Anchor, ReadySubscription, WebPushSubscription};
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, BrowserId, FormFactor, OperatingSystem,
@@ -52,6 +54,11 @@ pub(crate) fn anchor_with_browsers(count: u8) -> (AnchorNumber, Vec<BrowserId>) 
                 id
             })
             .collect();
+        // Signed in, which is how a browser reaches any of this: a key alone registers
+        // nothing, and signing out takes the registration with it.
+        for browser in &mut anchor.browsers {
+            browser.session_count = 1;
+        }
         storage.write(anchor).expect("writing a fresh anchor");
         (anchor_number, ids)
     })
@@ -64,18 +71,16 @@ fn key(seed: u8) -> PublicKey {
 /// The key a Home Screen app generated in its own partition and presents on every call.
 /// A registration whose every field passes the shape its newtype asserts, which is the
 /// only kind storage can hand back.
-pub(crate) fn subscription_at(
-    endpoint: &str,
-    created_at_ns: Timestamp,
-    issued_at_ns: Timestamp,
-) -> WebPushSubscription {
-    WebPushSubscription {
+pub(crate) fn subscription_at(endpoint: &str, created_at_ns: Timestamp) -> WebPushSubscription {
+    WebPushSubscription::Ready(ReadySubscription {
         endpoint: PushEndpoint::try_from(endpoint).expect("a relay endpoint"),
         created_at_ns,
-        vapid_public_key: VapidPublicKey::try_from(valid_vapid_key()).expect("a SEC1 P-256 point"),
-        jwt_signatures: JwtPool::try_new(valid_pool(), issued_at_ns)
-            .expect("a pool of 64-byte signatures"),
-    }
+        payload_ikm: PayloadIkm::try_from(valid_payload_ikm()).expect("32 bytes"),
+        payload_keyid: PayloadKeyId::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
+        subscriber_key: SubscriberKey::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
+        auth: AuthSecret::try_from(valid_auth()).expect("16 bytes"),
+        last_rotated_ns: created_at_ns,
+    })
 }
 
 pub(crate) fn app_key(seed: u8) -> PublicKey {
@@ -108,7 +113,7 @@ pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {
 }
 
 /// A real, fixed SEC1 point: a length-only fixture cannot pass the curve check.
-pub(crate) fn valid_vapid_key() -> Vec<u8> {
+pub(crate) fn valid_sec1_point() -> Vec<u8> {
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
     secret
@@ -118,50 +123,54 @@ pub(crate) fn valid_vapid_key() -> Vec<u8> {
         .to_vec()
 }
 
-pub(crate) fn valid_pool() -> Vec<Vec<u8>> {
-    vec![vec![3u8; JWT_SIG_LEN]; 3]
+/// Derived on subscribe; a fixture only has to be the right length.
+pub(crate) fn valid_payload_ikm() -> Vec<u8> {
+    vec![9u8; 32]
+}
+
+/// The subscription's own `auth` secret, which RFC 8291 puts at 16 bytes.
+pub(crate) fn valid_auth() -> Vec<u8> {
+    vec![4u8; 16]
+}
+
+/// What a key fetch would have left behind, so a test subscribe has a transport key to
+/// have been encrypted to.
+fn pending_for(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+    now_ns: Timestamp,
+) -> (SubscriberKey, SealedAuth) {
+    const TRANSPORT_SCALAR: [u8; 32] = [11u8; 32];
+    const SENDER_SEED: [u8; 32] = [12u8; 32];
+    // A refusal is not an abort: the key fetch and the subscribe refuse the same callers,
+    // so a test covering that refusal still needs what the browser would have sent. One
+    // that did not expect it reads the missing registration as `TransportKeyExpired`.
+    let _ = super::start_subscription(key, anchor_number, TRANSPORT_SCALAR, SENDER_SEED, now_ns);
+    super::transport::seal_auth(
+        &super::transport::public_key_of(&TRANSPORT_SCALAR),
+        &[13u8; 32],
+        &valid_auth(),
+    )
 }
 
 /// Well-formed defaults, so a field added to the request doesn't touch every test.
 pub(super) fn request(
     anchor_number: AnchorNumber,
     endpoint: &str,
-    jwt_issued_at_ns: Timestamp,
 ) -> SetWebPushSubscriptionRequest {
     SetWebPushSubscriptionRequest {
         anchor_number,
         endpoint: endpoint.to_string(),
-        vapid_public_key: ByteBuf::from(valid_vapid_key()),
-        jwt_signatures: valid_pool().into_iter().map(ByteBuf::from).collect(),
-        jwt_issued_at_ns,
+        p256dh: ByteBuf::from(valid_sec1_point()),
+        transport_key: ByteBuf::from(valid_sec1_point()),
+        sealed_auth: ByteBuf::from(vec![0u8; 32]),
     }
 }
 
 /// Only validation can build these, so the fixture goes through it.
-pub(super) fn validated(
-    anchor_number: AnchorNumber,
-    endpoint: &str,
-    jwt_issued_at_ns: Timestamp,
-) -> (PushEndpoint, VapidPublicKey, JwtPool) {
-    let SetWebPushSubscriptionRequest {
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
-        ..
-    } = request(anchor_number, endpoint, jwt_issued_at_ns);
-    (
-        PushEndpoint::try_from(endpoint.as_str()).expect("the fixture endpoint validates"),
-        VapidPublicKey::try_from(vapid_public_key.into_vec()).expect("the fixture key validates"),
-        JwtPool::try_new(
-            jwt_signatures
-                .into_iter()
-                .map(ByteBuf::into_vec)
-                .collect::<Vec<_>>(),
-            jwt_issued_at_ns,
-        )
-        .expect("the fixture pool validates"),
-    )
+pub(super) fn validated(anchor_number: AnchorNumber, endpoint: &str) -> PushEndpoint {
+    let SetWebPushSubscriptionRequest { endpoint, .. } = request(anchor_number, endpoint);
+    PushEndpoint::try_from(endpoint.as_str()).expect("the fixture endpoint validates")
 }
 
 /// `set_subscription` for a test that has an anchor number rather than the anchor.
@@ -186,13 +195,14 @@ pub(super) fn try_subscribe_as(
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), SetWebPushSubscriptionError> {
-    let (endpoint, vapid_public_key, jwt_signatures) = validated(anchor_number, endpoint, now_ns);
+    let (transport_key, sealed_auth) = pending_for(anchor_number, key, now_ns);
     super::set_subscription(
         key,
         anchor_number,
-        endpoint,
-        vapid_public_key,
-        jwt_signatures,
+        validated(anchor_number, endpoint),
+        SubscriberKey::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
+        transport_key,
+        sealed_auth,
         now_ns,
     )
 }
@@ -221,7 +231,7 @@ pub(super) fn point_at_app(
 }
 
 /// The record as it stands, which is where an app's own subscription lives.
-pub(super) fn app(app_id: NotificationAppId) -> NotificationApp {
+pub(crate) fn app(app_id: NotificationAppId) -> NotificationApp {
     storage_borrow(|storage| storage.notification_app(app_id)).expect("reading the app record")
 }
 
@@ -239,13 +249,41 @@ pub(crate) fn subscribe(
     try_subscribe(anchor_number, browser_id, endpoint, now_ns).expect("writing a subscription");
 }
 
+/// What this browser can be delivered to, which is what every test here asserts on. A
+/// registration waiting on its subscribe reports nothing, as it does to any caller.
 pub(crate) fn stored_subscription(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+) -> Option<ReadySubscription> {
+    anchor(anchor_number)
+        .webpush_subscription(browser_id)
+        .and_then(WebPushSubscription::ready)
+        .cloned()
+}
+
+/// The registration in whichever state it is in, for a test about the states themselves.
+pub(crate) fn stored_registration(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
 ) -> Option<WebPushSubscription> {
     anchor(anchor_number)
         .webpush_subscription(browser_id)
         .cloned()
+}
+
+/// Signs `browser_id` out of everything, as revoking its sessions from another browser
+/// does: the registration goes, the entry and its keys stay.
+pub(super) fn sign_browser_out(anchor_number: AnchorNumber, browser_id: BrowserId) {
+    storage_borrow_mut(|storage| {
+        let mut anchor = storage.read(anchor_number).expect("the test anchor");
+        anchor.set_webpush_subscription(browser_id, None);
+        for browser in &mut anchor.browsers {
+            if browser.id == browser_id {
+                browser.session_count = 0;
+            }
+        }
+        storage.write(anchor).expect("signing the browser out");
+    });
 }
 
 pub(super) fn stored_endpoint(

@@ -13,7 +13,6 @@ import { throwCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { claimDeviceApp } from "./deviceApp";
-import { clearNotificationsOff } from "./turnedOff";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
 import { turnOnAndProve } from "./turnOnAndProve";
 import type { DeviceNotificationState } from "./notificationState";
@@ -69,9 +68,6 @@ export const turnOnNotifications = async ({
       return { status: permission === "denied" ? "denied" : "dismissed" };
     }
   }
-
-  // Whatever the switch in settings said, the user is asking for notifications here.
-  await clearNotificationsOff(identityNumber);
 
   if (!device.registered) {
     // Subscribing drops the endpoint every other identity here is registered with, so

@@ -1885,15 +1885,35 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
-// What a browser uploads when it registers for Web Push, and how it replaces a pool
-// that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
-// browser key it signs in with, which is what says the subscription is this browser's.
+// What a browser uploads when it registers for Web Push. Signed with the browser key it
+// signs in with, which is what says the subscription is this browser's.
 type SetWebPushSubscriptionRequest = record {
     anchor_number : UserNumber;
     endpoint : text;                   // the relay URL the browser was issued
-    vapid_public_key : blob;           // uncompressed SEC1 P-256, echoed to the relay as k=
-    jwt_signatures : vec blob;         // one raw ECDSA signature per validity window
-    jwt_issued_at_ns : nat64;
+    // The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+    // nothing without a private scalar and forges nothing without the auth secret.
+    p256dh : blob;                     // 65 bytes
+    // The public half of the pair the browser minted to encrypt the auth secret with,
+    // uncompressed SEC1 P-256. The canister needs it to run its half of the agreement.
+    transport_key : blob;              // 65 bytes
+    // The subscription's 16-byte auth secret under AES-128-GCM, 32 bytes with its tag.
+    // Encrypted because an ingress call is not confidential, and (endpoint, p256dh, auth)
+    // is all a forged push the browser will decrypt needs. It is encrypted to the
+    // transport key prepare_webpush_subscription minted for this caller, whose private half
+    // never leaves the canister and is dropped as soon as this call spends it.
+    sealed_auth : blob;                // 32 bytes
+};
+
+// Both keys a browser needs before it can subscribe.
+type PrepareWebPushSubscriptionResponse = record {
+    vapid_public_key : blob;           // uncompressed SEC1 P-256
+    transport_public_key : blob;       // minted for this caller and this attempt
+};
+
+type PrepareWebPushSubscriptionError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
 };
 
 type RemoveWebPushSubscriptionRequest = record {
@@ -1904,8 +1924,10 @@ type RemoveWebPushSubscriptionRequest = record {
 type SetWebPushSubscriptionError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
-    // The pool offered is not newer than the one this endpoint already holds.
-    StaleJwtPool;
+    // Nothing here can open sealed_auth: the transport key it was encrypted to has
+    // expired, or a later prepare_webpush_subscription from this browser replaced it. Fetch the
+    // keys again and re-send.
+    TransportKeyExpired;
     InternalCanisterError : text;
 };
 
@@ -2056,12 +2078,9 @@ type GetWebPushSubscriptionStatusRequest = record {
 };
 
 // What a browser is registered with, so the frontend can tell a registration that is
-// still live from one another identity's re-subscribe left behind, and knows when to
-// sign the next pool.
+// still live from one another identity's re-subscribe left behind.
 type WebPushSubscriptionStatus = record {
     endpoint : text;        // compared against the one the browser holds
-    pool_len : nat32;       // windows covered, not a count of unused signatures
-    issued_at_ns : nat64;   // window i expires at issued_at_ns + (i + 1) * window
 };
 
 // ===== Notifications sent by an app =====
@@ -2069,6 +2088,11 @@ type WebPushSubscriptionStatus = record {
 // Scoped to (origin, recipient), and shared across the canisters sending for
 // one origin.
 type NotificationId = nat64;
+
+// Internet Identity's own id for one entry in one browser's inbox, assigned when the entry
+// is deposited and unique within that inbox. A wake-up names its entry by this, so the
+// service worker shows the notification the push was sent for.
+type InboxNotificationId = nat64;
 
 type Urgency = variant { VeryLow; Low; Normal; High };
 
@@ -2154,8 +2178,12 @@ type NotificationDelegationError = variant {
 
 // ===== Notifications a browser has yet to show =====
 
-type GetNextNotificationRequest = record {
+type GetNotificationRequest = record {
     anchor_number : UserNumber;
+    // Whose inbox holds it. An app's key signs for every browser pointing at the app, so
+    // the browser cannot be taken from the caller alone.
+    browser_id : nat32;
+    inbox_notification_id : InboxNotificationId;
 };
 
 // What a service worker shows for one wake-up: the app and account it is for, the
@@ -2209,12 +2237,12 @@ type ProbeNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
-// Null once nothing is left to show.
-type GetNextNotificationResponse = record {
+// Null where the named entry is gone: taken, expired, or dropped with the registration.
+type GetNotificationResponse = record {
     notification : opt NotificationToShow;
 };
 
-type GetNextNotificationError = variant {
+type GetNotificationError = variant {
     // The caller signs with no key this identity is signed in from, and with no key of
     // an app one of its browsers routes through.
     InvalidBrowserKey;
@@ -2223,8 +2251,9 @@ type GetNextNotificationError = variant {
 
 type RemoveNotificationRequest = record {
     anchor_number : UserNumber;
-    // As browser_get_next_notification returned it.
-    notification : NotificationToShow;
+    browser_id : nat32;
+    // As the wake-up that announced it named it.
+    inbox_notification_id : InboxNotificationId;
 };
 
 type RemoveNotificationResponse = record {};
@@ -2737,12 +2766,23 @@ service : (opt InternetIdentityInit) -> {
     prepare_notification_delegation : (PrepareNotificationDelegationRequest) -> (variant { Ok : PrepareNotificationDelegationResponse; Err : NotificationDelegationError });
     get_notification_delegation : (GetNotificationDelegationRequest) -> (variant { Ok : GetNotificationDelegationResponse; Err : NotificationDelegationError }) query;
 
-    // Called by the service worker on a wake-up, signed with the browser key: the oldest
-    // notification its browser has yet to show, passing over the ones it skips.
-    browser_get_next_notification : (GetNextNotificationRequest) -> (variant { Ok : GetNextNotificationResponse; Err : GetNextNotificationError }) query;
+    // Called by the service worker on a wake-up, signed with the browser key: the entry
+    // that wake-up named, where it has not expired and the identity still allows it.
+    browser_get_notification : (GetNotificationRequest) -> (variant { Ok : GetNotificationResponse; Err : GetNotificationError }) query;
     // Called by the service worker for the one it shows, while it fetches the content.
     browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 
+    // The key a browser subscribes with and every push names. Absent only in the moment
+    // between the install returning and the answer to the read it starts.
+    // Both keys a browser needs before it subscribes: the one every push is signed with,
+    // and a one-shot key it encrypts this subscription's auth secret to.
+    //
+    // An update call, because a query reply is signed by one replica. One that answered
+    // with a VAPID key of its own choosing would bind the subscription to it permanently,
+    // and the browser has nothing to check the answer against.
+    // A cold randomness pool yields the `Pending` result arm — a retry signal, not an
+    // error: asking put the draw in flight, so the caller re-calls the method.
+    prepare_webpush_subscription : (UserNumber) -> (variant { Ok : PrepareWebPushSubscriptionResponse; Pending; Err : PrepareWebPushSubscriptionError });
     // Called by the browser, or by the Home Screen app it points at: what the app
     // registers belongs to its own record, which every identity pointing at it is
     // delivered through, so the anchor named here is what authorized the call rather

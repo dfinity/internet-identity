@@ -4,6 +4,7 @@
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
 use crate::storage::storable::application::StorableOriginSha256;
+use crate::SECOND_NS;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AnchorNumber, ApplicationNumber, NotificationId, Timestamp, Urgency,
@@ -65,7 +66,6 @@ impl QueueItem for PendingNotification {
 /// remapping so aliases share the same queue limits.
 pub(crate) type AppBacklog = AdmissionQueue<StorableOriginSha256, PendingNotification>;
 
-const SECOND_NS: u64 = 1_000_000_000;
 const MINUTE_NS: u64 = 60 * SECOND_NS;
 const EXPIRY_NS: u64 = 5 * MINUTE_NS;
 

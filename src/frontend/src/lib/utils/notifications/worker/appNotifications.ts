@@ -3,7 +3,7 @@
  * channel showed it, and that somebody acted on it.
  *
  * The interface is declared here rather than generated, because it is the app's and
- * all of it is these two methods. `_internet_identity_notification_content` is a
+ * all of it is these three methods. `_internet_identity_notification_content` is a
  * query, so an app whose language cannot read caller info in a query cannot serve it
  * yet.
  */
@@ -20,17 +20,7 @@ export interface NotificationContent {
   url?: string;
 }
 
-/**
- * One call to one app canister.
- *
- * `shouldFetchRootKey` is the deployment's, and arrives by way of the worker's own
- * registration script URL — a woken worker has no page to ask and cannot import the
- * page's agent, which is bootstrapped from injected config. It is not derived from the
- * location either: the e2e serves Internet Identity on a public name against a local
- * replica, so "fetch it only on a loopback host" would be wrong there. Without it a
- * local replica's answers fail verification, which reads the same as an app that
- * dismissed the notification.
- */
+/** One call to one app canister. */
 export interface AppCall {
   appCanisterId: Principal;
   id: bigint;
@@ -62,6 +52,10 @@ interface AppNotificationService {
   _internet_identity_notification_opened: (id: bigint) => Promise<void>;
 }
 
+/** `shouldFetchRootKey` comes from the worker's own registration URL, not from the
+ *  location: the e2e serves Internet Identity on a public name against a local replica,
+ *  where a loopback test would be wrong, and without it a local replica's answers fail
+ *  verification, which reads the same as an app that dismissed the notification. */
 const actorFor = ({
   appCanisterId,
   identity,

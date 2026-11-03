@@ -5,20 +5,29 @@
 // it never sits between the page and the network, and no precaching, so a stale
 // worker cannot serve a stale app.
 //
-// A push carries no body, since the payload is not sealed to the browser's keys: what
-// it is for is asked of the canister, and its content of the app that sent it. The
-// subscription is `userVisibleOnly`, which obliges a visible notification per push.
+// A push names the identity, browser and inbox entry it was sent for, and carries
+// nothing else: the content is fetched from the app that sent it, with a delegation
+// minted for the purpose, so it never reaches the push service. The browser decrypts
+// the payload before this worker is woken. The subscription is `userVisibleOnly`,
+// which obliges a visible notification per push.
 
 import { reportOpened } from "$lib/utils/notifications/worker/notificationOpened";
 import {
+  entryIdFrom,
   onWakeUp,
   showPlaceholder,
 } from "$lib/utils/notifications/worker/wakeUp";
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
-import { refOf } from "$lib/utils/notifications/worker/shownNotification";
-import { openable } from "$lib/utils/notifications/worker/openTarget";
-import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
+import {
+  inTheAppOf,
+  refOf,
+  urlOf,
+} from "$lib/utils/notifications/worker/notificationRef";
+import {
+  openOnClick,
+  openTheApp,
+} from "$lib/utils/notifications/worker/openWindow";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 
@@ -36,9 +45,9 @@ worker.addEventListener("activate", (event) => {
   event.waitUntil(worker.clients.claim());
 });
 
-// One wake-up at a time, whatever the browser delivers. `browser_get_next_notification`
-// is a query and claims nothing, so two pushes handled at once would both read the same
-// head, show the same notification, and leave the one behind it with no wake-up coming.
+// One wake-up at a time, whatever the browser delivers. Each handler sweeps the
+// registration and then decides whether it still owes the user a notification, and two
+// running at once would read each other's half-finished answer to that.
 // `waitUntil` extends this worker's life; it does not serialise its handlers.
 const enqueue = promiseQueue();
 
@@ -51,89 +60,42 @@ worker.addEventListener("push", (event) => {
         await showPlaceholder(worker.registration);
         return;
       }
-      await onWakeUp({ registration: worker.registration });
+      await onWakeUp(
+        { registration: worker.registration },
+        entryIdFrom(event.data),
+      );
     }),
   );
 });
 
-/** The app's own window, which is the only one reused: a page on this origin that is not
- *  the app belongs to the user and is left where they put it. */
-const appWindow = async (): Promise<WindowClient | undefined> => {
-  const clients = await worker.clients.matchAll({
-    type: "window",
-    includeUncontrolled: true,
-  });
-  return clients.find((client) => {
-    try {
-      return new URL(client.url).pathname.startsWith(NOTIFICATION_APP_PATH);
-    } catch {
-      return false;
-    }
-  });
-};
-
-/**
- * Takes a window to `url`.
- *
- * iOS gives a standalone app one window and surfaces it for a URL in its own scope
- * rather than taking it there, so the running window is pointed by hand. Only a
- * destination inside the app reuses one; anything else opens its own.
- */
-const pointAt = async (url: string): Promise<void> => {
-  const reuse = url.startsWith(NOTIFICATION_APP_PATH)
-    ? await appWindow()
-    : undefined;
-  if (reuse === undefined) {
-    await worker.clients.openWindow(url);
-    return;
-  }
-  // Refused in some app views, where the page's own `hashchange` is what is left.
-  await reuse.navigate(url).catch(() => undefined);
-  await reuse.focus();
-};
-
 worker.addEventListener("notificationclick", (event) => {
   // A click does not take the notification off the screen by itself.
   event.notification.close();
-  const target = refOf(event.notification.data);
-  const url =
-    typeof event.notification.data?.url === "string"
-      ? event.notification.data.url
-      : undefined;
+  const ref = refOf(event.notification.data);
+  const url = urlOf(event.notification.data);
+  // Started here rather than inside `waitUntil`: the window has to be asked for while
+  // the click still permits it, which is this synchronous run and no later.
+  const opening =
+    ref !== undefined && url !== undefined
+      ? openOnClick(
+          worker,
+          url,
+          {
+            title: event.notification.title,
+            body: event.notification.body,
+          },
+          inTheAppOf(event.notification.data),
+        )
+      : openTheApp(worker);
   event.waitUntil(
     (async () => {
-      // Opening comes first: the click is what permits a worker to open a window,
-      // and that permission does not survive an await on a canister call. The
-      // app's window cannot be focused instead, because `matchAll` sees this origin
-      // only and the link is the app's.
-      if (target !== undefined && url !== undefined) {
-        const destination = await openable(url, {
-          title: event.notification.title,
-          body: event.notification.body,
-        });
-        // A refused window must not cost the app its report.
-        await pointAt(destination).catch(() => undefined);
-      } else {
-        const clients = await worker.clients.matchAll({
-          type: "window",
-          includeUncontrolled: true,
-        });
-        const open = clients.find((client) =>
-          client.url.startsWith(worker.origin),
-        );
-        if (open !== undefined) {
-          await open.focus();
-        } else {
-          await worker.clients.openWindow("/");
-        }
-      }
+      await opening.catch(() => undefined);
 
-      // Then the app learns its notification did its job. Nothing can act on a
-      // failure here: a click has no caller to answer and nothing to come back for,
-      // the window is open and the notification closed either way, and the queue
-      // entry went when it was shown. It costs the app a count, not the user.
-      if (target !== undefined && configured) {
-        await reportOpened({ ref: target }).catch(() => undefined);
+      // Nothing can act on a failure here: a click has no caller to answer, the window
+      // is open and the notification closed either way, and the inbox entry went when
+      // it was shown. It costs the app a count, not the user.
+      if (ref !== undefined && configured) {
+        await reportOpened({ ref }).catch(() => undefined);
       }
     })(),
   );

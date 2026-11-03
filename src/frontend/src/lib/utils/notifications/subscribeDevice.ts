@@ -1,96 +1,154 @@
-// Subscribes this browser to push and registers it with the canister: a fresh
-// VAPID key, a signed JWT pool, then set_webpush_subscription. The signing key
-// is kept (see vapidKeyStore) so the pool can be refreshed later without a new
-// subscription. Shared by opt-in, the settings toggle, and the reconcile pass.
+// Subscribes this browser to push and registers it with the canister: ask for the keys,
+// subscribe with Internet Identity's own VAPID key, encrypt this subscription's auth
+// secret to the one-shot transport key that came with it, then set_webpush_subscription.
+// Nothing is kept on this side, because the key that authorizes a push is the canister's.
+// Shared by opt-in, the settings toggle, and the reconcile pass.
 
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
-import { millisToNanos } from "$lib/utils/time";
-import { generateVapidKeypair, signJwtPool } from "./vapidPool";
 import {
   currentDeviceSubscription,
-  relayOriginOf,
+  subscribedWith,
   subscribeToPush,
 } from "./pushSubscription";
 import {
-  loadVapidKey,
-  storeVapidKey,
-  type StoredVapidKey,
-} from "./vapidKeyStore";
+  prepareSubscription,
+  type SubscriptionKeys,
+} from "./prepareSubscription";
+import { sealSubscriptionAuth } from "./transportSeal";
 import { browserKeyActor } from "./browserActor";
+import { registeredIdentityNumbers } from "$lib/stores/browser-key.store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
   _SERVICE,
+  PrepareWebPushSubscriptionError,
   SetWebPushSubscriptionError,
 } from "$lib/generated/internet_identity_types";
 
+/** Whether the canister already has `identityNumber` registered at this address. */
+const registeredAt = async (
+  actor: ActorSubclass<_SERVICE>,
+  identityNumber: bigint,
+  subscription: PushSubscription,
+): Promise<boolean> => {
+  const [held] = await actor.get_webpush_subscription_status({
+    anchor_number: identityNumber,
+  });
+  return held?.endpoint === subscription.endpoint;
+};
+
 /**
- * Registers a subscription this browser already holds with `identityNumber`, signing a
- * fresh pool with the key it was minted under.
+ * Registers a subscription this browser already holds with `identityNumber`.
  *
- * The subscription and its VAPID key belong to the browser, not to one identity, so a
- * second identity signing in here registers what is already there. Rotating instead
- * would unsubscribe the endpoint every other identity's row still names.
+ * The subscription belongs to the browser, not to one identity, so a second identity
+ * signing in here registers what is already there. Rotating instead would unsubscribe
+ * the endpoint every other identity's row still names.
  */
 export const registerStoredDevice = async (
   identityNumber: bigint,
-  { endpoint, privateKey, publicKeyRaw }: StoredVapidKey,
+  /** What the payload keys are derived from: the registration this call is about. */
+  subscription: PushSubscription,
   /** Who to call as. The Home Screen app signs as itself, and what it registers lands on its own record; everyone else signs as the browser key this sign-in registered. */
   caller?: ActorSubclass<_SERVICE>,
+  /** Keys already fetched for this identity, where the caller needed the VAPID half first. */
+  fetched?: SubscriptionKeys,
 ): Promise<string> => {
-  const issuedAtNs = millisToNanos(Date.now());
-  const signatures = await signJwtPool(
-    privateKey,
-    relayOriginOf(endpoint),
-    issuedAtNs,
-  );
   const actor = caller ?? (await browserKeyActor(identityNumber));
+  // Nothing to do where the canister already holds this address. Re-registering would
+  // mint a transport key and run the whole derivation to arrive at the record it already
+  // has, and the Home Screen app comes through here on every launch.
+  //
+  // Skipped where keys were handed down, because the caller fetched them for this
+  // subscribe and a prepare has already replaced the registration they belong to: there
+  // is no longer an address on the record to match.
+  if (
+    fetched === undefined &&
+    (await registeredAt(actor, identityNumber, subscription))
+  ) {
+    return subscription.endpoint;
+  }
+  // Its own fetch where none was handed down: the transport key is minted per caller and
+  // spent by one subscribe, so no two registrations can share one.
+  const { transportPublicKey } =
+    fetched ?? (await prepareSubscription(identityNumber, actor));
+  const { p256dh, transportKey, sealedAuth } = await sealSubscriptionAuth(
+    subscription,
+    transportPublicKey,
+  );
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,
-      endpoint,
-      vapid_public_key: publicKeyRaw,
-      jwt_signatures: signatures,
-      jwt_issued_at_ns: issuedAtNs,
+      endpoint: subscription.endpoint,
+      p256dh,
+      transport_key: transportKey,
+      sealed_auth: sealedAuth,
     })
     .then(throwCanisterError);
-  return endpoint;
+  return subscription.endpoint;
 };
 
 /**
- * Mints a subscription and a VAPID key for this browser, then registers it. Assumes
- * notification permission is already granted. `subscribeToPush` drops any prior
- * subscription, so this replaces one rather than adding to it, and every other
- * identity's stored row is left naming an endpoint that is gone: only call it where
- * the browser has no usable subscription of its own.
+ * The subscription this browser can be woken through: the one it already holds where
+ * that was minted with our key, and a fresh one otherwise.
+ *
+ * A subscription minted with any other application server key is one no push we sign
+ * can reach, so reusing it would register an endpoint that is dead on arrival.
+ *
+ * `minted` says a new one replaced whatever was there, which is what obliges the caller
+ * to re-register every other identity this browser holds a key for.
  */
-export const subscribeAndRegisterDevice = async (
-  identityNumber: bigint,
-): Promise<string> => {
-  const { publicKeyRaw, privateKey } = await generateVapidKeypair();
-  const endpoint = await subscribeToPush(publicKeyRaw);
-  const stored = { endpoint, privateKey, publicKeyRaw };
-  await registerStoredDevice(identityNumber, stored);
-  await storeVapidKey(stored);
-  return endpoint;
-};
-
-/** `minted` says whether the subscription is fresh, because a fresh key belongs on disk only once the canister has taken the endpoint it was made for. */
-const deviceSubscription = async (): Promise<{
-  subscription: StoredVapidKey;
+const usableSubscription = async (
+  keys: SubscriptionKeys,
+): Promise<{
+  subscription: PushSubscription;
   minted: boolean;
 }> => {
-  const stored = await loadVapidKey();
-  const live = await currentDeviceSubscription();
-  if (
-    stored !== undefined &&
-    live !== undefined &&
-    stored.endpoint === live.endpoint
-  ) {
-    return { subscription: stored, minted: false };
+  const held = await currentDeviceSubscription();
+  if (held !== undefined && subscribedWith(held, keys.vapidPublicKey)) {
+    return { subscription: held, minted: false };
   }
-  const { publicKeyRaw, privateKey } = await generateVapidKeypair();
-  const endpoint = await subscribeToPush(publicKeyRaw);
-  return { subscription: { endpoint, privateKey, publicKeyRaw }, minted: true };
+  return {
+    subscription: await subscribeToPush(keys.vapidPublicKey),
+    minted: true,
+  };
+};
+
+/**
+ * Moves every other identity that was registered on this browser onto `subscription`.
+ *
+ * Subscribing drops the endpoint they were registered with, so without this each one is
+ * left naming an address nothing is delivered to, and only its own owner going to
+ * settings would ever find out.
+ *
+ * Only an identity the canister already holds a registration for is moved: one that
+ * never turned notifications on, or turned them off again, has no registration to
+ * repair, and writing one here would turn them on in its owner's name. A browser signed
+ * out between that read and this write is refused by the canister, which is where that
+ * rule belongs. Theirs is a repair rather than what the caller asked for, so a refusal
+ * is left where it is.
+ */
+const repairOtherIdentities = async (
+  registered: bigint,
+  subscription: PushSubscription,
+): Promise<void> => {
+  const identityNumbers = await registeredIdentityNumbers().catch(() => []);
+  await Promise.all(
+    identityNumbers
+      .filter((identityNumber) => identityNumber !== registered)
+      .map(async (identityNumber) => {
+        try {
+          const actor = await browserKeyActor(identityNumber);
+          const [held] = await actor.get_webpush_subscription_status({
+            anchor_number: identityNumber,
+          });
+          if (held === undefined) {
+            return;
+          }
+          await registerStoredDevice(identityNumber, subscription, actor);
+        } catch {
+          // Left where it is: this identity's owner is not the one waiting on an answer.
+        }
+      }),
+  );
 };
 
 /**
@@ -101,24 +159,41 @@ const deviceSubscription = async (): Promise<{
 export const ensureRegisteredDevice = async (
   identityNumber: bigint,
 ): Promise<string> => {
-  const { subscription, minted } = await deviceSubscription();
-  await registerStoredDevice(identityNumber, subscription);
-  if (minted) {
-    await storeVapidKey(subscription);
+  const actor = await browserKeyActor(identityNumber);
+  const keys = await prepareSubscription(identityNumber, actor);
+  const { subscription, minted } = await usableSubscription(keys);
+  // Every identity on this browser registers the same subscription under its own browser
+  // key; the one that asked is distinguished only in that its answer is the one being
+  // waited on. Started together, so a failure of that one cannot leave the others on an
+  // endpoint this browser has already dropped.
+  const [asked] = await Promise.allSettled([
+    registerStoredDevice(identityNumber, subscription, actor, keys),
+    ...(minted ? [repairOtherIdentities(identityNumber, subscription)] : []),
+  ]);
+  if (asked.status === "rejected") {
+    throw asked.reason;
   }
   return subscription.endpoint;
 };
 
-/** `InvalidBrowserKey` is the anchor named not reaching the caller, which says nothing about the next one.
- * `StaleJwtPool` is about the endpoint, which every anchor shares, so the anchors after this one would be refused for the same reason. */
+/** `InvalidBrowserKey` is the anchor named not reaching the caller, which says nothing
+ * about the next one. Both halves of a registration answer it, because both are
+ * authorized by the anchor they name. */
 const anotherAnchorMayAnswer = (error: unknown): boolean => {
-  if (!isCanisterError<SetWebPushSubscriptionError>(error)) {
+  if (
+    !isCanisterError<
+      SetWebPushSubscriptionError | PrepareWebPushSubscriptionError
+    >(error)
+  ) {
     return false;
   }
   switch (error.type) {
     case "InvalidBrowserKey":
       return true;
-    case "StaleJwtPool":
+    // The transport key is this browser's, not this anchor's, so the next anchor would
+    // find it gone too: the remedy is a fresh fetch, which the next call does anyway.
+    case "TransportKeyExpired":
+      return false;
     case "InternalCanisterError":
       return false;
   }
@@ -130,18 +205,37 @@ export const registerForAnyAnchor = async (
   anchors: bigint[],
   caller: ActorSubclass<_SERVICE>,
 ): Promise<boolean> => {
-  const { subscription, minted } = await deviceSubscription();
+  // Before anything is fetched, because every launch of the installed app comes through
+  // here and the push service usually hands back the address it already gave us. An
+  // anchor already registered at it needs no key, no derivation and no write.
+  const held = await currentDeviceSubscription();
+  if (held !== undefined) {
+    for (const anchor of anchors) {
+      if (await registeredAt(caller, anchor, held)) {
+        return true;
+      }
+    }
+  }
+
+  // Both halves name an anchor and both are authorized through it, so both belong to
+  // the walk: an identity that has unlinked the app refuses the key fetch exactly as it
+  // refuses the registration, and says nothing about the next one.
+  let live: PushSubscription | undefined;
   for (const anchor of anchors) {
     try {
-      await registerStoredDevice(anchor, subscription, caller);
+      const keys = await prepareSubscription(anchor, caller);
+      // Once for the whole walk. Subscribing again would hand out a new endpoint and
+      // drop the one the anchors already refused through.
+      live ??= (await usableSubscription(keys)).subscription;
+      // Handed down rather than fetched again: a second fetch would mint another
+      // transport key, derive another sender key, and empty every inbox routed through
+      // this app a second time.
+      await registerStoredDevice(anchor, live, caller, keys);
     } catch (error) {
       if (anotherAnchorMayAnswer(error)) {
         continue;
       }
       throw error;
-    }
-    if (minted) {
-      await storeVapidKey(subscription);
     }
     return true;
   }

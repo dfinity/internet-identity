@@ -27,19 +27,48 @@ export interface ShownData {
   id: string;
   /** Where a click goes, already checked against the app's own origins. */
   url: string;
+  /** Whether the worker showing this belongs to the installed iOS app, which decides
+   *  whether a click on it goes through the Safari doorway. Settled here because the
+   *  answer is a promise and a click cannot wait for one: the permission to open a
+   *  window belongs to the synchronous run of the handler. */
+  inTheApp: boolean;
 }
 
 export const tagOf = (ref: NotificationRef): string =>
   `${ref.identityNumber}|${ref.origin}|${ref.accountNumber ?? ""}|${ref.id}`;
 
-export const dataOf = (ref: NotificationRef, url: string): ShownData => ({
+export const dataOf = (
+  ref: NotificationRef,
+  url: string,
+  inTheApp: boolean,
+): ShownData => ({
   identityNumber: ref.identityNumber.toString(),
   origin: ref.origin,
   accountNumber: ref.accountNumber?.toString() ?? "",
   appCanisterId: ref.appCanisterId,
   id: ref.id.toString(),
   url,
+  inTheApp,
 });
+
+/** Whether a click on this notification goes through the doorway. Anything this worker
+ *  did not write reads as a browser, which opens its link directly. */
+export const inTheAppOf = (data: unknown): boolean => {
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+  return (data as Partial<ShownData>).inTheApp === true;
+};
+
+/** Where a click on this notification goes, or `undefined` for data this worker did not
+ *  write. */
+export const urlOf = (data: unknown): string | undefined => {
+  if (typeof data !== "object" || data === null) {
+    return undefined;
+  }
+  const { url } = data as Partial<ShownData>;
+  return typeof url === "string" ? url : undefined;
+};
 
 /** The notification some data belongs to, or `undefined` for anything this worker did
  *  not write — an older version's notification, or a browser that dropped the data. */

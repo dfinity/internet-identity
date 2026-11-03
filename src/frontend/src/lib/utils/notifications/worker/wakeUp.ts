@@ -1,13 +1,9 @@
 /**
  * What the service worker does with a Web Push wake-up.
  *
- * A wake-up carries nothing: the canister queues one per notification and the worker
- * asks what it is for. Showing one takes a delegation Internet Identity signs for that
- * app and account, so the first wake-up for a pair shows a placeholder and mints one,
- * which earns another wake-up that replaces the placeholder with the app's own text.
- *
- * Everything here is driven by the worker's `push` handler; it is a module of its own
- * so it can be read, and tested, without a worker around it.
+ * A wake-up names one entry of one browser's inbox. Showing an app's own text takes a
+ * delegation Internet Identity signs for that app and account, so a worker holding none
+ * shows a placeholder and replaces it once the mint lands.
  */
 
 import {
@@ -20,6 +16,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
 import type {
   _SERVICE,
+  NotificationEvent,
   NotificationToShow,
 } from "$lib/generated/internet_identity_types";
 import { signingIdentities, type SigningIdentity } from "../signingIdentities";
@@ -30,15 +27,10 @@ import {
   reportNotificationReceived,
 } from "./appNotifications";
 import { allowedLink, fetchAlternativeOrigins } from "./notificationLink";
-import { refillJwtPool } from "./poolRefill";
 import { loadPullIdentity, mintPullIdentity } from "./pullDelegation";
-import {
-  dataOf,
-  refOf,
-  tagOf,
-  type NotificationRef,
-} from "./shownNotification";
-import { recordShown, shownRecently } from "./shownRecord";
+import { dataOf, refOf, tagOf, type NotificationRef } from "./notificationRef";
+import { isTheApp } from "./openTarget";
+import { recordShown, shownRecently } from "./recentlyShown";
 import { identityNotificationText } from "./identityNotification";
 import { NOTIFICATION_APP_PATH } from "../appPath";
 
@@ -46,14 +38,18 @@ import { NOTIFICATION_APP_PATH } from "../appPath";
  *  Eight seconds is well inside the budget a push handler gets. */
 const MINT_DEADLINE_MS = 8_000;
 
-/** What {@link withDeadline} rejects with, so a caller can tell the deadline running out from the work failing. */
+/** The sweep asks every app that has something on screen whether it still wants it, and
+ *  one that cannot answer must not hold up a notification from another. Closing a stale
+ *  banner late costs nothing, so this is short. */
+const SWEEP_DEADLINE_MS = 2_000;
+
 class DeadlineError extends Error {
   constructor(deadlineMs: number) {
     super(`no answer within ${deadlineMs}ms`);
   }
 }
 
-/** Rejects where `work` has not answered within `deadlineMs`; the work itself carries on. */
+/** The work itself carries on. */
 const withDeadline = <T>(work: Promise<T>, deadlineMs: number): Promise<T> =>
   Promise.race([
     work,
@@ -81,15 +77,71 @@ export const showPlaceholder = async (
 };
 
 export interface WakeUpContext {
-  /** The worker's registration, which owns the notifications it shows. */
+  /** Owns the notifications it shows. */
   registration: ServiceWorkerRegistration;
-  /** What this storage can sign for. Injected so a test can answer for it. */
+  // Both injected so a test can answer for them.
   signing?: () => Promise<SigningIdentity[]>;
-  /** The canister, as one of them. Injected so a test can answer for it. */
   internetIdentity?: (
     signing: SigningIdentity,
   ) => Promise<ActorSubclass<_SERVICE>>;
 }
+
+/** What the sealed payload carries, which is all a woken worker has to go on. */
+export interface InboxEntryId {
+  anchorNumber: bigint;
+  browserId: number;
+  inboxNotificationId: bigint;
+}
+
+/** What the push carried, or `undefined` where it carried nothing this worker can use. */
+export const entryIdFrom = (
+  data: PushMessageData | null,
+): InboxEntryId | undefined => {
+  try {
+    const payload: unknown = data?.json();
+    if (payload === null || typeof payload !== "object") {
+      return undefined;
+    }
+    const { anchor_number, browser_id, inbox_notification_id } =
+      payload as Record<string, unknown>;
+    if (
+      typeof anchor_number !== "number" ||
+      typeof browser_id !== "number" ||
+      typeof inbox_notification_id !== "number"
+    ) {
+      return undefined;
+    }
+    return {
+      anchorNumber: BigInt(anchor_number),
+      browserId: browser_id,
+      inboxNotificationId: BigInt(inbox_notification_id),
+    };
+  } catch {
+    return undefined;
+  }
+};
+
+/** An entry, as the canister answered for it. */
+interface InboxEntry {
+  actor: ActorSubclass<_SERVICE>;
+  identityNumber: bigint;
+  notification: NotificationToShow;
+  id: InboxEntryId;
+}
+
+/** Nothing on screen waits on these: a notification shown a consensus round late is one
+ *  iOS holds against the worker. Settled before the handler returns. */
+const backgroundCalls = () => {
+  const started: Promise<unknown>[] = [];
+  return {
+    start: (call: Promise<unknown>): void => {
+      started.push(call.catch(() => undefined));
+    },
+    settled: (): Promise<unknown> => Promise.all(started),
+  };
+};
+
+type BackgroundCalls = ReturnType<typeof backgroundCalls>;
 
 const internetIdentityActor = ({
   identity,
@@ -104,6 +156,40 @@ const internetIdentityActor = ({
       canisterId: Principal.fromText(config.canisterId),
     }),
   );
+
+const removeEntry = (
+  actor: ActorSubclass<_SERVICE>,
+  id: InboxEntryId,
+): Promise<unknown> =>
+  actor.browser_remove_notification({
+    anchor_number: id.anchorNumber,
+    browser_id: id.browserId,
+    inbox_notification_id: id.inboxNotificationId,
+  });
+
+/** A query: nothing the canister remembers having answered. */
+const fetchEntry = async (
+  context: WakeUpContext,
+  signing: SigningIdentity,
+  id: InboxEntryId,
+): Promise<InboxEntry | undefined> => {
+  const actor = await (context.internetIdentity ?? internetIdentityActor)(
+    signing,
+  );
+  const found = await actor.browser_get_notification({
+    anchor_number: id.anchorNumber,
+    browser_id: id.browserId,
+    inbox_notification_id: id.inboxNotificationId,
+  });
+  if ("Err" in found) {
+    return undefined;
+  }
+  const notification = found.Ok.notification[0];
+  if (notification === undefined) {
+    return undefined;
+  }
+  return { actor, identityNumber: signing.identityNumber, notification, id };
+};
 
 const refFor = (
   identityNumber: bigint,
@@ -142,7 +228,7 @@ const show = async (
     body: shown.body,
     icon: shown.icon,
     tag,
-    data: dataOf(ref, shown.url),
+    data: dataOf(ref, shown.url, await isTheApp()),
   });
   await recordShown();
 };
@@ -164,228 +250,154 @@ const senderOf = async (
   return { name: metadata?.name ?? hostname, icon: metadata?.logo };
 };
 
-/**
- * Update calls the wake-up sets going without waiting for them.
- *
- * Nothing on screen depends on their answers, and a notification that waits for one
- * before it is shown is shown a consensus round late, which is late enough for iOS to
- * hold the push against the worker. They are still settled before the handler returns,
- * so the `waitUntil` around the wake-up keeps the worker alive for them.
- */
-const sendAndForget = (
-  pending: Promise<unknown>[],
-  call: Promise<unknown>,
-): void => {
-  pending.push(call.catch(() => undefined));
-};
-
-interface Queued {
-  actor: ActorSubclass<_SERVICE>;
-  identityNumber: bigint;
-  notification: NotificationToShow;
-}
-
-/** What one identity has at the head of its queue. Reads only: a query, and nothing
- *  the canister remembers having answered. */
-const nextFor = async (
+/** Internet Identity's own: the words are written here, so there is nothing to mint. */
+const showIdentityEvent = async (
   context: WakeUpContext,
-  signing: SigningIdentity,
-): Promise<Queued | undefined> => {
-  const { identityNumber } = signing;
-  const actor = await (context.internetIdentity ?? internetIdentityActor)(
-    signing,
-  );
-  const next = await actor.browser_get_next_notification({
-    anchor_number: identityNumber,
-  });
-  if ("Err" in next) {
-    return undefined;
-  }
-  const notification = next.Ok.notification[0];
-  if (notification === undefined) {
-    return undefined;
-  }
-  return { actor, identityNumber, notification };
-};
-
-/**
- * Show what an identity has waiting, and tell the canister and the app it was shown.
- *
- * Answers whether anything was shown, which is what a `userVisibleOnly` subscription
- * obliges the worker to have done by the time it returns. Everything the answer does
- * not depend on is left in `pending`.
- */
-const showQueued = async (
-  context: WakeUpContext,
-  { actor, identityNumber, notification }: Queued,
-  {
-    pending,
-  }: {
-    pending: Promise<unknown>[];
-  },
+  entry: InboxEntry,
+  ref: NotificationRef,
+  event: NotificationEvent,
+  background: BackgroundCalls,
 ): Promise<boolean> => {
-  const ref = refFor(identityNumber, notification);
+  await show(context, ref, {
+    ...identityNotificationText(event),
+    url: NOTIFICATION_APP_PATH,
+  });
+  background.start(removeEntry(entry.actor, entry.id));
+  return true;
+};
 
-  // Internet Identity's own: no delegation to mint and no app to ask, which is also why it cannot spend a placeholder.
-  const [event] = notification.event;
-  if (event !== undefined) {
-    await show(context, ref, {
-      ...identityNotificationText(event),
-      // Opens this app rather than anywhere else: what it is about is here.
-      url: NOTIFICATION_APP_PATH,
-    });
-    sendAndForget(
-      pending,
-      actor.browser_remove_notification({
-        anchor_number: identityNumber,
-        notification,
-      }),
-    );
-    return true;
-  }
-
-  // Only Internet Identity's own carries no origin, and that returned just above.
-  const [origin] = notification.origin;
-  if (origin === undefined) {
+/** What the app published under this entry, or closing what it has dropped. */
+const showPublished = async (
+  context: WakeUpContext,
+  entry: InboxEntry,
+  ref: NotificationRef,
+  origin: string,
+  identity: Identity,
+  background: BackgroundCalls,
+): Promise<boolean> => {
+  const { notification } = entry;
+  const content = await fetchNotificationContent({
+    appCanisterId: notification.canister_id,
+    id: notification.id,
+    identity,
+  });
+  if (content === undefined) {
+    // The app dismissed it, or it expired: there is nothing to show and nothing left
+    // for the canister to hold.
+    await closeShown(context, ref);
+    background.start(removeEntry(entry.actor, entry.id));
     return false;
   }
 
-  const target = {
-    origin,
-    accountNumber: notification.account_number[0],
-  };
-  const held = await loadPullIdentity({
-    identityNumber,
-    target,
-
-    nowMillis: Date.now(),
+  const [sender, alternativeOrigins] = await Promise.all([
+    senderOf(origin),
+    fetchAlternativeOrigins(origin),
+  ]);
+  await show(context, ref, {
+    // The sender leads the title: an app's own title and body are its text to write,
+    // so the one line naming who sent it has to be somewhere the app cannot claim and
+    // a platform showing a single body line cannot drop.
+    title: `${sender.name} · ${content.title}`,
+    body: content.body,
+    icon: sender.icon,
+    url: allowedLink({ url: content.url, origin, alternativeOrigins }),
   });
 
-  // Minting is an update call, raced against a deadline rather than waited for: a worker that shows nothing is one the browser answers for.
-  // The promise is kept so the placeholder path can go on waiting for this same mint rather than starting a second one.
-  let minting: Promise<Identity | undefined> | undefined;
-  const mintWithin = (): Promise<Identity | undefined> => {
-    minting = mintPullIdentity({ actor, identityNumber, target });
-    sendAndForget(pending, minting);
-    return withDeadline(minting, MINT_DEADLINE_MS).catch((error: unknown) => {
-      console.error(
-        error instanceof DeadlineError
-          ? `the delegation for ${target.origin} was still being minted after ${MINT_DEADLINE_MS}ms`
-          : error,
-      );
-      return undefined;
-    });
-  };
-  const minted = held ?? (await mintWithin());
-
-  /** Spends the entry this wake-up was for. */
-  const forget = (): void =>
-    sendAndForget(
-      pending,
-      actor.browser_remove_notification({
-        anchor_number: identityNumber,
-        notification,
-      }),
-    );
-
-  /** Shows what the app published under this entry, or closes what it has dropped. */
-  const showFromApp = async (identity: Identity): Promise<boolean> => {
-    const content = await fetchNotificationContent({
+  background.start(
+    reportNotificationReceived({
       appCanisterId: notification.canister_id,
       id: notification.id,
       identity,
-    });
-    if (content === undefined) {
-      // The app dismissed it, or it expired: there is nothing to show and nothing left
-      // for the canister to hold.
-      await closeShown(context, ref);
-      forget();
-      return false;
-    }
+    }),
+  );
+  background.start(removeEntry(entry.actor, entry.id));
+  return true;
+};
 
-    const [sender, alternativeOrigins] = await Promise.all([
-      senderOf(origin),
-      fetchAlternativeOrigins(origin),
-    ]);
-    await show(context, ref, {
-      // The sender leads the title: an app's own title and body are its text to
-      // write, so the one line naming who sent it has to be somewhere the app
-      // cannot claim and a platform showing a single body line cannot drop.
-      title: `${sender.name} · ${content.title}`,
-      body: content.body,
-      icon: sender.icon,
-      url: allowedLink({
-        url: content.url,
-        origin,
-        alternativeOrigins,
-      }),
-    });
-
-    sendAndForget(
-      pending,
-      reportNotificationReceived({
-        appCanisterId: notification.canister_id,
-        id: notification.id,
-        identity,
-      }),
-    );
-    forget();
-    return true;
+/** Minting is raced against a deadline, not waited for: a worker that shows nothing is
+ *  one the browser answers for. */
+const showAppNotification = async (
+  context: WakeUpContext,
+  entry: InboxEntry,
+  ref: NotificationRef,
+  origin: string,
+  background: BackgroundCalls,
+): Promise<boolean> => {
+  const target = {
+    origin,
+    accountNumber: entry.notification.account_number[0],
   };
-
-  if (minted === undefined) {
-    // What the subscription owes the user, now rather than whenever the mint lands.
-    await show(context, ref, {
-      title: PLACEHOLDER_TITLE,
-      body: PLACEHOLDER_BODY,
-      url: origin,
-    });
-    // The mint is still in flight, and `waitUntil` keeps this worker alive for it, so
-    // the rest of the work happens here under the same wake-up. The canister does post
-    // one more wake-up when a delegation is minted, but a browser gets only one of
-    // those per delegation lifetime and it is not returned when its post fails, so
-    // resting correctness on it is what leaves the queue behind the wake-ups.
-    const late = await (minting ?? Promise.resolve(undefined)).catch(
-      () => undefined,
-    );
-    if (late === undefined) {
-      // A wake-up that leaves its entry queued puts the queue permanently one behind,
-      // which costs every notification after this one. One banner carrying no more
-      // than the placeholder is the cheaper loss.
-      forget();
-      return true;
-    }
-    // Replaces the placeholder: `show` closes this entry's own tag first.
-    await showFromApp(late);
-    return true;
+  const held = await loadPullIdentity({
+    identityNumber: entry.identityNumber,
+    target,
+    nowMillis: Date.now(),
+  });
+  if (held !== undefined) {
+    return await showPublished(context, entry, ref, origin, held, background);
   }
 
-  return await showFromApp(minted);
-};
-
-/** Signs a fresh pool of wake-up authorizations where the stored one is running out.
- *  Nothing depends on it: the notification is already shown. */
-const topUpPool = async (
-  context: WakeUpContext,
-  signing: SigningIdentity,
-): Promise<void> => {
-  const actor = await (context.internetIdentity ?? internetIdentityActor)(
-    signing,
-  );
-  await refillJwtPool({
-    actor,
-    identityNumber: signing.identityNumber,
-    nowNs: BigInt(Date.now()) * BigInt(1_000_000),
+  const minting = mintPullIdentity({
+    actor: entry.actor,
+    identityNumber: entry.identityNumber,
+    target,
   });
+  background.start(minting);
+  const minted = await withDeadline(minting, MINT_DEADLINE_MS).catch(
+    (error: unknown) => {
+      console.error(
+        error instanceof DeadlineError
+          ? `the delegation for ${origin} was still being minted after ${MINT_DEADLINE_MS}ms`
+          : error,
+      );
+      return undefined;
+    },
+  );
+  if (minted !== undefined) {
+    return await showPublished(context, entry, ref, origin, minted, background);
+  }
+
+  await show(context, ref, {
+    title: PLACEHOLDER_TITLE,
+    body: PLACEHOLDER_BODY,
+    url: origin,
+  });
+  // Finished under this wake-up rather than the one the canister posts when a
+  // delegation is minted: a browser gets one of those per delegation lifetime, and a
+  // failed post is not returned.
+  const late = await minting.catch(() => undefined);
+  if (late === undefined) {
+    // Spent anyway: an entry left behind puts the inbox one behind for good.
+    background.start(removeEntry(entry.actor, entry.id));
+    return true;
+  }
+  await showPublished(context, entry, ref, origin, late, background);
+  return true;
 };
 
-/**
- * Close what the apps have dismissed since it was shown.
- *
- * An app drops a notification's content when it no longer needs anyone's attention,
- * and a pull then answers with nothing. That is the same answer as for something
- * expired, and the same thing to do about it.
- */
+/** Answers whether anything was shown, which `userVisibleOnly` obliges the worker to
+ *  have done by the time it returns. */
+const showEntry = async (
+  context: WakeUpContext,
+  entry: InboxEntry,
+  background: BackgroundCalls,
+): Promise<boolean> => {
+  const ref = refFor(entry.identityNumber, entry.notification);
+
+  const [event] = entry.notification.event;
+  if (event !== undefined) {
+    return await showIdentityEvent(context, entry, ref, event, background);
+  }
+
+  // Only Internet Identity's own carries no origin, and that returned just above.
+  const [origin] = entry.notification.origin;
+  if (origin === undefined) {
+    return false;
+  }
+  return await showAppNotification(context, entry, ref, origin, background);
+};
+
+/** An app drops a notification's content when it no longer needs attention, which reads
+ *  the same as expired and is the same thing to do about. */
 const closeDismissed = async (context: WakeUpContext): Promise<void> => {
   const shown = await context.registration.getNotifications();
   await Promise.all(
@@ -422,54 +434,51 @@ const closeDismissed = async (context: WakeUpContext): Promise<void> => {
   );
 };
 
-/** One wake-up: show what arrived, and clear what no longer matters. */
-export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
+/** One wake-up: show what it named, and clear what no longer matters. */
+export const onWakeUp = async (
+  context: WakeUpContext,
+  /** Absent where the wake-up carried nothing, which leaves nothing to ask for. */
+  id: InboxEntryId | undefined,
+): Promise<void> => {
   const signing = await (context.signing ?? signingIdentities)();
-  // One round trip each, side by side: a wake-up shows one notification, so asking
-  // the entries one after another would only make the screen wait on the answers it
-  // ends up throwing away.
-  const queued = await Promise.all(
-    signing.map((one) => nextFor(context, one).catch(() => undefined)),
+
+  // Swept before anything is shown, and never after. Chrome reconciles its own
+  // record of what is on screen when the registration is enumerated, and an
+  // enumeration that lands before the browser has displayed a notification it was
+  // just given drops that notification from the record while the system goes on
+  // showing it. What is left is a banner whose click reaches nothing.
+  // Enumerated before anything is shown, for the reason above. The answers it waits on
+  // are the apps', so they are bounded: past the deadline the sweep goes on closing what
+  // it finds while this wake-up gets on with what it was sent for.
+  await withDeadline(closeDismissed(context), SWEEP_DEADLINE_MS).catch(
+    () => undefined,
   );
 
-  const pending: Promise<unknown>[] = [];
+  const background = backgroundCalls();
   let shown = false;
-  for (const entry of queued) {
-    if (entry === undefined) {
-      continue;
-    }
-    // The canister queues a wake-up per notification, so the ones passed over here
-    // keep their place and their own wake-up is still to come.
-    shown = await showQueued(context, entry, {
-      pending,
-    }).catch(() => false);
-    if (shown) {
-      break;
+  // A browser keeps a key per identity signed in; a Home Screen app's single key is
+  // paired with every identity that claimed it.
+  const signer =
+    id === undefined
+      ? undefined
+      : signing.find((one) => one.identityNumber === id.anchorNumber);
+  if (id !== undefined && signer !== undefined) {
+    const entry = await fetchEntry(context, signer, id).catch(() => undefined);
+    if (entry !== undefined) {
+      shown = await showEntry(context, entry, background).catch(() => false);
     }
   }
 
-  // The pool of signed wake-up authorizations is spent by elapsed time, and a
-  // browser whose user never opens the page again would let it run out.
-  for (const one of signing) {
-    sendAndForget(pending, topUpPool(context, one));
-  }
-
-  if (shown) {
-    sendAndForget(pending, closeDismissed(context));
-  } else {
-    // Whether this wake-up still owes the user something depends on what is on
-    // screen, and an app may have dismissed what is on screen.
-    await closeDismissed(context).catch(() => undefined);
-    // The browser is asked first; our own stamp covers iOS before 17.0, which answered an empty array.
+  if (!shown) {
+    // Our own stamp covers iOS before 17.0, which answered an empty array.
     const onScreen =
       (await context.registration.getNotifications()).length > 0 ||
       (await shownRecently());
     if (!onScreen) {
-      // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
-      // nothing on screen owes the user something.
+      // `userVisibleOnly`: a wake-up that left nothing on screen owes the user something.
       await showPlaceholder(context.registration);
     }
   }
 
-  await Promise.all(pending);
+  await background.settled();
 };

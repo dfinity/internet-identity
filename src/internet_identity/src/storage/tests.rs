@@ -8,7 +8,7 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::account::AccountReference;
 use crate::storage::account::{Account, AccountKey};
-use crate::storage::anchor::{Anchor, Device, MAX_BROWSERS};
+use crate::storage::anchor::{Anchor, Device, WebPushSubscription, MAX_BROWSERS};
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::{AccountReferenceListWrite, AccountReferenceWrite};
@@ -6785,12 +6785,7 @@ mod session_removal_tests {
     /// it signs as, which only the ceremony that created it knows.
     fn storage_with_sessions(
         browsers: &[u8],
-    ) -> (
-        Storage<VectorMemory>,
-        AnchorNumber,
-        u64,
-        Vec<Principal>,
-    ) {
+    ) -> (Storage<VectorMemory>, AnchorNumber, u64, Vec<Principal>) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
@@ -7010,9 +7005,9 @@ mod write_path_property_tests {
     use super::params_at;
     use super::record_use;
     use super::TEST_NOW;
-    use candid::Principal;
     use crate::storage::account::{AccountKey, AccountReference};
     use crate::storage::{CreateSessionParams, Storage};
+    use candid::Principal;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
@@ -7499,7 +7494,10 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     let (left_empty, _) = anchor
         .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
         .expect("registering a browser");
+    // Distinct ids, as a deposit draws them: an inbox of three zeroes is a state nothing
+    // can produce, and a wake-up naming one of them could not tell them apart.
     let queued = |notification_id: u64| InboxNotification {
+        inbox_notification_id: notification_id,
         application_number: Some(4),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
@@ -7513,14 +7511,14 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://relay.example/a",
                 0,
-                0,
             )),
         );
     }
-    anchor
-        .notifications_for_browser_mut(queued_on)
-        .expect("a registered browser")
-        .extend([3, 1, 2].map(queued));
+    let (inbox, next_id) = anchor
+        .inbox_and_next_id_for_browser_mut(queued_on)
+        .expect("a registered browser");
+    inbox.extend([3, 1, 2].map(queued));
+    *next_id = 4;
     storage.write(anchor).expect("writing the anchor");
 
     // Re-read from the same backing memory to simulate a canister upgrade.
@@ -7533,6 +7531,9 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         [3, 1, 2].map(queued)
     );
     assert!(reloaded.notifications_for_browser(left_empty).is_empty());
+    // The run of ids survives the reload too, or the next deposit would re-use one a
+    // wake-up already named.
+    assert_eq!(reloaded.next_inbox_notification_id(queued_on), Some(4));
 }
 
 #[test]
@@ -7791,7 +7792,6 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://web.push.apple.com/one",
                 2_000,
-                2_000,
             )),
             2_000,
         )
@@ -7801,6 +7801,7 @@ fn an_apps_subscription_is_the_records_and_not_an_anchors() {
     assert_eq!(
         stored
             .webpush_subscription
+            .and_then(WebPushSubscription::into_ready)
             .map(|subscription| subscription.endpoint.into_string()),
         Some("https://web.push.apple.com/one".to_string())
     );
@@ -7962,6 +7963,7 @@ fn forgetting_an_app_leaves_alone_a_browser_that_left_it_for_an_address_of_its_o
 
 fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNotification {
     crate::storage::anchor::InboxNotification {
+        inbox_notification_id: 0,
         application_number: Some(1),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
@@ -7972,7 +7974,7 @@ fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNot
 }
 
 fn app_subscription(endpoint: &str) -> crate::storage::anchor::WebPushSubscription {
-    crate::notifications::webpush::fixtures::subscription_at(endpoint, 1_000, 1_000)
+    crate::notifications::webpush::fixtures::subscription_at(endpoint, 1_000)
 }
 
 #[test]
@@ -7995,9 +7997,10 @@ fn a_new_app_address_drops_what_the_old_one_was_sent() {
         .push(queued_notification(7));
     storage.write(anchor).expect("queueing");
 
-    // The same address is a pool replacement, which keeps what is waiting.
+    // A rotation refresh rewrites the same address, which is the one way what is
+    // waiting survives: a subscribe passes through a pending registration.
     storage
-        .set_notification_app_subscription(app.id, Some(app_subscription("https://a")), 2_000)
+        .refresh_notification_app_subscription(app.id, Some(app_subscription("https://a")))
         .expect("the record is there");
     assert_eq!(
         storage
@@ -8079,7 +8082,6 @@ fn an_entry_delivers_through_the_app_it_points_at() {
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://web.push.apple.com/one",
                 1_000,
-                1_000,
             )),
             1_000,
         )
@@ -8111,7 +8113,6 @@ fn an_entry_that_stopped_routing_delivers_through_nothing() {
             app.id,
             Some(crate::notifications::webpush::fixtures::subscription_at(
                 "https://web.push.apple.com/one",
-                1_000,
                 1_000,
             )),
             1_000,
@@ -8149,6 +8150,7 @@ fn an_identity_notification_is_queued_without_an_application() {
         .notifications_for_browser_mut(0)
         .expect("a registered browser")
         .push(InboxNotification {
+            inbox_notification_id: 0,
             application_number: None,
             sender: Principal::from_slice(&[7; 10]),
             notification_id: 1,

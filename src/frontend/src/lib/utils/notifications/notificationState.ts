@@ -16,7 +16,6 @@ import { browserAppStatus } from "$lib/utils/notifications/appStatus";
 import { deviceHasDonorIdentity } from "./deviceApp";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
-import { loadVapidKey } from "./vapidKeyStore";
 import { recordPermission } from "./notificationDiagnostics";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
@@ -25,8 +24,8 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 export interface BrowserPushState {
   supported: boolean;
   permission: NotificationPermission;
-  /** The endpoint the browser and the signing key we kept agree on, or `undefined`
-   * where there is no live subscription to the key we hold. */
+  /** The endpoint this browser's push subscription names, or `undefined` where it
+   * holds none. */
   endpoint?: string;
 }
 
@@ -35,7 +34,8 @@ export interface BrowserDeviceState {
   source: "browser";
   supported: boolean;
   permission: NotificationPermission;
-  /** This browser holds a live subscription for the signing key we still keep. */
+  /** This browser holds a push subscription. Which key it was minted with is
+   * `subscribedWith`'s question, not this one's. */
   subscribed: boolean;
   /** The canister holds that same subscription under this identity. A second identity
    * on a subscribed browser is not registered until it registers for itself, and one
@@ -72,15 +72,10 @@ export const readBrowserPushState = async (): Promise<
       return { supported, permission };
     }
     const subscription = await currentDeviceSubscription();
-    const stored = await loadVapidKey();
-    const live =
-      subscription !== undefined &&
-      stored !== undefined &&
-      stored.endpoint === subscription.endpoint;
     return {
       supported,
       permission,
-      endpoint: live ? stored.endpoint : undefined,
+      endpoint: subscription?.endpoint,
     };
   } catch (error) {
     console.error(error);

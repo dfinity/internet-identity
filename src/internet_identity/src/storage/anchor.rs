@@ -1,7 +1,9 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
-use crate::notifications::webpush::{JwtPool, PushEndpoint, VapidPublicKey};
+use crate::notifications::webpush::{
+    AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SubscriberKey,
+};
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
@@ -12,7 +14,6 @@ use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_inbox::{
     StorableInboxNotification, StorableNotificationEvent,
 };
-use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -109,6 +110,9 @@ pub struct Browser {
     pub webpush_subscription: Option<WebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
     pub notifications: Vec<InboxNotification>,
+    /// What the next entry deposited in that inbox is named. Never rewound, so an id is
+    /// not reused while a wake-up announcing the entry that held it is still in flight.
+    pub next_inbox_notification_id: InboxNotificationId,
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
@@ -135,6 +139,8 @@ impl Browser {
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InboxNotification {
+    /// Assigned at deposit, unique within its inbox, and what a wake-up names.
+    pub inbox_notification_id: InboxNotificationId,
     /// `None` where Internet Identity sent this itself.
     pub application_number: Option<ApplicationNumber>,
     /// The canister that sent it, which the service worker fetches the text from.
@@ -150,6 +156,7 @@ pub struct InboxNotification {
 impl From<InboxNotification> for StorableInboxNotification {
     fn from(value: InboxNotification) -> Self {
         StorableInboxNotification {
+            inbox_notification_id: value.inbox_notification_id,
             application_number: value.application_number,
             event: value.event.map(StorableNotificationEvent::from),
             sender: value.sender.as_slice().to_vec(),
@@ -160,17 +167,75 @@ impl From<InboxNotification> for StorableInboxNotification {
     }
 }
 
-/// A browser's Web Push registration and the pool of VAPID JWTs it signed for it.
+/// A browser's Web Push registration, in whichever of its two states it is in.
 ///
 /// Held on the browser entry rather than on its own, so signing the browser out or
 /// letting the registry evict it takes the registration with it.
+///
+/// A subscribe takes two calls: the first mints the key the browser encrypts its `auth`
+/// secret to and leaves the private half here, the second spends it. A browser replacing
+/// its subscription passes back through [`Pending`](WebPushSubscription::Pending), so
+/// nothing reads one of these without asking for the ready half.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WebPushSubscription {
+pub enum WebPushSubscription {
+    Pending(PendingTransport),
+    Ready(ReadySubscription),
+}
+
+/// What a key fetch left behind for the subscribe that follows it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingTransport {
+    /// The private half of the key the browser encrypts `auth` to.
+    pub secret_key: [u8; 32],
+    /// Expanded into this subscription's first sender key once a subscribe arrives, and
+    /// held as a seed until then because a prompt the user denies never sends one.
+    pub sender_seed: [u8; 32],
+    pub minted_at_ns: Timestamp,
+}
+
+/// Where to reach a browser, and what to seal for it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReadySubscription {
     pub endpoint: PushEndpoint,
     pub created_at_ns: Timestamp,
-    pub vapid_public_key: VapidPublicKey,
-    /// Raw ECDSA P-256 signatures in window order, with the instant they were signed at.
-    pub jwt_signatures: JwtPool,
+    /// What a payload through this subscription is sealed with, derived here.
+    pub payload_ikm: PayloadIkm,
+    pub payload_keyid: PayloadKeyId,
+    /// What the ECDH of every refresh runs against.
+    pub subscriber_key: SubscriberKey,
+    /// The salt of every derivation of `payload_ikm`.
+    pub auth: AuthSecret,
+    /// When `payload_ikm` was last derived.
+    pub last_rotated_ns: Timestamp,
+}
+
+impl WebPushSubscription {
+    /// What can be delivered to, which a subscription waiting on its subscribe is not.
+    pub fn ready(&self) -> Option<&ReadySubscription> {
+        match self {
+            WebPushSubscription::Ready(ready) => Some(ready),
+            WebPushSubscription::Pending(_) => None,
+        }
+    }
+
+    pub fn into_ready(self) -> Option<ReadySubscription> {
+        match self {
+            WebPushSubscription::Ready(ready) => Some(ready),
+            WebPushSubscription::Pending(_) => None,
+        }
+    }
+
+    pub fn pending(&self) -> Option<&PendingTransport> {
+        match self {
+            WebPushSubscription::Pending(pending) => Some(pending),
+            WebPushSubscription::Ready(_) => None,
+        }
+    }
+}
+
+/// A 32-byte private key read back from a row this canister wrote.
+fn secret_key_of(bytes: Vec<u8>, dbg_name: &str) -> Result<[u8; 32], String> {
+    <[u8; 32]>::try_from(bytes.as_slice()).map_err(|_| format!("{dbg_name} is not 32 bytes"))
 }
 
 impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
@@ -180,41 +245,54 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
     /// the only way one refuses is a row that is not what it claims to be — which is the
     /// same failure as CBOR that will not decode, and belongs to the read.
     fn try_from(value: StorableWebPushSubscription) -> Result<Self, Self::Error> {
-        Ok(WebPushSubscription {
-            endpoint: PushEndpoint::try_from(value.endpoint.as_str())?,
-            created_at_ns: value.created_at_ns,
-            vapid_public_key: VapidPublicKey::try_from(value.vapid_public_key)?,
-            jwt_signatures: JwtPool::try_new(
-                value
-                    .jwt_pool
-                    .signatures
-                    .into_iter()
-                    .map(Vec::from)
-                    .collect(),
-                value.jwt_pool.issued_at_ns,
-            )?,
-        })
+        match value {
+            StorableWebPushSubscription::Pending {
+                secret_key,
+                sender_seed,
+                minted_at_ns,
+            } => Ok(WebPushSubscription::Pending(PendingTransport {
+                secret_key: secret_key_of(secret_key, "secret_key")?,
+                sender_seed: secret_key_of(sender_seed, "sender_seed")?,
+                minted_at_ns,
+            })),
+            StorableWebPushSubscription::Ready {
+                endpoint,
+                created_at_ns,
+                payload_ikm,
+                payload_keyid,
+                subscriber_key,
+                auth,
+                last_rotated_ns,
+            } => Ok(WebPushSubscription::Ready(ReadySubscription {
+                endpoint: PushEndpoint::try_from(endpoint.as_str())?,
+                created_at_ns,
+                payload_ikm: PayloadIkm::try_from(payload_ikm)?,
+                payload_keyid: PayloadKeyId::try_from(payload_keyid)?,
+                subscriber_key: SubscriberKey::try_from(subscriber_key)?,
+                auth: AuthSecret::try_from(auth)?,
+                last_rotated_ns,
+            })),
+        }
     }
 }
 
 impl From<WebPushSubscription> for StorableWebPushSubscription {
     fn from(value: WebPushSubscription) -> Self {
-        let issued_at_ns = value.jwt_signatures.issued_at_ns();
-        StorableWebPushSubscription {
-            endpoint: value.endpoint.into_string(),
-            created_at_ns: value.created_at_ns,
-            vapid_public_key: value.vapid_public_key.into_vec(),
-            jwt_pool: StorableWebPushJwtPool {
-                signatures: value
-                    .jwt_signatures
-                    .into_signatures()
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
-                issued_at_ns,
+        match value {
+            WebPushSubscription::Pending(pending) => StorableWebPushSubscription::Pending {
+                secret_key: pending.secret_key.to_vec(),
+                sender_seed: pending.sender_seed.to_vec(),
+                minted_at_ns: pending.minted_at_ns,
             },
-            // The entry holds it, so it is read here and never written.
-            notifications: None,
+            WebPushSubscription::Ready(ready) => StorableWebPushSubscription::Ready {
+                endpoint: ready.endpoint.into_string(),
+                created_at_ns: ready.created_at_ns,
+                payload_ikm: ready.payload_ikm.into_vec(),
+                payload_keyid: ready.payload_keyid.into_vec(),
+                subscriber_key: ready.subscriber_key.into_vec(),
+                auth: ready.auth.into_vec(),
+                last_rotated_ns: ready.last_rotated_ns,
+            },
         }
     }
 }
@@ -243,19 +321,13 @@ impl From<StorableBrowser> for Browser {
                     })
                     .ok()
             }),
-            // From the entry, or from the subscription for a record that carries it there.
             notifications: value
                 .notifications
-                .or_else(|| {
-                    value
-                        .webpush_subscription
-                        .as_ref()
-                        .and_then(|subscription| subscription.notifications.clone())
-                })
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|queued| {
                     Some(InboxNotification {
+                        inbox_notification_id: queued.inbox_notification_id,
                         application_number: queued.application_number,
                         event: queued.event.map(NotificationEvent::from),
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
@@ -265,6 +337,7 @@ impl From<StorableBrowser> for Browser {
                     })
                 })
                 .collect(),
+            next_inbox_notification_id: value.next_inbox_notification_id.unwrap_or_default(),
             notification_app: value.notification_app.map(NotificationAppRef::from),
         }
     }
@@ -284,6 +357,7 @@ impl From<Browser> for StorableBrowser {
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
+            next_inbox_notification_id: Some(value.next_inbox_notification_id),
             notifications: (!value.notifications.is_empty()).then(|| {
                 value
                     .notifications
@@ -1221,7 +1295,7 @@ impl Anchor {
         };
         let app = app(app_id)?;
         Some(NotificationAppInfo {
-            subscribed: app.webpush_subscription.is_some(),
+            subscribed: app.is_subscribed(),
             enabled,
             last_seen_ns: app.last_used_ns,
         })
@@ -1286,14 +1360,35 @@ impl Anchor {
             .map_or(&[], |browser| &browser.notifications)
     }
 
+    /// The inbox alone, for a caller that only empties or reads it.
     pub fn notifications_for_browser_mut(
         &mut self,
         browser_id: BrowserId,
     ) -> Option<&mut Vec<InboxNotification>> {
+        self.inbox_and_next_id_for_browser_mut(browser_id)
+            .map(|(inbox, _)| inbox)
+    }
+
+    /// The id the next entry deposited in this browser's inbox takes.
+    pub fn next_inbox_notification_id(&self, browser_id: BrowserId) -> Option<InboxNotificationId> {
+        self.browser(browser_id)
+            .map(|browser| browser.next_inbox_notification_id)
+    }
+
+    /// The inbox together with the id its next entry takes, which a deposit needs both of.
+    pub fn inbox_and_next_id_for_browser_mut(
+        &mut self,
+        browser_id: BrowserId,
+    ) -> Option<(&mut Vec<InboxNotification>, &mut InboxNotificationId)> {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)
-            .map(|browser| &mut browser.notifications)
+            .map(|browser| {
+                (
+                    &mut browser.notifications,
+                    &mut browser.next_inbox_notification_id,
+                )
+            })
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1430,6 +1525,7 @@ impl Anchor {
         let id = self.next_browser_id;
         self.next_browser_id = self.next_browser_id.saturating_add(1);
         self.browsers.push(Browser {
+            next_inbox_notification_id: 0,
             id,
             current_browser_key,
             next_browser_key,

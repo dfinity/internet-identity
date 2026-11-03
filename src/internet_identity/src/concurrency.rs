@@ -93,7 +93,7 @@ impl ConcurrencyLimiter {
 
 /// A limiter held in a `thread_local`, e.g. `&FOO` for
 /// `thread_local! { static FOO: RefCell<ConcurrencyLimiter> = ... }`.
-type Limiter = &'static LocalKey<RefCell<ConcurrencyLimiter>>;
+pub(crate) type Limiter = &'static LocalKey<RefCell<ConcurrencyLimiter>>;
 
 /// A reserved slot. Holding it holds the slot; dropping it frees the slot, so a
 /// slot lives exactly as long as the permit — hold it across the work it guards.

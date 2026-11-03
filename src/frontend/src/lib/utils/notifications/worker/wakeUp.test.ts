@@ -12,7 +12,6 @@ const reportNotificationReceived = vi.fn((_call: unknown) => Promise.resolve());
 const fetchAppMetadata = vi.fn((): Promise<{ name?: string } | undefined> =>
   Promise.resolve(undefined),
 );
-const refillJwtPool = vi.fn((_options: unknown) => Promise.resolve(false));
 const fetchAlternativeOrigins = vi.fn(() => Promise.resolve([] as string[]));
 
 const createSync = vi.fn((_options: unknown) => ({}));
@@ -37,7 +36,7 @@ vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
     ...actual,
     Actor: {
       createActor: () => ({
-        browser_get_next_notification: () =>
+        browser_get_notification: () =>
           Promise.resolve({ Ok: { notification: [] } }),
       }),
     },
@@ -47,9 +46,6 @@ vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
 vi.mock("$lib/utils/notifications/worker/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
   mintPullIdentity: () => mintPullIdentity(),
-}));
-vi.mock("$lib/utils/notifications/worker/poolRefill", () => ({
-  refillJwtPool: (options: unknown) => refillJwtPool(options),
 }));
 vi.mock("$lib/utils/notifications/worker/appNotifications", () => ({
   fetchNotificationContent: (call: unknown) => fetchNotificationContent(call),
@@ -81,7 +77,7 @@ const ORIGIN = "https://app.example";
 const SENDER = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
 
 const notification = {
-  origin: ORIGIN,
+  origin: [ORIGIN] as [] | [string],
   account_number: [] as [],
   canister_id: SENDER,
   id: BigInt(42),
@@ -128,7 +124,7 @@ const registration = () => {
 const internetIdentity = (queue: (typeof notification)[]) => {
   const removed: unknown[] = [];
   const actor = {
-    browser_get_next_notification: vi.fn(() =>
+    browser_get_notification: vi.fn(() =>
       Promise.resolve({
         Ok: { notification: queue.length === 0 ? [] : [queue[0]] },
       }),
@@ -148,6 +144,13 @@ const internetIdentity = (queue: (typeof notification)[]) => {
 };
 
 const identity = {} as Identity;
+
+/** What a wake-up names, as the push carries it. */
+const NAMED = {
+  anchorNumber: IDENTITY,
+  browserId: 1,
+  inboxNotificationId: BigInt(3),
+};
 
 /** An entry this storage can sign for, as `signingIdentities` answers them. */
 const signs = (identityNumber: bigint) => ({ identityNumber, identity });
@@ -170,10 +173,13 @@ describe("onWakeUp", () => {
     const ii = internetIdentity([notification]);
     fetchAppMetadata.mockResolvedValue({ name: "Example App" });
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     expect(shown.showNotification).toHaveBeenCalledWith(
       "Example App · New message",
@@ -192,7 +198,7 @@ describe("onWakeUp", () => {
     // Every other case injects the actor, so this is the only cover for the one the
     // worker builds: without the page's options it would talk to mainnet's default
     // host and verify against the wrong root key.
-    await onWakeUp({ registration: registration() });
+    await onWakeUp({ registration: registration() }, NAMED);
 
     expect(createSync).toHaveBeenCalledWith(
       expect.objectContaining(AGENT_OPTIONS),
@@ -200,10 +206,13 @@ describe("onWakeUp", () => {
   });
 
   it("asks the app that sent the notification", async () => {
-    await onWakeUp({
-      registration: registration(),
-      internetIdentity: internetIdentity([notification]).factory,
-    });
+    await onWakeUp(
+      {
+        registration: registration(),
+        internetIdentity: internetIdentity([notification]).factory,
+      },
+      NAMED,
+    );
 
     expect(fetchNotificationContent).toHaveBeenCalledWith(
       expect.objectContaining({ appCanisterId: SENDER, id: BigInt(42) }),
@@ -216,10 +225,13 @@ describe("onWakeUp", () => {
     loadPullIdentity.mockResolvedValue(undefined);
     fetchAppMetadata.mockResolvedValue({ name: "Example App" });
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     expect(mintPullIdentity).toHaveBeenCalledOnce();
     expect(shown.shown.map((entry) => entry.title)).toEqual([
@@ -242,10 +254,13 @@ describe("onWakeUp", () => {
     );
 
     let returned = false;
-    const wakeUp = onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    }).then(() => {
+    const wakeUp = onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    ).then(() => {
       returned = true;
     });
     // The placeholder is owed at the deadline rather than at the end of the wake-up.
@@ -283,10 +298,13 @@ describe("onWakeUp", () => {
         }),
     );
 
-    const wakeUp = onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    const wakeUp = onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
     await vi.waitFor(
       () => expect(shown.shown[0]?.title).toBe("Internet Identity"),
       { timeout: 10_000, interval: 100 },
@@ -315,10 +333,13 @@ describe("onWakeUp", () => {
         }),
     );
 
-    const wakeUp = onWakeUp({
-      registration: registration(),
-      internetIdentity: internetIdentity([notification]).factory,
-    });
+    const wakeUp = onWakeUp(
+      {
+        registration: registration(),
+        internetIdentity: internetIdentity([notification]).factory,
+      },
+      NAMED,
+    );
     await vi.waitFor(() => expect(logged).toHaveBeenCalled(), {
       timeout: 10_000,
       interval: 100,
@@ -333,18 +354,24 @@ describe("onWakeUp", () => {
     const shown = registration();
     fetchAppMetadata.mockResolvedValue({ name: "Example App" });
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: internetIdentity([]).factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: internetIdentity([]).factory,
+      },
+      NAMED,
+    );
     expect(shown.shown.map((entry) => entry.title)).toEqual([
       "Internet Identity",
     ]);
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: internetIdentity([notification]).factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: internetIdentity([notification]).factory,
+      },
+      NAMED,
+    );
 
     expect(shown.shown.map((entry) => entry.title)).toEqual([
       "Example App · New message",
@@ -367,10 +394,13 @@ describe("onWakeUp", () => {
       },
     ]);
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     expect(shown.shown[0].title).toBe("Notifications are on");
     // Named, because nobody recognises an identity by its number.
@@ -387,10 +417,13 @@ describe("onWakeUp", () => {
     const ii = internetIdentity([notification]);
     fetchNotificationContent.mockResolvedValue(undefined);
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     expect(ii.removed).toHaveLength(1);
     expect(reportNotificationReceived).not.toHaveBeenCalled();
@@ -405,10 +438,13 @@ describe("onWakeUp", () => {
     const ii = internetIdentity([notification]);
     fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     // Dropping it is what an app's own "nothing" means, and cannot be undone.
     expect(ii.removed).toHaveLength(0);
@@ -423,17 +459,23 @@ describe("onWakeUp", () => {
     const shown = registration();
     const ii = internetIdentity([notification]);
     fetchAppMetadata.mockResolvedValue({ name: "Example App" });
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
     expect(shown.shown).toHaveLength(1);
 
     fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     expect(shown.shown.map((entry) => entry.title)).toEqual([
       "Example App · New message",
@@ -443,43 +485,97 @@ describe("onWakeUp", () => {
   it("closes what an app has dismissed since it was shown", async () => {
     const shown = registration();
     const ii = internetIdentity([notification]);
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
     expect(shown.shown).toHaveLength(1);
 
     fetchNotificationContent.mockResolvedValue(undefined);
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     expect(shown.shown).toEqual([
       expect.objectContaining({ title: "Internet Identity" }),
     ]);
   });
 
-  it("asks for every entry this storage holds a key for", async () => {
-    const second = BigInt(10_001);
-    signing.mockResolvedValue([signs(IDENTITY), signs(second)]);
-    const ii = internetIdentity([
-      notification,
-      { ...notification, id: BigInt(43) },
-    ]);
+  it("asks only the identity the wake-up names, for the entry it names", async () => {
+    signing.mockResolvedValue([signs(BigInt(10_001)), signs(IDENTITY)]);
+    const ii = internetIdentity([notification]);
 
-    await onWakeUp({
-      registration: registration(),
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: registration(),
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
-    expect(ii.actor.browser_get_next_notification).toHaveBeenCalledTimes(2);
-    expect(ii.actor.browser_get_next_notification).toHaveBeenCalledWith({
+    expect(ii.actor.browser_get_notification).toHaveBeenCalledTimes(1);
+    expect(ii.actor.browser_get_notification).toHaveBeenCalledWith({
       anchor_number: IDENTITY,
+      browser_id: NAMED.browserId,
+      inbox_notification_id: NAMED.inboxNotificationId,
     });
-    expect(ii.actor.browser_get_next_notification).toHaveBeenCalledWith({
-      anchor_number: second,
-    });
+  });
+
+  it("asks nobody where no key signs for the identity the wake-up names", async () => {
+    signing.mockResolvedValue([signs(BigInt(10_001))]);
+    const ii = internetIdentity([notification]);
+    const shown = registration();
+
+    await onWakeUp(
+      { registration: shown, internetIdentity: ii.factory },
+      NAMED,
+    );
+
+    expect(ii.actor.browser_get_notification).not.toHaveBeenCalled();
+    // `userVisibleOnly` is still owed something.
+    expect(shown.shown).toEqual([
+      expect.objectContaining({ title: "Internet Identity" }),
+    ]);
+  });
+
+  it("shows the placeholder where the push carried nothing", async () => {
+    const ii = internetIdentity([notification]);
+    const shown = registration();
+
+    await onWakeUp(
+      { registration: shown, internetIdentity: ii.factory },
+      undefined,
+    );
+
+    expect(ii.actor.browser_get_notification).not.toHaveBeenCalled();
+    expect(shown.shown).toEqual([
+      expect.objectContaining({ title: "Internet Identity" }),
+    ]);
+  });
+
+  it("spends the entry by the name the wake-up gave it", async () => {
+    const ii = internetIdentity([notification]);
+    fetchAppMetadata.mockResolvedValue({ name: "Example App" });
+
+    await onWakeUp(
+      { registration: registration(), internetIdentity: ii.factory },
+      NAMED,
+    );
+
+    expect(ii.removed).toEqual([
+      {
+        anchor_number: IDENTITY,
+        browser_id: NAMED.browserId,
+        inbox_notification_id: NAMED.inboxNotificationId,
+      },
+    ]);
   });
 
   it("shows one notification per wake-up, whatever is waiting elsewhere", async () => {
@@ -487,26 +583,17 @@ describe("onWakeUp", () => {
     signing.mockResolvedValue([signs(IDENTITY), signs(BigInt(10_001))]);
     const ii = internetIdentity([notification]);
 
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: ii.factory,
-    });
+    await onWakeUp(
+      {
+        registration: shown,
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
 
     // The canister queues a wake-up per notification, so the second identity's
     // turn comes with its own.
     expect(shown.showNotification).toHaveBeenCalledOnce();
     expect(reportNotificationReceived).toHaveBeenCalledOnce();
-  });
-
-  it("does not fail a wake-up that showed its notification", async () => {
-    const shown = registration();
-    refillJwtPool.mockRejectedValue(new Error("no"));
-
-    await onWakeUp({
-      registration: shown,
-      internetIdentity: internetIdentity([notification]).factory,
-    });
-
-    expect(shown.shown).toHaveLength(1);
   });
 });

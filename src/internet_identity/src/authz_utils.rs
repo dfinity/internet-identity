@@ -217,7 +217,7 @@ pub fn check_browser_or_notification_app_authorization(
 }
 
 /// The key a notification call was signed with, which is what authorizing it established.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum NotificationKey {
     Browser(BrowserId),
     App(NotificationAppId),

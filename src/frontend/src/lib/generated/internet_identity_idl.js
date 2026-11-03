@@ -314,7 +314,10 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
-  const GetNextNotificationRequest = IDL.Record({
+  const InboxNotificationId = IDL.Nat64;
+  const GetNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+    'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
   });
   const IdentityForNotification = IDL.Record({
@@ -332,15 +335,16 @@ export const idlFactory = ({ IDL }) => {
     'event' : IDL.Opt(NotificationEvent),
     'account_number' : IDL.Opt(AccountNumber),
   });
-  const GetNextNotificationResponse = IDL.Record({
+  const GetNotificationResponse = IDL.Record({
     'notification' : IDL.Opt(NotificationToShow),
   });
-  const GetNextNotificationError = IDL.Variant({
+  const GetNotificationError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
   const RemoveNotificationRequest = IDL.Record({
-    'notification' : NotificationToShow,
+    'inbox_notification_id' : InboxNotificationId,
+    'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
   });
   const RemoveNotificationResponse = IDL.Record({});
@@ -733,11 +737,7 @@ export const idlFactory = ({ IDL }) => {
   const GetWebPushSubscriptionStatusRequest = IDL.Record({
     'anchor_number' : UserNumber,
   });
-  const WebPushSubscriptionStatus = IDL.Record({
-    'endpoint' : IDL.Text,
-    'issued_at_ns' : IDL.Nat64,
-    'pool_len' : IDL.Nat32,
-  });
+  const WebPushSubscriptionStatus = IDL.Record({ 'endpoint' : IDL.Text });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -1079,6 +1079,14 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'expiration' : Timestamp,
   });
+  const PrepareWebPushSubscriptionResponse = IDL.Record({
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'transport_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const PrepareWebPushSubscriptionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const ProbeNotificationAppRequest = IDL.Record({
     'anchor_number' : UserNumber,
   });
@@ -1125,16 +1133,16 @@ export const idlFactory = ({ IDL }) => {
     }),
   });
   const SetWebPushSubscriptionRequest = IDL.Record({
+    'sealed_auth' : IDL.Vec(IDL.Nat8),
     'endpoint' : IDL.Text,
-    'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
-    'jwt_issued_at_ns' : IDL.Nat64,
     'anchor_number' : UserNumber,
-    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'p256dh' : IDL.Vec(IDL.Nat8),
+    'transport_key' : IDL.Vec(IDL.Nat8),
   });
   const SetWebPushSubscriptionError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
-    'StaleJwtPool' : IDL.Null,
+    'TransportKeyExpired' : IDL.Null,
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
   const SmtpEnvelope = IDL.Record({
@@ -1367,12 +1375,12 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'browser_get_next_notification' : IDL.Func(
-        [GetNextNotificationRequest],
+    'browser_get_notification' : IDL.Func(
+        [GetNotificationRequest],
         [
           IDL.Variant({
-            'Ok' : GetNextNotificationResponse,
-            'Err' : GetNextNotificationError,
+            'Ok' : GetNotificationResponse,
+            'Err' : GetNotificationError,
           }),
         ],
         ['query'],
@@ -1924,6 +1932,17 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareSessionDelegation,
             'Err' : SessionDelegationError,
+          }),
+        ],
+        [],
+      ),
+    'prepare_webpush_subscription' : IDL.Func(
+        [UserNumber],
+        [
+          IDL.Variant({
+            'Ok' : PrepareWebPushSubscriptionResponse,
+            'Err' : PrepareWebPushSubscriptionError,
+            'Pending' : IDL.Null,
           }),
         ],
         [],

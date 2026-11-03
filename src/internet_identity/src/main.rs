@@ -45,7 +45,7 @@ use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
-use notifications::webpush::{deliverable_endpoint, JwtPool, PushEndpoint, VapidPublicKey};
+use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
 use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::cell::RefCell;
@@ -95,6 +95,7 @@ mod verified_emails;
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
+pub const SECOND_NS: u64 = secs_to_nanos(1);
 const MINUTE_NS: u64 = secs_to_nanos(60);
 const HOUR_NS: u64 = 60 * MINUTE_NS;
 const DAY_NS: u64 = 24 * HOUR_NS;
@@ -338,6 +339,62 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 // ---- Notifications: called by II's frontend / service worker ----
 
+/// Both keys a browser needs before it can subscribe: the one every push is signed with,
+/// and a one-shot key it encrypts this subscription's `auth` secret to.
+///
+/// An update call, because a query reply is signed by one replica. One that answered with
+/// a VAPID key of its own choosing would bind the subscription to it permanently, and the
+/// browser has nothing to check the answer against.
+#[update]
+async fn prepare_webpush_subscription(
+    anchor_number: AnchorNumber,
+) -> PrepareWebPushSubscriptionResult {
+    if let Err(err) = enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError) {
+        return PrepareWebPushSubscriptionResult::Err(err);
+    }
+    let Ok(key) = check_browser_or_notification_app_authorization(anchor_number) else {
+        return PrepareWebPushSubscriptionResult::Err(
+            PrepareWebPushSubscriptionError::InvalidBrowserKey,
+        );
+    };
+
+    let vapid_public_key = match notifications::webpush::vapid_key::held_public_key().await {
+        Ok(key) => key,
+        Err(err) => {
+            return PrepareWebPushSubscriptionResult::Err(
+                PrepareWebPushSubscriptionError::InternalCanisterError(err),
+            )
+        }
+    };
+
+    let now_ns = ic_cdk::api::time();
+    // Nothing pooled to derive from yet, which only happens when nobody has subscribed for
+    // a while. Asking for it put the draw in flight, so a caller coming back finds it.
+    let Some(seeds) = notifications::webpush::seed_pool::seeds_for(anchor_number, key, now_ns)
+    else {
+        return PrepareWebPushSubscriptionResult::Pending;
+    };
+
+    let transport_public_key =
+        notifications::webpush::transport::public_key_of(&seeds.transport_secret);
+    // Held on the registration the subscribe will write, which is the only call that can
+    // spend it.
+    if let Err(err) = notifications::webpush::start_subscription(
+        key,
+        anchor_number,
+        seeds.transport_secret,
+        seeds.sender_seed,
+        now_ns,
+    ) {
+        return PrepareWebPushSubscriptionResult::Err(err);
+    }
+
+    PrepareWebPushSubscriptionResult::Ok(PrepareWebPushSubscriptionResponse {
+        vapid_public_key: ByteBuf::from(vapid_public_key),
+        transport_public_key: ByteBuf::from(transport_public_key),
+    })
+}
+
 /// Authorized by the caller's own key: a browser writes its entry's subscription, an app
 /// writes its record's.
 #[update]
@@ -347,35 +404,34 @@ fn set_webpush_subscription(
     let SetWebPushSubscriptionRequest {
         anchor_number,
         endpoint,
-        vapid_public_key,
-        jwt_signatures,
-        jwt_issued_at_ns,
+        p256dh,
+        transport_key,
+        sealed_auth,
     } = request;
     enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
 
     // Every field at once rather than the first to fail, so a browser doesn't go round
-    // three times to learn what one answer can say.
-    let (endpoint, vapid_public_key, jwt_signatures) = match (
+    // four times to learn what one answer can say.
+    let (endpoint, p256dh, transport_key, sealed_auth) = match (
         PushEndpoint::try_from(endpoint.as_str())
             .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
-        VapidPublicKey::try_from(vapid_public_key.into_vec()),
-        JwtPool::try_new(
-            jwt_signatures
-                .into_iter()
-                .map(ByteBuf::into_vec)
-                .collect::<Vec<_>>(),
-            jwt_issued_at_ns,
-        ),
+        SubscriberKey::try_from(p256dh.into_vec()),
+        SubscriberKey::try_from(transport_key.into_vec()),
+        SealedAuth::try_from(sealed_auth.into_vec()),
     ) {
-        (Ok(endpoint), Ok(vapid_public_key), Ok(jwt_signatures)) => {
-            (endpoint, vapid_public_key, jwt_signatures)
+        (Ok(endpoint), Ok(p256dh), Ok(transport_key), Ok(sealed_auth)) => {
+            (endpoint, p256dh, transport_key, sealed_auth)
         }
-        (endpoint, vapid_public_key, jwt_signatures) => {
-            let problems: Vec<String> =
-                [endpoint.err(), vapid_public_key.err(), jwt_signatures.err()]
-                    .into_iter()
-                    .flatten()
-                    .collect();
+        (endpoint, p256dh, transport_key, sealed_auth) => {
+            let problems: Vec<String> = [
+                endpoint.err(),
+                p256dh.err(),
+                transport_key.err(),
+                sealed_auth.err(),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
             return Err(SetWebPushSubscriptionError::InternalCanisterError(
                 problems.join("; "),
             ));
@@ -389,8 +445,9 @@ fn set_webpush_subscription(
         key,
         anchor_number,
         endpoint,
-        vapid_public_key,
-        jwt_signatures,
+        p256dh,
+        transport_key,
+        sealed_auth,
         ic_cdk::api::time(),
     )
 }
@@ -470,9 +527,7 @@ fn prepare_notification_app_link(
     }) = anchor.notification_app(browser_id)
     {
         let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .is_some_and(|app| {
-                app.webpush_subscription.is_some() && !app.probe_went_unanswered(now)
-            });
+            .is_some_and(|app| app.is_subscribed() && !app.probe_went_unanswered(now));
         if still_answering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
         }
@@ -557,7 +612,6 @@ fn enable_notification_app(
         anchor_number,
         browser_id,
         NotificationEvent::NotificationsOn(identity),
-        notifications::dispatch::IdentityNotification::Probe,
         now_ns,
     ) {
         Some(probe) => Ok(probe),
@@ -653,7 +707,6 @@ fn probe_notification_app(
         request.anchor_number,
         browser_id,
         NotificationEvent::NotificationsOn(identity_for_notification(&anchor)),
-        notifications::dispatch::IdentityNotification::Probe,
         now_ns,
     )
     .ok_or(ProbeNotificationAppError::NotReachable)
@@ -827,12 +880,12 @@ fn link_notification_app(
     })
 }
 
-/// The entry a notification call acts on: the browser that signed it, or the one whose
-/// wake-ups route through the app that did.
+/// The browser this key is delivered through: the one that signed the call, or the one
+/// whose wake-ups route through the app that did, delivery switched on.
 ///
 /// Read here rather than carried out of the authorization, so what a call acts on is what
 /// is stored when it acts rather than what was stored when it was let in.
-fn notification_entry(
+fn delivering_browser(
     anchor_number: AnchorNumber,
     key: NotificationKey,
 ) -> Option<(storage::anchor::Anchor, BrowserId)> {
@@ -842,6 +895,17 @@ fn notification_entry(
         NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
     }?;
     Some((anchor, browser_id))
+}
+
+/// The anchor, where the key is delivered through the browser the request names. An app's
+/// key signs for every browser pointing at it, so the one named is checked, not trusted.
+fn anchor_delivering_to(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+    browser_id: BrowserId,
+) -> Option<storage::anchor::Anchor> {
+    let (anchor, delivering) = delivering_browser(anchor_number, key)?;
+    (delivering == browser_id).then_some(anchor)
 }
 
 /// Authorized by the browser key the caller signs with, or by the key of the Home Screen
@@ -861,7 +925,7 @@ fn prepare_notification_delegation(
     enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
-    let (anchor, browser_id) = notification_entry(request.anchor_number, key)
+    let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::prepare(
@@ -892,7 +956,7 @@ fn get_notification_delegation(
     enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
-    let (anchor, browser_id) = notification_entry(request.anchor_number, key)
+    let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::get(
@@ -909,20 +973,25 @@ fn get_notification_delegation(
 /// Authorized by the browser key the caller signs with, or by the key of the Home Screen
 /// app that entry routes through.
 #[query]
-fn browser_get_next_notification(
-    request: GetNextNotificationRequest,
-) -> Result<GetNextNotificationResponse, GetNextNotificationError> {
-    let GetNextNotificationRequest { anchor_number } = request;
-    enabled_or(GetNextNotificationError::InternalCanisterError)?;
+fn browser_get_notification(
+    request: GetNotificationRequest,
+) -> Result<GetNotificationResponse, GetNotificationError> {
+    let GetNotificationRequest {
+        anchor_number,
+        browser_id,
+        inbox_notification_id,
+    } = request;
+    enabled_or(GetNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
-        .map_err(|_| GetNextNotificationError::InvalidBrowserKey)?;
-    let (anchor, browser_id) = notification_entry(anchor_number, key)
-        .ok_or(GetNextNotificationError::InvalidBrowserKey)?;
+        .map_err(|_| GetNotificationError::InvalidBrowserKey)?;
+    let anchor = anchor_delivering_to(anchor_number, key, browser_id)
+        .ok_or(GetNotificationError::InvalidBrowserKey)?;
 
-    Ok(GetNextNotificationResponse {
-        notification: notifications::browser_inbox::next_to_collect(
+    Ok(GetNotificationResponse {
+        notification: notifications::browser_inbox::notification_named(
             &anchor,
             browser_id,
+            inbox_notification_id,
             ic_cdk::api::time(),
         ),
     })
@@ -935,13 +1004,14 @@ fn browser_remove_notification(
 ) -> Result<RemoveNotificationResponse, RemoveNotificationError> {
     let RemoveNotificationRequest {
         anchor_number,
-        notification,
+        browser_id,
+        inbox_notification_id,
     } = request;
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
-    let (anchor, browser_id) =
-        notification_entry(anchor_number, key).ok_or(RemoveNotificationError::InvalidBrowserKey)?;
+    let anchor = anchor_delivering_to(anchor_number, key, browser_id)
+        .ok_or(RemoveNotificationError::InvalidBrowserKey)?;
 
     let now_ns = ic_cdk::api::time();
     // An acknowledgement is the only thing that tells us the app is still installed.
@@ -951,9 +1021,14 @@ fn browser_remove_notification(
         });
     }
 
-    notifications::browser_inbox::remove_collected(anchor, browser_id, &notification, now_ns)
-        .map(|()| RemoveNotificationResponse {})
-        .map_err(RemoveNotificationError::InternalCanisterError)
+    notifications::browser_inbox::remove_collected(
+        anchor,
+        browser_id,
+        inbox_notification_id,
+        now_ns,
+    )
+    .map(|()| RemoveNotificationResponse {})
+    .map_err(RemoveNotificationError::InternalCanisterError)
 }
 
 #[update]
@@ -1708,6 +1783,16 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     update_root_hash();
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
+    }
+    // A browser subscribes with this key, so it has to be in hand before the first one
+    // asks rather than when the first wake-up goes out: nothing can be delivered to a
+    // browser that could not subscribe. Reading it is a call this hook cannot make, so it
+    // runs the moment the install returns, as the salt does.
+    if notifications::notifications_enabled() {
+        set_timer(
+            Duration::ZERO,
+            notifications::webpush::vapid_key::ensure_public_key,
+        );
     }
 
     // TEMPORARY: a read-only check of whether every stored passkey made it into the passkey

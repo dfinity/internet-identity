@@ -1,4 +1,5 @@
 import { isCanisterError } from "$lib/utils/utils";
+import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { ensureAppKey } from "$lib/utils/notifications/notificationAppKey";
 import { registerForAnyAnchor } from "$lib/utils/notifications/subscribeDevice";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
@@ -11,6 +12,12 @@ import {
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
+import {
+  readAppKey,
+  rememberInstalled,
+  rememberSpentFragment,
+} from "$lib/utils/notifications/notificationAppKey";
+import { currentDeviceSubscription } from "$lib/utils/notifications/pushSubscription";
 
 export type Screen =
   | { kind: "working" }
@@ -127,6 +134,32 @@ const spendTheFragment = async (
   }
 };
 
+/**
+ * Whether this launch has an update call to make, from what this device wrote down.
+ *
+ * Local reads only: the app record, the stored endpoint, and the subscription the
+ * browser holds. Nothing here subscribes and nothing reaches the network, so the page
+ * can ask before it paints. Anything it cannot read answers `true`, because a launch
+ * that might be about to wait should say so rather than sit on a blank screen.
+ */
+export const launchWillWrite = async (hash: string): Promise<boolean> => {
+  try {
+    const stored = await readAppKey();
+    if (stored.kind !== "key" || stored.record.appId === undefined) {
+      return true;
+    }
+    const { spentFragment } = stored.record;
+    // A fragment this app has not already answered is one it will present.
+    if (hash !== "" && spentFragment !== hash) {
+      return true;
+    }
+    // A browser holding no subscription is one that will make and register one.
+    return (await currentDeviceSubscription()) === undefined;
+  } catch {
+    return true;
+  }
+};
+
 /** `onTokenSpent` runs for a token the canister took, so the page can drop it from the URL. */
 export const insideTheApp = async (
   hash: string,
@@ -134,12 +167,29 @@ export const insideTheApp = async (
   onTokenSpent: () => void,
 ): Promise<Screen> => {
   const record = await ensureAppKey();
+  // Only this page knows it is the installed app and what it is running on. The worker
+  // cannot ask: an iPad in desktop mode is a Mac to anything reading the user agent
+  // alone, and `maxTouchPoints`, which tells them apart, is not on a worker's navigator.
+  const { os } = browserAndSystem();
+  void rememberInstalled("Ios" in os || "Ipados" in os);
   const actor = await appKeyActor(record);
 
-  // The Home Screen entry replays the URL captured at install, key and all, so every launch after the first presents a key the canister has already spent.
-  const outcome = await spendTheFragment(decodeLinkToken(hash), record);
+  // The Home Screen entry replays the URL captured at install, key and all, so every
+  // launch after the first presents a key the canister has already spent. Answering it
+  // again costs an update call to be told what this app wrote down the first time.
+  const replayed = record.spentFragment === hash && record.appId !== undefined;
+  const outcome = replayed
+    ? null
+    : await spendTheFragment(decodeLinkToken(hash), record);
   if (outcome?.status === "failed") {
+    // Recorded below and not here: a link that failed for a reason that may pass spent
+    // nothing, and an app that already has an `appId` would read the fragment as a
+    // replay on its next launch and never present it again. The identity it was adding
+    // would be left unlinked with nothing to say so.
     return { kind: "failed", reason: outcome.reason };
+  }
+  if (!replayed && hash !== "") {
+    await rememberSpentFragment(hash);
   }
   if (outcome?.status === "key-refused") {
     // Terminal, and before the anchors are read: only a fresh install gives this app another key.

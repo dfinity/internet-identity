@@ -341,19 +341,6 @@ mod tests {
         );
     }
 
-    /// The pass would skip it, so the app would hear nothing of a notification never sent.
-    #[test]
-    fn an_identity_whose_browser_spent_its_signed_pool_has_no_channel() {
-        setup();
-        let recipient = reachable();
-        let spent = 3 * 24 * 60 * 60 * 1_000_000_000 + NOW_NS;
-
-        assert_eq!(
-            send(vec![notification(&recipient, 7)], spent),
-            vec![rejected(&recipient, 7, NotAcceptedReason::NoChannel)]
-        );
-    }
-
     #[test]
     fn a_full_backlog_defers_to_a_time_rather_than_a_delay() {
         setup();

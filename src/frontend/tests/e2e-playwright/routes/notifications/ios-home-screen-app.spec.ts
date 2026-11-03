@@ -7,7 +7,7 @@ import {
 import { test } from "../../fixtures";
 import {
   armRealWorkerPush,
-  deliverPush,
+  deliverNewPushes,
   shownByTheWorker,
   startPushRelay,
   type PushRelay,
@@ -126,41 +126,25 @@ const joinTheRoomAndLeave = async (page: Page): Promise<void> => {
 };
 
 /**
- * Waits for the app's own text, delivering wake-ups until it arrives.
+ * Waits for the app's own text to reach the screen, handing over the wake-ups it takes.
  *
- * How many wake-ups that takes is not fixed. A mint that answers inside the worker's
- * deadline shows the text on the wake-up that asked for it; one that overruns spends a
- * placeholder, and what replaces it is the wake-up the mint earned. Only a delivery
- * brings that one in, because the relay counts wake-ups rather than delivering them, so
- * waiting without delivering waits on a placeholder nothing can replace.
- *
- * A wake-up with nothing left to show is harmless here: the worker places a placeholder
- * only where the screen is empty, and by this point it is not.
+ * A notification takes one wake-up, the one naming the inbox entry it was written to: the
+ * worker mints the delegation it needs inside that push event and reads the app's text
+ * with it there. Which of the wake-ups the relay holds is that one is not known here, and
+ * the canister goes on posting while this waits, so each new one is handed over as a push
+ * service would.
  */
 const expectTheAppToShow = async (
   app: HomeScreenApp,
   relay: PushRelay,
-  /** Wake-ups already handed to the worker, so each delivery here spends one the
-   *  canister actually posted. */
-  bridged: number,
   body: string,
   message: string,
 ): Promise<void> => {
-  let spent = bridged;
   await expect
     .poll(
       async () => {
-        const shown = (await shownByTheWorker(app.context)).map(
-          (one) => one.body,
-        );
-        // A push the canister never posted is one a phone would never receive. The relay
-        // stands in for the push service, so only what reached it may be delivered, and
-        // a canister that stopped posting has to fail this rather than be covered for.
-        if (!shown.includes(body) && relay.received() > spent) {
-          spent += 1;
-          await deliverPush(app.page, II_URL);
-        }
-        return shown;
+        await deliverNewPushes(app.page, II_URL, relay);
+        return (await shownByTheWorker(app.context)).map((one) => one.body);
       },
       { message, timeout: 60_000 },
     )
@@ -181,7 +165,7 @@ const answerTheProbe = async (
   sentBefore: number,
 ): Promise<void> => {
   await relay.waitForWakeUps(sentBefore + 1);
-  await deliverPush(app.page, II_URL);
+  await deliverNewPushes(app.page, II_URL, relay);
 };
 
 /**
@@ -191,10 +175,9 @@ const answerTheProbe = async (
  * wake-up the canister ever posted and pointing an identity at the app posts one of its
  * own before any of this.
  *
- * Only the first wake-up is waited for. How many a notification takes is not fixed: a
- * mint that answers in time shows the app's own text on this one, and one that overruns
- * spends a placeholder and earns another, which `expectTheAppToShow` delivers. Waiting
- * for a second here would wait for one the canister never posts.
+ * One wake-up carries a notification the whole way: the mint happens inside the push
+ * event and the app's text is read with it there. Which wake-up that is is not known from
+ * here, so every one the relay is still holding undelivered is handed over.
  */
 const expectDelivery = async (
   app: HomeScreenApp,
@@ -212,12 +195,12 @@ const expectDelivery = async (
       timeout: 30_000,
     })
     .toBeGreaterThan(0);
-  await deliverPush(app.page, II_URL);
+  await deliverNewPushes(app.page, II_URL, relay);
   // Reporting, not asserting: it puts what is on screen in the output so a failure below
   // says whether the worker never ran or ran and could not read the app's text.
   await reportShown(app, "after the first wake-up");
 
-  await expectTheAppToShow(app, relay, sentSoFar + 1, text, message);
+  await expectTheAppToShow(app, relay, text, message);
 };
 
 /**
@@ -557,7 +540,7 @@ test.describe("notifications on a Home Screen app", () => {
 
     // Deleted from the Home Screen, and nothing tells the canister: the relay answers
     // for that endpoint exactly as before, so the record goes on saying it delivers.
-    // That record is what the switch used to believe.
+    // That record is what the switch reads.
     await app.delete();
 
     const settings = await context.newPage();
@@ -908,5 +891,64 @@ test.describe("notifications on a Home Screen app", () => {
     });
 
     await relay.close();
+  });
+
+  // The doorway is the page a notification opens inside the app, which then hands the
+  // link to Safari. iOS resumes a standalone app on whatever page its window was left
+  // on, so what matters here is that the doorway takes itself out of the window.
+  test("leaves the window on the app rather than on the doorway", async ({
+    browser,
+  }) => {
+    const phone = await browser.newContext({ userAgent: IPHONE_AGENT });
+    // What iOS answers in an installed web app, as `addToHomeScreen` does: without it
+    // the app's own page takes the in-browser path and leaves for `/`.
+    await phone.addInitScript(() => {
+      Object.defineProperty(navigator, "standalone", {
+        configurable: true,
+        value: true,
+      });
+    });
+    const page = await phone.newPage();
+
+    // Only `https:` is followed, and nothing fetches it: the hand-over is an iOS
+    // scheme that no test browser answers, so the destination is never reached.
+    const carried = new URLSearchParams({
+      url: "https://chat.example.com/#chat",
+      title: "Example App",
+      body: "New message",
+    });
+    await page.goto(`${II_URL}/ios-icp-alerts/open#${carried.toString()}`);
+
+    // Shown while the hand-over has not taken the page away, which it cannot here:
+    // `x-safari-https:` is an iOS scheme and nothing answers it in a test browser.
+    await expect(
+      page.getByRole("heading", { name: "Almost there" }),
+    ).toBeVisible({ timeout: 30_000 });
+
+    // Read into the page and then dropped, so there is no fragment left for a resumed
+    // window to render the offer from a second time.
+    expect(new URL(page.url()).hash).toBe("");
+
+    // A resume: the Home Screen icon and Safari's chevron are the same foreground of
+    // the same window, and the icon must never come back to the offer.
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "hidden",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "visible",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await page.waitForURL(`${II_URL}/ios-icp-alerts`, { timeout: 30_000 });
+    await expect(
+      page.getByRole("heading", { name: "Almost there" }),
+    ).not.toBeVisible();
+
+    await phone.close();
   });
 });

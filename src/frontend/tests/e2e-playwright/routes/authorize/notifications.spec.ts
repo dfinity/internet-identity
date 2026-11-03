@@ -16,8 +16,9 @@ import { continueAs } from "./app-sessions/helpers";
  *
  * The browser's notification and service-worker APIs are stubbed, since headless
  * Chromium has no push service behind them, so no scenario here covers the native
- * permission prompt or a real registration. The consent screen, the VAPID pool the
- * browser signs and the rows the canister writes all run for real, and what the app is
+ * permission prompt or a real registration. The consent screen, the key fetch and the
+ * transport seal the browser runs on top of it, and the rows the canister writes, all run
+ * for real, and what the app is
  * told is read back from the canister.
  *
  * What "yes" means is both halves: this identity allowed the app, and this browser

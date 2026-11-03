@@ -67,7 +67,7 @@ export const linkWithToken = async (
         app_id: record.appId === undefined ? [] : [record.appId],
       })
       .then(throwCanisterError);
-    await rememberAppId(record, linked.app_id);
+    await rememberAppId(linked.app_id);
     return { status: "linked", appId: linked.app_id };
   } catch (error) {
     const reason = describe(error);

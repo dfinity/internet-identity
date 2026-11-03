@@ -1081,21 +1081,6 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export type GetNextNotificationError = {
-    /**
-     * The caller signs with no key this identity is signed in from, and with no key of
-     * an app one of its browsers routes through.
-     */
-    'InvalidBrowserKey' : null
-  } |
-  { 'InternalCanisterError' : string };
-export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
-/**
- * Null once nothing is left to show.
- */
-export interface GetNextNotificationResponse {
-  'notification' : [] | [NotificationToShow],
-}
 /**
  * Asks what this browser's entry says about the app it points at, for a page that has
  * the browser key and no session.
@@ -1116,6 +1101,29 @@ export interface GetNotificationDelegationResponse {
    */
   'sender_info_signature' : Uint8Array | number[],
   'signed_delegation' : SignedDelegation,
+}
+export type GetNotificationError = {
+    /**
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+export interface GetNotificationRequest {
+  'inbox_notification_id' : InboxNotificationId,
+  /**
+   * Whose inbox holds it. An app's key signs for every browser pointing at the app, so
+   * the browser cannot be taken from the caller alone.
+   */
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Null once nothing is left to show.
+ */
+export interface GetNotificationResponse {
+  'notification' : [] | [NotificationToShow],
 }
 /**
  * Request for `get_sso_discovery_status`.
@@ -1345,6 +1353,12 @@ export type IdentityPropertiesReplaceError = {
       'space_available' : bigint,
     }
   };
+/**
+ * Internet Identity's own id for one entry in one browser's inbox, assigned when the entry
+ * is deposited and unique within that inbox. A wake-up names its entry by this, so the
+ * service worker shows the notification the push was sent for.
+ */
+export type InboxNotificationId = bigint;
 /**
  * Init arguments of II which can be supplied on install and upgrade.
  * 
@@ -2137,6 +2151,20 @@ export interface PrepareSessionDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
 }
+export type PrepareWebPushSubscriptionError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+/**
+ * Both keys a browser needs before it can subscribe.
+ */
+export interface PrepareWebPushSubscriptionResponse {
+  'vapid_public_key' : Uint8Array | number[],
+  'transport_public_key' : Uint8Array | number[],
+}
 /**
  * The prepared id alias contains two (still unsigned) credentials in JWT format,
  * certifying the id alias for the issuer resp. the relying party.
@@ -2249,9 +2277,10 @@ export type RemoveNotificationError = {
   { 'InternalCanisterError' : string };
 export interface RemoveNotificationRequest {
   /**
-   * As browser_get_next_notification returned it.
+   * As the wake-up that announced it named it.
    */
-  'notification' : NotificationToShow,
+  'inbox_notification_id' : InboxNotificationId,
+  'browser_id' : number,
   'anchor_number' : UserNumber,
 }
 export type RemoveNotificationResponse = {};
@@ -2341,21 +2370,38 @@ export type SetWebPushSubscriptionError = {
   { 'InternalCanisterError' : string } |
   {
     /**
-     * The pool offered is not newer than the one this endpoint already holds.
+     * Nothing here can open sealed_auth: the transport key it was encrypted to has
+     * expired, or a later prepare_webpush_subscription from this browser replaced it. Fetch the
+     * keys again and re-send.
      */
-    'StaleJwtPool' : null
+    'TransportKeyExpired' : null
   };
 /**
- * What a browser uploads when it registers for Web Push, and how it replaces a pool
- * that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+ * What a browser uploads when it registers for Web Push. The same endpoint is a
+ * registration at that endpoint again, which keeps what is already queued for it. Signed with the
  * browser key it signs in with, which is what says the subscription is this browser's.
  */
 export interface SetWebPushSubscriptionRequest {
+  /**
+   * The subscription's 16-byte auth secret under AES-128-GCM, 32 bytes with its tag.
+   * Encrypted because an ingress call is not confidential, and (endpoint, p256dh, auth)
+   * is all a forged push the browser will decrypt needs. It is encrypted to the
+   * transport key prepare_webpush_subscription minted for this caller, whose private half
+   * never leaves the canister and is dropped as soon as this call spends it.
+   */
+  'sealed_auth' : Uint8Array | number[],
   'endpoint' : string,
-  'jwt_signatures' : Array<Uint8Array | number[]>,
-  'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
-  'vapid_public_key' : Uint8Array | number[],
+  /**
+   * The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+   * nothing without a private scalar and forges nothing without the auth secret.
+   */
+  'p256dh' : Uint8Array | number[],
+  /**
+   * The public half of the pair the browser minted to encrypt the auth secret with,
+   * uncompressed SEC1 P-256. The canister needs it to run its half of the agreement.
+   */
+  'transport_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
@@ -2596,11 +2642,7 @@ export interface WebAuthnCredential {
  * still live from one another identity's re-subscribe left behind, and knows when to
  * sign the next pool.
  */
-export interface WebPushSubscriptionStatus {
-  'endpoint' : string,
-  'issued_at_ns' : bigint,
-  'pool_len' : number,
-}
+export interface WebPushSubscriptionStatus { 'endpoint' : string }
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
@@ -2772,10 +2814,10 @@ export interface _SERVICE {
    * Called by the service worker on a wake-up, signed with the browser key: the oldest
    * notification its browser has yet to show, passing over the ones it skips.
    */
-  'browser_get_next_notification' : ActorMethod<
-    [GetNextNotificationRequest],
-    { 'Ok' : GetNextNotificationResponse } |
-      { 'Err' : GetNextNotificationError }
+  'browser_get_notification' : ActorMethod<
+    [GetNotificationRequest],
+    { 'Ok' : GetNotificationResponse } |
+      { 'Err' : GetNotificationError }
   >,
   /**
    * Called by the service worker for the one it shows, while it fetches the content.
@@ -3421,6 +3463,24 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
+  >,
+  /**
+   * The key a browser subscribes with and every push names. Absent only in the moment
+   * between the install returning and the answer to the read it starts.
+   * Both keys a browser needs before it subscribes: the one every push is signed with,
+   * and a one-shot key it encrypts this subscription's auth secret to.
+   * 
+   * An update call, because a query reply is signed by one replica. One that answered
+   * with a VAPID key of its own choosing would bind the subscription to it permanently,
+   * and the browser has nothing to check the answer against.
+   * A cold randomness pool yields the `Pending` result arm — a retry signal, not an
+   * error: asking put the draw in flight, so the caller re-calls the method.
+   */
+  'prepare_webpush_subscription' : ActorMethod<
+    [UserNumber],
+    { 'Ok' : PrepareWebPushSubscriptionResponse } |
+      { 'Err' : PrepareWebPushSubscriptionError } |
+      { 'Pending' : null }
   >,
   /**
    * Called by the browser, which watches for the answer leaving its own queue: that

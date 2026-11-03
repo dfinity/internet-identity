@@ -1587,21 +1587,55 @@ impl<M: Memory + Clone> Storage<M> {
         subscription: Option<WebPushSubscription>,
         now: Timestamp,
     ) -> Result<(), StorageError> {
+        self.write_notification_app_subscription(app_id, subscription, Some(now))
+    }
+
+    /// Replaces what an app's payloads are sealed with, leaving `last_used_ns` where it
+    /// is.
+    ///
+    /// A refresh is this canister's own work rather than a call from the app, and whether
+    /// the app has called is the whole of the evidence that it is still installed:
+    /// deleting a Home Screen app tells the canister nothing and the push service goes on
+    /// accepting for it. Stamping here would say a deleted app had just been heard from,
+    /// and no probe could ever go unanswered.
+    pub fn refresh_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+    ) -> Result<(), StorageError> {
+        self.write_notification_app_subscription(app_id, subscription, None)
+    }
+
+    fn write_notification_app_subscription(
+        &mut self,
+        app_id: NotificationAppId,
+        subscription: Option<WebPushSubscription>,
+        used_at_ns: Option<Timestamp>,
+    ) -> Result<(), StorageError> {
         let stored = self
             .notification_app_memory
             .get(&app_id)
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         // The record is read back only to keep its own fields.
         let mut app = NotificationApp::from(stored);
-        // Keep what is queued only where the registration is replaced at the same address.
-        // Anything else leaves it announced to an address nothing listens on, and a full
-        // queue posts no wake-up for what arrives after it.
+        // What is waiting survives only a rewrite of the same address, which is what a
+        // rotation refresh does. A subscribe cannot reach it: that passes through a
+        // pending registration, which has no address to compare. Anything else leaves
+        // entries announced to an address nothing listens on, and a full inbox posts no
+        // wake-up for what arrives after them.
         let same_address = matches!(
-            (app.webpush_subscription.as_ref(), subscription.as_ref()),
+            (
+                app.webpush_subscription
+                    .as_ref()
+                    .and_then(WebPushSubscription::ready),
+                subscription.as_ref().and_then(WebPushSubscription::ready),
+            ),
             (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
         );
         app.webpush_subscription = subscription;
-        app.last_used_ns = now;
+        if let Some(now) = used_at_ns {
+            app.last_used_ns = now;
+        }
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
         if !same_address {

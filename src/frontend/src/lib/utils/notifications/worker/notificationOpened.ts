@@ -10,7 +10,7 @@
 import { Principal } from "@icp-sdk/core/principal";
 import { reportNotificationOpened } from "./appNotifications";
 import { loadPullIdentity } from "./pullDelegation";
-import type { NotificationRef } from "./shownNotification";
+import type { NotificationRef } from "./notificationRef";
 
 /** Answers whether the app was told, which is what a test has to go on. */
 export const reportOpened = async ({
