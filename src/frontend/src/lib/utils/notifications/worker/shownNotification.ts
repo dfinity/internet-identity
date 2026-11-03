@@ -41,6 +41,16 @@ export const dataOf = (ref: NotificationRef, url: string): ShownData => ({
   url,
 });
 
+/** Where a click on this notification goes, or `undefined` for data this worker did not
+ *  write. */
+export const urlOf = (data: unknown): string | undefined => {
+  if (typeof data !== "object" || data === null) {
+    return undefined;
+  }
+  const { url } = data as Partial<ShownData>;
+  return typeof url === "string" ? url : undefined;
+};
+
 /** The notification some data belongs to, or `undefined` for anything this worker did
  *  not write — an older version's notification, or a browser that dropped the data. */
 export const refOf = (data: unknown): NotificationRef | undefined => {

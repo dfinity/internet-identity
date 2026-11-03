@@ -113,14 +113,15 @@ export const appPublicKey = (record: AppKeyRecord): Promise<Uint8Array> =>
 export const appPrincipal = async (record: AppKeyRecord): Promise<Principal> =>
   Principal.selfAuthenticating(await appPublicKey(record));
 
-/** Keeps the record the canister allocated, so a later link names it. A failure here costs
- *  this app the record on its next link, never the link it has just completed. */
-export const rememberAppId = async (
-  record: AppKeyRecord,
-  appId: bigint,
-): Promise<void> => {
+/** Read back rather than spread a caller's copy: the link this answers takes an update
+ *  call, and the store has moved on by the time it returns. */
+export const rememberAppId = async (appId: bigint): Promise<void> => {
   try {
-    await idbSet(RECORD_KEY, { ...record, appId }, APP_KEY_STORE);
+    const stored = await readAppKey();
+    if (stored.kind !== "key") {
+      return;
+    }
+    await idbSet(RECORD_KEY, { ...stored.record, appId }, APP_KEY_STORE);
   } catch (error) {
     console.error(error);
   }
