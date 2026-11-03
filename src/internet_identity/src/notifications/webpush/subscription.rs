@@ -13,8 +13,8 @@ use crate::storage::anchor::{Anchor, PendingTransport, ReadySubscription, WebPus
 use crate::storage::Storage;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError,
-    Timestamp, WebPushSubscriptionStatus,
+    AnchorNumber, BrowserId, PrepareWebPushSubscriptionError, RemoveWebPushSubscriptionError,
+    SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
 };
 
 /// Records the key a fetch just minted, against the registration that will spend it.
@@ -28,7 +28,7 @@ pub fn start_subscription(
     secret_key: [u8; 32],
     sender_seed: [u8; 32],
     now_ns: Timestamp,
-) -> Result<(), String> {
+) -> Result<(), PrepareWebPushSubscriptionError> {
     let pending = WebPushSubscription::Pending(PendingTransport {
         secret_key,
         sender_seed,
@@ -38,9 +38,22 @@ pub fn start_subscription(
         NotificationKey::App(app_id) => storage_borrow_mut(|storage| {
             storage.set_notification_app_subscription(app_id, Some(pending), now_ns)
         })
-        .map_err(|err| format!("{err}")),
+        .map_err(|err| {
+            PrepareWebPushSubscriptionError::InternalCanisterError(format!("{err}"))
+        }),
         NotificationKey::Browser(browser_id) => {
-            write_subscription(state::anchor(anchor_number), browser_id, Some(pending))
+            let anchor = state::anchor(anchor_number);
+            // This writes the entry's registration and empties its inbox, so it is
+            // refused on the same ground `set_subscription` is: a browser the identity
+            // signed out of stays signed out, whoever asks.
+            if anchor
+                .browser(browser_id)
+                .is_none_or(|browser| browser.session_count == 0)
+            {
+                return Err(PrepareWebPushSubscriptionError::InvalidBrowserKey);
+            }
+            write_subscription(anchor, browser_id, Some(pending))
+                .map_err(PrepareWebPushSubscriptionError::InternalCanisterError)
         }
     }
 }
@@ -674,6 +687,18 @@ mod tests {
         subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
         sign_browser_out(anchor_number, browsers[0]);
 
+        // Both halves refuse. The fetch matters as much as the subscribe: it writes the
+        // entry's registration and empties its inbox before any address is involved.
+        assert_eq!(
+            start_subscription(
+                NotificationKey::Browser(browsers[0]),
+                anchor_number,
+                [11u8; 32],
+                [12u8; 32],
+                2_000,
+            ),
+            Err(PrepareWebPushSubscriptionError::InvalidBrowserKey)
+        );
         assert_eq!(
             try_subscribe(anchor_number, browsers[0], ENDPOINT, 2_000),
             Err(SetWebPushSubscriptionError::InvalidBrowserKey)

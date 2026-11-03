@@ -1295,7 +1295,7 @@ impl Anchor {
         };
         let app = app(app_id)?;
         Some(NotificationAppInfo {
-            subscribed: app.webpush_subscription.is_some(),
+            subscribed: app.is_subscribed(),
             enabled,
             last_seen_ns: app.last_used_ns,
         })

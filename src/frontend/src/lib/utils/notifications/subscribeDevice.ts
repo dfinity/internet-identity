@@ -215,13 +215,20 @@ export const registerForAnyAnchor = async (
     }
   }
 
-  const { subscription: live } = await usableSubscription(
-    await prepareSubscription(first, caller),
-  );
+  const keys = await prepareSubscription(first, caller);
+  const { subscription: live } = await usableSubscription(keys);
 
   for (const anchor of anchors) {
     try {
-      await registerStoredDevice(anchor, live, caller);
+      // Handed down for the anchor they were fetched for, which saves it a status query
+      // and a second prepare: that one would mint another transport key, derive another
+      // sender key, and empty every inbox routed through this app a second time.
+      await registerStoredDevice(
+        anchor,
+        live,
+        caller,
+        anchor === first ? keys : undefined,
+      );
     } catch (error) {
       if (anotherAnchorMayAnswer(error)) {
         continue;

@@ -386,9 +386,7 @@ async fn prepare_webpush_subscription(
         seeds.sender_seed,
         now_ns,
     ) {
-        return PrepareWebPushSubscriptionResult::Err(
-            PrepareWebPushSubscriptionError::InternalCanisterError(err),
-        );
+        return PrepareWebPushSubscriptionResult::Err(err);
     }
 
     PrepareWebPushSubscriptionResult::Ok(PrepareWebPushSubscriptionResponse {
@@ -530,7 +528,7 @@ fn prepare_notification_app_link(
     {
         let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
             .is_some_and(|app| {
-                app.webpush_subscription.is_some() && !app.probe_went_unanswered(now)
+                app.is_subscribed() && !app.probe_went_unanswered(now)
             });
         if still_answering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);

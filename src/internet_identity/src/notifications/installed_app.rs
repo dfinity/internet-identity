@@ -64,6 +64,17 @@ impl NotificationApp {
                 && self.last_used_ns < probe.asked_at_ns
         })
     }
+
+    /// Whether this record holds an address a wake-up can go to. A registration part-way
+    /// through a subscribe holds keys and no address, so it is not one: reading it as
+    /// subscribed reports a readiness that does not exist, and leaves the app unreplaceable
+    /// because no probe is ever sent to an address that is not there.
+    pub fn is_subscribed(&self) -> bool {
+        self.webpush_subscription
+            .as_ref()
+            .and_then(WebPushSubscription::ready)
+            .is_some()
+    }
 }
 
 /// What a browser holds about a Home Screen app: an install it has handed a key to, or

@@ -63,19 +63,19 @@
         );
       }
 
+      // `openable` builds a link to this page for the installed app alone, so anything
+      // else arrived on one somebody else wrote. Following it would send a visitor off
+      // this origin on a link they did not choose, so nothing here is acted on and the
+      // page shows that it has nothing to open.
+      if (!isStandalone()) {
+        return;
+      }
       target = carrying?.url;
       shown =
         carrying !== undefined && carrying.title !== ""
           ? { title: carrying.title, body: carrying.body }
           : undefined;
       if (target === undefined) {
-        return;
-      }
-      // A browser reaches this page only because a worker cannot open another origin
-      // directly, so there is nothing to hand over: it goes where the link points.
-      // The Safari scheme is the installed app's problem alone.
-      if (!isStandalone()) {
-        window.location.replace(target);
         return;
       }
       window.location.href = viaSafari(target);

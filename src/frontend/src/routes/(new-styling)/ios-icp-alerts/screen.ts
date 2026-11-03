@@ -1,4 +1,5 @@
 import { isCanisterError } from "$lib/utils/utils";
+import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { ensureAppKey } from "$lib/utils/notifications/notificationAppKey";
 import { registerForAnyAnchor } from "$lib/utils/notifications/subscribeDevice";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
@@ -166,8 +167,11 @@ export const insideTheApp = async (
   onTokenSpent: () => void,
 ): Promise<Screen> => {
   const record = await ensureAppKey();
-  // Only this page knows it is the installed app, and the worker cannot ask.
-  void rememberInstalled();
+  // Only this page knows it is the installed app and what it is running on. The worker
+  // cannot ask: an iPad in desktop mode is a Mac to anything reading the user agent
+  // alone, and `maxTouchPoints`, which tells them apart, is not on a worker's navigator.
+  const { os } = browserAndSystem();
+  void rememberInstalled("Ios" in os || "Ipados" in os);
   const actor = await appKeyActor(record);
 
   // The Home Screen entry replays the URL captured at install, key and all, so every

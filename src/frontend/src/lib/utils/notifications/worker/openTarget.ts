@@ -11,22 +11,24 @@ const DOORWAY = `${NOTIFICATION_APP_PATH}/open`;
  * view for another origin, and nowhere else does, so nowhere else should be sent
  * through a page whose only job is to hand a link to Safari.
  *
- * Checked first, because what is stored cannot answer this on its own: a desktop
- * browser shares a storage partition with an installed app of the same origin, so a
- * tab reads as the app there. On iOS the app has a partition of its own, which is
- * what makes the stored answer meaningful at all.
+ * What a user agent can say on its own, which is everything but an iPad in desktop
+ * mode: that one sends a Mac agent, and the touch points that give it away are not on
+ * a worker's navigator. `isTheApp` reads the page's own answer instead.
  */
 export const onIos = (): boolean =>
   /iPhone|iPod|iPad/.test(navigator.userAgent);
 
+/**
+ * Both halves come from the record the app's own page wrote, because neither can be read
+ * here. A desktop browser shares a storage partition with an installed app of the same
+ * origin, so the marker alone would make a tab read as the app; and the user agent alone
+ * calls an iPad in desktop mode a Mac, so it would leave that app out.
+ */
 const isTheApp = async (): Promise<boolean> => {
-  if (!onIos()) {
-    return false;
-  }
   const stored = await readAppKey();
   switch (stored.kind) {
     case "key":
-      return stored.record.installed === true;
+      return stored.record.installed === true && stored.record.ios === true;
     case "no-key":
       return false;
     case "unreadable":

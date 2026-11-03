@@ -142,8 +142,10 @@ fn pending_for(
 ) -> (SubscriberKey, SealedAuth) {
     const TRANSPORT_SCALAR: [u8; 32] = [11u8; 32];
     const SENDER_SEED: [u8; 32] = [12u8; 32];
-    super::start_subscription(key, anchor_number, TRANSPORT_SCALAR, SENDER_SEED, now_ns)
-        .expect("the key fetch records what the subscribe spends");
+    // A refusal is not an abort: the key fetch and the subscribe refuse the same callers,
+    // so a test covering that refusal still needs what the browser would have sent. One
+    // that did not expect it reads the missing registration as `TransportKeyExpired`.
+    let _ = super::start_subscription(key, anchor_number, TRANSPORT_SCALAR, SENDER_SEED, now_ns);
     super::transport::seal_auth(
         &super::transport::public_key_of(&TRANSPORT_SCALAR),
         &[13u8; 32],

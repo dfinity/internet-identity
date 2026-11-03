@@ -20,6 +20,10 @@ export interface AppKeyRecord {
    *  app. A key's presence cannot stand in for this: a browser that holds one is
    *  still a browser, and only the installed app needs a link handed to Safari. */
   installed?: boolean;
+  /** Whether that page was on iOS or iPadOS, which only it can tell: an iPad in desktop
+   *  mode sends a Mac user agent, and the touch points that give it away are on the
+   *  page's `Navigator` and not on the worker's. */
+  ios?: boolean;
 }
 
 /** `unreadable` is not `no-key`: this key is the app's only name to the canister, so each caller has to say what it does when it cannot tell. */
@@ -62,16 +66,20 @@ export const ensureAppKey = async (): Promise<AppKeyRecord> => {
   }
 };
 
-/** Records that this storage belongs to the installed app, which only its own page knows. */
-export const rememberInstalled = async (): Promise<void> => {
+/** Records that this storage belongs to the installed app, and what it is installed on.
+ *  Both are things only its own page knows. */
+export const rememberInstalled = async (ios: boolean): Promise<void> => {
   try {
     const stored = await readAppKey();
-    if (stored.kind !== "key" || stored.record.installed === true) {
+    if (
+      stored.kind !== "key" ||
+      (stored.record.installed === true && stored.record.ios === ios)
+    ) {
       return;
     }
     await idbSet(
       RECORD_KEY,
-      { ...stored.record, installed: true },
+      { ...stored.record, installed: true, ios },
       APP_KEY_STORE,
     );
   } catch (error) {
