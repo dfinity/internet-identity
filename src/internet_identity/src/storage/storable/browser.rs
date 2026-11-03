@@ -39,11 +39,8 @@ pub struct StorableBrowser {
     /// What this identity's service worker has yet to show on this device, oldest first.
     #[n(11)]
     pub notifications: Option<Vec<StorableInboxNotification>>,
-    /// What the next entry deposited in that inbox is named.
-    ///
-    /// Absent on an entry written before entries were named. A map decodes without the
-    /// keys it does not carry only where the field admits their absence, and the inbox at
-    /// 11 is empty on such an entry, so its run of ids starts where a fresh one does.
+    /// What the next entry deposited in that inbox is named. `None` on an entry written
+    /// before entries were named, whose inbox is empty anyway.
     #[n(12)]
     pub next_inbox_notification_id: Option<u64>,
     // #[n(7)] RETIRED, never reuse: the Web Push registration before a push carried a payload.

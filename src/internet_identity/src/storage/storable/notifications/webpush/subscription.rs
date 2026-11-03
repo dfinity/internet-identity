@@ -1,14 +1,12 @@
 use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::{Decode, Encode};
 
-/// Where a push notification goes, and what its payload is sealed against. Held by a
-/// browser entry, and by a Home Screen app's record, which has one for every identity.
+/// Where a push goes, and what its payload is sealed against. Held by a browser entry,
+/// and by a Home Screen app's record, which has one per identity.
 ///
-/// Two states, because a subscribe takes two calls. The first mints a key for the browser
-/// to encrypt its `auth` secret to and leaves the private half here; the second spends it
-/// and writes what can be delivered to. A browser replacing its subscription passes back
-/// through `Pending`, which is why nothing outside this module reads a subscription
-/// without asking for the ready one.
+/// Two states because a subscribe takes two calls: the first mints the key the browser
+/// encrypts `auth` to, the second spends it. A re-subscribe passes back through
+/// `Pending`, so nothing outside this module reads one without asking for the ready half.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum StorableWebPushSubscription {
     /// A key fetch waiting for the subscribe it was minted for. Expires on its own.
@@ -33,10 +31,8 @@ pub enum StorableWebPushSubscription {
         /// Written per (re-)subscribe, so the manage screen can say since when.
         #[n(1)]
         created_at_ns: StorableTimestamp,
-        /// RFC 8291 §3.4 input keying material, derived here from `subscriber_key`,
-        /// `auth` and a sender key belonging to the pass that last refreshed it. Sealing
-        /// a payload with it costs two HKDFs and one AES-GCM, so the ECDH runs only on a
-        /// refresh.
+        /// RFC 8291 §3.4 input keying material, derived from `subscriber_key`, `auth`
+        /// and the sender key below. Re-derived only when a pass refreshes that key.
         #[cbor(n(2), with = "minicbor::bytes")]
         payload_ikm: Vec<u8>,
         /// The public half of that sender key, carried as the `keyid` the browser derives
@@ -51,8 +47,7 @@ pub enum StorableWebPushSubscription {
         /// every derivation of `payload_ikm`.
         #[cbor(n(5), with = "minicbor::bytes")]
         auth: Vec<u8>,
-        /// When `payload_ikm` was last derived. A pass refreshes the oldest stamps among
-        /// its own destinations, so this is what puts one at the back of that queue.
+        /// When `payload_ikm` was last derived. A pass refreshes the oldest it reaches.
         #[n(6)]
         last_rotated_ns: StorableTimestamp,
     },

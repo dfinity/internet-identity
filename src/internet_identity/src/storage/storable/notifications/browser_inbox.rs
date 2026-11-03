@@ -10,10 +10,8 @@ use internet_identity_interface::internet_identity::types::{
 };
 use minicbor::{Decode, Encode};
 
-/// What the service worker needs to fetch it: the app and account it is for, the
-/// canister to ask, and the app's own ID.
-///
-/// Internet Identity's own notification has no app and no account, and carries the event.
+/// One entry of a browser's inbox: which app and account it is for, and the canister
+/// that sent it. Internet Identity's own has neither, and carries the event instead.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
 pub struct StorableInboxNotification {
