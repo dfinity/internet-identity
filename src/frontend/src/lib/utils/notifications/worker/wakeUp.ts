@@ -37,6 +37,11 @@ import { NOTIFICATION_APP_PATH } from "../appPath";
  *  Eight seconds is well inside the budget a push handler gets. */
 const MINT_DEADLINE_MS = 8_000;
 
+/** The sweep asks every app that has something on screen whether it still wants it, and
+ *  one that cannot answer must not hold up a notification from another. Closing a stale
+ *  banner late costs nothing, so this is short. */
+const SWEEP_DEADLINE_MS = 2_000;
+
 class DeadlineError extends Error {
   constructor(deadlineMs: number) {
     super(`no answer within ${deadlineMs}ms`);
@@ -441,7 +446,12 @@ export const onWakeUp = async (
   // enumeration that lands before the browser has displayed a notification it was
   // just given drops that notification from the record while the system goes on
   // showing it. What is left is a banner whose click reaches nothing.
-  await closeDismissed(context).catch(() => undefined);
+  // Enumerated before anything is shown, for the reason above. The answers it waits on
+  // are the apps', so they are bounded: past the deadline the sweep goes on closing what
+  // it finds while this wake-up gets on with what it was sent for.
+  await withDeadline(closeDismissed(context), SWEEP_DEADLINE_MS).catch(
+    () => undefined,
+  );
 
   const background = backgroundCalls();
   let shown = false;

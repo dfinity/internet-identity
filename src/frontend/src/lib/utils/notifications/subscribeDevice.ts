@@ -125,7 +125,7 @@ const usableSubscription = async (
  * rule belongs. Theirs is a repair rather than what the caller asked for, so a refusal
  * is left where it is.
  */
-const registerSiblings = async (
+const repairOtherIdentities = async (
   registered: bigint,
   subscription: PushSubscription,
 ): Promise<void> => {
@@ -161,13 +161,13 @@ export const ensureRegisteredDevice = async (
   const actor = await browserKeyActor(identityNumber);
   const keys = await prepareSubscription(identityNumber, actor);
   const { subscription, minted } = await usableSubscription(keys);
-  // They are siblings: every identity here registers the same subscription under its own
-  // browser key, and the one that asked is distinguished only in that its answer is the
-  // one being waited on. Started together, so a failure of that one cannot leave the
-  // others on an endpoint this browser has already dropped.
+  // Every identity on this browser registers the same subscription under its own browser
+  // key; the one that asked is distinguished only in that its answer is the one being
+  // waited on. Started together, so a failure of that one cannot leave the others on an
+  // endpoint this browser has already dropped.
   const [asked] = await Promise.allSettled([
     registerStoredDevice(identityNumber, subscription, actor, keys),
-    ...(minted ? [registerSiblings(identityNumber, subscription)] : []),
+    ...(minted ? [repairOtherIdentities(identityNumber, subscription)] : []),
   ]);
   if (asked.status === "rejected") {
     throw asked.reason;

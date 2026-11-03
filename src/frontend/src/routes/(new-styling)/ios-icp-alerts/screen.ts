@@ -177,11 +177,15 @@ export const insideTheApp = async (
   const outcome = replayed
     ? null
     : await spendTheFragment(decodeLinkToken(hash), record);
+  if (outcome?.status === "failed") {
+    // Recorded below and not here: a link that failed for a reason that may pass spent
+    // nothing, and an app that already has an `appId` would read the fragment as a
+    // replay on its next launch and never present it again. The identity it was adding
+    // would be left unlinked with nothing to say so.
+    return { kind: "failed", reason: outcome.reason };
+  }
   if (!replayed && hash !== "") {
     await rememberSpentFragment(hash);
-  }
-  if (outcome?.status === "failed") {
-    return { kind: "failed", reason: outcome.reason };
   }
   if (outcome?.status === "key-refused") {
     // Terminal, and before the anchors are read: only a fresh install gives this app another key.
