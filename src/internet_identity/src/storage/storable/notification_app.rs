@@ -13,9 +13,6 @@ use std::collections::BTreeSet;
 
 pub type StorableNotificationAppId = NotificationAppId;
 
-/// Index 5 is retired and must never be reused. It held the Web Push registration
-/// before a push carried a payload, which cannot be read into 7 because it has no
-/// sealing keys, so such a record is dropped and the app registers again.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableNotificationApp {
@@ -29,13 +26,15 @@ pub struct StorableNotificationApp {
     pub last_used_ns: Timestamp,
     #[n(4)]
     pub anchors: BTreeSet<AnchorNumber>,
-    // #[n(5)] RETIRED, never reuse.
     /// The last time an entry asked this app to prove it is still installed.
     #[n(6)]
     pub pending_probe: Option<StorablePendingProbe>,
     /// What this app registered for Web Push, if anything.
     #[n(7)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
+    // RETIRED, never reuse. 5 held the Web Push registration before a push carried a
+    // payload, which cannot be read into 7 because it has no sealing keys, so such a
+    // record is dropped and the app registers again.
 }
 
 /// A probe an entry sent to this record, and when it sent it.

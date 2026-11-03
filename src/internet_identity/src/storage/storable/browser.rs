@@ -6,10 +6,6 @@ use crate::storage::storable::notifications::webpush::subscription::StorableWebP
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
 
-/// Indices 7 and 9 are retired and must never be reused. 7 held the Web Push
-/// registration before a push carried a payload, 9 the inbox before its entries were
-/// named. Neither can be read into 10 and 11, which need sealing keys and an id per
-/// entry, so a record written at either is dropped and the browser registers again.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
 pub struct StorableBrowser {
@@ -33,12 +29,10 @@ pub struct StorableBrowser {
     #[n(6)]
     pub session_count: u32,
 
-    // #[n(7)] RETIRED, never reuse.
     /// The notification app record this browser points at, where it has one.
     #[n(8)]
     pub notification_app: Option<StorableNotificationAppRef>,
 
-    // #[n(9)] RETIRED, never reuse.
     /// What this browser registered for Web Push, if anything.
     #[n(10)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
@@ -52,4 +46,8 @@ pub struct StorableBrowser {
     /// 11 is empty on such an entry, so its run of ids starts where a fresh one does.
     #[n(12)]
     pub next_inbox_notification_id: Option<u64>,
+    // RETIRED, never reuse. 7 held the Web Push registration before a push carried a
+    // payload, 9 the inbox before its entries were named. Neither can be read into 10
+    // and 11, which need sealing keys and an id per entry, so a record written at
+    // either is dropped and the browser registers again.
 }
