@@ -16,7 +16,7 @@ pub enum StorableWebPushSubscription {
     Pending {
         /// The private half of the key the browser encrypts `auth` to.
         #[cbor(n(0), with = "minicbor::bytes")]
-        transport_scalar: Vec<u8>,
+        secret_key: Vec<u8>,
         /// Expanded into this subscription's first sender key once a subscribe arrives.
         #[cbor(n(1), with = "minicbor::bytes")]
         sender_seed: Vec<u8>,

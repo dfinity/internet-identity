@@ -33,8 +33,8 @@ pub(crate) const PENDING_TTL_NS: u64 = 5 * 60 * SECOND_NS;
 const INFO_PREFIX: &[u8] = b"II webpush transport\0";
 
 /// The public half a browser encrypts to, uncompressed SEC1.
-pub(crate) fn public_key_of(transport_scalar: &[u8; 32]) -> Vec<u8> {
-    super::seed_pool::secret_key_from(transport_scalar)
+pub(crate) fn public_key_of(transport_secret: &[u8; 32]) -> Vec<u8> {
+    super::seed_pool::secret_key_from(transport_secret)
         .public_key()
         .to_encoded_point(false)
         .as_bytes()
@@ -47,11 +47,11 @@ pub(crate) fn public_key_of(transport_scalar: &[u8; 32]) -> Vec<u8> {
 /// encryption, which is why it arrives alongside the ciphertext rather than being known
 /// in advance.
 pub(crate) fn open(
-    transport_scalar: &[u8; 32],
+    transport_secret: &[u8; 32],
     browser_key: &SubscriberKey,
     sealed: &SealedAuth,
 ) -> Result<AuthSecret, String> {
-    let transport = super::seed_pool::secret_key_from(transport_scalar);
+    let transport = super::seed_pool::secret_key_from(transport_secret);
     let theirs = p256::PublicKey::from_sec1_bytes(browser_key.as_slice())
         .map_err(|_| "the browser's transport key is not a P-256 point".to_string())?;
 
@@ -85,10 +85,10 @@ pub(crate) fn open(
 #[cfg(test)]
 pub(crate) fn seal_auth(
     transport_public: &[u8],
-    browser_scalar: &[u8; 32],
+    browser_secret: &[u8; 32],
     auth: &[u8],
 ) -> (SubscriberKey, SealedAuth) {
-    let browser = super::seed_pool::secret_key_from(browser_scalar);
+    let browser = super::seed_pool::secret_key_from(browser_secret);
     let browser_public = browser
         .public_key()
         .to_encoded_point(false)
@@ -130,12 +130,12 @@ mod tests {
 
     #[test]
     fn what_the_browser_sealed_is_what_the_canister_opens() {
-        let transport_scalar = [9u8; 32];
-        let transport_public = public_key_of(&transport_scalar);
+        let transport_secret = [9u8; 32];
+        let transport_public = public_key_of(&transport_secret);
         let auth = [4u8; 16];
         let (browser_key, sealed) = sealed_by_browser(&transport_public, &[5u8; 32], &auth);
 
-        let opened = open(&transport_scalar, &browser_key, &sealed).expect("opening");
+        let opened = open(&transport_secret, &browser_key, &sealed).expect("opening");
         assert_eq!(opened.as_slice(), &auth);
     }
 
@@ -153,11 +153,11 @@ mod tests {
     /// another subscribe's transport key.
     #[test]
     fn a_ciphertext_does_not_move_to_another_browser_key() {
-        let transport_scalar = [9u8; 32];
-        let transport_public = public_key_of(&transport_scalar);
+        let transport_secret = [9u8; 32];
+        let transport_public = public_key_of(&transport_secret);
         let (_, sealed) = sealed_by_browser(&transport_public, &[5u8; 32], &[4u8; 16]);
         let (other_browser_key, _) = sealed_by_browser(&transport_public, &[6u8; 32], &[4u8; 16]);
 
-        assert!(open(&transport_scalar, &other_browser_key, &sealed).is_err());
+        assert!(open(&transport_secret, &other_browser_key, &sealed).is_err());
     }
 }

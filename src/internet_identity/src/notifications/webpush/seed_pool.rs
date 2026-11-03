@@ -76,7 +76,7 @@ fn new_pool_cache() -> PoolCache {
 /// The two private keys one subscribe needs: the one the browser encrypts `auth` to, and
 /// the seed that becomes this subscription's first sender key.
 pub(crate) struct SubscribeSeeds {
-    pub transport_scalar: [u8; 32],
+    pub transport_secret: [u8; 32],
     pub sender_seed: [u8; 32],
 }
 
@@ -140,7 +140,7 @@ fn derive(pool: &[u8; 32], caller: &[u8], now_ns: Timestamp) -> SubscribeSeeds {
             .into()
     };
     SubscribeSeeds {
-        transport_scalar: half(TRANSPORT_INFO),
+        transport_secret: half(TRANSPORT_INFO),
         sender_seed: half(SENDER_INFO),
     }
 }
@@ -179,7 +179,7 @@ mod tests {
     fn two_callers_sharing_a_pool_do_not_share_a_key() {
         let first = seeds(1, ANCHOR, BROWSER, 10);
         let second = seeds(1, ANCHOR, NotificationKey::Browser(2), 10);
-        assert_ne!(first.transport_scalar, second.transport_scalar);
+        assert_ne!(first.transport_secret, second.transport_secret);
         assert_ne!(first.sender_seed, second.sender_seed);
     }
 
@@ -188,8 +188,8 @@ mod tests {
     #[test]
     fn the_same_browser_number_under_two_identities_derives_differently() {
         assert_ne!(
-            seeds(1, 10_000, BROWSER, 10).transport_scalar,
-            seeds(1, 10_001, BROWSER, 10).transport_scalar
+            seeds(1, 10_000, BROWSER, 10).transport_secret,
+            seeds(1, 10_001, BROWSER, 10).transport_secret
         );
     }
 
@@ -197,8 +197,8 @@ mod tests {
     #[test]
     fn a_browser_and_an_app_at_one_number_derive_differently() {
         assert_ne!(
-            seeds(1, ANCHOR, NotificationKey::Browser(1), 10).transport_scalar,
-            seeds(1, ANCHOR, NotificationKey::App(1), 10).transport_scalar
+            seeds(1, ANCHOR, NotificationKey::Browser(1), 10).transport_secret,
+            seeds(1, ANCHOR, NotificationKey::App(1), 10).transport_secret
         );
     }
 
@@ -215,14 +215,14 @@ mod tests {
     #[test]
     fn the_transport_key_and_the_sender_seed_are_not_the_same_bytes() {
         let derived = seeds(1, ANCHOR, BROWSER, 10);
-        assert_ne!(derived.transport_scalar, derived.sender_seed);
+        assert_ne!(derived.transport_secret, derived.sender_seed);
     }
 
     #[test]
     fn a_redrawn_pool_derives_differently_for_the_same_call() {
         assert_ne!(
-            seeds(1, ANCHOR, BROWSER, 10).transport_scalar,
-            seeds(2, ANCHOR, BROWSER, 10).transport_scalar
+            seeds(1, ANCHOR, BROWSER, 10).transport_secret,
+            seeds(2, ANCHOR, BROWSER, 10).transport_secret
         );
     }
 

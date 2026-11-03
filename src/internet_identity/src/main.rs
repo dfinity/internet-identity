@@ -375,13 +375,13 @@ async fn prepare_webpush_subscription(
     };
 
     let transport_public_key =
-        notifications::webpush::transport::public_key_of(&seeds.transport_scalar);
+        notifications::webpush::transport::public_key_of(&seeds.transport_secret);
     // Held on the registration the subscribe will write, which is the only call that can
     // spend it.
     if let Err(err) = notifications::webpush::start_subscription(
         key,
         anchor_number,
-        seeds.transport_scalar,
+        seeds.transport_secret,
         seeds.sender_seed,
         now_ns,
     ) {

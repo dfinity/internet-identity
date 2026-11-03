@@ -24,12 +24,12 @@ use internet_identity_interface::internet_identity::types::{
 pub fn start_subscription(
     key: NotificationKey,
     anchor_number: AnchorNumber,
-    transport_scalar: [u8; 32],
+    secret_key: [u8; 32],
     sender_seed: [u8; 32],
     now_ns: Timestamp,
 ) -> Result<(), String> {
     let pending = WebPushSubscription::Pending(PendingTransport {
-        transport_scalar,
+        secret_key,
         sender_seed,
         minted_at_ns: now_ns,
     });
@@ -123,12 +123,8 @@ fn spend_pending(
     if now_ns.saturating_sub(pending.minted_at_ns) > transport::PENDING_TTL_NS {
         return Err(SetWebPushSubscriptionError::TransportKeyExpired);
     }
-    let auth = transport::open(
-        &pending.transport_scalar,
-        browser_transport_key,
-        sealed_auth,
-    )
-    .map_err(|_| SetWebPushSubscriptionError::TransportKeyExpired)?;
+    let auth = transport::open(&pending.secret_key, browser_transport_key, sealed_auth)
+        .map_err(|_| SetWebPushSubscriptionError::TransportKeyExpired)?;
     let sender = seed_pool::secret_key_from(&pending.sender_seed);
     let (payload_ikm, payload_keyid) = payload::derive_ikm(&sender, &subscriber_key, &auth)
         .map_err(SetWebPushSubscriptionError::InternalCanisterError)?;

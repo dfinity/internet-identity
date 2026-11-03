@@ -188,7 +188,7 @@ pub enum WebPushSubscription {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingTransport {
     /// The private half of the key the browser encrypts `auth` to.
-    pub transport_scalar: [u8; 32],
+    pub secret_key: [u8; 32],
     /// Expanded into this subscription's first sender key once a subscribe arrives, and
     /// held as a seed until then because a prompt the user denies never sends one.
     pub sender_seed: [u8; 32],
@@ -235,8 +235,8 @@ impl WebPushSubscription {
     }
 }
 
-/// A scalar read back from a row this canister wrote.
-fn scalar_of(bytes: Vec<u8>, dbg_name: &str) -> Result<[u8; 32], String> {
+/// A 32-byte private key read back from a row this canister wrote.
+fn secret_key_of(bytes: Vec<u8>, dbg_name: &str) -> Result<[u8; 32], String> {
     <[u8; 32]>::try_from(bytes.as_slice()).map_err(|_| format!("{dbg_name} is not 32 bytes"))
 }
 
@@ -249,12 +249,12 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
     fn try_from(value: StorableWebPushSubscription) -> Result<Self, Self::Error> {
         match value {
             StorableWebPushSubscription::Pending {
-                transport_scalar,
+                secret_key,
                 sender_seed,
                 minted_at_ns,
             } => Ok(WebPushSubscription::Pending(PendingTransport {
-                transport_scalar: scalar_of(transport_scalar, "transport_scalar")?,
-                sender_seed: scalar_of(sender_seed, "sender_seed")?,
+                secret_key: secret_key_of(secret_key, "secret_key")?,
+                sender_seed: secret_key_of(sender_seed, "sender_seed")?,
                 minted_at_ns,
             })),
             StorableWebPushSubscription::Ready {
@@ -282,7 +282,7 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
     fn from(value: WebPushSubscription) -> Self {
         match value {
             WebPushSubscription::Pending(pending) => StorableWebPushSubscription::Pending {
-                transport_scalar: pending.transport_scalar.to_vec(),
+                secret_key: pending.secret_key.to_vec(),
                 sender_seed: pending.sender_seed.to_vec(),
                 minted_at_ns: pending.minted_at_ns,
             },
