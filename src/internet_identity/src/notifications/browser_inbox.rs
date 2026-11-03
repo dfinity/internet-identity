@@ -21,9 +21,7 @@ pub(crate) const CAPACITY: usize = 100;
 /// Put a notification behind the inbox's newest, dropping what expired first, and name
 /// it so the wake-up announcing it can ask for that entry and no other.
 ///
-/// Every deposit earns a wake-up of its own. An overflowing inbox used to lean on the
-/// wake-up of the entry it dropped, which only worked while the worker took whatever sat
-/// at the head; a wake-up now names an entry that would no longer be there.
+/// Every deposit earns a wake-up of its own, including one that overflows the inbox.
 pub(crate) fn deposit(
     inbox: &mut Vec<InboxNotification>,
     next_id: &mut InboxNotificationId,

@@ -32,9 +32,9 @@ const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
 };
 
 /**
- * Subscribes this device to `applicationServerKey`. Any prior subscription is
- * dropped first: it is bound to an old VAPID key whose private half we no longer
- * hold, so its endpoint would reject every push we could sign.
+ * Subscribes this device to `applicationServerKey`. Any prior subscription is dropped
+ * first: it is bound to a VAPID key the canister does not sign with, so its endpoint
+ * would reject every push.
  */
 export const subscribeToPush = async (
   applicationServerKey: Uint8Array,
@@ -52,8 +52,8 @@ export const subscribeToPush = async (
  * Whether this subscription was minted with `applicationServerKey`.
  *
  * A relay binds a subscription to the key it was made with and refuses a push whose
- * `k=` is any other, so one made with a key we no longer sign with is dead however live
- * it looks. What the browser remembers of the subscription is the only way to tell.
+ * `k=` is any other, so one made with a key the canister does not sign with is dead
+ * however live it looks. What the browser remembers is the only way to tell.
  */
 export const subscribedWith = (
   subscription: PushSubscription,

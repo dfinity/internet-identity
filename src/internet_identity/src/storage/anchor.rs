@@ -139,9 +139,7 @@ impl Browser {
 /// A notification a browser's service worker has yet to take.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InboxNotification {
-    /// Ours, assigned at deposit and unique within the inbox holding it. A wake-up names
-    /// its entry by this, so the worker takes the notification the push was sent for
-    /// rather than whichever one happens to be at the head.
+    /// Assigned at deposit, unique within its inbox, and what a wake-up names.
     pub inbox_notification_id: InboxNotificationId,
     /// `None` where Internet Identity sent this itself.
     pub application_number: Option<ApplicationNumber>,

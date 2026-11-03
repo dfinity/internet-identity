@@ -872,7 +872,7 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
             match rotation::refresh(destination, &sender, now_ns) {
                 // Onto every wake-up for that registration, not only the one that was
                 // picked: two browsers through one app share it, and a stale copy left on
-                // the others would seal against a key the header no longer names.
+                // the others would seal against a key the header does not name.
                 Ok(Some(refreshed)) => {
                     // On the registration, not the destination: a Home Screen app's is
                     // shared, and the wake-ups through it come from different identities
@@ -1818,7 +1818,7 @@ mod tests {
     /// Two identities' browsers can point at one Home Screen app, and they share its
     /// registration. A refresh has to land on both wake-ups: the header names the sender
     /// key the material was derived against, so a stale copy left on the second would
-    /// seal against a key its own header no longer names, which the browser silently
+    /// seal against a key its own header does not name, which the browser silently
     /// fails to open.
     #[test]
     fn a_refresh_reaches_every_wake_up_through_one_app() {
