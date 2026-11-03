@@ -38,7 +38,9 @@ describe("tagOf", () => {
 
 describe("refOf", () => {
   it("reads back what was shown", () => {
-    expect(refOf(dataOf(ref, "https://app.example/chats/7", false))).toEqual(ref);
+    expect(refOf(dataOf(ref, "https://app.example/chats/7", false))).toEqual(
+      ref,
+    );
   });
 
   it("reads back the default account as no account", () => {
@@ -51,6 +53,8 @@ describe("refOf", () => {
   it("reads nothing from data this worker did not write", () => {
     expect(refOf(undefined)).toBeUndefined();
     expect(refOf({})).toBeUndefined();
-    expect(refOf({ ...dataOf(ref, "x", false), id: "not a number" })).toBeUndefined();
+    expect(
+      refOf({ ...dataOf(ref, "x", false), id: "not a number" }),
+    ).toBeUndefined();
   });
 });
