@@ -28,15 +28,16 @@ pub struct StorableBrowser {
     /// written.
     #[n(6)]
     pub session_count: u32,
+    // #[n(7)] RETIRED, never reuse: held the Web Push registration before a push
+    // carried a payload. A record written at 7 has no sealing keys, so it cannot be
+    // read into 10; it is dropped instead, and the browser registers again.
     /// The notification app record this browser points at, where it has one.
     #[n(8)]
     pub notification_app: Option<StorableNotificationAppRef>,
+    // #[n(9)] RETIRED, never reuse: held the inbox before its entries were named. A
+    // record written at 9 has no id per entry, so it cannot be read into 11; it is
+    // dropped instead, and the entries are gone.
     /// What this browser registered for Web Push, if anything.
-    ///
-    /// 7 held the registration before a push carried a payload, and 9 the inbox whose
-    /// entries were unnamed. Neither can be read into the shapes below, which require the
-    /// browser's sealing keys and an id per entry, so both were retired rather than
-    /// migrated: a browser re-registers and is whole again. Do not reuse either index.
     #[n(10)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
     /// What this identity's service worker has yet to show on this device, oldest first.
