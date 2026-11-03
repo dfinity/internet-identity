@@ -86,6 +86,13 @@ fn tier_of(relay_origin: &str) -> Tier {
     }
 }
 
+/// Whether a wake-up to `endpoint` goes to a relay nobody named. An endpoint whose origin
+/// cannot be read counts here too: it is at best unreachable, and it is never one of the
+/// origins the named list holds.
+pub(crate) fn is_unknown_relay(endpoint: &str) -> bool {
+    vapid_key::relay_origin_of(endpoint).is_none_or(|origin| tier_of(&origin) == Tier::Unknown)
+}
+
 /// That the relay answered at all, which is the only question a probe asks: one
 /// answering `404` for a path it has no subscription at has still proved it is there.
 type ReachabilityCache = SingleFlightCache<String, (), String>;
@@ -432,5 +439,24 @@ mod tests {
             Tier::KnownSubdomain
         );
         assert_eq!(tier_of("https://fcm.googleapis.com:8443"), Tier::Unknown);
+    }
+
+    #[test]
+    fn reads_the_population_of_a_whole_endpoint() {
+        for endpoint in [
+            "https://fcm.googleapis.com/fcm/send/abc",
+            "https://web.push.apple.com/QABC123",
+            "https://db5p.notify.windows.com/w/?token=abc",
+        ] {
+            assert!(!is_unknown_relay(endpoint), "{endpoint}");
+        }
+        for endpoint in [
+            "https://push.example.com/abc",
+            "https://evilpush.apple.com/abc",
+            // No origin to read, so there is no list it can be on.
+            "not a url",
+        ] {
+            assert!(is_unknown_relay(endpoint), "{endpoint}");
+        }
     }
 }

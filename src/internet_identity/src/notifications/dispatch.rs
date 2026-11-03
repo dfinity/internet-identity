@@ -65,21 +65,43 @@ pub(crate) const MAX_IDENTITY_POSTS_PER_PASS: usize = MAX_POSTS_PER_PASS / 2;
 /// near either — 65 posts a second each lasting 200ms is 13 in flight.
 const MAX_WAKEUP_OUTCALLS: usize = 2 * MAX_POSTS_PER_PASS;
 
+/// The share of [`MAX_WAKEUP_OUTCALLS`] a relay nobody named may hold at once. A browser
+/// subscribes through one of the named relays, so what is left is a population that only
+/// claimed its address. Its own share means a jammed one can hold no slot a named relay
+/// needs; the price is that a wake-up refused here is dropped rather than delayed.
+const MAX_UNKNOWN_WAKEUP_OUTCALLS: usize = 10;
+
+/// What is left of [`MAX_WAKEUP_OUTCALLS`] for the relays browsers actually subscribe
+/// through, which is what a pass plans against.
+const MAX_KNOWN_WAKEUP_OUTCALLS: usize = MAX_WAKEUP_OUTCALLS - MAX_UNKNOWN_WAKEUP_OUTCALLS;
+
 thread_local! {
-    /// The 90s reclaim age is above the ~60s outcall timeout, so a live call is never
-    /// reclaimed early.
-    static WAKEUP_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+    /// The relays we name and the hosts under their domains, which are one population
+    /// here: both are an operator's own address. The 90s reclaim age is above the ~60s
+    /// outcall timeout, so a live call is never reclaimed early.
+    static KNOWN_WAKEUP_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
         RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
             crate::concurrency::LimiterConfig {
-                max_concurrent: MAX_WAKEUP_OUTCALLS,
+                max_concurrent: MAX_KNOWN_WAKEUP_OUTCALLS,
+                max_age_secs: 90,
+            },
+        ));
+
+    static UNKNOWN_WAKEUP_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+        RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig {
+                max_concurrent: MAX_UNKNOWN_WAKEUP_OUTCALLS,
                 max_age_secs: 90,
             },
         ));
 }
 
-/// How many more wake-ups may be posted before the budget is full.
+/// How many more wake-ups may be posted to a known relay before that budget is full. The
+/// unknown share is left out: a pass plans before it knows which relays its items expand
+/// to, and sizing it against a budget that carries almost nothing would trim every pass
+/// to that.
 fn post_capacity() -> usize {
-    crate::concurrency::num_available_slots(&WAKEUP_OUTCALL_LIMIT)
+    crate::concurrency::num_available_slots(&KNOWN_WAKEUP_OUTCALL_LIMIT)
 }
 
 /// What became of one wake-up post.
@@ -967,10 +989,17 @@ mod outcalls {
     }
 
     pub(super) fn spawn_post(delivery: Delivery) {
-        // A pass plans within the budget and nothing runs between planning and here,
-        // so a refusal means the last recipient's browsers took the budget over. Its
-        // wake-up never leaves, which is what `Rejected` already stands for.
-        let Some(permit) = crate::concurrency::acquire(&WAKEUP_OUTCALL_LIMIT) else {
+        // Each population posts from its own budget, so a jammed relay refuses only its
+        // own wake-ups. A pass plans against the known budget and nothing runs between
+        // planning and here, so a refusal is either the last recipient's browsers taking
+        // that budget over or an unknown relay holding its share. Either way the wake-up
+        // never leaves, which is what `Rejected` already stands for.
+        let limit = if relays::is_unknown_relay(&delivery.endpoint) {
+            &UNKNOWN_WAKEUP_OUTCALL_LIMIT
+        } else {
+            &KNOWN_WAKEUP_OUTCALL_LIMIT
+        };
+        let Some(permit) = crate::concurrency::acquire(limit) else {
             settle(&delivery, PostOutcome::Rejected);
             return;
         };
@@ -1403,7 +1432,7 @@ mod tests {
     /// budget under pressure without an outcall.
     fn hold_outcall_slots(count: usize) -> Vec<crate::concurrency::Permit> {
         (0..count)
-            .map(|_| crate::concurrency::acquire(&WAKEUP_OUTCALL_LIMIT).expect("a free slot"))
+            .map(|_| crate::concurrency::acquire(&KNOWN_WAKEUP_OUTCALL_LIMIT).expect("a free slot"))
             .collect()
     }
 
@@ -1413,7 +1442,7 @@ mod tests {
         let (recipient, _) = subscribed_recipient(1);
         submit(recipient, 7, 10 * SECOND_NS);
 
-        let held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS);
+        let held = hold_outcall_slots(MAX_KNOWN_WAKEUP_OUTCALLS);
         assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
         assert_eq!(
             still_in_backlog(SECOND_NS),
@@ -1436,7 +1465,7 @@ mod tests {
             }
         }
 
-        let _held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS - 10);
+        let _held = hold_outcall_slots(MAX_KNOWN_WAKEUP_OUTCALLS - 10);
 
         assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 10);
         assert_eq!(still_in_backlog(SECOND_NS), 80 - 10);
@@ -1451,7 +1480,7 @@ mod tests {
         submit(recipient, 7, 10 * SECOND_NS);
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
-        let held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS);
+        let held = hold_outcall_slots(MAX_KNOWN_WAKEUP_OUTCALLS);
         notify(recipient, browsers[0]);
         assert!(plan_identity_pass(MAX_IDENTITY_POSTS_PER_PASS, SECOND_NS).is_empty());
 
