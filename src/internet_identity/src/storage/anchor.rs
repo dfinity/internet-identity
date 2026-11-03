@@ -1360,18 +1360,23 @@ impl Anchor {
             .map_or(&[], |browser| &browser.notifications)
     }
 
+    /// The inbox alone, for a caller that only empties or reads it.
     pub fn notifications_for_browser_mut(
         &mut self,
         browser_id: BrowserId,
     ) -> Option<&mut Vec<InboxNotification>> {
-        self.browsers
-            .iter_mut()
-            .find(|browser| browser.id == browser_id)
-            .map(|browser| &mut browser.notifications)
+        self.inbox_and_next_id_for_browser_mut(browser_id)
+            .map(|(inbox, _)| inbox)
+    }
+
+    /// The id the next entry deposited in this browser's inbox takes.
+    pub fn next_inbox_notification_id(&self, browser_id: BrowserId) -> Option<InboxNotificationId> {
+        self.browser(browser_id)
+            .map(|browser| browser.next_inbox_notification_id)
     }
 
     /// The inbox together with the id its next entry takes, which a deposit needs both of.
-    pub fn inbox_for_browser_mut(
+    pub fn inbox_and_next_id_for_browser_mut(
         &mut self,
         browser_id: BrowserId,
     ) -> Option<(&mut Vec<InboxNotification>, &mut InboxNotificationId)> {

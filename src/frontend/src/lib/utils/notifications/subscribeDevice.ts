@@ -55,6 +55,10 @@ export const registerStoredDevice = async (
   // Nothing to do where the canister already holds this address. Re-registering would
   // mint a transport key and run the whole derivation to arrive at the record it already
   // has, and the Home Screen app comes through here on every launch.
+  //
+  // Skipped where keys were handed down, because the caller fetched them for this
+  // subscribe and a prepare has already replaced the registration they belong to: there
+  // is no longer an address on the record to match.
   if (
     fetched === undefined &&
     (await registeredAt(actor, identityNumber, subscription))

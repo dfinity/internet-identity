@@ -126,7 +126,7 @@ test.describe("a notification the app sent", () => {
     // Internet Identity's own dispatch reaches the relay, and the relay standing
     // in for a push service is the only hop this test bridges by hand.
     await relay.waitForWakeUps(sentSoFar + 1);
-    // Keep what the worker says to itself, so a failure names the step.
+    // The worker has to be registered before a push can be delivered to it.
     await expect
       .poll(() => page.context().serviceWorkers().length, {
         message: "no service worker registered",

@@ -44,7 +44,6 @@
   let screen = $state<Screen>({ kind: "working" });
   /** Read on mount, because this page is rendered at build time where there is no document to ask. */
   let host = $state("");
-  /** Read on mount for the same reason, and only to shape the screen that waits for the launch. */
   /** Unknown until mount, because the page prerenders and the answer is `window`'s.
    *  Guessing one shape and correcting it shows the wrong skeleton first. */
   let inTheApp = $state<boolean | undefined>(undefined);
@@ -171,12 +170,13 @@
     return () => document.removeEventListener("visibilitychange", settleAgain);
   });
 
-  /** Raises the prompt, which only a gesture may do; a prompt dismissed without an answer leaves the permission at `default`. */
   /** The press is answered in the button rather than by swapping the screen: the prompt
    *  stands in front of this page, and a skeleton behind it is a screen rebuilding
    *  itself for a transition nobody is waiting on. */
   let asking = $state(false);
 
+  /** Raises the prompt, which only a gesture may do; one dismissed without an answer
+   *  leaves the permission at `default`. */
   const askForPermission = async () => {
     asking = true;
     let permission: NotificationPermission;
@@ -235,6 +235,10 @@
     );
   });
 
+  /** Set by the user saying the guess was wrong, which is the end of guessing: without
+   *  it the next glance at another app would throw them forward again. */
+  let theyAreStillOnTheSteps = $state(false);
+
   /** Adding to the Home Screen never takes the user out of Safari: the sheet and its
    *  dialog sit over this page. Leaving the tab and coming back to it therefore means
    *  they went to the Home Screen and chose not to open the app, which is the one hint
@@ -242,10 +246,6 @@
    *  only when the app is opened and links; the watcher above keeps running, so an app
    *  that was opened settles on its own and never reaches this. How long they were away
    *  says nothing, so it is not asked. */
-  /** Set by the user saying the guess was wrong, which is the end of guessing: without
-   *  it the next glance at another app would throw them forward again. */
-  let theyAreStillOnTheSteps = $state(false);
-
   $effect(() => {
     if (screen.kind !== "install" || theyAreStillOnTheSteps) {
       return;
@@ -334,12 +334,13 @@
     screen = await afterAlreadyAdded(window.location.hash).catch(failed);
   };
 
-  /** The probe is housekeeping: waking a record that still has an endpoint is what gets the push service to report it dead. */
   /** How far the record the user is replacing had got, read while it is still the one
    *  this browser points at. The watcher needs a new app to beat it, and reading it
    *  later would read the replacement's own. */
   let replacedLastSeen = $state<bigint | undefined>();
 
+  /** The probe is housekeeping: waking a record that still has an endpoint is what gets
+   *  the push service to report it dead. */
   const startOver = async () => {
     const identityNumber = fragmentIdentity(
       decodeLinkToken(window.location.hash),

@@ -5,7 +5,8 @@ use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
     browser_get_notification, browser_remove_notification, consent_granted,
     get_webpush_subscription_status, grant_consent, link_notification_app,
-    prepare_notification_app_link, remove_webpush_subscription, revoke_consent,
+    prepare_notification_app_link, prepare_webpush_subscription, remove_webpush_subscription,
+    revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -19,7 +20,8 @@ use internet_identity_interface::internet_identity::types::{
     GetNotificationRequest, GetNotificationResponse, InboxNotificationId, InternetIdentityInit,
     LinkNotificationAppRequest, NotificationAppId, NotificationGrantConsentError,
     NotificationRevokeConsentError, OperatingSystem, PrepareAccountSessionRequest,
-    PrepareNotificationAppLinkRequest, RemoveNotificationError, RemoveNotificationRequest,
+    PrepareNotificationAppLinkRequest, PrepareWebPushSubscriptionError,
+    PrepareWebPushSubscriptionResult, RemoveNotificationError, RemoveNotificationRequest,
     RemoveNotificationResponse, RemoveWebPushSubscriptionError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
@@ -145,7 +147,13 @@ fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<
         ORIGIN.into()
     )?);
     assert!(matches!(
-        browser_get_notification(&env, canister_id, principal_1(), next_request(anchor))?,
+        prepare_webpush_subscription(&env, canister_id, principal_1(), anchor)?,
+        PrepareWebPushSubscriptionResult::Err(
+            PrepareWebPushSubscriptionError::InternalCanisterError(_)
+        )
+    ));
+    assert!(matches!(
+        browser_get_notification(&env, canister_id, principal_1(), get_request(anchor))?,
         Err(GetNotificationError::InternalCanisterError(_))
     ));
     assert!(matches!(
@@ -870,8 +878,7 @@ mod subscriptions {
     }
 }
 
-/// What a browser registered, read through
-/// `get_webpush_subscription_status`.
+/// What a browser registered, read through `get_webpush_subscription_status`.
 mod subscription_status {
     use super::subscriptions::*;
     use super::*;
@@ -991,8 +998,8 @@ mod subscription_status {
     /// A browser reads its own registration, so an access method of the identity is
     /// as much a stranger to it as anyone else.
     #[test]
-    fn should_not_report_a_pool_to_a_caller_that_is_not_the_browser() -> Result<(), RejectResponse>
-    {
+    fn should_not_report_a_subscription_to_a_caller_that_is_not_the_browser(
+    ) -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, browser, _browser_id) = install_with_browser(&env);
         subscribe(&env, canister_id, anchor, &browser)?;
@@ -1375,10 +1382,14 @@ mod pull_delegation {
 mod browser_inbox {
     use super::subscriptions::{install_with_browser, key_holder};
     use super::*;
+    use canister_tests::api::internet_identity::notifications::set_webpush_subscription;
+    use internet_identity_interface::internet_identity::types::{
+        SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+    };
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn should_have_no_next_for_a_browser_nothing_was_sent_to() -> Result<(), RejectResponse> {
+    fn should_answer_nothing_for_an_entry_that_was_never_deposited() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, browser, _) = install_with_browser(&env);
 
@@ -1387,7 +1398,7 @@ mod browser_inbox {
                 &env,
                 canister_id,
                 key_holder(&browser).principal(),
-                next_request(anchor)
+                get_request(anchor)
             )?,
             Ok(GetNotificationResponse { notification: None })
         );
@@ -1411,13 +1422,46 @@ mod browser_inbox {
         Ok(())
     }
 
+    /// The raw call, so the fields are the caller's own rather than the ones a whole
+    /// subscribe fills in.
+    #[test]
+    fn should_report_every_invalid_field_at_once() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+
+        let refused = set_webpush_subscription(
+            &env,
+            canister_id,
+            key_holder(&browser).principal(),
+            SetWebPushSubscriptionRequest {
+                anchor_number: anchor,
+                endpoint: "not a url".to_string(),
+                p256dh: ByteBuf::from(vec![1]),
+                transport_key: ByteBuf::from(vec![2]),
+                sealed_auth: ByteBuf::from(vec![3]),
+            },
+        )?
+        .expect_err("every field is refused");
+
+        let SetWebPushSubscriptionError::InternalCanisterError(problems) = refused else {
+            panic!("a malformed field is not a browser-key refusal");
+        };
+        // One answer naming all four, so a browser does not go round four times.
+        assert_eq!(
+            problems.split("; ").count(),
+            4,
+            "named only some of them: {problems}"
+        );
+        Ok(())
+    }
+
     #[test]
     fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _, _) = install_with_browser(&env);
 
         assert_eq!(
-            browser_get_notification(&env, canister_id, principal_2(), next_request(anchor))?,
+            browser_get_notification(&env, canister_id, principal_2(), get_request(anchor))?,
             Err(GetNotificationError::InvalidBrowserKey)
         );
         assert_eq!(
@@ -2050,7 +2094,7 @@ mod shared_app {
         let (canister_id, first, _second, app) = install_with_shared_app(&env);
 
         assert_eq!(
-            browser_get_notification(&env, canister_id, app, next_request(first))?,
+            browser_get_notification(&env, canister_id, app, get_request(first))?,
             Ok(GetNotificationResponse { notification: None })
         );
         assert_eq!(
@@ -2079,7 +2123,7 @@ mod shared_app {
         .expect("the switch returned Err");
 
         assert_eq!(
-            browser_get_notification(&env, canister_id, app, next_request(second))?,
+            browser_get_notification(&env, canister_id, app, get_request(second))?,
             Err(GetNotificationError::InvalidBrowserKey)
         );
         assert_eq!(
@@ -2436,14 +2480,18 @@ mod claims {
     }
 }
 
-/// Runs the dispatcher's next pass.
-///
-/// Every flow here signs one browser in and sends it one notification, so the entry a
-/// wake-up would name is the first of the first browser's inbox.
+/// Runs the dispatcher's next pass, which is what deposits an entry and names it.
+fn run_dispatch_pass(env: &PocketIc) {
+    env.advance_time(std::time::Duration::from_secs(1));
+    env.tick();
+}
+
+/// Every flow here signs one browser in and sends it at most one notification, so the
+/// entry a wake-up would name is the first of the first browser's inbox.
 const FIRST_BROWSER: BrowserId = 0;
 const FIRST_ENTRY: InboxNotificationId = 0;
 
-fn next_request(anchor_number: AnchorNumber) -> GetNotificationRequest {
+fn get_request(anchor_number: AnchorNumber) -> GetNotificationRequest {
     GetNotificationRequest {
         anchor_number,
         browser_id: FIRST_BROWSER,
@@ -2931,6 +2979,43 @@ mod turning_on {
                 },
             )?,
             Ok(queued)
+        );
+        Ok(())
+    }
+
+    /// The central thing a wake-up now does: the pass deposits an entry, names it, and
+    /// the id it names is the one the service worker is answered with.
+    #[test]
+    fn should_hand_back_the_entry_the_wake_up_named() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _) = install_with_two_anchors(&env);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+
+        // Switching delivery on is Internet Identity's own notification, so the pass has
+        // something to deposit without an app canister sending one.
+        turn_on(&env, canister_id, browser(FIRST_BROWSER_SEED), anchor)?
+            .expect("the switch returned Err");
+        run_dispatch_pass(&env);
+
+        let shown = browser_get_notification(&env, canister_id, app, get_request(anchor))?
+            .expect("the read returned Err")
+            .notification
+            .expect("the pass deposited nothing the wake-up could name");
+        // Ours carries the event and names no app, which is what the worker writes the
+        // words for.
+        assert!(shown.event.is_some());
+        assert_eq!(shown.origin, None);
+
+        // Taken, so the same id answers with nothing the second time.
+        assert_eq!(
+            browser_remove_notification(&env, canister_id, app, remove_request(anchor))?,
+            Ok(RemoveNotificationResponse {})
+        );
+        assert_eq!(
+            browser_get_notification(&env, canister_id, app, get_request(anchor))?,
+            Ok(GetNotificationResponse { notification: None })
         );
         Ok(())
     }

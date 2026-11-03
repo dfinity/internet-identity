@@ -15,8 +15,8 @@ import { expect, type BrowserContext, type Page } from "@playwright/test";
  * `pushManager.subscribe` never resolves. `Notification`, `navigator.serviceWorker`
  * and the push manager are all replaced here, so nothing downstream covers the native
  * permission prompt or a real service-worker registration. What does run for real is
- * II's side: the consent screen, the subscription keys the browser derives and the rows
- * the canister writes.
+ * II's side: the consent screen, the key fetch and the transport seal the browser runs
+ * on top of it, and the rows the canister writes.
  *
  * Asserts nothing about the endpoint, which is a relay URL nothing is ever sent to.
  */

@@ -7494,8 +7494,10 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     let (left_empty, _) = anchor
         .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
         .expect("registering a browser");
+    // Distinct ids, as a deposit draws them: an inbox of three zeroes is a state nothing
+    // can produce, and a wake-up naming one of them could not tell them apart.
     let queued = |notification_id: u64| InboxNotification {
-        inbox_notification_id: 0,
+        inbox_notification_id: notification_id,
         application_number: Some(4),
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
@@ -7512,10 +7514,11 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
             )),
         );
     }
-    anchor
-        .notifications_for_browser_mut(queued_on)
-        .expect("a registered browser")
-        .extend([3, 1, 2].map(queued));
+    let (inbox, next_id) = anchor
+        .inbox_and_next_id_for_browser_mut(queued_on)
+        .expect("a registered browser");
+    inbox.extend([3, 1, 2].map(queued));
+    *next_id = 4;
     storage.write(anchor).expect("writing the anchor");
 
     // Re-read from the same backing memory to simulate a canister upgrade.
@@ -7528,6 +7531,9 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         [3, 1, 2].map(queued)
     );
     assert!(reloaded.notifications_for_browser(left_empty).is_empty());
+    // The run of ids survives the reload too, or the next deposit would re-use one a
+    // wake-up already named.
+    assert_eq!(reloaded.next_inbox_notification_id(queued_on), Some(4));
 }
 
 #[test]

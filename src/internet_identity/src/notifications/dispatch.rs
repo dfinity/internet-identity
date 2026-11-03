@@ -445,7 +445,8 @@ fn fan_out_to_destinations(
                 continue;
             };
             delivery.jwt = jwt;
-            let Some((queue, next_id)) = anchor.inbox_for_browser_mut(browser_id) else {
+            let Some((queue, next_id)) = anchor.inbox_and_next_id_for_browser_mut(browser_id)
+            else {
                 continue;
             };
             let deposited = browser_inbox::deposit(queue, next_id, queued, now_ns);
@@ -574,7 +575,9 @@ fn fan_out_to_browsers(
                 continue;
             };
             delivery.jwt = jwt;
-            let Some((queue, next_id)) = anchor.inbox_for_browser_mut(delivery.browser_id) else {
+            let Some((queue, next_id)) =
+                anchor.inbox_and_next_id_for_browser_mut(delivery.browser_id)
+            else {
                 continue;
             };
             queued_anywhere = true;
@@ -632,7 +635,7 @@ pub(crate) fn notify_identity(
 
         // Asked before the event is handed over, which is the whole point of reading it
         // off the event rather than off a second argument.
-        let proves_the_app_is_reachable = event.proves_the_app_is_reachable();
+        let proves_the_app_is_reachable = proves_the_app_is_reachable(&event);
         let notification_id = storage.allocate_identity_notification_id();
         if !submit_identity_wake_up(
             PendingIdentityNotification {
@@ -673,6 +676,19 @@ fn submit_identity_wake_up(pending: PendingIdentityNotification, now_ns: Timesta
         schedule_pass(now_ns);
     }
     accepted
+}
+
+/// Whether delivering this is also how a Home Screen app proves it is still installed.
+/// The ask is recorded on the app's record so a second one inside the window is handed
+/// the first one back.
+///
+/// Answered per variant rather than passed alongside: a caller that could say otherwise
+/// could say it wrongly.
+fn proves_the_app_is_reachable(event: &NotificationEvent) -> bool {
+    match event {
+        // Switching delivery on is what it proves, so arriving is the proof.
+        NotificationEvent::NotificationsOn(_) => true,
+    }
 }
 
 /// A browser that registered an address of its own is woken at it. Otherwise the app it

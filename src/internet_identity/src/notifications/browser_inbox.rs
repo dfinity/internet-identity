@@ -409,7 +409,7 @@ mod tests {
     /// The first entry `collect` still hands out. Production never asks this, since a
     /// wake-up names its own entry, but what the filters let through is what these tests
     /// are about.
-    fn next(
+    fn first_collectable(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
         now_ns: Timestamp,
@@ -424,12 +424,12 @@ mod tests {
             .find_map(|id| notification_named(&anchor, browser_id, id, now_ns))
     }
 
-    fn next_id(
+    fn first_collectable_id(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
         now_ns: Timestamp,
     ) -> Option<u64> {
-        next(anchor_number, browser_id, now_ns).map(|one| one.id)
+        first_collectable(anchor_number, browser_id, now_ns).map(|one| one.id)
     }
 
     fn remove(
@@ -601,7 +601,8 @@ mod tests {
                 from_app(1, 60 * SECOND_NS),
             ],
         );
-        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the oldest is shown");
+        let shown = first_collectable(anchor_number, browser_id, 2 * SECOND_NS)
+            .expect("the oldest is shown");
         assert!(shown.event.is_some());
 
         let crafted = NotificationToShow {
@@ -642,7 +643,8 @@ mod tests {
             ],
         );
 
-        let shown = next(anchor_number, browser_id, 2 * SECOND_NS).expect("the event is shown");
+        let shown = first_collectable(anchor_number, browser_id, 2 * SECOND_NS)
+            .expect("the event is shown");
         assert_eq!(shown.id, 1);
         assert!(shown.event.is_some());
         assert_eq!(shown.origin, None);
@@ -650,11 +652,14 @@ mod tests {
         remove(anchor_number, browser_id, &shown, 2 * SECOND_NS);
 
         assert_eq!(left_for(anchor_number, browser_id), vec![2]);
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            Some(2)
+        );
     }
 
     #[test]
-    fn the_next_is_the_oldest_and_nothing_is_removed() {
+    fn the_first_collectable_is_the_oldest_and_nothing_is_removed() {
         let (anchor_number, browser_id) = signed_in();
         let for_account = InboxNotification {
             account_number: Some(3),
@@ -667,7 +672,7 @@ mod tests {
         );
 
         assert_eq!(
-            next(anchor_number, browser_id, 2 * SECOND_NS),
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS),
             Some(NotificationToShow {
                 origin: Some(ORIGIN.to_string()),
                 account_number: Some(3),
@@ -680,25 +685,32 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_inbox_has_no_next() {
+    fn an_empty_inbox_has_nothing_collectable() {
         let (anchor_number, browser_id) = signed_in();
 
-        assert_eq!(next_id(anchor_number, browser_id, SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, SECOND_NS),
+            None
+        );
     }
 
     #[test]
-    fn the_next_one_comes_once_what_was_collected_is_removed() {
+    fn the_one_behind_comes_once_what_was_collected_is_removed() {
         let (anchor_number, browser_id) = signed_in();
         put(
             anchor_number,
             browser_id,
             [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
         );
-        let collected = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a next one");
+        let collected =
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("one to collect");
 
         remove(anchor_number, browser_id, &collected, 2 * SECOND_NS);
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(8));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            Some(8)
+        );
     }
 
     #[test]
@@ -710,7 +722,10 @@ mod tests {
             [from_app(1, 2 * SECOND_NS), from_app(2, 60 * SECOND_NS)],
         );
 
-        assert_eq!(next_id(anchor_number, browser_id, 3 * SECOND_NS), Some(2));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 3 * SECOND_NS),
+            Some(2)
+        );
     }
 
     #[test]
@@ -726,7 +741,10 @@ mod tests {
             [unknown, from_app(2, 60 * SECOND_NS)],
         );
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            Some(2)
+        );
     }
 
     #[test]
@@ -736,7 +754,10 @@ mod tests {
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), false, SECOND_NS)
             .expect("revoking consent");
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            None
+        );
     }
 
     #[test]
@@ -748,12 +769,15 @@ mod tests {
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, SECOND_NS)
             .expect("granting consent again");
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            None
+        );
         assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
     #[test]
-    fn a_signed_out_browser_has_no_next() {
+    fn a_signed_out_browser_has_nothing_collectable() {
         let (anchor_number, browser_id) = signed_in();
         put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         storage_borrow_mut(|storage| {
@@ -761,7 +785,10 @@ mod tests {
         })
         .expect("signing the browser out");
 
-        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            None
+        );
         assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
@@ -773,7 +800,8 @@ mod tests {
             browser_id,
             [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
         );
-        let seven = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
+        let seven =
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
 
         remove(anchor_number, browser_id, &seven, 2 * SECOND_NS);
 
@@ -792,7 +820,8 @@ mod tests {
             browser_id,
             [from_app(7, 60 * SECOND_NS), for_account],
         );
-        let without_account = next(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
+        let without_account =
+            first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
 
         remove(anchor_number, browser_id, &without_account, 2 * SECOND_NS);
 

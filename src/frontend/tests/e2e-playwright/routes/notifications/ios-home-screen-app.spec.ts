@@ -128,7 +128,7 @@ const joinTheRoomAndLeave = async (page: Page): Promise<void> => {
 /**
  * Waits for the app's own text to reach the screen, handing over the wake-ups it takes.
  *
- * A notification takes one wake-up, the one naming the entry it was queued under: the
+ * A notification takes one wake-up, the one naming the inbox entry it was written to: the
  * worker mints the delegation it needs inside that push event and reads the app's text
  * with it there. Which of the wake-ups the relay holds is that one is not known here, and
  * the canister goes on posting while this waits, so each new one is handed over as a push
@@ -540,7 +540,7 @@ test.describe("notifications on a Home Screen app", () => {
 
     // Deleted from the Home Screen, and nothing tells the canister: the relay answers
     // for that endpoint exactly as before, so the record goes on saying it delivers.
-    // That record is what the switch used to believe.
+    // That record is what the switch reads.
     await app.delete();
 
     const settings = await context.newPage();
