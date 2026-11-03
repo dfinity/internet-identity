@@ -217,13 +217,11 @@ const JWT_RETRY_MULTIPLIER: u64 = 2;
 /// carrying it is gone.
 const JWT_ABANDON_FILL_AFTER_SECS: u64 = 60;
 
-/// Our public key, where it has been asked for. A browser cannot subscribe before this
-/// lands, and a push cannot name a key we do not hold.
 /// The key, fetching and keeping it where this deployment has not got one yet.
 ///
-/// For a caller that can wait, which [`ensure_public_key`] exists because a query cannot.
-/// Derived from public inputs and the same forever, so the first caller to need it pays
-/// for every later one.
+/// Awaits the fetch, which only an update call can do: a query uses
+/// [`ensure_public_key`]. Derived from public inputs and the same forever, so the first
+/// caller to need it pays for every later one.
 pub(crate) async fn held_public_key() -> Result<Vec<u8>, String> {
     if let Some(held) = public_key() {
         return Ok(held);
@@ -233,6 +231,8 @@ pub(crate) async fn held_public_key() -> Result<Vec<u8>, String> {
     Ok(fetched)
 }
 
+/// Our public key, where it has been asked for. A browser cannot subscribe before this
+/// lands, and a push cannot name a key we do not hold.
 pub(crate) fn public_key() -> Option<Vec<u8>> {
     crate::state::persistent_state(|p| p.vapid_public_key.clone())
 }

@@ -1885,9 +1885,8 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
-// What a browser uploads when it registers for Web Push. The same endpoint is a
-// registration at that endpoint again, which keeps what is already queued for it. Signed with the
-// browser key it signs in with, which is what says the subscription is this browser's.
+// What a browser uploads when it registers for Web Push. Signed with the browser key it
+// signs in with, which is what says the subscription is this browser's.
 type SetWebPushSubscriptionRequest = record {
     anchor_number : UserNumber;
     endpoint : text;                   // the relay URL the browser was issued
@@ -2079,8 +2078,7 @@ type GetWebPushSubscriptionStatusRequest = record {
 };
 
 // What a browser is registered with, so the frontend can tell a registration that is
-// still live from one another identity's re-subscribe left behind, and knows when to
-// sign the next pool.
+// still live from one another identity's re-subscribe left behind.
 type WebPushSubscriptionStatus = record {
     endpoint : text;        // compared against the one the browser holds
 };
@@ -2239,7 +2237,7 @@ type ProbeNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
-// Null once nothing is left to show.
+// Null where the named entry is gone: taken, expired, or dropped with the registration.
 type GetNotificationResponse = record {
     notification : opt NotificationToShow;
 };
@@ -2768,8 +2766,8 @@ service : (opt InternetIdentityInit) -> {
     prepare_notification_delegation : (PrepareNotificationDelegationRequest) -> (variant { Ok : PrepareNotificationDelegationResponse; Err : NotificationDelegationError });
     get_notification_delegation : (GetNotificationDelegationRequest) -> (variant { Ok : GetNotificationDelegationResponse; Err : NotificationDelegationError }) query;
 
-    // Called by the service worker on a wake-up, signed with the browser key: the oldest
-    // notification its browser has yet to show, passing over the ones it skips.
+    // Called by the service worker on a wake-up, signed with the browser key: the entry
+    // that wake-up named, where it has not expired and the identity still allows it.
     browser_get_notification : (GetNotificationRequest) -> (variant { Ok : GetNotificationResponse; Err : GetNotificationError }) query;
     // Called by the service worker for the one it shows, while it fetches the content.
     browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });

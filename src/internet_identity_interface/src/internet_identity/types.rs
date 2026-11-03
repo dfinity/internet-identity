@@ -1100,8 +1100,7 @@ pub struct NotificationConsentGrantedRequest {
     pub origin: FrontendHostname,
 }
 
-/// Everything a browser uploads when it registers for Web Push, and how it replaces a
-/// registration at the same endpoint, which keeps what is already queued for it.
+/// Everything a browser uploads when it registers for Web Push.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SetWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,

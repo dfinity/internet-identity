@@ -1,6 +1,7 @@
-//! Send content-free wake-ups for backlog notifications, one per registered browser.
-//! A pass queues each notification for the browser before posting its wake-up, and
-//! spawns the posts rather than awaiting them. Nothing is retried; every outcome is counted.
+//! Post a wake-up per notification deposited in a browser's inbox, each carrying a
+//! sealed payload naming that one entry and signed for its relay. A pass deposits
+//! before it posts, and spawns the posts rather than awaiting them. Nothing is
+//! retried; every outcome is counted.
 
 use crate::admission_queue::{Admission, Taken};
 use crate::notifications::backlog::app::PendingNotification;

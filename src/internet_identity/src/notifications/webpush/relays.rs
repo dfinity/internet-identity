@@ -103,7 +103,7 @@ const REACHABILITY_MAX_ORIGINS: usize = 256;
 /// has been down accumulates failures, and the longest it is then held off after coming
 /// back is the marker's own lifetime. An hour apiece keeps that bound at two hours, which
 /// is why neither is set to the day a reachability answer would otherwise be good for.
-/// Re-asking costs one `HEAD` per origin per hour, which the probe budget barely notices.
+/// Re-asking costs one `GET` per origin per hour, which the probe budget barely notices.
 const REACHABILITY_FRESH_FOR_SECS: u64 = 60 * 60;
 const REACHABILITY_STALE_FOR_SECS: u64 = 60 * 60;
 const REACHABILITY_STALE_IF_ERROR_FOR_SECS: u64 = 60 * 60;

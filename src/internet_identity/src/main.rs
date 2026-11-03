@@ -883,12 +883,12 @@ fn link_notification_app(
     })
 }
 
-/// The entry a notification call acts on: the browser that signed it, or the one whose
+/// The browser a notification call acts on: the one that signed it, or the one whose
 /// wake-ups route through the app that did.
 ///
 /// Read here rather than carried out of the authorization, so what a call acts on is what
 /// is stored when it acts rather than what was stored when it was let in.
-fn notification_entry(
+fn authorized_browser(
     anchor_number: AnchorNumber,
     key: NotificationKey,
 ) -> Option<(storage::anchor::Anchor, BrowserId)> {
@@ -900,14 +900,14 @@ fn notification_entry(
     Some((anchor, browser_id))
 }
 
-/// The anchor, where `browser_id` names the entry this key speaks for. An app's key signs
-/// for every browser pointing at it, so a named browser is checked rather than trusted.
-fn notification_entry_named(
+/// The anchor, where the key speaks for the browser the request names. An app's key signs
+/// for every browser pointing at it, so the one named is checked rather than trusted.
+fn anchor_if_authorized_for(
     anchor_number: AnchorNumber,
     key: NotificationKey,
     browser_id: BrowserId,
 ) -> Option<storage::anchor::Anchor> {
-    let (anchor, authorized) = notification_entry(anchor_number, key)?;
+    let (anchor, authorized) = authorized_browser(anchor_number, key)?;
     (authorized == browser_id).then_some(anchor)
 }
 
@@ -928,7 +928,7 @@ fn prepare_notification_delegation(
     enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
-    let (anchor, browser_id) = notification_entry(request.anchor_number, key)
+    let (anchor, browser_id) = authorized_browser(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::prepare(
@@ -959,7 +959,7 @@ fn get_notification_delegation(
     enabled_or(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
-    let (anchor, browser_id) = notification_entry(request.anchor_number, key)
+    let (anchor, browser_id) = authorized_browser(request.anchor_number, key)
         .ok_or(NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::get(
@@ -987,7 +987,7 @@ fn browser_get_notification(
     enabled_or(GetNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| GetNotificationError::InvalidBrowserKey)?;
-    let anchor = notification_entry_named(anchor_number, key, browser_id)
+    let anchor = anchor_if_authorized_for(anchor_number, key, browser_id)
         .ok_or(GetNotificationError::InvalidBrowserKey)?;
 
     Ok(GetNotificationResponse {
@@ -1013,7 +1013,7 @@ fn browser_remove_notification(
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
-    let anchor = notification_entry_named(anchor_number, key, browser_id)
+    let anchor = anchor_if_authorized_for(anchor_number, key, browser_id)
         .ok_or(RemoveNotificationError::InvalidBrowserKey)?;
 
     let now_ns = ic_cdk::api::time();
