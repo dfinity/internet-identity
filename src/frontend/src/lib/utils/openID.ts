@@ -6,20 +6,55 @@ import { backendCanisterConfig } from "$lib/globals";
 import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
+import { clearOpenIdRedirectMarkers } from "$lib/utils/openIdRedirectMarkers";
 const BROADCAST_CHANNEL = "redirect_callback";
 const REDIRECT_CALLBACK_PATH = "/callback";
 // How often `redirectInPopup` checks whether the popup was closed.
 const POPUP_CLOSED_POLL_INTERVAL_MS = 250;
 // How long `redirectInPopup` keeps waiting for the callback payload after the
-// popup first reads as closed, before treating the flow as cancelled.
+// popup first reads as closed (or was never handed to us), before treating the
+// flow as cancelled.
 const POPUP_CLOSED_GRACE_MS = 1000;
 
-export class CallbackPopupClosedError extends Error {}
+/**
+ * The popup flow ended without a callback payload.
+ *
+ * - `blocked`: `window.open` returned `null` and no payload arrived within the
+ *   grace period. Usually the browser's pop-up blocker.
+ * - `closed`: the popup read as closed for the whole grace period without a
+ *   payload. Usually the user dismissed it.
+ *
+ * Both are reported to the user as a cancelled interaction; the reason is
+ * carried for analytics so the two can be told apart in production.
+ */
+export class CallbackPopupClosedError extends Error {
+  constructor(readonly reason: "blocked" | "closed") {
+    super(`OpenID callback popup ${reason}`);
+    this.name = "CallbackPopupClosedError";
+  }
+}
+
+/**
+ * The FedCM request was dismissed or could not complete.
+ *
+ * FedCM rejects with a deliberately opaque `NetworkError` for every failure
+ * the user is not meant to learn about (dismissed, no account, provider
+ * error). Wrapping it right where the FedCM call is made keeps
+ * {@link isOpenIdCancelError} from treating any other `NetworkError` as a
+ * cancelled interaction.
+ */
+export class FedCmCancelError extends Error {
+  constructor(readonly cause: unknown) {
+    super("FedCM request dismissed");
+    this.name = "FedCmCancelError";
+  }
+}
 
 /**
  * Payload the canister's POST /callback landing page delivers to the
- * frontend — via `BroadcastChannel` in the popup flow, via the
- * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
+ * frontend — via `BroadcastChannel` (and `window.opener.postMessage`) in the
+ * popup flow, via the `ii-openid-callback-data` sessionStorage entry in the
+ * same-tab flow.
  * Carries either the token or the IdP's RFC 6749 error report, plus the
  * CSRF `state` in both cases.
  *
@@ -78,6 +113,19 @@ const isCallbackPayload = (value: unknown): boolean =>
  *   known. If the promise rejects, the popup is closed and the outer
  *   promise rejects with the same error.
  *
+ * The payload can reach us two ways, both wired up BEFORE `window.open` so
+ * nothing the landing page posts can be missed:
+ * - the `redirect_callback` `BroadcastChannel`, which the landing page always
+ *   posts on;
+ * - a same-origin `message` event on this window, which the landing page also
+ *   posts to its `window.opener` when it has one.
+ *
+ * `window.open` returning `null` is not final either: Safari hands a
+ * `window.open` to an Apple ID authorization URL over to the system's
+ * Sign in with Apple dialog and only reports back once that has run, so the
+ * payload may already be on its way. A `null` window therefore starts the
+ * same grace period a closed popup gets, and only then counts as blocked.
+ *
  * The payload is resolved as `unknown`: it crosses a BroadcastChannel, so
  * the consumer (`extractIdTokenFromCallback`) revalidates its shape along
  * with the CSRF state check.
@@ -92,22 +140,50 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
   // `redirectWindow.location.href = ...` even though we'll end up on a
   // cross-origin IdP.
   const initialUrl = typeof url === "string" ? url : "/sso-connecting";
-  const redirectWindow = window.open(
-    initialUrl,
-    "_blank",
-    `width=${width},height=${height},left=${left},top=${top}`,
-  );
-  if (redirectWindow === null) {
-    throw new CallbackPopupClosedError();
-  }
+  // The popup inherits a copy of this tab's sessionStorage. A same-tab marker
+  // left behind by an abandoned redirect sign-in would make the popup's
+  // landing page navigate into the app instead of posting the payload back.
+  clearOpenIdRedirectMarkers();
 
   return new Promise<unknown>((resolve, reject) => {
+    let settled = false;
     const cleanup = () => {
+      settled = true;
       clearInterval(closeInterval);
       channel.close();
+      window.removeEventListener("message", onWindowMessage);
       redirectWindow?.close();
       window.focus();
     };
+    const onPayload = (data: unknown) => {
+      if (settled || !isCallbackPayload(data)) {
+        return;
+      }
+      cleanup();
+      resolve(data);
+    };
+    // Listen to the popup, we expect a message with the payload of the
+    // callback, after receiving it we can close the popup and resolve the
+    // promise.
+    const channel = new BroadcastChannel(BROADCAST_CHANNEL);
+    channel.addEventListener("message", (event) => onPayload(event.data));
+    // The landing page also posts the payload straight to its opener. Only a
+    // same-origin sender can produce it; the CSRF `state` is checked by the
+    // consumer either way.
+    const onWindowMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      onPayload(event.data);
+    };
+    window.addEventListener("message", onWindowMessage);
+
+    const redirectWindow = window.open(
+      initialUrl,
+      "_blank",
+      `width=${width},height=${height},left=${left},top=${top}`,
+    );
+
     // Periodically check if popup was closed by the user.
     // We can't listen for close events due to cross-origin restrictions,
     // so we poll to detect closure.
@@ -118,9 +194,13 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
     // closed while the message is still in flight. Keep listening for a
     // grace period after first seeing the popup closed; if the payload
     // arrives in time, the message listener resolves and cleans up.
-    let closedSince: number | undefined;
+    //
+    // A `null` window gets the same grace period from the start: see the
+    // Safari note in the function comment.
+    let closedSince: number | undefined =
+      redirectWindow === null ? Date.now() : undefined;
     const closeInterval = setInterval(() => {
-      if (redirectWindow.closed !== true) {
+      if (redirectWindow !== null && redirectWindow.closed !== true) {
         return;
       }
       closedSince ??= Date.now();
@@ -128,32 +208,28 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
         return;
       }
       cleanup();
-      reject(new CallbackPopupClosedError());
+      reject(
+        new CallbackPopupClosedError(
+          redirectWindow === null ? "blocked" : "closed",
+        ),
+      );
     }, POPUP_CLOSED_POLL_INTERVAL_MS);
-    // Listen to the popup, we expect a message with the payload of the
-    // callback, after receiving it we can close the popup and resolve the
-    // promise.
-    const channel = new BroadcastChannel(BROADCAST_CHANNEL);
-    channel.addEventListener("message", (event) => {
-      const data: unknown = event.data;
-      if (!isCallbackPayload(data)) {
-        return;
-      }
-      cleanup();
-      resolve(data);
-    });
 
     if (typeof url !== "string") {
       url.then(
         (resolvedUrl) => {
-          // The user may have closed the popup or the close-poller may have
-          // already rejected during the await — `closed` covers both.
-          if (redirectWindow.closed) {
+          // The popup may have been blocked, the user may have closed it, or
+          // the close-poller may have already rejected during the await —
+          // `closed` covers the latter two.
+          if (redirectWindow === null || redirectWindow.closed) {
             return;
           }
           redirectWindow.location.href = resolvedUrl;
         },
         (error: unknown) => {
+          if (settled) {
+            return;
+          }
           cleanup();
           reject(error);
         },
@@ -198,23 +274,33 @@ const requestWithCredentials = async (
   config: Omit<RequestConfig, "authURL">,
   options: RequestOptions,
 ): Promise<string> => {
-  const identityCredential = await navigator.credentials.get({
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    identity: {
-      context: "use",
-      providers: [
-        {
-          configURL: config.configURL,
-          clientId: config.clientId,
-          nonce: options.nonce,
-          loginHint: options.loginHint,
-        },
-      ],
-      mode: "active",
-    },
-    mediation: options.mediation,
-  });
+  let identityCredential: Credential | null;
+  try {
+    identityCredential = await navigator.credentials.get({
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      identity: {
+        context: "use",
+        providers: [
+          {
+            configURL: config.configURL,
+            clientId: config.clientId,
+            nonce: options.nonce,
+            loginHint: options.loginHint,
+          },
+        ],
+        mode: "active",
+      },
+      mediation: options.mediation,
+    });
+  } catch (error) {
+    // FedCM reports a dismissed dialog (and every other failure it keeps
+    // opaque) as a `NetworkError`; see `FedCmCancelError`.
+    if (error instanceof Error && error.name === "NetworkError") {
+      throw new FedCmCancelError(error);
+    }
+    throw error;
+  }
 
   if (
     identityCredential?.type !== "identity" ||
@@ -235,11 +321,19 @@ export const isNotSupportedError = (error: unknown) =>
   error instanceof Error && error.name === "NotSupportedError";
 
 /**
- * @param error to check whether it is a FedCM no permission error
+ * Whether the user ended the OpenID interaction without a result: the FedCM
+ * dialog was dismissed, or the popup closed (or never opened) without a
+ * callback payload.
+ *
+ * Deliberately narrow. Anything else that fails after the token is in hand
+ * (the canister call, the anchor lookup) is a real error and must surface as
+ * one rather than as the "Interaction canceled" hint.
+ *
+ * @param error to check
  */
 export const isOpenIdCancelError = (error: unknown) => {
   return (
-    (error instanceof Error && error.name === "NetworkError") ||
+    error instanceof FedCmCancelError ||
     error instanceof CallbackPopupClosedError
   );
 };

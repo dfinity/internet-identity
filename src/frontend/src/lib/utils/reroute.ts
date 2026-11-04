@@ -33,10 +33,19 @@ export const manuallyReroute = async (): Promise<boolean> => {
     const nextURL = new URL(next, window.location.origin);
     // Copy over the current query params
     nextURL.search = currentURL.search;
+    // A reroute to the route we're already on (e.g. "/" -> "/" when the
+    // discoverable passkey flow is on) is a no-op: there's nothing to
+    // navigate to, and reporting it as a reroute would make callers skip
+    // their own on-load work (tracking the page view, opening a resumed
+    // sign-in dialog). Treat it as "not rerouted".
+    if (nextURL.pathname === currentURL.pathname) {
+      return false;
+    }
     // Reroute to destination
     await goto(nextURL, { replaceState: true });
     // After rerouting, change the URL back to what the user expects to see
     replaceState(currentURL, {});
+    return true;
   }
-  return next !== undefined;
+  return false;
 };

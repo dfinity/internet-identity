@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   CallbackPopupClosedError,
   createRedirectURL,
+  FedCmCancelError,
   findConfig,
   issuerMatches,
   extractIssuerTemplateClaims,
@@ -14,6 +15,11 @@ import {
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
+import {
+  OPENID_AUTHORIZE_STATE_KEY,
+  OPENID_RETURN_PATH_KEY,
+  OPENID_WIZARD_RESUME_KEY,
+} from "$lib/utils/openIdRedirectMarkers";
 
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: {
@@ -559,14 +565,31 @@ describe("OAuthProviderError", () => {
 
 describe("isOpenIdCancelError", () => {
   it("returns true for CallbackPopupClosedError (popup closed by user)", () => {
-    expect(isOpenIdCancelError(new CallbackPopupClosedError())).toBe(true);
+    expect(isOpenIdCancelError(new CallbackPopupClosedError("closed"))).toBe(
+      true,
+    );
   });
 
-  it("returns true for a NetworkError (FedCM cancel)", () => {
+  it("returns true for CallbackPopupClosedError (popup blocked)", () => {
+    expect(isOpenIdCancelError(new CallbackPopupClosedError("blocked"))).toBe(
+      true,
+    );
+  });
+
+  it("returns true for a FedCM cancel", () => {
     const networkError = Object.assign(new Error("failed"), {
       name: "NetworkError",
     });
-    expect(isOpenIdCancelError(networkError)).toBe(true);
+    expect(isOpenIdCancelError(new FedCmCancelError(networkError))).toBe(true);
+  });
+
+  it("returns false for a bare NetworkError that did not come from FedCM", () => {
+    // A `NetworkError` from any later step (the canister call, the anchor
+    // lookup) is a real failure, not a cancelled interaction.
+    const networkError = Object.assign(new Error("failed"), {
+      name: "NetworkError",
+    });
+    expect(isOpenIdCancelError(networkError)).toBe(false);
   });
 
   it("returns false for a generic Error", () => {
@@ -722,6 +745,130 @@ describe("requestWithPopup", () => {
 
     await vi.advanceTimersByTimeAsync(250);
     expect(error).toBeInstanceOf(CallbackPopupClosedError);
+    expect((error as CallbackPopupClosedError).reason).toBe("closed");
     expect(channel.closed).toBe(true);
+  });
+
+  it("listens on the callback channel before the popup is opened", () => {
+    // Safari can run the whole Apple ID authorization inside `window.open`
+    // (system dialog) and have the landing page post the payload before
+    // `window.open` returns, so the listener must already exist by then.
+    let channelsWhenOpened: number | undefined;
+    const popup = { closed: false, close: vi.fn(), location: { href: "" } };
+    vi.spyOn(window, "open").mockImplementation(() => {
+      channelsWhenOpened = FakeBroadcastChannel.instances.length;
+      return popup as unknown as Window;
+    });
+
+    void requestWithPopup(config, { nonce: "nonce" }).catch(() => {});
+
+    expect(channelsWhenOpened).toBe(1);
+  });
+
+  it("resolves with the token when window.open returns null but the payload still arrives within the grace period", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const result = requestWithPopup(config, { nonce: "nonce" });
+    const state = new URL(open.mock.calls[0][0] as string).searchParams.get(
+      "state",
+    );
+    const [channel] = FakeBroadcastChannel.instances;
+
+    await vi.advanceTimersByTimeAsync(750);
+    expect(channel.closed).toBe(false);
+    channel.deliver({ id_token: "token", state });
+
+    await expect(result).resolves.toBe("token");
+    expect(channel.closed).toBe(true);
+  });
+
+  it("rejects as blocked once the grace period passes after window.open returned null", async () => {
+    vi.spyOn(window, "open").mockReturnValue(null);
+    const result = requestWithPopup(config, { nonce: "nonce" });
+    let error: unknown;
+    result.catch((e: unknown) => {
+      error = e;
+    });
+    const [channel] = FakeBroadcastChannel.instances;
+
+    // The grace period starts at the `null` return; the poll at 1000 ms is
+    // the first one past it.
+    await vi.advanceTimersByTimeAsync(750);
+    expect(error).toBeUndefined();
+    expect(channel.closed).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(error).toBeInstanceOf(CallbackPopupClosedError);
+    expect((error as CallbackPopupClosedError).reason).toBe("blocked");
+    expect(channel.closed).toBe(true);
+  });
+
+  it("does not navigate a deferred popup that was blocked, and still rejects as blocked", async () => {
+    vi.spyOn(window, "open").mockReturnValue(null);
+    const result = requestWithPopup(Promise.resolve(config), {
+      nonce: "nonce",
+    });
+    const rejection = expect(result).rejects.toMatchObject({
+      reason: "blocked",
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    await rejection;
+  });
+
+  it("accepts the payload posted to the opener window from the same origin", async () => {
+    const { popup, result, state, channel } = openPopup();
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { id_token: "token", state },
+        origin: window.location.origin,
+      }),
+    );
+
+    await expect(result).resolves.toBe("token");
+    expect(channel.closed).toBe(true);
+    expect(popup.close).toHaveBeenCalled();
+  });
+
+  it("ignores a payload posted to the opener window from another origin", async () => {
+    const { popup, result, state } = openPopup();
+    let error: unknown;
+    result.catch((e: unknown) => {
+      error = e;
+    });
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { id_token: "token", state },
+        origin: "https://evil.example",
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(error).toBeUndefined();
+    expect(popup.close).not.toHaveBeenCalled();
+
+    // Still waiting on the real payload: closing the popup ends the flow.
+    popup.closed = true;
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(error).toBeInstanceOf(CallbackPopupClosedError);
+  });
+
+  it("clears stale same-tab markers before opening the popup, so the popup's landing page posts back instead of navigating", () => {
+    sessionStorage.setItem(OPENID_RETURN_PATH_KEY, "/");
+    sessionStorage.setItem(OPENID_AUTHORIZE_STATE_KEY, "stale");
+    sessionStorage.setItem(OPENID_WIZARD_RESUME_KEY, "{}");
+    let markersWhenOpened: (string | null)[] | undefined;
+    const popup = { closed: false, close: vi.fn(), location: { href: "" } };
+    vi.spyOn(window, "open").mockImplementation(() => {
+      markersWhenOpened = [
+        sessionStorage.getItem(OPENID_RETURN_PATH_KEY),
+        sessionStorage.getItem(OPENID_AUTHORIZE_STATE_KEY),
+        sessionStorage.getItem(OPENID_WIZARD_RESUME_KEY),
+      ];
+      return popup as unknown as Window;
+    });
+
+    void requestWithPopup(config, { nonce: "nonce" }).catch(() => {});
+
+    expect(markersWhenOpened).toEqual([null, null, null]);
   });
 });
