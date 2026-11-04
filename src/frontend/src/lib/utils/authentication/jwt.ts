@@ -7,6 +7,7 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 import { MAX_POLL_ATTEMPTS, pollDelay } from "$lib/utils/openidPoll";
+import { fullNameBesideToken } from "$lib/utils/openID";
 import {
   AttributesIdentity,
   DelegationChain,
@@ -128,6 +129,10 @@ export const authenticateWithJWT = async ({
   const sessionKey = new Uint8Array(session.identity.getPublicKey().toDer());
   const domain: [] | [string] =
     discoveryDomain !== undefined ? [discoveryDomain] : [];
+  // Apple sends the user's name only on the first sign-in to II; the
+  // canister keeps the one it has when this sign-in brings none.
+  const fullName = fullNameBesideToken(jwt);
+  const appleFullName: [] | [string] = fullName !== undefined ? [fullName] : [];
 
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     // `prepare` (update) drives the SSO discovery/JWKS fetch; `get` (query)
@@ -138,6 +143,7 @@ export const authenticateWithJWT = async ({
       session.salt,
       sessionKey,
       domain,
+      appleFullName,
     );
     if ("Pending" in prepared) {
       await pollDelay();

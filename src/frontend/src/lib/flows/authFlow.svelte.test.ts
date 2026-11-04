@@ -135,10 +135,12 @@ vi.mock("$lib/utils/analytics/authenticationV2Funnel", () => ({
 
 const requestJWTMock = vi.hoisted(() => vi.fn());
 const decodeJWTMock = vi.hoisted(() => vi.fn());
+const fullNameBesideTokenMock = vi.hoisted(() => vi.fn());
 
 vi.mock("$lib/utils/openID", () => ({
   requestJWT: requestJWTMock,
   decodeJWT: decodeJWTMock,
+  fullNameBesideToken: fullNameBesideTokenMock,
   selectAuthScopes: (scopes: string[]) => scopes,
   extractIssuerTemplateClaims: () => [],
 }));
@@ -605,6 +607,7 @@ describe("AuthFlow — last-used tracking (openid vs sso)", () => {
   beforeEach(() => {
     requestJWTMock.mockReset();
     decodeJWTMock.mockReset();
+    fullNameBesideTokenMock.mockReset();
     authenticateWithJWTMock.mockReset();
     lastUsedIdentitiesStoreValue.addLastUsedIdentity.mockReset();
     decodeJWTMock.mockReturnValue({
@@ -726,6 +729,38 @@ describe("AuthFlow — last-used tracking (openid vs sso)", () => {
     expect(entry.identityNumber).toBe(BigInt(20));
     expect(entry.authMethod).toHaveProperty("openid");
     expect(entry.authMethod).not.toHaveProperty("sso");
+  });
+
+  it("sign-up sends the name Apple sent beside the token", async () => {
+    authenticateWithJWTMock
+      .mockRejectedValueOnce(noSuchAnchorError)
+      .mockResolvedValue({ identity: {}, identityNumber: BigInt(22) });
+    fullNameBesideTokenMock.mockImplementation((jwt: string) =>
+      jwt === "apple-jwt" ? "Jane Appleseed" : undefined,
+    );
+    const registrationFinish = vi.fn().mockResolvedValue({});
+    sessionStoreValue.set({
+      nonce: "test-nonce",
+      salt: new Uint8Array(32),
+      actor: {
+        identity_registration_start: vi
+          .fn()
+          .mockResolvedValue({ next_step: { Finish: null } }),
+        openid_identity_registration_finish: registrationFinish,
+      },
+    });
+
+    const flow = new AuthFlow();
+    await flow.continueWithOpenId(testConfig, "apple-jwt");
+    await flow.completeOpenIdRegistration("Jane");
+
+    expect(registrationFinish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jwt: "apple-jwt",
+        name: "Jane",
+        apple_full_name: ["Jane Appleseed"],
+      }),
+    );
   });
 
   it("sign-up commits an sso entry (keyed by domain) when a discovery domain is present", async () => {

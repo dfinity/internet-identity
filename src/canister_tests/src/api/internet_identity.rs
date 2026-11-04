@@ -542,6 +542,31 @@ pub fn openid_prepare_delegation_with_discovery(
     .map(|(x,)| x)
 }
 
+/// Like [`openid_prepare_delegation`] but also passes the user's name that
+/// Apple sent beside the JWT.
+pub fn openid_prepare_delegation_with_apple_full_name(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    apple_full_name: Option<&str>,
+) -> Result<
+    Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_prepare_delegation",
+        (jwt, salt, session_key, None::<&str>, apple_full_name),
+    )
+    .map(|(x,)| settled(x))
+}
+
 pub fn openid_get_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -624,6 +649,28 @@ pub fn openid_credential_add_with_discovery(
         (identity_number, jwt, salt, discovery_domain),
     )
     .map(|(x,)| x)
+}
+
+/// Like [`openid_credential_add`] but also passes the user's name that Apple
+/// sent beside the JWT.
+pub fn openid_credential_add_with_apple_full_name(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    jwt: &str,
+    salt: &[u8; 32],
+    apple_full_name: Option<&str>,
+) -> Result<Result<(), types::OpenIdCredentialAddError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "openid_credential_add",
+        (identity_number, jwt, salt, None::<&str>, apple_full_name),
+    )
+    .map(|(x,)| settled(x))
 }
 
 pub fn openid_credential_remove(

@@ -2537,6 +2537,7 @@ mod sso_gating {
                 name: "Gate User".into(),
                 discovery_domain: Some(GATE_DOMAIN.to_string()),
                 origin: Some(origin.to_string()),
+                apple_full_name: None,
             },
         )
         .expect("API call failed")

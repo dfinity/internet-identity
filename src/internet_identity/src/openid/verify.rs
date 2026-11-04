@@ -50,7 +50,8 @@ const MAX_EMAIL_LENGTH: usize = 256;
 
 // Maximum length of the name claim in the JWT, in practice we expect the identity provider to
 // already validate it on their end for a sane maximum length. This is an additional sanity check.
-const MAX_NAME_LENGTH: usize = 128;
+// Also bounds the name Apple sends beside its token (see `OpenIdCredential::set_apple_full_name`).
+pub(super) const MAX_NAME_LENGTH: usize = 128;
 
 // Maximum length of the iss claim in the JWT; a sanity bound.
 const MAX_ISS_LENGTH: usize = 255;
@@ -273,7 +274,9 @@ pub(super) fn verify_and_build(
             MetadataEntryV2::String(email_verified.into_string()),
         );
     }
-    if let Some(name) = name {
+    // An empty name is no name: it would be listed and certified as an empty
+    // `name` attribute, and would hide the name Apple sends beside its token.
+    if let Some(name) = name.filter(|name| !name.is_empty()) {
         metadata.insert("name".into(), MetadataEntryV2::String(name));
     }
     // Store issuer-specific claims (e.g. Microsoft's `tid`) in the metadata.

@@ -288,6 +288,10 @@ pub struct OpenIDRegFinishArg {
     pub discovery_domain: Option<String>,
     /// Target dapp origin, set only for a first gated SSO login.
     pub origin: Option<String>,
+    /// The user's name that Apple sent beside the JWT, in the authorization
+    /// response of the user's first sign-in; Apple keeps it out of the JWT.
+    /// Ignored for any other provider.
+    pub apple_full_name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

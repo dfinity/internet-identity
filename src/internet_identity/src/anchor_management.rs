@@ -277,11 +277,23 @@ pub fn remove_openid_credential(
 }
 
 /// Updates an `OpenIdCredential` of the given anchor, used to update details like the metadata.
+/// Apple sends the user's name only once, so an Apple credential keeps the name it has unless
+/// `apple_full_name` brings a new one it can take (see `OpenIdCredential::set_apple_full_name`).
 /// Return an error if the `OpenIdCredential` to be updated does not exist.
 pub fn update_openid_credential(
     anchor: &mut Anchor,
-    openid_credential: OpenIdCredential,
+    mut openid_credential: OpenIdCredential,
+    apple_full_name: Option<String>,
 ) -> Result<(), AnchorError> {
+    openid_credential.set_apple_full_name(apple_full_name);
+    if openid_credential.get_name().is_none() {
+        let stored_name = anchor
+            .openid_credentials()
+            .iter()
+            .find(|stored| stored.key() == openid_credential.key())
+            .and_then(OpenIdCredential::get_name);
+        openid_credential.set_apple_full_name(stored_name);
+    }
     anchor.update_openid_credential(openid_credential)
 }
 
@@ -392,6 +404,71 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
         Ok(Operation::AddOpenIdCredential {
             iss: openid_credential.iss.clone()
         })
+    );
+}
+
+#[test]
+fn should_keep_the_apple_name_across_sign_ins() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdConfig};
+
+    crate::openid::setup(vec![OpenIdConfig {
+        name: "Apple".into(),
+        logo: String::new(),
+        issuer: "https://appleid.apple.com".into(),
+        client_id: "ai.id.auth".into(),
+        jwks_uri: String::new(),
+        auth_uri: String::new(),
+        auth_scope: vec![],
+        fedcm_uri: None,
+        email_verification: None,
+        seed_jwks: None,
+    }]);
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let mut anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    // What a sign-in with Apple verifies: never a name.
+    let from_token = OpenIdCredential {
+        iss: "https://appleid.apple.com".into(),
+        sub: "apple-sub".into(),
+        aud: "ai.id.auth".into(),
+        last_usage_timestamp: None,
+        metadata: HashMap::default(),
+        sso_domain: None,
+        sso_name: None,
+        stable_id: None,
+    };
+    let mut linked = from_token.clone();
+    linked.set_apple_full_name(Some("Jane Appleseed".into()));
+    add_openid_credential(&mut anchor, linked, 0).unwrap();
+    let stored_name = |anchor: &Anchor| anchor.openid_credentials()[0].get_name();
+
+    // A later sign-in brings no name: the stored one stays.
+    update_openid_credential(&mut anchor, from_token.clone(), None).unwrap();
+    assert_eq!(stored_name(&anchor), Some("Jane Appleseed".into()));
+
+    // A name the credential can't take counts as none: the stored one stays.
+    for unusable in [String::new(), " \t".into(), "a".repeat(129)] {
+        update_openid_credential(&mut anchor, from_token.clone(), Some(unusable)).unwrap();
+        assert_eq!(stored_name(&anchor), Some("Jane Appleseed".into()));
+    }
+
+    // A sign-in that brings one (after the user revoked II at Apple) replaces it.
+    update_openid_credential(&mut anchor, from_token.clone(), Some("Jane Doe".into())).unwrap();
+    assert_eq!(stored_name(&anchor), Some("Jane Doe".into()));
+
+    // Other metadata is still refreshed from the token.
+    let mut with_email = from_token;
+    with_email.metadata.insert(
+        "email".into(),
+        MetadataEntryV2::String("jane@example.com".into()),
+    );
+    update_openid_credential(&mut anchor, with_email, None).unwrap();
+    assert_eq!(stored_name(&anchor), Some("Jane Doe".into()));
+    assert_eq!(
+        anchor.openid_credentials()[0].get_email(),
+        Some("jane@example.com".into())
     );
 }
 

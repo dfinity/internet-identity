@@ -7,6 +7,8 @@ import {
   extractIssuerTemplateClaims,
   selectAuthScopes,
   extractIdTokenFromCallback,
+  decodeJWT,
+  fullNameBesideToken,
   isOpenIdCancelError,
   OAuthProviderError,
   requestWithPopup,
@@ -491,6 +493,89 @@ describe("extractIdTokenFromCallback", () => {
     expect(() =>
       extractIdTokenFromCallback({ state: STATE, id_token: 42 }, STATE),
     ).toThrow("No token received");
+  });
+
+  it("keeps the full name sent beside the token", () => {
+    // Apple sends the user's name beside its ID token, not in it.
+    const token = "eyJhbGciOi.apple-with-name.token";
+    expect(
+      extractIdTokenFromCallback(
+        { id_token: token, state: STATE, full_name: "Jane Appleseed" },
+        STATE,
+      ),
+    ).toBe(token);
+    expect(fullNameBesideToken(token)).toBe("Jane Appleseed");
+  });
+
+  it("returns the token without a name when full_name is null or not a string", () => {
+    // The canister serializes an absent full_name as JSON null.
+    for (const [token, full_name] of [
+      ["eyJhbGciOi.null-name.token", null],
+      ["eyJhbGciOi.numeric-name.token", 42],
+    ] as const) {
+      expect(
+        extractIdTokenFromCallback(
+          { id_token: token, state: STATE, full_name },
+          STATE,
+        ),
+      ).toBe(token);
+      expect(fullNameBesideToken(token)).toBeUndefined();
+    }
+  });
+
+  it("does not keep the full name of a callback that fails its state check", () => {
+    const token = "eyJhbGciOi.forged.token";
+    expect(() =>
+      extractIdTokenFromCallback(
+        { id_token: token, state: "attacker-state", full_name: "Mallory" },
+        STATE,
+      ),
+    ).toThrow("Invalid state");
+    expect(fullNameBesideToken(token)).toBeUndefined();
+  });
+});
+
+describe("decodeJWT", () => {
+  const STATE = "decode-state";
+
+  const jwtWith = (claims: Record<string, unknown>): string => {
+    const body = btoa(JSON.stringify(claims))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    return `eyJhbGciOiJSUzI1NiJ9.${body}.c2lnbmF0dXJl`;
+  };
+
+  it("falls back to the name sent beside the token", () => {
+    const token = jwtWith({
+      iss: "https://appleid.apple.com",
+      sub: "apple-sub",
+      aud: "ai.id.auth",
+      email: "jane@example.com",
+    });
+    expect(decodeJWT(token).name).toBeUndefined();
+
+    extractIdTokenFromCallback(
+      { id_token: token, state: STATE, full_name: "Jane Appleseed" },
+      STATE,
+    );
+
+    expect(decodeJWT(token).name).toBe("Jane Appleseed");
+  });
+
+  it("prefers the name in the token", () => {
+    const token = jwtWith({
+      iss: "https://accounts.google.com",
+      sub: "google-sub",
+      aud: "client",
+      name: "Signed Name",
+    });
+    extractIdTokenFromCallback(
+      { id_token: token, state: STATE, full_name: "Jane Appleseed" },
+      STATE,
+    );
+
+    expect(decodeJWT(token).name).toBe("Signed Name");
   });
 });
 

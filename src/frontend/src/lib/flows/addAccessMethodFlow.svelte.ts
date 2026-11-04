@@ -1,6 +1,11 @@
 import { frontendCanisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
-import { decodeJWT, requestJWT, selectAuthScopes } from "$lib/utils/openID";
+import {
+  decodeJWT,
+  fullNameBesideToken,
+  requestJWT,
+  selectAuthScopes,
+} from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import { retryWhilePending } from "$lib/utils/openidPoll";
@@ -49,6 +54,7 @@ export class AddAccessMethodFlow {
         },
       );
       const { iss, sub, aud, name, email } = decodeJWT(jwt);
+      const fullName = fullNameBesideToken(jwt);
       this.#isSystemOverlayVisible = false;
       // AddAccessMethod.svelte already disables the per-provider button
       // when that provider is linked to the current identity, and
@@ -65,6 +71,7 @@ export class AddAccessMethodFlow {
           jwt,
           salt,
           discoveryDomain !== undefined ? [discoveryDomain] : [],
+          fullName !== undefined ? [fullName] : [],
         ),
       ).then(throwCanisterError);
 

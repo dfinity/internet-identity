@@ -123,6 +123,7 @@ pub fn create_identity_with_openid_credential(
             name: "John Doe".into(),
             discovery_domain: None,
             origin: None,
+            apple_full_name: None,
         },
     )
     .expect("API call failed")
