@@ -1664,16 +1664,24 @@ impl<M: Memory + Clone> Storage<M> {
                 .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| browser.id)
                 .collect();
-            let mut cleared = false;
-            for browser_id in pointing {
-                cleared |= anchor.clear_notifications_for_browser(browser_id);
-            }
-            if !cleared {
+            let cleared: Vec<BrowserId> = pointing
+                .into_iter()
+                .filter(|browser_id| anchor.clear_notifications_for_browser(*browser_id))
+                .collect();
+            if cleared.is_empty() {
                 continue;
             }
             if let Err(err) = self.write(anchor) {
                 ic_cdk::println!(
                     "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
+                );
+                continue;
+            }
+            for browser_id in cleared {
+                crate::notifications::delivery_metrics::inbox_cleared(
+                    anchor_number,
+                    browser_id,
+                    crate::notifications::delivery_metrics::Reason::SubscriptionReplaced,
                 );
             }
         }
@@ -3785,7 +3793,7 @@ impl<M: Memory + Clone> Storage<M> {
         //
         // After the refusals above, so a ceremony that cannot happen registers nothing —
         // the record reaches storage only through the write at the end.
-        let (browser_id, _) = anchor
+        let (browser_id, evicted) = anchor
             .resolve_browser(
                 browser_keys.current().clone(),
                 browser_keys.next().clone(),
@@ -3870,6 +3878,13 @@ impl<M: Memory + Clone> Storage<M> {
         // the sessions of every browser the registry gave up, the account reference list
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, now_ns, state)?;
+        for evicted in evicted {
+            crate::notifications::delivery_metrics::inbox_cleared(
+                anchor_number,
+                evicted,
+                crate::notifications::delivery_metrics::Reason::BrowserEvicted,
+            );
+        }
 
         let key = SessionLocator {
             anchor_number,

@@ -136,6 +136,10 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     .value(&[("outcome", "rate_limited")], posts.rate_limited as f64)?
     .value(&[("outcome", "relay_error")], posts.relay_error as f64)?
     .value(&[("outcome", "rejected")], posts.rejected as f64)?;
+    let waiting =
+        state::notification_backlog_mut(time(), |backlog| backlog.stats(time()).stored_total)
+            + state::identity_backlog_mut(time(), |backlog| backlog.stats(time()).stored_total);
+    crate::notifications::delivery_metrics::encode(w, waiting)?;
     w.encode_gauge(
         "internet_identity_stable_memory_pages",
         stable_size() as f64,

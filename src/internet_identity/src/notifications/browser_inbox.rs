@@ -7,6 +7,7 @@
 //! The inbox lives on the browser's entry, and is cleared when its wake-up address
 //! changes.
 
+use crate::notifications::delivery_metrics::{self, Reason};
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -22,20 +23,19 @@ pub(crate) const CAPACITY: usize = 100;
 /// it so the wake-up announcing it can ask for that entry and no other.
 ///
 /// Every deposit earns a wake-up of its own, including one that overflows the inbox.
+/// Answers the entry as deposited, and the id of the one it pushed out of a full inbox.
 pub(crate) fn deposit(
     inbox: &mut Vec<InboxNotification>,
     next_id: &mut InboxNotificationId,
     mut notification: InboxNotification,
     now_ns: Timestamp,
-) -> InboxNotification {
+) -> (InboxNotification, Option<InboxNotificationId>) {
     notification.inbox_notification_id = *next_id;
     *next_id = next_id.wrapping_add(1);
     inbox.retain(|entry| entry.expires_at_ns > now_ns);
-    if inbox.len() >= CAPACITY {
-        inbox.remove(0);
-    }
+    let overflowed = (inbox.len() >= CAPACITY).then(|| inbox.remove(0).inbox_notification_id);
     inbox.push(notification.clone());
-    notification
+    (notification, overflowed)
 }
 
 /// A failed post means no wake-up is coming for the entry it named, so that entry goes
@@ -107,19 +107,33 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
         };
         let browser_ids: Vec<BrowserId> =
             anchor.browsers().iter().map(|browser| browser.id).collect();
-        let mut removed = false;
+        let mut removed = Vec::new();
         for browser_id in browser_ids {
             if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                let before = inbox.len();
-                inbox.retain(|entry| entry.application_number != Some(application_number));
-                removed |= inbox.len() < before;
+                let (theirs, others) = std::mem::take(inbox)
+                    .into_iter()
+                    .partition(|entry| entry.application_number == Some(application_number));
+                *inbox = others;
+                let theirs: Vec<InboxNotification> = theirs;
+                if !theirs.is_empty() {
+                    removed.push((browser_id, theirs));
+                }
             }
         }
-        if !removed {
+        if removed.is_empty() {
             return;
         }
         if let Err(err) = storage.write(anchor) {
             ic_cdk::println!("Failed to drop what an app without consent deposited: {err}");
+            return;
+        }
+        for (browser_id, entries) in removed {
+            delivery_metrics::entries_removed(
+                anchor_number,
+                browser_id,
+                entries.iter().map(|entry| entry.inbox_notification_id),
+                Reason::ConsentRevoked,
+            );
         }
     });
 }
@@ -184,10 +198,24 @@ pub(crate) fn remove_collected(
         let Some(position) = inbox.iter().position(|entry| {
             entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
         }) else {
+            if inbox
+                .iter()
+                .any(|entry| entry.inbox_notification_id == inbox_notification_id)
+            {
+                delivery_metrics::entries_removed(
+                    anchor.anchor_number(),
+                    browser_id,
+                    [inbox_notification_id],
+                    Reason::FetchedTooLate,
+                );
+            }
             return Ok(());
         };
         inbox.remove(position);
-        storage.write(anchor).map_err(|err| format!("{err}"))
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).map_err(|err| format!("{err}"))?;
+        delivery_metrics::collected(anchor_number, browser_id, inbox_notification_id);
+        Ok(())
     })
 }
 
@@ -252,7 +280,7 @@ mod tests {
         let mut next_id = 7;
 
         for id in 1..=3 {
-            let deposited = deposit(
+            let (deposited, _) = deposit(
                 &mut inbox,
                 &mut next_id,
                 entry(id, 60 * SECOND_NS),
@@ -283,13 +311,13 @@ mod tests {
         let mut second = Vec::new();
         let mut next_id = 0;
 
-        let to_first = deposit(
+        let (to_first, _) = deposit(
             &mut first,
             &mut next_id,
             entry(1, 60 * SECOND_NS),
             SECOND_NS,
         );
-        let to_second = deposit(
+        let (to_second, _) = deposit(
             &mut second,
             &mut next_id,
             entry(1, 60 * SECOND_NS),
@@ -324,13 +352,15 @@ mod tests {
             .collect();
         let mut next_id = CAPACITY as u64;
 
-        deposit(
+        let (_, overflowed) = deposit(
             &mut inbox,
             &mut next_id,
             entry(1_000, 60 * SECOND_NS),
             SECOND_NS,
         );
 
+        // The entry pushed out is named, so it can be counted as lost.
+        assert_eq!(overflowed, Some(0));
         assert_eq!(inbox.len(), CAPACITY);
         assert_eq!(inbox.first().map(|one| one.notification_id), Some(1));
         assert_eq!(inbox.last().map(|one| one.notification_id), Some(1_000));
