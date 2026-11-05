@@ -1565,6 +1565,17 @@ pub struct RemoveNotificationRequest {
     pub browser_id: BrowserId,
     /// As the wake-up that announced it named it.
     pub inbox_notification_id: InboxNotificationId,
+    /// Why the worker could not show it. Absent where it did.
+    pub content_failure: Option<NotificationContentFailure>,
+}
+
+/// How the service worker's call to the app's canister for a notification's content failed.
+#[derive(Clone, Copy, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationContentFailure {
+    /// The call got no answer.
+    Unreachable,
+    /// The app's canister rejected the call or trapped.
+    Rejected,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

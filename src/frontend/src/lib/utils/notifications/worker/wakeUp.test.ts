@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Principal } from "@icp-sdk/core/principal";
-import type { Identity } from "@icp-sdk/core/agent";
+import { RejectError, type Identity } from "@icp-sdk/core/agent";
 import type { NotificationEvent } from "$lib/generated/internet_identity_types";
 
 const signing =
@@ -433,7 +433,7 @@ describe("onWakeUp", () => {
     ]);
   });
 
-  it("keeps the notification where the app could not be asked", async () => {
+  it("reports the app it could not ask as unreachable", async () => {
     const shown = registration();
     const ii = internetIdentity([notification]);
     fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
@@ -446,12 +446,32 @@ describe("onWakeUp", () => {
       NAMED,
     );
 
-    // Dropping it is what an app's own "nothing" means, and cannot be undone.
-    expect(ii.removed).toHaveLength(0);
+    expect(ii.removed).toEqual([
+      expect.objectContaining({ content_failure: [{ Unreachable: null }] }),
+    ]);
     expect(reportNotificationReceived).not.toHaveBeenCalled();
     // `userVisibleOnly` still has to be satisfied.
     expect(shown.shown.map((entry) => entry.title)).toEqual([
       "Internet Identity",
+    ]);
+  });
+
+  it("reports an app whose canister rejected the call as rejected", async () => {
+    const ii = internetIdentity([notification]);
+    fetchNotificationContent.mockRejectedValue(
+      Object.create(RejectError.prototype),
+    );
+
+    await onWakeUp(
+      {
+        registration: registration(),
+        internetIdentity: ii.factory,
+      },
+      NAMED,
+    );
+
+    expect(ii.removed).toEqual([
+      expect.objectContaining({ content_failure: [{ Rejected: null }] }),
     ]);
   });
 
@@ -574,6 +594,7 @@ describe("onWakeUp", () => {
         anchor_number: IDENTITY,
         browser_id: NAMED.browserId,
         inbox_notification_id: NAMED.inboxNotificationId,
+        content_failure: [],
       },
     ]);
   });

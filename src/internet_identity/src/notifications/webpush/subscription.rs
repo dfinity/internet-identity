@@ -4,7 +4,7 @@
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
 use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
-use crate::notifications::delivery_metrics::{self, Reason};
+use crate::notifications::delivery_metrics::{self, Path, Reason};
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::NotificationAppRef;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
@@ -281,15 +281,19 @@ fn write_subscription(
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
+    let path = storage_borrow(|storage| {
+        anchor
+            .browser(browser_id)
+            .map_or(Path::Other, |browser| dispatch::path_of(storage, browser))
+    });
     let cleared = anchor
         .notifications_for_browser_mut(browser_id)
-        .is_some_and(|inbox| !std::mem::take(inbox).is_empty());
+        .map(std::mem::take)
+        .unwrap_or_default();
     let anchor_number = anchor.anchor_number();
     let left = anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
-    if cleared {
-        delivery_metrics::inbox_cleared(anchor_number, browser_id, Reason::SubscriptionReplaced);
-    }
+    delivery_metrics::entries_removed(anchor_number, &cleared, path, Reason::SubscriptionReplaced);
     // Read after the write, so the reference this browser just dropped is already gone:
     // a record the last browser left behind is one nothing can reach again.
     if let Some(app_id) = left {

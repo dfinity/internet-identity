@@ -104,6 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
+use crate::notifications::delivery_metrics;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
@@ -112,7 +113,9 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
+use crate::storage::anchor::{
+    Anchor, BrowserError, InboxNotification, WebPushSubscription, MAX_BROWSERS,
+};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1664,10 +1667,12 @@ impl<M: Memory + Clone> Storage<M> {
                 .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| browser.id)
                 .collect();
-            let cleared: Vec<BrowserId> = pointing
-                .into_iter()
-                .filter(|browser_id| anchor.clear_notifications_for_browser(*browser_id))
-                .collect();
+            let mut cleared: Vec<InboxNotification> = Vec::new();
+            for browser_id in pointing {
+                if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
+                    cleared.append(inbox);
+                }
+            }
             if cleared.is_empty() {
                 continue;
             }
@@ -1677,13 +1682,12 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             }
-            for browser_id in cleared {
-                crate::notifications::delivery_metrics::inbox_cleared(
-                    anchor_number,
-                    browser_id,
-                    crate::notifications::delivery_metrics::Reason::SubscriptionReplaced,
-                );
-            }
+            delivery_metrics::entries_removed(
+                anchor_number,
+                &cleared,
+                delivery_metrics::Path::App,
+                delivery_metrics::Reason::SubscriptionReplaced,
+            );
         }
     }
 
@@ -3793,6 +3797,23 @@ impl<M: Memory + Clone> Storage<M> {
         //
         // After the refusals above, so a ceremony that cannot happen registers nothing —
         // the record reaches storage only through the write at the end.
+        // Read before the registry may give a browser up, which takes its inbox with it.
+        let inboxes_at_risk: Vec<(BrowserId, delivery_metrics::Path, Vec<InboxNotification>)> =
+            if anchor.browsers().len() >= MAX_BROWSERS {
+                anchor
+                    .browsers()
+                    .iter()
+                    .map(|browser| {
+                        (
+                            browser.id,
+                            crate::notifications::dispatch::path_of(self, browser),
+                            browser.notifications.clone(),
+                        )
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
         let (browser_id, evicted) = anchor
             .resolve_browser(
                 browser_keys.current().clone(),
@@ -3878,12 +3899,15 @@ impl<M: Memory + Clone> Storage<M> {
         // the sessions of every browser the registry gave up, the account reference list
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, now_ns, state)?;
-        for evicted in evicted {
-            crate::notifications::delivery_metrics::inbox_cleared(
-                anchor_number,
-                evicted,
-                crate::notifications::delivery_metrics::Reason::BrowserEvicted,
-            );
+        for (browser_id, path, inbox) in &inboxes_at_risk {
+            if evicted.contains(browser_id) {
+                delivery_metrics::entries_removed(
+                    anchor_number,
+                    inbox,
+                    *path,
+                    delivery_metrics::Reason::BrowserEvicted,
+                );
+            }
         }
 
         let key = SessionLocator {

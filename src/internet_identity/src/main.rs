@@ -1008,6 +1008,7 @@ fn browser_remove_notification(
         anchor_number,
         browser_id,
         inbox_notification_id,
+        content_failure,
     } = request;
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
@@ -1027,6 +1028,7 @@ fn browser_remove_notification(
         anchor,
         browser_id,
         inbox_notification_id,
+        content_failure,
         now_ns,
     )
     .map(|()| RemoveNotificationResponse {})

@@ -342,9 +342,14 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
+  const NotificationContentFailure = IDL.Variant({
+    'Unreachable' : IDL.Null,
+    'Rejected' : IDL.Null,
+  });
   const RemoveNotificationRequest = IDL.Record({
     'inbox_notification_id' : InboxNotificationId,
     'browser_id' : IDL.Nat32,
+    'content_failure' : IDL.Opt(NotificationContentFailure),
     'anchor_number' : UserNumber,
   });
   const RemoveNotificationResponse = IDL.Record({});

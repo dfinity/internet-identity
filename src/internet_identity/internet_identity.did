@@ -2254,6 +2254,16 @@ type RemoveNotificationRequest = record {
     browser_id : nat32;
     // As the wake-up that announced it named it.
     inbox_notification_id : InboxNotificationId;
+    // Why the worker could not show it. Absent where it did.
+    content_failure : opt NotificationContentFailure;
+};
+
+// How the service worker's call to the app's canister for a notification's content failed.
+type NotificationContentFailure = variant {
+    // The call got no answer.
+    Unreachable;
+    // The app's canister rejected the call or trapped.
+    Rejected;
 };
 
 type RemoveNotificationResponse = record {};
