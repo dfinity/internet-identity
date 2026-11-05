@@ -183,6 +183,7 @@ const fetchEntry = async (
   context: WakeUpContext,
   signing: SigningIdentity,
   id: InboxEntryId,
+  background: BackgroundCalls,
 ): Promise<InboxEntry | undefined> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     signing,
@@ -197,6 +198,9 @@ const fetchEntry = async (
   }
   const notification = found.Ok.notification[0];
   if (notification === undefined) {
+    // Expired or already gone. Removing it lets Internet Identity count one that expired
+    // as asked for too late; one already gone is no error.
+    background.start(removeEntry(actor, id));
     return undefined;
   }
   return { actor, identityNumber: signing.identityNumber, notification, id };
@@ -484,7 +488,9 @@ export const onWakeUp = async (
       ? undefined
       : signing.find((one) => one.identityNumber === id.anchorNumber);
   if (id !== undefined && signer !== undefined) {
-    const entry = await fetchEntry(context, signer, id).catch(() => undefined);
+    const entry = await fetchEntry(context, signer, id, background).catch(
+      () => undefined,
+    );
     if (entry !== undefined) {
       shown = await showEntry(context, entry, background).catch(() => false);
     }

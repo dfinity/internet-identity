@@ -499,8 +499,8 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
-            let (deposited, displaced) = browser_inbox::deposit(queue, next_id, entry, now_ns);
-            deposits.deposited(path, displaced);
+            let (deposited, overflowed) = browser_inbox::deposit(queue, next_id, entry, now_ns);
+            deposits.deposited(path, overflowed);
             // The body is sealed once the pass is planned, because what it is sealed with
             // may be refreshed first and the salt comes from the pass rather than the entry.
             delivery.notification = Some(deposited);
@@ -642,9 +642,9 @@ fn fan_out_to_browsers(
                 continue;
             };
             queued_anywhere = true;
-            let (deposited, displaced) =
+            let (deposited, overflowed) =
                 browser_inbox::deposit(queue, next_id, queued.clone(), now_ns);
-            deposits.deposited(path, displaced);
+            deposits.deposited(path, overflowed);
             delivery.notification = Some(deposited);
             to_post.push(delivery);
         }
@@ -673,8 +673,8 @@ fn fan_out_to_browsers(
 #[derive(Default)]
 struct Deposits {
     pushes: Vec<PlannedPush>,
-    /// What each deposit took out of its inbox, by the delivery path of that inbox.
-    displaced: Vec<(Path, browser_inbox::Displaced)>,
+    /// The entries pushed out of a full inbox, by the delivery path of that inbox.
+    overflowed: Vec<(Path, InboxNotification)>,
 }
 
 impl Deposits {
@@ -685,12 +685,13 @@ impl Deposits {
         });
     }
 
-    fn deposited(&mut self, path: Path, displaced: browser_inbox::Displaced) {
+    fn deposited(&mut self, path: Path, overflowed: Option<InboxNotification>) {
         self.pushes.push(PlannedPush {
             path,
             deposited: true,
         });
-        self.displaced.push((path, displaced));
+        self.overflowed
+            .extend(overflowed.map(|overflowed| (path, overflowed)));
     }
 
     fn count(
@@ -700,16 +701,10 @@ impl Deposits {
         labels: Labels,
         now_ns: Timestamp,
     ) {
-        for (path, displaced) in &self.displaced {
+        for (path, overflowed) in &self.overflowed {
             delivery_metrics::entries_removed(
                 anchor_number,
-                &displaced.expired,
-                *path,
-                Reason::NeverFetched,
-            );
-            delivery_metrics::entries_removed(
-                anchor_number,
-                &displaced.overflowed,
+                [overflowed],
                 *path,
                 Reason::InboxFull,
             );
@@ -930,7 +925,6 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
             delivery.anchor_number,
             notification,
             Path::of(delivery.target, &delivery.endpoint),
-            &delivery.urgency,
             outcome.loss(),
         );
     }

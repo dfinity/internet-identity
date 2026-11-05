@@ -3946,12 +3946,18 @@ impl<M: Memory + Clone> Storage<M> {
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
+        let path = anchor
+            .browser(browser_id)
+            .map_or(delivery_metrics::Path::Other, |browser| {
+                crate::notifications::dispatch::path_of(self, browser)
+            });
         // A browser the identity signed out of must stop being notified for it. The entry
         // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
-        if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
-            queue.clear();
-        }
+        let cleared = anchor
+            .notifications_for_browser_mut(browser_id)
+            .map(std::mem::take)
+            .unwrap_or_default();
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -3971,6 +3977,12 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         self.write_account_state(anchor, now, state)?;
+        delivery_metrics::entries_removed(
+            anchor_number,
+            &cleared,
+            path,
+            delivery_metrics::Reason::BrowserSignedOut,
+        );
 
         Ok(revoked)
     }

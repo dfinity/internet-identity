@@ -24,38 +24,20 @@ pub(crate) const CAPACITY: usize = 100;
 /// Put a notification behind the inbox's newest, dropping what expired first, and name
 /// it so the wake-up announcing it can ask for that entry and no other.
 ///
-/// What a deposit took out of the inbox to make room.
-#[derive(Debug, Default)]
-pub(crate) struct Displaced {
-    /// Expired without a device collecting them.
-    pub(crate) expired: Vec<InboxNotification>,
-    /// The oldest, where the inbox was full.
-    pub(crate) overflowed: Option<InboxNotification>,
-}
-
 /// Every deposit earns a wake-up of its own, including one that overflows the inbox.
-/// Answers the entry as deposited, and what it took out.
+/// Answers the entry as deposited, and the oldest where the inbox was full.
 pub(crate) fn deposit(
     inbox: &mut Vec<InboxNotification>,
     next_id: &mut InboxNotificationId,
     mut notification: InboxNotification,
     now_ns: Timestamp,
-) -> (InboxNotification, Displaced) {
+) -> (InboxNotification, Option<InboxNotification>) {
     notification.inbox_notification_id = *next_id;
     *next_id = next_id.wrapping_add(1);
-    let (expired, kept) = std::mem::take(inbox)
-        .into_iter()
-        .partition(|entry| entry.expires_at_ns <= now_ns);
-    *inbox = kept;
+    inbox.retain(|entry| entry.expires_at_ns > now_ns);
     let overflowed = (inbox.len() >= CAPACITY).then(|| inbox.remove(0));
     inbox.push(notification.clone());
-    (
-        notification,
-        Displaced {
-            expired,
-            overflowed,
-        },
-    )
+    (notification, overflowed)
 }
 
 /// A failed post means no wake-up is coming for the entry it named, so that entry goes
@@ -241,7 +223,7 @@ pub(crate) fn remove_collected(
             })
         };
         match lost {
-            None => delivery_metrics::collected(anchor_number, &entry, path),
+            None => delivery_metrics::collected(anchor_number, &entry, path, now_ns),
             Some(reason) => {
                 delivery_metrics::entries_removed(anchor_number, [&entry], path, reason)
             }
@@ -383,7 +365,7 @@ mod tests {
             .collect();
         let mut next_id = CAPACITY as u64;
 
-        let (_, displaced) = deposit(
+        let (_, overflowed) = deposit(
             &mut inbox,
             &mut next_id,
             entry(1_000, 60 * SECOND_NS),
@@ -391,10 +373,7 @@ mod tests {
         );
 
         // The entry pushed out is handed back, so it can be counted as lost.
-        assert_eq!(
-            displaced.overflowed.map(|entry| entry.notification_id),
-            Some(0)
-        );
+        assert_eq!(overflowed.map(|entry| entry.notification_id), Some(0));
         assert_eq!(inbox.len(), CAPACITY);
         assert_eq!(inbox.first().map(|one| one.notification_id), Some(1));
         assert_eq!(inbox.last().map(|one| one.notification_id), Some(1_000));

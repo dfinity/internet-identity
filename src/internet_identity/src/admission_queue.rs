@@ -829,11 +829,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                     queue.remove_entry(priority, expires_at_ns, &key, max_pending_per_group);
                 let emptied = queue.is_empty();
                 if let Some(entry) = removed {
-                    let window_ends_ns = entry
-                        .received_at_ns
-                        .saturating_add(self.config.discard_entries_after_ns);
+                    // The expiry it ended with, which a folded resend may have set: the
+                    // app's own where that was the earlier, the backlog's window where not.
                     self.expired.push(Expired {
-                        by_own_deadline: entry.expires_at_ns < window_ends_ns,
+                        by_own_deadline: entry.item.expires_at_ns() == Some(entry.expires_at_ns),
                         item: entry.item,
                     });
                 }
@@ -1463,6 +1462,31 @@ mod tests {
         assert_eq!(admissions, vec![Admission::Folded]);
         assert_eq!(backlog.stored_total, 1);
         assert_eq!(backlog.stats(2).folded_duplicates, 1);
+    }
+
+    #[test]
+    fn a_folded_resend_that_expires_by_its_own_deadline_is_the_apps() {
+        let mut backlog = TestQueue::new(config(), 0);
+        // Its window ends at 100, before its own deadline at 150.
+        backlog.admit(1, vec![expiring(1, 1, 150)], 0);
+        // The resend restarts the window to 140, after its own deadline at 120.
+        backlog.admit(1, vec![expiring(1, 1, 120)], 40);
+
+        backlog.admit(1, vec![item(2, 1)], 121);
+
+        let expired = backlog.drain_expired();
+        assert!(matches!(expired.as_slice(), [only] if only.by_own_deadline));
+    }
+
+    #[test]
+    fn an_item_that_waits_its_whole_window_is_the_backlogs() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![expiring(1, 1, 150)], 0);
+
+        backlog.admit(1, vec![item(2, 1)], 101);
+
+        let expired = backlog.drain_expired();
+        assert!(matches!(expired.as_slice(), [only] if !only.by_own_deadline));
     }
 
     #[test]

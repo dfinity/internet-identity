@@ -599,6 +599,28 @@ describe("onWakeUp", () => {
     ]);
   });
 
+  it("removes an entry it was not given, so one asked for too late is counted", async () => {
+    const ii = internetIdentity([]);
+    const shown = registration();
+
+    await onWakeUp(
+      { registration: shown, internetIdentity: ii.factory },
+      NAMED,
+    );
+
+    expect(ii.removed).toEqual([
+      {
+        anchor_number: IDENTITY,
+        browser_id: NAMED.browserId,
+        inbox_notification_id: NAMED.inboxNotificationId,
+        content_failure: [],
+      },
+    ]);
+    expect(shown.shown).toEqual([
+      expect.objectContaining({ title: "Internet Identity" }),
+    ]);
+  });
+
   it("shows one notification per wake-up, whatever is waiting elsewhere", async () => {
     const shown = registration();
     signing.mockResolvedValue([signs(IDENTITY), signs(BigInt(10_001))]);

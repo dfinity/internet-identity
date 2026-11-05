@@ -139,7 +139,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     let waiting =
         state::notification_backlog_mut(time(), |backlog| backlog.stats(time()).stored_total)
             + state::identity_backlog_mut(time(), |backlog| backlog.stats(time()).stored_total);
-    crate::notifications::delivery_metrics::encode(w, waiting)?;
+    crate::notifications::delivery_metrics::encode(w, waiting, time())?;
     w.encode_gauge(
         "internet_identity_stable_memory_pages",
         stable_size() as f64,
