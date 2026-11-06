@@ -302,6 +302,9 @@ should_upgrade_frontend() {
 # still possible, but only after confirming the commits it adds.
 ensure_head_on_upstream_main() {
   local input
+  if [ "${MOCK_JSON:-}" ]; then
+    return
+  fi
   git fetch --quiet "$REPO_HTTPS_URL" main
   if git merge-base --is-ancestor HEAD FETCH_HEAD; then
     return
