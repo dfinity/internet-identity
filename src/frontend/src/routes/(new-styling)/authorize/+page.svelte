@@ -97,6 +97,9 @@
   // The redirect to Apple is waiting behind the native Sign in with Apple
   // sheet, which keeps this page on screen.
   let isBehindAppleSheet = $state(false);
+  // iOS tells this page nothing when the sheet is canceled, so a way back to
+  // the app shows up after a moment.
+  let canReturnToApp = $state(false);
   let ssoInitError = $state<{ cause: unknown }>();
   // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
   // Holds everything the dialog needs to run one normal (primary-client)
@@ -268,6 +271,7 @@
     ) {
       isBehindAppleSheet = true;
       closeWhenAppleSheetIsCanceled();
+      setTimeout(() => (canReturnToApp = true), 10_000);
     }
     window.location.assign(next);
   };
@@ -701,6 +705,11 @@
       <p class="text-text-primary text-base font-medium">
         {$t`Connecting to Apple`}
       </p>
+      {#if canReturnToApp}
+        <button class="btn btn-secondary mt-3" onclick={returnToApp}>
+          {$t`Return to app`}
+        </button>
+      {/if}
     </div>
   {/if}
 {:else if data.flow === "sso-init"}
