@@ -2,13 +2,13 @@
 //!
 //! A notification is counted once at each stage it reaches: received, accepted, pushed
 //! (a push service took one of its pushes) and delivered (one of its devices collected
-//! it). Up to the fan-out, one that stops is counted as a loss with the reason. A push is
-//! one copy of a notification on its way to one browser or Home Screen app, and runs the
-//! funnel from accepted on, by delivery path, with a reason for every push lost. Past the
-//! fan-out, the reasons are the pushes': a notification whose copies stopped for two
-//! different reasons has no one reason of its own. Resends folded into a waiting copy,
-//! and notifications the app was told to send again later, sit beside the funnel: they
-//! are counted in received when they come back.
+//! it). One that stops is counted as a loss with the reason: up to the fan-out where it
+//! stopped, past it once no copy can arrive any more, for the reason its last copy was
+//! lost, or as never fetched where a copy was still waiting. A push is one copy of a
+//! notification on its way to one browser or Home Screen app, and runs the funnel from
+//! accepted on, by delivery path, with a reason for every push lost. Resends folded into
+//! a waiting copy, and notifications the app was told to send again later, sit beside the
+//! funnel: they are counted in received when they come back.
 //!
 //! Counting a notification once however many copies it has takes one key per live
 //! notification, kept until it expires. Everything lives on the heap, as the backlogs do,
@@ -389,6 +389,9 @@ struct Live {
     /// Copies on each [`Path`] that neither reached a device nor were lost yet. What is
     /// left when the key goes was never fetched.
     open: [u8; Path::COUNT],
+    /// Why the last copy lost ended, which is the notification's reason when none of its
+    /// copies was delivered and none is left open.
+    last_loss: Option<Reason>,
 }
 
 fn live_key(anchor_number: AnchorNumber, entry: &InboxNotification) -> LiveKey {
@@ -499,16 +502,21 @@ impl Counters {
         anchor_number: AnchorNumber,
         entry: &InboxNotification,
         path: Path,
+        loss: Option<Reason>,
     ) -> Option<Labels> {
         let live = self.live.get_mut(&live_key(anchor_number, entry))?;
         let open = &mut live.open[path as usize];
         *open = open.checked_sub(1)?;
+        if loss.is_some() {
+            live.last_loss = loss;
+        }
         let live = *live;
         Some(self.live_labels(&live))
     }
 
     /// Forgets the notifications no copy of can arrive any more, counting the copies still
-    /// open as never fetched, and past the cap the ones closest to that.
+    /// open as never fetched and an undelivered notification as lost, and past the cap the
+    /// ones closest to that.
     fn prune(&mut self, now_ns: Timestamp) {
         while let Some((&(expires_at_ns, _), _)) = self.live.first_key_value() {
             let gone = expires_at_ns.saturating_add(LATE_FETCH_GRACE_NS) <= now_ns;
@@ -533,6 +541,16 @@ impl Counters {
                     );
                 }
             }
+            if live.delivered {
+                continue;
+            }
+            // A copy still open was never fetched; otherwise every copy was lost, the last
+            // one for the reason the notification takes.
+            let reason = match live.open.iter().any(|copies| *copies > 0) {
+                true => Reason::NeverFetched,
+                false => live.last_loss.unwrap_or(Reason::NeverFetched),
+            };
+            self.lost(reason, &labels);
         }
     }
 }
@@ -630,6 +648,7 @@ pub(crate) fn fanned_out(
                 pushed: false,
                 delivered: false,
                 open,
+                last_loss: None,
             },
         );
         counters.prune(now_ns);
@@ -660,7 +679,7 @@ pub(crate) fn settled(
             }
             Err(reason) => reason,
         };
-        if let Some(labels) = counters.close(anchor_number, entry, path) {
+        if let Some(labels) = counters.close(anchor_number, entry, path, Some(reason)) {
             bump(&mut counters.push_losses, (reason, path, labels));
         }
     });
@@ -675,7 +694,7 @@ pub(crate) fn collected(
 ) {
     with(|counters| {
         counters.prune(now_ns);
-        let Some(labels) = counters.close(anchor_number, entry, path) else {
+        let Some(labels) = counters.close(anchor_number, entry, path, None) else {
             return;
         };
         bump(
@@ -701,7 +720,7 @@ pub(crate) fn entries_removed<'a>(
 ) {
     with(|counters| {
         for entry in entries {
-            if let Some(labels) = counters.close(anchor_number, entry, path) {
+            if let Some(labels) = counters.close(anchor_number, entry, path, Some(reason)) {
                 bump(&mut counters.push_losses, (reason, path, labels));
             }
         }
@@ -709,14 +728,20 @@ pub(crate) fn entries_removed<'a>(
 }
 
 /// Notifications out to their browsers, with a copy still open, neither delivered nor
-/// expired.
-fn in_flight(now_ns: Timestamp) -> usize {
+/// expired, by their labels.
+fn in_flight(now_ns: Timestamp) -> BTreeMap<Labels, u64> {
     with(|counters| {
-        counters
+        let mut by_labels = BTreeMap::new();
+        for live in counters
             .live
             .range((now_ns.saturating_add(1), 0)..)
-            .filter(|(_, live)| !live.delivered && live.open.iter().any(|copies| *copies > 0))
-            .count()
+            .map(|(_, live)| live)
+        {
+            if !live.delivered && live.open.iter().any(|copies| *copies > 0) {
+                bump(&mut by_labels, counters.live_labels(live));
+            }
+        }
+        by_labels
     })
 }
 
@@ -798,10 +823,17 @@ pub(crate) fn encode(
         }
         Ok::<(), std::io::Error>(())
     })?;
-    w.encode_gauge(
+    let mut builder = w.gauge_vec(
         "internet_identity_notifications_in_flight",
-        (waiting + in_flight(now_ns)) as f64,
-        "Notifications waiting in a backlog, or out to their browsers and neither delivered nor expired.",
+        "Notifications out to their browsers, neither delivered nor expired.",
+    )?;
+    for (labels, count) in in_flight(now_ns) {
+        builder = builder.value(&labels.pairs(&[]), count as f64)?;
+    }
+    w.encode_gauge(
+        "internet_identity_notifications_waiting",
+        waiting as f64,
+        "Notifications waiting in a backlog to be sent out.",
     )
 }
 
@@ -899,6 +931,15 @@ mod tests {
     /// Long enough after `EXPIRES` for every key to be gone.
     const LATER: Timestamp = EXPIRES + LATE_FETCH_GRACE_NS;
 
+    fn in_flight_count(now_ns: Timestamp) -> u64 {
+        in_flight(now_ns).values().sum()
+    }
+
+    /// Prunes the keys gone by `LATER`, by fanning out another notification then.
+    fn after_every_key_went() {
+        fanned_out(1, &entry(99, LATER * 2), labels(), vec![deposited()], LATER);
+    }
+
     #[test]
     fn two_collected_copies_deliver_the_notification_once() {
         let entry = fan_out_to_two_browsers();
@@ -910,7 +951,7 @@ mod tests {
         assert_eq!(notification_count_for_testing("pushed"), 1);
         assert_eq!(notification_count_for_testing("delivered"), 1);
         assert_eq!(push_count_for_testing("delivered"), 2);
-        assert_eq!(in_flight(NOW), 0);
+        assert_eq!(in_flight_count(NOW), 0);
     }
 
     #[test]
@@ -925,12 +966,43 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_post_is_a_push_loss_and_not_a_notification_loss() {
+    fn a_failed_post_is_a_push_loss_at_once() {
         let entry = fan_out_to_two_browsers();
         settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
 
         assert_eq!(push_loss_count_for_testing("relay_gone"), 1);
         assert_eq!(loss_count_for_testing("relay_gone"), 0);
+    }
+
+    #[test]
+    fn a_notification_whose_every_copy_was_lost_takes_the_last_reason() {
+        let entry = fan_out_to_two_browsers();
+        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        entries_removed(1, [&entry], Path::Chrome, Reason::InboxFull);
+        after_every_key_went();
+
+        assert_eq!(loss_count_for_testing("inbox_full"), 1);
+        assert_eq!(loss_count_for_testing("relay_gone"), 0);
+    }
+
+    #[test]
+    fn an_undelivered_notification_with_a_copy_still_open_was_never_fetched() {
+        let entry = fan_out_to_two_browsers();
+        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        after_every_key_went();
+
+        assert_eq!(loss_count_for_testing("never_fetched"), 1);
+    }
+
+    #[test]
+    fn a_delivered_notification_is_not_lost() {
+        let entry = fan_out_to_two_browsers();
+        collected(1, &entry, Path::Chrome, NOW);
+        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        after_every_key_went();
+
+        assert_eq!(loss_count_for_testing("relay_gone"), 0);
+        assert_eq!(loss_count_for_testing("never_fetched"), 0);
     }
 
     #[test]
@@ -964,7 +1036,7 @@ mod tests {
     fn copies_still_open_when_the_key_goes_were_never_fetched() {
         let entry = fan_out_to_two_browsers();
         collected(1, &entry, Path::Chrome, NOW);
-        assert_eq!(in_flight(NOW), 0);
+        assert_eq!(in_flight_count(NOW), 0);
 
         fanned_out(
             1,
@@ -975,15 +1047,15 @@ mod tests {
         );
 
         assert_eq!(push_loss_count_for_testing("never_fetched"), 1);
-        assert_eq!(in_flight(LATER), 1);
+        assert_eq!(in_flight_count(LATER), 1);
     }
 
     #[test]
     fn an_undelivered_notification_leaves_the_gauge_when_it_expires() {
         fan_out_to_two_browsers();
 
-        assert_eq!(in_flight(NOW), 1);
-        assert_eq!(in_flight(EXPIRES), 0);
+        assert_eq!(in_flight_count(NOW), 1);
+        assert_eq!(in_flight_count(EXPIRES), 0);
     }
 
     #[test]
