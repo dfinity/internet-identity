@@ -70,11 +70,11 @@ const FROM_PARAM = "from";
 export const installSourceParam = (source: NotificationsSource): string =>
   new URLSearchParams({ [FROM_PARAM]: source }).toString();
 
-/** `undefined` where the fragment carries no source this build knows. */
+/** `undefined` where the fragment or query carries no source this build knows. */
 export const installSourceOf = (
-  hash: string,
+  params: string,
 ): NotificationsSource | undefined => {
-  const from = new URLSearchParams(hash.replace(/^#/, "")).get(FROM_PARAM);
+  const from = new URLSearchParams(params.replace(/^[#?]/, "")).get(FROM_PARAM);
   switch (from) {
     case "authorize":
     case "settings":

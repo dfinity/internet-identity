@@ -44,6 +44,7 @@
     IcpAlertsEvents,
     icpAlertsFunnel,
     installSourceOf,
+    installSourceParam,
     type NotificationsSource,
   } from "$lib/utils/analytics/icpAlertsFunnel";
 
@@ -122,29 +123,34 @@
     if (!isStandalone()) {
       return await insideTheBrowser(window.location.hash).catch(failed);
     }
-    let linked = false;
     const landed = await insideTheApp(
       window.location.hash,
       Notification.permission,
       () => {
-        linked = true;
+        setupUnderway = true;
         track(IcpAlertsEvents.AppLinked);
-        // Keeps a reload from presenting a spent token; replaying a spent one is harmless either way.
-        history.replaceState(null, "", window.location.pathname);
+        // Keeps a reload from presenting a spent token; replaying a spent one is harmless
+        // either way. The source moves to the query, which the replay check never reads.
+        history.replaceState(
+          null,
+          "",
+          source === undefined
+            ? window.location.pathname
+            : `${window.location.pathname}?${installSourceParam(source)}`,
+        );
       },
     ).catch(failed);
     if (landed.kind === "stale-link" || landed.kind === "unusable-key") {
       track(IcpAlertsEvents.AppLinkRefused, { reason: landed.kind });
-    }
-    if (linked && landed.kind === "ready") {
-      track(IcpAlertsEvents.Ready);
     }
     return landed;
   };
 
   onMount(() => {
     void (async () => {
-      source = installSourceOf(window.location.hash);
+      source =
+        installSourceOf(window.location.hash) ??
+        installSourceOf(window.location.search);
       host = window.location.host;
       beginWaiting();
       const standalone = isStandalone();
@@ -234,9 +240,6 @@
     }
     try {
       screen = await settleWithTheApp(permission).catch(failed);
-      if (screen.kind === "ready") {
-        track(IcpAlertsEvents.Ready);
-      }
     } finally {
       asking = false;
     }
@@ -311,6 +314,28 @@
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
+  });
+
+  /** Set where this page has seen setup left to do: a link it just made, or a permission
+   *  still to grant. A launch of an app that already delivers lands on `ready` without it,
+   *  and is not a setup finishing. */
+  let setupUnderway = false;
+  let readyTracked = false;
+  $effect(() => {
+    if (screen.kind === "ask" || screen.kind === "blocked") {
+      setupUnderway = true;
+      return;
+    }
+    if (
+      screen.kind !== "ready" ||
+      !screen.inTheApp ||
+      !setupUnderway ||
+      readyTracked
+    ) {
+      return;
+    }
+    readyTracked = true;
+    track(IcpAlertsEvents.Ready);
   });
 
   /** Once per page: the steps are left and come back to as the user walks them. */

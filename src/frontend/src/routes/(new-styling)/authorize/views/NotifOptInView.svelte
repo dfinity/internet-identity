@@ -74,7 +74,12 @@
       ? icpAlertsFunnel
       : browserNotificationsFunnel,
   );
-  onMount(() => funnel.init({ source: "authorize" }));
+  onMount(() => {
+    const started = funnel;
+    started.init({ source: "authorize" });
+    // A new request remounts this view without `done()`, and the funnel's session listener must not outlive it.
+    return () => started.close();
+  });
 
   const skip = () => {
     funnel.trigger(BrowserNotificationsEvents.Skipped);
