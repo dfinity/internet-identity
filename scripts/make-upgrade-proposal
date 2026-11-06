@@ -296,6 +296,32 @@ should_upgrade_frontend() {
   [[ "$upgrade_type" == "frontend" || "$upgrade_type" == "both" ]]
 }
 
+# The release tag goes on HEAD, so a local main with unpushed commits
+# would ship them in the release and list them in the proposals.
+# Releasing from a commit off upstream main (e.g. a hotfix branch) is
+# still possible, but only after confirming the commits it adds.
+ensure_head_on_upstream_main() {
+  local input
+  if [ "${MOCK_JSON:-}" ]; then
+    return
+  fi
+  git fetch --quiet "$REPO_HTTPS_URL" main
+  if git merge-base --is-ancestor HEAD FETCH_HEAD; then
+    return
+  fi
+  echo
+  echo "HEAD is not on main of $REPO_HTTPS_URL. Tagging it would also release:"
+  echo
+  git log --oneline FETCH_HEAD..HEAD
+  echo
+  echo "To release upstream main instead: git switch --detach FETCH_HEAD"
+  echo "To tag HEAD anyway, enter 'y':"
+  read -r input
+  if [[ ${input:-} != "y" ]]; then
+    exit 1
+  fi
+}
+
 is_release_sop_script_newest_version() {
   if git diff --quiet origin/main scripts/upgrade-proposal; then
     echo "yes"
@@ -1462,6 +1488,9 @@ echo "Upgrade type: $UPGRADE_TYPE"
 echo ""
 
 confirm_cmd git fetch "$REPO_HTTPS_URL" --tags --force
+if [ -z "$(checklist_get "git tag -f $TAG_NAME")" ]; then
+  ensure_head_on_upstream_main
+fi
 confirm_cmd git tag -f $TAG_NAME
 record "Release commit" git rev-parse $TAG_NAME
 record "New tag pushed" git push "$REPO_HTTPS_URL" $TAG_NAME
