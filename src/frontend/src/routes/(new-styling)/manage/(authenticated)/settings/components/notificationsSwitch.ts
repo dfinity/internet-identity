@@ -33,6 +33,6 @@ export const turnOnWithApp = async ({
   }
   return {
     delivering: false,
-    installUrl: await installUrlOrNone(identityNumber),
+    installUrl: await installUrlOrNone(identityNumber, "settings"),
   };
 };

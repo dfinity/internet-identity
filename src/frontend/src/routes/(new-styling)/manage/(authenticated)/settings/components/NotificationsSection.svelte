@@ -26,6 +26,14 @@
   import { replacementInstallUrl } from "./replacementInstallUrl";
   import { turnOnWithApp } from "./notificationsSwitch";
   import {
+    BrowserNotificationsEvents,
+    browserNotificationsFunnel,
+  } from "$lib/utils/analytics/browserNotificationsFunnel";
+  import {
+    IcpAlertsEvents,
+    icpAlertsFunnel,
+  } from "$lib/utils/analytics/icpAlertsFunnel";
+  import {
     turnOffInBrowser,
     turnOnInBrowser,
   } from "./browserNotificationsSwitch";
@@ -46,6 +54,7 @@
 
   /** Where notifications arrive is a Home Screen app on iOS and this browser anywhere else. */
   const needsApp = notificationsNeedInstallHere();
+  const funnel = needsApp ? icpAlertsFunnel : browserNotificationsFunnel;
 
   /** Where the install lives, shown where the browser refused the tab. */
   let refusedInstallUrl = $state<string | undefined>(undefined);
@@ -161,8 +170,14 @@
     if (!needsApp) {
       switch (await turnOnInBrowser(identityNumber)) {
         case "delivering":
+          funnel.trigger(BrowserNotificationsEvents.Enabled);
           return true;
         case "permission-refused":
+          funnel.trigger(
+            Notification.permission === "denied"
+              ? BrowserNotificationsEvents.PermissionDenied
+              : BrowserNotificationsEvents.PermissionDismissed,
+          );
           toaster.error({
             title: $t`Notifications are blocked`,
             description: $t`Allow them for this site in your browser settings, then turn this on again.`,
@@ -190,6 +205,7 @@
       }
       if (stillThere) {
         tab.point(undefined);
+        icpAlertsFunnel.trigger(IcpAlertsEvents.Enabled);
         return true;
       }
       // Gone. The switch never went on, so nothing has to come back off. The record
@@ -198,17 +214,32 @@
       const replacing = await replacementInstallUrl(identityNumber);
       tab.point(replacing);
       refusedInstallUrl = tab.opened ? undefined : replacing;
+      installOpened(replacing, tab.opened);
       return false;
     }
     const outcome = await turnOnWithApp({ identityNumber, ownApp });
     if (outcome.delivering) {
       tab.point(undefined);
+      icpAlertsFunnel.trigger(IcpAlertsEvents.Enabled);
       return true;
     }
     tab.point(outcome.installUrl);
     // A tab the browser refused is not a failure: the link goes on the section.
     refusedInstallUrl = tab.opened ? undefined : outcome.installUrl;
+    installOpened(outcome.installUrl, tab.opened);
     return false;
+  };
+
+  const installOpened = (url: string | undefined, tabOpened: boolean) => {
+    if (url === undefined) {
+      icpAlertsFunnel.trigger(IcpAlertsEvents.Failed, {
+        reason: "no-install-url",
+      });
+      return;
+    }
+    icpAlertsFunnel.trigger(IcpAlertsEvents.InstallOpened, {
+      tab: tabOpened ? "opened" : "refused",
+    });
   };
 
   const handleToggle = (event: Event) => {
@@ -220,6 +251,10 @@
     enabled = wanted;
     refusedInstallUrl = undefined;
     busy = true;
+    if (wanted) {
+      funnel.init({ source: "settings" });
+      funnel.trigger(BrowserNotificationsEvents.EnablePressed);
+    }
     void (async () => {
       try {
         if (!wanted) {
@@ -233,6 +268,11 @@
         enabled = outcome;
       } catch (error) {
         enabled = live;
+        if (wanted) {
+          funnel.trigger(BrowserNotificationsEvents.Failed, {
+            reason: isCanisterError(error) ? "canister-error" : "browser-error",
+          });
+        }
         if (isCanisterError(error)) {
           handleError(error);
           return;
@@ -242,6 +282,9 @@
           description: failureMessage(error),
         });
       } finally {
+        if (wanted) {
+          funnel.close();
+        }
         busy = false;
         void invalidateAll();
       }

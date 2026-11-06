@@ -3,8 +3,10 @@ import { establishedChannelStore } from "$lib/stores/channelStore";
 import Plausible from "plausible-tracker";
 import { PlausibleInitOptions } from "plausible-tracker/build/main/lib/tracker";
 import { get } from "svelte/store";
+import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
 
 let tracker: undefined | ReturnType<typeof Plausible>;
+let hashMode = false;
 
 // Whether `initAnalytics` has run yet — regardless of its outcome. Lets us tell
 // "analytics not initialized yet" (queue events) apart from "initialized but
@@ -22,10 +24,11 @@ let initialized = false;
 // that if init never brings up a tracker (analytics disabled, or a stuck init)
 // the queue can't grow without limit.
 type QueuedHit =
-  | { kind: "pageView" }
+  | { kind: "pageView"; url: string }
   | {
       kind: "event";
       name: string;
+      url: string;
       props?: Record<string, string | number | boolean>;
     };
 const MAX_QUEUED_HITS = 50;
@@ -60,6 +63,7 @@ export const initAnalytics = (config: AnalyticsConfig | undefined) => {
     config === undefined ? undefined : convertToPlausibleConfig(config);
   if (plausibleConfig !== undefined) {
     tracker = Plausible(plausibleConfig);
+    hashMode = plausibleConfig.hashMode === true;
   }
   initialized = true;
   // Flush anything emitted before the tracker existed. If analytics is disabled
@@ -69,9 +73,13 @@ export const initAnalytics = (config: AnalyticsConfig | undefined) => {
   if (tracker !== undefined) {
     for (const hit of pending) {
       if (hit.kind === "pageView") {
-        tracker.trackPageview();
+        tracker.trackPageview({ url: reportedUrl(hit.url) });
       } else {
-        tracker.trackEvent(hit.name, { props: hit.props });
+        tracker.trackEvent(
+          hit.name,
+          { props: hit.props },
+          { url: reportedUrl(hit.url) },
+        );
       }
     }
   }
@@ -94,6 +102,19 @@ const withAuthorizationOrigin = (
     : props;
 };
 
+/**
+ * The tracker reports `location.href` unless told otherwise, fragment included. Plausible
+ * reads the fragment only in hash mode, and the notification app's fragment is never a
+ * route: it holds the private link key its install was minted with.
+ */
+const reportedUrl = (href: string): string => {
+  const url = new URL(href);
+  if (!hashMode || url.pathname.startsWith(NOTIFICATION_APP_PATH)) {
+    url.hash = "";
+  }
+  return url.toString();
+};
+
 // Queue a hit only while analytics is still coming up. Once initialized without
 // a tracker (analytics disabled), hits are dropped rather than accumulated.
 const enqueue = (hit: QueuedHit): void => {
@@ -104,18 +125,20 @@ const enqueue = (hit: QueuedHit): void => {
 
 export const analytics = {
   pageView: () => {
+    const url = window.location.href;
     if (tracker === undefined) {
-      enqueue({ kind: "pageView" });
+      enqueue({ kind: "pageView", url });
       return;
     }
-    tracker.trackPageview();
+    tracker.trackPageview({ url: reportedUrl(url) });
   },
   event: (name: string, props?: Record<string, string | number | boolean>) => {
+    const url = window.location.href;
     const eventProps = withAuthorizationOrigin(props);
     if (tracker === undefined) {
-      enqueue({ kind: "event", name, props: eventProps });
+      enqueue({ kind: "event", name, url, props: eventProps });
       return;
     }
-    tracker.trackEvent(name, { props: eventProps });
+    tracker.trackEvent(name, { props: eventProps }, { url: reportedUrl(url) });
   },
 };

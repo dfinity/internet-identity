@@ -40,8 +40,24 @@
   import ReinstallSteps from "./ReinstallSteps.svelte";
   import SafariIosSteps from "./installSteps/SafariIosSteps.svelte";
   import IosAppSteps from "./blockedSteps/IosAppSteps.svelte";
+  import {
+    IcpAlertsEvents,
+    icpAlertsFunnel,
+    installSourceOf,
+    type NotificationsSource,
+  } from "$lib/utils/analytics/icpAlertsFunnel";
 
   let screen = $state<Screen>({ kind: "working" });
+  /** Where the install was offered, read before a spent token is dropped from the URL. */
+  let source: NotificationsSource | undefined;
+  const track = (
+    event: (typeof IcpAlertsEvents)[keyof typeof IcpAlertsEvents],
+    properties?: Record<string, string>,
+  ) =>
+    icpAlertsFunnel.trigger(event, {
+      ...(source === undefined ? {} : { from: source }),
+      ...properties,
+    });
   /** Read on mount, because this page is rendered at build time where there is no document to ask. */
   let host = $state("");
   /** Unknown until mount, because the page prerenders and the answer is `window`'s.
@@ -102,16 +118,33 @@
   };
 
   /** The whole of what a launch does, which is also the whole of what retrying it is. */
-  const launch = async (): Promise<Screen> =>
-    isStandalone()
-      ? await insideTheApp(window.location.hash, Notification.permission, () =>
-          // Keeps a reload from presenting a spent token; replaying a spent one is harmless either way.
-          history.replaceState(null, "", window.location.pathname),
-        ).catch(failed)
-      : await insideTheBrowser(window.location.hash).catch(failed);
+  const launch = async (): Promise<Screen> => {
+    if (!isStandalone()) {
+      return await insideTheBrowser(window.location.hash).catch(failed);
+    }
+    let linked = false;
+    const landed = await insideTheApp(
+      window.location.hash,
+      Notification.permission,
+      () => {
+        linked = true;
+        track(IcpAlertsEvents.AppLinked);
+        // Keeps a reload from presenting a spent token; replaying a spent one is harmless either way.
+        history.replaceState(null, "", window.location.pathname);
+      },
+    ).catch(failed);
+    if (landed.kind === "stale-link" || landed.kind === "unusable-key") {
+      track(IcpAlertsEvents.AppLinkRefused, { reason: landed.kind });
+    }
+    if (linked && landed.kind === "ready") {
+      track(IcpAlertsEvents.Ready);
+    }
+    return landed;
+  };
 
   onMount(() => {
     void (async () => {
+      source = installSourceOf(window.location.hash);
       host = window.location.host;
       beginWaiting();
       const standalone = isStandalone();
@@ -179,6 +212,7 @@
    *  leaves the permission at `default`. */
   const askForPermission = async () => {
     asking = true;
+    track(IcpAlertsEvents.PermissionAsked);
     let permission: NotificationPermission;
     try {
       permission = await Notification.requestPermission();
@@ -187,8 +221,22 @@
       asking = false;
       return;
     }
+    switch (permission) {
+      case "granted":
+        track(IcpAlertsEvents.PermissionGranted);
+        break;
+      case "denied":
+        track(IcpAlertsEvents.PermissionDenied);
+        break;
+      case "default":
+        track(IcpAlertsEvents.PermissionDismissed);
+        break;
+    }
     try {
       screen = await settleWithTheApp(permission).catch(failed);
+      if (screen.kind === "ready") {
+        track(IcpAlertsEvents.Ready);
+      }
     } finally {
       asking = false;
     }
@@ -229,6 +277,7 @@
     return watchForInstall(
       identityNumber,
       () => {
+        track(IcpAlertsEvents.AppDetected);
         screen = { kind: "ready", inTheApp: false };
       },
       { replacedLastSeen },
@@ -262,6 +311,16 @@
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
+  });
+
+  /** Once per page: the steps are left and come back to as the user walks them. */
+  let stepsShown = false;
+  $effect(() => {
+    if (screen.kind !== "install" || stepsShown) {
+      return;
+    }
+    stepsShown = true;
+    track(IcpAlertsEvents.StepsShown);
   });
 
   const backToTheSteps = () => {
@@ -331,6 +390,7 @@
   });
 
   const alreadyAdded = async () => {
+    track(IcpAlertsEvents.SaidAlreadyAdded);
     screen = await afterAlreadyAdded(window.location.hash).catch(failed);
   };
 
@@ -360,7 +420,7 @@
       await probeApp(identityNumber);
       // iOS bookmarks whatever the address bar holds when the page is added, and the key
       // in this one was spent by the app the user has just said is gone.
-      const url = await prepareInstallUrl({ identityNumber });
+      const url = await prepareInstallUrl({ identityNumber, source });
       if (url === undefined) {
         screen = { kind: "unlinked" };
         return;
@@ -391,7 +451,7 @@
       // The record this browser points at may still claim to deliver, and the canister
       // takes an unanswered probe of its own as the evidence that it does not.
       await probeApp(identityNumber);
-      const url = await prepareInstallUrl({ identityNumber });
+      const url = await prepareInstallUrl({ identityNumber, source });
       if (url === undefined) {
         screen = { kind: "unlinked" };
         return;

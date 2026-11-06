@@ -11,7 +11,7 @@ export const replacementInstallUrl = async (
   identityNumber: bigint,
 ): Promise<string | undefined> => {
   try {
-    return await prepareInstallUrl({ identityNumber });
+    return await prepareInstallUrl({ identityNumber, source: "settings" });
   } catch (error) {
     console.error(error);
     return undefined;
