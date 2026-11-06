@@ -59,9 +59,11 @@ describe("analytics init ordering", () => {
     // pageView).
     expect(plausibleFactory).toHaveBeenCalledTimes(1);
     expect(trackEvent).toHaveBeenCalledTimes(1);
-    expect(trackEvent).toHaveBeenCalledWith("start-mcp-authorize", {
-      props: undefined,
-    });
+    expect(trackEvent).toHaveBeenCalledWith(
+      "start-mcp-authorize",
+      { props: undefined },
+      expect.anything(),
+    );
     expect(trackPageview).toHaveBeenCalledTimes(1);
     expect(trackEvent.mock.invocationCallOrder[0]).toBeLessThan(
       trackPageview.mock.invocationCallOrder[0],
@@ -72,9 +74,11 @@ describe("analytics init ordering", () => {
     initAnalytics(ENABLED_CONFIG);
     analytics.event("mcp-authorize--confirmed");
 
-    expect(trackEvent).toHaveBeenCalledWith("mcp-authorize--confirmed", {
-      props: undefined,
-    });
+    expect(trackEvent).toHaveBeenCalledWith(
+      "mcp-authorize--confirmed",
+      { props: undefined },
+      expect.anything(),
+    );
   });
 
   it("drops pre-init events when analytics is disabled (no unbounded queue)", () => {
@@ -94,5 +98,25 @@ describe("analytics init ordering", () => {
     initAnalytics(ENABLED_CONFIG);
     expect(plausibleFactory).toHaveBeenCalledTimes(1);
     expect(trackEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("reported url", () => {
+  it("never reports the notification app's fragment, which holds its link key", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/ios-icp-alerts#anchor=10000&key=secret&from=authorize",
+    );
+    initAnalytics({
+      Plausible: { ...ENABLED_CONFIG.Plausible, hash_mode: [true] },
+    } as unknown as AnalyticsConfig);
+    analytics.event("icp-alerts--app-linked");
+
+    expect(trackEvent).toHaveBeenCalledWith(
+      "icp-alerts--app-linked",
+      { props: undefined },
+      { url: `${window.location.origin}/ios-icp-alerts` },
+    );
   });
 });

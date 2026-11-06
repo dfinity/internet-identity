@@ -6,6 +6,10 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
 import { NOTIFICATION_APP_PATH } from "./appPath";
+import {
+  installSourceParam,
+  type NotificationsSource,
+} from "$lib/utils/analytics/icpAlertsFunnel";
 
 /** `undefined` where no sign-in has registered this browser; rejects where its key could not be read, which is not the same thing. */
 const registeredBrowserActor = async (
@@ -25,8 +29,11 @@ const registeredBrowserActor = async (
  *  The canister refuses while the app it would replace is still answering, so a caller that offers an install asks the app to prove itself first. */
 export const prepareInstallUrl = async ({
   identityNumber,
+  source,
 }: {
   identityNumber: bigint;
+  /** Where the install was offered, carried to the Home Screen app for analytics; `undefined` where a URL that never carried one is minted again. */
+  source: NotificationsSource | undefined;
 }): Promise<string | undefined> => {
   const actor = await registeredBrowserActor(identityNumber);
   if (actor === undefined) {
@@ -44,10 +51,10 @@ export const prepareInstallUrl = async ({
       link_principal: identity.getPrincipal(),
     })
     .then(throwCanisterError);
-  return `${NOTIFICATION_APP_PATH}#${encodeLinkToken({
-    identityNumber,
-    linkKey,
-  })}`;
+  const token = encodeLinkToken({ identityNumber, linkKey });
+  return source === undefined
+    ? `${NOTIFICATION_APP_PATH}#${token}`
+    : `${NOTIFICATION_APP_PATH}#${token}&${installSourceParam(source)}`;
 };
 
 /** The placeholder the new tab holds while the URL is still being minted: this page, told to wait rather than to decide. */
@@ -58,9 +65,10 @@ export const INSTALL_PLACEHOLDER_URL = `${NOTIFICATION_APP_PATH}?installing`;
  *  That refusal is not worked around here: the caller that means to replace an app probes it first, and the screen says so where it is still there. */
 export const installUrlOrNone = async (
   identityNumber: bigint,
+  source: NotificationsSource,
 ): Promise<string | undefined> => {
   try {
-    return await prepareInstallUrl({ identityNumber });
+    return await prepareInstallUrl({ identityNumber, source });
   } catch (error) {
     console.error(error);
     return undefined;

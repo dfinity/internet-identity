@@ -12,6 +12,8 @@ export interface StartedInstall {
   granted: Promise<void>;
   /** Where the install lives, once there is a token to point at it. */
   url: Promise<string | undefined>;
+  /** Whether the browser allowed the tab; a refused one leaves the link on the screen behind it. */
+  tabOpened: boolean;
 }
 
 /** Synchronous so it can be called straight from the press: a browser allows `window.open` only inside the gesture.
@@ -36,8 +38,8 @@ export const startAppInstall = ({
   // Nothing awaits this until sign-in settles, and an unattached rejection in between is an unhandled rejection.
   void granted.catch(() => undefined);
 
-  const url = installUrlOrNone(identityNumber);
+  const url = installUrlOrNone(identityNumber, "authorize");
   void url.then(tab.point);
 
-  return { granted, url };
+  return { granted, url, tabOpened: tab.opened };
 };

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { BellOffIcon } from "@lucide/svelte";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -26,6 +27,14 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { isCanisterError } from "$lib/utils/utils";
+  import {
+    BrowserNotificationsEvents,
+    browserNotificationsFunnel,
+  } from "$lib/utils/analytics/browserNotificationsFunnel";
+  import {
+    IcpAlertsEvents,
+    icpAlertsFunnel,
+  } from "$lib/utils/analytics/icpAlertsFunnel";
 
   interface Props {
     /** dApp name for the copy, or undefined when it isn't known. */
@@ -58,6 +67,30 @@
     installFirst,
     onDone,
   }: Props = $props();
+
+  /** Which story this device is in follows from where its notifications arrive. */
+  const funnel = $derived(
+    device.source === "app" || installFirst
+      ? icpAlertsFunnel
+      : browserNotificationsFunnel,
+  );
+  onMount(() => {
+    const started = funnel;
+    started.init({ source: "authorize" });
+    // A new request remounts this view without `done()`, and the funnel's session listener must not outlive it.
+    return () => started.close();
+  });
+
+  const skip = () => {
+    funnel.trigger(BrowserNotificationsEvents.Skipped);
+    done();
+  };
+
+  /** Hands sign-in back, which is where this screen's funnel ends. */
+  const done = () => {
+    funnel.close();
+    onDone();
+  };
 
   // Always opens on the ask, so the unblock guidance is only ever reached by asking
   // and being refused, with the reason for the question already on screen. A new
@@ -94,8 +127,24 @@
     granting = started.granted;
     // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
     void started.url.then(
-      () => settleSignIn(),
-      () => settleSignIn(),
+      (url) => {
+        if (url === undefined) {
+          icpAlertsFunnel.trigger(IcpAlertsEvents.Failed, {
+            reason: "no-install-url",
+          });
+        } else {
+          icpAlertsFunnel.trigger(IcpAlertsEvents.InstallOpened, {
+            tab: started.tabOpened ? "opened" : "refused",
+          });
+        }
+        return settleSignIn();
+      },
+      () => {
+        icpAlertsFunnel.trigger(IcpAlertsEvents.Failed, {
+          reason: "no-install-url",
+        });
+        return settleSignIn();
+      },
     );
   };
 
@@ -108,6 +157,9 @@
    * message is shown as it came, which makes a screenshot enough to act on.
    */
   const reportFailure = (error: unknown) => {
+    funnel.trigger(BrowserNotificationsEvents.Failed, {
+      reason: isCanisterError(error) ? "canister-error" : "browser-error",
+    });
     if (isCanisterError(error)) {
       recordFailure("register-failed", failureMessage(error));
       handleError(error);
@@ -125,7 +177,7 @@
     try {
       await granting;
       clearFailure();
-      onDone();
+      done();
     } catch (error) {
       variant = "enable";
       reportFailure(error);
@@ -138,12 +190,17 @@
   const enabledBy = (result: EnableNotificationsResult): boolean => {
     switch (result.status) {
       case "enabled":
+        funnel.trigger(BrowserNotificationsEvents.Enabled);
         return true;
       case "denied":
+        funnel.trigger(BrowserNotificationsEvents.PermissionDenied);
         recordFailure("permission-denied");
         variant = "blocked";
         return false;
       case "unanswered":
+        funnel.trigger(BrowserNotificationsEvents.Failed, {
+          reason: "unanswered",
+        });
         // Nothing was read about this device's app, so the reason is shown and Allow stays in front of the user.
         toaster.error({
           title: $t`Notifications unavailable`,
@@ -155,6 +212,7 @@
         needsInstall = true;
         return false;
       case "dismissed":
+        funnel.trigger(BrowserNotificationsEvents.PermissionDismissed);
         // The permission is still `default`, so the prompt can be raised again.
         // Stay where the user is, with Allow still in front of them.
         return false;
@@ -176,7 +234,7 @@
         return;
       }
       clearFailure();
-      onDone();
+      done();
     } catch (error) {
       reportFailure(error);
     } finally {
@@ -204,6 +262,7 @@
         return;
       }
       const current = await readDeviceState(identityNumber, pushState);
+      browserNotificationsFunnel.trigger(BrowserNotificationsEvents.Unblocked);
       variant = "enable";
       busy = false;
       if (pushState.permission !== "granted") {
@@ -236,8 +295,15 @@
     {appLogo}
     {origin}
     {busy}
-    onEnable={needsInstall ? startInstall : () => void runEnable(device)}
-    onSkip={() => onDone()}
+    onEnable={() => {
+      funnel.trigger(BrowserNotificationsEvents.EnablePressed);
+      if (needsInstall) {
+        startInstall();
+        return;
+      }
+      void runEnable(device);
+    }}
+    onSkip={skip}
   />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
@@ -256,11 +322,7 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button
-        class="btn btn-tertiary btn-xl"
-        onclick={() => onDone()}
-        disabled={busy}
-      >
+      <button class="btn btn-tertiary btn-xl" onclick={skip} disabled={busy}>
         {$t`Not now`}
       </button>
     </div>
