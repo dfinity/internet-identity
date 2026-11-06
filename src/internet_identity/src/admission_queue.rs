@@ -825,10 +825,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 if expires_at_ns > now_ns {
                     break;
                 }
-                let removed =
+                let removed_entry =
                     queue.remove_entry(priority, expires_at_ns, &key, max_pending_per_group);
                 let emptied = queue.is_empty();
-                if let Some(entry) = removed {
+                if let Some(entry) = removed_entry {
                     // The expiry it ended with, which a folded resend may have set: the
                     // app's own where that was the earlier, the backlog's window where not.
                     self.expired.push(Expired {
@@ -1474,8 +1474,8 @@ mod tests {
 
         backlog.admit(1, vec![item(2, 1)], 121);
 
-        let expired = backlog.drain_expired();
-        assert!(matches!(expired.as_slice(), [only] if only.by_own_deadline));
+        let expired_items = backlog.drain_expired();
+        assert!(matches!(expired_items.as_slice(), [only] if only.by_own_deadline));
     }
 
     #[test]
@@ -1485,8 +1485,8 @@ mod tests {
 
         backlog.admit(1, vec![item(2, 1)], 101);
 
-        let expired = backlog.drain_expired();
-        assert!(matches!(expired.as_slice(), [only] if !only.by_own_deadline));
+        let expired_items = backlog.drain_expired();
+        assert!(matches!(expired_items.as_slice(), [only] if !only.by_own_deadline));
     }
 
     #[test]

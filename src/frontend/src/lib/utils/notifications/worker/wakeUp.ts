@@ -17,7 +17,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
 import type {
   _SERVICE,
-  NotificationContentFailure,
+  NotShownReason,
   NotificationEvent,
   NotificationToShow,
 } from "$lib/generated/internet_identity_types";
@@ -159,24 +159,26 @@ const internetIdentityActor = ({
     }),
   );
 
-/** `failure` says how the app failed to give the content, so Internet Identity counts
+/** `notShown` says how the app failed to give the content, so Internet Identity counts
  *  the notification as lost rather than shown. */
 const removeEntry = (
   actor: ActorSubclass<_SERVICE>,
   id: InboxEntryId,
-  failure?: NotificationContentFailure,
+  notShown?: NotShownReason,
 ): Promise<unknown> =>
   actor.browser_remove_notification({
     anchor_number: id.anchorNumber,
     browser_id: id.browserId,
     inbox_notification_id: id.inboxNotificationId,
-    content_failure: failure === undefined ? [] : [failure],
+    not_shown: notShown === undefined ? [] : [notShown],
   });
 
 /** A canister that answered with a reject or a trap rejected the call; anything else
  *  never got an answer. */
-const contentFailureOf = (error: unknown): NotificationContentFailure =>
-  error instanceof RejectError ? { Rejected: null } : { Unreachable: null };
+const notShownReasonOf = (error: unknown): NotShownReason =>
+  error instanceof RejectError
+    ? { PayloadRejected: null }
+    : { PayloadUnreachable: null };
 
 /** A query: nothing the canister remembers having answered. */
 const fetchEntry = async (
@@ -302,7 +304,7 @@ const showPublished = async (
     // The app said nothing about what is on screen, so that stays. The entry goes with
     // the reason, since no later wake-up names it again.
     background.start(
-      removeEntry(entry.actor, entry.id, contentFailureOf(error)),
+      removeEntry(entry.actor, entry.id, notShownReasonOf(error)),
     );
     throw error;
   }

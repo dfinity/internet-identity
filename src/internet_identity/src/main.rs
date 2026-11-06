@@ -1008,7 +1008,7 @@ fn browser_remove_notification(
         anchor_number,
         browser_id,
         inbox_notification_id,
-        content_failure,
+        not_shown,
     } = request;
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
@@ -1028,7 +1028,7 @@ fn browser_remove_notification(
         anchor,
         browser_id,
         inbox_notification_id,
-        content_failure,
+        not_shown,
         now_ns,
     )
     .map(|()| RemoveNotificationResponse {})
@@ -1159,14 +1159,14 @@ fn app_send_notification(
             for notification in &notifications {
                 let labels =
                     delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref());
-                delivery_metrics::received(&labels);
-                delivery_metrics::unlisted_sender(caller(), &labels);
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_unlisted_sender(caller(), &labels);
             }
             Err(SendNotificationError::NoSuchSender)
         }
         Senders::Pending { retry_after } => {
             for notification in &notifications {
-                delivery_metrics::deferred(
+                delivery_metrics::count_deferred(
                     delivery_metrics::DeferCause::SenderList,
                     &delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref()),
                 );

@@ -23,7 +23,7 @@ pub fn submit(
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
     let mut not_accepted = Vec::new();
-    let mut resolved: BTreeMap<Principal, Result<Resolved, Refusal>> = BTreeMap::new();
+    let mut resolutions: BTreeMap<Principal, Result<Resolved, Refusal>> = BTreeMap::new();
     let mut reachable = Vec::new();
 
     for Notification {
@@ -33,7 +33,7 @@ pub fn submit(
         urgency,
     } in notifications
     {
-        let resolution = resolved
+        let resolution = resolutions
             .entry(recipient)
             .or_insert_with(|| resolve_recipient(recipient, origin, now_ns))
             .clone();
@@ -54,8 +54,8 @@ pub fn submit(
             }),
             Err(refusal) => {
                 let labels = Labels::app(origin.as_str(), urgency.as_ref());
-                delivery_metrics::received(&labels);
-                delivery_metrics::lost(refusal.metric_reason(), &labels);
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_lost(refusal.metric_reason(), &labels);
                 not_accepted.push(NotAccepted {
                     id,
                     recipient,
@@ -71,7 +71,7 @@ pub fn submit(
     for pending in &reachable {
         delivery_metrics::number_application(pending.application_number, origin.as_str());
     }
-    let counted: Vec<(Labels, Option<Timestamp>)> = reachable
+    let counted_notifications: Vec<(Labels, Option<Timestamp>)> = reachable
         .iter()
         .map(|pending| {
             (
@@ -87,17 +87,17 @@ pub fn submit(
             now_ns,
         )
     });
-    for (admitted, (labels, expires_at_ns)) in admissions.into_iter().zip(counted) {
+    for (admitted, (labels, expires_at_ns)) in admissions.into_iter().zip(counted_notifications) {
         match admitted.admission {
             Admission::Accepted => {
-                delivery_metrics::received(&labels);
-                delivery_metrics::accepted(&labels);
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
             }
-            Admission::Folded => delivery_metrics::folded(&labels),
+            Admission::Folded => delivery_metrics::count_folded(&labels),
             Admission::Dropped => {
-                delivery_metrics::received(&labels);
-                delivery_metrics::accepted(&labels);
-                delivery_metrics::lost(Reason::ExpiredOnArrival, &labels);
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
+                delivery_metrics::count_lost(Reason::ExpiredOnArrival, &labels);
             }
             Admission::Full {
                 retry_after_ns,
@@ -126,11 +126,11 @@ fn count_deferral(
     retry_after: Timestamp,
     expires_at_ns: Option<Timestamp>,
 ) {
-    let by_capacity = cause == FullCause::Queue;
+    let is_capacity_cause = cause == FullCause::Queue;
     if expires_at_ns.is_some_and(|expires_at_ns| retry_after >= expires_at_ns) {
-        delivery_metrics::received(labels);
-        delivery_metrics::lost(
-            if by_capacity {
+        delivery_metrics::count_received(labels);
+        delivery_metrics::count_lost(
+            if is_capacity_cause {
                 Reason::CapacityPastExpiry
             } else {
                 Reason::AppLimitPastExpiry
@@ -139,8 +139,8 @@ fn count_deferral(
         );
         return;
     }
-    delivery_metrics::deferred(
-        if by_capacity {
+    delivery_metrics::count_deferred(
+        if is_capacity_cause {
             DeferCause::Capacity
         } else {
             DeferCause::AppLimit
@@ -505,10 +505,10 @@ mod tests {
             principal: Principal::from_slice(&[9; 29]),
         };
         let long_after = BROWSER_GONE_AFTER_NS + NOW_NS;
-        let dormant = reachable();
+        let dormant_recipient = reachable();
 
         send(vec![notification(&stranger, 1)], NOW_NS);
-        send(vec![notification(&dormant, 2)], long_after);
+        send(vec![notification(&dormant_recipient, 2)], long_after);
 
         assert_eq!(
             delivery_metrics::notification_count_for_testing("received"),
@@ -543,9 +543,9 @@ mod tests {
         setup();
         let recipient = reachable();
         let mut batch: Vec<_> = (0..21).map(|id| notification(&recipient, id)).collect();
-        let mut too_late = notification(&recipient, 21);
-        too_late.expires_at = Some(NOW_NS + 1);
-        batch.push(too_late);
+        let mut late_notification = notification(&recipient, 21);
+        late_notification.expires_at = Some(NOW_NS + 1);
+        batch.push(late_notification);
 
         send(batch, NOW_NS);
 

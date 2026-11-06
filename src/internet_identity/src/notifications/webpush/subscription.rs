@@ -170,12 +170,17 @@ pub fn remove_subscription(
 fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Result<(), String> {
     let mut anchor =
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
-    let (path, cleared) = take_inbox(&mut anchor, browser_id);
+    let (path, cleared_notifications) = take_inbox(&mut anchor, browser_id);
     // The reference stays, because it is which app this browser has rather than whether
     // it is routing.
     anchor.disable_notification_app(browser_id);
     write_subscription(anchor, browser_id, None)?;
-    delivery_metrics::entries_removed(anchor_number, &cleared, path, Reason::SubscriptionReplaced);
+    delivery_metrics::count_removed_entries(
+        anchor_number,
+        &cleared_notifications,
+        path,
+        Reason::SubscriptionReplaced,
+    );
     Ok(())
 }
 
@@ -186,11 +191,11 @@ fn take_inbox(anchor: &mut Anchor, browser_id: BrowserId) -> (Path, Vec<InboxNot
             .browser(browser_id)
             .map_or(Path::Other, |browser| dispatch::path_of(storage, browser))
     });
-    let cleared = anchor
+    let cleared_notifications = anchor
         .notifications_for_browser_mut(browser_id)
         .map(std::mem::take)
         .unwrap_or_default();
-    (path, cleared)
+    (path, cleared_notifications)
 }
 
 /// `target` says who held the posted endpoint, rather than whoever the entry points at by
@@ -300,11 +305,16 @@ fn write_subscription(
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    let (path, cleared) = take_inbox(&mut anchor, browser_id);
+    let (path, cleared_notifications) = take_inbox(&mut anchor, browser_id);
     let anchor_number = anchor.anchor_number();
     let left = anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
-    delivery_metrics::entries_removed(anchor_number, &cleared, path, Reason::SubscriptionReplaced);
+    delivery_metrics::count_removed_entries(
+        anchor_number,
+        &cleared_notifications,
+        path,
+        Reason::SubscriptionReplaced,
+    );
     // Read after the write, so the reference this browser just dropped is already gone:
     // a record the last browser left behind is one nothing can reach again.
     if let Some(app_id) = left {

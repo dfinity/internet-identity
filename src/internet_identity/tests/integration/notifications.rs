@@ -2525,7 +2525,7 @@ fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
         anchor_number,
         browser_id: FIRST_BROWSER,
         inbox_notification_id: FIRST_ENTRY,
-        content_failure: None,
+        not_shown: None,
     }
 }
 

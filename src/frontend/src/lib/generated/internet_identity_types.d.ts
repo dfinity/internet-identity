@@ -1646,6 +1646,22 @@ export interface NotAccepted {
 export type NotAcceptedReason = { 'NoSuchRecipient' : null } |
   { 'NoChannel' : null } |
   { 'Deferred' : { 'retry_after' : Timestamp } };
+/**
+ * Why the service worker could not show a notification: its call to the app's canister
+ * for the content failed, which only the device sees.
+ */
+export type NotShownReason = {
+    /**
+     * The call got no answer.
+     */
+    'PayloadUnreachable' : null
+  } |
+  {
+    /**
+     * The app's canister rejected the call or trapped.
+     */
+    'PayloadRejected' : null
+  };
 export interface Notification {
   'id' : NotificationId,
   /**
@@ -1699,21 +1715,6 @@ export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
-/**
- * How the service worker's call to the app's canister for a notification's content failed.
- */
-export type NotificationContentFailure = {
-    /**
-     * The call got no answer.
-     */
-    'Unreachable' : null
-  } |
-  {
-    /**
-     * The app's canister rejected the call or trapped.
-     */
-    'Rejected' : null
-  };
 export type NotificationDelegationError = {
     /**
      * The caller is no browser of this identity, that browser is not registered
@@ -2296,11 +2297,11 @@ export interface RemoveNotificationRequest {
    */
   'inbox_notification_id' : InboxNotificationId,
   'browser_id' : number,
+  'anchor_number' : UserNumber,
   /**
    * Why the worker could not show it. Absent where it did.
    */
-  'content_failure' : [] | [NotificationContentFailure],
-  'anchor_number' : UserNumber,
+  'not_shown' : [] | [NotShownReason],
 }
 export type RemoveNotificationResponse = {};
 export type RemoveWebPushSubscriptionError = {

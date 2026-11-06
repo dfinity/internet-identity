@@ -384,11 +384,11 @@ struct Live {
     application_number: Option<ApplicationNumber>,
     /// Into [`URGENCIES`].
     urgency: u8,
-    pushed: bool,
-    delivered: bool,
+    is_pushed: bool,
+    is_delivered: bool,
     /// Copies on each [`Path`] that neither reached a device nor were lost yet. What is
     /// left when the key goes was never fetched.
-    open: [u8; Path::COUNT],
+    open_copies: [u8; Path::COUNT],
     /// Why the last copy lost ended, which is the notification's reason when none of its
     /// copies was delivered and none is left open.
     last_loss: Option<Reason>,
@@ -408,7 +408,7 @@ fn live_key(anchor_number: AnchorNumber, entry: &InboxNotification) -> LiveKey {
 pub(crate) struct PlannedPush {
     pub(crate) path: Path,
     /// Deposited in the browser's inbox. Not where its relay cannot be reached.
-    pub(crate) deposited: bool,
+    pub(crate) is_deposited: bool,
 }
 
 #[derive(Default)]
@@ -464,11 +464,11 @@ impl Counters {
         OTHER.to_string()
     }
 
-    fn reached(&mut self, stage: Stage, labels: &Labels) {
+    fn count_reached(&mut self, stage: Stage, labels: &Labels) {
         bump(&mut self.notifications, (stage, labels.clone()));
     }
 
-    fn lost(&mut self, reason: Reason, labels: &Labels) {
+    fn count_lost(&mut self, reason: Reason, labels: &Labels) {
         bump(&mut self.losses, (reason, labels.clone()));
     }
 
@@ -505,8 +505,8 @@ impl Counters {
         loss: Option<Reason>,
     ) -> Option<Labels> {
         let live = self.live.get_mut(&live_key(anchor_number, entry))?;
-        let open = &mut live.open[path as usize];
-        *open = open.checked_sub(1)?;
+        let open_copies = &mut live.open_copies[path as usize];
+        *open_copies = open_copies.checked_sub(1)?;
         if loss.is_some() {
             live.last_loss = loss;
         }
@@ -519,71 +519,71 @@ impl Counters {
     /// ones closest to that.
     fn prune(&mut self, now_ns: Timestamp) {
         while let Some((&(expires_at_ns, _), _)) = self.live.first_key_value() {
-            let gone = expires_at_ns.saturating_add(LATE_FETCH_GRACE_NS) <= now_ns;
-            if !gone && self.live.len() <= MAX_LIVE_NOTIFICATIONS {
+            let is_gone = expires_at_ns.saturating_add(LATE_FETCH_GRACE_NS) <= now_ns;
+            if !is_gone && self.live.len() <= MAX_LIVE_NOTIFICATIONS {
                 break;
             }
-            if !gone {
+            if !is_gone {
                 self.evicted = self.evicted.saturating_add(1);
             }
             let Some((_, live)) = self.live.pop_first() else {
                 break;
             };
-            if !gone {
+            if !is_gone {
                 continue;
             }
             let labels = self.live_labels(&live);
             for path in Path::ALL {
-                for _ in 0..live.open[path as usize] {
+                for _ in 0..live.open_copies[path as usize] {
                     bump(
                         &mut self.push_losses,
                         (Reason::NeverFetched, path, labels.clone()),
                     );
                 }
             }
-            if live.delivered {
+            if live.is_delivered {
                 continue;
             }
             // A copy still open was never fetched; otherwise every copy was lost, the last
             // one for the reason the notification takes.
-            let reason = match live.open.iter().any(|copies| *copies > 0) {
+            let reason = match live.open_copies.iter().any(|copies| *copies > 0) {
                 true => Reason::NeverFetched,
                 false => live.last_loss.unwrap_or(Reason::NeverFetched),
             };
-            self.lost(reason, &labels);
+            self.count_lost(reason, &labels);
         }
     }
 }
 
 /// A notification in a call the app made, before anything is decided about it.
-pub(crate) fn received(labels: &Labels) {
-    with(|counters| counters.reached(Stage::Received, labels));
+pub(crate) fn count_received(labels: &Labels) {
+    with(|counters| counters.count_reached(Stage::Received, labels));
 }
 
 /// A received notification that went into a backlog.
-pub(crate) fn accepted(labels: &Labels) {
-    with(|counters| counters.reached(Stage::Accepted, labels));
+pub(crate) fn count_accepted(labels: &Labels) {
+    with(|counters| counters.count_reached(Stage::Accepted, labels));
 }
 
 /// A notification lost before it was fanned out to any browser.
-pub(crate) fn lost(reason: Reason, labels: &Labels) {
-    with(|counters| counters.lost(reason, labels));
+pub(crate) fn count_lost(reason: Reason, labels: &Labels) {
+    with(|counters| counters.count_lost(reason, labels));
 }
 
-pub(crate) fn deferred(cause: DeferCause, labels: &Labels) {
+pub(crate) fn count_deferred(cause: DeferCause, labels: &Labels) {
     with(|counters| bump(&mut counters.deferred, (cause, labels.clone())));
 }
 
-pub(crate) fn folded(labels: &Labels) {
+pub(crate) fn count_folded(labels: &Labels) {
     with(|counters| bump(&mut counters.folded, labels.clone()));
 }
 
 /// A notification refused because `canister` is not one of the app's senders.
-pub(crate) fn unlisted_sender(canister: Principal, labels: &Labels) {
+pub(crate) fn count_unlisted_sender(canister: Principal, labels: &Labels) {
     with(|counters| {
         let canister = counters.canister_label(canister);
         bump(&mut counters.unlisted_senders, (canister, labels.clone()));
-        counters.lost(Reason::SenderNotAllowed, labels);
+        counters.count_lost(Reason::SenderNotAllowed, labels);
     });
 }
 
@@ -602,7 +602,7 @@ pub(crate) fn number_application(application_number: ApplicationNumber, origin: 
 
 /// A notification taken from a backlog and deposited, as `entry`, for the browsers in
 /// `pushes`. One deposited nowhere is lost here.
-pub(crate) fn fanned_out(
+pub(crate) fn track_fan_out(
     anchor_number: AnchorNumber,
     entry: &InboxNotification,
     labels: Labels,
@@ -612,17 +612,17 @@ pub(crate) fn fanned_out(
     with(|counters| {
         counters.prune(now_ns);
         if pushes.is_empty() {
-            counters.lost(Reason::NoDevice, &labels);
+            counters.count_lost(Reason::NoDevice, &labels);
             return;
         }
-        let mut open = [0u8; Path::COUNT];
+        let mut open_copies = [0u8; Path::COUNT];
         for push in pushes {
             bump(
                 &mut counters.pushes,
                 (Stage::Accepted, push.path, labels.clone()),
             );
-            if push.deposited {
-                let copies = &mut open[push.path as usize];
+            if push.is_deposited {
+                let copies = &mut open_copies[push.path as usize];
                 *copies = copies.saturating_add(1);
             } else {
                 bump(
@@ -631,8 +631,8 @@ pub(crate) fn fanned_out(
                 );
             }
         }
-        if open.iter().all(|copies| *copies == 0) {
-            counters.lost(Reason::RelayUnreachable, &labels);
+        if open_copies.iter().all(|copies| *copies == 0) {
+            counters.count_lost(Reason::RelayUnreachable, &labels);
             return;
         }
         let urgency = URGENCIES
@@ -645,9 +645,9 @@ pub(crate) fn fanned_out(
             Live {
                 application_number: entry.application_number,
                 urgency,
-                pushed: false,
-                delivered: false,
-                open,
+                is_pushed: false,
+                is_delivered: false,
+                open_copies,
                 last_loss: None,
             },
         );
@@ -656,7 +656,7 @@ pub(crate) fn fanned_out(
 }
 
 /// The answer to the post announcing `entry`: `Ok` where a push service took it.
-pub(crate) fn settled(
+pub(crate) fn count_push_outcome(
     anchor_number: AnchorNumber,
     entry: &InboxNotification,
     path: Path,
@@ -668,12 +668,12 @@ pub(crate) fn settled(
                 let Some(live) = counters.live.get_mut(&live_key(anchor_number, entry)) else {
                     return;
                 };
-                let first = !std::mem::replace(&mut live.pushed, true);
+                let is_first_push = !std::mem::replace(&mut live.is_pushed, true);
                 let live = *live;
                 let labels = counters.live_labels(&live);
                 bump(&mut counters.pushes, (Stage::Pushed, path, labels.clone()));
-                if first {
-                    counters.reached(Stage::Pushed, &labels);
+                if is_first_push {
+                    counters.count_reached(Stage::Pushed, &labels);
                 }
                 return;
             }
@@ -686,7 +686,7 @@ pub(crate) fn settled(
 }
 
 /// A device collected `entry`, which delivers its notification unless another did first.
-pub(crate) fn collected(
+pub(crate) fn count_collected(
     anchor_number: AnchorNumber,
     entry: &InboxNotification,
     path: Path,
@@ -701,18 +701,18 @@ pub(crate) fn collected(
             &mut counters.pushes,
             (Stage::Delivered, path, labels.clone()),
         );
-        let first = counters
+        let is_first_delivery = counters
             .live
             .get_mut(&live_key(anchor_number, entry))
-            .is_some_and(|live| !std::mem::replace(&mut live.delivered, true));
-        if first {
-            counters.reached(Stage::Delivered, &labels);
+            .is_some_and(|live| !std::mem::replace(&mut live.is_delivered, true));
+        if is_first_delivery {
+            counters.count_reached(Stage::Delivered, &labels);
         }
     });
 }
 
 /// Entries taken out of an inbox at `path`, for `reason`, before a device collected them.
-pub(crate) fn entries_removed<'a>(
+pub(crate) fn count_removed_entries<'a>(
     anchor_number: AnchorNumber,
     entries: impl IntoIterator<Item = &'a InboxNotification>,
     path: Path,
@@ -737,7 +737,7 @@ fn in_flight(now_ns: Timestamp) -> BTreeMap<Labels, u64> {
             .range((now_ns.saturating_add(1), 0)..)
             .map(|(_, live)| live)
         {
-            if !live.delivered && live.open.iter().any(|copies| *copies > 0) {
+            if !live.is_delivered && live.open_copies.iter().any(|copies| *copies > 0) {
                 bump(&mut by_labels, counters.live_labels(live));
             }
         }
@@ -917,14 +917,14 @@ mod tests {
     fn deposited() -> PlannedPush {
         PlannedPush {
             path: Path::Chrome,
-            deposited: true,
+            is_deposited: true,
         }
     }
 
     fn fan_out_to_two_browsers() -> InboxNotification {
         reset_for_testing();
         let entry = entry(7, EXPIRES);
-        fanned_out(1, &entry, labels(), vec![deposited(), deposited()], NOW);
+        track_fan_out(1, &entry, labels(), vec![deposited(), deposited()], NOW);
         entry
     }
 
@@ -937,16 +937,16 @@ mod tests {
 
     /// Prunes the keys gone by `LATER`, by fanning out another notification then.
     fn after_every_key_went() {
-        fanned_out(1, &entry(99, LATER * 2), labels(), vec![deposited()], LATER);
+        track_fan_out(1, &entry(99, LATER * 2), labels(), vec![deposited()], LATER);
     }
 
     #[test]
     fn two_collected_copies_deliver_the_notification_once() {
         let entry = fan_out_to_two_browsers();
-        settled(1, &entry, Path::Chrome, Ok(()));
-        settled(1, &entry, Path::Chrome, Ok(()));
-        collected(1, &entry, Path::Chrome, NOW);
-        collected(1, &entry, Path::Chrome, NOW);
+        count_push_outcome(1, &entry, Path::Chrome, Ok(()));
+        count_push_outcome(1, &entry, Path::Chrome, Ok(()));
+        count_collected(1, &entry, Path::Chrome, NOW);
+        count_collected(1, &entry, Path::Chrome, NOW);
 
         assert_eq!(notification_count_for_testing("pushed"), 1);
         assert_eq!(notification_count_for_testing("delivered"), 1);
@@ -956,11 +956,11 @@ mod tests {
 
     #[test]
     fn a_resend_under_the_same_id_is_another_notification() {
-        let first = fan_out_to_two_browsers();
-        collected(1, &first, Path::Chrome, NOW);
-        let again = entry(7, EXPIRES + 1);
-        fanned_out(1, &again, labels(), vec![deposited()], NOW);
-        collected(1, &again, Path::Chrome, NOW);
+        let first_entry = fan_out_to_two_browsers();
+        count_collected(1, &first_entry, Path::Chrome, NOW);
+        let resent_entry = entry(7, EXPIRES + 1);
+        track_fan_out(1, &resent_entry, labels(), vec![deposited()], NOW);
+        count_collected(1, &resent_entry, Path::Chrome, NOW);
 
         assert_eq!(notification_count_for_testing("delivered"), 2);
     }
@@ -968,7 +968,7 @@ mod tests {
     #[test]
     fn a_failed_post_is_a_push_loss_at_once() {
         let entry = fan_out_to_two_browsers();
-        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
 
         assert_eq!(push_loss_count_for_testing("relay_gone"), 1);
         assert_eq!(loss_count_for_testing("relay_gone"), 0);
@@ -977,8 +977,8 @@ mod tests {
     #[test]
     fn a_notification_whose_every_copy_was_lost_takes_the_last_reason() {
         let entry = fan_out_to_two_browsers();
-        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
-        entries_removed(1, [&entry], Path::Chrome, Reason::InboxFull);
+        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_removed_entries(1, [&entry], Path::Chrome, Reason::InboxFull);
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("inbox_full"), 1);
@@ -988,7 +988,7 @@ mod tests {
     #[test]
     fn an_undelivered_notification_with_a_copy_still_open_was_never_fetched() {
         let entry = fan_out_to_two_browsers();
-        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("never_fetched"), 1);
@@ -997,8 +997,8 @@ mod tests {
     #[test]
     fn a_delivered_notification_is_not_lost() {
         let entry = fan_out_to_two_browsers();
-        collected(1, &entry, Path::Chrome, NOW);
-        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_collected(1, &entry, Path::Chrome, NOW);
+        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("relay_gone"), 0);
@@ -1009,14 +1009,14 @@ mod tests {
     fn a_removed_entry_keeps_its_notifications_urgency() {
         reset_for_testing();
         let entry = entry(7, EXPIRES);
-        fanned_out(
+        track_fan_out(
             1,
             &entry,
             Labels::app("https://app.example", Some(&Urgency::High)),
             vec![deposited()],
             NOW,
         );
-        entries_removed(1, [&entry], Path::Chrome, Reason::InboxFull);
+        count_removed_entries(1, [&entry], Path::Chrome, Reason::InboxFull);
 
         assert!(with(|counters| counters
             .push_losses
@@ -1027,7 +1027,7 @@ mod tests {
     #[test]
     fn a_fan_out_that_reached_no_browser_is_lost_for_no_device() {
         reset_for_testing();
-        fanned_out(1, &entry(7, EXPIRES), labels(), vec![], NOW);
+        track_fan_out(1, &entry(7, EXPIRES), labels(), vec![], NOW);
 
         assert_eq!(loss_count_for_testing("no_device"), 1);
     }
@@ -1035,10 +1035,10 @@ mod tests {
     #[test]
     fn copies_still_open_when_the_key_goes_were_never_fetched() {
         let entry = fan_out_to_two_browsers();
-        collected(1, &entry, Path::Chrome, NOW);
+        count_collected(1, &entry, Path::Chrome, NOW);
         assert_eq!(in_flight_count(NOW), 0);
 
-        fanned_out(
+        track_fan_out(
             1,
             &self::entry(8, LATER * 2),
             labels(),
@@ -1061,10 +1061,10 @@ mod tests {
     #[test]
     fn a_copy_is_counted_once_however_often_it_is_removed() {
         let entry = fan_out_to_two_browsers();
-        settled(1, &entry, Path::Chrome, Err(Reason::RelayGone));
-        entries_removed(1, [&entry], Path::Chrome, Reason::SubscriptionReplaced);
-        entries_removed(1, [&entry], Path::Chrome, Reason::SubscriptionReplaced);
-        collected(1, &entry, Path::Chrome, LATER);
+        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_removed_entries(1, [&entry], Path::Chrome, Reason::SubscriptionReplaced);
+        count_removed_entries(1, [&entry], Path::Chrome, Reason::SubscriptionReplaced);
+        count_collected(1, &entry, Path::Chrome, LATER);
 
         assert_eq!(push_loss_count_for_testing("relay_gone"), 1);
         assert_eq!(push_loss_count_for_testing("subscription_replaced"), 1);
@@ -1075,14 +1075,14 @@ mod tests {
     #[test]
     fn a_copy_removed_after_its_key_is_gone_is_not_counted_again() {
         let entry = fan_out_to_two_browsers();
-        fanned_out(
+        track_fan_out(
             1,
             &self::entry(8, LATER * 2),
             labels(),
             vec![deposited()],
             LATER,
         );
-        entries_removed(1, [&entry], Path::Chrome, Reason::FetchedTooLate);
+        count_removed_entries(1, [&entry], Path::Chrome, Reason::FetchedTooLate);
 
         assert_eq!(push_loss_count_for_testing("never_fetched"), 2);
         assert_eq!(push_loss_count_for_testing("fetched_too_late"), 0);
@@ -1092,7 +1092,7 @@ mod tests {
     fn the_cap_evicts_the_soonest_to_expire() {
         reset_for_testing();
         for id in 0..=MAX_LIVE_NOTIFICATIONS as u64 {
-            fanned_out(
+            track_fan_out(
                 2,
                 &entry(id, EXPIRES + id),
                 labels(),

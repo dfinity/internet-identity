@@ -1667,13 +1667,13 @@ impl<M: Memory + Clone> Storage<M> {
                 .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| browser.id)
                 .collect();
-            let mut cleared: Vec<InboxNotification> = Vec::new();
+            let mut cleared_notifications: Vec<InboxNotification> = Vec::new();
             for browser_id in pointing {
                 if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                    cleared.append(inbox);
+                    cleared_notifications.append(inbox);
                 }
             }
-            if cleared.is_empty() {
+            if cleared_notifications.is_empty() {
                 continue;
             }
             if let Err(err) = self.write(anchor) {
@@ -1682,9 +1682,9 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             }
-            delivery_metrics::entries_removed(
+            delivery_metrics::count_removed_entries(
                 anchor_number,
-                &cleared,
+                &cleared_notifications,
                 delivery_metrics::Path::App,
                 delivery_metrics::Reason::SubscriptionReplaced,
             );
@@ -3814,7 +3814,7 @@ impl<M: Memory + Clone> Storage<M> {
             } else {
                 Vec::new()
             };
-        let (browser_id, evicted) = anchor
+        let (browser_id, evicted_browsers) = anchor
             .resolve_browser(
                 browser_keys.current().clone(),
                 browser_keys.next().clone(),
@@ -3900,8 +3900,8 @@ impl<M: Memory + Clone> Storage<M> {
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, now_ns, state)?;
         for (browser_id, path, inbox) in &inboxes_at_risk {
-            if evicted.contains(browser_id) {
-                delivery_metrics::entries_removed(
+            if evicted_browsers.contains(browser_id) {
+                delivery_metrics::count_removed_entries(
                     anchor_number,
                     inbox,
                     *path,
@@ -3954,7 +3954,7 @@ impl<M: Memory + Clone> Storage<M> {
         // A browser the identity signed out of must stop being notified for it. The entry
         // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
-        let cleared = anchor
+        let cleared_notifications = anchor
             .notifications_for_browser_mut(browser_id)
             .map(std::mem::take)
             .unwrap_or_default();
@@ -3977,9 +3977,9 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         self.write_account_state(anchor, now, state)?;
-        delivery_metrics::entries_removed(
+        delivery_metrics::count_removed_entries(
             anchor_number,
-            &cleared,
+            &cleared_notifications,
             path,
             delivery_metrics::Reason::BrowserSignedOut,
         );

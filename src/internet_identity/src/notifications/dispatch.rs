@@ -418,7 +418,7 @@ fn fan_out_to_destinations(
     let labels = Labels::identity(&pending.urgency);
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
-            delivery_metrics::lost(Reason::StorageError, &labels);
+            delivery_metrics::count_lost(Reason::StorageError, &labels);
             return false;
         };
         let destinations: Vec<BrowserId> = match &pending.destination {
@@ -426,7 +426,7 @@ fn fan_out_to_destinations(
             None => anchor.browsers().iter().map(|browser| browser.id).collect(),
         };
         let expires_at_ns = now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS);
-        let queued = InboxNotification {
+        let queued_entry = InboxNotification {
             // Named by `deposit`, which is what draws from the inbox's own run of ids.
             inbox_notification_id: 0,
             application_number: None,
@@ -455,7 +455,7 @@ fn fan_out_to_destinations(
             planned.push((
                 relay_origin,
                 browser_id,
-                queued.clone(),
+                queued_entry.clone(),
                 Delivery {
                     anchor_number: pending.anchor_number,
                     browser_id,
@@ -473,7 +473,7 @@ fn fan_out_to_destinations(
         }
 
         if planned.is_empty() {
-            delivery_metrics::lost(Reason::NoDevice, &labels);
+            delivery_metrics::count_lost(Reason::NoDevice, &labels);
             return false;
         }
         // All or none, and before anything is deposited: an entry left in the backlog for
@@ -491,7 +491,7 @@ fn fan_out_to_destinations(
             // rather than deposited for: it cannot be woken, and the entry it would sit
             // behind would never be shown.
             let Some(jwt) = jwt else {
-                deposits.unreachable(path);
+                deposits.count_unreachable(path);
                 continue;
             };
             delivery.jwt = jwt;
@@ -499,11 +499,12 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
-            let (deposited, overflowed) = browser_inbox::deposit(queue, next_id, entry, now_ns);
-            deposits.deposited(path, overflowed);
+            let (deposited_entry, overflowed_entry) =
+                browser_inbox::deposit(queue, next_id, entry, now_ns);
+            deposits.count_deposit(path, overflowed_entry);
             // The body is sealed once the pass is planned, because what it is sealed with
             // may be refreshed first and the salt comes from the pass rather than the entry.
-            delivery.notification = Some(deposited);
+            delivery.notification = Some(deposited_entry);
             to_post.push(delivery);
         }
         // Posted only once the deposits are persisted, as the app half does: a wake-up
@@ -511,11 +512,11 @@ fn fan_out_to_destinations(
         // service worker can ask nothing for.
         match storage.write(anchor) {
             Ok(()) => {
-                deposits.count(pending.anchor_number, &queued, labels, now_ns);
+                deposits.count(pending.anchor_number, &queued_entry, labels, now_ns);
                 deliveries.extend(to_post)
             }
             Err(err) => {
-                delivery_metrics::lost(Reason::StorageError, &labels);
+                delivery_metrics::count_lost(Reason::StorageError, &labels);
                 ic_cdk::println!("Failed to queue what Internet Identity has to say: {err}")
             }
         }
@@ -565,7 +566,7 @@ fn fan_out_to_browsers(
         return true;
     }
     let pending = &taken.entry.item;
-    let queued = InboxNotification {
+    let queued_entry = InboxNotification {
         // Named by `deposit`, once per browser this is deposited for.
         inbox_notification_id: 0,
         application_number: Some(pending.application_number),
@@ -575,11 +576,11 @@ fn fan_out_to_browsers(
         expires_at_ns: taken.entry.expires_at_ns,
         account_number: pending.account_number,
     };
-    let ttl_seconds = queued.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
+    let ttl_seconds = queued_entry.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
     let labels = Labels::app_number(pending.application_number, &pending.urgency);
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
-            delivery_metrics::lost(Reason::StorageError, &labels);
+            delivery_metrics::count_lost(Reason::StorageError, &labels);
             return false;
         };
         let apps: Vec<Option<NotificationApp>> = anchor
@@ -616,7 +617,7 @@ fn fan_out_to_browsers(
             })
             .collect();
         if woken.is_empty() {
-            delivery_metrics::lost(Reason::NoDevice, &labels);
+            delivery_metrics::count_lost(Reason::NoDevice, &labels);
             return false;
         }
         // All or none, and before anything is deposited: an entry left in the backlog for
@@ -632,7 +633,7 @@ fn fan_out_to_browsers(
             let path = Path::of(delivery.target, &delivery.endpoint);
             // Nothing answers at this browser's relay; see the identity fan-out.
             let Some(jwt) = jwt else {
-                deposits.unreachable(path);
+                deposits.count_unreachable(path);
                 continue;
             };
             delivery.jwt = jwt;
@@ -642,15 +643,15 @@ fn fan_out_to_browsers(
                 continue;
             };
             queued_anywhere = true;
-            let (deposited, overflowed) =
-                browser_inbox::deposit(queue, next_id, queued.clone(), now_ns);
-            deposits.deposited(path, overflowed);
-            delivery.notification = Some(deposited);
+            let (deposited_entry, overflowed_entry) =
+                browser_inbox::deposit(queue, next_id, queued_entry.clone(), now_ns);
+            deposits.count_deposit(path, overflowed_entry);
+            delivery.notification = Some(deposited_entry);
             to_post.push(delivery);
         }
         match storage.write(anchor) {
             Ok(()) => {
-                deposits.count(pending.anchor_number, &queued, labels, now_ns);
+                deposits.count(pending.anchor_number, &queued_entry, labels, now_ns);
                 out.extend(to_post);
                 if queued_anywhere {
                     storage.record_notified(
@@ -661,7 +662,7 @@ fn fan_out_to_browsers(
                 }
             }
             Err(err) => {
-                delivery_metrics::lost(Reason::StorageError, &labels);
+                delivery_metrics::count_lost(Reason::StorageError, &labels);
                 ic_cdk::println!("Failed to queue a notification for its browsers: {err}")
             }
         }
@@ -674,24 +675,24 @@ fn fan_out_to_browsers(
 struct Deposits {
     pushes: Vec<PlannedPush>,
     /// The entries pushed out of a full inbox, by the delivery path of that inbox.
-    overflowed: Vec<(Path, InboxNotification)>,
+    overflowed_entries: Vec<(Path, InboxNotification)>,
 }
 
 impl Deposits {
-    fn unreachable(&mut self, path: Path) {
+    fn count_unreachable(&mut self, path: Path) {
         self.pushes.push(PlannedPush {
             path,
-            deposited: false,
+            is_deposited: false,
         });
     }
 
-    fn deposited(&mut self, path: Path, overflowed: Option<InboxNotification>) {
+    fn count_deposit(&mut self, path: Path, overflowed_entry: Option<InboxNotification>) {
         self.pushes.push(PlannedPush {
             path,
-            deposited: true,
+            is_deposited: true,
         });
-        self.overflowed
-            .extend(overflowed.map(|overflowed| (path, overflowed)));
+        self.overflowed_entries
+            .extend(overflowed_entry.map(|entry| (path, entry)));
     }
 
     fn count(
@@ -701,15 +702,15 @@ impl Deposits {
         labels: Labels,
         now_ns: Timestamp,
     ) {
-        for (path, overflowed) in &self.overflowed {
-            delivery_metrics::entries_removed(
+        for (path, overflowed_entry) in &self.overflowed_entries {
+            delivery_metrics::count_removed_entries(
                 anchor_number,
-                [overflowed],
+                [overflowed_entry],
                 *path,
                 Reason::InboxFull,
             );
         }
-        delivery_metrics::fanned_out(anchor_number, entry, labels, self.pushes, now_ns);
+        delivery_metrics::track_fan_out(anchor_number, entry, labels, self.pushes, now_ns);
     }
 }
 
@@ -784,19 +785,19 @@ fn submit_identity_wake_up(pending: PendingIdentityNotification, now_ns: Timesta
     for answer in &admitted {
         match answer.admission {
             Admission::Accepted => {
-                delivery_metrics::received(&labels);
-                delivery_metrics::accepted(&labels);
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
             }
-            Admission::Folded => delivery_metrics::folded(&labels),
+            Admission::Folded => delivery_metrics::count_folded(&labels),
             Admission::Dropped => {
-                delivery_metrics::received(&labels);
-                delivery_metrics::accepted(&labels);
-                delivery_metrics::lost(Reason::ExpiredOnArrival, &labels);
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
+                delivery_metrics::count_lost(Reason::ExpiredOnArrival, &labels);
             }
             // Nobody is told to send it again, so it is lost here.
             Admission::Full { .. } => {
-                delivery_metrics::received(&labels);
-                delivery_metrics::lost(Reason::BacklogFull, &labels);
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_lost(Reason::BacklogFull, &labels);
             }
         }
     }
@@ -921,7 +922,7 @@ pub(crate) fn path_of<M: Memory + Clone>(storage: &Storage<M>, browser: &Browser
 pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     record_post_outcome(outcome);
     if let Some(notification) = delivery.notification.as_ref() {
-        delivery_metrics::settled(
+        delivery_metrics::count_push_outcome(
             delivery.anchor_number,
             notification,
             Path::of(delivery.target, &delivery.endpoint),

@@ -447,7 +447,7 @@ describe("onWakeUp", () => {
     );
 
     expect(ii.removed).toEqual([
-      expect.objectContaining({ content_failure: [{ Unreachable: null }] }),
+      expect.objectContaining({ not_shown: [{ PayloadUnreachable: null }] }),
     ]);
     expect(reportNotificationReceived).not.toHaveBeenCalled();
     // `userVisibleOnly` still has to be satisfied.
@@ -471,7 +471,7 @@ describe("onWakeUp", () => {
     );
 
     expect(ii.removed).toEqual([
-      expect.objectContaining({ content_failure: [{ Rejected: null }] }),
+      expect.objectContaining({ not_shown: [{ PayloadRejected: null }] }),
     ]);
   });
 
@@ -594,7 +594,7 @@ describe("onWakeUp", () => {
         anchor_number: IDENTITY,
         browser_id: NAMED.browserId,
         inbox_notification_id: NAMED.inboxNotificationId,
-        content_failure: [],
+        not_shown: [],
       },
     ]);
   });
@@ -613,7 +613,7 @@ describe("onWakeUp", () => {
         anchor_number: IDENTITY,
         browser_id: NAMED.browserId,
         inbox_notification_id: NAMED.inboxNotificationId,
-        content_failure: [],
+        not_shown: [],
       },
     ]);
     expect(shown.shown).toEqual([

@@ -1566,16 +1566,17 @@ pub struct RemoveNotificationRequest {
     /// As the wake-up that announced it named it.
     pub inbox_notification_id: InboxNotificationId,
     /// Why the worker could not show it. Absent where it did.
-    pub content_failure: Option<NotificationContentFailure>,
+    pub not_shown: Option<NotShownReason>,
 }
 
-/// How the service worker's call to the app's canister for a notification's content failed.
+/// Why the service worker could not show a notification: its call to the app's canister
+/// for the content failed, which only the device sees.
 #[derive(Clone, Copy, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum NotificationContentFailure {
+pub enum NotShownReason {
     /// The call got no answer.
-    Unreachable,
+    PayloadUnreachable,
     /// The app's canister rejected the call or trapped.
-    Rejected,
+    PayloadRejected,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
