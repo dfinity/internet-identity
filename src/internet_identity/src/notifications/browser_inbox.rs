@@ -7,12 +7,14 @@
 //! The inbox lives on the browser's entry, and is cleared when its wake-up address
 //! changes.
 
+use crate::notifications::delivery_metrics::{self, Path, Reason};
+use crate::notifications::dispatch;
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, InboxNotification, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, InboxNotificationId, NotificationToShow, Timestamp,
+    AnchorNumber, BrowserId, InboxNotificationId, NotShownReason, NotificationToShow, Timestamp,
 };
 
 /// Most entries one inbox holds. A new one past it replaces the oldest.
@@ -22,20 +24,19 @@ pub(crate) const CAPACITY: usize = 100;
 /// it so the wake-up announcing it can ask for that entry and no other.
 ///
 /// Every deposit earns a wake-up of its own, including one that overflows the inbox.
+/// Answers the entry as deposited, and the oldest where the inbox was full.
 pub(crate) fn deposit(
     inbox: &mut Vec<InboxNotification>,
     next_id: &mut InboxNotificationId,
     mut notification: InboxNotification,
     now_ns: Timestamp,
-) -> InboxNotification {
+) -> (InboxNotification, Option<InboxNotification>) {
     notification.inbox_notification_id = *next_id;
     *next_id = next_id.wrapping_add(1);
     inbox.retain(|entry| entry.expires_at_ns > now_ns);
-    if inbox.len() >= CAPACITY {
-        inbox.remove(0);
-    }
+    let overflowed_entry = (inbox.len() >= CAPACITY).then(|| inbox.remove(0));
     inbox.push(notification.clone());
-    notification
+    (notification, overflowed_entry)
 }
 
 /// A failed post means no wake-up is coming for the entry it named, so that entry goes
@@ -105,21 +106,37 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
         let Ok(mut anchor) = storage.read(anchor_number) else {
             return;
         };
-        let browser_ids: Vec<BrowserId> =
-            anchor.browsers().iter().map(|browser| browser.id).collect();
-        let mut removed = false;
-        for browser_id in browser_ids {
+        let browsers: Vec<(BrowserId, Path)> = anchor
+            .browsers()
+            .iter()
+            .map(|browser| (browser.id, dispatch::path_of(storage, browser)))
+            .collect();
+        let mut removed_entries = Vec::new();
+        for (browser_id, path) in browsers {
             if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                let before = inbox.len();
-                inbox.retain(|entry| entry.application_number != Some(application_number));
-                removed |= inbox.len() < before;
+                let (theirs, others): (Vec<_>, Vec<_>) = std::mem::take(inbox)
+                    .into_iter()
+                    .partition(|entry| entry.application_number == Some(application_number));
+                *inbox = others;
+                if !theirs.is_empty() {
+                    removed_entries.push((path, theirs));
+                }
             }
         }
-        if !removed {
+        if removed_entries.is_empty() {
             return;
         }
         if let Err(err) = storage.write(anchor) {
             ic_cdk::println!("Failed to drop what an app without consent deposited: {err}");
+            return;
+        }
+        for (path, entries) in removed_entries {
+            delivery_metrics::count_removed_entries(
+                anchor_number,
+                &entries,
+                path,
+                Reason::ConsentRevoked,
+            );
         }
     });
 }
@@ -165,8 +182,9 @@ pub(crate) fn notification_named(
     })
 }
 
-/// Remove the entry the service worker collected. One already gone is no error: expiry,
-/// a full inbox or a failed wake-up may have dropped it first.
+/// Remove the entry the service worker collected, which it showed unless it names how the
+/// app failed to give it the content. One already gone is no error: expiry, a full inbox
+/// or a failed wake-up may have dropped it first.
 ///
 /// The id names one entry of one inbox, so nothing else is needed to tell it from an
 /// expired entry, or from another application's notification carrying the same sender id.
@@ -174,20 +192,42 @@ pub(crate) fn remove_collected(
     mut anchor: Anchor,
     browser_id: BrowserId,
     inbox_notification_id: InboxNotificationId,
+    not_shown: Option<NotShownReason>,
     now_ns: Timestamp,
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
+        let anchor_number = anchor.anchor_number();
+        let path = anchor
+            .browser(browser_id)
+            .map_or(Path::Other, |browser| dispatch::path_of(storage, browser));
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
             return Ok(());
         };
-        // `collect` hands out only unexpired entries, so this searches the same set.
-        let Some(position) = inbox.iter().position(|entry| {
-            entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
-        }) else {
+        let Some(position) = inbox
+            .iter()
+            .position(|entry| entry.inbox_notification_id == inbox_notification_id)
+        else {
             return Ok(());
         };
-        inbox.remove(position);
-        storage.write(anchor).map_err(|err| format!("{err}"))
+        let entry = inbox.remove(position);
+        storage.write(anchor).map_err(|err| format!("{err}"))?;
+        // `collect` hands out only unexpired entries, so one past its expiry was asked
+        // for too late to be shown.
+        let loss_reason = if entry.expires_at_ns <= now_ns {
+            Some(Reason::FetchedTooLate)
+        } else {
+            not_shown.map(|not_shown| match not_shown {
+                NotShownReason::PayloadUnreachable => Reason::PayloadUnreachable,
+                NotShownReason::PayloadRejected => Reason::PayloadRejected,
+            })
+        };
+        match loss_reason {
+            None => delivery_metrics::count_collected(anchor_number, &entry, path, now_ns),
+            Some(reason) => {
+                delivery_metrics::count_removed_entries(anchor_number, [&entry], path, reason)
+            }
+        }
+        Ok(())
     })
 }
 
@@ -252,7 +292,7 @@ mod tests {
         let mut next_id = 7;
 
         for id in 1..=3 {
-            let deposited = deposit(
+            let (deposited_entry, _) = deposit(
                 &mut inbox,
                 &mut next_id,
                 entry(id, 60 * SECOND_NS),
@@ -260,7 +300,7 @@ mod tests {
             );
             // What the wake-up announcing it names, which is also what is stored.
             assert_eq!(
-                deposited.inbox_notification_id,
+                deposited_entry.inbox_notification_id,
                 inbox.last().unwrap().inbox_notification_id
             );
         }
@@ -283,13 +323,13 @@ mod tests {
         let mut second = Vec::new();
         let mut next_id = 0;
 
-        let to_first = deposit(
+        let (to_first, _) = deposit(
             &mut first,
             &mut next_id,
             entry(1, 60 * SECOND_NS),
             SECOND_NS,
         );
-        let to_second = deposit(
+        let (to_second, _) = deposit(
             &mut second,
             &mut next_id,
             entry(1, 60 * SECOND_NS),
@@ -324,13 +364,15 @@ mod tests {
             .collect();
         let mut next_id = CAPACITY as u64;
 
-        deposit(
+        let (_, overflowed_entry) = deposit(
             &mut inbox,
             &mut next_id,
             entry(1_000, 60 * SECOND_NS),
             SECOND_NS,
         );
 
+        // The entry pushed out is handed back, so it can be counted as lost.
+        assert_eq!(overflowed_entry.map(|entry| entry.notification_id), Some(0));
         assert_eq!(inbox.len(), CAPACITY);
         assert_eq!(inbox.first().map(|one| one.notification_id), Some(1));
         assert_eq!(inbox.last().map(|one| one.notification_id), Some(1_000));
@@ -439,8 +481,14 @@ mod tests {
         now_ns: Timestamp,
     ) {
         // Every fixture here is named after the sender id it carries.
-        remove_collected(anchor(anchor_number), browser_id, notification.id, now_ns)
-            .expect("removing");
+        remove_collected(
+            anchor(anchor_number),
+            browser_id,
+            notification.id,
+            None,
+            now_ns,
+        )
+        .expect("removing");
     }
 
     fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {

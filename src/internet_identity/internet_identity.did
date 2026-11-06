@@ -2254,6 +2254,17 @@ type RemoveNotificationRequest = record {
     browser_id : nat32;
     // As the wake-up that announced it named it.
     inbox_notification_id : InboxNotificationId;
+    // Why the worker could not show it. Absent where it did.
+    not_shown : opt NotShownReason;
+};
+
+// Why the service worker could not show a notification: its call to the app's canister
+// for the content failed, which only the device sees.
+type NotShownReason = variant {
+    // The call got no answer.
+    PayloadUnreachable;
+    // The app's canister rejected the call or trapped.
+    PayloadRejected;
 };
 
 type RemoveNotificationResponse = record {};

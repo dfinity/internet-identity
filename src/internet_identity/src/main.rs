@@ -46,7 +46,9 @@ use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
-use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
+use notifications::{
+    admit_batch, delivery_metrics, enabled_or, fetchable_origin, TooManyNotifications,
+};
 use serde_bytes::ByteBuf;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -1006,6 +1008,7 @@ fn browser_remove_notification(
         anchor_number,
         browser_id,
         inbox_notification_id,
+        not_shown,
     } = request;
     enabled_or(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
@@ -1025,6 +1028,7 @@ fn browser_remove_notification(
         anchor,
         browser_id,
         inbox_notification_id,
+        not_shown,
         now_ns,
     )
     .map(|()| RemoveNotificationResponse {})
@@ -1151,8 +1155,22 @@ fn app_send_notification(
     })?;
 
     match notifications::senders::authorize(&origin, caller(), ic_cdk::api::time()) {
-        Senders::NotListed => Err(SendNotificationError::NoSuchSender),
+        Senders::NotListed => {
+            for notification in &notifications {
+                let labels =
+                    delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref());
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_unlisted_sender(caller(), &labels);
+            }
+            Err(SendNotificationError::NoSuchSender)
+        }
         Senders::Pending { retry_after } => {
+            for notification in &notifications {
+                delivery_metrics::count_deferred(
+                    delivery_metrics::DeferCause::SenderList,
+                    &delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref()),
+                );
+            }
             Ok(notifications::defer_whole_batch(notifications, retry_after))
         }
         Senders::Listed => Ok(notifications::submission::submit(

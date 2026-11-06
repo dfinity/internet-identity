@@ -104,6 +104,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
+use crate::notifications::delivery_metrics;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
 use crate::state::PersistentState;
@@ -112,7 +113,9 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError, WebPushSubscription, MAX_BROWSERS};
+use crate::storage::anchor::{
+    Anchor, BrowserError, InboxNotification, WebPushSubscription, MAX_BROWSERS,
+};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1664,18 +1667,27 @@ impl<M: Memory + Clone> Storage<M> {
                 .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| browser.id)
                 .collect();
-            let mut cleared = false;
+            let mut cleared_notifications: Vec<InboxNotification> = Vec::new();
             for browser_id in pointing {
-                cleared |= anchor.clear_notifications_for_browser(browser_id);
+                if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
+                    cleared_notifications.append(inbox);
+                }
             }
-            if !cleared {
+            if cleared_notifications.is_empty() {
                 continue;
             }
             if let Err(err) = self.write(anchor) {
                 ic_cdk::println!(
                     "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
                 );
+                continue;
             }
+            delivery_metrics::count_removed_entries(
+                anchor_number,
+                &cleared_notifications,
+                delivery_metrics::Path::App,
+                delivery_metrics::Reason::SubscriptionReplaced,
+            );
         }
     }
 
@@ -3785,7 +3797,24 @@ impl<M: Memory + Clone> Storage<M> {
         //
         // After the refusals above, so a ceremony that cannot happen registers nothing —
         // the record reaches storage only through the write at the end.
-        let (browser_id, _) = anchor
+        // Read before the registry may give a browser up, which takes its inbox with it.
+        let inboxes_at_risk: Vec<(BrowserId, delivery_metrics::Path, Vec<InboxNotification>)> =
+            if anchor.browsers().len() >= MAX_BROWSERS {
+                anchor
+                    .browsers()
+                    .iter()
+                    .map(|browser| {
+                        (
+                            browser.id,
+                            crate::notifications::dispatch::path_of(self, browser),
+                            browser.notifications.clone(),
+                        )
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+        let (browser_id, evicted_browsers) = anchor
             .resolve_browser(
                 browser_keys.current().clone(),
                 browser_keys.next().clone(),
@@ -3870,6 +3899,16 @@ impl<M: Memory + Clone> Storage<M> {
         // the sessions of every browser the registry gave up, the account reference list
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, now_ns, state)?;
+        for (browser_id, path, inbox) in &inboxes_at_risk {
+            if evicted_browsers.contains(browser_id) {
+                delivery_metrics::count_removed_entries(
+                    anchor_number,
+                    inbox,
+                    *path,
+                    delivery_metrics::Reason::BrowserEvicted,
+                );
+            }
+        }
 
         let key = SessionLocator {
             anchor_number,
@@ -3907,12 +3946,18 @@ impl<M: Memory + Clone> Storage<M> {
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
+        let path = anchor
+            .browser(browser_id)
+            .map_or(delivery_metrics::Path::Other, |browser| {
+                crate::notifications::dispatch::path_of(self, browser)
+            });
         // A browser the identity signed out of must stop being notified for it. The entry
         // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
-        if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
-            queue.clear();
-        }
+        let cleared_notifications = anchor
+            .notifications_for_browser_mut(browser_id)
+            .map(std::mem::take)
+            .unwrap_or_default();
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -3932,6 +3977,12 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         self.write_account_state(anchor, now, state)?;
+        delivery_metrics::count_removed_entries(
+            anchor_number,
+            &cleared_notifications,
+            path,
+            delivery_metrics::Reason::BrowserSignedOut,
+        );
 
         Ok(revoked)
     }

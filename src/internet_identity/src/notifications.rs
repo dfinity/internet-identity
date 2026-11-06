@@ -7,6 +7,7 @@
 pub(crate) mod backlog;
 pub(crate) mod browser_inbox;
 pub mod delegation;
+pub(crate) mod delivery_metrics;
 pub(crate) mod dispatch;
 pub mod installed_app;
 pub mod senders;
@@ -130,6 +131,7 @@ pub(crate) fn test_setup() {
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
     crate::state::storage_replace(Storage::new((0, 100), VectorMemory::default()));
+    delivery_metrics::reset_for_testing();
     storage_borrow_mut(|s| s.update_salt([7u8; 32]));
     // Asked of the management canister on a real deployment, which a test has none of.
     crate::state::persistent_state_mut(|p| {

@@ -105,7 +105,7 @@ const _: () = assert!(APP_BACKLOG.pressure_cleared_below < APP_BACKLOG.max_entri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admission_queue::{Admission, Admitted, Taken};
+    use crate::admission_queue::{Admission, Admitted, FullCause, Taken};
 
     fn results<Key>(admitted: Vec<Admitted<Key>>) -> Vec<Admission> {
         admitted
@@ -219,7 +219,8 @@ mod tests {
         assert_eq!(
             results(backlog.admit(app.clone(), vec![notification(1, cap)], 1)),
             vec![Admission::Full {
-                retry_after_ns: APP_BACKLOG.retry.base_ns
+                retry_after_ns: APP_BACKLOG.retry.base_ns,
+                cause: FullCause::Group,
             }]
         );
 

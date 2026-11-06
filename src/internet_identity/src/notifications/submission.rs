@@ -1,7 +1,8 @@
 //! Put an app's batch into the backlog, answering for what II cannot take.
 
-use crate::admission_queue::Admission;
+use crate::admission_queue::{Admission, FullCause};
 use crate::notifications::backlog::app::PendingNotification;
+use crate::notifications::delivery_metrics::{self, DeferCause, Labels, Reason};
 use crate::notifications::{dispatch, BROWSER_GONE_AFTER_NS};
 use crate::origin::ApplicationOrigin;
 use crate::state::{self, storage_borrow};
@@ -22,7 +23,7 @@ pub fn submit(
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
     let mut not_accepted = Vec::new();
-    let mut resolved: BTreeMap<Principal, Result<Resolved, NotAcceptedReason>> = BTreeMap::new();
+    let mut resolutions: BTreeMap<Principal, Result<Resolved, Refusal>> = BTreeMap::new();
     let mut reachable = Vec::new();
 
     for Notification {
@@ -32,7 +33,7 @@ pub fn submit(
         urgency,
     } in notifications
     {
-        let resolution = resolved
+        let resolution = resolutions
             .entry(recipient)
             .or_insert_with(|| resolve_recipient(recipient, origin, now_ns))
             .clone();
@@ -51,17 +52,34 @@ pub fn submit(
                 urgency: urgency.unwrap_or(Urgency::Normal),
                 expires_at_ns: expires_at,
             }),
-            Err(reason) => not_accepted.push(NotAccepted {
-                id,
-                recipient,
-                reason,
-            }),
+            Err(refusal) => {
+                let labels = Labels::app(origin.as_str(), urgency.as_ref());
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_lost(refusal.metric_reason(), &labels);
+                not_accepted.push(NotAccepted {
+                    id,
+                    recipient,
+                    reason: refusal.answer(),
+                })
+            }
         }
     }
     if reachable.is_empty() {
         return SendNotificationResponse { not_accepted };
     }
 
+    for pending in &reachable {
+        delivery_metrics::number_application(pending.application_number, origin.as_str());
+    }
+    let counted_notifications: Vec<(Labels, Option<Timestamp>)> = reachable
+        .iter()
+        .map(|pending| {
+            (
+                Labels::app(origin.as_str(), Some(&pending.urgency)),
+                pending.expires_at_ns,
+            )
+        })
+        .collect();
     let admissions = state::notification_backlog_mut(now_ns, |backlog| {
         backlog.admit(
             StorableOriginSha256::from_origin(&origin.as_str().to_string()),
@@ -69,23 +87,93 @@ pub fn submit(
             now_ns,
         )
     });
-    for admitted in admissions {
+    for (admitted, (labels, expires_at_ns)) in admissions.into_iter().zip(counted_notifications) {
         match admitted.admission {
-            Admission::Accepted | Admission::Folded | Admission::Dropped => {}
-            Admission::Full { retry_after_ns } => {
+            Admission::Accepted => {
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
+            }
+            Admission::Folded => delivery_metrics::count_folded(&labels),
+            Admission::Dropped => {
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
+                delivery_metrics::count_lost(Reason::ExpiredOnArrival, &labels);
+            }
+            Admission::Full {
+                retry_after_ns,
+                cause,
+            } => {
+                let retry_after = now_ns.saturating_add(retry_after_ns);
+                count_deferral(&labels, cause, retry_after, expires_at_ns);
                 let (recipient, id) = admitted.key;
                 not_accepted.push(NotAccepted {
                     id,
                     recipient,
-                    reason: NotAcceptedReason::Deferred {
-                        retry_after: now_ns.saturating_add(retry_after_ns),
-                    },
+                    reason: NotAcceptedReason::Deferred { retry_after },
                 });
             }
         }
     }
     dispatch::schedule_pass(now_ns);
     SendNotificationResponse { not_accepted }
+}
+
+/// A deferral is counted beside the funnel, as the app is expected to send it again. One
+/// told to come back no sooner than it expires cannot arrive, so it is a loss instead.
+fn count_deferral(
+    labels: &Labels,
+    cause: FullCause,
+    retry_after: Timestamp,
+    expires_at_ns: Option<Timestamp>,
+) {
+    let is_capacity_cause = cause == FullCause::Queue;
+    if expires_at_ns.is_some_and(|expires_at_ns| retry_after >= expires_at_ns) {
+        delivery_metrics::count_received(labels);
+        delivery_metrics::count_lost(
+            if is_capacity_cause {
+                Reason::CapacityPastExpiry
+            } else {
+                Reason::AppLimitPastExpiry
+            },
+            labels,
+        );
+        return;
+    }
+    delivery_metrics::count_deferred(
+        if is_capacity_cause {
+            DeferCause::Capacity
+        } else {
+            DeferCause::AppLimit
+        },
+        labels,
+    );
+}
+
+/// Why a recipient cannot be reached, finer than the answer the app is given.
+#[derive(Clone, Copy, Debug)]
+enum Refusal {
+    /// The principal names no account at the origin.
+    UnknownPrincipal,
+    /// None of the identity's browsers was used within [`BROWSER_GONE_AFTER_NS`].
+    Dormant,
+    NoChannel,
+}
+
+impl Refusal {
+    fn answer(self) -> NotAcceptedReason {
+        match self {
+            Refusal::UnknownPrincipal | Refusal::Dormant => NotAcceptedReason::NoSuchRecipient,
+            Refusal::NoChannel => NotAcceptedReason::NoChannel,
+        }
+    }
+
+    fn metric_reason(self) -> Reason {
+        match self {
+            Refusal::UnknownPrincipal => Reason::UnknownPrincipal,
+            Refusal::Dormant => Reason::DormantIdentity,
+            Refusal::NoChannel => Reason::NoChannel,
+        }
+    }
 }
 
 /// Where a recipient principal points: its identity, the app, and its account there.
@@ -103,25 +191,25 @@ fn resolve_recipient(
     recipient: Principal,
     origin: &ApplicationOrigin,
     now_ns: Timestamp,
-) -> Result<Resolved, NotAcceptedReason> {
+) -> Result<Resolved, Refusal> {
     let origin = &origin.as_str().to_string();
     storage_borrow(|storage| {
         let account = storage
             .lookup_account_with_principal(recipient)
             .filter(|account| account.origin == *origin)
-            .ok_or(NotAcceptedReason::NoSuchRecipient)?;
+            .ok_or(Refusal::UnknownPrincipal)?;
         let application_number = storage
             .lookup_application_number_with_origin(origin)
-            .ok_or(NotAcceptedReason::NoSuchRecipient)?;
+            .ok_or(Refusal::UnknownPrincipal)?;
         let anchor = storage
             .read(account.anchor_number)
-            .map_err(|_| NotAcceptedReason::NoSuchRecipient)?;
+            .map_err(|_| Refusal::UnknownPrincipal)?;
         let live = anchor
             .browsers()
             .iter()
             .any(|browser| now_ns.saturating_sub(browser.last_used) < BROWSER_GONE_AFTER_NS);
         if !live {
-            return Err(NotAcceptedReason::NoSuchRecipient);
+            return Err(Refusal::Dormant);
         }
         let consented = storage
             .read_anchor_application_config(account.anchor_number, origin)
@@ -132,7 +220,7 @@ fn resolve_recipient(
                 .iter()
                 .any(|browser| dispatch::can_wake(storage, browser, now_ns))
         {
-            return Err(NotAcceptedReason::NoChannel);
+            return Err(Refusal::NoChannel);
         }
         Ok(Resolved {
             anchor_number: account.anchor_number,
@@ -145,6 +233,7 @@ fn resolve_recipient(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notifications::delivery_metrics;
     use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
     use crate::notifications::write_notifications_decision;
     use crate::state::storage_borrow_mut;
@@ -389,6 +478,85 @@ mod tests {
         assert_eq!(send(vec![late], NOW_NS), vec![]);
 
         assert!(queued(NOW_NS).is_empty());
+    }
+
+    #[test]
+    fn a_queued_notification_is_counted_received_and_accepted() {
+        setup();
+        let recipient = reachable();
+
+        send(vec![notification(&recipient, 7)], NOW_NS);
+
+        assert_eq!(
+            delivery_metrics::notification_count_for_testing("received"),
+            1
+        );
+        assert_eq!(
+            delivery_metrics::notification_count_for_testing("accepted"),
+            1
+        );
+    }
+
+    #[test]
+    fn a_refusal_is_counted_received_and_lost_for_its_reason() {
+        setup();
+        let stranger = Recipient {
+            anchor_number: 0,
+            principal: Principal::from_slice(&[9; 29]),
+        };
+        let long_after = BROWSER_GONE_AFTER_NS + NOW_NS;
+        let dormant_recipient = reachable();
+
+        send(vec![notification(&stranger, 1)], NOW_NS);
+        send(vec![notification(&dormant_recipient, 2)], long_after);
+
+        assert_eq!(
+            delivery_metrics::notification_count_for_testing("received"),
+            2
+        );
+        assert_eq!(
+            delivery_metrics::loss_count_for_testing("unknown_principal"),
+            1
+        );
+        assert_eq!(
+            delivery_metrics::loss_count_for_testing("dormant_identity"),
+            1
+        );
+    }
+
+    #[test]
+    fn a_resend_of_a_waiting_notification_is_folded_rather_than_received() {
+        setup();
+        let recipient = reachable();
+
+        send(vec![notification(&recipient, 7)], NOW_NS);
+        send(vec![notification(&recipient, 7)], NOW_NS);
+
+        assert_eq!(
+            delivery_metrics::notification_count_for_testing("received"),
+            1
+        );
+    }
+
+    #[test]
+    fn a_deferral_is_not_received_unless_it_cannot_come_back_in_time() {
+        setup();
+        let recipient = reachable();
+        let mut batch: Vec<_> = (0..21).map(|id| notification(&recipient, id)).collect();
+        let mut late_notification = notification(&recipient, 21);
+        late_notification.expires_at = Some(NOW_NS + 1);
+        batch.push(late_notification);
+
+        send(batch, NOW_NS);
+
+        assert_eq!(
+            delivery_metrics::notification_count_for_testing("received"),
+            21
+        );
+        assert_eq!(
+            delivery_metrics::loss_count_for_testing("app_limit_past_expiry"),
+            1
+        );
     }
 
     #[test]

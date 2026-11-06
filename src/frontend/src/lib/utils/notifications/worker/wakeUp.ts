@@ -9,6 +9,7 @@
 import {
   Actor,
   HttpAgent,
+  RejectError,
   type ActorSubclass,
   type Identity,
 } from "@icp-sdk/core/agent";
@@ -16,6 +17,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
 import type {
   _SERVICE,
+  NotShownReason,
   NotificationEvent,
   NotificationToShow,
 } from "$lib/generated/internet_identity_types";
@@ -157,21 +159,33 @@ const internetIdentityActor = ({
     }),
   );
 
+/** `notShown` says how the app failed to give the content, so Internet Identity counts
+ *  the notification as lost rather than shown. */
 const removeEntry = (
   actor: ActorSubclass<_SERVICE>,
   id: InboxEntryId,
+  notShown?: NotShownReason,
 ): Promise<unknown> =>
   actor.browser_remove_notification({
     anchor_number: id.anchorNumber,
     browser_id: id.browserId,
     inbox_notification_id: id.inboxNotificationId,
+    not_shown: notShown === undefined ? [] : [notShown],
   });
+
+/** A canister that answered with a reject or a trap rejected the call; anything else
+ *  never got an answer. */
+const notShownReasonOf = (error: unknown): NotShownReason =>
+  error instanceof RejectError
+    ? { PayloadRejected: null }
+    : { PayloadUnreachable: null };
 
 /** A query: nothing the canister remembers having answered. */
 const fetchEntry = async (
   context: WakeUpContext,
   signing: SigningIdentity,
   id: InboxEntryId,
+  background: BackgroundCalls,
 ): Promise<InboxEntry | undefined> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     signing,
@@ -186,6 +200,9 @@ const fetchEntry = async (
   }
   const notification = found.Ok.notification[0];
   if (notification === undefined) {
+    // Expired or already gone. Removing it lets Internet Identity count one that expired
+    // as asked for too late; one already gone is no error.
+    background.start(removeEntry(actor, id));
     return undefined;
   }
   return { actor, identityNumber: signing.identityNumber, notification, id };
@@ -276,11 +293,21 @@ const showPublished = async (
   background: BackgroundCalls,
 ): Promise<boolean> => {
   const { notification } = entry;
-  const content = await fetchNotificationContent({
-    appCanisterId: notification.canister_id,
-    id: notification.id,
-    identity,
-  });
+  let content;
+  try {
+    content = await fetchNotificationContent({
+      appCanisterId: notification.canister_id,
+      id: notification.id,
+      identity,
+    });
+  } catch (error) {
+    // The app said nothing about what is on screen, so that stays. The entry goes with
+    // the reason, since no later wake-up names it again.
+    background.start(
+      removeEntry(entry.actor, entry.id, notShownReasonOf(error)),
+    );
+    throw error;
+  }
   if (content === undefined) {
     // The app dismissed it, or it expired: there is nothing to show and nothing left
     // for the canister to hold.
@@ -463,7 +490,9 @@ export const onWakeUp = async (
       ? undefined
       : signing.find((one) => one.identityNumber === id.anchorNumber);
   if (id !== undefined && signer !== undefined) {
-    const entry = await fetchEntry(context, signer, id).catch(() => undefined);
+    const entry = await fetchEntry(context, signer, id, background).catch(
+      () => undefined,
+    );
     if (entry !== undefined) {
       shown = await showEntry(context, entry, background).catch(() => false);
     }

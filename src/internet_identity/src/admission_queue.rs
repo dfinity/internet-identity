@@ -113,7 +113,21 @@ pub(crate) enum Admission {
     /// Queue, sender, lane, or group capacity reached.
     Full {
         retry_after_ns: u64,
+        cause: FullCause,
     },
+}
+
+/// Which limit turned an item away.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FullCause {
+    /// The queue as a whole.
+    Queue,
+    /// The sender's share of the queue.
+    Sender,
+    /// The item's group.
+    Group,
+    /// The item's lane, which is full or cannot drain before the item expires.
+    Lane,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -387,6 +401,16 @@ pub(crate) struct AdmissionQueue<Sender: Clone + Ord, Item: QueueItem> {
     rejected_group_full: u64,
     rejected_lane_full: u64,
     dropped_already_expired: u64,
+    /// Entries discarded on expiry since [`Self::drain_expired`] was last called.
+    expired: Vec<Expired<Item>>,
+}
+
+/// An entry discarded because it expired before it was taken.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Expired<Item> {
+    pub(crate) item: Item,
+    /// The item's own deadline ran out, rather than the queue's window.
+    pub(crate) by_own_deadline: bool,
 }
 
 impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
@@ -405,7 +429,13 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             rejected_group_full: 0,
             rejected_lane_full: 0,
             dropped_already_expired: 0,
+            expired: Vec::new(),
         }
+    }
+
+    /// Hands over what expired in the queue since the last call.
+    pub(crate) fn drain_expired(&mut self) -> Vec<Expired<Item>> {
+        std::mem::take(&mut self.expired)
     }
 
     /// Return one outcome per input item, in input order.
@@ -452,7 +482,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 self.rejected_group_full += 1;
                 let since_ns = self.record_group_refusal(&sender, &item.group(), now_ns);
                 let retry_after_ns = self.retry_after_ns(Some(since_ns), now_ns);
-                admissions.push(answer(Admission::Full { retry_after_ns }));
+                admissions.push(answer(Admission::Full {
+                    retry_after_ns,
+                    cause: FullCause::Group,
+                }));
                 continue;
             }
 
@@ -464,13 +497,21 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
 
             // Reject items if the queue or sender is at capacity.
             if self.queue_is_full() || self.sender_is_at_cap(&sender) {
+                let cause = if self.queue_is_full() {
+                    FullCause::Queue
+                } else {
+                    FullCause::Sender
+                };
                 // Sender pressure can persist while the queue still has room.
                 let since_ns = match self.at_capacity_since_ns {
                     Some(since_ns) => since_ns,
                     None => self.record_sender_refusal(&sender, now_ns),
                 };
                 let retry_after_ns = self.retry_after_ns(Some(since_ns), now_ns);
-                admissions.push(answer(Admission::Full { retry_after_ns }));
+                admissions.push(answer(Admission::Full {
+                    retry_after_ns,
+                    cause,
+                }));
                 continue;
             }
 
@@ -480,7 +521,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 self.rejected_lane_full += 1;
                 let since_ns = self.record_lane_refusal(&sender, lane, now_ns);
                 let retry_after_ns = self.retry_after_ns(Some(since_ns), now_ns);
-                admissions.push(answer(Admission::Full { retry_after_ns }));
+                admissions.push(answer(Admission::Full {
+                    retry_after_ns,
+                    cause: FullCause::Lane,
+                }));
                 continue;
             }
 
@@ -781,8 +825,17 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 if expires_at_ns > now_ns {
                     break;
                 }
-                queue.remove_entry(priority, expires_at_ns, &key, max_pending_per_group);
+                let removed_entry =
+                    queue.remove_entry(priority, expires_at_ns, &key, max_pending_per_group);
                 let emptied = queue.is_empty();
+                if let Some(entry) = removed_entry {
+                    // The expiry it ended with, which a folded resend may have set: the
+                    // app's own where that was the earlier, the backlog's window where not.
+                    self.expired.push(Expired {
+                        by_own_deadline: entry.item.expires_at_ns() == Some(entry.expires_at_ns),
+                        item: entry.item,
+                    });
+                }
                 self.account_for_removal(sender, emptied);
                 self.record_lane_held(sender, priority, expires_at_ns);
                 self.discarded_expired += 1;
@@ -1256,7 +1309,8 @@ mod tests {
                 Admission::Accepted,
                 Admission::Accepted,
                 Admission::Full {
-                    retry_after_ns: 1_000
+                    retry_after_ns: 1_000,
+                    cause: FullCause::Lane,
                 },
             ]
         );
@@ -1281,7 +1335,8 @@ mod tests {
                 Admission::Accepted,
                 Admission::Accepted,
                 Admission::Full {
-                    retry_after_ns: 1_000
+                    retry_after_ns: 1_000,
+                    cause: FullCause::Lane,
                 },
             ]
         );
@@ -1336,7 +1391,8 @@ mod tests {
             vec![
                 Admission::Accepted,
                 Admission::Full {
-                    retry_after_ns: 1_000
+                    retry_after_ns: 1_000,
+                    cause: FullCause::Lane,
                 },
                 Admission::Accepted,
             ]
@@ -1372,7 +1428,8 @@ mod tests {
         assert_eq!(
             hint(&mut backlog, 5),
             vec![Admission::Full {
-                retry_after_ns: 1_000
+                retry_after_ns: 1_000,
+                cause: FullCause::Lane,
             }]
         );
 
@@ -1380,7 +1437,8 @@ mod tests {
         assert_eq!(
             hint(&mut backlog, 15),
             vec![Admission::Full {
-                retry_after_ns: 2_000
+                retry_after_ns: 2_000,
+                cause: FullCause::Lane,
             }]
         );
     }
@@ -1404,6 +1462,31 @@ mod tests {
         assert_eq!(admissions, vec![Admission::Folded]);
         assert_eq!(backlog.stored_total, 1);
         assert_eq!(backlog.stats(2).folded_duplicates, 1);
+    }
+
+    #[test]
+    fn a_folded_resend_that_expires_by_its_own_deadline_is_the_apps() {
+        let mut backlog = TestQueue::new(config(), 0);
+        // Its window ends at 100, before its own deadline at 150.
+        backlog.admit(1, vec![expiring(1, 1, 150)], 0);
+        // The resend restarts the window to 140, after its own deadline at 120.
+        backlog.admit(1, vec![expiring(1, 1, 120)], 40);
+
+        backlog.admit(1, vec![item(2, 1)], 121);
+
+        let expired_items = backlog.drain_expired();
+        assert!(matches!(expired_items.as_slice(), [only] if only.by_own_deadline));
+    }
+
+    #[test]
+    fn an_item_that_waits_its_whole_window_is_the_backlogs() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![expiring(1, 1, 150)], 0);
+
+        backlog.admit(1, vec![item(2, 1)], 101);
+
+        let expired_items = backlog.drain_expired();
+        assert!(matches!(expired_items.as_slice(), [only] if !only.by_own_deadline));
     }
 
     #[test]
@@ -1435,7 +1518,8 @@ mod tests {
                 Admission::Accepted,
                 Admission::Accepted,
                 Admission::Full {
-                    retry_after_ns: 1_000
+                    retry_after_ns: 1_000,
+                    cause: FullCause::Group,
                 }
             ]
         );
@@ -1562,7 +1646,8 @@ mod tests {
                 Admission::Accepted,
                 Admission::Accepted,
                 Admission::Full {
-                    retry_after_ns: 1_000
+                    retry_after_ns: 1_000,
+                    cause: FullCause::Sender,
                 },
             ]
         );
@@ -1587,7 +1672,8 @@ mod tests {
         assert_eq!(
             incumbent,
             vec![Admission::Full {
-                retry_after_ns: 1_000
+                retry_after_ns: 1_000,
+                cause: FullCause::Sender,
             }]
         );
         assert_eq!(newcomer, vec![Admission::Accepted]);
@@ -1614,7 +1700,8 @@ mod tests {
         assert_eq!(
             admissions,
             vec![Admission::Full {
-                retry_after_ns: 1_000
+                retry_after_ns: 1_000,
+                cause: FullCause::Queue,
             }]
         );
     }
@@ -1651,7 +1738,8 @@ mod tests {
         assert_eq!(
             results(backlog.admit(1, vec![item(2, 2)], 60)),
             vec![Admission::Full {
-                retry_after_ns: 60_000
+                retry_after_ns: 60_000,
+                cause: FullCause::Sender,
             }]
         );
     }
@@ -1688,7 +1776,8 @@ mod tests {
         assert_eq!(
             admissions.last(),
             Some(&Admission::Full {
-                retry_after_ns: 1_000
+                retry_after_ns: 1_000,
+                cause: FullCause::Queue,
             })
         );
     }
@@ -1798,7 +1887,8 @@ mod tests {
         assert_eq!(
             refused(&mut backlog, 5),
             vec![Admission::Full {
-                retry_after_ns: 1_000
+                retry_after_ns: 1_000,
+                cause: FullCause::Lane,
             }]
         );
 
@@ -1807,7 +1897,8 @@ mod tests {
         assert_eq!(
             refused(&mut backlog, 15),
             vec![Admission::Full {
-                retry_after_ns: 2_000
+                retry_after_ns: 2_000,
+                cause: FullCause::Lane,
             }]
         );
     }
@@ -1909,19 +2000,22 @@ mod tests {
                 Admitted {
                     key: (7, 3),
                     admission: Admission::Full {
-                        retry_after_ns: 1_000
+                        retry_after_ns: 1_000,
+                        cause: FullCause::Group,
                     }
                 },
                 Admitted {
                     key: (8, 8),
                     admission: Admission::Full {
-                        retry_after_ns: 2_000
+                        retry_after_ns: 2_000,
+                        cause: FullCause::Queue,
                     }
                 },
                 Admitted {
                     key: (9, 9),
                     admission: Admission::Full {
-                        retry_after_ns: 2_000
+                        retry_after_ns: 2_000,
+                        cause: FullCause::Queue,
                     }
                 },
             ]
@@ -2003,7 +2097,7 @@ mod tests {
             .remove(0)
             .admission
         {
-            Admission::Full { retry_after_ns } => retry_after_ns,
+            Admission::Full { retry_after_ns, .. } => retry_after_ns,
             other => panic!("expected a full sender, got {other:?}"),
         }
     }
@@ -2014,7 +2108,7 @@ mod tests {
             .remove(0)
             .admission
         {
-            Admission::Full { retry_after_ns } => retry_after_ns,
+            Admission::Full { retry_after_ns, .. } => retry_after_ns,
             other => panic!("expected a full group, got {other:?}"),
         }
     }
@@ -2025,7 +2119,7 @@ mod tests {
             .remove(0)
             .admission
         {
-            Admission::Full { retry_after_ns } => retry_after_ns,
+            Admission::Full { retry_after_ns, .. } => retry_after_ns,
             other => panic!("expected a full queue, got {other:?}"),
         }
     }

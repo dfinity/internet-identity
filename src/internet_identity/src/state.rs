@@ -2,6 +2,7 @@ use crate::anchor_management::tentative_device_registration::ValidatedRegistrati
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::notifications::backlog::app::{AppBacklog, APP_BACKLOG};
 use crate::notifications::backlog::identity::{IdentityBacklog, IDENTITY_BACKLOG};
+use crate::notifications::delivery_metrics;
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -432,18 +433,43 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
 
 /// Initialize the backlog at `now_ns` on first use.
 pub fn notification_backlog_mut<R>(now_ns: Timestamp, f: impl FnOnce(&mut AppBacklog) -> R) -> R {
-    STATE.with(|s| {
+    let (result, expired_items) = STATE.with(|s| {
         let mut backlog = s.notification_backlog.borrow_mut();
-        f(backlog.get_or_insert_with(|| AppBacklog::new(APP_BACKLOG, now_ns)))
-    })
+        let backlog = backlog.get_or_insert_with(|| AppBacklog::new(APP_BACKLOG, now_ns));
+        let result = f(backlog);
+        (result, backlog.drain_expired())
+    });
+    for expired_item in expired_items {
+        let labels = delivery_metrics::Labels::app_number(
+            expired_item.item.application_number,
+            &expired_item.item.urgency,
+        );
+        delivery_metrics::count_lost(expiry_reason(expired_item.by_own_deadline), &labels);
+    }
+    result
+}
+
+fn expiry_reason(by_own_deadline: bool) -> delivery_metrics::Reason {
+    if by_own_deadline {
+        delivery_metrics::Reason::ExpiredAppDeadline
+    } else {
+        delivery_metrics::Reason::ExpiredInBacklog
+    }
 }
 
 /// Initialize the identity backlog at `now_ns` on first use.
 pub fn identity_backlog_mut<R>(now_ns: Timestamp, f: impl FnOnce(&mut IdentityBacklog) -> R) -> R {
-    STATE.with(|s| {
+    let (result, expired_items) = STATE.with(|s| {
         let mut backlog = s.identity_backlog.borrow_mut();
-        f(backlog.get_or_insert_with(|| IdentityBacklog::new(IDENTITY_BACKLOG, now_ns)))
-    })
+        let backlog = backlog.get_or_insert_with(|| IdentityBacklog::new(IDENTITY_BACKLOG, now_ns));
+        let result = f(backlog);
+        (result, backlog.drain_expired())
+    });
+    for expired_item in expired_items {
+        let labels = delivery_metrics::Labels::identity(&expired_item.item.urgency);
+        delivery_metrics::count_lost(expiry_reason(expired_item.by_own_deadline), &labels);
+    }
+    result
 }
 
 pub fn storage_borrow<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {

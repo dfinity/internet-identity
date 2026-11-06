@@ -7,6 +7,7 @@ use crate::admission_queue::{Admission, Taken};
 use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::backlog::identity::PendingIdentityNotification;
 use crate::notifications::browser_inbox;
+use crate::notifications::delivery_metrics::{self, Labels, Path, PlannedPush, Reason};
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::rotation;
 use crate::notifications::webpush::{
@@ -111,18 +112,41 @@ pub(crate) enum PostOutcome {
     /// 404 or 410: the relay no longer holds the subscription.
     Gone,
     RateLimited,
-    /// Any other answer from the relay.
+    /// Any other answer outside 2xx and 5xx.
     RelayError,
+    /// 5xx.
+    RelayServerError,
     /// The outcall failed, so the relay never answered.
     Rejected,
+    /// No outcall slot was free, so the wake-up never left.
+    // Answered by the outcalls, which tests stub out.
+    #[cfg_attr(test, allow(dead_code))]
+    NoCapacity,
+    /// The wake-up could not be sealed for its destination, so it never left.
+    Unsealed,
 }
 
 impl PostOutcome {
+    /// Why the push was lost, or `Ok` where a push service took it.
+    fn loss(self) -> Result<(), Reason> {
+        match self {
+            PostOutcome::Sent => Ok(()),
+            PostOutcome::Gone => Err(Reason::RelayGone),
+            PostOutcome::RateLimited => Err(Reason::RelayRateLimited),
+            PostOutcome::RelayError => Err(Reason::RelayRejected),
+            PostOutcome::RelayServerError => Err(Reason::RelayServerError),
+            PostOutcome::Rejected => Err(Reason::RelayNoAnswer),
+            PostOutcome::NoCapacity => Err(Reason::NoOutcallCapacity),
+            PostOutcome::Unsealed => Err(Reason::SealFailed),
+        }
+    }
+
     pub(crate) fn of_status(status: u32) -> Self {
         match status {
             200..=299 => PostOutcome::Sent,
             404 | 410 => PostOutcome::Gone,
             429 => PostOutcome::RateLimited,
+            500..=599 => PostOutcome::RelayServerError,
             _ => PostOutcome::RelayError,
         }
     }
@@ -164,8 +188,10 @@ fn record_post_outcome(outcome: PostOutcome) {
             PostOutcome::Sent => &mut tally.sent,
             PostOutcome::Gone => &mut tally.gone,
             PostOutcome::RateLimited => &mut tally.rate_limited,
-            PostOutcome::RelayError => &mut tally.relay_error,
-            PostOutcome::Rejected => &mut tally.rejected,
+            PostOutcome::RelayError | PostOutcome::RelayServerError => &mut tally.relay_error,
+            PostOutcome::Rejected | PostOutcome::NoCapacity | PostOutcome::Unsealed => {
+                &mut tally.rejected
+            }
         };
         *count = count.saturating_add(1);
         counts.set(tally);
@@ -314,7 +340,7 @@ fn seal_and_post(mut deliveries: Vec<Delivery>, pass_bytes: &[u8; 32], now_ns: T
     seal_pass(&mut deliveries, pass_bytes, now_ns);
     for delivery in deliveries {
         if delivery.body.is_none() {
-            settle(&delivery, PostOutcome::Rejected);
+            settle(&delivery, PostOutcome::Unsealed);
             continue;
         }
         outcalls::spawn_post(delivery);
@@ -389,8 +415,10 @@ fn fan_out_to_destinations(
         vapid_key::ensure_public_key();
         return true;
     }
+    let labels = Labels::identity(&pending.urgency);
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
+            delivery_metrics::count_lost(Reason::StorageError, &labels);
             return false;
         };
         let destinations: Vec<BrowserId> = match &pending.destination {
@@ -398,6 +426,17 @@ fn fan_out_to_destinations(
             None => anchor.browsers().iter().map(|browser| browser.id).collect(),
         };
         let expires_at_ns = now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS);
+        let queued_entry = InboxNotification {
+            // Named by `deposit`, which is what draws from the inbox's own run of ids.
+            inbox_notification_id: 0,
+            application_number: None,
+            // Ours, so the worker signs to us for it rather than fetching it from an app.
+            sender: crate::storage::canister_id(),
+            notification_id: pending.notification_id,
+            expires_at_ns,
+            account_number: None,
+            event: Some(pending.event.clone()),
+        };
         let mut planned = Vec::new();
         for browser_id in destinations {
             let Some(browser) = anchor
@@ -413,21 +452,10 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
-            let queued = InboxNotification {
-                // Named by `deposit`, which is what draws from the inbox's own run of ids.
-                inbox_notification_id: 0,
-                application_number: None,
-                // Ours, so the worker signs to us for it rather than fetching it from an app.
-                sender: crate::storage::canister_id(),
-                notification_id: pending.notification_id,
-                expires_at_ns,
-                account_number: None,
-                event: Some(pending.event.clone()),
-            };
             planned.push((
                 relay_origin,
                 browser_id,
-                queued,
+                queued_entry.clone(),
                 Delivery {
                     anchor_number: pending.anchor_number,
                     browser_id,
@@ -445,6 +473,7 @@ fn fan_out_to_destinations(
         }
 
         if planned.is_empty() {
+            delivery_metrics::count_lost(Reason::NoDevice, &labels);
             return false;
         }
         // All or none, and before anything is deposited: an entry left in the backlog for
@@ -455,11 +484,14 @@ fn fan_out_to_destinations(
         };
 
         let mut to_post = Vec::new();
-        for ((_, browser_id, queued, mut delivery), jwt) in planned.into_iter().zip(jwts) {
+        let mut deposits = Deposits::default();
+        for ((_, browser_id, entry, mut delivery), jwt) in planned.into_iter().zip(jwts) {
+            let path = Path::of(delivery.target, &delivery.endpoint);
             // Nothing answers at this browser's relay, so it is left out of the fan-out
             // rather than deposited for: it cannot be woken, and the entry it would sit
             // behind would never be shown.
             let Some(jwt) = jwt else {
+                deposits.count_unreachable(path);
                 continue;
             };
             delivery.jwt = jwt;
@@ -467,18 +499,24 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
-            let deposited = browser_inbox::deposit(queue, next_id, queued, now_ns);
+            let (deposited_entry, overflowed_entry) =
+                browser_inbox::deposit(queue, next_id, entry, now_ns);
+            deposits.count_deposit(path, overflowed_entry);
             // The body is sealed once the pass is planned, because what it is sealed with
             // may be refreshed first and the salt comes from the pass rather than the entry.
-            delivery.notification = Some(deposited);
+            delivery.notification = Some(deposited_entry);
             to_post.push(delivery);
         }
         // Posted only once the deposits are persisted, as the app half does: a wake-up
         // names an entry, and one naming an entry a failed write never stored is one the
         // service worker can ask nothing for.
         match storage.write(anchor) {
-            Ok(()) => deliveries.extend(to_post),
+            Ok(()) => {
+                deposits.count(pending.anchor_number, &queued_entry, labels, now_ns);
+                deliveries.extend(to_post)
+            }
             Err(err) => {
+                delivery_metrics::count_lost(Reason::StorageError, &labels);
                 ic_cdk::println!("Failed to queue what Internet Identity has to say: {err}")
             }
         }
@@ -528,7 +566,7 @@ fn fan_out_to_browsers(
         return true;
     }
     let pending = &taken.entry.item;
-    let queued = InboxNotification {
+    let queued_entry = InboxNotification {
         // Named by `deposit`, once per browser this is deposited for.
         inbox_notification_id: 0,
         application_number: Some(pending.application_number),
@@ -538,9 +576,11 @@ fn fan_out_to_browsers(
         expires_at_ns: taken.entry.expires_at_ns,
         account_number: pending.account_number,
     };
-    let ttl_seconds = queued.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
+    let ttl_seconds = queued_entry.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
+    let labels = Labels::app_number(pending.application_number, &pending.urgency);
     storage_borrow_mut(|storage| {
         let Ok(mut anchor) = storage.read(pending.anchor_number) else {
+            delivery_metrics::count_lost(Reason::StorageError, &labels);
             return false;
         };
         let apps: Vec<Option<NotificationApp>> = anchor
@@ -577,6 +617,7 @@ fn fan_out_to_browsers(
             })
             .collect();
         if woken.is_empty() {
+            delivery_metrics::count_lost(Reason::NoDevice, &labels);
             return false;
         }
         // All or none, and before anything is deposited: an entry left in the backlog for
@@ -586,10 +627,13 @@ fn fan_out_to_browsers(
             return true;
         };
         let mut to_post = Vec::new();
+        let mut deposits = Deposits::default();
         let mut queued_anywhere = false;
         for ((_, mut delivery), jwt) in woken.into_iter().zip(jwts) {
+            let path = Path::of(delivery.target, &delivery.endpoint);
             // Nothing answers at this browser's relay; see the identity fan-out.
             let Some(jwt) = jwt else {
+                deposits.count_unreachable(path);
                 continue;
             };
             delivery.jwt = jwt;
@@ -599,12 +643,15 @@ fn fan_out_to_browsers(
                 continue;
             };
             queued_anywhere = true;
-            let deposited = browser_inbox::deposit(queue, next_id, queued.clone(), now_ns);
-            delivery.notification = Some(deposited);
+            let (deposited_entry, overflowed_entry) =
+                browser_inbox::deposit(queue, next_id, queued_entry.clone(), now_ns);
+            deposits.count_deposit(path, overflowed_entry);
+            delivery.notification = Some(deposited_entry);
             to_post.push(delivery);
         }
         match storage.write(anchor) {
             Ok(()) => {
+                deposits.count(pending.anchor_number, &queued_entry, labels, now_ns);
                 out.extend(to_post);
                 if queued_anywhere {
                     storage.record_notified(
@@ -614,10 +661,57 @@ fn fan_out_to_browsers(
                     );
                 }
             }
-            Err(err) => ic_cdk::println!("Failed to queue a notification for its browsers: {err}"),
+            Err(err) => {
+                delivery_metrics::count_lost(Reason::StorageError, &labels);
+                ic_cdk::println!("Failed to queue a notification for its browsers: {err}")
+            }
         }
         false
     })
+}
+
+/// What one fan-out deposited, counted once the write that stores it has gone through.
+#[derive(Default)]
+struct Deposits {
+    pushes: Vec<PlannedPush>,
+    /// The entries pushed out of a full inbox, by the delivery path of that inbox.
+    overflowed_entries: Vec<(Path, InboxNotification)>,
+}
+
+impl Deposits {
+    fn count_unreachable(&mut self, path: Path) {
+        self.pushes.push(PlannedPush {
+            path,
+            is_deposited: false,
+        });
+    }
+
+    fn count_deposit(&mut self, path: Path, overflowed_entry: Option<InboxNotification>) {
+        self.pushes.push(PlannedPush {
+            path,
+            is_deposited: true,
+        });
+        self.overflowed_entries
+            .extend(overflowed_entry.map(|entry| (path, entry)));
+    }
+
+    fn count(
+        self,
+        anchor_number: AnchorNumber,
+        entry: &InboxNotification,
+        labels: Labels,
+        now_ns: Timestamp,
+    ) {
+        for (path, overflowed_entry) in &self.overflowed_entries {
+            delivery_metrics::count_removed_entries(
+                anchor_number,
+                [overflowed_entry],
+                *path,
+                Reason::InboxFull,
+            );
+        }
+        delivery_metrics::track_fan_out(anchor_number, entry, labels, self.pushes, now_ns);
+    }
 }
 
 /// It says something just happened, so one reaching a device a day later says nothing true.
@@ -684,9 +778,29 @@ pub(crate) fn notify_identity(
 /// stops one of them taking the outcall budget from the rest.
 fn submit_identity_wake_up(pending: PendingIdentityNotification, now_ns: Timestamp) -> bool {
     let anchor_number = pending.anchor_number;
+    let labels = Labels::identity(&pending.urgency);
     let admitted = state::identity_backlog_mut(now_ns, |backlog| {
         backlog.admit(anchor_number, vec![pending], now_ns)
     });
+    for answer in &admitted {
+        match answer.admission {
+            Admission::Accepted => {
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
+            }
+            Admission::Folded => delivery_metrics::count_folded(&labels),
+            Admission::Dropped => {
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_accepted(&labels);
+                delivery_metrics::count_lost(Reason::ExpiredOnArrival, &labels);
+            }
+            // Nobody is told to send it again, so it is lost here.
+            Admission::Full { .. } => {
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_lost(Reason::BacklogFull, &labels);
+            }
+        }
+    }
     let accepted = admitted
         .iter()
         .any(|answer| matches!(answer.admission, Admission::Accepted | Admission::Folded));
@@ -787,11 +901,34 @@ pub(crate) fn can_wake<M: Memory + Clone>(
     wake_up_address(browser, app.as_ref(), now_ns).is_some()
 }
 
+/// The way this entry's inbox is reached, for counting what leaves it.
+pub(crate) fn path_of<M: Memory + Clone>(storage: &Storage<M>, browser: &Browser) -> Path {
+    if let Some(own) = browser
+        .webpush_subscription
+        .as_ref()
+        .and_then(WebPushSubscription::ready)
+    {
+        return Path::of(DeliveryTarget::Browser, own.endpoint.as_str());
+    }
+    match routed_app(storage, browser) {
+        Some(app) => Path::of(DeliveryTarget::App(app.id), ""),
+        None => Path::Other,
+    }
+}
+
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
 /// way: a relay that lost the subscription takes the registration and the queue with
 /// it, and any other failure removes an entry, since no wake-up is coming for it.
 pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     record_post_outcome(outcome);
+    if let Some(notification) = delivery.notification.as_ref() {
+        delivery_metrics::count_push_outcome(
+            delivery.anchor_number,
+            notification,
+            Path::of(delivery.target, &delivery.endpoint),
+            outcome.loss(),
+        );
+    }
     match outcome {
         PostOutcome::Sent => {}
         PostOutcome::Gone => {
@@ -804,7 +941,12 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
                 ic_cdk::println!("Failed to drop a push registration the relay called gone: {err}");
             }
         }
-        PostOutcome::RateLimited | PostOutcome::RelayError | PostOutcome::Rejected => {
+        PostOutcome::RateLimited
+        | PostOutcome::RelayError
+        | PostOutcome::RelayServerError
+        | PostOutcome::Rejected
+        | PostOutcome::NoCapacity
+        | PostOutcome::Unsealed => {
             // A wake-up that announced nothing new leaves the queue alone: the entry it
             // was for is one the service worker has already been told about.
             let Some(notification) = delivery.notification.as_ref() else {
@@ -1000,7 +1142,7 @@ mod outcalls {
             &KNOWN_WAKEUP_OUTCALL_LIMIT
         };
         let Some(permit) = crate::concurrency::acquire(limit) else {
-            settle(&delivery, PostOutcome::Rejected);
+            settle(&delivery, PostOutcome::NoCapacity);
             return;
         };
         ic_cdk::spawn(async move {
@@ -1991,8 +2133,8 @@ mod tests {
             (429, PostOutcome::RateLimited),
             (400, PostOutcome::RelayError),
             (403, PostOutcome::RelayError),
-            (500, PostOutcome::RelayError),
-            (503, PostOutcome::RelayError),
+            (500, PostOutcome::RelayServerError),
+            (503, PostOutcome::RelayServerError),
         ] {
             assert_eq!(PostOutcome::of_status(status), outcome, "status {status}");
         }

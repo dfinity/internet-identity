@@ -1120,7 +1120,7 @@ export interface GetNotificationRequest {
   'anchor_number' : UserNumber,
 }
 /**
- * Null once nothing is left to show.
+ * Null where the named entry is gone: taken, expired, or dropped with the registration.
  */
 export interface GetNotificationResponse {
   'notification' : [] | [NotificationToShow],
@@ -1646,6 +1646,22 @@ export interface NotAccepted {
 export type NotAcceptedReason = { 'NoSuchRecipient' : null } |
   { 'NoChannel' : null } |
   { 'Deferred' : { 'retry_after' : Timestamp } };
+/**
+ * Why the service worker could not show a notification: its call to the app's canister
+ * for the content failed, which only the device sees.
+ */
+export type NotShownReason = {
+    /**
+     * The call got no answer.
+     */
+    'PayloadUnreachable' : null
+  } |
+  {
+    /**
+     * The app's canister rejected the call or trapped.
+     */
+    'PayloadRejected' : null
+  };
 export interface Notification {
   'id' : NotificationId,
   /**
@@ -2282,6 +2298,10 @@ export interface RemoveNotificationRequest {
   'inbox_notification_id' : InboxNotificationId,
   'browser_id' : number,
   'anchor_number' : UserNumber,
+  /**
+   * Why the worker could not show it. Absent where it did.
+   */
+  'not_shown' : [] | [NotShownReason],
 }
 export type RemoveNotificationResponse = {};
 export type RemoveWebPushSubscriptionError = {
@@ -2377,9 +2397,8 @@ export type SetWebPushSubscriptionError = {
     'TransportKeyExpired' : null
   };
 /**
- * What a browser uploads when it registers for Web Push. The same endpoint is a
- * registration at that endpoint again, which keeps what is already queued for it. Signed with the
- * browser key it signs in with, which is what says the subscription is this browser's.
+ * What a browser uploads when it registers for Web Push. Signed with the browser key it
+ * signs in with, which is what says the subscription is this browser's.
  */
 export interface SetWebPushSubscriptionRequest {
   /**
@@ -2639,8 +2658,7 @@ export interface WebAuthnCredential {
 }
 /**
  * What a browser is registered with, so the frontend can tell a registration that is
- * still live from one another identity's re-subscribe left behind, and knows when to
- * sign the next pool.
+ * still live from one another identity's re-subscribe left behind.
  */
 export interface WebPushSubscriptionStatus { 'endpoint' : string }
 export interface _SERVICE {
@@ -2811,8 +2829,8 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegisterError }
   >,
   /**
-   * Called by the service worker on a wake-up, signed with the browser key: the oldest
-   * notification its browser has yet to show, passing over the ones it skips.
+   * Called by the service worker on a wake-up, signed with the browser key: the entry
+   * that wake-up named, where it has not expired and the identity still allows it.
    */
   'browser_get_notification' : ActorMethod<
     [GetNotificationRequest],
