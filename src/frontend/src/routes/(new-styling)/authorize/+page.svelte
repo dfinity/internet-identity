@@ -273,14 +273,27 @@
   };
 
   /**
-   * Canceling the sheet drops the redirect without telling this page: the
+   * Canceling the sheet can drop the redirect without telling this page: the
    * window only gets its focus back. A completed sheet gives focus back too,
    * but the redirect then goes on and `beforeunload` follows within
    * milliseconds, so focus that stays without one is a cancel.
+   *
+   * A cancel can also let the redirect go on towards Apple's web page, which
+   * fires `beforeunload` as well. A completed sheet replaces this page with
+   * Apple's reply within moments, so a page still here seconds after the
+   * sheet closed is a cancel either way.
    */
   const closeWhenAppleSheetIsCanceled = () => {
     let sheetOpened = false;
     let leaving = false;
+    let returned = false;
+    const returnOnce = () => {
+      if (returned) {
+        return;
+      }
+      returned = true;
+      returnToApp();
+    };
     window.addEventListener("blur", () => (sheetOpened = true));
     window.addEventListener("beforeunload", () => (leaving = true));
     window.addEventListener("focus", () => {
@@ -291,8 +304,9 @@
         if (leaving) {
           return;
         }
-        returnToApp();
+        returnOnce();
       }, 500);
+      setTimeout(returnOnce, 5000);
     });
   };
 
