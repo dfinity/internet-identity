@@ -21,14 +21,22 @@ export class CallbackPopupClosedError extends Error {}
  * frontend — via `BroadcastChannel` in the popup flow, via the
  * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
  * Carries either the token or the IdP's RFC 6749 error report, plus the
- * CSRF `state` in both cases.
+ * CSRF `state` in both cases. With the token comes the user's `full_name`
+ * when the IdP sent it beside the token, as Apple does in its `user` field.
  *
- * The canister serializes an absent `error_description` as JSON `null`
- * rather than omitting the key, so the schema accepts `null` and normalizes
- * it to `undefined`.
+ * The canister serializes an absent `full_name` or `error_description` as
+ * JSON `null` rather than omitting the key, so the schema accepts `null` and
+ * normalizes it to `undefined`.
  */
 const CallbackPayloadSchema = z.union([
-  z.object({ id_token: z.string(), state: z.string() }),
+  z.object({
+    id_token: z.string(),
+    state: z.string(),
+    full_name: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? undefined),
+  }),
   z.object({
     error: z.string(),
     error_description: z
@@ -51,6 +59,7 @@ const CallbackFieldsSchema = z
   .object({
     state: z.string().optional().catch(undefined),
     id_token: z.string().optional().catch(undefined),
+    full_name: z.string().nullish().catch(undefined),
     error: z.string().optional().catch(undefined),
     error_description: z.string().nullish().catch(undefined),
   })
@@ -162,6 +171,183 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
   });
 };
 
+/**
+ * Names that IdPs sent beside an ID token instead of in it, keyed by the
+ * account the token is for (`iss` and `sub`). Apple does this: it keeps the
+ * user's name out of its ID tokens and sends it once, with the user's first
+ * authorization of II.
+ *
+ * {@link decodeJWT} reads the name from here, so it reaches every flow that
+ * passes a token for that account on (sign-up, sign-in, linking) without
+ * each of them carrying it along.
+ */
+const fullNamesByAccount = new Map<string, string>();
+
+const accountKey = (iss: string, sub: string): string => `${iss} ${sub}`;
+
+/** Keep the name an IdP sent beside `jwt` for the account `jwt` is for. */
+const keepFullNameForAccount = (jwt: string, fullName: string): void => {
+  const { iss, sub } = decodeJWT(jwt);
+  fullNamesByAccount.set(accountKey(iss, sub), fullName);
+};
+
+/** The longest name kept from beside a token: the bound the II canister puts on a name. */
+const MAX_FULL_NAME_BYTES = 128;
+
+/**
+ * A full name from its parts, trimmed and joined by a space, or `undefined`
+ * when no part is left or the name is longer than the canister keeps.
+ */
+const joinFullName = (
+  ...parts: (string | null | undefined)[]
+): string | undefined => {
+  const fullName = parts
+    .map((part) => part?.trim())
+    .filter((part) => part !== undefined && part.length > 0)
+    .join(" ");
+  return fullName.length > 0 &&
+    new TextEncoder().encode(fullName).length <= MAX_FULL_NAME_BYTES
+    ? fullName
+    : undefined;
+};
+
+const APPLE_ORIGIN = "https://appleid.apple.com";
+
+/**
+ * Apple's reply to a `response_mode=web_message` authorization, which Apple
+ * posts to the window that opened the popup as a JSON string: the token
+ * when the user completed the sheet, an error when they didn't. `user` comes
+ * only with the user's first authorization of II, and only when the `name`
+ * scope was requested.
+ */
+const AppleReplySchema = z.object({
+  method: z.literal("oauthDone"),
+  data: z.union([
+    z.object({
+      authorization: z.object({ id_token: z.string(), state: z.string() }),
+      user: z
+        .object({
+          name: z
+            .object({
+              firstName: z.string().nullish(),
+              lastName: z.string().nullish(),
+            })
+            .nullish(),
+        })
+        .nullish()
+        .catch(undefined),
+    }),
+    z.object({ error: z.string() }),
+  ]),
+});
+
+const parseAppleReply = (data: unknown) => {
+  try {
+    const parsed = AppleReplySchema.safeParse(
+      typeof data === "string" ? JSON.parse(data) : data,
+    );
+    return parsed.success ? parsed.data.data : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * How long after the sheet gives the window its focus back Apple's reply may
+ * still arrive. A canceled sheet can end without any reply: the window only
+ * gets its focus back. A completed sheet gives focus back too, with Apple's
+ * reply right behind it.
+ */
+const APPLE_REPLY_AFTER_FOCUS_MS = 1000;
+
+/**
+ * Sign in with Apple in a browser that shows Apple's native sheet instead
+ * of the popup (see {@link isAppleSignInSheetBrowser}). The form_post reply
+ * through /callback doesn't reach this window from there, so `redirectURL`
+ * asks Apple for a web_message reply, which Apple posts straight to this
+ * window.
+ */
+const requestWithAppleSheet = (redirectURL: URL): Promise<string> => {
+  const expectedState = redirectURL.searchParams.get("state");
+  const width = 500;
+  const height = 600;
+  const left = (window.innerWidth - width) / 2 + window.screenX;
+  const top = (window.innerHeight - height) / 2 + window.screenY;
+  const popup = window.open(
+    redirectURL.href,
+    "_blank",
+    `width=${width},height=${height},left=${left},top=${top}`,
+  );
+  if (popup === null) {
+    return Promise.reject(new CallbackPopupClosedError());
+  }
+  return new Promise((resolve, reject) => {
+    let canceledTimer: ReturnType<typeof setTimeout> | undefined;
+    let closedSince: number | undefined;
+    const finish = () => {
+      window.removeEventListener("message", onMessage);
+      window.removeEventListener("focus", onFocus);
+      clearTimeout(canceledTimer);
+      clearInterval(closedInterval);
+      // Closes the window Safari opens when it shows Apple's web page
+      // instead of the sheet.
+      popup.close();
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== APPLE_ORIGIN) {
+        return;
+      }
+      const reply = parseAppleReply(event.data);
+      if (reply === undefined) {
+        return;
+      }
+      finish();
+      if ("error" in reply) {
+        reject(
+          reply.error === "user_cancelled_authorize"
+            ? new CallbackPopupClosedError()
+            : new OAuthProviderError(reply.error),
+        );
+        return;
+      }
+      if (reply.authorization.state !== expectedState) {
+        reject(new Error("Invalid state"));
+        return;
+      }
+      const { id_token } = reply.authorization;
+      const name = reply.user?.name;
+      const fullName = joinFullName(name?.firstName, name?.lastName);
+      if (fullName !== undefined) {
+        keepFullNameForAccount(id_token, fullName);
+      }
+      resolve(id_token);
+    };
+    const onFocus = () => {
+      clearTimeout(canceledTimer);
+      canceledTimer = setTimeout(() => {
+        finish();
+        reject(new CallbackPopupClosedError());
+      }, APPLE_REPLY_AFTER_FOCUS_MS);
+    };
+    // Canceling the sheet closes the window WebKit hands back for the popup,
+    // as does closing the window Apple's web page opens in. A reply posted
+    // just before the window closes still gets the grace period to arrive.
+    const closedInterval = setInterval(() => {
+      if (!popup.closed) {
+        return;
+      }
+      closedSince ??= Date.now();
+      if (Date.now() - closedSince < POPUP_CLOSED_GRACE_MS) {
+        return;
+      }
+      finish();
+      reject(new CallbackPopupClosedError());
+    }, POPUP_CLOSED_POLL_INTERVAL_MS);
+    window.addEventListener("message", onMessage);
+    window.addEventListener("focus", onFocus);
+  });
+};
+
 export interface RequestConfig {
   // OAuth client ID
   clientId: string;
@@ -180,6 +366,8 @@ export interface RequestOptions {
   loginHint?: string;
   // Optional, see: https://developers.google.com/privacy-sandbox/blog/fedcm-auto-reauthn#mediation-options
   mediation?: CredentialMediationRequirement;
+  // Optional, how the IdP replies to the redirect flow, `form_post` by default
+  responseMode?: "form_post" | "web_message";
 }
 
 export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
@@ -291,8 +479,12 @@ export const createRedirectURL = (
   // The IdP POSTs the response to the canister's /callback handler, which
   // returns certified HTML that delivers the payload to the frontend. Unlike
   // `fragment`, `form_post` works across Okta/Auth0/Apple and never puts the
-  // id_token in a URL.
-  authURL.searchParams.set("response_mode", "form_post");
+  // id_token in a URL. `web_message` is for Sign in with Apple under Safari's
+  // native sheet, see `requestWithAppleSheet`.
+  authURL.searchParams.set(
+    "response_mode",
+    options.responseMode ?? "form_post",
+  );
   authURL.searchParams.set("client_id", config.clientId);
   authURL.searchParams.set("redirect_uri", redirectURL.href);
   authURL.searchParams.set("scope", config.authScope);
@@ -337,7 +529,7 @@ export const extractIdTokenFromCallback = (
   callback: unknown,
   expectedState: string,
 ): string => {
-  const { state, id_token, error, error_description } =
+  const { state, id_token, full_name, error, error_description } =
     CallbackFieldsSchema.parse(callback);
   if (state !== expectedState) {
     throw new Error("Invalid state");
@@ -347,6 +539,9 @@ export const extractIdTokenFromCallback = (
   }
   if (id_token === undefined) {
     throw new Error("No token received");
+  }
+  if (full_name !== undefined && full_name !== null) {
+    keepFullNameForAccount(id_token, full_name);
   }
   return id_token;
 };
@@ -384,6 +579,17 @@ export const requestWithPopup = async (
       throw new Error("Missing state in redirect URL");
     }
     return extractIdTokenFromCallback(callback, capturedState);
+  }
+  if (
+    new URL(configOrPromise.authURL).origin === APPLE_ORIGIN &&
+    isAppleSignInSheetBrowser(navigator.userAgent)
+  ) {
+    return requestWithAppleSheet(
+      createRedirectURL(configOrPromise, {
+        ...options,
+        responseMode: "web_message",
+      }),
+    );
   }
   const redirectURL = createRedirectURL(configOrPromise, options);
   const callback = await redirectInPopup(redirectURL.href);
@@ -438,6 +644,16 @@ export const isFedCMSupported = (
     "IdentityCredential" in window
   );
 };
+
+/**
+ * Whether this browser replaces Sign in with Apple with Apple's native sheet:
+ * Safari on macOS, and every browser on iOS and iPadOS, all of which are
+ * WebKit underneath.
+ * @param userAgent browser user agent string
+ */
+export const isAppleSignInSheetBrowser = (userAgent: string): boolean =>
+  /AppleWebKit\//.test(userAgent) &&
+  !/Chrome\/|Chromium\/|Edg\/|OPR\/|Android/.test(userAgent);
 
 /**
  * Build a concrete issuer URL from a configured issuer pattern and claims.
@@ -589,6 +805,10 @@ export const requestJWT = async (
 
 /**
  * Decode a JWT token so it can be compared with others
+ *
+ * `name` falls back to the name the IdP sent beside the token (see
+ * {@link fullNamesByAccount}), so an Apple user's name reads like a Google
+ * user's.
  * @param token to decode
  * @returns common claims
  */
@@ -617,7 +837,7 @@ export const decodeJWT = (
     // Login hint is usually preferred_username else fall back to email or even sub
     loginHint: preferred_username ?? email ?? sub,
     // Additional optional metadata claims
-    name,
+    name: name ?? fullNamesByAccount.get(accountKey(iss, sub)),
     email,
     ...rest,
   };
