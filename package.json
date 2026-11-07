@@ -53,7 +53,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "*",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
-    "@vitest/browser": "^4.1.11",
+    "@vitest/browser": "^4.1.12",
     "@zag-js/svelte": "^1.44.0",
     "@zag-js/toast": "^1.44.0",
     "acorn": "^8.18.0",
@@ -80,7 +80,7 @@
     "typescript-eslint": "^8.70.1",
     "vite": "^7.3.6",
     "vite-plugin-node-polyfills": "^0.28.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "@dfinity/internet-identity-vc-api": "*",
