@@ -84,6 +84,10 @@ fn hex_to_vec(s: &str) -> Vec<u8> {
     hex::decode(s).expect("test vector contains malformed hex")
 }
 
+fn hex_to_name(s: &str) -> DnsName {
+    DnsName::from_wire(&hex_to_vec(s)).expect("test vector contains malformed name")
+}
+
 impl From<WireRrsig> for Rrsig {
     fn from(w: WireRrsig) -> Self {
         // The wire format stores `signer_name` as the canonical wire
@@ -97,7 +101,7 @@ impl From<WireRrsig> for Rrsig {
             expiration: w.expiration,
             inception: w.inception,
             key_tag: w.key_tag,
-            signer_name: DnsName(hex_to_vec(&w.signer_name)),
+            signer_name: hex_to_name(&w.signer_name),
             signature: hex_to_vec(&w.signature_hex),
         }
     }
@@ -106,7 +110,7 @@ impl From<WireRrsig> for Rrsig {
 impl From<WireSignedRRset> for SignedRRset {
     fn from(w: WireSignedRRset) -> Self {
         SignedRRset {
-            name: DnsName(hex_to_vec(&w.name_hex)),
+            name: hex_to_name(&w.name_hex),
             rtype: w.rtype,
             rdata: w.rdata_hex.iter().map(|h| hex_to_vec(h)).collect(),
             ttl: w.ttl,

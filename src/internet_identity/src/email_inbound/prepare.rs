@@ -185,8 +185,9 @@ fn verify_dnssec_skeleton(
 
     // Convert the Candid-friendly bundle to the verifier's internal
     // representation. (See `crate::dnssec::types::interface_conversions`
-    // for the From<> impls.)
-    let bundle: crate::dnssec::DnsProofBundle = proof.into();
+    // for the TryFrom<> impls.)
+    let bundle = crate::dnssec::DnsProofBundle::try_from(proof)
+        .map_err(|e| EmailChallengeError::EmailVerificationFailed(format!("DNSSEC name: {e:?}")))?;
 
     // The skeleton bundle must carry at most one hop (the optional
     // DMARC TXT at `_dmarc.<registered_domain>`). Reject up front if
@@ -223,11 +224,13 @@ fn verify_dnssec_skeleton(
     }
 
     // Optional DMARC hop: if present, validate it as a single TXT
-    // hop at `_dmarc.<registered_domain>`.
+    // hop at `_dmarc.<registered_domain>`. The trailing dot is kept so
+    // a registered domain that already ends in one cannot match.
     let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
     let dmarc = if bundle.hops.is_empty() {
         None
     } else {
+        let dmarc_name = crate::dnssec::DnsName::from_text(&dmarc_fqdn).ok();
         let requested_name = bundle.hops[0].name.clone();
         let verified = crate::dnssec::verify_hops_with_clock(
             &bundle.hops,
@@ -237,8 +240,8 @@ fn verify_dnssec_skeleton(
             now_secs,
         )
         .map_err(|e| EmailChallengeError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}")))?;
-        let leaf_name = crate::dnssec::wire::decode_dns_name_lowercase(&verified.name.0);
-        if !leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
+        let leaf_name = verified.name.to_string();
+        if dmarc_name.as_ref() != Some(&verified.name) {
             return Err(EmailChallengeError::EmailVerificationFailed(format!(
                 "skeleton bundle leaf name {leaf_name:?} is not the expected \
                  DMARC name {dmarc_fqdn:?} — DKIM leaves belong in submit_dkim_leaf"

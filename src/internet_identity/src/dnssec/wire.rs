@@ -11,16 +11,11 @@
 //! - [`parse_txt_rdata`] flattens TXT RDATA byte chunks (character-
 //!   strings each prefixed by one length octet) into the concatenated
 //!   bytes the DKIM / DMARC verifier expects.
-//! - [`encode_dns_name_lowercase`] turns a dotted ASCII name into wire
-//!   format with every label lower-cased — used to build the canonical
-//!   FQDN that a verified RRset's owner name must round-trip to.
-//! - [`decode_dns_name_lowercase`] is the inverse, used to read a
-//!   verified leaf's owner name back out for comparison.
 //!
-//! Keeping these in one place stops the email-recovery callers
+//! Keeping it in one place stops the email-recovery callers
 //! (`prepare_add` for the DMARC leaf, `submit_dkim_leaf` for the DKIM
 //! leaf) from each carrying their own copy that could drift apart on
-//! a bounds-check or canonicalisation fix.
+//! a bounds-check fix.
 
 /// Length of the fixed DNSKEY RDATA header (RFC 4034 §2.1):
 ///
@@ -50,13 +45,6 @@ pub const DS_DIGEST_TYPE_SHA256: u8 = 2;
 /// want (e.g. `EmailChallengeError::EmailVerificationFailed`).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TxtRdataTruncated;
-
-/// The dotted DNS name handed to [`encode_dns_name_lowercase`] could
-/// not be expressed in wire format because some label was >63 bytes
-/// or the total wire length exceeded 255 bytes (RFC 1035 §2.3.4 /
-/// §3.1). Marker type, like [`TxtRdataTruncated`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct InvalidDnsName;
 
 /// Concatenate one or more TXT character-strings into the bytes the
 /// DKIM / DMARC verifier expects.
@@ -88,69 +76,6 @@ pub(crate) fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, TxtRdataTrun
     Ok(out)
 }
 
-/// Encode a dotted ASCII DNS name (with or without a trailing dot)
-/// into wire format: a sequence of length-prefixed labels terminated
-/// by a zero-length root label. Labels are lowercased on the way in.
-///
-/// Returns [`InvalidDnsName`] when the input violates RFC 1035 §3.1
-/// limits — a single label longer than 63 bytes, or an encoded name
-/// longer than 255 bytes total including the root terminator.
-/// Silently truncating an oversized label would mutate the name into
-/// a different DNS name, which is a correctness bug at best and a
-/// cache-poisoning vector at worst.
-pub(crate) fn encode_dns_name_lowercase(dotted: &str) -> Result<Vec<u8>, InvalidDnsName> {
-    let trimmed = dotted.strip_suffix('.').unwrap_or(dotted);
-    let mut out = Vec::with_capacity(trimmed.len() + 2);
-    for label in trimmed.split('.') {
-        if label.is_empty() {
-            continue;
-        }
-        let bytes = label.as_bytes();
-        if bytes.len() > 63 {
-            return Err(InvalidDnsName);
-        }
-        out.push(bytes.len() as u8);
-        for &b in bytes {
-            out.push(b.to_ascii_lowercase());
-        }
-    }
-    out.push(0);
-    if out.len() > 255 {
-        return Err(InvalidDnsName);
-    }
-    Ok(out)
-}
-
-/// Decode a wire-format DNS name (length-prefixed labels) into a
-/// dotted ASCII-lowercased string with a trailing dot. The root
-/// terminator (`\x00`) is *not* an extra label — the trailing dot
-/// comes from the final non-root label; reaching the terminator just
-/// stops the walk.
-///
-/// Truncated input is treated as fail-open: whatever labels we
-/// already consumed get returned. The caller compares against an
-/// expected name, so truncation always surfaces as a mismatch.
-pub(crate) fn decode_dns_name_lowercase(wire: &[u8]) -> String {
-    let mut out = String::new();
-    let mut i = 0;
-    while i < wire.len() {
-        let len = wire[i] as usize;
-        i += 1;
-        if len == 0 {
-            break;
-        }
-        if i + len > wire.len() {
-            return out;
-        }
-        for &b in &wire[i..i + len] {
-            out.push(b.to_ascii_lowercase() as char);
-        }
-        out.push('.');
-        i += len;
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,70 +104,5 @@ mod tests {
         // Length octet says 10 bytes follow, only 3 do.
         let rdata = vec![b"\x0aabc".to_vec()];
         assert_eq!(parse_txt_rdata(&rdata).unwrap_err(), TxtRdataTruncated);
-    }
-
-    #[test]
-    fn encode_dns_name_simple_round_trip() {
-        let wire = encode_dns_name_lowercase("example.com").unwrap();
-        assert_eq!(wire, b"\x07example\x03com\x00");
-    }
-
-    #[test]
-    fn encode_dns_name_lowercases_input() {
-        let wire = encode_dns_name_lowercase("EXAMPLE.com").unwrap();
-        assert_eq!(wire, b"\x07example\x03com\x00");
-    }
-
-    #[test]
-    fn encode_dns_name_handles_trailing_dot() {
-        // RFC 1035 allows an optional trailing dot to mark the root.
-        let with_dot = encode_dns_name_lowercase("example.com.").unwrap();
-        let without_dot = encode_dns_name_lowercase("example.com").unwrap();
-        assert_eq!(with_dot, without_dot);
-    }
-
-    #[test]
-    fn encode_dns_name_rejects_oversized_label() {
-        let label = "a".repeat(64);
-        let name = format!("{label}.example.com");
-        assert_eq!(
-            encode_dns_name_lowercase(&name).unwrap_err(),
-            InvalidDnsName
-        );
-    }
-
-    #[test]
-    fn encode_dns_name_rejects_total_length_overflow() {
-        // 5 × 50-char labels + length octets + terminator → wire > 255.
-        let label = "a".repeat(50);
-        let name = (0..5).map(|_| label.as_str()).collect::<Vec<_>>().join(".");
-        assert_eq!(
-            encode_dns_name_lowercase(&name).unwrap_err(),
-            InvalidDnsName
-        );
-    }
-
-    #[test]
-    fn decode_dns_name_returns_dotted_lowercase() {
-        let name = decode_dns_name_lowercase(b"\x07Example\x03COM\x00");
-        assert_eq!(name, "example.com.");
-    }
-
-    #[test]
-    fn decode_dns_name_fails_open_on_truncation() {
-        // Label says 9 bytes follow, only "example" (7) is there.
-        let name = decode_dns_name_lowercase(b"\x09example");
-        // We returned whatever we'd consumed — empty in this case (the
-        // truncation hit before any label completed).
-        assert_eq!(name, "");
-    }
-
-    #[test]
-    fn encode_then_decode_round_trips() {
-        let wire = encode_dns_name_lowercase("Selector1._domainkey.GMAIL.com").unwrap();
-        assert_eq!(
-            decode_dns_name_lowercase(&wire),
-            "selector1._domainkey.gmail.com."
-        );
     }
 }

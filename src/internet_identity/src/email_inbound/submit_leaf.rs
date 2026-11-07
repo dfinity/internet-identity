@@ -490,8 +490,12 @@ fn run_submit(
     // same-zone case; one new chain for the Proton/Tutanota-style
     // cross-zone CNAME case.
     let mut zones = snapshot.cached_zones.clone();
-    let extra_chains_internal: Vec<crate::dnssec::DelegationChain> =
-        extra_chains.iter().cloned().map(Into::into).collect();
+    let extra_chains_internal: Vec<crate::dnssec::DelegationChain> = extra_chains
+        .iter()
+        .cloned()
+        .map(TryInto::try_into)
+        .collect::<Result<_, _>>()
+        .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
     crate::dnssec::verify_extra_chains_with_clock(
         &extra_chains_internal,
         &snapshot.cached_root_dnskey,
@@ -505,24 +509,28 @@ fn run_submit(
     // FQDN. Any incoherence (wrong first hop, intermediate that
     // isn't a CNAME, bad target chaining, oversized chain, loop) is
     // surfaced as DkimLeafMismatch.
-    let hops_internal: Vec<crate::dnssec::SignedRRset> =
-        hops.iter().cloned().map(Into::into).collect();
+    let hops_internal: Vec<crate::dnssec::SignedRRset> = hops
+        .iter()
+        .cloned()
+        .map(TryInto::try_into)
+        .collect::<Result<_, _>>()
+        .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
     let expected_fqdn = format!(
         "{}._domainkey.{}.",
         snapshot.material.selector, snapshot.material.registered_domain
     );
-    let expected_wire = crate::dnssec::wire::encode_dns_name_lowercase(&expected_fqdn)
+    let expected_name = crate::dnssec::DnsName::from_text(&expected_fqdn)
         .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
     let verified = crate::dnssec::verify_hops_with_clock(
         &hops_internal,
         &zones,
-        &crate::dnssec::DnsName(expected_wire),
+        &expected_name,
         crate::dnssec::TYPE_TXT,
         now_secs,
     )
     .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
 
-    let leaf_name = crate::dnssec::wire::decode_dns_name_lowercase(&verified.name.0);
+    let leaf_name = verified.name.to_string();
 
     // Steps 4–6 (parse TXT → tag contract → signature → DMARC
     // alignment → From-match) are shared with the DoH fallback. The

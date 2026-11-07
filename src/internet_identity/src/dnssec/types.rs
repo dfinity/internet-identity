@@ -16,16 +16,7 @@ pub const TYPE_TXT: u16 = 16;
 pub const TYPE_DS: u16 = 43;
 pub const TYPE_DNSKEY: u16 = 48;
 
-/// A DNS owner name in wire form: a sequence of `(length, label)`
-/// tuples terminated by a zero-length label (RFC 1035 §3.1).
-///
-/// Canonicalisation (RFC 4034 §6.2 — lower-case every ASCII label
-/// byte) happens inside the verifier; callers are expected to supply
-/// names exactly as the DoH resolver returned them. The verifier
-/// rejects compression pointers (RFC 1035 §4.1.4 / RFC 4034 §6.2)
-/// implicitly by failing the downstream signature check.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DnsName(pub Vec<u8>);
+pub use super::name::{DnsName, NameError};
 
 /// One signed RRset — the RDATA collection plus the RRSIG that
 /// authenticates it. Both come from the same DoH response.
@@ -76,8 +67,7 @@ pub struct Rrsig {
     /// quickly pick the candidate signer in the DNSKEY RRset
     /// (RFC 4034 §3.1.6 + Appendix B).
     pub key_tag: u16,
-    /// Owner name of the zone that signed this RRset, in wire form
-    /// (RFC 4034 §3.1.7).
+    /// Owner name of the zone that signed this RRset (RFC 4034 §3.1.7).
     pub signer_name: DnsName,
     /// Algorithm-specific signature bytes (RFC 4034 §3.1.8;
     /// per-algorithm encoding in RFCs 5702 / 6605 / 8080).
@@ -153,8 +143,7 @@ pub struct VerifiedRecord {
     pub rdata: Vec<Vec<u8>>,
 }
 
-/// A map from canonical (lowercased, length-prefixed wire-format)
-/// zone name to that zone's validated DNSKEY RRset.
+/// A map from zone name to that zone's validated DNSKEY RRset.
 ///
 /// The verifier builds this from the supplied delegation chains.
 /// Two-phase callers can also cache it across prepare/submit calls
@@ -243,8 +232,7 @@ pub enum DnssecError {
 
     /// Bundle is structurally malformed — e.g. RDATA bytes don't
     /// decode per the relevant RFC, an Ed25519 public key is not
-    /// 32 bytes, a label length exceeds 63 (RFC 1035 §2.3.4), or a
-    /// chain has no links.
+    /// 32 bytes, or a chain has no links.
     Malformed(&'static str),
 
     /// Two delegation chains in the same bundle land at the same
@@ -281,28 +269,35 @@ pub enum DnssecError {
 // `internet_identity_interface::types::dnssec`. Used at the canister
 // method boundary so callers (FE, integration tests) can pass a
 // `DnsProofBundle` over Candid without us having to add CandidType
-// derives everywhere in the verifier.
+// derives everywhere in the verifier. The only failure is a name
+// that is not a [`DnsName`].
 // =========================================================================
 
 mod interface_conversions {
-    use super::{DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset};
+    use super::{
+        DelegationChain, DelegationLink, DnsName, DnsProofBundle, NameError, Rrsig, SignedRRset,
+    };
     use internet_identity_interface::internet_identity::types as i_types;
 
-    impl From<i_types::SignedRRset> for SignedRRset {
-        fn from(v: i_types::SignedRRset) -> Self {
-            SignedRRset {
-                name: DnsName(v.name.into_vec()),
+    impl TryFrom<i_types::SignedRRset> for SignedRRset {
+        type Error = NameError;
+
+        fn try_from(v: i_types::SignedRRset) -> Result<Self, NameError> {
+            Ok(SignedRRset {
+                name: DnsName::from_wire(&v.name)?,
                 rtype: v.rtype,
                 rdata: v.rdata.into_iter().map(|b| b.into_vec()).collect(),
                 ttl: v.ttl,
-                rrsig: v.rrsig.into(),
-            }
+                rrsig: v.rrsig.try_into()?,
+            })
         }
     }
 
-    impl From<i_types::Rrsig> for Rrsig {
-        fn from(v: i_types::Rrsig) -> Self {
-            Rrsig {
+    impl TryFrom<i_types::Rrsig> for Rrsig {
+        type Error = NameError;
+
+        fn try_from(v: i_types::Rrsig) -> Result<Self, NameError> {
+            Ok(Rrsig {
                 type_covered: v.type_covered,
                 algorithm: v.algorithm,
                 labels: v.labels,
@@ -310,36 +305,161 @@ mod interface_conversions {
                 expiration: v.expiration,
                 inception: v.inception,
                 key_tag: v.key_tag,
-                signer_name: DnsName(v.signer_name.into_vec()),
+                signer_name: DnsName::from_wire(&v.signer_name)?,
                 signature: v.signature.into_vec(),
-            }
+            })
         }
     }
 
-    impl From<i_types::DelegationLink> for DelegationLink {
-        fn from(v: i_types::DelegationLink) -> Self {
-            DelegationLink {
-                child_ds: v.child_ds.into(),
-                child_dnskey: v.child_dnskey.into(),
-            }
+    impl TryFrom<i_types::DelegationLink> for DelegationLink {
+        type Error = NameError;
+
+        fn try_from(v: i_types::DelegationLink) -> Result<Self, NameError> {
+            Ok(DelegationLink {
+                child_ds: v.child_ds.try_into()?,
+                child_dnskey: v.child_dnskey.try_into()?,
+            })
         }
     }
 
-    impl From<i_types::DelegationChain> for DelegationChain {
-        fn from(v: i_types::DelegationChain) -> Self {
-            DelegationChain {
-                links: v.links.into_iter().map(Into::into).collect(),
-            }
+    impl TryFrom<i_types::DelegationChain> for DelegationChain {
+        type Error = NameError;
+
+        fn try_from(v: i_types::DelegationChain) -> Result<Self, NameError> {
+            Ok(DelegationChain {
+                links: v
+                    .links
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            })
         }
     }
 
-    impl From<i_types::DnsProofBundle> for DnsProofBundle {
-        fn from(v: i_types::DnsProofBundle) -> Self {
-            DnsProofBundle {
-                root_dnskey: v.root_dnskey.into(),
-                chains: v.chains.into_iter().map(Into::into).collect(),
-                hops: v.hops.into_iter().map(Into::into).collect(),
-            }
+    impl TryFrom<i_types::DnsProofBundle> for DnsProofBundle {
+        type Error = NameError;
+
+        fn try_from(v: i_types::DnsProofBundle) -> Result<Self, NameError> {
+            Ok(DnsProofBundle {
+                root_dnskey: v.root_dnskey.try_into()?,
+                chains: v
+                    .chains
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+                hops: v
+                    .hops
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        DnsName, DnsProofBundle, DnssecError, NameError, Rrsig, SignedRRset, ZoneKeysMap,
+        TYPE_DNSKEY,
+    };
+    use internet_identity_interface::internet_identity::types as i_types;
+    use serde_bytes::ByteBuf;
+
+    fn dnskey_rrset(name: &DnsName) -> SignedRRset {
+        SignedRRset {
+            name: name.clone(),
+            rtype: TYPE_DNSKEY,
+            rdata: Vec::new(),
+            ttl: 0,
+            rrsig: Rrsig {
+                type_covered: TYPE_DNSKEY,
+                algorithm: 0,
+                labels: 0,
+                original_ttl: 0,
+                expiration: 0,
+                inception: 0,
+                key_tag: 0,
+                signer_name: name.clone(),
+                signature: Vec::new(),
+            },
+        }
+    }
+
+    #[test]
+    fn zone_keys_map_rejects_case_variant_duplicate_zone() {
+        let lower = DnsName::from_wire(b"\x07example\x03com\x00").unwrap();
+        let upper = DnsName::from_wire(b"\x07EXAMPLE\x03COM\x00").unwrap();
+        let mut zones = ZoneKeysMap::new();
+        assert_eq!(zones.insert(lower.clone(), dnskey_rrset(&lower)), Ok(()));
+        assert_eq!(
+            zones.insert(upper.clone(), dnskey_rrset(&upper)),
+            Err(DnssecError::DuplicateZone)
+        );
+        assert_eq!(zones.len(), 1);
+        assert!(zones.get(&upper).is_some());
+    }
+
+    /// A Candid bundle whose every name is `name`: one hop and one
+    /// one-link chain, the rest zeroed.
+    fn candid_bundle(name: &[u8]) -> i_types::DnsProofBundle {
+        let rrset = i_types::SignedRRset {
+            name: ByteBuf::from(name),
+            rtype: 0,
+            rdata: Vec::new(),
+            ttl: 0,
+            rrsig: i_types::Rrsig {
+                type_covered: 0,
+                algorithm: 0,
+                labels: 0,
+                original_ttl: 0,
+                expiration: 0,
+                inception: 0,
+                key_tag: 0,
+                signer_name: ByteBuf::from(name),
+                signature: ByteBuf::new(),
+            },
+        };
+        i_types::DnsProofBundle {
+            root_dnskey: rrset.clone(),
+            chains: vec![i_types::DelegationChain {
+                links: vec![i_types::DelegationLink {
+                    child_ds: rrset.clone(),
+                    child_dnskey: rrset.clone(),
+                }],
+            }],
+            hops: vec![rrset],
+        }
+    }
+
+    #[test]
+    fn candid_bundle_with_well_formed_names_is_admitted() {
+        let bundle = DnsProofBundle::try_from(candid_bundle(b"\x07Example\x03COM\x00")).unwrap();
+        let expected = DnsName::from_wire(b"\x07example\x03com\x00").unwrap();
+        assert_eq!(bundle.hops[0].name, expected);
+        assert_eq!(
+            bundle.chains[0].links[0].child_ds.rrsig.signer_name,
+            expected
+        );
+    }
+
+    #[test]
+    fn candid_bundle_with_compression_pointer_in_hop_name_is_rejected() {
+        let mut candid = candid_bundle(b"\x07example\x03com\x00");
+        candid.hops[0].name = ByteBuf::from(b"\xc0\x0c".to_vec());
+        assert_eq!(
+            DnsProofBundle::try_from(candid),
+            Err(NameError::UnsupportedLabelType)
+        );
+    }
+
+    #[test]
+    fn candid_bundle_with_unterminated_signer_name_is_rejected() {
+        let mut candid = candid_bundle(b"\x07example\x03com\x00");
+        candid.chains[0].links[0].child_ds.rrsig.signer_name = ByteBuf::from(b"\x03com".to_vec());
+        assert_eq!(
+            DnsProofBundle::try_from(candid),
+            Err(NameError::MissingRootLabel)
+        );
     }
 }
