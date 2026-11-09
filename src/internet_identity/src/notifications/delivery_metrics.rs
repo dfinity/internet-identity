@@ -820,8 +820,11 @@ impl Counters {
         if !counter(self).contains_key(&key) {
             let origin = origin.filter(|origin| self.apps.contains(origin));
             if !self.make_room(origin.as_deref(), key.line_bytes()) {
-                self.series_folded = self.series_folded.saturating_add(1);
-                key = key.fold_into_other();
+                let folded = key.fold_into_other();
+                if folded != key {
+                    self.series_folded = self.series_folded.saturating_add(1);
+                    key = folded;
+                }
             }
             if !counter(self).contains_key(&key) {
                 self.series_bytes = self.series_bytes.saturating_add(key.line_bytes());
@@ -1712,6 +1715,61 @@ mod tests {
         assert!(with(|counters| counters
             .losses
             .contains_key(&(Reason::BacklogFull, labels.fold_into_other()))));
+    }
+
+    /// Fills the budget to the byte, past what the longest lines leave of it.
+    fn fill_the_budget() {
+        fill_the_apps_ranking(NOW);
+        fill_the_series();
+        with(|counters| counters.series_bytes = counters.series_bytes.max(MAX_SERIES_BYTES));
+    }
+
+    #[test]
+    fn past_the_cap_unlisted_callers_share_the_other_series() {
+        reset_for_testing();
+        fill_the_budget();
+        let urgencies = [
+            Urgency::High,
+            Urgency::Normal,
+            Urgency::Low,
+            Urgency::VeryLow,
+        ];
+
+        for index in 0..200u64 {
+            let canister = Principal::from_slice(&index.to_be_bytes());
+            let origin = format!("https://unlisted-{index}.example");
+            for urgency in &urgencies {
+                let labels = Labels::app(&origin, Some(urgency));
+                count_unlisted_sender(canister, &origin, &labels, NOW);
+            }
+        }
+
+        let refused = with(|counters| counters.unlisted_senders.clone());
+        assert!(refused.len() <= urgencies.len(), "{} series", refused.len());
+        assert!(refused
+            .keys()
+            .all(|(canister, labels)| canister == OTHER && origin_of(labels) == OTHER));
+        assert_eq!(refused.values().sum::<u64>(), 800);
+    }
+
+    #[test]
+    fn past_the_cap_only_a_series_that_loses_its_name_counts_as_folded() {
+        reset_for_testing();
+        fill_the_budget();
+        let folded = with(|counters| counters.series_folded);
+
+        let identity = Labels::identity(&Urgency::High);
+        let unranked = Labels::app("https://unranked.example", Some(&Urgency::High));
+        with(|counters| {
+            counters.count_lost(Reason::BacklogFull, &identity);
+            counters.count_lost(Reason::BacklogFull, &unranked);
+        });
+        assert_eq!(with(|counters| counters.series_folded), folded);
+
+        let (lowest, _) = with(|counters| counters.apps.lowest()).expect("a ranked app");
+        let quiet = Labels::app(&lowest, Some(&Urgency::High));
+        with(|counters| counters.count_lost(Reason::BacklogFull, &quiet));
+        assert_eq!(with(|counters| counters.series_folded), folded + 1);
     }
 
     #[test]
