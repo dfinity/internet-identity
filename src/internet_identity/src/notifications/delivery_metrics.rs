@@ -13,6 +13,11 @@
 //! Counting a notification once however many copies it has takes one key per live
 //! notification, kept until it expires. Everything lives on the heap, as the backlogs do,
 //! so an upgrade starts the counters from zero, which Prometheus reads as a counter reset.
+//!
+//! Every series is a line of the `/metrics` reply, which has to fit in one response. The
+//! apps named on their own series are the ones most used lately by a sender they list,
+//! and the series together stay within [`MAX_SERIES`]: past it, the least used apps give
+//! way to busier ones, and what still does not fit is counted under `other`.
 
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::webpush::vapid_key;
@@ -23,15 +28,25 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, ApplicationNumber, Timestamp, Urgency,
 };
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// Apps named on their own series; any other app is counted as `other`. The number of
 /// apps has no bound, and every series is one more line on every scrape.
 const MAX_NAMED_ORIGINS: usize = 100;
 
-/// Calling canisters named on their own series, for the same reason.
-const MAX_NAMED_CANISTERS: usize = 100;
+/// Pairs of a calling canister and the origin it named, for the senders an origin does
+/// not list, named on their own series.
+const MAX_NAMED_UNLISTED_SENDERS: usize = 100;
+
+/// How fast a ranking forgets: an entry's use counts half after this long.
+const RANK_HALF_LIFE_NS: Timestamp = 24 * 60 * 60 * 1_000_000_000;
+
+/// Series across the counters, about 1.7 MB at the length of a line with a long origin,
+/// which leaves room in the 3 MiB reply for the rest of `/metrics`. Series counted under
+/// `other` or for Internet Identity itself are bounded by the labels' variants and are
+/// created past it.
+const MAX_SERIES: usize = 10_000;
 
 const OTHER: &str = "other";
 
@@ -62,18 +77,30 @@ impl Source {
 pub(crate) struct Labels {
     source: Source,
     urgency: &'static str,
-    /// The app's origin, or [`OTHER`] past [`MAX_NAMED_ORIGINS`]. Internet Identity's own
-    /// notifications have none.
+    /// The app's origin while it is among the apps ranked by use, otherwise [`OTHER`].
+    /// Internet Identity's own notifications have none.
     origin: Option<String>,
 }
 
 impl Labels {
-    /// An app's notification, by the origin it was sent for.
+    /// An app's notification, by the origin it was sent for, from a caller not known to
+    /// be one of its senders. The origin is named only where a listed sender already
+    /// ranked it, as anyone can name any origin.
     pub(crate) fn app(origin: &str, urgency: Option<&Urgency>) -> Self {
         Labels {
             source: Source::Apps,
             urgency: urgency_label(urgency),
             origin: Some(with(|counters| counters.origin_label(origin))),
+        }
+    }
+
+    /// An app's notification from a sender the origin lists, which counts as one use of
+    /// the app in its ranking.
+    pub(crate) fn listed_app(origin: &str, urgency: Option<&Urgency>, now_ns: Timestamp) -> Self {
+        Labels {
+            source: Source::Apps,
+            urgency: urgency_label(urgency),
+            origin: Some(with(|counters| counters.rank_app(origin, now_ns))),
         }
     }
 
@@ -98,6 +125,22 @@ impl Labels {
             source: Source::InternetIdentity,
             urgency: urgency_label(Some(urgency)),
             origin: None,
+        }
+    }
+
+    /// The same labels under `origin`.
+    fn with_origin(&self, origin: String) -> Self {
+        Labels {
+            origin: Some(origin),
+            ..self.clone()
+        }
+    }
+
+    /// The same labels with an app's origin counted as [`OTHER`].
+    fn fold_into_other(&self) -> Self {
+        match self.origin {
+            Some(_) => self.with_origin(OTHER.to_string()),
+            None => self.clone(),
         }
     }
 
@@ -411,6 +454,176 @@ pub(crate) struct PlannedPush {
     pub(crate) is_deposited: bool,
 }
 
+/// How much an entry was used lately: `value` uses as of `at_ns`, halving every
+/// [`RANK_HALF_LIFE_NS`] since.
+#[derive(Clone, Copy, Debug)]
+struct Score {
+    value: f64,
+    at_ns: Timestamp,
+}
+
+impl Score {
+    fn value_at(self, now_ns: Timestamp) -> f64 {
+        let half_lives = now_ns.saturating_sub(self.at_ns) as f64 / RANK_HALF_LIFE_NS as f64;
+        self.value * (-half_lives).exp2()
+    }
+
+    /// Orders scores as their values at any one moment do, whichever moment that is, as
+    /// every score halves at the same pace.
+    fn level(self) -> f64 {
+        self.value.log2() + self.at_ns as f64 / RANK_HALF_LIFE_NS as f64
+    }
+}
+
+/// The entries used most lately, at most `CAPACITY` of them. A newcomer to a full ranking
+/// replaces the lowest entry and starts just above where it was, so an entry with more
+/// than a `CAPACITY`th of the recent use is never the one replaced.
+struct Ranking<K, const CAPACITY: usize> {
+    scores: BTreeMap<K, Score>,
+}
+
+impl<K, const CAPACITY: usize> Default for Ranking<K, CAPACITY> {
+    fn default() -> Self {
+        Ranking {
+            scores: BTreeMap::new(),
+        }
+    }
+}
+
+impl<K: Ord + Clone, const CAPACITY: usize> Ranking<K, CAPACITY> {
+    fn contains(&self, key: &K) -> bool {
+        self.scores.contains_key(key)
+    }
+
+    /// Counts one use of `key`, answering the entry it replaced, if any.
+    fn rank(&mut self, key: &K, now_ns: Timestamp) -> Option<K> {
+        if let Some(score) = self.scores.get_mut(key) {
+            *score = Score {
+                value: score.value_at(now_ns) + 1.0,
+                at_ns: now_ns,
+            };
+            return None;
+        }
+        let mut replaced = None;
+        let mut value = 1.0;
+        if self.scores.len() >= CAPACITY {
+            if let Some((lowest, score)) = self.lowest() {
+                value += score.value_at(now_ns);
+                self.scores.remove(&lowest);
+                replaced = Some(lowest);
+            }
+        }
+        self.scores.insert(
+            key.clone(),
+            Score {
+                value,
+                at_ns: now_ns,
+            },
+        );
+        replaced
+    }
+
+    fn lowest(&self) -> Option<(K, Score)> {
+        self.scores
+            .iter()
+            .min_by(|(_, a), (_, b)| a.level().total_cmp(&b.level()))
+            .map(|(key, score)| (key.clone(), *score))
+    }
+
+    /// The lowest entry, where it ranks below `key`.
+    fn lowest_below(&self, key: &K) -> Option<K> {
+        let level = self.scores.get(key)?.level();
+        self.lowest()
+            .filter(|(_, score)| score.level() < level)
+            .map(|(lowest, _)| lowest)
+    }
+
+    fn remove(&mut self, key: &K) {
+        self.scores.remove(key);
+    }
+}
+
+/// The key of one series: its own labels, and the [`Labels`] every series carries.
+trait Series: Ord + Clone {
+    fn labels(&self) -> &Labels;
+
+    /// The app in the apps ranking this series is counted for, by origin.
+    fn app_origin(&self) -> Option<&str> {
+        self.labels().origin.as_deref()
+    }
+
+    /// The series this one is counted under where it has no room, or where its app gave
+    /// way to another.
+    fn fold_into_other(&self) -> Self;
+}
+
+impl Series for Labels {
+    fn labels(&self) -> &Labels {
+        self
+    }
+    fn fold_into_other(&self) -> Self {
+        Labels::fold_into_other(self)
+    }
+}
+
+macro_rules! impl_series {
+    ($($first:ty),*) => {$(
+        impl Series for ($first, Labels) {
+            fn labels(&self) -> &Labels {
+                &self.1
+            }
+            fn fold_into_other(&self) -> Self {
+                (self.0, self.1.fold_into_other())
+            }
+        }
+
+        impl Series for ($first, Path, Labels) {
+            fn labels(&self) -> &Labels {
+                &self.2
+            }
+            fn fold_into_other(&self) -> Self {
+                (self.0, self.1, self.2.fold_into_other())
+            }
+        }
+    )*};
+}
+
+impl_series!(Stage, Reason, DeferCause);
+
+/// A sender an origin does not list, by the calling canister. Named by the ranking of
+/// unlisted pairs, so in no app's.
+impl Series for (String, Labels) {
+    fn labels(&self) -> &Labels {
+        &self.1
+    }
+    fn app_origin(&self) -> Option<&str> {
+        None
+    }
+    fn fold_into_other(&self) -> Self {
+        (OTHER.to_string(), self.1.fold_into_other())
+    }
+}
+
+/// The series of the app at `origin` counted under `other`; `None` for any other.
+fn fold_app_series<K: Series>(key: &K, origin: &str) -> Option<K> {
+    (key.labels().origin.as_deref() == Some(origin)).then(|| key.fold_into_other())
+}
+
+/// Moves the count of every key `fold` answers another key for onto that key.
+fn fold_keys<K: Ord + Clone>(map: &mut BTreeMap<K, u64>, fold: impl Fn(&K) -> Option<K>) {
+    let moves: Vec<(K, K)> = map
+        .keys()
+        .filter_map(|key| fold(key).map(|into| (key.clone(), into)))
+        .collect();
+    for (key, into) in moves {
+        let Some(count) = map.remove(&key) else {
+            continue;
+        };
+        let total = map.entry(into).or_default();
+        *total = total.saturating_add(count);
+    }
+}
+
 #[derive(Default)]
 struct Counters {
     notifications: BTreeMap<(Stage, Labels), u64>,
@@ -420,9 +633,13 @@ struct Counters {
     deferred: BTreeMap<(DeferCause, Labels), u64>,
     folded: BTreeMap<Labels, u64>,
     unlisted_senders: BTreeMap<(String, Labels), u64>,
-    named_origins: BTreeSet<String>,
+    /// Origins, ranked by the notifications their listed senders send.
+    apps: Ranking<String, MAX_NAMED_ORIGINS>,
+    /// Canister and origin, ranked by the notifications refused for the pair.
+    unlisted_pairs: Ranking<(String, String), MAX_NAMED_UNLISTED_SENDERS>,
     application_origins: BTreeMap<ApplicationNumber, String>,
-    named_canisters: BTreeSet<String>,
+    /// New series counted under `other` for want of room.
+    series_folded: u64,
     live: BTreeMap<LiveKey, Live>,
     evicted: u64,
 }
@@ -441,35 +658,104 @@ fn bump<K: Ord>(map: &mut BTreeMap<K, u64>, key: K) {
 }
 
 impl Counters {
-    fn origin_label(&mut self, origin: &str) -> String {
-        if self.named_origins.contains(origin) {
-            return origin.to_string();
+    fn origin_label(&self, origin: &str) -> String {
+        match self.apps.contains(&origin.to_string()) {
+            true => origin.to_string(),
+            false => OTHER.to_string(),
         }
-        if self.named_origins.len() < MAX_NAMED_ORIGINS {
-            self.named_origins.insert(origin.to_string());
-            return origin.to_string();
-        }
-        OTHER.to_string()
     }
 
-    fn canister_label(&mut self, canister: Principal) -> String {
-        let canister = canister.to_text();
-        if self.named_canisters.contains(&canister) {
-            return canister;
+    fn rank_app(&mut self, origin: &str, now_ns: Timestamp) -> String {
+        let origin = origin.to_string();
+        if let Some(replaced) = self.apps.rank(&origin, now_ns) {
+            self.fold_app(&replaced);
         }
-        if self.named_canisters.len() < MAX_NAMED_CANISTERS {
-            self.named_canisters.insert(canister.clone());
-            return canister;
+        origin
+    }
+
+    /// Counts what is left of an app no longer ranked under `other`.
+    fn fold_app(&mut self, origin: &str) {
+        self.application_origins.retain(|_, named| named != origin);
+        fold_keys(&mut self.notifications, |key| fold_app_series(key, origin));
+        fold_keys(&mut self.losses, |key| fold_app_series(key, origin));
+        fold_keys(&mut self.pushes, |key| fold_app_series(key, origin));
+        fold_keys(&mut self.push_losses, |key| fold_app_series(key, origin));
+        fold_keys(&mut self.deferred, |key| fold_app_series(key, origin));
+        fold_keys(&mut self.folded, |key| fold_app_series(key, origin));
+    }
+
+    fn rank_unlisted_pair(&mut self, pair: &(String, String), now_ns: Timestamp) {
+        let Some((canister, origin)) = self.unlisted_pairs.rank(pair, now_ns) else {
+            return;
+        };
+        fold_keys(&mut self.unlisted_senders, |key: &(String, Labels)| {
+            (key.0 == canister && key.1.origin.as_deref() == Some(origin.as_str()))
+                .then(|| key.fold_into_other())
+        });
+    }
+
+    fn series_count(&self) -> usize {
+        self.notifications.len()
+            + self.losses.len()
+            + self.pushes.len()
+            + self.push_losses.len()
+            + self.deferred.len()
+            + self.folded.len()
+            + self.unlisted_senders.len()
+    }
+
+    /// Makes room for a new series of the app at `origin`, if any, by folding the apps
+    /// ranked below it. Answers whether there is room.
+    fn make_room(&mut self, origin: Option<&str>) -> bool {
+        while self.series_count() >= MAX_SERIES {
+            let Some(origin) = origin.map(str::to_string) else {
+                return false;
+            };
+            let Some(lowest) = self.apps.lowest_below(&origin) else {
+                return false;
+            };
+            self.apps.remove(&lowest);
+            self.fold_app(&lowest);
         }
-        OTHER.to_string()
+        true
+    }
+
+    /// Counts one more under `key`, in the counter `counter` picks. A new series that
+    /// does not fit is counted under `other`.
+    fn count<K: Series>(&mut self, counter: fn(&mut Counters) -> &mut BTreeMap<K, u64>, key: K) {
+        let mut key = key;
+        let origin = key.app_origin().map(str::to_string);
+        // Labels taken before their app gave way still name it.
+        if origin
+            .as_ref()
+            .is_some_and(|origin| origin != OTHER && !self.apps.contains(origin))
+        {
+            key = key.fold_into_other();
+        }
+        if !counter(self).contains_key(&key) {
+            let origin = origin.filter(|origin| self.apps.contains(origin));
+            if !self.make_room(origin.as_deref()) {
+                self.series_folded = self.series_folded.saturating_add(1);
+                key = key.fold_into_other();
+            }
+        }
+        bump(counter(self), key);
     }
 
     fn count_reached(&mut self, stage: Stage, labels: &Labels) {
-        bump(&mut self.notifications, (stage, labels.clone()));
+        self.count(|c| &mut c.notifications, (stage, labels.clone()));
     }
 
     fn count_lost(&mut self, reason: Reason, labels: &Labels) {
-        bump(&mut self.losses, (reason, labels.clone()));
+        self.count(|c| &mut c.losses, (reason, labels.clone()));
+    }
+
+    fn count_push(&mut self, stage: Stage, path: Path, labels: &Labels) {
+        self.count(|c| &mut c.pushes, (stage, path, labels.clone()));
+    }
+
+    fn count_push_lost(&mut self, reason: Reason, path: Path, labels: &Labels) {
+        self.count(|c| &mut c.push_losses, (reason, path, labels.clone()));
     }
 
     /// The labels of a live notification.
@@ -535,10 +821,7 @@ impl Counters {
             let labels = self.live_labels(&live);
             for path in Path::ALL {
                 for _ in 0..live.open_copies[path as usize] {
-                    bump(
-                        &mut self.push_losses,
-                        (Reason::NeverFetched, path, labels.clone()),
-                    );
+                    self.count_push_lost(Reason::NeverFetched, path, &labels);
                 }
             }
             if live.is_delivered {
@@ -571,31 +854,41 @@ pub(crate) fn count_lost(reason: Reason, labels: &Labels) {
 }
 
 pub(crate) fn count_deferred(cause: DeferCause, labels: &Labels) {
-    with(|counters| bump(&mut counters.deferred, (cause, labels.clone())));
+    with(|counters| counters.count(|c| &mut c.deferred, (cause, labels.clone())));
 }
 
 pub(crate) fn count_folded(labels: &Labels) {
-    with(|counters| bump(&mut counters.folded, labels.clone()));
+    with(|counters| counters.count(|c| &mut c.folded, labels.clone()));
 }
 
-/// A notification refused because `canister` is not one of the app's senders.
-pub(crate) fn count_unlisted_sender(canister: Principal, labels: &Labels) {
+/// A notification for `origin` refused because `canister` is not one of its senders,
+/// `labels` being its labels from [`Labels::app`].
+pub(crate) fn count_unlisted_sender(
+    canister: Principal,
+    origin: &str,
+    labels: &Labels,
+    now_ns: Timestamp,
+) {
     with(|counters| {
-        let canister = counters.canister_label(canister);
-        bump(&mut counters.unlisted_senders, (canister, labels.clone()));
+        let pair = (canister.to_text(), origin.to_string());
+        counters.rank_unlisted_pair(&pair, now_ns);
+        let (canister, origin) = pair;
+        counters.count(
+            |c| &mut c.unlisted_senders,
+            (canister, labels.with_origin(origin)),
+        );
         counters.count_lost(Reason::SenderNotAllowed, labels);
     });
 }
 
 /// Names the app behind `application_number`, so what it has in the backlog is counted
-/// under its origin once it is taken.
+/// under its origin once it is taken. Only an app in the ranking is named.
 pub(crate) fn number_application(application_number: ApplicationNumber, origin: &str) {
     with(|counters| {
-        let label = counters.origin_label(origin);
-        if label != OTHER {
+        if counters.apps.contains(&origin.to_string()) {
             counters
                 .application_origins
-                .insert(application_number, label);
+                .insert(application_number, origin.to_string());
         }
     });
 }
@@ -617,18 +910,12 @@ pub(crate) fn track_fan_out(
         }
         let mut open_copies = [0u8; Path::COUNT];
         for push in pushes {
-            bump(
-                &mut counters.pushes,
-                (Stage::Accepted, push.path, labels.clone()),
-            );
+            counters.count_push(Stage::Accepted, push.path, &labels);
             if push.is_deposited {
                 let copies = &mut open_copies[push.path as usize];
                 *copies = copies.saturating_add(1);
             } else {
-                bump(
-                    &mut counters.push_losses,
-                    (Reason::RelayUnreachable, push.path, labels.clone()),
-                );
+                counters.count_push_lost(Reason::RelayUnreachable, push.path, &labels);
             }
         }
         if open_copies.iter().all(|copies| *copies == 0) {
@@ -671,7 +958,7 @@ pub(crate) fn count_push_outcome(
                 let is_first_push = !std::mem::replace(&mut live.is_pushed, true);
                 let live = *live;
                 let labels = counters.live_labels(&live);
-                bump(&mut counters.pushes, (Stage::Pushed, path, labels.clone()));
+                counters.count_push(Stage::Pushed, path, &labels);
                 if is_first_push {
                     counters.count_reached(Stage::Pushed, &labels);
                 }
@@ -680,7 +967,7 @@ pub(crate) fn count_push_outcome(
             Err(reason) => reason,
         };
         if let Some(labels) = counters.close(anchor_number, entry, path, Some(reason)) {
-            bump(&mut counters.push_losses, (reason, path, labels));
+            counters.count_push_lost(reason, path, &labels);
         }
     });
 }
@@ -697,10 +984,7 @@ pub(crate) fn count_collected(
         let Some(labels) = counters.close(anchor_number, entry, path, None) else {
             return;
         };
-        bump(
-            &mut counters.pushes,
-            (Stage::Delivered, path, labels.clone()),
-        );
+        counters.count_push(Stage::Delivered, path, &labels);
         let is_first_delivery = counters
             .live
             .get_mut(&live_key(anchor_number, entry))
@@ -721,7 +1005,7 @@ pub(crate) fn count_removed_entries<'a>(
     with(|counters| {
         for entry in entries {
             if let Some(labels) = counters.close(anchor_number, entry, path, Some(reason)) {
-                bump(&mut counters.push_losses, (reason, path, labels));
+                counters.count_push_lost(reason, path, &labels);
             }
         }
     });
@@ -810,13 +1094,18 @@ pub(crate) fn encode(
             builder = builder.value(&labels.pairs(&[]), *count as f64)?;
         }
         w.encode_counter(
+            "internet_identity_notification_series_folded",
+            counters.series_folded as f64,
+            "New series counted under other since the last upgrade because the series had reached their cap.",
+        )?;
+        w.encode_counter(
             "internet_identity_notification_keys_evicted",
             counters.evicted as f64,
             "Live notifications forgotten since the last upgrade because more were live than the cap allows. What becomes of their copies afterwards is not counted.",
         )?;
         let mut builder = w.counter_vec(
             "internet_identity_notification_unlisted_senders",
-            "Notifications refused since the last upgrade because the calling canister is not one of the app's senders, by canister.",
+            "Notifications refused since the last upgrade because the calling canister is not one of the app's senders, by canister and the origin it named.",
         )?;
         for ((canister, labels), count) in &counters.unlisted_senders {
             builder = builder.value(&labels.pairs(&[("canister", canister)]), *count as f64)?;
@@ -1106,21 +1395,238 @@ mod tests {
         assert_eq!(push_loss_count_for_testing("never_fetched"), 0);
     }
 
-    #[test]
-    fn origins_past_the_cap_are_counted_as_other() {
-        reset_for_testing();
+    const DAY: Timestamp = RANK_HALF_LIFE_NS;
+
+    fn app(index: usize) -> String {
+        format!("https://{index}.example")
+    }
+
+    fn origin_of(labels: &Labels) -> &str {
+        labels.origin.as_deref().unwrap_or_default()
+    }
+
+    fn is_ranked(origin: &str) -> bool {
+        with(|counters| counters.apps.contains(&origin.to_string()))
+    }
+
+    fn total_losses() -> u64 {
+        with(|counters| counters.losses.values().sum())
+    }
+
+    /// Ranks `MAX_NAMED_ORIGINS` apps at `now_ns`, each with a loss, `app(0)` the busiest.
+    fn fill_the_apps_ranking(now_ns: Timestamp) {
         for index in 0..MAX_NAMED_ORIGINS {
-            Labels::app(&format!("https://{index}.example"), None);
+            let uses = if index == 0 { 5 } else { 1 };
+            for _ in 0..uses {
+                let labels = Labels::listed_app(&app(index), None, now_ns);
+                count_lost(Reason::UnknownPrincipal, &labels);
+            }
+        }
+    }
+
+    #[test]
+    fn an_origin_is_named_only_once_a_listed_sender_used_it() {
+        reset_for_testing();
+        assert_eq!(origin_of(&Labels::app(&app(1), None)), OTHER);
+
+        Labels::listed_app(&app(1), None, NOW);
+
+        assert_eq!(origin_of(&Labels::app(&app(1), None)), app(1));
+    }
+
+    #[test]
+    fn an_unlisted_caller_takes_no_place_in_the_apps_ranking() {
+        reset_for_testing();
+        for index in 0..=MAX_NAMED_ORIGINS {
+            let labels = Labels::app(&app(index), None);
+            count_unlisted_sender(Principal::anonymous(), &app(index), &labels, NOW);
         }
 
+        assert!(with(|counters| counters.apps.scores.is_empty()));
         assert_eq!(
-            Labels::app("https://one-too-many.example", None).origin,
-            Some(OTHER.to_string())
+            origin_of(&Labels::listed_app("https://listed.example", None, NOW)),
+            "https://listed.example"
         );
+    }
+
+    #[test]
+    fn a_newcomer_replaces_the_least_used_app_and_keeps_the_busiest() {
+        reset_for_testing();
+        fill_the_apps_ranking(NOW);
+        let losses = total_losses();
+
+        Labels::listed_app("https://newcomer.example", None, NOW);
+
+        assert!(is_ranked(&app(0)));
         assert_eq!(
-            Labels::app("https://0.example", None).origin,
-            Some("https://0.example".to_string())
+            (1..MAX_NAMED_ORIGINS)
+                .filter(|index| !is_ranked(&app(*index)))
+                .count(),
+            1
         );
+        assert_eq!(total_losses(), losses);
+        assert_eq!(
+            with(|counters| counters
+                .losses
+                .keys()
+                .filter(|(_, labels)| origin_of(labels) == OTHER)
+                .count()),
+            1
+        );
+    }
+
+    #[test]
+    fn an_app_busy_long_ago_gives_way_to_apps_busy_lately() {
+        reset_for_testing();
+        for _ in 0..10 {
+            Labels::listed_app(&app(0), None, NOW);
+        }
+        for index in 1..MAX_NAMED_ORIGINS {
+            for _ in 0..2 {
+                Labels::listed_app(&app(index), None, NOW + 7 * DAY);
+            }
+        }
+
+        Labels::listed_app("https://newcomer.example", None, NOW + 7 * DAY);
+
+        assert!(!is_ranked(&app(0)));
+    }
+
+    #[test]
+    fn a_replaced_app_in_flight_is_counted_under_other_from_then_on() {
+        reset_for_testing();
+        let labels = Labels::listed_app(&app(0), None, NOW);
+        number_application(1, &app(0));
+        let entry = entry(7, EXPIRES);
+        track_fan_out(1, &entry, labels, vec![deposited()], NOW);
+        with(|counters| counters.fold_app(&app(0)));
+
+        count_collected(1, &entry, Path::Chrome, NOW);
+
+        assert!(with(|counters| counters
+            .pushes
+            .keys()
+            .all(|(_, _, labels)| origin_of(labels) == OTHER)));
+        assert_eq!(push_count_for_testing("delivered"), 1);
+    }
+
+    #[test]
+    fn labels_taken_before_their_app_gave_way_count_under_other() {
+        reset_for_testing();
+        let labels = Labels::listed_app(&app(0), None, NOW);
+        with(|counters| {
+            counters.apps.remove(&app(0));
+            counters.fold_app(&app(0));
+        });
+
+        count_lost(Reason::UnknownPrincipal, &labels);
+
+        assert!(with(|counters| counters
+            .losses
+            .keys()
+            .all(|(_, labels)| origin_of(labels) == OTHER)));
+    }
+
+    #[test]
+    fn an_unlisted_pair_gives_way_by_use_and_folds_into_other() {
+        const ORIGIN: &str = "https://unlisted.example";
+        reset_for_testing();
+        let canister = |index: u64| Principal::from_slice(&index.to_be_bytes());
+        let labels = Labels::app(ORIGIN, None);
+        for index in 0..MAX_NAMED_UNLISTED_SENDERS as u64 {
+            let uses = if index == 0 { 3 } else { 1 };
+            for _ in 0..uses {
+                count_unlisted_sender(canister(index), ORIGIN, &labels, NOW);
+            }
+        }
+
+        count_unlisted_sender(canister(999), ORIGIN, &labels, NOW);
+
+        let refused = with(|counters| counters.unlisted_senders.clone());
+        assert_eq!(refused.values().sum::<u64>(), 103);
+        assert_eq!(refused.len(), MAX_NAMED_UNLISTED_SENDERS + 1);
+        let named = (
+            canister(0).to_text(),
+            labels.with_origin(ORIGIN.to_string()),
+        );
+        assert_eq!(refused.get(&named), Some(&3));
+        let other = (OTHER.to_string(), labels.with_origin(OTHER.to_string()));
+        assert_eq!(refused.get(&other), Some(&1));
+    }
+
+    /// Counts push losses for every ranked app, busiest first, past the series cap.
+    fn fill_the_series() {
+        let reasons = [
+            Reason::RelayGone,
+            Reason::RelayRejected,
+            Reason::RelayServerError,
+            Reason::NeverFetched,
+            Reason::FetchedTooLate,
+        ];
+        let urgencies = [
+            Urgency::High,
+            Urgency::Normal,
+            Urgency::Low,
+            Urgency::VeryLow,
+        ];
+        for index in 0..MAX_NAMED_ORIGINS {
+            for urgency in &urgencies {
+                let labels = Labels::app(&app(index), Some(urgency));
+                for reason in reasons {
+                    for path in Path::ALL {
+                        with(|counters| counters.count_push_lost(reason, path, &labels));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_series_stay_within_their_cap() {
+        reset_for_testing();
+        fill_the_apps_ranking(NOW);
+        fill_the_series();
+
+        let series = with(|counters| counters.series_count());
+        // The series under `other` this fill can create past the cap: its push losses,
+        // and the loss each app was ranked with.
+        let other_series = 4 * 5 * Path::COUNT + 1;
+        assert!(series <= MAX_SERIES + other_series, "{series} series");
+        assert!(with(|counters| counters.series_folded) > 0);
+    }
+
+    #[test]
+    fn past_the_cap_a_busier_app_makes_room_by_folding_a_quieter_one() {
+        reset_for_testing();
+        fill_the_apps_ranking(NOW);
+        fill_the_series();
+        let ranked_apps = with(|counters| counters.apps.scores.len());
+
+        let labels = Labels::app(&app(0), Some(&Urgency::High));
+        with(|counters| counters.count_lost(Reason::BacklogFull, &labels));
+
+        assert!(with(|counters| counters
+            .losses
+            .contains_key(&(Reason::BacklogFull, labels.clone()))));
+        assert!(with(|counters| counters.apps.scores.len()) < ranked_apps);
+        assert!(is_ranked(&app(0)));
+    }
+
+    #[test]
+    fn past_the_cap_the_quietest_app_counts_a_new_series_under_other() {
+        reset_for_testing();
+        fill_the_apps_ranking(NOW);
+        fill_the_series();
+        let (lowest, _) = with(|counters| counters.apps.lowest()).expect("a ranked app");
+        let folded = with(|counters| counters.series_folded);
+
+        let labels = Labels::app(&lowest, Some(&Urgency::High));
+        with(|counters| counters.count_lost(Reason::BacklogFull, &labels));
+
+        assert_eq!(with(|counters| counters.series_folded), folded + 1);
+        assert!(with(|counters| counters
+            .losses
+            .contains_key(&(Reason::BacklogFull, labels.fold_into_other()))));
     }
 
     #[test]
