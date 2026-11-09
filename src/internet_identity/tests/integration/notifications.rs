@@ -3121,6 +3121,25 @@ mod delivery_metrics {
 
     const LISTED_APP: &str = "https://listed-app.example";
     const UNLISTED_ORIGIN: &str = "https://unlisted.example";
+    /// The bytes an origin may take.
+    const ORIGIN_LIMIT: usize = 255;
+    /// The reply limit `/metrics` has to stay within.
+    const REPLY_LIMIT: usize = 3 * 1024 * 1024;
+
+    /// An origin about as long as II takes, starting with `name`.
+    fn longest_origin(name: &str) -> String {
+        const DOMAIN: &str = ".example";
+        let mut origin = format!("https://{name}");
+        loop {
+            let room = ORIGIN_LIMIT - DOMAIN.len() - origin.len();
+            if room < 2 {
+                break;
+            }
+            origin.push('.');
+            origin.push_str(&"a".repeat((room - 1).min(60)));
+        }
+        origin + DOMAIN
+    }
 
     /// The canister `LISTED_APP` lists as its sender.
     fn listed_sender() -> Principal {
@@ -3165,8 +3184,8 @@ mod delivery_metrics {
         )
     }
 
-    /// Answers every sender list being fetched: `LISTED_APP`'s names `listed_sender`, and
-    /// every other origin serves none.
+    /// Answers every sender list being fetched: an origin whose host starts with `listed`
+    /// names `listed_sender`, and every other origin serves none.
     fn serve_sender_lists(env: &PocketIc) {
         for _ in 0..6 {
             env.tick();
@@ -3175,7 +3194,7 @@ mod delivery_metrics {
                 break;
             }
             for request in pending {
-                let (status, body) = match request.url.starts_with(LISTED_APP) {
+                let (status, body) = match request.url.starts_with("https://listed") {
                     true => (
                         200,
                         format!(r#"{{"senders":["{}"]}}"#, listed_sender().to_text()).into_bytes(),
@@ -3279,7 +3298,7 @@ mod delivery_metrics {
         let canister_id =
             install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_notifications_enabled());
         let origins: Vec<String> = (0..120)
-            .map(|index| format!("https://unlisted-{index}.example"))
+            .map(|index| longest_origin(&format!("unlisted-{index}")))
             .collect();
         let callers = [
             Principal::anonymous(),
@@ -3306,6 +3325,7 @@ mod delivery_metrics {
             .expect("the listed sender's send returned Err");
 
         let metrics = get_metrics(&env, canister_id);
+        assert!(metrics.len() < REPLY_LIMIT);
         // A named pair per urgency for at most 100 pairs, and the rest under `other`.
         assert!(unlisted_sender_lines(&metrics).len() <= 4 * 101);
         assert!(funnel_lines(&metrics)
@@ -3318,6 +3338,36 @@ mod delivery_metrics {
             ),
             1.0,
         );
+        Ok(())
+    }
+
+    /// A hundred apps at the longest origins each have their series, and the reply stays
+    /// within its limit.
+    #[test]
+    fn should_name_every_listed_app_at_the_longest_origins() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id =
+            install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_notifications_enabled());
+        let apps: Vec<String> = (0..100)
+            .map(|index| longest_origin(&format!("listed-{index}")))
+            .collect();
+        read_sender_lists(&env, canister_id, listed_sender(), &apps)?;
+        for app in &apps {
+            send(&env, canister_id, listed_sender(), app)?
+                .expect("the listed sender's send returned Err");
+        }
+
+        let metrics = get_metrics(&env, canister_id);
+        assert!(metrics.len() < REPLY_LIMIT);
+        for app in &apps {
+            assert_metric(
+                &metrics,
+                &format!(
+                    r#"internet_identity_notification_losses{{drop="accept",reason="unknown_principal",source="apps",urgency="very_low",origin="{app}"}}"#
+                ),
+                1.0,
+            );
+        }
         Ok(())
     }
 }

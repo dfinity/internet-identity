@@ -16,8 +16,10 @@
 //!
 //! Every series is a line of the `/metrics` reply, which has to fit in one response. The
 //! apps named on their own series are the ones most used lately by a sender they list,
-//! and the series together stay within [`MAX_SERIES`]: past it, the least used apps give
-//! way to busier ones, and what still does not fit is counted under `other`.
+//! and the series together stay within [`MAX_SERIES_BYTES`]: past it, the least used apps
+//! give way to busier ones, and what still does not fit is counted under `other`. An app
+//! that gives way loses its series, which Prometheus reads as series that ended, and
+//! what follows is counted under `other`.
 
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::webpush::vapid_key;
@@ -42,11 +44,15 @@ const MAX_NAMED_UNLISTED_SENDERS: usize = 100;
 /// How fast a ranking forgets: an entry's use counts half after this long.
 const RANK_HALF_LIFE_NS: Timestamp = 24 * 60 * 60 * 1_000_000_000;
 
-/// Series across the counters, about 1.7 MB at the length of a line with a long origin,
-/// which leaves room in the 3 MiB reply for the rest of `/metrics`. Series counted under
-/// `other` or for Internet Identity itself are bounded by the labels' variants and are
-/// created past it.
-const MAX_SERIES: usize = 10_000;
+/// The bytes the series' lines take in `/metrics`. Series counted under `other` or for
+/// Internet Identity itself are bounded by the labels' variants, at about 150 KB each, and
+/// are created past it; with them and the rest of `/metrics` the reply stays well within
+/// its 3 MiB.
+const MAX_SERIES_BYTES: usize = 1_500_000;
+
+/// A line's bytes past its labels, at the longest value and timestamp: the space before
+/// each, the newline, and some to spare.
+const LINE_VALUE_BYTES: usize = 40;
 
 const OTHER: &str = "other";
 
@@ -545,56 +551,130 @@ impl<K: Ord + Clone, const CAPACITY: usize> Ranking<K, CAPACITY> {
 
 /// The key of one series: its own labels, and the [`Labels`] every series carries.
 trait Series: Ord + Clone {
+    /// The metric this series is a line of.
+    const METRIC: &'static str;
+
     fn labels(&self) -> &Labels;
+
+    /// The labels of the series' line, in the order `/metrics` writes them.
+    fn pairs(&self) -> Vec<(&str, &str)>;
 
     /// The app in the apps ranking this series is counted for, by origin.
     fn app_origin(&self) -> Option<&str> {
         self.labels().origin.as_deref()
     }
 
-    /// The series this one is counted under where it has no room, or where its app gave
-    /// way to another.
+    /// The series this one is counted under where it has no room, or where its app is not
+    /// ranked.
     fn fold_into_other(&self) -> Self;
+
+    /// The bytes of the series' line in `/metrics`, at most.
+    fn line_bytes(&self) -> usize {
+        let labels: usize = self
+            .pairs()
+            .iter()
+            .map(|(name, value)| name.len() + value.len() + r#"="","#.len())
+            .sum();
+        Self::METRIC.len() + "{}".len() + labels + LINE_VALUE_BYTES
+    }
 }
 
+impl Series for (Stage, Labels) {
+    const METRIC: &'static str = "internet_identity_notifications";
+    fn labels(&self) -> &Labels {
+        &self.1
+    }
+    fn pairs(&self) -> Vec<(&str, &str)> {
+        self.1.pairs(&[("stage", self.0.as_str())])
+    }
+    fn fold_into_other(&self) -> Self {
+        (self.0, self.1.fold_into_other())
+    }
+}
+
+impl Series for (Reason, Labels) {
+    const METRIC: &'static str = "internet_identity_notification_losses";
+    fn labels(&self) -> &Labels {
+        &self.1
+    }
+    fn pairs(&self) -> Vec<(&str, &str)> {
+        self.1.pairs(&[
+            ("drop", self.0.drop().as_str()),
+            ("reason", self.0.as_str()),
+        ])
+    }
+    fn fold_into_other(&self) -> Self {
+        (self.0, self.1.fold_into_other())
+    }
+}
+
+impl Series for (Stage, Path, Labels) {
+    const METRIC: &'static str = "internet_identity_notification_pushes";
+    fn labels(&self) -> &Labels {
+        &self.2
+    }
+    fn pairs(&self) -> Vec<(&str, &str)> {
+        self.2
+            .pairs(&[("stage", self.0.as_str()), ("path", self.1.as_str())])
+    }
+    fn fold_into_other(&self) -> Self {
+        (self.0, self.1, self.2.fold_into_other())
+    }
+}
+
+impl Series for (Reason, Path, Labels) {
+    const METRIC: &'static str = "internet_identity_notification_push_losses";
+    fn labels(&self) -> &Labels {
+        &self.2
+    }
+    fn pairs(&self) -> Vec<(&str, &str)> {
+        self.2.pairs(&[
+            ("drop", self.0.drop().as_str()),
+            ("reason", self.0.as_str()),
+            ("path", self.1.as_str()),
+        ])
+    }
+    fn fold_into_other(&self) -> Self {
+        (self.0, self.1, self.2.fold_into_other())
+    }
+}
+
+impl Series for (DeferCause, Labels) {
+    const METRIC: &'static str = "internet_identity_notifications_deferred";
+    fn labels(&self) -> &Labels {
+        &self.1
+    }
+    fn pairs(&self) -> Vec<(&str, &str)> {
+        self.1.pairs(&[("cause", self.0.as_str())])
+    }
+    fn fold_into_other(&self) -> Self {
+        (self.0, self.1.fold_into_other())
+    }
+}
+
+/// A resend folded into a waiting copy.
 impl Series for Labels {
+    const METRIC: &'static str = "internet_identity_notifications_folded";
     fn labels(&self) -> &Labels {
         self
+    }
+    fn pairs(&self) -> Vec<(&str, &str)> {
+        Labels::pairs(self, &[])
     }
     fn fold_into_other(&self) -> Self {
         Labels::fold_into_other(self)
     }
 }
 
-macro_rules! impl_series {
-    ($($first:ty),*) => {$(
-        impl Series for ($first, Labels) {
-            fn labels(&self) -> &Labels {
-                &self.1
-            }
-            fn fold_into_other(&self) -> Self {
-                (self.0, self.1.fold_into_other())
-            }
-        }
-
-        impl Series for ($first, Path, Labels) {
-            fn labels(&self) -> &Labels {
-                &self.2
-            }
-            fn fold_into_other(&self) -> Self {
-                (self.0, self.1, self.2.fold_into_other())
-            }
-        }
-    )*};
-}
-
-impl_series!(Stage, Reason, DeferCause);
-
 /// A sender an origin does not list, by the calling canister. Named by the ranking of
 /// unlisted pairs, so in no app's.
 impl Series for (String, Labels) {
+    const METRIC: &'static str = "internet_identity_notification_unlisted_senders";
     fn labels(&self) -> &Labels {
         &self.1
+    }
+    fn pairs(&self) -> Vec<(&str, &str)> {
+        self.1.pairs(&[("canister", &self.0)])
     }
     fn app_origin(&self) -> Option<&str> {
         None
@@ -604,24 +684,35 @@ impl Series for (String, Labels) {
     }
 }
 
-/// The series of the app at `origin` counted under `other`; `None` for any other.
-fn fold_app_series<K: Series>(key: &K, origin: &str) -> Option<K> {
-    (key.labels().origin.as_deref() == Some(origin)).then(|| key.fold_into_other())
+/// Deletes the series `is_dropped` picks, answering the bytes their lines took.
+fn drop_series<K: Series>(map: &mut BTreeMap<K, u64>, is_dropped: impl Fn(&K) -> bool) -> usize {
+    let mut bytes = 0;
+    map.retain(|key, _| {
+        let is_kept = !is_dropped(key);
+        if !is_kept {
+            bytes += key.line_bytes();
+        }
+        is_kept
+    });
+    bytes
 }
 
-/// Moves the count of every key `fold` answers another key for onto that key.
-fn fold_keys<K: Ord + Clone>(map: &mut BTreeMap<K, u64>, fold: impl Fn(&K) -> Option<K>) {
-    let moves: Vec<(K, K)> = map
-        .keys()
-        .filter_map(|key| fold(key).map(|into| (key.clone(), into)))
-        .collect();
-    for (key, into) in moves {
-        let Some(count) = map.remove(&key) else {
-            continue;
-        };
-        let total = map.entry(into).or_default();
-        *total = total.saturating_add(count);
+/// Whether `key` is a series of the app at `origin`.
+fn is_app_series<K: Series>(key: &K, origin: &str) -> bool {
+    key.labels().origin.as_deref() == Some(origin)
+}
+
+/// Encodes every series of one counter.
+fn encode_series<K: Series>(
+    w: &mut MetricsEncoder<Vec<u8>>,
+    help: &str,
+    counter: &BTreeMap<K, u64>,
+) -> std::io::Result<()> {
+    let mut builder = w.counter_vec(K::METRIC, help)?;
+    for (key, count) in counter {
+        builder = builder.value(&key.pairs(), *count as f64)?;
     }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -638,6 +729,8 @@ struct Counters {
     /// Canister and origin, ranked by the notifications refused for the pair.
     unlisted_pairs: Ranking<(String, String), MAX_NAMED_UNLISTED_SENDERS>,
     application_origins: BTreeMap<ApplicationNumber, String>,
+    /// The bytes the series' lines take, see [`Series::line_bytes`].
+    series_bytes: usize,
     /// New series counted under `other` for want of room.
     series_folded: u64,
     live: BTreeMap<LiveKey, Live>,
@@ -668,46 +761,38 @@ impl Counters {
     fn rank_app(&mut self, origin: &str, now_ns: Timestamp) -> String {
         let origin = origin.to_string();
         if let Some(replaced) = self.apps.rank(&origin, now_ns) {
-            self.fold_app(&replaced);
+            self.drop_app(&replaced);
         }
         origin
     }
 
-    /// Counts what is left of an app no longer ranked under `other`.
-    fn fold_app(&mut self, origin: &str) {
+    /// Deletes the series of an app no longer ranked. Prometheus keeps what they counted
+    /// up to its last scrape, and what follows is counted under `other`.
+    fn drop_app(&mut self, origin: &str) {
         self.application_origins.retain(|_, named| named != origin);
-        fold_keys(&mut self.notifications, |key| fold_app_series(key, origin));
-        fold_keys(&mut self.losses, |key| fold_app_series(key, origin));
-        fold_keys(&mut self.pushes, |key| fold_app_series(key, origin));
-        fold_keys(&mut self.push_losses, |key| fold_app_series(key, origin));
-        fold_keys(&mut self.deferred, |key| fold_app_series(key, origin));
-        fold_keys(&mut self.folded, |key| fold_app_series(key, origin));
+        let bytes = drop_series(&mut self.notifications, |key| is_app_series(key, origin))
+            + drop_series(&mut self.losses, |key| is_app_series(key, origin))
+            + drop_series(&mut self.pushes, |key| is_app_series(key, origin))
+            + drop_series(&mut self.push_losses, |key| is_app_series(key, origin))
+            + drop_series(&mut self.deferred, |key| is_app_series(key, origin))
+            + drop_series(&mut self.folded, |key| is_app_series(key, origin));
+        self.series_bytes = self.series_bytes.saturating_sub(bytes);
     }
 
     fn rank_unlisted_pair(&mut self, pair: &(String, String), now_ns: Timestamp) {
         let Some((canister, origin)) = self.unlisted_pairs.rank(pair, now_ns) else {
             return;
         };
-        fold_keys(&mut self.unlisted_senders, |key: &(String, Labels)| {
-            (key.0 == canister && key.1.origin.as_deref() == Some(origin.as_str()))
-                .then(|| key.fold_into_other())
+        let bytes = drop_series(&mut self.unlisted_senders, |key| {
+            key.0 == canister && key.1.origin.as_deref() == Some(origin.as_str())
         });
+        self.series_bytes = self.series_bytes.saturating_sub(bytes);
     }
 
-    fn series_count(&self) -> usize {
-        self.notifications.len()
-            + self.losses.len()
-            + self.pushes.len()
-            + self.push_losses.len()
-            + self.deferred.len()
-            + self.folded.len()
-            + self.unlisted_senders.len()
-    }
-
-    /// Makes room for a new series of the app at `origin`, if any, by folding the apps
-    /// ranked below it. Answers whether there is room.
-    fn make_room(&mut self, origin: Option<&str>) -> bool {
-        while self.series_count() >= MAX_SERIES {
+    /// Makes room for a new series of `bytes` of the app at `origin`, if any, by dropping
+    /// the apps ranked below it. Answers whether there is room.
+    fn make_room(&mut self, origin: Option<&str>, bytes: usize) -> bool {
+        while self.series_bytes.saturating_add(bytes) > MAX_SERIES_BYTES {
             let Some(origin) = origin.map(str::to_string) else {
                 return false;
             };
@@ -715,7 +800,7 @@ impl Counters {
                 return false;
             };
             self.apps.remove(&lowest);
-            self.fold_app(&lowest);
+            self.drop_app(&lowest);
         }
         true
     }
@@ -734,9 +819,12 @@ impl Counters {
         }
         if !counter(self).contains_key(&key) {
             let origin = origin.filter(|origin| self.apps.contains(origin));
-            if !self.make_room(origin.as_deref()) {
+            if !self.make_room(origin.as_deref(), key.line_bytes()) {
                 self.series_folded = self.series_folded.saturating_add(1);
                 key = key.fold_into_other();
+            }
+            if !counter(self).contains_key(&key) {
+                self.series_bytes = self.series_bytes.saturating_add(key.line_bytes());
             }
         }
         bump(counter(self), key);
@@ -1035,64 +1123,36 @@ pub(crate) fn encode(
     now_ns: Timestamp,
 ) -> std::io::Result<()> {
     with(|counters| {
-        let mut builder = w.counter_vec(
-            "internet_identity_notifications",
+        encode_series(
+            w,
             "Notifications that reached each stage since the last upgrade: received, accepted, pushed (a push service took one of its pushes) and delivered (a device collected it).",
+            &counters.notifications,
         )?;
-        for ((stage, labels), count) in &counters.notifications {
-            builder = builder.value(&labels.pairs(&[("stage", stage.as_str())]), *count as f64)?;
-        }
-        let mut builder = w.counter_vec(
-            "internet_identity_notification_losses",
+        encode_series(
+            w,
             "Notifications lost before they were fanned out, since the last upgrade, by drop and reason. Losses past the fan-out are the gaps between stages, with their reasons on the push losses.",
+            &counters.losses,
         )?;
-        for ((reason, labels), count) in &counters.losses {
-            builder = builder.value(
-                &labels.pairs(&[
-                    ("drop", reason.drop().as_str()),
-                    ("reason", reason.as_str()),
-                ]),
-                *count as f64,
-            )?;
-        }
-        let mut builder = w.counter_vec(
-            "internet_identity_notification_pushes",
+        encode_series(
+            w,
             "Pushes, one per browser or Home Screen app a notification goes to, that reached each stage since the last upgrade, by delivery path.",
+            &counters.pushes,
         )?;
-        for ((stage, path, labels), count) in &counters.pushes {
-            builder = builder.value(
-                &labels.pairs(&[("stage", stage.as_str()), ("path", path.as_str())]),
-                *count as f64,
-            )?;
-        }
-        let mut builder = w.counter_vec(
-            "internet_identity_notification_push_losses",
+        encode_series(
+            w,
             "Pushes lost since the last upgrade, by drop, reason and delivery path.",
+            &counters.push_losses,
         )?;
-        for ((reason, path, labels), count) in &counters.push_losses {
-            builder = builder.value(
-                &labels.pairs(&[
-                    ("drop", reason.drop().as_str()),
-                    ("reason", reason.as_str()),
-                    ("path", path.as_str()),
-                ]),
-                *count as f64,
-            )?;
-        }
-        let mut builder = w.counter_vec(
-            "internet_identity_notifications_deferred",
+        encode_series(
+            w,
             "Notifications the app was told to send again later since the last upgrade, by cause. They are counted in received when they come back.",
+            &counters.deferred,
         )?;
-        for ((cause, labels), count) in &counters.deferred {
-            builder = builder.value(&labels.pairs(&[("cause", cause.as_str())]), *count as f64)?;
-        }
-        let mut builder = w.counter_vec(
-            "internet_identity_notifications_folded",
+        encode_series(
+            w,
             "Resends of a notification still waiting in the backlog since the last upgrade, folded into the waiting copy.",
+            &counters.folded,
         )?;
-        for (labels, count) in &counters.folded {
-            builder = builder.value(&labels.pairs(&[]), *count as f64)?;
-        }
         w.encode_counter(
             "internet_identity_notification_series_folded",
             counters.series_folded as f64,
@@ -1103,13 +1163,11 @@ pub(crate) fn encode(
             counters.evicted as f64,
             "Live notifications forgotten since the last upgrade because more were live than the cap allows. What becomes of their copies afterwards is not counted.",
         )?;
-        let mut builder = w.counter_vec(
-            "internet_identity_notification_unlisted_senders",
+        encode_series(
+            w,
             "Notifications refused since the last upgrade because the calling canister is not one of the app's senders, by canister and the origin it named.",
+            &counters.unlisted_senders,
         )?;
-        for ((canister, labels), count) in &counters.unlisted_senders {
-            builder = builder.value(&labels.pairs(&[("canister", canister)]), *count as f64)?;
-        }
         Ok::<(), std::io::Error>(())
     })?;
     let mut builder = w.gauge_vec(
@@ -1397,8 +1455,12 @@ mod tests {
 
     const DAY: Timestamp = RANK_HALF_LIFE_NS;
 
+    /// The longest origin II takes, `FRONTEND_HOSTNAME_LIMIT` bytes, so every line is as
+    /// long as an app's line can be.
     fn app(index: usize) -> String {
-        format!("https://{index}.example")
+        let origin = format!("https://{index:03}.example");
+        let padding = "a".repeat(crate::delegation::FRONTEND_HOSTNAME_LIMIT - origin.len());
+        format!("https://{padding}{index:03}.example")
     }
 
     fn origin_of(labels: &Labels) -> &str {
@@ -1464,15 +1526,12 @@ mod tests {
                 .count(),
             1
         );
-        assert_eq!(total_losses(), losses);
-        assert_eq!(
-            with(|counters| counters
-                .losses
-                .keys()
-                .filter(|(_, labels)| origin_of(labels) == OTHER)
-                .count()),
-            1
-        );
+        // The replaced app's series went, and nothing it counted moved to `other`.
+        assert_eq!(total_losses(), losses - 1);
+        assert!(with(|counters| counters
+            .losses
+            .keys()
+            .all(|(_, labels)| origin_of(labels) != OTHER)));
     }
 
     #[test]
@@ -1499,7 +1558,10 @@ mod tests {
         number_application(1, &app(0));
         let entry = entry(7, EXPIRES);
         track_fan_out(1, &entry, labels, vec![deposited()], NOW);
-        with(|counters| counters.fold_app(&app(0)));
+        with(|counters| {
+            counters.apps.remove(&app(0));
+            counters.drop_app(&app(0));
+        });
 
         count_collected(1, &entry, Path::Chrome, NOW);
 
@@ -1516,7 +1578,7 @@ mod tests {
         let labels = Labels::listed_app(&app(0), None, NOW);
         with(|counters| {
             counters.apps.remove(&app(0));
-            counters.fold_app(&app(0));
+            counters.drop_app(&app(0));
         });
 
         count_lost(Reason::UnknownPrincipal, &labels);
@@ -1528,7 +1590,7 @@ mod tests {
     }
 
     #[test]
-    fn an_unlisted_pair_gives_way_by_use_and_folds_into_other() {
+    fn an_unlisted_pair_gives_way_by_use_and_its_series_goes() {
         const ORIGIN: &str = "https://unlisted.example";
         reset_for_testing();
         let canister = |index: u64| Principal::from_slice(&index.to_be_bytes());
@@ -1543,15 +1605,16 @@ mod tests {
         count_unlisted_sender(canister(999), ORIGIN, &labels, NOW);
 
         let refused = with(|counters| counters.unlisted_senders.clone());
-        assert_eq!(refused.values().sum::<u64>(), 103);
-        assert_eq!(refused.len(), MAX_NAMED_UNLISTED_SENDERS + 1);
-        let named = (
-            canister(0).to_text(),
-            labels.with_origin(ORIGIN.to_string()),
-        );
-        assert_eq!(refused.get(&named), Some(&3));
-        let other = (OTHER.to_string(), labels.with_origin(OTHER.to_string()));
-        assert_eq!(refused.get(&other), Some(&1));
+        let series = |index: u64| {
+            (
+                canister(index).to_text(),
+                labels.with_origin(ORIGIN.to_string()),
+            )
+        };
+        assert_eq!(refused.len(), MAX_NAMED_UNLISTED_SENDERS);
+        assert_eq!(refused.values().sum::<u64>(), 102);
+        assert_eq!(refused.get(&series(0)), Some(&3));
+        assert_eq!(refused.get(&series(999)), Some(&1));
     }
 
     /// Counts push losses for every ranked app, busiest first, past the series cap.
@@ -1581,22 +1644,44 @@ mod tests {
         }
     }
 
+    fn encoded_reply() -> Vec<u8> {
+        let mut writer = MetricsEncoder::new(vec![], i64::MAX);
+        encode(&mut writer, usize::MAX, NOW).expect("the metrics encode");
+        writer.into_inner()
+    }
+
     #[test]
-    fn the_series_stay_within_their_cap() {
+    fn the_reply_stays_within_its_budget_at_the_longest_origins() {
         reset_for_testing();
         fill_the_apps_ranking(NOW);
         fill_the_series();
 
-        let series = with(|counters| counters.series_count());
-        // The series under `other` this fill can create past the cap: its push losses,
-        // and the loss each app was ranked with.
-        let other_series = 4 * 5 * Path::COUNT + 1;
-        assert!(series <= MAX_SERIES + other_series, "{series} series");
         assert!(with(|counters| counters.series_folded) > 0);
+        let series_bytes = with(|counters| counters.series_bytes);
+        let reply = encoded_reply();
+        // What the cap counts covers every series line the reply holds.
+        let series_lines: usize = String::from_utf8_lossy(&reply)
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains('{'))
+            .filter(|line| !line.starts_with("internet_identity_notifications_in_flight"))
+            .map(|line| line.len() + 1)
+            .sum();
+        assert!(
+            series_lines <= series_bytes,
+            "{series_lines} > {series_bytes}"
+        );
+        // Past the cap only series under `other` are created: this fill's push losses and
+        // the loss each app was ranked with.
+        let other_bytes = (4 * 5 * Path::COUNT + 1) * 300;
+        assert!(
+            series_bytes <= MAX_SERIES_BYTES + other_bytes,
+            "{series_bytes} bytes"
+        );
+        assert!(reply.len() < 2 * 1024 * 1024, "{} bytes", reply.len());
     }
 
     #[test]
-    fn past_the_cap_a_busier_app_makes_room_by_folding_a_quieter_one() {
+    fn past_the_cap_a_busier_app_makes_room_by_dropping_a_quieter_one() {
         reset_for_testing();
         fill_the_apps_ranking(NOW);
         fill_the_series();
