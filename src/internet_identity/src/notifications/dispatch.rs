@@ -18,7 +18,7 @@ use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, InboxNotification, ReadySubscription, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::Storage;
-use crate::SECOND_NS;
+use crate::{DAY_NS, HOUR_NS, SECOND_NS};
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use ic_stable_structures::Memory;
@@ -716,11 +716,11 @@ impl Deposits {
 
 /// How long an app's notification is worth showing where the app named no deadline of
 /// its own.
-const DEFAULT_APP_NOTIFICATION_TTL_NS: u64 = 60 * 60 * SECOND_NS;
+const DEFAULT_APP_NOTIFICATION_TTL_NS: u64 = HOUR_NS;
 
 /// The longest an app may ask for. Its deadline holds an inbox entry and a relay's
 /// storage, both of which are somebody else's room to take.
-const MAX_APP_NOTIFICATION_TTL_NS: u64 = 24 * 60 * 60 * SECOND_NS;
+const MAX_APP_NOTIFICATION_TTL_NS: u64 = DAY_NS;
 
 /// The deadline an app named, within what Internet Identity keeps one for. It says how
 /// long the notification is worth showing, which is how long its inbox entry stands and
@@ -736,7 +736,7 @@ fn app_expiry_ns(chosen_ns: Option<Timestamp>, sent_at_ns: Timestamp) -> Timesta
 }
 
 /// It says something just happened, so one reaching a device a day later says nothing true.
-const IDENTITY_NOTIFICATION_TTL_NS: u64 = 60 * 60 * SECOND_NS;
+const IDENTITY_NOTIFICATION_TTL_NS: u64 = HOUR_NS;
 
 /// Submits one of Internet Identity's own wake-ups for one entry. Silent where the entry
 /// cannot be woken or the identity's own share of the backlog is full.
