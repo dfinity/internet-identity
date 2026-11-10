@@ -53,7 +53,7 @@ pub fn submit(
                 expires_at_ns: expires_at,
             }),
             Err(refusal) => {
-                let labels = Labels::app(origin.as_str(), urgency.as_ref());
+                let labels = Labels::listed_app(origin.as_str(), urgency.as_ref(), now_ns);
                 delivery_metrics::count_received(&labels);
                 delivery_metrics::count_lost(refusal.metric_reason(), &labels);
                 not_accepted.push(NotAccepted {
@@ -68,18 +68,18 @@ pub fn submit(
         return SendNotificationResponse { not_accepted };
     }
 
-    for pending in &reachable {
-        delivery_metrics::number_application(pending.application_number, origin.as_str());
-    }
     let counted_notifications: Vec<(Labels, Option<Timestamp>)> = reachable
         .iter()
         .map(|pending| {
             (
-                Labels::app(origin.as_str(), Some(&pending.urgency)),
+                Labels::listed_app(origin.as_str(), Some(&pending.urgency), now_ns),
                 pending.expires_at_ns,
             )
         })
         .collect();
+    for pending in &reachable {
+        delivery_metrics::number_application(pending.application_number, origin.as_str());
+    }
     let admissions = state::notification_backlog_mut(now_ns, |backlog| {
         backlog.admit(
             StorableOriginSha256::from_origin(&origin.as_str().to_string()),
