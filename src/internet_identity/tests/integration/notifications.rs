@@ -3109,3 +3109,265 @@ mod turning_on {
         Ok(())
     }
 }
+
+/// What `/metrics` says about the notifications apps send, whoever sends them.
+mod delivery_metrics {
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::app_send_notification;
+    use canister_tests::framework::{assert_metric, get_metrics};
+    use internet_identity_interface::internet_identity::types::{
+        Notification, SendNotificationArg, SendNotificationError, SendNotificationResponse, Urgency,
+    };
+
+    const LISTED_APP: &str = "https://listed-app.example";
+    const UNLISTED_ORIGIN: &str = "https://unlisted.example";
+    /// The bytes an origin may take.
+    const ORIGIN_LIMIT: usize = 255;
+    /// The reply limit `/metrics` has to stay within.
+    const REPLY_LIMIT: usize = 3 * 1024 * 1024;
+
+    /// An origin about as long as II takes, starting with `name`.
+    fn longest_origin(name: &str) -> String {
+        const DOMAIN: &str = ".example";
+        let mut origin = format!("https://{name}");
+        loop {
+            let room = ORIGIN_LIMIT - DOMAIN.len() - origin.len();
+            if room < 2 {
+                break;
+            }
+            origin.push('.');
+            origin.push_str(&"a".repeat((room - 1).min(60)));
+        }
+        origin + DOMAIN
+    }
+
+    /// The canister `LISTED_APP` lists as its sender.
+    fn listed_sender() -> Principal {
+        Principal::from_slice(&[0xab, 0x01])
+    }
+
+    fn unlisted_sender(seed: u8) -> Principal {
+        Principal::from_slice(&[seed, 0x02])
+    }
+
+    /// Sends `origin` one notification of each urgency, as `caller`.
+    fn send(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        caller: Principal,
+        origin: &str,
+    ) -> Result<Result<SendNotificationResponse, SendNotificationError>, RejectResponse> {
+        let urgencies = [
+            Urgency::High,
+            Urgency::Normal,
+            Urgency::Low,
+            Urgency::VeryLow,
+        ];
+        let notifications = urgencies
+            .into_iter()
+            .zip(0..)
+            .map(|(urgency, id)| Notification {
+                id,
+                recipient: principal_1(),
+                expires_at: None,
+                urgency: Some(urgency),
+            })
+            .collect();
+        app_send_notification(
+            env,
+            canister_id,
+            caller,
+            SendNotificationArg {
+                origin: origin.to_string(),
+                notifications,
+            },
+        )
+    }
+
+    /// Answers every sender list being fetched: an origin whose host starts with `listed`
+    /// names `listed_sender`, and every other origin serves none.
+    fn serve_sender_lists(env: &PocketIc) {
+        for _ in 0..6 {
+            env.tick();
+            let pending = env.get_canister_http();
+            if pending.is_empty() {
+                break;
+            }
+            for request in pending {
+                let (status, body) = match request.url.starts_with("https://listed") {
+                    true => (
+                        200,
+                        format!(r#"{{"senders":["{}"]}}"#, listed_sender().to_text()).into_bytes(),
+                    ),
+                    false => (404, vec![]),
+                };
+                env.mock_canister_http_response(MockCanisterHttpResponse {
+                    subnet_id: request.subnet_id,
+                    request_id: request.request_id,
+                    response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                        status,
+                        headers: vec![],
+                        body,
+                    }),
+                    additional_responses: vec![],
+                });
+            }
+        }
+        env.tick();
+    }
+
+    /// Sends for each of `origins` once, so II fetches their sender lists, and serves the
+    /// lists. Few enough at a time to stay within II's concurrent outcalls.
+    fn read_sender_lists(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        caller: Principal,
+        origins: &[String],
+    ) -> Result<(), RejectResponse> {
+        for batch in origins.chunks(40) {
+            for origin in batch {
+                send(env, canister_id, caller, origin)?.expect("the deferred send returned Err");
+            }
+            serve_sender_lists(env);
+        }
+        Ok(())
+    }
+
+    /// The lines of the series every notification is counted in, leaving out the senders
+    /// an origin does not list, which name the origin a caller gave.
+    fn funnel_lines(metrics: &str) -> Vec<&str> {
+        metrics
+            .lines()
+            .filter(|line| line.starts_with("internet_identity_notification"))
+            .filter(|line| !line.starts_with("internet_identity_notification_unlisted_senders"))
+            .collect()
+    }
+
+    fn unlisted_sender_lines(metrics: &str) -> Vec<&str> {
+        metrics
+            .lines()
+            .filter(|line| line.starts_with("internet_identity_notification_unlisted_senders{"))
+            .collect()
+    }
+
+    #[test]
+    fn should_count_an_unlisted_caller_without_naming_its_origin() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id =
+            install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_notifications_enabled());
+        let caller = unlisted_sender(1);
+        read_sender_lists(&env, canister_id, caller, &[UNLISTED_ORIGIN.to_string()])?;
+
+        assert_eq!(
+            send(&env, canister_id, caller, UNLISTED_ORIGIN)?,
+            Err(SendNotificationError::NoSuchSender)
+        );
+
+        let metrics = get_metrics(&env, canister_id);
+        let named = format!(r#"origin="{UNLISTED_ORIGIN}""#);
+        assert!(funnel_lines(&metrics)
+            .iter()
+            .all(|line| !line.contains(&named)));
+        assert_metric(
+            &metrics,
+            r#"internet_identity_notifications_deferred{cause="sender_list",source="apps",urgency="high",origin="other"}"#,
+            1.0,
+        );
+        assert_metric(
+            &metrics,
+            r#"internet_identity_notification_losses{drop="accept",reason="sender_not_allowed",source="apps",urgency="high",origin="other"}"#,
+            1.0,
+        );
+        assert_metric(
+            &metrics,
+            &format!(
+                r#"internet_identity_notification_unlisted_senders{{canister="{}",source="apps",urgency="high",origin="{UNLISTED_ORIGIN}"}}"#,
+                caller.to_text()
+            ),
+            1.0,
+        );
+        Ok(())
+    }
+
+    /// Any caller can name any origin. However many origins and callers there are,
+    /// `/metrics` keeps answering, and an app that starts sending after them is named.
+    #[test]
+    fn should_keep_metrics_small_and_name_a_listed_app_whatever_unlisted_callers_send(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id =
+            install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_notifications_enabled());
+        let origins: Vec<String> = (0..120)
+            .map(|index| longest_origin(&format!("unlisted-{index}")))
+            .collect();
+        let callers = [
+            Principal::anonymous(),
+            unlisted_sender(1),
+            unlisted_sender(2),
+        ];
+        read_sender_lists(&env, canister_id, callers[0], &origins)?;
+        for origin in &origins {
+            for caller in callers {
+                assert_eq!(
+                    send(&env, canister_id, caller, origin)?,
+                    Err(SendNotificationError::NoSuchSender)
+                );
+            }
+        }
+
+        read_sender_lists(
+            &env,
+            canister_id,
+            listed_sender(),
+            &[LISTED_APP.to_string()],
+        )?;
+        send(&env, canister_id, listed_sender(), LISTED_APP)?
+            .expect("the listed sender's send returned Err");
+
+        let metrics = get_metrics(&env, canister_id);
+        assert!(metrics.len() < REPLY_LIMIT);
+        // A named pair per urgency for at most 100 pairs, and the rest under `other`.
+        assert!(unlisted_sender_lines(&metrics).len() <= 4 * 101);
+        assert!(funnel_lines(&metrics)
+            .iter()
+            .all(|line| !line.contains(r#"origin="https://unlisted-"#)));
+        assert_metric(
+            &metrics,
+            &format!(
+                r#"internet_identity_notification_losses{{drop="accept",reason="unknown_principal",source="apps",urgency="high",origin="{LISTED_APP}"}}"#
+            ),
+            1.0,
+        );
+        Ok(())
+    }
+
+    /// A hundred apps at the longest origins each have their series, and the reply stays
+    /// within its limit.
+    #[test]
+    fn should_name_every_listed_app_at_the_longest_origins() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id =
+            install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_notifications_enabled());
+        let apps: Vec<String> = (0..100)
+            .map(|index| longest_origin(&format!("listed-{index}")))
+            .collect();
+        read_sender_lists(&env, canister_id, listed_sender(), &apps)?;
+        for app in &apps {
+            send(&env, canister_id, listed_sender(), app)?
+                .expect("the listed sender's send returned Err");
+        }
+
+        let metrics = get_metrics(&env, canister_id);
+        assert!(metrics.len() < REPLY_LIMIT);
+        for app in &apps {
+            assert_metric(
+                &metrics,
+                &format!(
+                    r#"internet_identity_notification_losses{{drop="accept",reason="unknown_principal",source="apps",urgency="very_low",origin="{app}"}}"#
+                ),
+                1.0,
+            );
+        }
+        Ok(())
+    }
+}

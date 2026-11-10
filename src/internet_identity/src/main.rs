@@ -1159,7 +1159,12 @@ fn app_send_notification(
                 let labels =
                     delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref());
                 delivery_metrics::count_received(&labels);
-                delivery_metrics::count_unlisted_sender(caller(), &labels);
+                delivery_metrics::count_unlisted_sender(
+                    caller(),
+                    origin.as_str(),
+                    &labels,
+                    ic_cdk::api::time(),
+                );
             }
             Err(SendNotificationError::NoSuchSender)
         }
