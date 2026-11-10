@@ -8303,4 +8303,24 @@ mod secondary_passkey_pubkey_holders_tests {
         remove_passkey(&mut storage, first, 0);
         assert_eq!(holders(&storage, 0), (Some(second), vec![]));
     }
+
+    /// A shared key whose indexed anchor dropped it before the map existed lost its entry
+    /// although another anchor still holds it; the sweep indexes that holder again.
+    #[test]
+    fn should_backfill_a_shared_key_whose_entry_was_already_dropped() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        let second = write_anchor(&mut storage, &[passkey(0)]);
+        storage
+            .lookup_secondary_anchors_with_passkey_pubkey_memory
+            .clear_new();
+        remove_passkey(&mut storage, first, 0);
+        assert_eq!(holders(&storage, 0), (None, vec![]));
+
+        assert_eq!(
+            storage.backfill_secondary_passkey_pubkey_holders_batch(0, u64::MAX),
+            None
+        );
+        assert_eq!(holders(&storage, 0), (Some(second), vec![]));
+    }
 }
