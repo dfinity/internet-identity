@@ -8182,3 +8182,125 @@ fn an_identity_notification_is_queued_without_an_application() {
         ))
     );
 }
+
+mod secondary_passkey_pubkey_holders_tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn passkey(n: u8) -> Device {
+        Device {
+            pubkey: ByteBuf::from(vec![n]),
+            credential_id: Some(ByteBuf::from(vec![n, 0xc1])),
+            ..sample_device()
+        }
+    }
+
+    fn write_anchor(storage: &mut Storage<VectorMemory>, devices: &[Device]) -> AnchorNumber {
+        let mut anchor = storage.allocate_anchor(0).unwrap();
+        for device in devices {
+            anchor.add_device(device.clone()).unwrap();
+        }
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        anchor_number
+    }
+
+    fn remove_passkey(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber, n: u8) {
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.remove_device(&passkey(n).pubkey).unwrap();
+        storage.write(anchor).unwrap();
+    }
+
+    fn holders(
+        storage: &Storage<VectorMemory>,
+        n: u8,
+    ) -> (Option<AnchorNumber>, Vec<AnchorNumber>) {
+        let principal = Principal::self_authenticating(passkey(n).pubkey);
+        (
+            storage.lookup_anchor_with_passkey_pubkey(&passkey(n).pubkey),
+            storage
+                .lookup_secondary_anchors_with_passkey_pubkey_memory
+                .get(&principal)
+                .map(Into::into)
+                .unwrap_or_default(),
+        )
+    }
+
+    #[test]
+    fn should_hand_a_shared_key_to_the_next_holder_when_its_owner_drops_it() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        let second = write_anchor(&mut storage, &[passkey(0)]);
+        let third = write_anchor(&mut storage, &[passkey(0)]);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![second, third]));
+
+        remove_passkey(&mut storage, first, 0);
+        assert_eq!(holders(&storage, 0), (Some(second), vec![third]));
+
+        remove_passkey(&mut storage, second, 0);
+        assert_eq!(holders(&storage, 0), (Some(third), vec![]));
+
+        remove_passkey(&mut storage, third, 0);
+        assert_eq!(holders(&storage, 0), (None, vec![]));
+    }
+
+    #[test]
+    fn should_forget_another_holder_that_drops_a_shared_key() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        let second = write_anchor(&mut storage, &[passkey(0), passkey(2)]);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![second]));
+
+        remove_passkey(&mut storage, second, 0);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+    }
+
+    #[test]
+    fn should_not_hand_a_key_to_a_recorded_holder_that_no_longer_holds_it() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        let unrelated = write_anchor(&mut storage, &[passkey(2)]);
+        storage
+            .lookup_secondary_anchors_with_passkey_pubkey_memory
+            .insert(
+                Principal::self_authenticating(passkey(0).pubkey),
+                vec![unrelated].into(),
+            );
+
+        remove_passkey(&mut storage, first, 0);
+        assert_eq!(holders(&storage, 0), (None, vec![]));
+    }
+
+    #[test]
+    fn should_backfill_keys_shared_before_their_other_holders_were_recorded() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        let second = write_anchor(&mut storage, &[passkey(0)]);
+        let third = write_anchor(&mut storage, &[passkey(2)]);
+        // As on a canister upgraded from a release without the map.
+        storage
+            .lookup_secondary_anchors_with_passkey_pubkey_memory
+            .clear_new();
+
+        // One anchor per batch, resuming from the returned cursor.
+        let mut start = 0;
+        let mut cursors = vec![];
+        while let Some(next) = storage.backfill_secondary_passkey_pubkey_holders_batch(start, 1) {
+            cursors.push(next);
+            start = next;
+        }
+        assert_eq!(cursors, vec![second, third]);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![second]));
+        assert_eq!(holders(&storage, 2), (Some(third), vec![]));
+
+        // A second sweep changes nothing.
+        assert_eq!(
+            storage.backfill_secondary_passkey_pubkey_holders_batch(0, u64::MAX),
+            None
+        );
+        assert_eq!(holders(&storage, 0), (Some(first), vec![second]));
+
+        remove_passkey(&mut storage, first, 0);
+        assert_eq!(holders(&storage, 0), (Some(second), vec![]));
+    }
+}

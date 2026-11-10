@@ -226,6 +226,7 @@ const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
 const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 39u8;
+const LOOKUP_SECONDARY_ANCHORS_WITH_PASSKEY_PUBKEY_MEMORY_INDEX: u8 = 40u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -260,6 +261,9 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID: MemoryId =
 
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX);
+
+const LOOKUP_SECONDARY_ANCHORS_WITH_PASSKEY_PUBKEY_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_SECONDARY_ANCHORS_WITH_PASSKEY_PUBKEY_MEMORY_INDEX);
 
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX);
@@ -507,6 +511,14 @@ pub struct Storage<M: Memory> {
     pub(crate) lookup_anchor_with_passkey_pubkey_hash_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 
+    lookup_secondary_anchors_with_passkey_pubkey_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// For a passkey pubkey that more than one anchor holds (which predates the uniqueness
+    /// checks), the anchors holding it other than the one in
+    /// `lookup_anchor_with_passkey_pubkey_hash_memory`. When that anchor drops the key, the
+    /// first of these takes over its entry, so the key stays indexed while anyone holds it.
+    pub(crate) lookup_secondary_anchors_with_passkey_pubkey_memory:
+        StableBTreeMap<Principal, StorableAnchorNumberList, ManagedMemory<M>>,
+
     lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Reverse index for the email-recovery flow: maps
     /// `SHA-256(lowercase(address))` to the anchor that bound it. The
@@ -638,6 +650,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID);
         let lookup_anchor_with_passkey_pubkey_hash_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
+        let lookup_secondary_anchors_with_passkey_pubkey_memory =
+            memory_manager.get(LOOKUP_SECONDARY_ANCHORS_WITH_PASSKEY_PUBKEY_MEMORY_ID);
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
         let mcp_grant_memory = memory_manager.get(MCP_GRANT_MEMORY_ID);
@@ -774,6 +788,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_passkey_pubkey_hash_memory: StableBTreeMap::init(
                 lookup_anchor_with_passkey_pubkey_hash_memory,
+            ),
+            lookup_secondary_anchors_with_passkey_pubkey_memory_wrapper: MemoryWrapper::new(
+                lookup_secondary_anchors_with_passkey_pubkey_memory.clone(),
+            ),
+            lookup_secondary_anchors_with_passkey_pubkey_memory: StableBTreeMap::init(
+                lookup_secondary_anchors_with_passkey_pubkey_memory,
             ),
             lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_email_recovery_memory.clone(),
@@ -1824,31 +1844,147 @@ impl<M: Memory + Clone> Storage<M> {
                 continue;
             };
             if existing_anchor_number != anchor_number {
-                // Ensure that a user can remove only their own passkey pubkey from the index.
+                // Ensure that a user can remove only their own passkey pubkey from the index;
+                // they only stop being one of its other holders.
+                self.remove_secondary_passkey_pubkey_holder(principal, anchor_number);
                 continue;
             }
-            self.lookup_anchor_with_passkey_pubkey_hash_memory
-                .remove(principal);
+            // Hand the entry to another anchor that still holds the key, if there is one, so
+            // that the key does not drop out of the index while it is in use.
+            match self.take_secondary_passkey_pubkey_holder(principal) {
+                Some(next_holder) => {
+                    self.lookup_anchor_with_passkey_pubkey_hash_memory
+                        .insert(*principal, next_holder);
+                }
+                None => {
+                    self.lookup_anchor_with_passkey_pubkey_hash_memory
+                        .remove(principal);
+                }
+            }
         }
 
         for principal in principals_to_be_added {
-            if self
-                .lookup_anchor_with_passkey_pubkey_hash_memory
-                .contains_key(principal)
-            {
-                // This principal is already occupied; do not overwrite it.
-                ic_cdk::println!(
-                    "WARNING: Principal {:?} derived from a passkey credential pubkey is already \
-                     indexed for another anchor; skipping indexing for anchor number {}",
-                    principal,
-                    anchor_number,
-                );
-                continue;
-            };
-
-            self.lookup_anchor_with_passkey_pubkey_hash_memory
-                .insert(*principal, anchor_number);
+            self.index_passkey_pubkey_holder(*principal, anchor_number);
         }
+    }
+
+    /// Records that `anchor_number` holds the passkey pubkey `principal`: as the anchor the
+    /// index maps it to if no anchor holds it yet, or else as one of its other holders. The
+    /// entry of the anchor that holds it first is never overwritten. Idempotent.
+    fn index_passkey_pubkey_holder(&mut self, principal: Principal, anchor_number: AnchorNumber) {
+        match self
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .get(&principal)
+        {
+            None => {
+                self.lookup_anchor_with_passkey_pubkey_hash_memory
+                    .insert(principal, anchor_number);
+            }
+            Some(existing) if existing == anchor_number => {}
+            Some(_) => {
+                let mut holders: Vec<AnchorNumber> = self
+                    .lookup_secondary_anchors_with_passkey_pubkey_memory
+                    .get(&principal)
+                    .map(Into::into)
+                    .unwrap_or_default();
+                if !holders.contains(&anchor_number) {
+                    holders.push(anchor_number);
+                    self.lookup_secondary_anchors_with_passkey_pubkey_memory
+                        .insert(principal, holders.into());
+                }
+            }
+        }
+    }
+
+    fn remove_secondary_passkey_pubkey_holder(
+        &mut self,
+        principal: &Principal,
+        anchor_number: AnchorNumber,
+    ) {
+        let Some(holders) = self
+            .lookup_secondary_anchors_with_passkey_pubkey_memory
+            .get(principal)
+        else {
+            return;
+        };
+        let mut holders: Vec<AnchorNumber> = holders.into();
+        holders.retain(|holder| *holder != anchor_number);
+        if holders.is_empty() {
+            self.lookup_secondary_anchors_with_passkey_pubkey_memory
+                .remove(principal);
+        } else {
+            self.lookup_secondary_anchors_with_passkey_pubkey_memory
+                .insert(*principal, holders.into());
+        }
+    }
+
+    /// Removes and returns the first other holder of `principal` that still holds it.
+    fn take_secondary_passkey_pubkey_holder(
+        &mut self,
+        principal: &Principal,
+    ) -> Option<AnchorNumber> {
+        let holders: Vec<AnchorNumber> = self
+            .lookup_secondary_anchors_with_passkey_pubkey_memory
+            .remove(principal)?
+            .into();
+        let mut holders = holders.into_iter();
+        // A holder is checked against its stored passkeys before it takes over, so a list
+        // that went stale can never hand the entry to an anchor without the key.
+        let next_holder = holders.by_ref().find(|holder| {
+            self.stable_anchor_memory
+                .get(holder)
+                .and_then(|anchor| anchor.passkey_credentials)
+                .is_some_and(|passkeys| {
+                    passkeys.iter().any(|passkey| {
+                        Principal::self_authenticating(&passkey.pubkey) == *principal
+                    })
+                })
+        })?;
+        let rest: Vec<AnchorNumber> = holders.collect();
+        if !rest.is_empty() {
+            self.lookup_secondary_anchors_with_passkey_pubkey_memory
+                .insert(*principal, rest.into());
+        }
+        Some(next_holder)
+    }
+
+    /// TEMPORARY: one batch of a one-time sweep recording the passkey pubkeys that several
+    /// anchors already shared before `lookup_secondary_anchors_with_passkey_pubkey_memory`
+    /// existed. Examines the stored anchors in ascending order from `start`, at most
+    /// `max_anchors` of them (at least one). Writes only what `Storage::write` would write
+    /// for each anchor's current passkeys, so a batch that runs twice changes nothing.
+    ///
+    /// Returns the anchor number the next batch starts from, or `None` once every stored
+    /// anchor has been examined.
+    pub fn backfill_secondary_passkey_pubkey_holders_batch(
+        &mut self,
+        start: AnchorNumber,
+        max_anchors: u64,
+    ) -> Option<AnchorNumber> {
+        let batch: Vec<(AnchorNumber, Vec<Principal>)> = self
+            .stable_anchor_memory
+            .range(start..)
+            .take(max_anchors.max(1).saturating_add(1) as usize)
+            .map(|(anchor_number, storable_anchor)| {
+                let principals = storable_anchor
+                    .passkey_credentials
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|passkey| Principal::self_authenticating(&passkey.pubkey))
+                    .collect::<BTreeSet<_>>();
+                (anchor_number, principals.into_iter().collect())
+            })
+            .collect();
+        let max_anchors = max_anchors.max(1) as usize;
+        let next_anchor_number = batch
+            .get(max_anchors)
+            .map(|(anchor_number, _)| *anchor_number);
+        for (anchor_number, principals) in batch.into_iter().take(max_anchors) {
+            for principal in principals {
+                self.index_passkey_pubkey_holder(principal, anchor_number);
+            }
+        }
+        next_anchor_number
     }
 
     fn sync_anchor_with_recovery_phrase_principal_index(
@@ -4742,6 +4878,11 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_anchor_with_passkey_pubkey_hash_memory".to_string(),
                 self.lookup_anchor_with_passkey_pubkey_hash_memory_wrapper
+                    .size(),
+            ),
+            (
+                "lookup_secondary_anchors_with_passkey_pubkey_memory".to_string(),
+                self.lookup_secondary_anchors_with_passkey_pubkey_memory_wrapper
                     .size(),
             ),
             (

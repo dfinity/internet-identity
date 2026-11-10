@@ -456,3 +456,26 @@ fn should_report_time_per_rate_limit_token() -> Result<(), RejectResponse> {
     );
     Ok(())
 }
+
+/// Tests that the one-time sweep of shared passkey pubkeys runs to completion after an
+/// upgrade. Keys can no longer be shared, so on a fresh canister it records none.
+#[test]
+fn should_complete_the_secondary_passkey_pubkey_holders_backfill_after_an_upgrade(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    flows::register_anchor(&env, canister_id);
+    flows::register_anchor_with_device(&env, canister_id, &device_data_2());
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    env.advance_time(Duration::from_secs(5));
+    for _ in 0..5 {
+        env.tick();
+    }
+
+    assert_eq!(
+        api::secondary_passkey_pubkey_holders_backfill_status(&env, canister_id, principal_1())?,
+        (0, true)
+    );
+    Ok(())
+}
