@@ -18,12 +18,30 @@ use internet_identity_interface::internet_identity::types::{
     PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionResult,
     ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
     RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+    RemoveWebPushSubscriptionRequest, SendNotificationArg, SendNotificationError,
+    SendNotificationResponse, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
     WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
+
+pub fn app_send_notification(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    arg: SendNotificationArg,
+) -> Result<Result<SendNotificationResponse, SendNotificationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_send_notification",
+        (arg,),
+    )
+    .map(|(x,)| x)
+}
 
 pub fn prepare_notification_app_link(
     env: &PocketIc,
