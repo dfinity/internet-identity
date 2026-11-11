@@ -8323,4 +8323,69 @@ mod secondary_passkey_pubkey_holders_tests {
         );
         assert_eq!(holders(&storage, 0), (Some(second), vec![]));
     }
+
+    fn sweep_all(storage: &mut Storage<VectorMemory>) {
+        let mut start = 0;
+        while let Some(next) = storage.backfill_secondary_passkey_pubkey_holders_batch(start, 1) {
+            start = next;
+        }
+    }
+
+    /// While the sweep runs, an indexed anchor dropping a shared key whose other holder is
+    /// not recorded yet must not free the key for anyone else to register.
+    #[test]
+    fn should_keep_a_dropped_key_indexed_until_the_sweep_records_its_other_holders() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        let second = write_anchor(&mut storage, &[passkey(0)]);
+        storage
+            .lookup_secondary_anchors_with_passkey_pubkey_memory
+            .clear_new();
+        storage.start_secondary_passkey_pubkey_holders_backfill();
+
+        remove_passkey(&mut storage, first, 0);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+
+        assert_eq!(
+            storage.backfill_secondary_passkey_pubkey_holders_batch(0, 1),
+            Some(second)
+        );
+        assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+
+        sweep_all(&mut storage);
+        assert_eq!(holders(&storage, 0), (Some(second), vec![]));
+
+        // Once the sweep is done, dropping a key frees it right away again.
+        remove_passkey(&mut storage, second, 0);
+        assert_eq!(holders(&storage, 0), (None, vec![]));
+    }
+
+    #[test]
+    fn should_free_a_key_dropped_during_the_sweep_that_nobody_else_holds() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        write_anchor(&mut storage, &[passkey(2)]);
+        storage.start_secondary_passkey_pubkey_holders_backfill();
+
+        remove_passkey(&mut storage, first, 0);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+
+        sweep_all(&mut storage);
+        assert_eq!(holders(&storage, 0), (None, vec![]));
+    }
+
+    #[test]
+    fn should_keep_a_key_added_back_during_the_sweep_by_the_anchor_that_dropped_it() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        storage.start_secondary_passkey_pubkey_holders_backfill();
+
+        remove_passkey(&mut storage, first, 0);
+        let mut anchor = storage.read(first).unwrap();
+        anchor.add_device(passkey(0)).unwrap();
+        storage.write(anchor).unwrap();
+
+        sweep_all(&mut storage);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+    }
 }

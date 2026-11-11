@@ -1891,6 +1891,13 @@ fn clear_secondary_passkey_pubkey_holders_backfill_timer() {
 /// Safe to call from both `init` and `post_upgrade`: with no anchors the first batch
 /// reports completion right away.
 fn init_secondary_passkey_pubkey_holders_backfill_timer() {
+    // Anchors stored before this point may share pubkeys the sweep has yet to record. Any
+    // anchor created later went through the index, so a canister without anchors has none.
+    state::storage_borrow_mut(|storage| {
+        if storage.anchor_count() > 0 {
+            storage.start_secondary_passkey_pubkey_holders_backfill();
+        }
+    });
     let timer_id = ic_cdk_timers::set_timer_interval(
         SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BACKOFF,
         run_secondary_passkey_pubkey_holders_backfill_batch,

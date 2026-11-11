@@ -519,6 +519,13 @@ pub struct Storage<M: Memory> {
     pub(crate) lookup_secondary_anchors_with_passkey_pubkey_memory:
         StableBTreeMap<Principal, StorableAnchorNumberList, ManagedMemory<M>>,
 
+    /// TEMPORARY, heap only: while the sweep recording the other holders of shared passkey
+    /// pubkeys runs, the pubkeys whose indexed anchor dropped them with no other holder
+    /// recorded yet. Their entries stay in place, since a holder the sweep has not reached
+    /// yet may still hold the key, and are reconciled once the sweep finishes. `None`
+    /// whenever no sweep runs.
+    passkey_pubkeys_awaiting_backfill: Option<BTreeSet<Principal>>,
+
     lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Reverse index for the email-recovery flow: maps
     /// `SHA-256(lowercase(address))` to the anchor that bound it. The
@@ -795,6 +802,7 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_secondary_anchors_with_passkey_pubkey_memory: StableBTreeMap::init(
                 lookup_secondary_anchors_with_passkey_pubkey_memory,
             ),
+            passkey_pubkeys_awaiting_backfill: None,
             lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_email_recovery_memory.clone(),
             ),
@@ -1856,10 +1864,17 @@ impl<M: Memory + Clone> Storage<M> {
                     self.lookup_anchor_with_passkey_pubkey_hash_memory
                         .insert(*principal, next_holder);
                 }
-                None => {
-                    self.lookup_anchor_with_passkey_pubkey_hash_memory
-                        .remove(principal);
-                }
+                None => match self.passkey_pubkeys_awaiting_backfill.as_mut() {
+                    // Another anchor the sweep has not reached yet may still hold the key,
+                    // so the entry stays until the sweep has recorded every holder.
+                    Some(awaiting) => {
+                        awaiting.insert(*principal);
+                    }
+                    None => {
+                        self.lookup_anchor_with_passkey_pubkey_hash_memory
+                            .remove(principal);
+                    }
+                },
             }
         }
 
@@ -1930,22 +1945,69 @@ impl<M: Memory + Clone> Storage<M> {
         let mut holders = holders.into_iter();
         // A holder is checked against its stored passkeys before it takes over, so a list
         // that went stale can never hand the entry to an anchor without the key.
-        let next_holder = holders.by_ref().find(|holder| {
-            self.stable_anchor_memory
-                .get(holder)
-                .and_then(|anchor| anchor.passkey_credentials)
-                .is_some_and(|passkeys| {
-                    passkeys.iter().any(|passkey| {
-                        Principal::self_authenticating(&passkey.pubkey) == *principal
-                    })
-                })
-        })?;
+        let next_holder = holders
+            .by_ref()
+            .find(|holder| self.anchor_holds_passkey_pubkey(*holder, principal))?;
         let rest: Vec<AnchorNumber> = holders.collect();
         if !rest.is_empty() {
             self.lookup_secondary_anchors_with_passkey_pubkey_memory
                 .insert(*principal, rest.into());
         }
         Some(next_holder)
+    }
+
+    /// TEMPORARY: marks the start of the sweep recording the other holders of shared passkey
+    /// pubkeys. Until `backfill_secondary_passkey_pubkey_holders_batch` reports it done, an
+    /// indexed anchor dropping a pubkey with no other holder recorded keeps its entry, so
+    /// the pubkey cannot be registered again while a holder not yet swept still has it.
+    pub fn start_secondary_passkey_pubkey_holders_backfill(&mut self) {
+        self.passkey_pubkeys_awaiting_backfill
+            .get_or_insert_with(BTreeSet::new);
+    }
+
+    /// Settles the entries kept while the sweep ran, now that every holder is recorded: an
+    /// entry whose anchor still lacks the pubkey goes to another holder, or else is removed.
+    fn reconcile_passkey_pubkeys_awaiting_backfill(&mut self) {
+        let Some(awaiting) = self.passkey_pubkeys_awaiting_backfill.take() else {
+            return;
+        };
+        for principal in awaiting {
+            let Some(indexed_anchor) = self
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&principal)
+            else {
+                continue;
+            };
+            if self.anchor_holds_passkey_pubkey(indexed_anchor, &principal) {
+                // The anchor added the pubkey again after dropping it.
+                continue;
+            }
+            match self.take_secondary_passkey_pubkey_holder(&principal) {
+                Some(next_holder) => {
+                    self.lookup_anchor_with_passkey_pubkey_hash_memory
+                        .insert(principal, next_holder);
+                }
+                None => {
+                    self.lookup_anchor_with_passkey_pubkey_hash_memory
+                        .remove(&principal);
+                }
+            }
+        }
+    }
+
+    fn anchor_holds_passkey_pubkey(
+        &self,
+        anchor_number: AnchorNumber,
+        principal: &Principal,
+    ) -> bool {
+        self.stable_anchor_memory
+            .get(&anchor_number)
+            .and_then(|anchor| anchor.passkey_credentials)
+            .is_some_and(|passkeys| {
+                passkeys
+                    .iter()
+                    .any(|passkey| Principal::self_authenticating(&passkey.pubkey) == *principal)
+            })
     }
 
     /// TEMPORARY: one batch of a one-time sweep recording the passkey pubkeys that several
@@ -1955,7 +2017,8 @@ impl<M: Memory + Clone> Storage<M> {
     /// for each anchor's current passkeys, so a batch that runs twice changes nothing.
     ///
     /// Returns the anchor number the next batch starts from, or `None` once every stored
-    /// anchor has been examined.
+    /// anchor has been examined, at which point the entries kept since
+    /// `start_secondary_passkey_pubkey_holders_backfill` are reconciled.
     pub fn backfill_secondary_passkey_pubkey_holders_batch(
         &mut self,
         start: AnchorNumber,
@@ -1983,6 +2046,9 @@ impl<M: Memory + Clone> Storage<M> {
             for principal in principals {
                 self.index_passkey_pubkey_holder(principal, anchor_number);
             }
+        }
+        if next_anchor_number.is_none() {
+            self.reconcile_passkey_pubkeys_awaiting_backfill();
         }
         next_anchor_number
     }

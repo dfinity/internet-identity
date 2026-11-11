@@ -458,24 +458,40 @@ fn should_report_time_per_rate_limit_token() -> Result<(), RejectResponse> {
 }
 
 /// Tests that the one-time sweep of shared passkey pubkeys runs to completion after an
-/// upgrade. Keys can no longer be shared, so on a fresh canister it records none.
+/// upgrade, and that a passkey an anchor drops while it runs stays reserved until then:
+/// another anchor the sweep has not reached yet could still hold it.
 #[test]
 fn should_complete_the_secondary_passkey_pubkey_holders_backfill_after_an_upgrade(
 ) -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-    flows::register_anchor(&env, canister_id);
-    flows::register_anchor_with_device(&env, canister_id, &device_data_2());
+    let first = flows::register_anchor(&env, canister_id);
+    let second = flows::register_anchor_with_device(&env, canister_id, &device_data_2());
+    let dropped = DeviceData {
+        pubkey: ByteBuf::from("dropped passkey"),
+        credential_id: Some(ByteBuf::from("dropped credential id")),
+        ..device_data_1()
+    };
+    api::add(&env, canister_id, principal_1(), first, &dropped)?;
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    assert_eq!(
+        api::secondary_passkey_pubkey_holders_backfill_status(&env, canister_id, principal_1())?,
+        (0, false)
+    );
+    api::remove(&env, canister_id, principal_1(), first, &dropped.pubkey)?;
+    assert!(api::add(&env, canister_id, principal_2(), second, &dropped).is_err());
+
     env.advance_time(Duration::from_secs(5));
     for _ in 0..5 {
         env.tick();
     }
 
+    // Keys can no longer be shared, so the sweep records none, and the dropped key is free.
     assert_eq!(
         api::secondary_passkey_pubkey_holders_backfill_status(&env, canister_id, principal_1())?,
         (0, true)
     );
+    api::add(&env, canister_id, principal_2(), second, &dropped)?;
     Ok(())
 }
