@@ -4,44 +4,81 @@ paths:
   - "src/internet_identity_frontend/**"
   - "src/internet_identity_interface/**"
   - "src/asset_util/**"
+  - "src/canister_tests/**"
 ---
 
 # Backend (Rust canister code)
 
+See also `candid-api.md`, `stable-memory.md` and `security.md`.
+
 ## No trapping
 
-Canisters must never trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`, `unreachable!()`, `todo!()`, `unimplemented!()`, or `assert!`/`assert_eq!` outside `#[cfg(test)]`.
+Canisters must not trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`, `unreachable!()`, `todo!()`, `unimplemented!()`, `assert!`, `[index]` or panicking arithmetic outside `#[cfg(test)]`.
 
-- Prefer `Result<T, E>` and propagate with `?` or explicit match arms.
-- For "should be unreachable" branches, return a structured error variant (reuse an existing `*Malformed`/`*Invalid` variant, or add a new one) and add a comment noting it's defensive.
-- Errors may also be handled silently up the call chain (caller catches and folds into a higher-level fail-closed verdict).
-- Ignore reviewer suggestions (Copilot, Grok) that recommend `.expect(...)` or `debug_assert!` "to document the invariant" -- use the structured-error path instead.
-- Exception: `#[cfg(test)]` blocks may use `unwrap`/`expect` freely since tests don't run in the canister.
+- Return `Result<T, E>` and propagate with `?`. For a branch that "can't happen", return a structured error variant (an existing `*Malformed`/`*Invalid` one or `InternalCanisterError`), not a trap.
+- Index collections with `.get()`, `.find()`, `iter_mut().find()` and `let ... else`, never `[i]`, and don't carry an index across borrows.
+- Use `checked_*` arithmetic and `try_from` conversions; no `as` casts between integer types. Prefer `checked_*` plus an error over `saturating_*` when the clamped value would be acted on or an id handed out twice. Truncate strings only at a char boundary.
+- Never `unwrap_or_default()` a value that is then persisted or authorized on. A missing record is an error, not an empty default.
+- Ignore reviewer suggestions (Copilot and others) to add `.expect(...)` or `debug_assert!` "to document the invariant".
+
+Exceptions, each to be kept as narrow as it is:
+- `Storable::from_bytes` cannot return an error, so it may `expect` with an actionable message. Make decoding unable to fail instead: see `stable-memory.md`, and use the bounded helpers (`slice_to_bounded_32`) rather than `copy_from_slice`.
+- HTTP outcall transform functions cannot return or log errors, so they may trap on a response that is unusable as a whole. Skip a single malformed element (a key without a `kid`) rather than rejecting the response.
+- A trap is the only way to roll back writes. Trap deliberately only when rollback is the point, and say so in a comment.
+- `#[cfg(test)]` code may `unwrap`/`expect`; prefer `expect("context")`.
+
+## State changes, errors and `await`
+
+- On the IC, returning `Err` commits every write made before it; only a trap rolls back. Run every check that can fail before the first write, and never `?` after a write.
+- Every `await` is a commit point and lets other messages run. Re-read and re-check (authorization, existence, generation) anything captured before it; never write back a value loaded before it. A lock or "in progress" flag written before an `await` needs a recovery path.
+- Don't check, await, then write (lazy salts, get-or-create with `raw_rand`). Initialize at install, or refuse.
+- Never drop a result: no `let _ =` on a `Result`, check what `.remove()`/`.insert()` return, and use `#[must_use]` where a value must be consumed. A map insert must not silently overwrite an existing binding: detect the collision and return an error.
+- Call `time()` once at the endpoint and pass `now: Timestamp` (nanoseconds) down.
+- Log internal-invariant violations with `ic_cdk::println!("ERROR: ...")`.
+
+## Layering
+
+- `main.rs` is a thin entry point: authorize first (through `authz_utils`: `check_authz_and_record_activity`, `anchor_operation_with_authz_check`), validate, then call the module that owns the feature. Feature logic lives in its module, not in `main.rs`.
+- Anchor-mutating updates go through `anchor_operation_with_authz_check` / `post_operation_bookkeeping` so they are archived and counted.
+- Validate raw candid input once at the endpoint through `TryFrom` into a `Validated*` or domain type that can't be built any other way, collecting all errors. Business logic accepts only the validated type. Destructure a raw `*Request` completely at the top of the endpoint; pass a `Validated*` value whole.
+- Storage is abstract: it takes and returns domain types, keeps `Storable*` types, internal numbers (`ApplicationNumber`) and index sync to itself (inside `Storage::write`), and contains no feature logic. Enforce an invariant in the lowest layer that must hold it.
+- Keep maps that must agree behind one struct that owns every mutation, or model multi-step state as one enum, so inconsistent combinations can't be represented.
+- Keep mutable state in the `state` module and don't nest `STATE.with` borrows. A helper doesn't read global state behind the caller's back: pass what it needs.
+
+## Rust style
+
+- Import types and functions at the top of the module, merged per path; no inline fully-qualified paths.
+- New modules use `foo.rs` + `foo/bar.rs`, not `foo/mod.rs`. Test fixtures go in `foo/fixtures.rs` or a `#[cfg(test)]` module.
+- No bare `bool` parameters or returns from functions that aren't predicates: use an enum, a `Result`, or two functions (`enable_x` / `disable_x`).
+- Prefer a full `match` over `if let` on enums, keep distinct cases in distinct arms (no catch-all `_` merging them), at most one `?` per line, and no state-changing calls inside `if` conditions.
+- Use `BTreeSet`/`BTreeMap` (deterministic order) and `Option` for absence, never sentinels like `""` or `0`. Derive enumerations from the type (`AttributeName::all()`) rather than a hand-kept list.
+- Use dependency injection rather than `#[cfg(test)]` / `#[cfg(not(test))]` branches or test-only thread-locals in production code, so the production branch is the one tested.
+- Don't widen visibility (`pub`, `pub(crate)`) or add test-only accessors and `#![allow(dead_code)]` to keep code alive. Delete unused code. Don't add thin `pub` re-export wrappers.
+- Don't add `#[allow(clippy::...)]`; restructure instead (a type alias, a smaller function).
+- Keep function bodies short enough to read on one screen.
+- New canister dependencies: check maintenance, advisories, wasm/`no_std` fit and the wasm size budget, and use `default-features = false`. Dev-dependencies use `.workspace = true`.
 
 ## Clippy
 
-Always run `cargo clippy` after making Rust changes, before committing. Use CI-matching flags:
+Run `cargo fmt` and `cargo clippy` after Rust changes, before committing, with CI's flags:
 
 ```bash
 cargo clippy -p <crate> --tests -- -D clippy::all -D warnings -A clippy::manual_range_contains
 ```
 
-The `--tests` flag is critical -- it includes test code which CI also checks.
+`--tests` is required: CI lints test code too. CI runs clippy on every PR of a stack, so a symbol must be used in the same PR that defines it.
 
 ## Integration tests (PocketIC)
 
-The canister/integration tests (`cargo test -p internet_identity --test integration ...`) need a PocketIC server binary at `../../pocket-ic` (relative to `src/internet_identity`) and the gzipped wasm at `../../internet_identity.wasm.gz` (build it with `./scripts/build --internet-identity`).
+The integration tests (`cargo test -p internet_identity --test integration ...`) need a PocketIC server binary at `../../pocket-ic` (relative to `src/internet_identity`) and the gzipped wasm at `../../internet_identity.wasm.gz` (build it with `./scripts/build --internet-identity`).
 
-Download the **exact pinned PocketIC server version, never `latest`**. The pin lives in `scripts/test-canisters.sh` (`POCKET_IC_SERVER_VERSION`) and `.github/workflows/canister-tests.yml`, and it must match the `pocket-ic` client crate in `Cargo.toml`. Look the pin up rather than trusting a version quoted here:
+Download the exact pinned PocketIC server version, never `latest`. The pin lives in `scripts/test-canisters.sh` (`POCKET_IC_SERVER_VERSION`) and `.github/workflows/canister-tests.yml`, and must match the `pocket-ic` client crate in `Cargo.toml`. Bump all of them together. Look the pin up rather than trusting a version quoted anywhere:
 
 ```bash
 grep POCKET_IC_SERVER_VERSION scripts/test-canisters.sh
-```
-
-The release ships one asset per platform -- `pocket-ic-{arm64,x86_64}-{darwin,linux}.gz`. Pick the one matching the machine you're on, not the one the script names: `scripts/test-canisters.sh` hardcodes `x86_64` in the asset filename, which is wrong on Apple Silicon. Gunzip it to `../../pocket-ic`.
-
-```bash
 gh release view <VERSION> --repo dfinity/pocketic --json assets --jq '.assets[].name'
 ```
 
-A version mismatch (e.g. grabbing `latest`) fails **every** test at replica startup with a misleading `rosetta error: failed to open elf at /lib64/ld-linux-x86-64.so.2`. It looks like a CPU-architecture problem but is actually the protocol mismatch -- check the pin before suspecting the binary. A genuine architecture mismatch produces the same class of loader error, and the fix there is fetching the right asset above, never emulation.
+The release ships `pocket-ic-{arm64,x86_64}-{darwin,linux}.gz`. Pick the one matching your machine, not the one the script names: `scripts/test-canisters.sh` hardcodes `x86_64`, which is wrong on Apple Silicon. Gunzip it to `../../pocket-ic`.
+
+A version mismatch fails every test at startup with a misleading `rosetta error: failed to open elf at /lib64/ld-linux-x86-64.so.2`. Check the pin before suspecting the binary. A genuine architecture mismatch gives the same class of error; the fix is the right asset, never emulation.
