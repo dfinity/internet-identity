@@ -46,10 +46,10 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 - Keep PII and linkable data (emails, `sub`, mailbox provider, nonces) out of logs, the archive, metrics and errors. Don't tell relying parties which authentication method was used.
 - `#[query(hidden = true)]` is not access control. Never ship debug endpoints in production candid.
 - One production wasm per canister: dev behaviour (`fetch_root_key`, dummy auth, captcha) is set through init args, never compile-time features.
+- HTTP outcall transforms deserialize into the accepted shape and re-emit only that, with a fixed status and no headers, so replicas agree.
 
 ## Browser
 
-- HTTP outcall transforms deserialize into the accepted shape and re-emit only that, with a fixed status and no headers, so replicas agree.
 - Size caps stop the download (`fetchCapped`), not check the size after buffering. Sensitive fetches use `redirect: "error"` and `credentials: "omit"`.
 - Validate every untrusted message and stored value with zod. Every `postMessage` listener checks the origin.
 - Show app-supplied metadata next to the origin it came from. Never inline SVG from an app; re-encode images and use `blob:` URLs.
