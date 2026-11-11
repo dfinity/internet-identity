@@ -13,6 +13,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 - Bound every loop over stored data per call (`MAX_TO_PRUNE`-style), counting items examined, not only items produced. Updates are capped at about 20B instructions.
 - Reject cheaply before doing expensive work on an untrusted call. Give every outcall path a concurrency limit (`ConcurrencyLimiter`).
 - II runs on a system subnet: cycles are not the constraint, and per-endpoint rate limits or per-identity caps don't help (identities are free). Keep state bounded instead.
+- HTTP outcall transforms deserialize into the accepted shape and re-emit only that, with a fixed status and no headers, so replicas agree.
 
 ## Authorization and trust
 
@@ -46,7 +47,6 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 - Keep PII and linkable data (emails, `sub`, mailbox provider, nonces) out of logs, the archive, metrics and errors. Don't tell relying parties which authentication method was used.
 - `#[query(hidden = true)]` is not access control. Never ship debug endpoints in production candid.
 - One production wasm per canister: dev behaviour (`fetch_root_key`, dummy auth, captcha) is set through init args, never compile-time features.
-- HTTP outcall transforms deserialize into the accepted shape and re-emit only that, with a fixed status and no headers, so replicas agree.
 
 ## Browser
 
