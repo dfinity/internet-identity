@@ -23,7 +23,7 @@ Reviewers remove more comments than they ask for. Make the code say it first: le
 ## Scope and structure
 
 - Don't add props, options, fields, exports, versions or concepts "for later". Add them with their first caller.
-- Before writing a helper, search for one: local utils, then `$lib/utils/` or the crate's `utils.rs`, then a well-maintained dependency already in the tree, then the platform. Prefer a maintained library over hand-rolled parsers, codecs and crypto.
+- Before writing a helper, look at the options: an existing local util, `$lib/utils/` or the crate's `utils.rs`, a dependency already in the tree, a new dependency, the platform, or writing it yourself. There is no fixed order. List the options you considered in the PR description and recommend one for this case, with the reason (fit, maintenance, wasm size, how much code it saves). Crypto is the exception: always use the crypto team's maintained libraries, never hand-rolled crypto.
 - Accept a little duplication across features over a premature shared abstraction; extract on the third use.
 - Prefer early-return guard clauses over nested `if`/`else`: preconditions first, then the happy path.
 - Use explicit comparisons (`!== undefined`, `=== null`, `.length > 0`) for non-boolean values.

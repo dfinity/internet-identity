@@ -65,7 +65,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 
 - Co-locate helpers with the route or component that uses them. Move to `$lib/utils/` only when unrelated routes share it; a `$lib` module never lives under `routes/`.
 - Import through `$lib/...`, not long `../` chains.
-- Search for existing utilities before writing one: local utils, `$lib/utils/`, library helpers (`@icp-sdk`), browser APIs. Notable ones: `throwCanisterError`, `writableStored`, `fetchCapped`, `secureRandomId`, `promiseQueue`, the `locale.store` formatters, `anonymousActor` for public data.
+- Before writing a utility, weigh the existing options (local utils, `$lib/utils/`, `@icp-sdk` helpers, browser APIs) and recommend one in the PR description, as in `code-style.md`. Notable ones: `throwCanisterError`, `writableStored`, `fetchCapped`, `secureRandomId`, `promiseQueue`, the `locale.store` formatters, `anonymousActor` for public data.
 - Persist per-identity preferences with a `writableStored` store keyed by anchor, never raw global `localStorage`.
 - Check browser support (older Safari is a real target) before using a new API.
 
