@@ -24,7 +24,7 @@ Canisters must not trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`,
 Exceptions, each to be kept as narrow as it is:
 - `Storable::from_bytes` cannot return an error, so it may `expect` with an actionable message. Make decoding unable to fail instead: see `stable-memory.md`, and use the bounded helpers (`slice_to_bounded_32`) rather than `copy_from_slice`.
 - HTTP outcall transform functions cannot return or log errors, so they may trap on a response that is unusable as a whole. Skip a single malformed element (a key without a `kid`) rather than rejecting the response.
-- A trap is the only way to roll back writes. Trap deliberately only when rollback is the point, and say so in a comment.
+- A trap is the only way to roll back writes. Keep a deliberate trap where rollback is the point (an anchor write that must not commit without its archive entry) or where init or upgrade must abort, and say so in a comment. Don't convert such a trap into an `Err`.
 - `#[cfg(test)]` code may `unwrap`/`expect`; prefer `expect("context")`.
 
 ## State changes, errors and `await`
@@ -60,17 +60,18 @@ Exceptions, each to be kept as narrow as it is:
 
 ## Clippy
 
-Run `cargo fmt` and `cargo clippy` after Rust changes, before committing, with CI's flags:
+Run `cargo fmt` and `cargo clippy` after Rust changes, before committing. CI (`.github/workflows/rust.yml`) runs two passes, and both must be clean:
 
 ```bash
-cargo clippy -p <crate> --tests -- -D clippy::all -D warnings -A clippy::manual_range_contains
+cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
+cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
 ```
 
-`--tests` is required: CI lints test code too. CI runs clippy on every PR of a stack, so a symbol must be used in the same PR that defines it.
+The first pass catches dead code that only test code uses; the second lints the tests. Add `-p <crate>` to narrow a local run. CI runs clippy on every PR of a stack, so a symbol must be used in the same PR that defines it.
 
 ## Integration tests (PocketIC)
 
-The integration tests (`cargo test -p internet_identity --test integration ...`) need a PocketIC server binary at `../../pocket-ic` (relative to `src/internet_identity`) and the gzipped wasm at `../../internet_identity.wasm.gz` (build it with `./scripts/build --internet-identity`).
+`scripts/test-canisters.sh` prepares everything the integration tests (`cargo test -p internet_identity --test integration ...`) need, at the repository root: the PocketIC server binary `pocket-ic`, the built `internet_identity.wasm.gz` and `archive.wasm.gz`, and the previous release wasms (`internet_identity_previous.wasm.gz`, `archive_previous.wasm.gz`) for the upgrade and rollback tests. Read it before preparing them by hand.
 
 Download the exact pinned PocketIC server version, never `latest`. The pin lives in `scripts/test-canisters.sh` (`POCKET_IC_SERVER_VERSION`) and `.github/workflows/canister-tests.yml`, and must match the `pocket-ic` client crate in `Cargo.toml`. Bump all of them together. Look the pin up rather than trusting a version quoted anywhere:
 
@@ -79,6 +80,6 @@ grep POCKET_IC_SERVER_VERSION scripts/test-canisters.sh
 gh release view <VERSION> --repo dfinity/pocketic --json assets --jq '.assets[].name'
 ```
 
-The release ships `pocket-ic-{arm64,x86_64}-{darwin,linux}.gz`. Pick the one matching your machine, not the one the script names: `scripts/test-canisters.sh` hardcodes `x86_64`, which is wrong on Apple Silicon. Gunzip it to `../../pocket-ic`.
+The release ships `pocket-ic-{arm64,x86_64}-{darwin,linux}.gz`. Pick the one matching your machine, not the one the script names: `scripts/test-canisters.sh` hardcodes `x86_64`, which is wrong on Apple Silicon. Gunzip it to `pocket-ic` at the repository root and `chmod +x` it.
 
-A version mismatch fails every test at startup with a misleading `rosetta error: failed to open elf at /lib64/ld-linux-x86-64.so.2`. Check the pin before suspecting the binary. A genuine architecture mismatch gives the same class of error; the fix is the right asset, never emulation.
+A loader error such as `rosetta error: failed to open elf at /lib64/ld-linux-x86-64.so.2` or `Exec format error` means the binary doesn't match the platform: fetch the right asset, never emulate. A server that starts but fails every test at setup usually means the version doesn't match the `pocket-ic` crate: check the pin.

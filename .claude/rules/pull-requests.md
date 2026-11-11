@@ -5,7 +5,7 @@
 Run the checks CI runs, even if a pre-commit hook would; hooks aren't installed in fresh clones, containers or CI:
 
 - Rust: `cargo fmt`, then `cargo clippy` with the flags in `backend.md`.
-- JS/TS/Svelte: `npm run format`, `npm run lint -- --fix`, `npm run check`. CI stops at the first failure, so fix all three.
+- JS/TS/Svelte: `npm run format`, `npm run lint:eslint -- --fix`, `npm run lint`, `npm run check`. CI stops at the first failure, so fix all three.
 - After a `.did` change: `npm run generate` (see `candid-api.md`).
 - Revert any `src/frontend/src/lib/locales/*.po` diff (see `i18n-and-copy.md`).
 
@@ -31,7 +31,7 @@ PR titles follow conventional commits with a scope naming the product surface th
 - `feat(be,fe)`: both surfaces.
 - The same for `fix`, `chore`, `refactor`, `docs`, `test`. The type matches the change (`feat`, not `test`, for a feature with tests).
 
-`src/internet_identity_interface` is shared, so scope a change there by the canister the type serves (`InternetIdentityFrontendArgs` is `fe`, `InternetIdentityInit` is `be`). A PR without a `be`/`fe` scope breaks the release scripts' changelog split, and the scope must match the diff: a `feat(be)` PR has no Svelte changes beyond generated bindings. Commit titles inside a PR can use any scope, since PRs are squash-merged.
+`src/internet_identity_interface` is shared, so scope a change there by the canister the type serves (`InternetIdentityFrontendArgs` is `fe`, `InternetIdentityInit` is `be`). The upgrade-proposal generator (`scripts/make-upgrade-proposal`) routes squashed commits to the backend or frontend proposal by this scope, sending unscoped `feat` commits to both. Release notes are split by changed paths instead. The scope must match the diff: a `feat(be)` PR has no Svelte changes beyond generated bindings. Commit titles inside a PR can use any scope, since PRs are squash-merged.
 
 ## Descriptions
 

@@ -54,7 +54,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 ## TypeScript
 
 - Never use `as` casts or `!` non-null assertions; narrow with guards and early returns, or restructure. Type props so misuse can't compile (discriminated unions, `Pick<...>`).
-- Import types at the top of the file (`import type { Foo } from "module"`); no inline `import("module").Type` and no runtime `import()`.
+- Import types at the top of the file (`import type { Foo } from "module"`); no inline `import("module").Type`. Use static imports; a runtime `import()` is only for intentional lazy loading (locale catalogs in `locale.store.ts`).
 - Use the generated candid types for canister calls; no `any`, no `JSON.stringify(result.Err)`.
 - Validate untrusted data (URL params, `postMessage`, stored values) with zod schemas and derive types with `z.infer`. Don't hand-write parsers zod covers.
 - Use `Uint8Array` for bytes, never Node's `Buffer`.

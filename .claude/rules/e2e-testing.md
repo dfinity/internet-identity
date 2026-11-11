@@ -35,7 +35,7 @@ For the user (interactive): `./scripts/dev-e2e`.
 
 Run with `--workers=1`, as CI does: specs share canister state, and parallel workers produce false failures. For broad frontend changes (auth flows, consent, sessions), run the full suite, not just the new spec.
 
-Other invocations: `npx playwright test <file> -g "<name pattern>"`, `--ui`, `--trace on`.
+Other invocations, all with `--workers=1`: `npx playwright test <file> --workers=1 -g "<name pattern>"`, `--ui`, `--trace on`.
 
 ## Environment the scripts set
 
@@ -49,12 +49,14 @@ The ports are declared at the top of `scripts/dev-e2e-setup`. Read them from the
 
 - `OPENID_PORTS`: every provider the stack starts.
 - `DIRECT_OPENID_PORTS`: the subset configured as direct providers.
-- `PAIRWISE_OPENID_PORT`: an Entra-style provider issuing a pairwise `sub` plus a stable `oid`, used by the non-`sub` gating tests. It is one of the SSO discovery providers under a distinct host, so the gating tests get a discovery-cache entry the other tests never touch. See `SSO_ENTRA_DISCOVERY_DOMAIN` in `fixtures/sso.ts`.
+- `PAIRWISE_OPENID_PORT`: a separate Entra-style provider issuing a pairwise `sub` plus a stable `oid`, for the non-`sub` gating tests (`SSO_ENTRA_DISCOVERY_DOMAIN` in `fixtures/sso.ts`).
+
+`fixtures/sso.ts` also defines `SSO_GATING_DISCOVERY_DOMAIN`: the public-`sub` SSO provider under an alternate host (`127.0.0.1` instead of `localhost`), so the `sub` gating tests get a discovery-cache entry the other tests never touch. Use the Entra domain, not this alias, for non-`sub` gating.
 
 ## Stack gotchas
 
 - With `NO_HOT_RELOAD=1` and `SEPARATE_FRONTEND_CANISTER=1` the browser loads assets from the canister. `.svelte` changes take effect only after `dev-e2e-setup` reinstalls it.
-- Re-running `dev-e2e-setup` does not re-apply changed init args to an installed canister. Run `--teardown` first.
+- Re-running `dev-e2e-setup` rebuilds a canister only when files in its own directory (or `src/frontend`) are newer than its wasm. Changes to shared crates (`src/internet_identity_interface`, `src/asset_util`) and changed init args are not picked up: run `--teardown` first.
 - A test that signs up through OpenID/SSO and signs in again in the same context gets an auto-redirecting IdP popup. Call `await page.context().clearCookies()` between the flows.
 - Don't edit spec files while a run is in flight: Playwright recompiles the spec against a cached `utils.ts` and fails with a one-off `SyntaxError: does not provide an export named X`.
 - pocket-ic clock drift: in long sessions or after a VM resume the replica clock falls behind the host. Past 5 minutes the agent rejects certificates with `TrustError: Certificate is signed more than 5 minutes in the past`, and every flow that round-trips a delegation hangs to the test timeout, often several at once late in a run. Confirm by comparing `date -u` with the replica's cert timestamps, and restart the stack (`--teardown`, then setup). Don't "fix" tests for it.
