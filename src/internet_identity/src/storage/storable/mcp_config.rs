@@ -7,8 +7,9 @@ use std::borrow::Cow;
 /// (see [`crate::storage`]) so it syncs across all of the identity's devices —
 /// unlike the CLI-access toggle, which is device-local. It is written via the
 /// authenticated `mcp_set_config` method and read by the `/mcp` connect flow
-/// (verify-at-connect) and the Settings UI via `mcp_get_config`. Kept separate
-/// from the core anchor record so it never touches anchor serialization.
+/// (verify-at-connect) via `mcp_get_config`, and by the Settings UI as
+/// `IdentityInfo::mcp_config`. Kept separate from the core anchor record so it
+/// never touches anchor serialization.
 ///
 /// `Default` is the disabled, no-server state, returned for anchors that have
 /// never written a config.

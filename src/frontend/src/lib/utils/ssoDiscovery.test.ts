@@ -22,12 +22,14 @@ const DISCOVERY: SsoDiscovery = {
   scopes: ["openid", "profile", "email"],
   name: ["DFINITY"],
   resolved_client_id: ["dfinity-sso-client-id"],
+  session_max_age_ns: BigInt(28_800_000_000_000),
 };
 
 describe("ssoDiscovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    vi.mocked(anonymousActor.discover_sso).mockResolvedValue(undefined);
   });
 
   describe("validateDomain", () => {
@@ -108,6 +110,7 @@ describe("ssoDiscovery", () => {
         clientId: "dfinity-sso-client-id",
         resolvedClientId: "dfinity-sso-client-id",
         name: "DFINITY",
+        sessionMaxAgeNs: BigInt(28_800_000_000_000),
         discovery: {
           issuer: "https://dfinity.okta.com",
           authorization_endpoint:
@@ -119,8 +122,35 @@ describe("ssoDiscovery", () => {
         org_domain: "dfinity.org",
         target_app_origin: [],
       });
-      // Already resolved, so no update was needed to drive a fetch.
-      expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
+      // Resolved from the cache: one update refreshes it and the domain's keys.
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(1);
+      expect(anonymousActor.discover_sso).toHaveBeenCalledWith("dfinity.org");
+    });
+
+    it("resolves without waiting for the refresh update", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Resolved: DISCOVERY,
+      });
+      vi.mocked(anonymousActor.discover_sso).mockReturnValue(
+        new Promise<undefined>(() => {}),
+      );
+
+      const result = await discoverSsoConfig("dfinity.org");
+
+      expect(result.domain).toBe("dfinity.org");
+    });
+
+    it("resolves when the refresh update fails", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Resolved: DISCOVERY,
+      });
+      vi.mocked(anonymousActor.discover_sso).mockRejectedValue(
+        new Error("update failed"),
+      );
+
+      const result = await discoverSsoConfig("dfinity.org");
+
+      expect(result.domain).toBe("dfinity.org");
     });
 
     it("passes the target origin and returns the per-app resolvedClientId", async () => {
@@ -164,13 +194,24 @@ describe("ssoDiscovery", () => {
       }
     });
 
-    it("drives the update while the query reads Pending, then resolves", async () => {
+    it("starts nothing for a lookup that was already aborted", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        discoverSsoConfig("dfinity.org", controller.signal),
+      ).rejects.toThrow("SSO discovery aborted");
+
+      expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
+      expect(anonymousActor.get_sso_discovery_status).not.toHaveBeenCalled();
+    });
+
+    it("calls the update once, then polls only the query until it resolves", async () => {
       vi.useFakeTimers();
       vi.mocked(anonymousActor.get_sso_discovery_status)
         .mockResolvedValueOnce({ Pending: null })
         .mockResolvedValueOnce({ Pending: null })
         .mockResolvedValueOnce({ Resolved: DISCOVERY });
-      vi.mocked(anonymousActor.discover_sso).mockResolvedValue(undefined);
 
       const promise = discoverSsoConfig("dfinity.org");
       await vi.advanceTimersByTimeAsync(500);
@@ -178,8 +219,46 @@ describe("ssoDiscovery", () => {
 
       const result = await promise;
       expect(result.domain).toBe("dfinity.org");
-      // Each Pending read drove the update.
-      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(2);
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(1);
+      expect(anonymousActor.get_sso_discovery_status).toHaveBeenCalledTimes(3);
+    });
+
+    it("stops at once when the canister reports a failure, with its retry time", async () => {
+      const retryAfterMs = Date.UTC(2026, 9, 7, 12, 0, 0);
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Failed: {
+          retry_after: [BigInt(retryAfterMs) * BigInt(1_000_000)],
+          reason: [],
+        },
+      });
+
+      const error = await discoverSsoConfig("dfinity.org").catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(DomainNotConfiguredError);
+      if (error instanceof DomainNotConfiguredError) {
+        expect(error.reason).toBe("failed");
+        expect(error.retryAfter).toEqual(new Date(retryAfterMs));
+      }
+      expect(anonymousActor.get_sso_discovery_status).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports no retry time when no retry can help, with the canister's reason", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Failed: { retry_after: [], reason: ['domain "a/b" has a path'] },
+      });
+
+      const error = await discoverSsoConfig("dfinity.org").catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(DomainNotConfiguredError);
+      if (error instanceof DomainNotConfiguredError) {
+        expect(error.reason).toBe("failed");
+        expect(error.retryAfter).toBeUndefined();
+        expect(error.detail).toBe('domain "a/b" has a path');
+      }
     });
 
     it("stops polling when the abort signal is already aborted", async () => {

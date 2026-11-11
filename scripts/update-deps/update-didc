@@ -11,7 +11,11 @@ auth_header=()
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   auth_header=(-H "Authorization: Bearer $GITHUB_TOKEN")
 fi
-latest_didc_release=$(curl -sSL "${auth_header[@]}" https://api.github.com/repos/dfinity/candid/releases/latest | jq .tag_name -r)
+# dfinity/candid also publishes non-didc releases (e.g. candid_ui), so
+# `releases/latest` isn't necessarily a didc one. Pick the newest
+# `didc-v*` release instead.
+latest_didc_release=$(curl -sSL "${auth_header[@]}" "https://api.github.com/repos/dfinity/candid/releases?per_page=100" \
+  | jq -r '[.[] | select(.draft == false and .prerelease == false and (.tag_name | startswith("didc-v")))][0].tag_name')
 
 if [ -z "$latest_didc_release" ] || [ "$latest_didc_release" = "null" ]; then
   echo "expected a didc release, got '$latest_didc_release'" >&2
@@ -30,15 +34,14 @@ if [ "$current_didc_release" != "$latest_didc_release" ]; then
   sed -e "s/$current_didc_release/$latest_didc_release/g" ./.didc-release \
     > "$release_tmp"
 
-  grep -vE '^(linux64|macos|arm32)[[:space:]]' ./.didc-checksums \
-    > "$checksums_tmp"
-  sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}' -i "$checksums_tmp"
+  # Keep the header comments, drop every `<target> <sha256>` line.
+  grep -E '^[[:space:]]*#' ./.didc-checksums > "$checksums_tmp"
   printf '\n' >> "$checksums_tmp"
-  for plat in linux64 macos arm32; do
+  for target in aarch64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
     sha=$(curl --location --fail --silent --show-error \
-      "https://github.com/dfinity/candid/releases/download/$latest_didc_release/didc-$plat" \
+      "https://github.com/dfinity/candid/releases/download/$latest_didc_release/didc-$target.tar.xz" \
       | shasum -a 256 | awk '{print $1}')
-    printf '%-7s %s\n' "$plat" "$sha" >> "$checksums_tmp"
+    printf '%-25s %s\n' "$target" "$sha" >> "$checksums_tmp"
   done
 
   mv "$release_tmp" ./.didc-release

@@ -1,10 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+
+const { mockGetPrimaryOrigin } = vi.hoisted(() => ({
+  mockGetPrimaryOrigin: vi.fn<() => string | undefined>(),
+}));
+
+vi.mock("$lib/globals", () => ({
+  getPrimaryOrigin: mockGetPrimaryOrigin,
+}));
+
 import {
   type AccessMethod,
   compareAccessMethods,
   toAccessMethods,
   toKey,
   isCurrentAccessMethod,
+  isLegacyPasskey,
 } from "./utils";
 import type {
   AuthnMethodData,
@@ -206,5 +216,34 @@ describe("isCurrentAccessMethod", () => {
     expect(
       isCurrentAccessMethod(authenticated, { openid: makeOpenId("i", "s") }),
     ).toBe(false);
+  });
+});
+
+describe("isLegacyPasskey", () => {
+  const withOrigin = (origin?: string): AuthnMethodData => ({
+    ...makePasskey(1),
+    metadata: origin !== undefined ? [["origin", { String: origin }]] : [],
+  });
+
+  beforeEach(() => {
+    mockGetPrimaryOrigin.mockReset();
+    mockGetPrimaryOrigin.mockReturnValue("https://id.ai");
+  });
+
+  it("is legacy when registered on another origin", () => {
+    expect(isLegacyPasskey(withOrigin("https://identity.ic0.app"))).toBe(true);
+  });
+
+  it("is not legacy when registered on the primary origin", () => {
+    expect(isLegacyPasskey(withOrigin("https://id.ai"))).toBe(false);
+  });
+
+  it("is legacy when no origin was recorded", () => {
+    expect(isLegacyPasskey(withOrigin())).toBe(true);
+  });
+
+  it("is never legacy when no primary origin is configured", () => {
+    mockGetPrimaryOrigin.mockReturnValue(undefined);
+    expect(isLegacyPasskey(withOrigin("https://identity.ic0.app"))).toBe(false);
   });
 });

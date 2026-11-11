@@ -21,7 +21,13 @@ pub mod registration;
 pub mod tentative_device_registration;
 
 pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
-    let anchor = state::anchor(anchor_number);
+    anchor_info(&state::anchor(anchor_number))
+}
+
+/// As [`get_anchor_info`], for a caller that has already read the anchor. Reading one is
+/// a full stable-memory read and deserialise, so a caller assembling several answers
+/// about the same identity reads it once and passes it.
+pub fn anchor_info(anchor: &Anchor) -> IdentityAnchorInfo {
     let devices = anchor
         .devices()
         .clone()
@@ -39,7 +45,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let name = anchor.name();
 
     let device_registration =
-        tentative_device_registration::get_tentative_registration(anchor_number);
+        tentative_device_registration::get_tentative_registration(anchor.anchor_number());
 
     let created_at = anchor.created_at();
 
@@ -148,6 +154,10 @@ pub fn replace_device(
     old_device: DeviceKey,
     new_device: DeviceData,
 ) -> Operation {
+    // Drop pending email challenges before mutating the auth set so a
+    // prepare started under the replaced device cannot finalize.
+    crate::email_inbound::drop_challenges_for_anchor(anchor_number);
+
     anchor
         .remove_device(&old_device)
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
@@ -170,6 +180,10 @@ pub fn remove_device(
     anchor: &mut Anchor,
     device_key: DeviceKey,
 ) -> Operation {
+    // Drop pending email challenges before mutating the auth set so a
+    // prepare started under the removed device cannot finalize.
+    crate::email_inbound::drop_challenges_for_anchor(anchor_number);
+
     anchor
         .remove_device(&device_key)
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
@@ -202,10 +216,7 @@ pub fn check_openid_credential_is_unique<M: Memory + Clone>(
     storage: &Storage<M>,
     openid_credential_key: &OpenIdCredentialKey,
 ) -> Result<(), AnchorError> {
-    if storage
-        .lookup_anchor_with_openid_credential(openid_credential_key)
-        .is_some()
-    {
+    if storage.is_openid_credential_registered(openid_credential_key) {
         return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
     }
 
@@ -250,8 +261,18 @@ pub fn remove_openid_credential(
     anchor: &mut Anchor,
     key: &OpenIdCredentialKey,
 ) -> Result<Operation, AnchorError> {
+    // Fail closed on a missing key *before* wiping pending challenges so a
+    // mistyped remove doesn't kill a legitimate in-flight prepare.
+    // Then drop challenges and remove — same update message, no interleaving.
+    // Compare fields in place to avoid cloning `(iss, sub, aud)` via `key()`.
+    let (iss, sub, aud) = key;
+    let _ = anchor
+        .openid_credentials()
+        .iter()
+        .find(|c| &c.iss == iss && &c.sub == sub && &c.aud == aud)
+        .ok_or(AnchorError::OpenIdCredentialNotFound)?;
+    crate::email_inbound::drop_challenges_for_anchor(anchor.anchor_number());
     anchor.remove_openid_credential(key)?;
-    let (iss, _, _) = key;
     Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
 }
 
@@ -294,6 +315,14 @@ pub fn check_passkey_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String
         .is_none()
         .then_some(())
         .ok_or_else(|| "passkey with this public key is already used".to_string())
+}
+
+/// Check if the given `PublicKey` is not used as a recovery phrase by any anchor.
+pub fn check_recovery_phrase_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String> {
+    lookup_caller_identity_by_recovery_phrase(Principal::self_authenticating(pubkey))
+        .is_none()
+        .then_some(())
+        .ok_or_else(|| "recovery phrase with this public key is already used".to_string())
 }
 
 /// Set `name` of the given anchor.

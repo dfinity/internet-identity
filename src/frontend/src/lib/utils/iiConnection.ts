@@ -63,6 +63,11 @@ import {
 } from "./analytics/webauthnAuthenticationFunnel";
 import { HARDWARE_KEY_TEST } from "$lib/state/featureFlags";
 import { frontendCanisterConfig } from "$lib/globals";
+// Re-exported so the callers in this file, and anything importing it from here, are
+// untouched by the move. It lives in `urlUtils` because that is where its two constants
+// already were, and because it is string work with nothing to do with a connection.
+export { remapToLegacyDomain } from "$lib/utils/urlUtils";
+import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -100,8 +105,7 @@ export type LoginSuccess = {
 };
 
 export type RegFlowNextStep =
-  | { step: "checkCaptcha"; captcha_png_base64: string }
-  | { step: "finish" };
+  { step: "checkCaptcha"; captcha_png_base64: string } | { step: "finish" };
 export type RegistrationFlowStepSuccess = {
   kind: "registrationFlowStepSuccess";
   nextStep: RegFlowNextStep;
@@ -150,8 +154,7 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 
 export class Connection {
   private webAuthFlows:
-    | { flows: WebAuthnFlow[]; currentIndex: number }
-    | undefined;
+    { flows: WebAuthnFlow[]; currentIndex: number } | undefined;
 
   public constructor(
     readonly canisterId: string,
@@ -993,21 +996,6 @@ export const creationOptions = (
   };
 };
 
-// In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or
-// any of the newer canister gateway domains (icp0.io, icp.net) we map back the derivation origin
-// to the ic0.app domain.
-export const remapToLegacyDomain = (origin: string): string => {
-  const ORIGIN_MAPPING_REGEX =
-    /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.(?:icp0\.io|icp\.net)$/;
-  const match = origin.match(ORIGIN_MAPPING_REGEX);
-  const subdomain = match?.groups?.subdomain;
-  if (subdomain !== undefined) {
-    return `https://${subdomain}.ic0.app`;
-  } else {
-    return origin;
-  }
-};
-
 export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
   if (buf1.byteLength != buf2.byteLength) return false;
   const dv1 = new Int8Array(buf1);
@@ -1025,12 +1013,11 @@ export const inferHost = (): string => {
   // The domain used for the http api
   const IC_API_DOMAIN = "icp-api.io";
 
-  const location = window?.location;
-  if (location === undefined) {
-    // If there is no location, then most likely this is a non-browser environment. All bets
-    // are off but we return something valid just in case.
+  if (typeof window === "undefined") {
+    // Not a browser. All bets are off, but return something valid just in case.
     return "https://" + IC_API_DOMAIN;
   }
+  const location = window.location;
 
   // Match a hostname against an official gateway domain by exact equality or
   // by a dot boundary, so adversarial subdomains like `evil-ic0.app` are not

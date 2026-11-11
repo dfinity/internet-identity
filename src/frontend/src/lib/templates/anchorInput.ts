@@ -126,9 +126,11 @@ export const mkAnchorInput = ({
         value="${ifDefined(userNumber?.toString())}"
         data-expected=${ifDefined(dataExpected)}
         @input=${inputFilter(isDigits, onBadInput, onInput)}
-        @change=${onChange !== undefined
-          ? () => withRef(userNumberInput, (input) => onChange(input.value))
-          : undefined}
+        @change=${
+          onChange !== undefined
+            ? () => withRef(userNumberInput, (input) => onChange(input.value))
+            : undefined
+        }
         @keydown=${inputFilter(isDigits, onBadInput)}
         @keyup=${inputFilter(isDigits, onBadInput)}
         @mousedown=${inputFilter(isDigits, onBadInput)}

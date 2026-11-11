@@ -1,4 +1,4 @@
-use crate::openid::{Aud, Iss, OpenIdCredential, Sub};
+use crate::openid::{Aud, Domain, Iss, OpenIdCredential, Sub};
 use crate::storage::storable::metadata_v2::StorableMetadataEntryV2;
 use crate::storage::storable::openid_credential_key::StorableOpenIdCredentialKey;
 use ic_stable_structures::storable::Bound;
@@ -23,11 +23,9 @@ pub struct StorableOpenIdCredential {
     pub metadata: HashMap<String, StorableMetadataEntryV2>,
     /// SSO discovery domain this credential was created through, stamped at
     /// verification time. `None` for direct-provider credentials (Google /
-    /// Microsoft / Apple) and for SSO credentials written before this field
-    /// existed — the latter are backfilled by the `sso_credential_migration`
-    /// upgrade arg (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
-    /// `Option` so credentials written under the previous schema decode
-    /// cleanly — same pattern as the optional fields on `StorableAnchor`.
+    /// Microsoft / Apple). `Option` so credentials written under the previous
+    /// schema decode cleanly — same pattern as the optional fields on
+    /// `StorableAnchor`.
     #[n(5)]
     pub sso_domain: Option<String>,
     /// Human-readable SSO label from the domain's hop-1
@@ -84,7 +82,7 @@ impl From<StorableOpenIdCredential> for OpenIdCredential {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
-            sso_domain: value.sso_domain,
+            sso_domain: value.sso_domain.map(Domain::from_stored),
             sso_name: value.sso_name,
             stable_id: value.stable_id,
         }
@@ -103,7 +101,7 @@ impl From<OpenIdCredential> for StorableOpenIdCredential {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
-            sso_domain: value.sso_domain,
+            sso_domain: value.sso_domain.map(String::from),
             sso_name: value.sso_name,
             stable_id: value.stable_id,
         }

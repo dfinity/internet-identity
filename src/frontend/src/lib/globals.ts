@@ -2,13 +2,9 @@ import { Principal } from "@icp-sdk/core/principal";
 import { type _SERVICE } from "$lib/generated/internet_identity_types";
 import { type InternetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_types";
 import { readCanisterId } from "$lib/utils/init";
-import {
-  Actor,
-  ActorSubclass,
-  HttpAgent,
-  HttpAgentOptions,
-} from "@icp-sdk/core/agent";
+import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import { inferHost } from "$lib/utils/iiConnection";
+import type { AgentOptions } from "$lib/utils/notifications/workerConfig";
 import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
 import { init as internetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_idl";
 import { IDL } from "@icp-sdk/core/candid";
@@ -24,10 +20,12 @@ const OpenIdEmailVerificationIDL = IDL.Variant({
   Google: IDL.Null,
   Unknown: IDL.Null,
   Microsoft: IDL.Null,
+  Apple: IDL.Null,
 });
 
 const backendCanisterConfigIDL = IDL.Record({
   mcp_official_url: IDL.Opt(IDL.Text),
+  notifications_enabled: IDL.Opt(IDL.Bool),
   openid_configs: IDL.Opt(
     IDL.Vec(
       IDL.Record({
@@ -48,9 +46,7 @@ const backendCanisterConfigIDL = IDL.Record({
 
 // Types for above IDL definition
 export type OpenIdEmailVerification =
-  | { Google: null }
-  | { Unknown: null }
-  | { Microsoft: null };
+  { Google: null } | { Unknown: null } | { Microsoft: null } | { Apple: null };
 export interface OpenIdConfig {
   auth_uri: string;
   jwks_uri: string;
@@ -66,12 +62,19 @@ export interface OpenIdConfig {
 export type BackendCanisterConfig = {
   openid_configs: [] | [OpenIdConfig[]];
   mcp_official_url: [] | [string];
+  /** Whether the backend notifies. Absent from a canister older than the field. */
+  notifications_enabled: [] | [boolean];
 };
+
+/** Whether this deployment's backend notifies. Its endpoints refuse every notification
+ *  call otherwise, so there is nothing for the frontend to offer. */
+export const notificationsEnabled = (): boolean =>
+  backendCanisterConfig?.notifications_enabled[0] ?? false;
 
 export let canisterId: Principal;
 export let frontendCanisterConfig: InternetIdentityFrontendInit;
 export let backendCanisterConfig: BackendCanisterConfig;
-export let agentOptions: HttpAgentOptions;
+export let agentOptions: AgentOptions;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
 

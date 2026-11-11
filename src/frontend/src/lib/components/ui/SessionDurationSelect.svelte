@@ -3,6 +3,7 @@
   import { ChevronDownIcon } from "@lucide/svelte";
   import { formatDuration, t } from "$lib/stores/locale.store";
   import {
+    SESSION_DURATION_PRESETS,
     cappedSessionDurations,
     sessionDurationBreakdown,
   } from "$lib/utils/sessionDuration";
@@ -21,6 +22,9 @@
     disabled?: boolean;
     /** Popover alignment relative to the trigger. */
     align?: Align;
+    /** Trigger style: bordered, or borderless inside a row that has its own
+     *  border. */
+    variant?: "secondary" | "tertiary";
   }
 
   let {
@@ -28,6 +32,7 @@
     value = $bindable(),
     disabled = false,
     align = "end",
+    variant = "secondary",
   }: Props = $props();
 
   const MINUTE = 60;
@@ -57,14 +62,13 @@
   // Every preset up to the cap, plus the cap itself when it isn't a preset, each
   // with its label and a flag for the current selection.
   const options = $derived(
-    cappedSessionDurations(
-      maxSeconds,
-      presets.map((preset) => preset.value),
-    ).map((optionValue) => ({
-      value: optionValue,
-      label: labelFor(optionValue),
-      selected: optionValue === value,
-    })),
+    cappedSessionDurations(maxSeconds, SESSION_DURATION_PRESETS).map(
+      (optionValue) => ({
+        value: optionValue,
+        label: labelFor(optionValue),
+        selected: optionValue === value,
+      }),
+    ),
   );
 
   // The trigger shows the selected duration's label.
@@ -76,7 +80,10 @@
        Select can't open once the user has committed. -->
   <button
     type="button"
-    class="btn btn-secondary btn-sm shrink-0 gap-2"
+    class={[
+      "btn btn-sm shrink-0",
+      variant === "secondary" ? "btn-secondary gap-2" : "btn-tertiary !px-2.5",
+    ]}
     {disabled}
   >
     <span>{selectedLabel}</span>

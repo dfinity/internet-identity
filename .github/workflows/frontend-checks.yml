@@ -6,6 +6,12 @@ on:
   pull_request:
   merge_group:
 
+# Cancelling is limited to pull requests, because a cancelled merge-queue run fails
+# the queue and a release tag has nothing to supersede it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   frontend-checks:
     runs-on: ubuntu-latest
@@ -22,12 +28,11 @@ jobs:
         run: npm run lint
       - name: Check formatting
         run: npm run format-check
+      - name: Build the frontend
+        run: npm run build
       - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
-        run: |
-          npm run generate
-          cd demos/vc_issuer
-          npm run generate
+        run: npm run generate
       - name: Check for dapp logos
         run: |
           while read -r logo
@@ -46,6 +51,5 @@ jobs:
         with:
           add: |
             src/frontend/generated
-            demos/vc_issuer/app/generated
           default_author: github_actions
           message: "🤖 npm run generate auto-update"

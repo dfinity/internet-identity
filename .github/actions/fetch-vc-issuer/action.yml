@@ -1,0 +1,14 @@
+name: "fetch-vc-issuer"
+description: Download the VC demo issuer release pinned in .github/versions/vc-issuer into .vc-issuer/
+
+runs:
+  using: "composite"
+  steps:
+    # The `gh` CLI requires a token to run at all. The release lives in a public
+    # repository, so the workflow's own token is enough — including on pull
+    # requests from forks, which get a token but no secrets.
+    - name: Fetch VC issuer release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: ./scripts/fetch-vc-issuer

@@ -1,4 +1,5 @@
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
+import { MAX_ALTERNATIVE_ORIGINS } from "$lib/utils/urlUtils";
 import { Principal } from "@icp-sdk/core/principal";
 import { expect } from "vitest";
 
@@ -152,6 +153,56 @@ test("should not validate if canister id resolution fails", async () => {
     resolveCanisterId: () => Promise.resolve("not_found"),
   });
   expect(result.result).toBe("invalid");
+});
+
+// Spelled out rather than imported from the implementation so that lowering
+// the limit there makes these boundary tests fail instead of following along.
+
+// A list of the given length whose last entry is the request origin used by
+// the boundary tests below, so that only the number of entries decides the
+// outcome.
+const alternativeOriginsOfLength = (length: number): string[] => [
+  ...Array.from({ length: length - 1 }, (_, index) => `https://a${index}.com`),
+  "https://example.com",
+];
+
+test("should validate if alternative origins file has the maximum number of entries", async () => {
+  setupMocks({
+    iiUrl: "https://id.ai",
+    response: Response.json({
+      alternativeOrigins: alternativeOriginsOfLength(MAX_ALTERNATIVE_ORIGINS),
+    }),
+  });
+
+  const result = await validateDerivationOrigin({
+    requestOrigin: "https://example.com",
+    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
+    resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+  });
+
+  expect(result).toEqual({ result: "valid" });
+});
+
+test("should not validate if alternative origins file has too many entries", async () => {
+  setupMocks({
+    iiUrl: "https://id.ai",
+    response: Response.json({
+      alternativeOrigins: alternativeOriginsOfLength(
+        MAX_ALTERNATIVE_ORIGINS + 1,
+      ),
+    }),
+  });
+
+  const result = await validateDerivationOrigin({
+    requestOrigin: "https://example.com",
+    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
+    resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+  });
+
+  expect(result).toEqual({
+    result: "invalid",
+    message: expect.stringContaining("has too many entries"),
+  });
 });
 
 const validIIUrls = [

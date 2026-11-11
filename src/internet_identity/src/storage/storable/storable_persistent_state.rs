@@ -35,10 +35,13 @@ pub struct StorablePersistentState {
     captcha_config: Option<CaptchaConfig>,
     related_origins: Option<Vec<String>>,
     backend_origin: Option<String>,
+    vapid_public_key: Option<Vec<u8>>,
     new_flow_origins: Option<Vec<String>>,
     openid_configs: Option<Vec<OpenIdConfig>>,
     oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     sso_allow_insecure_discovery: Option<bool>,
+    notifications_allow_insecure_sender_list: Option<bool>,
+    notifications_allow_insecure_endpoint: Option<bool>,
     analytics_config: Option<AnalyticsConfig>,
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
@@ -47,6 +50,7 @@ pub struct StorablePersistentState {
     dnssec_config: Option<DnssecConfig>,
     doh_config: Option<DohConfig>,
     mcp_official_url: Option<String>,
+    notifications_enabled: Option<bool>,
 }
 
 impl Storable for StorablePersistentState {
@@ -86,10 +90,13 @@ impl From<PersistentState> for StorablePersistentState {
             captcha_config: Some(s.captcha_config),
             related_origins: s.related_origins,
             backend_origin: s.backend_origin,
+            vapid_public_key: s.vapid_public_key,
             new_flow_origins: s.new_flow_origins,
             openid_configs: s.openid_configs,
             oidc_configs: s.oidc_configs,
             sso_allow_insecure_discovery: s.sso_allow_insecure_discovery,
+            notifications_allow_insecure_sender_list: s.notifications_allow_insecure_sender_list,
+            notifications_allow_insecure_endpoint: s.notifications_allow_insecure_endpoint,
             analytics_config: s.analytics_config,
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
@@ -98,6 +105,7 @@ impl From<PersistentState> for StorablePersistentState {
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
+            notifications_enabled: s.notifications_enabled,
         }
     }
 }
@@ -114,10 +122,13 @@ impl From<StorablePersistentState> for PersistentState {
             captcha_config: s.captcha_config.unwrap_or(DEFAULT_CAPTCHA_CONFIG),
             related_origins: s.related_origins,
             backend_origin: s.backend_origin,
+            vapid_public_key: s.vapid_public_key,
             new_flow_origins: s.new_flow_origins,
             openid_configs: s.openid_configs,
             oidc_configs: s.oidc_configs,
             sso_allow_insecure_discovery: s.sso_allow_insecure_discovery,
+            notifications_allow_insecure_sender_list: s.notifications_allow_insecure_sender_list,
+            notifications_allow_insecure_endpoint: s.notifications_allow_insecure_endpoint,
             analytics_config: s.analytics_config,
             event_stats_24h_start: s.event_stats_24h_start,
             enable_dapps_explorer: s.enable_dapps_explorer,
@@ -127,6 +138,7 @@ impl From<StorablePersistentState> for PersistentState {
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
+            notifications_enabled: s.notifications_enabled,
         }
     }
 }
@@ -171,11 +183,14 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
             }),
             related_origins: None,
+            vapid_public_key: None,
             backend_origin: None,
             new_flow_origins: None,
             openid_configs: None,
             oidc_configs: None,
             sso_allow_insecure_discovery: None,
+            notifications_allow_insecure_sender_list: None,
+            notifications_allow_insecure_endpoint: None,
             analytics_config: None,
             enable_dapps_explorer: None,
             is_production: None,
@@ -184,6 +199,7 @@ mod tests {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
+            notifications_enabled: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -203,11 +219,14 @@ mod tests {
                 captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
             },
             related_origins: None,
+            vapid_public_key: None,
             backend_origin: None,
             new_flow_origins: None,
             openid_configs: None,
             oidc_configs: None,
             sso_allow_insecure_discovery: None,
+            notifications_allow_insecure_sender_list: None,
+            notifications_allow_insecure_endpoint: None,
             event_stats_24h_start: None,
             analytics_config: None,
             enable_dapps_explorer: None,
@@ -217,6 +236,7 @@ mod tests {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
+            notifications_enabled: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }

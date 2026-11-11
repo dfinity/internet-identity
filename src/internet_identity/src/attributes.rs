@@ -324,6 +324,32 @@ fn insert_certified_attribute(
     }
 }
 
+/// The SSO session deadline entry for a certified bundle, or `None` when the
+/// bundle carries no attribute for that SSO domain.
+///
+/// The deadline is scoped to the domain whose policy set it rather than living
+/// under `implicit:`, because one bundle can carry attributes from several
+/// scopes with different lifetimes and a verifier must enforce the deadline
+/// belonging to the scope it reads.
+fn sso_session_expiry_entry(
+    certified_pairs: &BTreeMap<String, Icrc3Value>,
+    sso_session_domain: Option<&str>,
+    sso_session_expiry_ns: Option<u64>,
+) -> Option<(String, Icrc3Value)> {
+    let domain = sso_session_domain?;
+    let expiry_ns = sso_session_expiry_ns?;
+    let scope_prefix = format!("sso:{domain}:");
+    certified_pairs
+        .keys()
+        .any(|key| key.starts_with(&scope_prefix))
+        .then(|| {
+            (
+                format!("{scope_prefix}expires_at_timestamp_ns"),
+                Icrc3Value::Nat(candid::Nat::from(expiry_ns)),
+            )
+        })
+}
+
 impl Anchor {
     /// Resolves an unscoped `email` / `verified_email` spec to a stored
     /// verified-email entry. The user picked the address in the consent
@@ -377,6 +403,9 @@ impl Anchor {
         // SSO domain this session signed in through, or `None` for non-SSO
         // sessions; `sso:<domain>` attributes certify only when it matches.
         sso_session_domain: Option<String>,
+        // When the session signed in through SSO, the instant its assertions
+        // stop being valid, from the domain's `session_max_age_seconds`.
+        sso_session_expiry_ns: Option<u64>,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
         let mut problems = Vec::new();
@@ -489,6 +518,14 @@ impl Anchor {
 
         if !problems.is_empty() {
             return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
+        }
+
+        if let Some((key, value)) = sso_session_expiry_entry(
+            &certified_pairs,
+            sso_session_domain.as_deref(),
+            sso_session_expiry_ns,
+        ) {
+            certified_pairs.insert(key, value);
         }
 
         certified_pairs.insert("implicit:nonce".to_string(), Icrc3Value::Blob(nonce));
@@ -759,6 +796,77 @@ mod tests {
                 attribute_name: name,
             },
             value: value.as_bytes().to_vec(),
+        }
+    }
+
+    mod sso_session_expiry_entry_tests {
+        use super::super::sso_session_expiry_entry;
+        use candid::Nat;
+        use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+        use std::collections::BTreeMap;
+
+        const DOMAIN: &str = "acme.example";
+        const EXPIRES_AT: u64 = 1_700_028_800_000_000_000;
+
+        fn pairs(keys: &[&str]) -> BTreeMap<String, Icrc3Value> {
+            keys.iter()
+                .map(|k| ((*k).to_string(), Icrc3Value::Text("v".to_string())))
+                .collect()
+        }
+
+        #[test]
+        fn stamps_the_deadline_scoped_to_the_domain() {
+            let entry = sso_session_expiry_entry(
+                &pairs(&["sso:acme.example:email"]),
+                Some(DOMAIN),
+                Some(EXPIRES_AT),
+            );
+            assert_eq!(
+                entry,
+                Some((
+                    "sso:acme.example:expires_at_timestamp_ns".to_string(),
+                    Icrc3Value::Nat(Nat::from(EXPIRES_AT))
+                ))
+            );
+        }
+
+        #[test]
+        fn skips_a_bundle_without_attributes_for_that_domain() {
+            let entry = sso_session_expiry_entry(
+                &pairs(&["openid:https://accounts.google.com:email"]),
+                Some(DOMAIN),
+                Some(EXPIRES_AT),
+            );
+            assert_eq!(entry, None);
+        }
+
+        #[test]
+        fn stamps_only_the_signed_in_domain() {
+            let entry = sso_session_expiry_entry(
+                &pairs(&["sso:other.example:email", "sso:acme.example:name"]),
+                Some(DOMAIN),
+                Some(EXPIRES_AT),
+            );
+            assert_eq!(
+                entry.map(|(key, _)| key),
+                Some("sso:acme.example:expires_at_timestamp_ns".to_string())
+            );
+        }
+
+        #[test]
+        fn skips_a_non_sso_session() {
+            assert_eq!(
+                sso_session_expiry_entry(
+                    &pairs(&["sso:acme.example:email"]),
+                    None,
+                    Some(EXPIRES_AT)
+                ),
+                None
+            );
+            assert_eq!(
+                sso_session_expiry_entry(&pairs(&["sso:acme.example:email"]), Some(DOMAIN), None),
+                None
+            );
         }
     }
 
@@ -1125,6 +1233,7 @@ mod tests {
         const MICROSOFT_PERSONAL_TID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
         const MICROSOFT_RESOLVED_ISSUER: &str =
             "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0";
+        const APPLE_ISSUER: &str = "https://appleid.apple.com";
 
         fn setup_providers() {
             crate::openid::setup(vec![
@@ -1150,6 +1259,18 @@ mod tests {
                     auth_scope: vec![],
                     fedcm_uri: None,
                     email_verification: Some(OpenIdEmailVerificationScheme::Microsoft),
+                    seed_jwks: None,
+                },
+                OpenIdConfig {
+                    name: "Apple".to_string(),
+                    logo: String::new(),
+                    issuer: APPLE_ISSUER.to_string(),
+                    client_id: "test-client-id".to_string(),
+                    jwks_uri: String::new(),
+                    auth_uri: String::new(),
+                    auth_scope: vec![],
+                    fedcm_uri: None,
+                    email_verification: Some(OpenIdEmailVerificationScheme::Apple),
                     seed_jwks: None,
                 },
             ]);
@@ -1691,6 +1812,91 @@ mod tests {
             );
         }
 
+        // ── Apple verified email tests ───────────────────────────────────
+
+        /// The `openid:<apple>:verified_email` value for an Apple credential
+        /// carrying `metadata`, if any.
+        fn apple_verified_email(metadata: &[(&str, &str)]) -> Option<String> {
+            setup_providers();
+
+            let credential = OpenIdCredential {
+                iss: APPLE_ISSUER.to_string(),
+                sub: "001234.apple-user.0789".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: metadata
+                    .iter()
+                    .map(|(key, value)| {
+                        (key.to_string(), MetadataEntryV2::String(value.to_string()))
+                    })
+                    .collect(),
+                sso_domain: None,
+                sso_name: None,
+                stable_id: None,
+            };
+            let anchor = anchor_with_openid_credentials(vec![credential]);
+            let mut requested = request_verified_email_for(Some(AttributeScope::OpenId {
+                issuer: APPLE_ISSUER.to_string(),
+            }));
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(
+                    APPLE_ISSUER.to_string(),
+                    "001234.apple-user.0789".to_string(),
+                    "test-client-id".to_string(),
+                ))
+                .expect("credential key should be present");
+            let pairs = attribute_pairs(attrs);
+            assert!(pairs.len() <= 1);
+            pairs.into_iter().next().map(|(key, value)| {
+                pretty_assert_eq!(key, format!("openid:{APPLE_ISSUER}:verified_email"));
+                value
+            })
+        }
+
+        // Apple's private relay addresses never reach these tests: they are not
+        // kept on the credential at all (see `openid::verify::reachable_email`).
+
+        #[test]
+        fn test_apple_returns_verified_email_when_email_verified_is_true() {
+            pretty_assert_eq!(
+                apple_verified_email(&[("email", "user@icloud.com"), ("email_verified", "true")]),
+                Some("user@icloud.com".to_string())
+            );
+        }
+
+        #[test]
+        fn test_apple_email_verified_check_is_case_insensitive() {
+            pretty_assert_eq!(
+                apple_verified_email(&[("email", "user@example.com"), ("email_verified", "TRUE")]),
+                Some("user@example.com".to_string())
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_verified_is_false() {
+            // Sign in with Apple at Work & School accounts may not be verified.
+            pretty_assert_eq!(
+                apple_verified_email(&[
+                    ("email", "student@school.example"),
+                    ("email_verified", "false"),
+                ]),
+                None
+            );
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_verified_is_missing() {
+            pretty_assert_eq!(apple_verified_email(&[("email", "user@example.com")]), None);
+        }
+
+        #[test]
+        fn test_apple_returns_nothing_when_email_is_missing() {
+            pretty_assert_eq!(apple_verified_email(&[("email_verified", "true")]), None);
+        }
+
         #[test]
         fn test_no_verified_email_without_matching_provider() {
             // Use an issuer with no configured provider
@@ -1932,6 +2138,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
 
             match result {
@@ -1971,6 +2178,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
 
             match result {
@@ -2009,6 +2217,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
 
             match result {
@@ -2040,6 +2249,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
                 None,
             );
 
@@ -2317,7 +2527,7 @@ mod tests {
                 metadata,
                 // Stamped SSO credential — `discovery_domain()` /
                 // `matched_attribute_scope()` read this directly.
-                sso_domain: Some(SSO_DOMAIN.to_string()),
+                sso_domain: Some(crate::openid::Domain::try_from(SSO_DOMAIN).unwrap()),
                 sso_name: None,
                 stable_id: None,
             }
@@ -2358,7 +2568,10 @@ mod tests {
         #[test]
         fn credential_reports_discovery_domain() {
             let credential = sso_credential_with(email_and_name_metadata());
-            pretty_assert_eq!(credential.discovery_domain(), Some(SSO_DOMAIN.to_string()),);
+            pretty_assert_eq!(
+                credential.discovery_domain(),
+                Some(&crate::openid::Domain::try_from(SSO_DOMAIN).unwrap())
+            );
         }
 
         // `matched_attribute_scope()` returns `Sso { .. }` for an
@@ -2490,6 +2703,7 @@ mod tests {
                 account,
                 // SSO session for this domain, so the request reaches the verified_email branch.
                 Some(SSO_DOMAIN.to_string()),
+                None,
             );
             match res {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2539,6 +2753,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
                 None,
             );
             match res {
@@ -2770,6 +2985,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2808,6 +3024,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2843,6 +3060,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
                 None,
             );
             match result {
@@ -2886,6 +3104,7 @@ mod tests {
                     None,
                     1_000_000_000,
                     account,
+                    None,
                     None,
                 )
             }));

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   CallbackPopupClosedError,
   createRedirectURL,
@@ -9,6 +9,8 @@ import {
   extractIdTokenFromCallback,
   isOpenIdCancelError,
   OAuthProviderError,
+  requestWithPopup,
+  type RequestConfig,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
@@ -511,6 +513,22 @@ describe("createRedirectURL", () => {
     expect(redirectUri).not.toBeNull();
     expect(new URL(redirectUri ?? "").pathname).toBe("/callback");
   });
+
+  it("separates the scopes with a percent-encoded space", () => {
+    // Apple wants `scope=openid%20email`, not `scope=openid+email`.
+    const url = createRedirectURL(
+      {
+        clientId: "test-client",
+        authURL: "https://appleid.apple.com/auth/authorize",
+        authScope: "openid email",
+      },
+      { nonce: "test-nonce", loginHint: "first+tag@example.com" },
+    );
+    expect(url.href).toContain("scope=openid%20email");
+    expect(url.href).not.toContain("+");
+    expect(url.searchParams.get("scope")).toBe("openid email");
+    expect(url.searchParams.get("login_hint")).toBe("first+tag@example.com");
+  });
 });
 
 describe("OAuthProviderError", () => {
@@ -565,5 +583,145 @@ describe("isOpenIdCancelError", () => {
 
   it("returns false for null", () => {
     expect(isOpenIdCancelError(null)).toBe(false);
+  });
+});
+
+describe("requestWithPopup", () => {
+  /**
+   * Stand-in for the opener's end of the `BroadcastChannel`, so the test
+   * decides exactly when the callback page's message lands relative to the
+   * close poll. Like a real channel, it drops messages once closed.
+   */
+  class FakeBroadcastChannel {
+    static instances: FakeBroadcastChannel[] = [];
+    readonly #listeners: ((event: MessageEvent) => void)[] = [];
+    closed = false;
+
+    constructor(readonly name: string) {
+      FakeBroadcastChannel.instances.push(this);
+    }
+
+    addEventListener(
+      _type: "message",
+      listener: (event: MessageEvent) => void,
+    ) {
+      this.#listeners.push(listener);
+    }
+
+    close() {
+      this.closed = true;
+    }
+
+    deliver(data: unknown) {
+      if (this.closed) {
+        return;
+      }
+      this.#listeners.forEach((listener) =>
+        listener(new MessageEvent("message", { data })),
+      );
+    }
+  }
+
+  const config: RequestConfig = {
+    clientId: "client",
+    authURL: "https://idp.example/authorize",
+    authScope: "openid",
+  };
+
+  const openPopup = () => {
+    const popup = { closed: false, close: vi.fn(), location: { href: "" } };
+    const open = vi
+      .spyOn(window, "open")
+      .mockReturnValue(popup as unknown as Window);
+    const result = requestWithPopup(config, { nonce: "nonce" });
+    const state = new URL(open.mock.calls[0][0] as string).searchParams.get(
+      "state",
+    );
+    const [channel] = FakeBroadcastChannel.instances;
+    return { popup, result, state, channel };
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeBroadcastChannel.instances = [];
+    vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("opens a deferred popup to /sso-connecting synchronously, then navigates the same window", async () => {
+    const popup = { closed: false, close: vi.fn(), location: { href: "" } };
+    const open = vi
+      .spyOn(window, "open")
+      .mockReturnValue(popup as unknown as Window);
+    let resolveConfig: (config: RequestConfig) => void = () => {};
+    const deferredConfig = new Promise<RequestConfig>((resolve) => {
+      resolveConfig = resolve;
+    });
+
+    const result = requestWithPopup(deferredConfig, { nonce: "nonce" });
+
+    expect(open).toHaveBeenCalledWith(
+      "/sso-connecting",
+      "_blank",
+      expect.any(String),
+    );
+    expect(popup.location.href).toBe("");
+
+    resolveConfig(config);
+    await vi.waitFor(() =>
+      expect(popup.location.href).toMatch(
+        /^https:\/\/idp\.example\/authorize\?/,
+      ),
+    );
+    expect(open).toHaveBeenCalledTimes(1);
+
+    popup.closed = true;
+    const rejection = expect(result).rejects.toBeInstanceOf(
+      CallbackPopupClosedError,
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    await rejection;
+  });
+
+  it("resolves with the token when the callback's message lands after the popup reads as closed", async () => {
+    const { popup, result, state, channel } = openPopup();
+
+    // The callback page posts the payload and closes itself back to back.
+    // The popup already reads as closed while the message is in flight.
+    popup.closed = true;
+    // Polls at 250, 500, 750 and 1000 ms all see the popup closed, 750 ms
+    // into the grace period that starts at the first of them.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(channel.closed).toBe(false);
+
+    channel.deliver({ id_token: "token", state });
+
+    await expect(result).resolves.toBe("token");
+    expect(channel.closed).toBe(true);
+    expect(popup.close).toHaveBeenCalled();
+  });
+
+  it("rejects with CallbackPopupClosedError once the grace period passes without a message", async () => {
+    const { popup, result, channel } = openPopup();
+    let error: unknown;
+    result.catch((e: unknown) => {
+      error = e;
+    });
+
+    popup.closed = true;
+    // The first poll to see the popup closed is at 250 ms, so the 1 s grace
+    // period runs out at the 1250 ms poll.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(error).toBeUndefined();
+    expect(channel.closed).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(error).toBeInstanceOf(CallbackPopupClosedError);
+    expect(channel.closed).toBe(true);
   });
 });

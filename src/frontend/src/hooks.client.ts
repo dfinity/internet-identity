@@ -10,6 +10,7 @@ import {
   frontendCanisterConfig,
 } from "$lib/globals";
 import { initAnalytics } from "$lib/utils/analytics/analytics";
+import { redirectToPrimaryOrigin } from "$lib/utils/primaryOrigin";
 import { localeStore } from "$lib/stores/locale.store";
 import { getLocaleDirection } from "$lib/constants/locale.constants";
 
@@ -51,6 +52,17 @@ const overrideFeatureFlags = () => {
 
 export const init: ClientInit = async () => {
   await initGlobals();
+  // Redirect related origins to the primary origin here, before any component
+  // mounts, so it happens before the authorize layout establishes the ICRC-29
+  // channel. The client learns the signer origin from the handshake response,
+  // so redirecting before the handshake is invisible to it, while redirecting
+  // after it leaves the client pinned to the previous origin until its
+  // disconnect timeout closes the window.
+  //
+  // Nothing else is initialized on a document that is about to be replaced.
+  if (redirectToPrimaryOrigin()) {
+    return;
+  }
   // Initialize analytics here, in the client `init` hook, so the tracker exists
   // before any component mounts. Svelte runs a child component's `onMount`
   // before its parent's, so initializing in the root layout's `onMount` (as it

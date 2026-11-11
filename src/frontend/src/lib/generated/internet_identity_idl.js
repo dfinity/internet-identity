@@ -5,12 +5,6 @@ export const idlFactory = ({ IDL }) => {
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
     'allowed_domains' : IDL.Vec(IDL.Text),
   });
-  const SsoCredentialMigrationEntry = IDL.Record({
-    'name' : IDL.Opt(IDL.Text),
-    'issuer' : IDL.Text,
-    'discovery_domain' : IDL.Text,
-    'client_id' : IDL.Text,
-  });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,
     'key_tag' : IDL.Nat16,
@@ -37,6 +31,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIdEmailVerification = IDL.Variant({
     'Google' : IDL.Null,
     'Unknown' : IDL.Null,
+    'Apple' : IDL.Null,
     'Microsoft' : IDL.Null,
   });
   const OpenIdConfig = IDL.Record({
@@ -72,14 +67,14 @@ export const idlFactory = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
-    'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
-    'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
+    'notifications_allow_insecure_endpoint' : IDL.Opt(IDL.Bool),
+    'notifications_enabled' : IDL.Opt(IDL.Bool),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
@@ -90,6 +85,7 @@ export const idlFactory = ({ IDL }) => {
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'mcp_official_url' : IDL.Opt(IDL.Opt(IDL.Text)),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'notifications_allow_insecure_sender_list' : IDL.Opt(IDL.Bool),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
@@ -145,6 +141,88 @@ export const idlFactory = ({ IDL }) => {
       'verification_code' : IDL.Text,
       'device_registration_timeout' : Timestamp,
     }),
+  });
+  const SessionKey = PublicKey;
+  const AppGetDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'expiration' : Timestamp,
+  });
+  const Delegation = IDL.Record({
+    'permissions' : IDL.Opt(IDL.Text),
+    'pubkey' : PublicKey,
+    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
+    'expiration' : Timestamp,
+  });
+  const SignedDelegation = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'delegation' : Delegation,
+  });
+  const AppSessionError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
+  const AppNotificationConsentStatusResponse = IDL.Record({
+    'is_granted' : IDL.Bool,
+  });
+  const AppNotificationConsentStatusError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
+  const AppPrepareDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+  });
+  const AppPrepareDelegationResponse = IDL.Record({
+    'user_key' : PublicKey,
+    'expiration' : Timestamp,
+  });
+  const AppRevokeNotificationConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
+  const NotificationId = IDL.Nat64;
+  const Urgency = IDL.Variant({
+    'Low' : IDL.Null,
+    'High' : IDL.Null,
+    'VeryLow' : IDL.Null,
+    'Normal' : IDL.Null,
+  });
+  const Notification = IDL.Record({
+    'id' : NotificationId,
+    'urgency' : IDL.Opt(Urgency),
+    'recipient' : IDL.Principal,
+    'expires_at' : IDL.Opt(Timestamp),
+  });
+  const FrontendHostname = IDL.Text;
+  const SendNotificationArg = IDL.Record({
+    'notifications' : IDL.Vec(Notification),
+    'origin' : FrontendHostname,
+  });
+  const NotAcceptedReason = IDL.Variant({
+    'NoSuchRecipient' : IDL.Null,
+    'NoChannel' : IDL.Null,
+    'Deferred' : IDL.Record({ 'retry_after' : Timestamp }),
+  });
+  const NotAccepted = IDL.Record({
+    'id' : NotificationId,
+    'recipient' : IDL.Principal,
+    'reason' : NotAcceptedReason,
+  });
+  const SendNotificationResponse = IDL.Record({
+    'not_accepted' : IDL.Vec(NotAccepted),
+  });
+  const SendNotificationError = IDL.Variant({
+    'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSender' : IDL.Null,
+  });
+  const AppSsoDomainStatus = IDL.Variant({
+    'Available' : IDL.Record({ 'name' : IDL.Opt(IDL.Text) }),
+    'Unavailable' : IDL.Record({
+      'retry_after' : IDL.Opt(Timestamp),
+      'reason' : IDL.Opt(IDL.Text),
+    }),
+    'Pending' : IDL.Null,
   });
   const IdentityNumber = IDL.Nat64;
   const AuthnMethodProtection = IDL.Variant({
@@ -236,6 +314,49 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
+  const InboxNotificationId = IDL.Nat64;
+  const GetNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+    'browser_id' : IDL.Nat32,
+    'anchor_number' : UserNumber,
+  });
+  const IdentityForNotification = IDL.Record({
+    'name' : IDL.Opt(IDL.Text),
+    'anchor_number' : UserNumber,
+  });
+  const NotificationEvent = IDL.Variant({
+    'NotificationsOn' : IdentityForNotification,
+  });
+  const AccountNumber = IDL.Nat64;
+  const NotificationToShow = IDL.Record({
+    'id' : NotificationId,
+    'origin' : IDL.Opt(FrontendHostname),
+    'canister_id' : IDL.Principal,
+    'event' : IDL.Opt(NotificationEvent),
+    'account_number' : IDL.Opt(AccountNumber),
+  });
+  const GetNotificationResponse = IDL.Record({
+    'notification' : IDL.Opt(NotificationToShow),
+  });
+  const GetNotificationError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
+  const NotShownReason = IDL.Variant({
+    'PayloadUnreachable' : IDL.Null,
+    'PayloadRejected' : IDL.Null,
+  });
+  const RemoveNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+    'browser_id' : IDL.Nat32,
+    'anchor_number' : UserNumber,
+    'not_shown' : IDL.Opt(NotShownReason),
+  });
+  const RemoveNotificationResponse = IDL.Record({});
+  const RemoveNotificationError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const CheckCaptchaArg = IDL.Record({ 'solution' : IDL.Text });
   const RegistrationFlowNextStep = IDL.Variant({
     'CheckCaptcha' : IDL.Record({ 'captcha_png_base64' : IDL.Text }),
@@ -249,8 +370,19 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'WrongSolution' : IDL.Record({ 'new_captcha_png_base64' : IDL.Text }),
   });
-  const FrontendHostname = IDL.Text;
-  const AccountNumber = IDL.Nat64;
+  const ClaimNotificationAppRequest = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'offering_anchor_number' : UserNumber,
+    'anchor_number' : UserNumber,
+    'expires_at_ns' : IDL.Nat64,
+  });
+  const ClaimNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'InvalidClaimToken' : IDL.Null,
+    'ClaimTokenExpired' : IDL.Null,
+  });
   const AccountInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
     'origin' : IDL.Text,
@@ -272,6 +404,14 @@ export const idlFactory = ({ IDL }) => {
     'creation_in_progress' : IDL.Null,
     'success' : IDL.Principal,
     'failed' : IDL.Text,
+  });
+  const DisableNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const DisableNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
   });
   const VerificationPath = IDL.Variant({
     'Doh' : IDL.Null,
@@ -366,21 +506,19 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
-  const SessionKey = PublicKey;
   const EmailRecoveryGetDelegationArgs = IDL.Record({
     'session_key' : SessionKey,
     'expiration' : Timestamp,
     'nonce' : IDL.Text,
   });
-  const Delegation = IDL.Record({
-    'permissions' : IDL.Opt(IDL.Text),
-    'pubkey' : PublicKey,
-    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
-    'expiration' : Timestamp,
+  const EnableNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
   });
-  const SignedDelegation = IDL.Record({
-    'signature' : IDL.Vec(IDL.Nat8),
-    'delegation' : Delegation,
+  const EnableNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NotReachable' : IDL.Null,
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
@@ -388,11 +526,39 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
+  const ForgetApplicationsRequest = IDL.Record({
+    'origins' : IDL.Vec(FrontendHostname),
+    'anchor_number' : UserNumber,
+  });
+  const ForgetApplicationsError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const Permissions = IDL.Variant({ 'all' : IDL.Null, 'queries' : IDL.Null });
   const AccountDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+  });
+  const GetAccountSessionRequest = IDL.Record({
+    'session_id' : IDL.Nat64,
+    'session_key' : SessionKey,
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'expiration' : Timestamp,
+    'identity_number' : UserNumber,
+  });
+  const GetAccountSessionResponse = IDL.Record({
+    'signed_delegation' : SignedDelegation,
+  });
+  const AccountSessionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'StaleBrowserKey' : IDL.Null,
+    'NoSuchSession' : IDL.Null,
+    'NoSuchAccount' : IDL.Null,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -517,6 +683,35 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const GetNotificationAppStatusRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationAppInfo = IDL.Record({
+    'last_seen_ns' : IDL.Nat64,
+    'enabled' : IDL.Bool,
+    'subscribed' : IDL.Bool,
+  });
+  const NotificationAppStatus = IDL.Variant({
+    'Linked' : NotificationAppInfo,
+    'NoApp' : IDL.Null,
+    'AwaitingInstall' : IDL.Nat64,
+  });
+  const GetNotificationDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'expiration' : Timestamp,
+    'anchor_number' : UserNumber,
+  });
+  const GetNotificationDelegationResponse = IDL.Record({
+    'sender_info_signature' : IDL.Vec(IDL.Nat8),
+    'signed_delegation' : SignedDelegation,
+  });
+  const NotificationDelegationError = IDL.Variant({
+    'NoNotificationAccess' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -534,11 +729,20 @@ export const idlFactory = ({ IDL }) => {
     'resolved_client_id' : IDL.Opt(IDL.Text),
     'discovery_domain' : IDL.Text,
     'client_id' : IDL.Text,
+    'session_max_age_ns' : IDL.Nat64,
   });
   const SsoDiscoveryStatus = IDL.Variant({
+    'Failed' : IDL.Record({
+      'retry_after' : IDL.Opt(Timestamp),
+      'reason' : IDL.Opt(IDL.Text),
+    }),
     'Resolved' : SsoDiscovery,
     'Pending' : IDL.Null,
   });
+  const GetWebPushSubscriptionStatusRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const WebPushSubscriptionStatus = IDL.Record({ 'endpoint' : IDL.Text });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -566,6 +770,49 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'last_used' : IDL.Opt(Timestamp),
   });
+  const OperatingSystem = IDL.Variant({
+    'Ios' : IDL.Null,
+    'Linux' : IDL.Null,
+    'Android' : IDL.Null,
+    'Macos' : IDL.Null,
+    'ChromeOs' : IDL.Null,
+    'Windows' : IDL.Null,
+    'Other' : IDL.Text,
+    'Ipados' : IDL.Null,
+  });
+  const FormFactor = IDL.Variant({
+    'Unknown' : IDL.Null,
+    'Tablet' : IDL.Null,
+    'Desktop' : IDL.Null,
+    'Mobile' : IDL.Null,
+  });
+  const BrowserBrand = IDL.Variant({
+    'Edge' : IDL.Null,
+    'Firefox' : IDL.Null,
+    'Safari' : IDL.Null,
+    'SamsungInternet' : IDL.Null,
+    'Opera' : IDL.Null,
+    'Other' : IDL.Text,
+    'Chrome' : IDL.Null,
+  });
+  const BrowserDescription = IDL.Record({
+    'os' : OperatingSystem,
+    'model' : IDL.Opt(IDL.Text),
+    'form_factor' : FormFactor,
+    'brand' : BrowserBrand,
+  });
+  const BrowserInfo = IDL.Record({
+    'id' : IDL.Nat32,
+    'session_count' : IDL.Nat32,
+    'notification_app' : IDL.Opt(NotificationAppInfo),
+    'description' : BrowserDescription,
+    'created_at' : Timestamp,
+    'last_used' : Timestamp,
+  });
+  const McpConfig = IDL.Record({
+    'url' : IDL.Opt(IDL.Text),
+    'enabled' : IDL.Bool,
+  });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
     'session' : IDL.Opt(IDL.Principal),
@@ -578,6 +825,8 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
     'created_at' : IDL.Opt(Timestamp),
+    'browsers' : IDL.Opt(IDL.Vec(BrowserInfo)),
+    'mcp_config' : IDL.Opt(McpConfig),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
   });
@@ -620,6 +869,32 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const NotificationAppId = IDL.Nat64;
+  const LinkNotificationAppRequest = IDL.Record({
+    'app_principal' : IDL.Principal,
+    'app_id' : IDL.Opt(NotificationAppId),
+    'anchor_number' : UserNumber,
+  });
+  const LinkNotificationAppResponse = IDL.Record({
+    'app_id' : NotificationAppId,
+  });
+  const LinkNotificationAppError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'PrincipalAlreadyInUse' : IDL.Null,
+    'NoPendingLink' : IDL.Null,
+    'AppPrincipalIsAnonymous' : IDL.Null,
+  });
+  const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
+  const ApplicationInfo = IDL.Record({
+    'origin' : FrontendHostname,
+    'notifications_allowed' : IDL.Bool,
+    'last_notified' : IDL.Opt(Timestamp),
+    'last_used' : IDL.Opt(Timestamp),
+  });
+  const ListApplicationsError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const ListAvailableAttributesRequest = IDL.Record({
     'attributes' : IDL.Opt(IDL.Vec(IDL.Text)),
     'identity_number' : IdentityNumber,
@@ -635,10 +910,6 @@ export const idlFactory = ({ IDL }) => {
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
   });
-  const McpConfig = IDL.Record({
-    'url' : IDL.Opt(IDL.Text),
-    'enabled' : IDL.Bool,
-  });
   const McpPrepareDelegation = IDL.Record({
     'user_key' : UserKey,
     'account_number' : IDL.Opt(AccountNumber),
@@ -647,6 +918,29 @@ export const idlFactory = ({ IDL }) => {
   const McpRegistrationV2 = IDL.Record({
     'permissions' : Permissions,
     'expiration' : Timestamp,
+  });
+  const NotificationAppAnchorsRequest = IDL.Record({
+    'app_id' : NotificationAppId,
+  });
+  const NotificationConsentGrantedRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
+  const NotificationGrantConsentRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
+  const NotificationGrantConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
+  const NotificationRevokeConsentRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
+  const NotificationRevokeConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
@@ -664,6 +958,9 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
   });
   const OpenIdDelegationError = IDL.Variant({
+    'SsoDomainMismatch' : IDL.Record({
+      'registered_sso_domain' : IDL.Opt(IDL.Text),
+    }),
     'NoSuchDelegation' : IDL.Null,
     'NoSuchAnchor' : IDL.Null,
     'JwtExpired' : IDL.Null,
@@ -684,6 +981,27 @@ export const idlFactory = ({ IDL }) => {
   const PrepareAccountDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
+  });
+  const PrepareAccountSessionRequest = IDL.Record({
+    'permissions' : IDL.Opt(Permissions),
+    'browser_description' : BrowserDescription,
+    'max_idle' : IDL.Opt(IDL.Nat64),
+    'session_key' : SessionKey,
+    'valid_for' : IDL.Opt(IDL.Nat64),
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'next_browser_key' : PublicKey,
+    'next_browser_key_signature' : IDL.Vec(IDL.Nat8),
+    'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
+    'current_browser_key' : PublicKey,
+    'identity_number' : UserNumber,
+  });
+  const PrepareAccountSessionResponse = IDL.Record({
+    'user_key' : PublicKey,
+    'browser_id' : IDL.Nat32,
+    'session_id' : IDL.Nat64,
+    'expiration' : Timestamp,
+    'account_principal' : IDL.Principal,
   });
   const PrepareAttributeRequest = IDL.Record({
     'origin' : FrontendHostname,
@@ -738,21 +1056,76 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareMcpRegistrationDelegation = IDL.Record({
     'user_key' : UserKey,
-    'expiration' : Timestamp,
     'trusted_url' : IDL.Text,
+    'expiration' : Timestamp,
+  });
+  const PrepareNotificationAppLinkRequest = IDL.Record({
+    'link_principal' : IDL.Principal,
+    'anchor_number' : UserNumber,
+  });
+  const PrepareNotificationAppLinkError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'LinkPrincipalIsAnonymous' : IDL.Null,
+    'AppAlreadyDelivering' : IDL.Null,
+  });
+  const PrepareNotificationDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'anchor_number' : UserNumber,
+  });
+  const PrepareNotificationDelegationResponse = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+    'sender_info' : IDL.Vec(IDL.Nat8),
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
+  });
+  const PrepareWebPushSubscriptionResponse = IDL.Record({
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'transport_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const PrepareWebPushSubscriptionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
+  const ProbeNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const ProbeNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NotReachable' : IDL.Null,
   });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
   });
   const RegisterResponse = IDL.Variant({
+    'device_already_used' : IDL.Null,
     'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
+  });
+  const RemoveWebPushSubscriptionRequest = IDL.Record({
+    'browser_id' : IDL.Nat32,
+    'anchor_number' : UserNumber,
+  });
+  const RemoveWebPushSubscriptionError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
+  const RevokeBrowserSessionsRequest = IDL.Record({
+    'browser_id' : IDL.Nat32,
+    'identity_number' : UserNumber,
+  });
+  const SessionRevokeError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const SetDefaultAccountError = IDL.Variant({
     'NoSuchOrigin' : IDL.Record({ 'anchor_number' : UserNumber }),
@@ -763,6 +1136,18 @@ export const idlFactory = ({ IDL }) => {
       'origin' : FrontendHostname,
       'anchor_number' : UserNumber,
     }),
+  });
+  const SetWebPushSubscriptionRequest = IDL.Record({
+    'sealed_auth' : IDL.Vec(IDL.Nat8),
+    'endpoint' : IDL.Text,
+    'anchor_number' : UserNumber,
+    'p256dh' : IDL.Vec(IDL.Nat8),
+    'transport_key' : IDL.Vec(IDL.Nat8),
+  });
+  const SetWebPushSubscriptionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'TransportKeyExpired' : IDL.Null,
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
   const SmtpEnvelope = IDL.Record({
@@ -848,6 +1233,62 @@ export const idlFactory = ({ IDL }) => {
         [UserNumber, DeviceData],
         [AddTentativeDeviceResponse],
         [],
+      ),
+    'app_get_delegation' : IDL.Func(
+        [AppGetDelegationRequest],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
+        ['query'],
+      ),
+    'app_notification_consent_status' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : AppNotificationConsentStatusResponse,
+            'Err' : AppNotificationConsentStatusError,
+          }),
+        ],
+        ['query'],
+      ),
+    'app_prepare_delegation' : IDL.Func(
+        [AppPrepareDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : AppPrepareDelegationResponse,
+            'Err' : AppSessionError,
+          }),
+        ],
+        [],
+      ),
+    'app_revoke_notification_consent' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AppRevokeNotificationConsentError,
+          }),
+        ],
+        [],
+      ),
+    'app_revoke_session' : IDL.Func(
+        [],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AppSessionError })],
+        [],
+      ),
+    'app_send_notification' : IDL.Func(
+        [SendNotificationArg],
+        [
+          IDL.Variant({
+            'Ok' : SendNotificationResponse,
+            'Err' : SendNotificationError,
+          }),
+        ],
+        [],
+      ),
+    'app_sso_domain_check' : IDL.Func([IDL.Text], [], []),
+    'app_sso_domain_status' : IDL.Func(
+        [IDL.Text],
+        [AppSsoDomainStatus],
+        ['query'],
       ),
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
@@ -939,6 +1380,26 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'browser_get_notification' : IDL.Func(
+        [GetNotificationRequest],
+        [
+          IDL.Variant({
+            'Ok' : GetNotificationResponse,
+            'Err' : GetNotificationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'browser_remove_notification' : IDL.Func(
+        [RemoveNotificationRequest],
+        [
+          IDL.Variant({
+            'Ok' : RemoveNotificationResponse,
+            'Err' : RemoveNotificationError,
+          }),
+        ],
+        [],
+      ),
     'check_captcha' : IDL.Func(
         [CheckCaptchaArg],
         [
@@ -949,6 +1410,12 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'check_session' : IDL.Func([], [IDL.Bool], ['query']),
+    'claim_notification_app' : IDL.Func(
+        [ClaimNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ClaimNotificationAppError })],
+        [],
+      ),
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
     'create_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Text],
@@ -957,6 +1424,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
+    'disable_notification_app' : IDL.Func(
+        [DisableNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : DisableNotificationAppError })],
+        [],
+      ),
     'discover_sso' : IDL.Func([IDL.Text], [], []),
     'email_challenge_diagnostics' : IDL.Func(
         [IDL.Text],
@@ -1018,9 +1490,24 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
         [],
       ),
+    'enable_notification_app' : IDL.Func(
+        [EnableNotificationAppRequest],
+        [
+          IDL.Variant({
+            'Ok' : NotificationId,
+            'Err' : EnableNotificationAppError,
+          }),
+        ],
+        [],
+      ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
+    'forget_applications' : IDL.Func(
+        [ForgetApplicationsRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ForgetApplicationsError })],
+        [],
+      ),
     'get_account_delegation' : IDL.Func(
         [
           UserNumber,
@@ -1034,6 +1521,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : SignedDelegation,
             'Err' : AccountDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'get_account_session' : IDL.Func(
+        [GetAccountSessionRequest],
+        [
+          IDL.Variant({
+            'Ok' : GetAccountSessionResponse,
+            'Err' : AccountSessionError,
           }),
         ],
         ['query'],
@@ -1094,6 +1591,21 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
         ['query'],
       ),
+    'get_notification_app_status' : IDL.Func(
+        [GetNotificationAppStatusRequest],
+        [NotificationAppStatus],
+        ['query'],
+      ),
+    'get_notification_delegation' : IDL.Func(
+        [GetNotificationDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : GetNotificationDelegationResponse,
+            'Err' : NotificationDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -1112,6 +1624,11 @@ export const idlFactory = ({ IDL }) => {
     'get_sso_discovery_status' : IDL.Func(
         [GetSsoDiscoveryStatusRequest],
         [SsoDiscoveryStatus],
+        ['query'],
+      ),
+    'get_webpush_subscription_status' : IDL.Func(
+        [GetWebPushSubscriptionStatusRequest],
+        [IDL.Opt(WebPushSubscriptionStatus)],
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
@@ -1156,6 +1673,26 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'link_notification_app' : IDL.Func(
+        [LinkNotificationAppRequest],
+        [
+          IDL.Variant({
+            'Ok' : LinkNotificationAppResponse,
+            'Err' : LinkNotificationAppError,
+          }),
+        ],
+        [],
+      ),
+    'list_applications' : IDL.Func(
+        [ListApplicationsRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Vec(ApplicationInfo),
+            'Err' : ListApplicationsError,
+          }),
+        ],
+        ['query'],
+      ),
     'list_available_attributes' : IDL.Func(
         [ListAvailableAttributesRequest],
         [
@@ -1228,6 +1765,36 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
+    'notification_app_anchors' : IDL.Func(
+        [NotificationAppAnchorsRequest],
+        [IDL.Vec(UserNumber)],
+        ['query'],
+      ),
+    'notification_consent_granted' : IDL.Func(
+        [NotificationConsentGrantedRequest],
+        [IDL.Bool],
+        ['query'],
+      ),
+    'notification_grant_consent' : IDL.Func(
+        [NotificationGrantConsentRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : NotificationGrantConsentError,
+          }),
+        ],
+        [],
+      ),
+    'notification_revoke_consent' : IDL.Func(
+        [NotificationRevokeConsentRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : NotificationRevokeConsentError,
+          }),
+        ],
+        [],
+      ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt, IDL.Opt(IDL.Text)],
         [
@@ -1294,6 +1861,16 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'prepare_account_session' : IDL.Func(
+        [PrepareAccountSessionRequest],
+        [
+          IDL.Variant({
+            'Ok' : PrepareAccountSessionResponse,
+            'Err' : AccountSessionError,
+          }),
+        ],
+        [],
+      ),
     'prepare_attributes' : IDL.Func(
         [PrepareAttributeRequest],
         [
@@ -1334,6 +1911,26 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'prepare_notification_app_link' : IDL.Func(
+        [PrepareNotificationAppLinkRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : PrepareNotificationAppLinkError,
+          }),
+        ],
+        [],
+      ),
+    'prepare_notification_delegation' : IDL.Func(
+        [PrepareNotificationDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : PrepareNotificationDelegationResponse,
+            'Err' : NotificationDelegationError,
+          }),
+        ],
+        [],
+      ),
     'prepare_session_delegation' : IDL.Func(
         [UserNumber, SessionKey, IDL.Opt(IDL.Nat64)],
         [
@@ -1344,16 +1941,57 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'prepare_webpush_subscription' : IDL.Func(
+        [UserNumber],
+        [
+          IDL.Variant({
+            'Ok' : PrepareWebPushSubscriptionResponse,
+            'Err' : PrepareWebPushSubscriptionError,
+            'Pending' : IDL.Null,
+          }),
+        ],
+        [],
+      ),
+    'probe_notification_app' : IDL.Func(
+        [ProbeNotificationAppRequest],
+        [
+          IDL.Variant({
+            'Ok' : NotificationId,
+            'Err' : ProbeNotificationAppError,
+          }),
+        ],
+        [],
+      ),
     'register' : IDL.Func(
         [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],
         [],
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
+    'remove_webpush_subscription' : IDL.Func(
+        [RemoveWebPushSubscriptionRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : RemoveWebPushSubscriptionError,
+          }),
+        ],
+        [],
+      ),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
+    'revoke_browser_sessions' : IDL.Func(
+        [RevokeBrowserSessionsRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SessionRevokeError })],
+        [],
+      ),
     'set_default_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : SetDefaultAccountError })],
+        [],
+      ),
+    'set_webpush_subscription' : IDL.Func(
+        [SetWebPushSubscriptionRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SetWebPushSubscriptionError })],
         [],
       ),
     'smtp_request' : IDL.Func([SmtpRequest], [SmtpResponse], []),
@@ -1414,12 +2052,6 @@ export const init = ({ IDL }) => {
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
     'allowed_domains' : IDL.Vec(IDL.Text),
   });
-  const SsoCredentialMigrationEntry = IDL.Record({
-    'name' : IDL.Opt(IDL.Text),
-    'issuer' : IDL.Text,
-    'discovery_domain' : IDL.Text,
-    'client_id' : IDL.Text,
-  });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,
     'key_tag' : IDL.Nat16,
@@ -1446,6 +2078,7 @@ export const init = ({ IDL }) => {
   const OpenIdEmailVerification = IDL.Variant({
     'Google' : IDL.Null,
     'Unknown' : IDL.Null,
+    'Apple' : IDL.Null,
     'Microsoft' : IDL.Null,
   });
   const OpenIdConfig = IDL.Record({
@@ -1481,14 +2114,14 @@ export const init = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
-    'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
-    'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
+    'notifications_allow_insecure_endpoint' : IDL.Opt(IDL.Bool),
+    'notifications_enabled' : IDL.Opt(IDL.Bool),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
@@ -1499,6 +2132,7 @@ export const init = ({ IDL }) => {
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'mcp_official_url' : IDL.Opt(IDL.Opt(IDL.Text)),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'notifications_allow_insecure_sender_list' : IDL.Opt(IDL.Bool),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });

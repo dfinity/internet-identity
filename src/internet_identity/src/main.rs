@@ -3,20 +3,24 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::delegation::DelegationAccess;
+use crate::origin::ApplicationOrigin;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
-    anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
+    anchor_operation_with_authz_check, check_app_authorization, check_authorization,
+    check_authz_and_record_activity, check_browser_authorization,
+    check_browser_or_notification_app_authorization, check_notification_app_authorization,
+    AuthorizedSession, NotificationKey,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
-use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk::call;
+use ic_cdk::spawn;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-
-use ic_cdk_timers::TimerId;
+use ic_cdk_timers::set_timer;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -38,21 +42,29 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::installed_app::NotificationAppRef;
+use notifications::senders::Senders;
+use notifications::validation::NOT_ENABLED_MESSAGE;
+use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
+use notifications::{
+    admit_batch, delivery_metrics, enabled_or, fetchable_origin, TooManyNotifications,
+};
 use serde_bytes::ByteBuf;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
-use storage::storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storage::{Salt, Storage};
 
 mod account_management;
+mod admission_queue;
 mod anchor_management;
 mod archive;
 mod assets;
 mod authz_utils;
+mod browser_key;
 
 mod attributes;
+mod concurrency;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
@@ -67,8 +79,11 @@ mod ii_domain;
 mod mcp;
 mod mcp_registration;
 
+mod notifications;
 mod openid;
+mod origin;
 mod session_delegation;
+mod sessions;
 mod single_flight_cache;
 mod state;
 mod stats;
@@ -81,6 +96,7 @@ mod verified_emails;
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
 }
+pub const SECOND_NS: u64 = secs_to_nanos(1);
 const MINUTE_NS: u64 = secs_to_nanos(60);
 const HOUR_NS: u64 = 60 * MINUTE_NS;
 const DAY_NS: u64 = 24 * HOUR_NS;
@@ -93,258 +109,9 @@ const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
 
-// ---- SSO credential migration (temporary, see PR-M of
-// `docs/ongoing/openid-sso-prod-readiness.md` §8.6) ----
-//
-// Stored `OpenIdCredential`s grew `sso_domain` / `sso_name` fields. New
-// credentials are stamped at verification time, but existing SSO credentials
-// in stable storage must be backfilled from the `sso_credential_migration`
-// upgrade arg. Backfilling all credentials synchronously in `post_upgrade`
-// would blow the instruction limit on II's production canister, so we batch
-// the work via an interval timer using the same convention as the prior
-// OpenID credential key migration (#3784) and anchor migration (#3713).
-
-/// How long to wait between migration batches.
-const SSO_CREDENTIAL_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
-/// Maximum number of credential index keys to examine per batch (= per
-/// ingress message). Matches the 2 000-per-batch convention used for
-/// previous migrations.
-const SSO_CREDENTIAL_MIGRATION_BATCH_SIZE: u64 = 2_000;
-
-thread_local! {
-    // TODO: Remove these after the data migration is complete.
-    static SSO_CREDENTIAL_MIGRATION_ENTRIES: RefCell<Vec<SsoCredentialMigrationEntry>> = const { RefCell::new(Vec::new()) };
-    static SSO_CREDENTIAL_MIGRATION_CURSOR: RefCell<Option<StorableOpenIdCredentialKey>> = const { RefCell::new(None) };
-    static SSO_CREDENTIAL_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
-    static SSO_CREDENTIAL_MIGRATION_STAMPED: RefCell<u64> = const { RefCell::new(0) };
-    static SSO_CREDENTIAL_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    static SSO_CREDENTIAL_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
-}
-
-/// Temporary hidden endpoint: returns any per-entry errors encountered
-/// during the SSO credential migration.
-#[update(hidden = true)]
-fn list_sso_credential_migration_errors() -> Vec<String> {
-    SSO_CREDENTIAL_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
-}
-
-/// Temporary hidden endpoint: returns `(stamped_credentials, is_done)` so
-/// monitoring can track migration progress.
-#[query(hidden = true)]
-fn sso_credential_migration_status() -> (u64, bool) {
-    (
-        SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow(|c| *c),
-        SSO_CREDENTIAL_MIGRATION_DONE.with_borrow(|d| *d),
-    )
-}
-
-/// Process one batch of the SSO credential migration. Bound to the interval
-/// timer set up in [`init_sso_credential_migration_timer`]; clears the timer
-/// once the migration signals completion.
-fn run_sso_credential_migration_batch() {
-    if SSO_CREDENTIAL_MIGRATION_DONE.with_borrow(|done| *done) {
-        return;
-    }
-
-    let entries = SSO_CREDENTIAL_MIGRATION_ENTRIES.with_borrow(|entries| entries.clone());
-    let cursor = SSO_CREDENTIAL_MIGRATION_CURSOR.with_borrow(|cursor| cursor.clone());
-    let outcome = state::storage_borrow_mut(|storage| {
-        storage.migrate_sso_credentials_batch(&entries, cursor, SSO_CREDENTIAL_MIGRATION_BATCH_SIZE)
-    });
-
-    SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow_mut(|count| {
-        *count = count.saturating_add(outcome.stamped);
-    });
-    if !outcome.errors.is_empty() {
-        SSO_CREDENTIAL_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
-    }
-    if let Some(next_cursor) = outcome.next_cursor {
-        SSO_CREDENTIAL_MIGRATION_CURSOR.replace(Some(next_cursor));
-    }
-
-    if outcome.is_done {
-        SSO_CREDENTIAL_MIGRATION_DONE.replace(true);
-        SSO_CREDENTIAL_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-            if let Some(timer_id) = id_slot.take() {
-                ic_cdk_timers::clear_timer(timer_id);
-            }
-        });
-        let stamped = SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow(|c| *c);
-        ic_cdk::println!("SSO credential migration COMPLETED ({stamped} credentials stamped).");
-    }
-}
-
-/// Start the interval timer driving [`run_sso_credential_migration_batch`].
-/// Safe to call from both `init` (the first batch will immediately see an
-/// empty entry list or index and mark the migration done) and `post_upgrade`.
-fn init_sso_credential_migration_timer() {
-    let timer_id = ic_cdk_timers::set_timer_interval(
-        SSO_CREDENTIAL_MIGRATION_BATCH_BACKOFF_SECONDS,
-        run_sso_credential_migration_batch,
-    );
-    SSO_CREDENTIAL_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-        if let Some(old_id) = id_slot.replace(timer_id) {
-            ic_cdk_timers::clear_timer(old_id);
-        }
-    });
-}
-
-// ---- MCP config migration (temporary; remove once every deployment has run
-// it) ----
-//
-// `enabled` on a stored `StorableMcpConfig` predates the official connector,
-// so a stored `false` only ever meant "no custom server of mine" — nobody
-// could have declined a connector that did not exist. This one-shot migration
-// gives AI access on the official connector to *every* anchor: it walks the
-// anchor map, so anchors that never wrote a config get a row too. Those are the
-// anchors that registered before configs were seeded at registration time, and
-// nothing else would ever switch them on.
-//
-// Driven by the `mcp_config_migration` upgrade arg and batched via an interval
-// timer, using the same convention as the SSO credential migration above:
-// writing a config for every anchor in `post_upgrade` would blow the
-// instruction limit.
-
-/// How long to wait between migration batches.
-const MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
-/// Maximum number of anchors to examine per batch (= per ingress message).
-/// Matches the 2 000-per-batch convention used for previous migrations.
-const MCP_CONFIG_MIGRATION_BATCH_SIZE: u64 = 2_000;
-
-/// Largest window [`list_mcp_config_migration_errors`] serves in one call, so a
-/// wide `lo`/`hi` range can't push the response past the 2 MiB limit. The full
-/// set is accumulated regardless — even the pathological case of every anchor
-/// erroring is a few hundred MB of strings, which fits the heap — so paging is
-/// only about the response size, not about bounding what is kept.
-const MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT: u64 = 500;
-
-thread_local! {
-    // TODO: Remove these after the data migration is complete.
-    static MCP_CONFIG_MIGRATION_REQUESTED: RefCell<bool> = const { RefCell::new(false) };
-    static MCP_CONFIG_MIGRATION_CURSOR: RefCell<Option<AnchorNumber>> = const { RefCell::new(None) };
-    static MCP_CONFIG_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
-    static MCP_CONFIG_MIGRATION_COUNT: RefCell<u64> = const { RefCell::new(0) };
-    static MCP_CONFIG_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    static MCP_CONFIG_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
-}
-
-/// Temporary hidden endpoint: per-anchor errors encountered during the MCP
-/// config migration, as the half-open range `[lo, hi)`. The strings name an
-/// anchor number and the anomaly, never a principal.
-///
-/// Every error is collected, but paginated on read because this migration
-/// touches every anchor: returning the whole list at once could exceed the
-/// 2 MiB response limit and fail exactly when it is needed. `hi` is clamped to
-/// the number stored and to [`MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT`] past `lo`,
-/// so page until a call returns fewer than requested. An out-of-range `lo`
-/// yields an empty vector rather than trapping.
-#[update(hidden = true)]
-fn list_mcp_config_migration_errors(lo: u64, hi: u64) -> Vec<String> {
-    MCP_CONFIG_MIGRATION_ERRORS.with_borrow(|errors| {
-        let len = errors.len() as u64;
-        if lo >= len || hi <= lo {
-            return vec![];
-        }
-        let end = hi.min(len).min(lo + MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT);
-        errors[lo as usize..end as usize].to_vec()
-    })
-}
-
-/// Temporary hidden endpoint: returns `(migrated_configs, is_done)` so beta
-/// monitoring can watch the migration land before it is proposed for
-/// production. Both values are per-boot, and `(0, false)` is ambiguous between
-/// two cases: this upgrade didn't pass `mcp_config_migration`, or it did and
-/// the scan hasn't finished. Only `(_, true)` means a run completed, so a
-/// `(0, false)` that persists past the first few batches is the signal that
-/// the arg never arrived.
-///
-/// `(0, true)` alone does not mean success: a migration refused for want of an
-/// official connector also lands there. [`list_mcp_config_migration_errors`]
-/// carries the refusal, so check it before reading `true` as "done".
-#[query(hidden = true)]
-fn mcp_config_migration_status() -> (u64, bool) {
-    (
-        MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c),
-        MCP_CONFIG_MIGRATION_DONE.with_borrow(|d| *d),
-    )
-}
-
-/// Process one batch of the MCP config migration. Bound to the interval timer
-/// set up in [`init_mcp_config_migration_timer`]; clears the timer once the
-/// scan reaches the end.
-fn run_mcp_config_migration_batch() {
-    if MCP_CONFIG_MIGRATION_DONE.with_borrow(|done| *done) {
-        return;
-    }
-
-    let cursor = MCP_CONFIG_MIGRATION_CURSOR.with_borrow(|cursor| *cursor);
-    let outcome = state::storage_borrow_mut(|storage| {
-        storage.migrate_mcp_configs_batch(cursor, MCP_CONFIG_MIGRATION_BATCH_SIZE)
-    });
-
-    MCP_CONFIG_MIGRATION_COUNT.with_borrow_mut(|count| {
-        *count = count.saturating_add(outcome.migrated);
-    });
-    if !outcome.errors.is_empty() {
-        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
-    }
-    if let Some(next_cursor) = outcome.next_cursor {
-        MCP_CONFIG_MIGRATION_CURSOR.replace(Some(next_cursor));
-    }
-
-    if outcome.is_done {
-        MCP_CONFIG_MIGRATION_DONE.replace(true);
-        MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-            if let Some(timer_id) = id_slot.take() {
-                ic_cdk_timers::clear_timer(timer_id);
-            }
-        });
-        let migrated = MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c);
-        ic_cdk::println!("MCP config migration COMPLETED ({migrated} configs migrated).");
-    }
-}
-
-/// Start the interval timer driving [`run_mcp_config_migration_batch`], unless
-/// this upgrade didn't ask for the migration. Nothing about a completed run is
-/// persisted, so the upgrade arg is the only control: passing it again re-runs
-/// the migration, exactly like the SSO credential migration above.
-///
-/// Without an official connector the migration is refused outright: the shape it
-/// writes resolves to no trusted URL at all, so it would leave every identity
-/// with AI access reading on and nothing behind it. Same rule as
-/// `mcp::init_config_for_new_identity`.
-fn init_mcp_config_migration_timer() {
-    if !MCP_CONFIG_MIGRATION_REQUESTED.with_borrow(|requested| *requested) {
-        return;
-    }
-    if mcp::official_url().is_none() {
-        // Record the refusal, not just the log line: `mcp_config_migration_status`
-        // would otherwise report `(0, true)`, indistinguishable from a run that
-        // completed with nothing to do.
-        let err = "migration refused: mcp_config_migration was requested but this deployment has \
-                   no official connector"
-            .to_string();
-        ic_cdk::println!("WARNING: MCP config migration: {err}");
-        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.push(err));
-        MCP_CONFIG_MIGRATION_DONE.replace(true);
-        return;
-    }
-    let timer_id = ic_cdk_timers::set_timer_interval(
-        MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS,
-        run_mcp_config_migration_batch,
-    );
-    MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-        if let Some(old_id) = id_slot.replace(timer_id) {
-            ic_cdk_timers::clear_timer(old_id);
-        }
-    });
-}
-
 #[update]
 async fn init_salt() {
-    state::init_salt().await;
+    state::set_salt_if_unset().await;
 }
 
 #[update]
@@ -416,7 +183,11 @@ fn verify_tentative_device(
     ) {
         Ok(maybe_confirmed_device) => {
             if let Some(confirmed_device) = maybe_confirmed_device {
-                // Add device to anchor with bookkeeping if it has been confirmed
+                // Add device to anchor with bookkeeping if it has been confirmed.
+                // Adding a method does not invalidate a pinned prepare-time
+                // AuthorizationKey; finalize re-auth remains the gate. (Eager
+                // drop is reserved for remove/replace paths — same as
+                // authn_method_add / OpenID add.)
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, confirmed_device);
                 if let Err(err) = state::storage_borrow_mut(|storage| storage.write(anchor)) {
@@ -567,6 +338,854 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
     anchor_management::lookup_caller_identity_by_recovery_phrase(caller)
 }
 
+// ---- Notifications: called by II's frontend / service worker ----
+
+/// Both keys a browser needs before it can subscribe: the one every push is signed with,
+/// and a one-shot key it encrypts this subscription's `auth` secret to.
+///
+/// An update call, because a query reply is signed by one replica. One that answered with
+/// a VAPID key of its own choosing would bind the subscription to it permanently, and the
+/// browser has nothing to check the answer against.
+#[update]
+async fn prepare_webpush_subscription(
+    anchor_number: AnchorNumber,
+) -> PrepareWebPushSubscriptionResult {
+    if let Err(err) = enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError) {
+        return PrepareWebPushSubscriptionResult::Err(err);
+    }
+    let Ok(key) = check_browser_or_notification_app_authorization(anchor_number) else {
+        return PrepareWebPushSubscriptionResult::Err(
+            PrepareWebPushSubscriptionError::InvalidBrowserKey,
+        );
+    };
+
+    let vapid_public_key = match notifications::webpush::vapid_key::held_public_key().await {
+        Ok(key) => key,
+        Err(err) => {
+            return PrepareWebPushSubscriptionResult::Err(
+                PrepareWebPushSubscriptionError::InternalCanisterError(err),
+            )
+        }
+    };
+
+    let now_ns = ic_cdk::api::time();
+    // Nothing pooled to derive from yet, which only happens when nobody has subscribed for
+    // a while. Asking for it put the draw in flight, so a caller coming back finds it.
+    let Some(seeds) = notifications::webpush::seed_pool::seeds_for(anchor_number, key, now_ns)
+    else {
+        return PrepareWebPushSubscriptionResult::Pending;
+    };
+
+    let transport_public_key =
+        notifications::webpush::transport::public_key_of(&seeds.transport_secret);
+    // Held on the registration the subscribe will write, which is the only call that can
+    // spend it.
+    if let Err(err) = notifications::webpush::start_subscription(
+        key,
+        anchor_number,
+        seeds.transport_secret,
+        seeds.sender_seed,
+        now_ns,
+    ) {
+        return PrepareWebPushSubscriptionResult::Err(err);
+    }
+
+    PrepareWebPushSubscriptionResult::Ok(PrepareWebPushSubscriptionResponse {
+        vapid_public_key: ByteBuf::from(vapid_public_key),
+        transport_public_key: ByteBuf::from(transport_public_key),
+    })
+}
+
+/// Authorized by the caller's own key: a browser writes its entry's subscription, an app
+/// writes its record's.
+#[update]
+fn set_webpush_subscription(
+    request: SetWebPushSubscriptionRequest,
+) -> Result<(), SetWebPushSubscriptionError> {
+    let SetWebPushSubscriptionRequest {
+        anchor_number,
+        endpoint,
+        p256dh,
+        transport_key,
+        sealed_auth,
+    } = request;
+    enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
+
+    // Every field at once rather than the first to fail, so a browser doesn't go round
+    // four times to learn what one answer can say.
+    let (endpoint, p256dh, transport_key, sealed_auth) = match (
+        PushEndpoint::try_from(endpoint.as_str())
+            .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
+        SubscriberKey::try_from(p256dh.into_vec()),
+        SubscriberKey::try_from(transport_key.into_vec()),
+        SealedAuth::try_from(sealed_auth.into_vec()),
+    ) {
+        (Ok(endpoint), Ok(p256dh), Ok(transport_key), Ok(sealed_auth)) => {
+            (endpoint, p256dh, transport_key, sealed_auth)
+        }
+        (endpoint, p256dh, transport_key, sealed_auth) => {
+            let problems: Vec<String> = [
+                endpoint.err(),
+                p256dh.err(),
+                transport_key.err(),
+                sealed_auth.err(),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            return Err(SetWebPushSubscriptionError::InternalCanisterError(
+                problems.join("; "),
+            ));
+        }
+    };
+
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
+
+    notifications::webpush::set_subscription(
+        key,
+        anchor_number,
+        endpoint,
+        p256dh,
+        transport_key,
+        sealed_auth,
+        ic_cdk::api::time(),
+    )
+}
+
+/// `None` for a deployment that does not notify and for a caller that is neither a browser
+/// of this identity nor an app one of its browsers points at, so neither can be probed with it.
+#[query]
+fn get_webpush_subscription_status(
+    request: GetWebPushSubscriptionStatusRequest,
+) -> Option<WebPushSubscriptionStatus> {
+    let GetWebPushSubscriptionStatusRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
+        return None;
+    }
+    let Ok(key) = check_browser_or_notification_app_authorization(anchor_number) else {
+        return None;
+    };
+
+    notifications::webpush::subscription_status(anchor_number, key)
+}
+
+/// Authorized by the identity rather than by the browser, so a browser that is lost or
+/// left behind can be silenced from another one.
+#[update]
+fn remove_webpush_subscription(
+    request: RemoveWebPushSubscriptionRequest,
+) -> Result<(), RemoveWebPushSubscriptionError> {
+    let RemoveWebPushSubscriptionRequest {
+        anchor_number,
+        browser_id,
+    } = request;
+    enabled_or(RemoveWebPushSubscriptionError::InternalCanisterError)?;
+    check_authz_and_record_activity(anchor_number)
+        .map_err(|_| RemoveWebPushSubscriptionError::Unauthorized(caller()))?;
+
+    notifications::webpush::remove_subscription(anchor_number, browser_id)
+}
+
+/// How long an install has to complete. Long enough to walk the steps at a reading pace,
+/// short enough that a fragment left in a browser history is of little use.
+const PENDING_LINK_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+/// Hands this browser's install a one-shot key, named by the principal the app will sign
+/// the link call as. The private half travels to the app in the URL fragment and never
+/// crosses the network, so a boundary node that sees the link call cannot replay it
+/// against a key of its own.
+#[update]
+fn prepare_notification_app_link(
+    request: PrepareNotificationAppLinkRequest,
+) -> Result<(), PrepareNotificationAppLinkError> {
+    let PrepareNotificationAppLinkRequest {
+        anchor_number,
+        link_principal,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(PrepareNotificationAppLinkError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    // The whole authority of an install URL is the key behind this principal, and the
+    // anonymous principal is held by everyone, so an install offered to it is one
+    // anybody could complete.
+    if link_principal == Principal::anonymous() {
+        return Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous);
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| PrepareNotificationAppLinkError::InvalidBrowserKey)?;
+    let now = ic_cdk::api::time();
+    // The install slot replaces the reference this entry holds, so starting one takes
+    // delivery off an app that is working. What decides whether it is working is what the
+    // canister stores about it, never anything the caller asserts: an app switched off or
+    // with no registration of its own is replaced freely, and so is one that was asked to
+    // prove itself, had its window, and never called.
+    if let Some(NotificationAppRef::Linked {
+        app_id,
+        enabled: true,
+    }) = anchor.notification_app(browser_id)
+    {
+        let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
+            .is_some_and(|app| app.is_subscribed() && !app.probe_went_unanswered(now));
+        if still_answering {
+            return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
+        }
+    }
+
+    anchor.start_notification_app_link(
+        browser_id,
+        link_principal,
+        now.saturating_add(PENDING_LINK_LIFETIME_NS),
+    );
+
+    state::storage_borrow_mut(|storage| {
+        storage.write(anchor).map_err(|err| {
+            PrepareNotificationAppLinkError::InternalCanisterError(format!("{err:?}"))
+        })
+    })
+}
+
+/// Authorized by the browser key alone, so the install page can ask without a session, and
+/// only about the caller's own entry. A deployment with notifications off and a caller we
+/// do not recognise both read as `NoApp`, which is what they have in common.
+#[query]
+fn get_notification_app_status(request: GetNotificationAppStatusRequest) -> NotificationAppStatus {
+    if !notifications::notifications_enabled() {
+        return NotificationAppStatus::NoApp;
+    }
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return NotificationAppStatus::NoApp;
+    };
+    anchor.notification_app_status(
+        browser_id,
+        ic_cdk::api::time(),
+        notifications::installed_app::record,
+    )
+}
+
+/// Switches delivery on and proves the app is there in one call, because the two cannot
+/// be separated: a reference that is off is skipped when the canister picks who to send
+/// to, so a probe sent first finds nothing to wake, and a switch thrown first announces
+/// itself and then has the probe say the same thing to the same device. The probe is the
+/// announcement here. Where nothing can be woken the switch does not stay on: an entry
+/// that delivers for nobody must not read as on while the caller offers the install.
+#[update]
+fn enable_notification_app(
+    request: EnableNotificationAppRequest,
+) -> Result<NotificationId, EnableNotificationAppError> {
+    let EnableNotificationAppRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
+        return Err(EnableNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| EnableNotificationAppError::InvalidBrowserKey)?;
+    // An install nobody has opened is not an app to switch on: the flag lives on the
+    // reference the app writes, so flipping it here would answer Ok and change nothing.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(EnableNotificationAppError::NoNotificationApp);
+    }
+
+    let now_ns = ic_cdk::api::time();
+    // One already on its way is asking what this call asks, and a second would reach the
+    // same address with the same thing to say. The ask is the record's, so another
+    // identity pointing at this app may be the one that made it.
+    let outstanding = outstanding_probe_of(&anchor, browser_id, now_ns);
+    anchor.enable_notification_app(browser_id);
+    let identity = identity_for_notification(&anchor);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| EnableNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })?;
+    if let Some(probe) = outstanding {
+        return Ok(probe);
+    }
+
+    match notifications::dispatch::notify_identity(
+        anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity),
+        now_ns,
+    ) {
+        Some(probe) => Ok(probe),
+        None => {
+            // Read again rather than reusing what was written above: the dispatch owns the
+            // anchor while it runs, and the queue it may have touched is on it.
+            state::storage_borrow_mut(|storage| {
+                let mut anchor = storage.read(anchor_number).map_err(|err| {
+                    EnableNotificationAppError::InternalCanisterError(format!("{err:?}"))
+                })?;
+                anchor.disable_notification_app(browser_id);
+                storage.write(anchor).map_err(|err| {
+                    EnableNotificationAppError::InternalCanisterError(format!("{err:?}"))
+                })
+            })?;
+            Err(EnableNotificationAppError::NotReachable)
+        }
+    }
+}
+
+/// The reference stays: this stops delivery for this identity and leaves the app where it
+/// is, subscription included, because the subscription is the record's and is shared.
+///
+/// Nothing is announced. An app reads who it delivers for from the canister, and a
+/// wake-up posted to an entry that has just stopped delivering would be dropped on its
+/// way out anyway.
+#[update]
+fn disable_notification_app(
+    request: DisableNotificationAppRequest,
+) -> Result<(), DisableNotificationAppError> {
+    let DisableNotificationAppRequest { anchor_number } = request;
+    if !notifications::notifications_enabled() {
+        return Err(DisableNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| DisableNotificationAppError::InvalidBrowserKey)?;
+    // As for switching on: there is nothing to switch until the app has linked.
+    if anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())
+        .is_none()
+    {
+        return Err(DisableNotificationAppError::NoNotificationApp);
+    }
+
+    anchor.disable_notification_app(browser_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| DisableNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
+/// The probe still inside its window on the record this entry points at.
+///
+/// The ask is kept on the record because the answer lands there, so every identity
+/// pointing at one app shares the ask: one of them probing is the whole device probing.
+fn outstanding_probe_of(
+    anchor: &storage::anchor::Anchor,
+    browser_id: BrowserId,
+    now_ns: Timestamp,
+) -> Option<NotificationId> {
+    let app_id = anchor
+        .notification_app(browser_id)
+        .and_then(|reference| reference.linked_app())?;
+    notifications::installed_app::record(app_id)?.outstanding_probe(now_ns)
+}
+
+/// Nothing says when a user deletes a web app, so the app proving itself is the only
+/// evidence. A browser whose record has a probe outstanding is given that one back.
+#[update]
+fn probe_notification_app(
+    request: ProbeNotificationAppRequest,
+) -> Result<NotificationId, ProbeNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(ProbeNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| ProbeNotificationAppError::InvalidBrowserKey)?;
+    if anchor.notification_app(browser_id).is_none() {
+        return Err(ProbeNotificationAppError::NoNotificationApp);
+    }
+    let now_ns = ic_cdk::api::time();
+    if let Some(outstanding) = outstanding_probe_of(&anchor, browser_id, now_ns) {
+        return Ok(outstanding);
+    }
+
+    notifications::dispatch::notify_identity(
+        request.anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity_for_notification(&anchor)),
+        now_ns,
+    )
+    .ok_or(ProbeNotificationAppError::NotReachable)
+}
+
+/// Which identity a notification is about, in the terms the user knows it by.
+fn identity_for_notification(anchor: &storage::anchor::Anchor) -> IdentityForNotification {
+    IdentityForNotification {
+        anchor_number: anchor.anchor_number(),
+        name: anchor.name(),
+    }
+}
+
+/// Thirty minutes. Bounding a claimed expiry from above keeps a signature made by a
+/// since-retired browser key worthless years later. The frontend asks for less.
+const CLAIM_TOKEN_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
+
+fn claim_token_expiry_in_range(expires_at_ns: Timestamp, now: Timestamp) -> bool {
+    expires_at_ns > now && expires_at_ns <= now.saturating_add(CLAIM_TOKEN_LIFETIME_NS)
+}
+
+#[cfg(test)]
+mod claim_token_expiry {
+    use super::{claim_token_expiry_in_range, CLAIM_TOKEN_LIFETIME_NS};
+
+    const NOW: u64 = 1_700_000_000_000_000_000;
+
+    #[test]
+    fn an_expiry_that_has_arrived_is_no_longer_claimable() {
+        assert!(!claim_token_expiry_in_range(NOW, NOW));
+        assert!(!claim_token_expiry_in_range(NOW - 1, NOW));
+    }
+
+    #[test]
+    fn an_expiry_is_claimable_up_to_and_including_the_ceiling() {
+        assert!(claim_token_expiry_in_range(NOW + 1, NOW));
+        assert!(claim_token_expiry_in_range(
+            NOW + CLAIM_TOKEN_LIFETIME_NS,
+            NOW
+        ));
+    }
+
+    #[test]
+    fn an_expiry_beyond_the_ceiling_is_refused() {
+        assert!(!claim_token_expiry_in_range(
+            NOW + CLAIM_TOKEN_LIFETIME_NS + 1,
+            NOW
+        ));
+    }
+
+    #[test]
+    fn a_ceiling_that_would_overflow_still_accepts_what_is_under_it() {
+        assert!(claim_token_expiry_in_range(u64::MAX, u64::MAX - 1));
+    }
+}
+
+/// Points a browser of `anchor_number` at the Home Screen app that
+/// `offering_anchor_number` already has on the same device.
+///
+/// Authorized twice over: the caller must be a browser of the identity being added, and
+/// `request.signature` must be one a browser of the offering identity made over both
+/// anchor numbers and the expiry. Nothing is stored between the two halves, and spending
+/// the same signature twice changes nothing.
+#[update]
+fn claim_notification_app(
+    request: ClaimNotificationAppRequest,
+) -> Result<(), ClaimNotificationAppError> {
+    let ClaimNotificationAppRequest {
+        anchor_number,
+        offering_anchor_number,
+        expires_at_ns,
+        signature,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(ClaimNotificationAppError::InternalCanisterError(
+            NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let now = ic_cdk::api::time();
+    if !claim_token_expiry_in_range(expires_at_ns, now) {
+        return Err(ClaimNotificationAppError::ClaimTokenExpired);
+    }
+    let (mut anchor, browser_id) = check_browser_authorization(anchor_number)
+        .map_err(|_| ClaimNotificationAppError::InvalidBrowserKey)?;
+
+    let offering_anchor = state::anchor(offering_anchor_number);
+    let offering_browser = offering_anchor
+        .browser_that_signed_claim(&signature, anchor_number, expires_at_ns)
+        .ok_or(ClaimNotificationAppError::InvalidClaimToken)?;
+    // Taken from the offering browser's own reference, so the claiming identity is never
+    // told which record it reached.
+    let app_id = offering_anchor
+        .notification_app(offering_browser)
+        .and_then(|reference| reference.linked_app())
+        .ok_or(ClaimNotificationAppError::NoNotificationApp)?;
+
+    // A claim is the user asking this identity to use the app already on the device, so
+    // it links with delivery on exactly as a first install does.
+    anchor.point_at_notification_app(browser_id, app_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| ClaimNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })?;
+
+    Ok(())
+}
+
+/// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
+/// nobody to deliver for, and those cases cannot be told apart.
+#[query]
+fn notification_app_anchors(request: NotificationAppAnchorsRequest) -> Vec<AnchorNumber> {
+    let NotificationAppAnchorsRequest { app_id } = request;
+    if !notifications::notifications_enabled() {
+        return vec![];
+    }
+    let Ok(app) = check_notification_app_authorization(app_id) else {
+        return vec![];
+    };
+    app.anchors.into_iter().collect()
+}
+
+/// Called by the Home Screen app, signed with the one-shot key its installing browser put
+/// in the URL fragment. The signature covers this call and nothing else, so it cannot be
+/// lifted onto a call naming another key, and the slot it spends is cleared here.
+#[update]
+fn link_notification_app(
+    request: LinkNotificationAppRequest,
+) -> Result<LinkNotificationAppResponse, LinkNotificationAppError> {
+    let LinkNotificationAppRequest {
+        anchor_number,
+        app_principal,
+        app_id,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(LinkNotificationAppError::InternalCanisterError(
+            notifications::NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    // The record is keyed by this principal, and the anonymous one is held by everyone,
+    // so a record keyed by it is one any caller at all would resolve to.
+    if app_principal == Principal::anonymous() {
+        return Err(LinkNotificationAppError::AppPrincipalIsAnonymous);
+    }
+    let now = ic_cdk::api::time();
+    let mut anchor = state::anchor(anchor_number);
+    let installing_browser = anchor
+        .browser_awaiting_link(caller(), now)
+        .ok_or(LinkNotificationAppError::NoPendingLink)?;
+    if anchor.browser_signs_as(app_principal) {
+        return Err(LinkNotificationAppError::PrincipalAlreadyInUse);
+    }
+
+    let app = state::storage_borrow_mut(|storage| {
+        storage.ensure_notification_app(app_principal, app_id, now)
+    })
+    .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
+    anchor.point_at_notification_app(installing_browser, app.id);
+
+    state::storage_borrow_mut(|storage| {
+        let Err(err) = storage.write(anchor) else {
+            // The app keeps this so a later link names the record it already has.
+            return Ok(LinkNotificationAppResponse { app_id: app.id });
+        };
+        // The record is already written, and this reply commits it whether it carries
+        // `Ok` or `Err`.
+        storage.delete_notification_app_if_unreferenced(app.id);
+        Err(LinkNotificationAppError::InternalCanisterError(format!(
+            "{err:?}"
+        )))
+    })
+}
+
+/// The browser this key is delivered through: the one that signed the call, or the one
+/// whose wake-ups route through the app that did, delivery switched on.
+///
+/// Read here rather than carried out of the authorization, so what a call acts on is what
+/// is stored when it acts rather than what was stored when it was let in.
+fn delivering_browser(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+) -> Option<(storage::anchor::Anchor, BrowserId)> {
+    let anchor = state::anchor(anchor_number);
+    let browser_id = match key {
+        NotificationKey::Browser(browser_id) => Some(browser_id),
+        NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
+    }?;
+    Some((anchor, browser_id))
+}
+
+/// The anchor, where the key is delivered through the browser the request names. An app's
+/// key signs for every browser pointing at it, so the one named is checked, not trusted.
+fn anchor_delivering_to(
+    anchor_number: AnchorNumber,
+    key: NotificationKey,
+    browser_id: BrowserId,
+) -> Option<storage::anchor::Anchor> {
+    let (anchor, delivering) = delivering_browser(anchor_number, key)?;
+    (delivering == browser_id).then_some(anchor)
+}
+
+/// Authorized by the browser key the caller signs with, or by the key of the Home Screen
+/// app that entry routes through.
+#[update]
+fn prepare_notification_delegation(
+    request: PrepareNotificationDelegationRequest,
+) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
+    let PrepareNotificationDelegationRequest {
+        anchor_number,
+        origin,
+        account_number,
+        session_key,
+    } = request;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(NotificationDelegationError::InternalCanisterError)?;
+    enabled_or(NotificationDelegationError::InternalCanisterError)?;
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
+    let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
+        .ok_or(NotificationDelegationError::NoNotificationAccess)?;
+
+    notifications::delegation::prepare(
+        anchor_number,
+        &origin,
+        account_number,
+        session_key,
+        &anchor,
+        browser_id,
+        ic_cdk::api::time(),
+    )
+}
+
+/// Authorized like the prepare it follows: by the browser key, or by the app's key.
+#[query]
+fn get_notification_delegation(
+    request: GetNotificationDelegationRequest,
+) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
+    let GetNotificationDelegationRequest {
+        anchor_number,
+        origin,
+        account_number,
+        session_key,
+        expiration,
+    } = request;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(NotificationDelegationError::InternalCanisterError)?;
+    enabled_or(NotificationDelegationError::InternalCanisterError)?;
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
+    let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
+        .ok_or(NotificationDelegationError::NoNotificationAccess)?;
+
+    notifications::delegation::get(
+        anchor_number,
+        &origin,
+        account_number,
+        session_key,
+        expiration,
+        &anchor,
+        browser_id,
+    )
+}
+
+/// Authorized by the browser key the caller signs with, or by the key of the Home Screen
+/// app that entry routes through.
+#[query]
+fn browser_get_notification(
+    request: GetNotificationRequest,
+) -> Result<GetNotificationResponse, GetNotificationError> {
+    let GetNotificationRequest {
+        anchor_number,
+        browser_id,
+        inbox_notification_id,
+    } = request;
+    enabled_or(GetNotificationError::InternalCanisterError)?;
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| GetNotificationError::InvalidBrowserKey)?;
+    let anchor = anchor_delivering_to(anchor_number, key, browser_id)
+        .ok_or(GetNotificationError::InvalidBrowserKey)?;
+
+    Ok(GetNotificationResponse {
+        notification: notifications::browser_inbox::notification_named(
+            &anchor,
+            browser_id,
+            inbox_notification_id,
+            ic_cdk::api::time(),
+        ),
+    })
+}
+
+/// Authorized like the read it follows: by the browser key, or by the app's key.
+#[update]
+fn browser_remove_notification(
+    request: RemoveNotificationRequest,
+) -> Result<RemoveNotificationResponse, RemoveNotificationError> {
+    let RemoveNotificationRequest {
+        anchor_number,
+        browser_id,
+        inbox_notification_id,
+        not_shown,
+    } = request;
+    enabled_or(RemoveNotificationError::InternalCanisterError)?;
+    let key = check_browser_or_notification_app_authorization(anchor_number)
+        .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
+    let anchor = anchor_delivering_to(anchor_number, key, browser_id)
+        .ok_or(RemoveNotificationError::InvalidBrowserKey)?;
+
+    let now_ns = ic_cdk::api::time();
+    // An acknowledgement is the only thing that tells us the app is still installed.
+    if let NotificationKey::App(app_id) = key {
+        state::storage_borrow_mut(|storage| {
+            storage.stamp_notification_app_use(app_id, caller(), now_ns)
+        });
+    }
+
+    notifications::browser_inbox::remove_collected(
+        anchor,
+        browser_id,
+        inbox_notification_id,
+        not_shown,
+        now_ns,
+    )
+    .map(|()| RemoveNotificationResponse {})
+    .map_err(RemoveNotificationError::InternalCanisterError)
+}
+
+#[update]
+fn notification_grant_consent(
+    request: NotificationGrantConsentRequest,
+) -> Result<(), NotificationGrantConsentError> {
+    use NotificationGrantConsentError::*;
+
+    let NotificationGrantConsentRequest {
+        anchor_number,
+        origin,
+    } = request;
+
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+    notifications::enabled_or(InternalCanisterError)?;
+
+    check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
+
+    notifications::grant_consent(anchor_number, &origin, ic_cdk::api::time())
+}
+
+#[update]
+fn notification_revoke_consent(
+    NotificationRevokeConsentRequest {
+        anchor_number,
+        origin,
+    }: NotificationRevokeConsentRequest,
+) -> Result<(), NotificationRevokeConsentError> {
+    use NotificationRevokeConsentError::*;
+
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+    notifications::enabled_or(InternalCanisterError)?;
+
+    check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
+
+    notifications::revoke_consent(anchor_number, &origin, ic_cdk::api::time())
+        .map_err(|err| InternalCanisterError(format!("{err}")))
+}
+
+/// `false` for an origin this deployment does not notify for and for an unauthorized
+/// caller, so neither can be probed with it.
+#[query]
+fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> bool {
+    let NotificationConsentGrantedRequest {
+        anchor_number,
+        origin,
+    } = request;
+    let Ok(origin) = ApplicationOrigin::try_from(origin.as_str()) else {
+        return false;
+    };
+    if !notifications::notifications_enabled() {
+        return false;
+    }
+    if check_authorization(anchor_number).is_err() {
+        return false;
+    }
+
+    notifications::consent_granted(anchor_number, &origin)
+}
+
+// ---- Notifications: called by an app's frontend ----
+
+#[query]
+fn app_notification_consent_status(
+) -> Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError> {
+    use AppNotificationConsentStatusError::*;
+
+    notifications::enabled_or(InternalCanisterError)?;
+
+    let AuthorizedSession {
+        anchor_number,
+        origin,
+        ..
+    } = check_app_authorization(ic_cdk::api::time()).map_err(|_| NoSuchSession)?;
+
+    Ok(AppNotificationConsentStatusResponse {
+        is_granted: notifications::consent_granted_for(anchor_number, &origin),
+    })
+}
+
+#[update]
+fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentError> {
+    use AppRevokeNotificationConsentError::*;
+
+    let now = ic_cdk::api::time();
+
+    let AuthorizedSession {
+        anchor_number,
+        origin,
+        ..
+    } = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+
+    notifications::enabled_or(InternalCanisterError)?;
+    let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
+
+    notifications::revoke_consent(anchor_number, &origin, now)
+        .map_err(|err| InternalCanisterError(format!("{err}")))
+}
+
+// ---- Notifications: called by an app's backend ----
+
+/// Authorized by the origin listing the caller in the sender list it publishes. A
+/// caller II cannot judge yet has its batch deferred rather than refused.
+#[update]
+fn app_send_notification(
+    request: SendNotificationArg,
+) -> Result<SendNotificationResponse, SendNotificationError> {
+    let SendNotificationArg {
+        origin,
+        notifications,
+    } = request;
+    let origin = ApplicationOrigin::try_from(origin.as_str())
+        .map_err(SendNotificationError::InternalCanisterError)?;
+    enabled_or(SendNotificationError::InternalCanisterError)?;
+    fetchable_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
+    let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {
+        SendNotificationError::TooManyNotifications {
+            limit: limit as u32,
+        }
+    })?;
+
+    match notifications::senders::authorize(&origin, caller(), ic_cdk::api::time()) {
+        Senders::NotListed => {
+            for notification in &notifications {
+                let labels =
+                    delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref());
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_unlisted_sender(
+                    caller(),
+                    origin.as_str(),
+                    &labels,
+                    ic_cdk::api::time(),
+                );
+            }
+            Err(SendNotificationError::NoSuchSender)
+        }
+        Senders::Pending { retry_after } => {
+            for notification in &notifications {
+                delivery_metrics::count_deferred(
+                    delivery_metrics::DeferCause::SenderList,
+                    &delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref()),
+                );
+            }
+            Ok(notifications::defer_whole_batch(notifications, retry_after))
+        }
+        Senders::Listed => Ok(notifications::submission::submit(
+            &origin,
+            notifications,
+            caller(),
+            ic_cdk::api::time(),
+        )),
+    }
+}
+
 #[query]
 fn lookup_device_key(credential_id: CredentialId) -> Option<DeviceKeyWithAnchor> {
     anchor_management::lookup_device_key_with_credential_id(&credential_id)
@@ -587,7 +1206,7 @@ fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Pri
 }
 
 #[update]
-async fn prepare_delegation(
+fn prepare_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
@@ -606,8 +1225,8 @@ async fn prepare_delegation(
         // The legacy endpoint has no read-only option.
         DelegationAccess::Unrestricted,
         &ii_domain,
+        time(),
     )
-    .await
     .map(
         |PrepareAccountDelegation {
              user_key,
@@ -640,6 +1259,26 @@ fn get_delegation(
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
 }
 
+/// A query, as `get_accounts` is: the list is for the user to read, and nothing is
+/// decided on it. Asks for the identity's own access methods, as `identity_info` does.
+#[query]
+fn list_applications(
+    request: ListApplicationsRequest,
+) -> Result<Vec<ApplicationInfo>, ListApplicationsError> {
+    check_authorization(request.anchor_number)
+        .map_err(|err| ListApplicationsError::Unauthorized(err.principal))?;
+    Ok(account_management::list_applications(request.anchor_number))
+}
+
+/// Origins are taken as `list_applications` spells them; one the identity holds nothing
+/// at is already forgotten.
+#[update]
+fn forget_applications(request: ForgetApplicationsRequest) -> Result<(), ForgetApplicationsError> {
+    check_authz_and_record_activity(request.anchor_number)
+        .map_err(|_| ForgetApplicationsError::Unauthorized(caller()))?;
+    account_management::forget_applications(request.anchor_number, request.origins)
+}
+
 #[query]
 fn get_accounts(
     anchor_number: AnchorNumber,
@@ -665,8 +1304,13 @@ fn create_account(
     match check_authorization(anchor_number) {
         Ok(_) => {
             // check if this anchor and acc are actually linked
-            account_management::create_account_for_origin(anchor_number, origin, name)
-                .map(|acc| acc.to_info())
+            account_management::create_account_for_origin(
+                anchor_number,
+                origin,
+                name,
+                ic_cdk::api::time(),
+            )
+            .map(|acc| acc.to_info())
         }
         Err(err) => Err(CreateAccountError::Unauthorized(err.principal)),
     }
@@ -685,6 +1329,7 @@ fn update_account(
             account_number,
             origin,
             update,
+            ic_cdk::api::time(),
         )
         .map(|acc| acc.to_info()),
         Err(err) => Err(UpdateAccountError::Unauthorized(err.principal)),
@@ -727,14 +1372,80 @@ fn set_default_account(
 ) -> Result<AccountInfo, SetDefaultAccountError> {
     check_authz_and_record_activity(anchor_number).map_err(SetDefaultAccountError::from)?;
 
-    let result =
-        account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
+    let result = account_management::set_default_account_for_origin(
+        anchor_number,
+        origin,
+        account_number,
+        ic_cdk::api::time(),
+    )?;
     anchor_management::post_operation_bookkeeping(anchor_number, Operation::SetDefaultAccount);
     Ok(result)
 }
 
 #[update]
-async fn prepare_account_delegation(
+fn prepare_account_session(
+    request: PrepareAccountSessionRequest,
+) -> Result<PrepareAccountSessionResponse, AccountSessionError> {
+    sessions::prepare_account_session(request)
+}
+
+#[query]
+fn get_account_session(
+    request: GetAccountSessionRequest,
+) -> Result<GetAccountSessionResponse, AccountSessionError> {
+    sessions::get_account_session(request)
+}
+
+#[update]
+fn app_prepare_delegation(
+    request: AppPrepareDelegationRequest,
+) -> Result<AppPrepareDelegationResponse, AppSessionError> {
+    let now = ic_cdk::api::time();
+
+    // `NoSuchSession` whichever bound refused: which one it was would tell the app
+    // something about the identity behind the session, and it would do nothing
+    // differently either way.
+    let session = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+
+    sessions::app_prepare_delegation(session, request, now)
+}
+
+#[update]
+fn revoke_browser_sessions(
+    request: RevokeBrowserSessionsRequest,
+) -> Result<(), SessionRevokeError> {
+    sessions::revoke_browser_sessions(request, ic_cdk::api::time())
+}
+
+#[update]
+fn app_revoke_session() -> Result<(), AppSessionError> {
+    // Nothing to authorize: the caller arrives as the principal its session signs with,
+    // which names that session and no other, and a session past its bounds is still the
+    // caller's to sign out. Idempotent — a session that is not there is `Ok`.
+    state::storage_borrow_mut(|storage| storage.revoke_session(caller(), ic_cdk::api::time()))
+        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))
+}
+
+/// Whether the calling session is still usable, for the II frontend's silent re-auth
+/// path. Advisory: a query reply is not certified, and the refresh path enforces the
+/// same conditions on every mint regardless of the answer here.
+#[query]
+fn check_session() -> bool {
+    check_app_authorization(ic_cdk::api::time()).is_ok()
+}
+
+#[query]
+fn app_get_delegation(
+    request: AppGetDelegationRequest,
+) -> Result<SignedDelegation, AppSessionError> {
+    let now = ic_cdk::api::time();
+    let session = check_app_authorization(now).map_err(|_| AppSessionError::NoSuchSession)?;
+
+    sessions::app_get_delegation(session, request, now)
+}
+
+#[update]
+fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
@@ -758,8 +1469,8 @@ async fn prepare_account_delegation(
                 // value (queries-only by default in the CLI and MCP flows).
                 DelegationAccess::from(permissions),
                 &ii_domain,
+                time(),
             )
-            .await
         }
         Err(err) => Err(err.into()),
     }
@@ -792,9 +1503,14 @@ fn get_account_delegation(
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL). Persisted on-chain, so it follows the identity across
-/// devices. Read by the Settings UI and by the `/mcp` connect flow, which
-/// verifies the connecting origin against it at connect time. `null` means the
-/// anchor has never written a config.
+/// devices. `null` means the anchor has never written a config.
+///
+/// A query, so the reply is signed by one node rather than by consensus: the
+/// `/mcp` connect flow uses it only to pick which screen to show, and gates
+/// delivery on the certified `trusted_url` from
+/// `prepare_mcp_registration_delegation`. Anything that renders trust or feeds
+/// a write reads the config from `IdentityInfo::mcp_config` instead, certified
+/// by the `identity_info` update call.
 #[query]
 fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
@@ -833,15 +1549,19 @@ fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), 
 /// key) and hands back the `McpSession` the operation runs on, so there is no
 /// way to reach `prepare_delegation` without it.
 #[update]
-async fn mcp_prepare_delegation(
+fn mcp_prepare_delegation(
     target_origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    mcp::authorize_mcp_session_for_update()?
-        .prepare_delegation(target_origin, account_number, session_key, max_ttl)
-        .await
+    mcp::authorize_mcp_session_for_update()?.prepare_delegation(
+        target_origin,
+        account_number,
+        session_key,
+        max_ttl,
+        time(),
+    )
 }
 
 /// Fetch the delegation prepared by `mcp_prepare_delegation`. The anchor is
@@ -876,7 +1596,7 @@ fn mcp_get_accounts(
 }
 
 #[update]
-async fn prepare_session_delegation(
+fn prepare_session_delegation(
     anchor_number: AnchorNumber,
     session_key: SessionKey,
     max_ttl: Option<u64>,
@@ -884,7 +1604,7 @@ async fn prepare_session_delegation(
     internet_identity_interface::internet_identity::types::PrepareSessionDelegation,
     internet_identity_interface::internet_identity::types::SessionDelegationError,
 > {
-    session_delegation::prepare_session_delegation(anchor_number, session_key, max_ttl).await
+    session_delegation::prepare_session_delegation(anchor_number, session_key, max_ttl, time())
 }
 
 #[query]
@@ -1012,9 +1732,10 @@ fn config() -> InternetIdentityInit {
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
         sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
-        // One-shot upgrade arg driving the SSO credential backfill; not
-        // persisted as config, so there is nothing to report back here.
-        sso_credential_migration: None,
+        notifications_allow_insecure_sender_list: persistent_state
+            .notifications_allow_insecure_sender_list,
+        notifications_allow_insecure_endpoint: persistent_state
+            .notifications_allow_insecure_endpoint,
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -1025,9 +1746,7 @@ fn config() -> InternetIdentityInit {
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
         mcp_official_url: Some(persistent_state.mcp_official_url.clone()),
-        // One-shot upgrade arg driving the MCP config migration; not persisted
-        // as config, so there is nothing to report back here.
-        mcp_config_migration: None,
+        notifications_enabled: persistent_state.notifications_enabled,
     })
 }
 
@@ -1055,6 +1774,14 @@ fn acknowledge_entries(sequence_number: u64) {
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     state::init_new();
     initialize(maybe_arg);
+    // A salt is derived from raw randomness, which takes an await this hook cannot make, so
+    // the derivation runs the moment the install returns instead.
+    //
+    // There is deliberately no equivalent in `post_upgrade`. An upgrade keeps the salt,
+    // because stable memory is what an upgrade keeps. The one canister that would want it
+    // there is one upgraded from a release that derived its salt on the first delegation
+    // and never issued one, which has to be asked for a salt rather than given one.
+    set_timer(Duration::ZERO, || spawn(state::set_salt_if_unset()));
 }
 
 #[post_upgrade]
@@ -1079,14 +1806,16 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
-
-    // Kick off the SSO credential batch migration. Examines at most
-    // `SSO_CREDENTIAL_MIGRATION_BATCH_SIZE` index keys per tick so each batch
-    // fits in one ingress message; timer self-clears once the migration
-    // signals done (immediately, when no `sso_credential_migration` arg was
-    // supplied).
-    init_sso_credential_migration_timer();
-    init_mcp_config_migration_timer();
+    // A browser subscribes with this key, so it has to be in hand before the first one
+    // asks rather than when the first wake-up goes out: nothing can be delivered to a
+    // browser that could not subscribe. Reading it is a call this hook cannot make, so it
+    // runs the moment the install returns, as the salt does.
+    if notifications::notifications_enabled() {
+        set_timer(
+            Duration::ZERO,
+            notifications::webpush::vapid_key::ensure_public_key,
+        );
+    }
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -1134,11 +1863,21 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.sso_allow_insecure_discovery = Some(sso_allow_insecure_discovery);
             })
         }
-        if let Some(entries) = arg.sso_credential_migration {
-            // One-shot arg, not persisted: the entries only need to live
-            // until the batch migration kicked off in `initialize()` has
-            // walked the credential index once.
-            SSO_CREDENTIAL_MIGRATION_ENTRIES.replace(entries);
+        if let Some(notifications_allow_insecure_sender_list) =
+            arg.notifications_allow_insecure_sender_list
+        {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_allow_insecure_sender_list =
+                    Some(notifications_allow_insecure_sender_list);
+            })
+        }
+        if let Some(notifications_allow_insecure_endpoint) =
+            arg.notifications_allow_insecure_endpoint
+        {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_allow_insecure_endpoint =
+                    Some(notifications_allow_insecure_endpoint);
+            })
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {
             state::persistent_state_mut(|persistent_state| {
@@ -1182,13 +1921,15 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.doh_config = doh_config;
             })
         }
-        if arg.mcp_config_migration == Some(true) {
-            MCP_CONFIG_MIGRATION_REQUESTED.replace(true);
-        }
         if let Some(mcp_official_url) = arg.mcp_official_url {
             // Outer Some -> apply: inner None clears, inner Some replaces.
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.mcp_official_url = mcp_official_url;
+            })
+        }
+        if let Some(notifications_enabled) = arg.notifications_enabled {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_enabled = Some(notifications_enabled);
             })
         }
     }
@@ -1321,9 +2062,10 @@ mod v2_api {
     #[update]
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, IdentityInfoError> {
         check_authz_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
-        let anchor_info = anchor_management::get_anchor_info(identity_number);
+        let anchor = state::anchor(identity_number);
+        let anchor_info = anchor_management::anchor_info(&anchor);
 
-        let metadata = state::anchor(identity_number)
+        let metadata = anchor
             .identity_metadata()
             .clone()
             .unwrap_or_default()
@@ -1337,19 +2079,21 @@ mod v2_api {
         // enforces ≤1 entry, so the FE picks the first to render the
         // recovery-email card — but a future bump to N>1 won't need a
         // candid schema change.
-        let stored_email_recovery = state::anchor(identity_number).email_recovery.clone();
+        let stored_email_recovery = anchor.email_recovery.clone();
         let email_recovery = if stored_email_recovery.is_empty() {
             None
         } else {
             Some(stored_email_recovery)
         };
 
-        let stored_verified_emails = state::anchor(identity_number).verified_emails.clone();
+        let stored_verified_emails = anchor.verified_emails.clone();
         let verified_emails = if stored_verified_emails.is_empty() {
             None
         } else {
             Some(stored_verified_emails)
         };
+
+        let browsers = anchor.browsers_info(notifications::installed_app::record);
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
@@ -1366,6 +2110,12 @@ mod v2_api {
             created_at: anchor_info.created_at,
             email_recovery,
             verified_emails,
+            browsers,
+            // The same config `mcp_get_config` serves, but certified: this is
+            // an update call, so the Settings UI can render the trusted server
+            // — and base the config it writes back — on a value no single node
+            // can forge.
+            mcp_config: mcp::get_mcp_config(identity_number),
         };
         Ok(identity_info)
     }
@@ -1608,7 +2358,9 @@ mod v2_api {
             )?;
 
         if let Some(confirmed_device) = maybe_confirmed_device {
-            // Add device to anchor with bookkeeping if it has been confirmed
+            // Adding a method does not invalidate a pinned prepare-time
+            // AuthorizationKey (see verify_tentative_device). No pending
+            // email-challenge drop here — match authn_method_add / OpenID add.
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, confirmed_device);
             state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
@@ -1665,11 +2417,13 @@ mod openid_api {
 
     #[update]
     fn openid_identity_registration_finish(
-        mut arg: OpenIDRegFinishArg,
+        arg: OpenIDRegFinishArg,
     ) -> OpenIdResult<IdRegFinishResult, IdRegFinishError> {
-        // Canonicalize the untrusted discovery domain at the boundary so both
-        // verification and the credential stored from `arg` see the same value.
-        arg.discovery_domain = openid::canonical_discovery_domain_opt(arg.discovery_domain);
+        let discovery_domain = match openid::parse_discovery_domain(arg.discovery_domain.as_deref())
+        {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
         // Verify the JWT up front (driving any SSO discovery/JWKS fetches): a
         // cold or evicted cache surfaces as the `Pending` retry arm instead of a
         // terminal error, and the verified credential is then handed to the
@@ -1677,7 +2431,7 @@ mod openid_api {
         // domain + origin) goes through the SSO gate; everything else (a direct
         // provider or an ungated SSO login) through the plain OpenID verify —
         // mirroring the `sso_`/`openid_prepare_delegation` split on the auth side.
-        let credential = match (arg.discovery_domain.as_deref(), arg.origin.as_deref()) {
+        let credential = match (discovery_domain.as_ref(), arg.origin.as_deref()) {
             (Some(domain), Some(origin)) => {
                 openid::prefetch_sso(Some(domain));
                 match openid::verify_sso_for_registration(&arg.jwt, &arg.salt, domain, origin) {
@@ -1686,7 +2440,10 @@ mod openid_api {
                     Err(err) => return OpenIdResult::Err(err),
                 }
             }
-            _ => match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+            _ => match registration::registration_flow_v2::verify_openid_for_registration(
+                &arg,
+                discovery_domain.as_ref(),
+            ) {
                 Ok(openid::Cached::Ready(credential)) => credential,
                 Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
                 Err(err) => return OpenIdResult::Err(err),
@@ -1714,9 +2471,12 @@ mod openid_api {
         salt: [u8; 32],
         discovery_domain: Option<String>,
     ) -> OpenIdResult<(), OpenIdCredentialAddError> {
-        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
-        openid::prefetch_sso(discovery_domain.as_deref());
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+        let discovery_domain = match openid::parse_discovery_domain(discovery_domain.as_deref()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        openid::prefetch_sso(discovery_domain.as_ref());
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
             // SSO discovery/JWKS isn't cached yet; the fetch is in flight. The
             // frontend retries the call.
@@ -1768,21 +2528,23 @@ mod openid_api {
         // read the result. A cold cache reads `Pending`; the frontend polls
         // `openid_get_delegation` and re-calls this until the delegation is
         // ready.
-        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
-        openid::prefetch_sso(discovery_domain.as_deref());
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+        let discovery_domain = match openid::parse_discovery_domain(discovery_domain.as_deref()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        openid::prefetch_sso(discovery_domain.as_ref());
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
         // The verified credential already carries the SSO stable identifier, so
-        // the anchor write below reconciles the stable-id index — an existing
-        // anchor self-heals on a normal sign-in.
+        // the anchor write below reconciles the stable-id index.
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
-            let anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
-            })
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let anchor_number = openid::resolve_anchor_with_openid_credential(
+                &openid_credential.key(),
+                discovery_domain.as_ref(),
+            )?;
 
             // Update anchor with latest OpenID credential from JWT so latest information is stored,
             // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
@@ -1792,15 +2554,14 @@ mod openid_api {
             state::storage_borrow_mut(|storage| storage.write(anchor))
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
-            let (user_key, expiration) = openid_credential
-                .prepare_jwt_delegation(session_key, anchor_number)
-                .await;
+            let (user_key, expiration) =
+                openid_credential.prepare_jwt_delegation(session_key, anchor_number);
 
             // Checking again because the association could've changed during the .await
-            let still_anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
-            })
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let still_anchor_number = openid::resolve_anchor_with_openid_credential(
+                &openid_credential.key(),
+                discovery_domain.as_ref(),
+            )?;
 
             if anchor_number != still_anchor_number {
                 return Err(OpenIdDelegationError::NoSuchAnchor);
@@ -1832,21 +2593,23 @@ mod openid_api {
         // caches. A `Pending` means discovery/JWKS isn't cached yet — the
         // frontend re-calls `openid_prepare_delegation` (an update, which drives
         // the fetch) and polls this again.
-        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+        let discovery_domain = match openid::parse_discovery_domain(discovery_domain.as_deref()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_ref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
 
-        let delegation = match state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
-        }) {
-            Some(anchor_number) => {
-                openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
-            }
-            None => Err(OpenIdDelegationError::NoSuchAnchor),
-        };
+        let delegation = openid::resolve_anchor_with_openid_credential(
+            &openid_credential.key(),
+            discovery_domain.as_ref(),
+        )
+        .and_then(|anchor_number| {
+            openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
+        });
 
         match delegation {
             Ok(signed) => OpenIdResult::Ok(signed),
@@ -1854,16 +2617,47 @@ mod openid_api {
         }
     }
 
-    /// Drive the two-hop SSO discovery fetch for `domain`. The frontend calls
-    /// this when `get_sso_discovery_status` reads `Pending`, then keeps polling
-    /// the query until it returns `Resolved`.
+    /// Drive the two-hop SSO discovery fetch and the domain's JWKS fetch for
+    /// `domain`. The frontend calls this once, then polls
+    /// `get_sso_discovery_status`.
     #[update]
     fn discover_sso(domain: String) {
-        openid::discover_sso(&openid::canonical_discovery_domain(&domain))
+        // A value that is not a domain has nothing to fetch;
+        // `get_sso_discovery_status` reports why.
+        if let Ok(domain) = openid::Domain::try_from(domain.as_str()) {
+            openid::discover_sso(&domain)
+        }
+    }
+
+    /// Start the fetches behind `app_sso_domain_status` for `domain`, or
+    /// refresh a stale result.
+    #[update]
+    fn app_sso_domain_check(domain: String) {
+        // A value that is not a domain has nothing to fetch;
+        // `app_sso_domain_status` reports why.
+        if let Ok(domain) = openid::Domain::try_from(domain.as_str()) {
+            openid::discover_sso(&domain)
+        }
+    }
+
+    /// Whether `domain` can be used for SSO sign-in.
+    #[query]
+    fn app_sso_domain_status(
+        domain: String,
+    ) -> internet_identity_interface::internet_identity::types::AppSsoDomainStatus {
+        match openid::Domain::try_from(domain.as_str()) {
+            Ok(domain) => openid::app_sso_domain_status(&domain),
+            Err(reason) => {
+                internet_identity_interface::internet_identity::types::AppSsoDomainStatus::Unavailable {
+                    retry_after: None,
+                    reason: Some(reason),
+                }
+            }
+        }
     }
 
     /// Read the status of `org_domain`'s SSO discovery: `Resolved` with the
-    /// config, or `Pending` while the fetch is in flight.
+    /// config, `Pending` while the fetch is in flight, or `Failed`.
     ///
     /// With `target_app_origin`, the resolved `resolved_client_id` is the client
     /// that origin must use.
@@ -1871,10 +2665,17 @@ mod openid_api {
     fn get_sso_discovery_status(
         request: internet_identity_interface::internet_identity::types::GetSsoDiscoveryStatusRequest,
     ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryStatus {
-        openid::get_sso_discovery_status(
-            &openid::canonical_discovery_domain(&request.org_domain),
-            request.target_app_origin.as_deref(),
-        )
+        match openid::Domain::try_from(request.org_domain.as_str()) {
+            Ok(domain) => {
+                openid::get_sso_discovery_status(&domain, request.target_app_origin.as_deref())
+            }
+            Err(reason) => {
+                internet_identity_interface::internet_identity::types::SsoDiscoveryStatus::Failed {
+                    retry_after: None,
+                    reason: Some(reason),
+                }
+            }
+        }
     }
 
     /// SSO sign-in: verify the JWT, enforce the per-app gate, resolve the II-client
@@ -1890,7 +2691,14 @@ mod openid_api {
             org_domain,
             target_app_origin: origin,
         } = request;
-        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        let discovery_domain = match openid::Domain::try_from(org_domain.as_str()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(reason) => {
+                return OpenIdResult::Err(
+                    openid::OpenIDJWTVerificationError::GenericError(reason).into(),
+                )
+            }
+        };
         openid::prefetch_sso(Some(&discovery_domain));
 
         let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
@@ -1899,6 +2707,7 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err.into()),
         };
 
+        let session_max_age_ns = verification.session_max_age_ns;
         let identity = match openid::resolve_ii_client_identity(&verification) {
             Ok(identity) => identity,
             Err(err) => return OpenIdResult::Err(err),
@@ -1907,8 +2716,7 @@ mod openid_api {
         let prepared: Result<SsoPrepareDelegationResponse, OpenIdDelegationError> = async {
             let key = identity.credential.key();
             let anchor_number =
-                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
-                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+                openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
 
             // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
             let mut anchor = state::anchor(anchor_number);
@@ -1919,8 +2727,13 @@ mod openid_api {
 
             let (user_key, expiration) = identity
                 .credential
-                .prepare_jwt_delegation(session_key, anchor_number)
-                .await;
+                .prepare_jwt_delegation(session_key, anchor_number);
+
+            // The session deadline is fixed here, at the ceremony, from the
+            // policy captured while the discovery cache was warm. Everything
+            // downstream reads this value rather than the cache, so an evicted
+            // entry or a refreshed policy can't move a live session's deadline.
+            let session_expiry_ns = ic_cdk::api::time().saturating_add(session_max_age_ns);
 
             let (sso_attr_bundle, _bundle_expiration) = openid::prepare_sso_attr_bundle(
                 &identity.credential.iss,
@@ -1929,12 +2742,12 @@ mod openid_api {
                 anchor_number,
                 &discovery_domain,
                 &origin,
+                session_expiry_ns,
             );
 
             // The association could change during the `.await`.
             let still_anchor_number =
-                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
-                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+                openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
             if anchor_number != still_anchor_number {
                 // The credential re-associated to a different anchor during the
                 // `.await` (a concurrent account change). Deliberately reported
@@ -1970,7 +2783,14 @@ mod openid_api {
             target_app_origin: origin,
             sso_attr_bundle,
         } = request;
-        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        let discovery_domain = match openid::Domain::try_from(org_domain.as_str()) {
+            Ok(discovery_domain) => discovery_domain,
+            Err(reason) => {
+                return OpenIdResult::Err(
+                    openid::OpenIDJWTVerificationError::GenericError(reason).into(),
+                )
+            }
+        };
         let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
             Ok(openid::Cached::Ready(v)) => v,
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
@@ -1982,11 +2802,11 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err),
         };
         let key = identity.credential.key();
-        let Some(anchor_number) =
-            state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
-        else {
-            return OpenIdResult::Err(OpenIdDelegationError::NoSuchAnchor);
-        };
+        let anchor_number =
+            match openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain)) {
+                Ok(anchor_number) => anchor_number,
+                Err(err) => return OpenIdResult::Err(err),
+            };
         let signed_delegation =
             match identity
                 .credential
@@ -2271,11 +3091,24 @@ mod email_recovery_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
-        check_authorization(identity_number)
+        // Seed the email-challenge PRNG *before* pinning AuthorizationKey.
+        // `prepare_common` also calls `ensure_seeded`; if we snapshot authz
+        // first, the first prepare after install/upgrade yields on
+        // `raw_rand` and a concurrent remove/replace can finish while no
+        // pending entry exists for `drop_challenges_for_anchor` — then this
+        // call resumes and inserts a stale challenge. Seeding first makes
+        // that await a no-op, so authz → insert runs without yielding
+        // (IC only interleaves at await points).
+        crate::email_inbound::rng::ensure_seeded().await;
+
+        // Pin the authorization *method* (device pubkey / OpenID key /
+        // recovery address), not `caller()`: a temp-key principal expires
+        // in 10 minutes while the challenge lives 30.
+        let (_anchor, authorization_key) = check_authorization(identity_number)
             .map_err(|err| EmailChallengeError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::prepare_add(identity_number, dns_input, now_secs).await
+        email_recovery::prepare_add(identity_number, dns_input, now_secs, authorization_key).await
     }
 
     /// Anonymous. The FE-side counterpart of `prepare_add` for the
@@ -2388,12 +3221,24 @@ mod verified_email_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
-        check_authorization(identity_number)
+        // Same linearization as `email_recovery_credential_prepare_add`:
+        // seed before authz snapshot so prepare does not await between
+        // pinning AuthorizationKey and inserting the pending challenge.
+        crate::email_inbound::rng::ensure_seeded().await;
+
+        // Pin the authorization *method*, not `caller()` — see
+        // `email_recovery_credential_prepare_add`.
+        let (_anchor, authorization_key) = check_authorization(identity_number)
             .map_err(|err| EmailChallengeError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        crate::verified_emails::prepare_add_verified_email(identity_number, dns_input, now_secs)
-            .await
+        crate::verified_emails::prepare_add_verified_email(
+            identity_number,
+            dns_input,
+            now_secs,
+            authorization_key,
+        )
+        .await
     }
 
     #[update]
@@ -2452,9 +3297,6 @@ mod attribute_sharing {
         let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
             .map_err(PrepareAttributeError::GetAccountError)?;
 
-        // This is the only async operation, so we do it first, call operations that depend on
-        // the time. TODO: refactor to avoid asynchronicity here.
-        state::ensure_salt_set().await;
         let issued_at_timestamp_ns = ic_cdk::api::time();
 
         let attributes = anchor.prepare_attributes(attribute_keys, account, issued_at_timestamp_ns);
@@ -2517,9 +3359,10 @@ mod attribute_sharing {
         } = request.try_into()?;
 
         // SSO session iff a certified bundle for this origin is attached; gates `sso:<domain>` attributes.
-        let sso_session_domain = openid::read_certified_sso_bundle()
-            .filter(|bundle| bundle.origin == origin)
-            .map(|bundle| bundle.sso_domain);
+        let sso_session =
+            openid::read_certified_sso_bundle().filter(|bundle| bundle.origin == origin);
+        let sso_session_expiry_ns = sso_session.as_ref().map(|bundle| bundle.session_expiry_ns);
+        let sso_session_domain = sso_session.map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 PrepareIcrc3AttributeError::AuthorizationError(principal)
@@ -2528,8 +3371,6 @@ mod attribute_sharing {
         let account =
             get_account_for_origin(anchor.anchor_number(), origin.clone(), account_number)
                 .map_err(PrepareIcrc3AttributeError::GetAccountError)?;
-
-        state::ensure_salt_set().await;
 
         let issued_at_timestamp_ns = ic_cdk::api::time();
         let message = anchor.prepare_icrc3_attributes(
@@ -2540,6 +3381,7 @@ mod attribute_sharing {
             issued_at_timestamp_ns,
             account,
             sso_session_domain,
+            sso_session_expiry_ns,
         )?;
 
         Ok(PrepareIcrc3AttributeResponse { message })
@@ -2649,66 +3491,5 @@ mod test {
         .unwrap_or_else(|e| {
             panic!("the canister code interface is not equal to the did file: {e:?}")
         });
-    }
-}
-
-#[cfg(test)]
-mod list_mcp_config_migration_errors_tests {
-    use super::*;
-
-    fn seed(count: usize) {
-        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| {
-            *errors = (0..count).map(|i| format!("anchor {i}")).collect();
-        });
-    }
-
-    #[test]
-    fn serves_the_requested_half_open_range() {
-        seed(10);
-        assert_eq!(
-            list_mcp_config_migration_errors(2, 5),
-            vec!["anchor 2", "anchor 3", "anchor 4"]
-        );
-    }
-
-    #[test]
-    fn clamps_hi_to_what_is_retained() {
-        seed(3);
-        assert_eq!(
-            list_mcp_config_migration_errors(1, u64::MAX),
-            vec!["anchor 1", "anchor 2"]
-        );
-    }
-
-    #[test]
-    fn caps_the_window_at_the_page_limit() {
-        let total = MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT as usize + 10;
-        seed(total);
-        assert_eq!(
-            list_mcp_config_migration_errors(0, total as u64).len(),
-            MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT as usize
-        );
-    }
-
-    #[test]
-    fn returns_empty_for_out_of_range_or_inverted_bounds() {
-        seed(3);
-        // Past the end, and an empty or backwards window: empty, never a trap.
-        assert!(list_mcp_config_migration_errors(3, 9).is_empty());
-        assert!(list_mcp_config_migration_errors(u64::MAX, u64::MAX).is_empty());
-        assert!(list_mcp_config_migration_errors(2, 2).is_empty());
-        assert!(list_mcp_config_migration_errors(2, 1).is_empty());
-    }
-
-    #[test]
-    fn empty_error_list_never_slices() {
-        seed(0);
-        // The `lo >= len` guard catches this because `lo` is a `u64`, so it can't
-        // be below an empty list's length of 0 — the slice is never reached.
-        assert!(list_mcp_config_migration_errors(0, 0).is_empty());
-        assert!(list_mcp_config_migration_errors(0, u64::MAX).is_empty());
-        assert!(
-            list_mcp_config_migration_errors(0, MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT).is_empty()
-        );
     }
 }

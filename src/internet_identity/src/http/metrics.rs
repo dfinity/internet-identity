@@ -61,11 +61,6 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Number of total account references registered in this canister.",
         )?;
         w.encode_gauge(
-            "internet_identity_account_counter_discrepancy_count",
-            storage.get_discrepancy_counter().account_counter_rebuilds as f64,
-            "Number of times the account counter was found to be inconsistent with the actual number of accounts.",
-        )?;
-        w.encode_gauge(
             "internet_identity_total_application_count",
             storage.get_total_application_count() as f64,
             "Number of total applications registered in this canister.",
@@ -131,6 +126,20 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Number of active signatures issued by this canister.",
         )
     })?;
+    let posts = crate::notifications::dispatch::post_outcomes();
+    w.counter_vec(
+        "internet_identity_notification_wake_ups",
+        "Wake-up posts to push relays since the last upgrade, by outcome.",
+    )?
+    .value(&[("outcome", "sent")], posts.sent as f64)?
+    .value(&[("outcome", "gone")], posts.gone as f64)?
+    .value(&[("outcome", "rate_limited")], posts.rate_limited as f64)?
+    .value(&[("outcome", "relay_error")], posts.relay_error as f64)?
+    .value(&[("outcome", "rejected")], posts.rejected as f64)?;
+    let waiting_count =
+        state::notification_backlog_mut(time(), |backlog| backlog.stats(time()).stored_total)
+            + state::identity_backlog_mut(time(), |backlog| backlog.stats(time()).stored_total);
+    crate::notifications::delivery_metrics::encode(w, waiting_count, time())?;
     w.encode_gauge(
         "internet_identity_stable_memory_pages",
         stable_size() as f64,

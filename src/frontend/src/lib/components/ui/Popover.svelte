@@ -30,6 +30,7 @@
   }: Props = $props();
 
   const MOBILE_BREAKPOINT = 480;
+  const VIEWPORT_MARGIN = "1rem";
 
   let popoverRef = $state<HTMLElement | null>();
   let windowWidth = $state(window.innerWidth);
@@ -52,6 +53,7 @@
 
   $effect(() => {
     let tracking = true;
+    let lastMaxPanelHeight: string | undefined;
 
     const track = () => {
       if (
@@ -110,21 +112,33 @@
           finalDirection = "right";
         }
 
+        const sideTop = {
+          start: anchorRect.top,
+          center:
+            anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5,
+          end: anchorRect.bottom - popoverRect.height,
+        }[align];
+
         // Compute top position
         popoverRef.style.top = {
           up: `calc(${anchorRect.top - popoverRect.height}px - ${distance})`,
-          right: {
-            start: `${anchorRect.top}px`,
-            center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
-            end: `${anchorRect.bottom - popoverRect.height}px`,
-          }[align],
+          right: `${sideTop}px`,
           down: `calc(${anchorRect.bottom}px + ${distance})`,
-          left: {
-            start: `${anchorRect.top}px`,
-            center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
-            end: `${anchorRect.bottom - popoverRect.height}px`,
-          }[align],
+          left: `${sideTop}px`,
         }[finalDirection];
+
+        // Publish the vertical room left once positioned, so tall children can
+        // scroll internally instead of running off the bottom of the viewport.
+        const maxPanelHeight = {
+          up: `calc(${spaceAbove}px - ${distance} - ${VIEWPORT_MARGIN})`,
+          right: `calc(${window.innerHeight - Math.max(sideTop, 0)}px - ${VIEWPORT_MARGIN})`,
+          down: `calc(${spaceBelow}px - ${distance} - ${VIEWPORT_MARGIN})`,
+          left: `calc(${window.innerHeight - Math.max(sideTop, 0)}px - ${VIEWPORT_MARGIN})`,
+        }[finalDirection];
+        if (maxPanelHeight !== lastMaxPanelHeight) {
+          lastMaxPanelHeight = maxPanelHeight;
+          popoverRef.style.setProperty("--max-panel-height", maxPanelHeight);
+        }
 
         // Compute left position
         const inlineAlign = getInlineAlign(align);

@@ -33,6 +33,18 @@ export type Authorized = {
 const contextInternal = writable<AuthorizationContext | undefined>();
 const authorizedInternal = writable<Authorized | undefined>();
 
+export type AuthorizationPromptContext = {
+  prompt?: "none" | "login";
+  hint?: string;
+  resumable?: boolean;
+};
+
+/** Kept out of `AuthorizationContext`, whose presence is what makes the sign-in UI
+ *  render: URL state must not paint anything before there is a request to answer. */
+export const authorizationPromptStore = writable<AuthorizationPromptContext>(
+  {},
+);
+
 export const authorizationStore = {
   /** Called by the channel handler once the delegation request is parsed.
    *  Sets the effective origin and the app's requested session duration in a
@@ -50,6 +62,12 @@ export const authorizationStore = {
       effectiveOrigin,
       maxTimeToLive,
     }));
+  },
+  /** The origin alone, for a request that asks nothing about session duration.
+   *  Leaves `maxTimeToLive` as it stands rather than clearing what an earlier
+   *  request set. */
+  setRequestOrigin: (effectiveOrigin: string): void => {
+    contextInternal.update((context) => ({ ...context, effectiveOrigin }));
   },
   /** Called by the UI as soon as the auth method is chosen — lets consumers
    *  react to the flow type (e.g. OpenID vs passkey) without waiting for

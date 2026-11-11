@@ -153,23 +153,42 @@ export const matchDeclaredCallback = async (
       "The MCP server does not declare this callback in its allow-list.",
     );
   }
-  // Validate the matched entry itself — never just the fact of a match. The
-  // caller only asks about callbacks on the trusted origin, but re-verifying
-  // here keeps the invariant local: a declared cross-origin callback is
-  // rejected rather than honoured, whatever the caller did.
-  let matched: URL;
+  // Validate the matched entry itself — never just the fact of a match.
+  return assertDeliverableCallback(origin, requestedCallback);
+};
+
+/**
+ * The checks every callback must pass before anything is delivered to it,
+ * whatever established that it is the right one: it must parse, sit on the
+ * trust-confirmed `origin`, and carry no fragment of its own.
+ *
+ * Separate from the allow-list so both connect paths share it — a remote
+ * server's callback reaches this after matching its declared entry, a local
+ * server's (which has no allow-list to match) reaches it directly. Callers
+ * generally derive `origin` from the callback itself, so the same-origin check
+ * is usually a tautology; keeping it here means the invariant holds locally
+ * even if a caller ever stops doing that. The fragment check is not a
+ * tautology: the connect flow appends its own fragment, and a callback that
+ * already carried one would produce `...#theirs#delegation=...`, mangling the
+ * delivery. Nothing legitimate needs one.
+ *
+ * Returns the callback unchanged, so it reads as the value that passed.
+ */
+export const assertDeliverableCallback = (
+  origin: string,
+  callback: string,
+): string => {
+  let parsed: URL;
   try {
-    matched = new URL(requestedCallback);
+    parsed = new URL(callback);
   } catch {
-    throw new Error("The declared callback is not a valid URL.");
+    throw new Error("The callback is not a valid URL.");
   }
-  if (matched.origin !== origin) {
-    throw new Error("The declared callback is not on the server's origin.");
+  if (parsed.origin !== origin) {
+    throw new Error("The callback is not on the trusted server's origin.");
   }
-  if (matched.hash !== "") {
-    // The connect flow appends its own fragment; a declared fragment could
-    // clobber or be clobbered by it. Nothing legitimate needs one.
-    throw new Error("The declared callback must not carry a fragment.");
+  if (parsed.hash !== "") {
+    throw new Error("The callback must not carry a fragment.");
   }
-  return requestedCallback;
+  return callback;
 };

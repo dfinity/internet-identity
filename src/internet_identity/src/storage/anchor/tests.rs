@@ -1,3 +1,4 @@
+use crate::notifications::webpush::fixtures::subscription_at;
 use crate::openid::OpenIdCredential;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use candid::Principal;
@@ -223,6 +224,9 @@ fn should_allow_protection_only_on_recovery_phrases() {
 fn should_prevent_mutation_when_invariants_are_violated() {
     let mut device1 = recovery_phrase(1, DeviceProtection::Unprotected);
     let mut anchor = Anchor {
+        browsers: vec![],
+        next_browser_id: 0,
+        session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             device1.clone(),
@@ -245,6 +249,9 @@ fn should_prevent_mutation_when_invariants_are_violated() {
 #[test]
 fn should_prevent_addition_when_invariants_are_violated() {
     let mut anchor = Anchor {
+        browsers: vec![],
+        next_browser_id: 0,
+        session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             recovery_phrase(1, DeviceProtection::Unprotected),
@@ -267,6 +274,9 @@ fn should_prevent_addition_when_invariants_are_violated() {
 fn should_allow_removal_when_invariants_are_violated() {
     let device1 = recovery_phrase(1, DeviceProtection::Unprotected);
     let mut anchor = Anchor {
+        browsers: vec![],
+        next_browser_id: 0,
+        session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             device1.clone(),
@@ -1258,5 +1268,1196 @@ mod mirror_verified_email_tests {
             .verified_emails
             .iter()
             .all(|e| e.address != "new@example.com"));
+    }
+}
+
+mod browser_tests {
+    use super::*;
+    use crate::browser_key::test_keys::{claim_token, public_key, signing_key};
+    use crate::notifications::installed_app::{
+        NotificationApp, NotificationAppId, NotificationAppRef,
+    };
+    use crate::storage::anchor::{BrowserError, InboxNotification, MAX_BROWSERS};
+    use internet_identity_interface::internet_identity::types::{
+        BrowserBrand, BrowserDescription, BrowserId, FormFactor, NotificationAppInfo,
+        NotificationAppStatus, OperatingSystem, PublicKey,
+    };
+
+    fn anchor() -> Anchor {
+        Anchor::new(10_000, 0)
+    }
+
+    /// A description that differs by `label`, for tests that only need to tell entries
+    /// apart. The label rides in `model`, the description's one free-text field.
+    fn description(label: &str) -> BrowserDescription {
+        BrowserDescription {
+            brand: BrowserBrand::Chrome,
+            os: OperatingSystem::Macos,
+            form_factor: FormFactor::Desktop,
+            model: Some(label.to_string()),
+        }
+    }
+
+    fn browser_key(seed: u8) -> PublicKey {
+        ByteBuf::from(vec![seed; 91])
+    }
+
+    /// What a browser presenting `browser_key(seed)` announces it will rotate to.
+    fn successor_key(seed: u8) -> PublicKey {
+        ByteBuf::from(vec![seed; 92])
+    }
+
+    /// One browser's keys in the order it presents them. A sign-in promotes the successor
+    /// announced last time and announces a fresh one, so no key is ever presented twice.
+    fn rotating_key(browser: u8, step: u8) -> PublicKey {
+        let mut key = vec![browser; 91];
+        key[0] = step;
+        ByteBuf::from(key)
+    }
+
+    /// The one-shot principal a browser names when it mints an install URL.
+    fn link_principal(seed: u8) -> Principal {
+        Principal::self_authenticating([seed; 32])
+    }
+
+    /// An anchor holding the one registered browser an install starts from.
+    fn anchor_with_browser() -> (Anchor, BrowserId) {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        (anchor, id)
+    }
+
+    /// A record as storage answers with one, with nothing registered: an app that has
+    /// been opened and has not been given permission yet.
+    fn record(app_id: NotificationAppId, last_used: Timestamp) -> NotificationApp {
+        NotificationApp {
+            id: app_id,
+            principal: Principal::self_authenticating(vec![app_id as u8; 91]),
+            created_at_ns: 1_000,
+            last_used_ns: last_used,
+            anchors: std::collections::BTreeSet::new(),
+            webpush_subscription: None,
+            pending_probe: None,
+        }
+    }
+
+    #[test]
+    fn a_pending_install_is_found_by_the_principal_it_names() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(
+            anchor.browser_awaiting_link(link_principal(1), 2_000),
+            Some(id)
+        );
+    }
+
+    #[test]
+    fn a_pending_install_is_not_found_by_another_principal() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(2), 2_000), None);
+    }
+
+    #[test]
+    fn a_pending_install_is_not_found_once_it_has_expired() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 5_000), None);
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 5_001), None);
+    }
+
+    #[test]
+    fn a_second_install_retires_the_principal_the_first_named() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+        anchor.start_notification_app_link(id, link_principal(2), 6_000);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
+        assert_eq!(
+            anchor.browser_awaiting_link(link_principal(2), 2_000),
+            Some(id)
+        );
+    }
+
+    #[test]
+    fn a_pending_install_points_at_no_app_yet() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(
+            anchor.notification_app(id).and_then(|app| app.linked_app()),
+            None
+        );
+    }
+
+    /// The install the user has not opened yet, which is neither an app nor nothing: the
+    /// key is still spendable, so the only thing left to do is open it.
+    #[test]
+    fn a_live_pending_install_reads_as_awaiting_the_app() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(
+            anchor.notification_app_status(id, 4_999, |app_id| Some(record(app_id, 2_000))),
+            NotificationAppStatus::AwaitingInstall(5_000)
+        );
+    }
+
+    /// Past its expiry the app holding that key can never finish, and the URL on the
+    /// Home Screen is frozen, so there is nothing to wait for.
+    #[test]
+    fn an_expired_pending_install_reads_as_no_app_at_all() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        assert_eq!(
+            anchor.notification_app_status(id, 5_000, |app_id| Some(record(app_id, 2_000))),
+            NotificationAppStatus::NoApp
+        );
+    }
+
+    #[test]
+    fn a_pending_install_has_no_delivery_to_switch() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+
+        anchor.disable_notification_app(id);
+        assert_eq!(
+            anchor.browser_awaiting_link(link_principal(1), 2_000),
+            Some(id)
+        );
+    }
+
+    #[test]
+    fn linking_points_the_browser_at_the_app_with_delivery_on() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: true
+            })
+        );
+    }
+
+    #[test]
+    fn linking_spends_the_pending_install() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.start_notification_app_link(id, link_principal(1), 5_000);
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
+    }
+
+    /// A browser points at the record it was pointed at last, and lets go of the one it
+    /// had: an entry carries one reference, so the record it left may now have no browser
+    /// pointing at it at all.
+    #[test]
+    fn a_browser_points_at_one_app_at_a_time() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor.point_at_notification_app(id, 8);
+
+        assert_eq!(
+            anchor.notification_app(id).and_then(|app| app.linked_app()),
+            Some(8)
+        );
+    }
+
+    #[test]
+    fn pointing_at_the_same_app_twice_leaves_it_pointed_there() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+
+        anchor.point_at_notification_app(id, 7);
+        assert_eq!(
+            anchor.notification_app(id).and_then(|app| app.linked_app()),
+            Some(7)
+        );
+    }
+
+    #[test]
+    fn pointing_at_the_same_app_again_keeps_it_switched_off() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor.disable_notification_app(id);
+
+        anchor.point_at_notification_app(id, 7);
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: false,
+            })
+        );
+    }
+
+    #[test]
+    fn pointing_at_another_app_starts_enabled() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor.disable_notification_app(id);
+
+        anchor.point_at_notification_app(id, 8);
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef::Linked {
+                app_id: 8,
+                enabled: true,
+            })
+        );
+    }
+
+    /// A browser key rotates on every sign-in, so the reference moves between this
+    /// identity's entries without the user deciding anything. Their answer about the app
+    /// moves with it, or signing in again would turn delivery back on unasked.
+    #[test]
+    fn moving_a_reference_between_browsers_keeps_it_switched_off() {
+        let (mut anchor, first) = anchor_with_browser();
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(first, 7);
+        anchor.disable_notification_app(first);
+
+        anchor.point_at_notification_app(second, 7);
+
+        assert_eq!(
+            anchor.notification_app(second),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: false
+            })
+        );
+    }
+
+    /// Nobody to carry an answer from, and every caller that points an entry at an app
+    /// is the user asking for that app, so it starts delivering.
+    #[test]
+    fn pointing_at_an_app_this_identity_has_never_had_starts_it_on() {
+        let (mut anchor, id) = anchor_with_browser();
+
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: true
+            })
+        );
+    }
+
+    #[test]
+    fn pointing_a_second_browser_at_one_app_takes_it_off_the_first() {
+        let (mut anchor, first) = anchor_with_browser();
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(first, 7);
+
+        anchor.point_at_notification_app(second, 7);
+        assert_eq!(anchor.notification_app(first), None);
+        assert_eq!(
+            anchor
+                .notification_app(second)
+                .and_then(|app| app.linked_app()),
+            Some(7)
+        );
+        assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(second));
+    }
+
+    #[test]
+    fn taking_an_app_off_an_entry_drops_what_it_had_waiting() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(first, 7);
+        anchor
+            .notifications_for_browser_mut(first)
+            .expect("a listed browser")
+            .push(InboxNotification {
+                inbox_notification_id: 0,
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
+
+        anchor.point_at_notification_app(second, 7);
+
+        assert!(anchor.notifications_for_browser(first).is_empty());
+    }
+
+    #[test]
+    fn repointing_a_browser_drops_what_the_old_app_was_sent() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_for_browser_mut(id)
+            .expect("a listed browser")
+            .push(InboxNotification {
+                inbox_notification_id: 0,
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
+
+        anchor.point_at_notification_app(id, 7);
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
+
+        anchor.point_at_notification_app(id, 8);
+
+        assert!(anchor.notifications_for_browser(id).is_empty());
+    }
+
+    /// A reference naming a record that is gone is no app this identity has. The record
+    /// is the only evidence the app exists, so answering one without it would report a
+    /// vanished app as an app last seen at the epoch.
+    #[test]
+    fn a_reference_whose_record_is_gone_reads_as_no_app() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(
+            anchor.notification_app_status(id, 1_000, |app_id| Some(record(app_id, 2_000))),
+            NotificationAppStatus::Linked(NotificationAppInfo {
+                subscribed: false,
+                enabled: true,
+                last_seen_ns: 2_000,
+            })
+        );
+        assert_eq!(
+            anchor.notification_app_status(id, 1_000, |_| None),
+            NotificationAppStatus::NoApp
+        );
+        // What is gone is the record. The reference stays, because the only thing that
+        // creates one is a key the app itself spent.
+        assert_eq!(
+            anchor.notification_app(id).and_then(|app| app.linked_app()),
+            Some(7)
+        );
+    }
+
+    /// The identity's own view of its browsers answers what the browser's own read of
+    /// the same entry does, a record that is gone included.
+    #[test]
+    fn a_browsers_entry_reads_as_no_app_where_the_record_is_gone() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(
+            anchor
+                .browsers_info(|app_id| Some(record(app_id, 2_000)))
+                .expect("one browser")[0]
+                .notification_app,
+            Some(NotificationAppInfo {
+                subscribed: false,
+                enabled: true,
+                last_seen_ns: 2_000,
+            })
+        );
+        assert_eq!(
+            anchor.browsers_info(|_| None).expect("one browser")[0].notification_app,
+            None
+        );
+    }
+
+    #[test]
+    fn an_unknown_browser_holds_neither_an_install_nor_an_app() {
+        let mut anchor = anchor();
+
+        anchor.start_notification_app_link(42, link_principal(1), 5_000);
+        anchor.point_at_notification_app(42, 7);
+
+        assert_eq!(anchor.browser_awaiting_link(link_principal(1), 2_000), None);
+        assert_eq!(anchor.notification_app(42), None);
+    }
+
+    #[test]
+    fn a_key_a_browser_signs_with_is_recognised_in_either_slot() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert!(anchor.browser_signs_as(Principal::self_authenticating(browser_key(1))));
+        assert!(anchor.browser_signs_as(Principal::self_authenticating(successor_key(1))));
+        assert!(!anchor.browser_signs_as(Principal::self_authenticating(browser_key(2))));
+    }
+
+    #[test]
+    fn an_unseen_key_registers_a_new_device() {
+        let mut anchor = anchor();
+
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome on MacBook"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(id, 0);
+        assert_eq!(anchor.browsers().len(), 1);
+        assert_eq!(
+            anchor.browsers()[0].description,
+            description("Chrome on MacBook")
+        );
+        assert_eq!(anchor.browsers()[0].current_browser_key, browser_key(1));
+        assert_eq!(anchor.browsers()[0].created_at, 1_000);
+    }
+
+    #[test]
+    fn a_browser_that_rotates_reuses_its_entry_and_keeps_its_description() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome on MacBook"),
+                1_000,
+            )
+            .unwrap();
+
+        let (again, _) = anchor
+            .resolve_browser(
+                successor_key(1),
+                browser_key(2),
+                description("Something else"),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(again, id);
+        assert_eq!(anchor.browsers().len(), 1);
+        assert_eq!(
+            anchor.browsers()[0].description,
+            description("Chrome on MacBook")
+        );
+    }
+
+    #[test]
+    fn registration_stamps_both_timestamps() {
+        let mut anchor = anchor();
+
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(anchor.browsers()[0].created_at, 1_000);
+        assert_eq!(anchor.browsers()[0].last_used, 1_000);
+    }
+
+    #[test]
+    fn reuse_advances_last_used_and_leaves_created_at_alone() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        anchor
+            .resolve_browser(
+                successor_key(1),
+                browser_key(2),
+                description("Chrome"),
+                5_000,
+            )
+            .unwrap();
+
+        assert_eq!(anchor.browsers()[0].created_at, 1_000);
+        assert_eq!(anchor.browsers()[0].last_used, 5_000);
+    }
+
+    #[test]
+    fn a_key_this_anchor_has_not_seen_registers_a_fresh_device() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Firefox"),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(id, 1);
+        assert_eq!(anchor.browsers().len(), 2);
+    }
+
+    #[test]
+    fn ids_are_never_reused() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+        anchor.browsers.clear();
+
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                2_000,
+            )
+            .unwrap();
+
+        assert_ne!(second, first);
+        assert_eq!(second, 1);
+    }
+
+    #[test]
+    fn registering_past_the_cap_drops_the_least_recently_used_and_never_fails() {
+        let mut anchor = anchor();
+        for index in 0..MAX_BROWSERS {
+            anchor
+                .resolve_browser(
+                    browser_key(index as u8),
+                    successor_key(index as u8),
+                    description(&format!("device-{index}")),
+                    index as u64 + 1,
+                )
+                .unwrap();
+        }
+
+        let (newest, dropped) = anchor
+            .resolve_browser(
+                browser_key(200),
+                successor_key(200),
+                description("newest"),
+                10_000,
+            )
+            .unwrap();
+
+        assert_eq!(anchor.browsers().len(), MAX_BROWSERS);
+        assert!(anchor.browsers().iter().any(|d| d.id == newest));
+        assert!(!anchor
+            .browsers()
+            .iter()
+            .any(|b| b.description == description("device-0")));
+        assert!(anchor
+            .browsers()
+            .iter()
+            .any(|b| b.description == description("device-1")));
+        assert_eq!(dropped, vec![0]);
+    }
+
+    #[test]
+    fn the_cap_evicts_on_use_rather_than_on_enrolment() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(browser_key(0), successor_key(0), description("oldest"), 1)
+            .unwrap();
+        for index in 1..MAX_BROWSERS {
+            anchor
+                .resolve_browser(
+                    browser_key(index as u8),
+                    successor_key(index as u8),
+                    description(&format!("device-{index}")),
+                    index as u64 + 1,
+                )
+                .unwrap();
+        }
+        anchor
+            .resolve_browser(
+                successor_key(0),
+                rotating_key(0, 200),
+                description("oldest"),
+                9_000,
+            )
+            .unwrap();
+
+        let (_, dropped) = anchor
+            .resolve_browser(
+                browser_key(200),
+                successor_key(200),
+                description("newest"),
+                10_000,
+            )
+            .unwrap();
+
+        assert_eq!(dropped, vec![1]);
+        assert!(anchor.browsers().iter().any(|device| device.id == first));
+    }
+
+    #[test]
+    fn a_browser_that_clears_storage_evicts_its_own_records_before_a_used_one() {
+        let mut anchor = anchor();
+        // The phone rotates on every sign-in, as a browser that kept its storage does.
+        let (kept, _) = anchor
+            .resolve_browser(browser_key(0), rotating_key(0, 1), description("phone"), 1)
+            .unwrap();
+        for wipe in 0..MAX_BROWSERS as u64 {
+            anchor
+                .resolve_browser(
+                    rotating_key(0, wipe as u8 + 1),
+                    rotating_key(0, wipe as u8 + 2),
+                    description("phone"),
+                    1_000 + wipe * 10,
+                )
+                .unwrap();
+            // A wiped browser has no key to promote, so each pass is a browser this
+            // anchor has never seen.
+            anchor
+                .resolve_browser(
+                    browser_key(wipe as u8 + 1),
+                    successor_key(wipe as u8 + 1),
+                    description(&format!("wiped-{wipe}")),
+                    1_001 + wipe * 10,
+                )
+                .unwrap();
+        }
+
+        assert!(anchor.browsers().iter().any(|device| device.id == kept));
+    }
+
+    #[test]
+    fn a_wiped_browser_presenting_a_fresh_key_is_a_new_device() {
+        let mut anchor = anchor();
+        let (before, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        let (after, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Chrome"),
+                2_000,
+            )
+            .unwrap();
+
+        assert_ne!(after, before);
+        assert_eq!(anchor.browsers().len(), 2);
+    }
+
+    #[test]
+    fn a_successor_is_accepted_and_takes_over_from_the_key_it_replaces() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        let (again, _) = anchor
+            .resolve_browser(
+                successor_key(1),
+                browser_key(2),
+                description("Chrome"),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(again, id);
+        assert_eq!(anchor.browsers().len(), 1);
+        assert_eq!(anchor.browsers()[0].current_browser_key, successor_key(1));
+        assert_eq!(anchor.browsers()[0].next_browser_key, browser_key(2));
+    }
+
+    #[test]
+    fn the_key_a_successor_replaced_is_retired() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+        anchor
+            .resolve_browser(
+                successor_key(1),
+                browser_key(2),
+                description("Chrome"),
+                2_000,
+            )
+            .unwrap();
+
+        let (after, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(3),
+                description("Chrome"),
+                3_000,
+            )
+            .unwrap();
+
+        assert_ne!(after, id);
+        assert_eq!(anchor.browsers().len(), 2);
+    }
+
+    /// A response that never reached the browser leaves it proving with the key the entry
+    /// has already retired. That is refused rather than registered: a second list for one
+    /// browser is exactly what a dropped response must not cost, and the browser holds the
+    /// successor that does resolve.
+    #[test]
+    fn a_retired_key_is_refused_rather_than_registered() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        // The successor it re-announces is the one this entry is already waiting for, which
+        // is the shape a retry actually takes: the browser has not moved on either.
+        let retried = anchor.resolve_browser(
+            browser_key(1),
+            successor_key(1),
+            description("Chrome"),
+            2_000,
+        );
+
+        assert_eq!(retried, Err(BrowserError::StaleBrowserKey));
+        assert_eq!(anchor.browsers().len(), 1);
+        assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(1));
+    }
+
+    /// The other half of the same rule, from the browser's side: promoting the successor
+    /// it announced is what gets it back to its own entry.
+    #[test]
+    fn promoting_the_announced_successor_resolves_the_same_browser() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        let (again, _) = anchor
+            .resolve_browser(
+                successor_key(1),
+                successor_key(2),
+                description("Chrome"),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(again, id);
+        assert_eq!(anchor.browsers().len(), 1);
+        assert_eq!(anchor.browsers()[0].current_browser_key, successor_key(1));
+        assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(2));
+    }
+
+    /// A browser signing a call for itself is recognised by the key it still holds,
+    /// which is the successor it announced, never the one the sign-in retired.
+    #[test]
+    fn a_browser_is_recognised_by_the_key_it_still_holds() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(successor_key(1))),
+            Some(id)
+        );
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(browser_key(1))),
+            None,
+            "the key the sign-in retired must not name a browser"
+        );
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(browser_key(9))),
+            None
+        );
+    }
+
+    #[test]
+    fn a_claim_token_is_signed_by_the_key_the_browser_still_holds() {
+        let retired = signing_key(1);
+        let held = signing_key(2);
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                public_key(&retired),
+                public_key(&held),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_that_signed_claim(
+                &claim_token(&held, 10_000, 10_001, 5_000),
+                10_001,
+                5_000
+            ),
+            Some(id)
+        );
+        assert_eq!(
+            anchor.browser_that_signed_claim(
+                &claim_token(&retired, 10_000, 10_001, 5_000),
+                10_001,
+                5_000
+            ),
+            None,
+            "the key the sign-in retired must not sign a claim token"
+        );
+    }
+
+    #[test]
+    fn a_claim_token_signed_for_another_offering_anchor_names_no_browser() {
+        let held = signing_key(2);
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                public_key(&signing_key(1)),
+                public_key(&held),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_that_signed_claim(
+                &claim_token(&held, 10_002, 10_001, 5_000),
+                10_001,
+                5_000
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn rotating_repeatedly_keeps_the_same_browser() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(browser_key(0), browser_key(1), description("Chrome"), 1)
+            .unwrap();
+
+        for step in 1..10u8 {
+            let (again, _) = anchor
+                .resolve_browser(
+                    browser_key(step),
+                    browser_key(step + 1),
+                    description("Chrome"),
+                    step as u64 * 100,
+                )
+                .unwrap();
+            assert_eq!(again, id);
+        }
+
+        assert_eq!(anchor.browsers().len(), 1);
+    }
+
+    /// Presented keys are visible on the wire, so announcing one another browser is about to
+    /// present would otherwise take over its entry when it does.
+    #[test]
+    fn a_successor_another_browser_holds_is_refused() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        let stealing_the_key = anchor.resolve_browser(
+            browser_key(2),
+            browser_key(1),
+            description("Firefox"),
+            2_000,
+        );
+        let stealing_the_successor = anchor.resolve_browser(
+            browser_key(2),
+            successor_key(1),
+            description("Firefox"),
+            2_000,
+        );
+
+        assert_eq!(stealing_the_key, Err(BrowserError::SuccessorAlreadyInUse));
+        assert_eq!(
+            stealing_the_successor,
+            Err(BrowserError::SuccessorAlreadyInUse)
+        );
+        assert_eq!(anchor.browsers().len(), 1);
+    }
+
+    /// The browser that already holds it is re-announcing, which a retry does.
+    #[test]
+    fn a_second_sign_in_from_a_key_a_browser_never_announced_is_a_new_browser() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        // Neither slot holds it, so there is nothing to say this is the same browser.
+        let (other, _) = anchor
+            .resolve_browser(
+                browser_key(7),
+                successor_key(7),
+                description("Chrome"),
+                2_000,
+            )
+            .unwrap();
+
+        assert_ne!(other, id);
+        assert_eq!(anchor.browsers().len(), 2);
+    }
+
+    #[test]
+    fn a_browser_cannot_name_itself_its_own_successor() {
+        let mut anchor = anchor();
+
+        // Rotation is what stops a leaked key from outliving one sign-in. A browser that
+        // announced the key it is presenting would keep it alive for as long as it kept
+        // asking, and so would whoever leaked it.
+        assert_eq!(
+            anchor.resolve_browser(browser_key(1), browser_key(1), description("Chrome"), 1_000),
+            Err(BrowserError::SuccessorMatchesCurrent)
+        );
+        assert!(anchor.browsers().is_empty());
+    }
+
+    #[test]
+    fn a_registered_browser_cannot_stop_rotating_either() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.resolve_browser(
+                successor_key(1),
+                successor_key(1),
+                description("Chrome"),
+                2_000
+            ),
+            Err(BrowserError::SuccessorMatchesCurrent)
+        );
+        // The entry is left as it was, still awaiting a successor it has not seen.
+        assert_eq!(anchor.browsers()[0].current_browser_key, browser_key(1));
+        assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(1));
+    }
+
+    /// A browser has one route: pointing at a record takes the address it registered for
+    /// itself, and what that address was sent goes with it.
+    #[test]
+    fn pointing_at_an_app_takes_the_browsers_own_address_and_what_it_was_sent() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor
+            .set_webpush_subscription(id, Some(subscription_at("https://push.example/one", 1_000)));
+        anchor
+            .notifications_for_browser_mut(id)
+            .expect("a listed browser")
+            .push(InboxNotification {
+                inbox_notification_id: 0,
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
+
+        anchor.point_at_notification_app(id, 7);
+
+        assert!(anchor.webpush_subscription(id).is_none());
+        assert!(anchor.notifications_for_browser(id).is_empty());
+    }
+
+    /// The other half of one route per browser: registering an address of its own is how
+    /// a browser leaves the record it points at. An install still running is not a route,
+    /// so it is left where it is.
+    #[test]
+    fn registering_an_address_of_its_own_leaves_the_record_it_points_at() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+
+        assert_eq!(anchor.leave_notification_app(id), Some(7));
+        assert!(anchor.notification_app(id).is_none());
+
+        anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
+
+        assert_eq!(anchor.leave_notification_app(id), None);
+        assert!(anchor.notification_app(id).is_some());
+    }
+
+    /// Switching delivery off empties the queue: nothing drains it while it is off and
+    /// nothing joins it, so what is left would only be shown in place of whatever causes
+    /// the first wake-up after switching back on.
+    #[test]
+    fn switching_delivery_off_clears_what_was_queued() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_for_browser_mut(id)
+            .expect("a listed browser")
+            .push(InboxNotification {
+                inbox_notification_id: 0,
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
+
+        anchor.disable_notification_app(id);
+
+        assert!(anchor.notifications_for_browser(id).is_empty());
+    }
+
+    /// An install that has not completed is a route of its own: what was posted while
+    /// the entry pointed at the app before it is unreadable by the app that finishes.
+    #[test]
+    fn finishing_an_install_over_an_old_app_drops_what_that_app_was_sent() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor
+            .notifications_for_browser_mut(id)
+            .expect("a listed browser")
+            .push(InboxNotification {
+                inbox_notification_id: 0,
+                application_number: Some(1),
+                sender: Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+                event: None,
+            });
+        anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
+
+        anchor.point_at_notification_app(id, 8);
+
+        assert!(anchor.notifications_for_browser(id).is_empty());
+    }
+
+    #[test]
+    fn taking_over_an_app_this_identity_already_switched_on_keeps_it_on() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        anchor.point_at_notification_app(second, 7);
+
+        assert_eq!(
+            anchor.notification_app(second),
+            Some(NotificationAppRef::Linked {
+                app_id: 7,
+                enabled: true
+            })
+        );
     }
 }

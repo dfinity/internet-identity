@@ -13,33 +13,6 @@ pub struct StorableAccountsCounter {
     pub stored_account_references: u64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum AccountType {
-    AccountReference,
-    Account,
-}
-
-impl StorableAccountsCounter {
-    pub fn increment(&self, account_type: &AccountType) -> Self {
-        match account_type {
-            AccountType::AccountReference => Self {
-                stored_account_references: self
-                    .stored_account_references
-                    .checked_add(1)
-                    .expect("overflow in stored_account_references"),
-                stored_accounts: self.stored_accounts,
-            },
-            AccountType::Account => Self {
-                stored_accounts: self
-                    .stored_accounts
-                    .checked_add(1)
-                    .expect("overflow in stored_accounts"),
-                stored_account_references: self.stored_account_references,
-            },
-        }
-    }
-}
-
 impl Storable for StorableAccountsCounter {
     fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();

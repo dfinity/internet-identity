@@ -81,8 +81,7 @@ export const flowErrorToastTemplate = <K extends FlowError["kind"]>(
       ? html`<div class="l-stack">
           <h4>Error details:</h4>
           <pre data-role="error-detail" class="t-paragraph">
-${props.detail}</pre
-          >
+${props.detail}</pre>
         </div>`
       : undefined;
   return html`

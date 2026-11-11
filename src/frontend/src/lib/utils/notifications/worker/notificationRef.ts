@@ -1,0 +1,101 @@
+/**
+ * What a shown notification carries, so the worker can find it again.
+ *
+ * The tag names the notification, which is what makes the real content replace the
+ * placeholder shown before it and a repeat of the same notification replace itself
+ * rather than pile up. It names the identity as well: a notification id is scoped to
+ * one app and one recipient, so two identities signed in on one browser can be handed
+ * the same one. The data carries what the canister calls need, since a worker
+ * woken later has nothing else to go on. Both are plain strings: notification data
+ * goes through structured cloning, and `bigint` support for it is not everywhere.
+ */
+
+export interface NotificationRef {
+  identityNumber: bigint;
+  origin: string;
+  /** `undefined` is the unreserved default account. */
+  accountNumber?: bigint;
+  appCanisterId: string;
+  id: bigint;
+}
+
+export interface ShownData {
+  identityNumber: string;
+  origin: string;
+  accountNumber: string;
+  appCanisterId: string;
+  id: string;
+  /** Where a click goes, already checked against the app's own origins. */
+  url: string;
+  /** Whether the worker showing this belongs to the installed iOS app, which decides
+   *  whether a click on it goes through the Safari doorway. Settled here because the
+   *  answer is a promise and a click cannot wait for one: the permission to open a
+   *  window belongs to the synchronous run of the handler. */
+  inTheApp: boolean;
+}
+
+export const tagOf = (ref: NotificationRef): string =>
+  `${ref.identityNumber}|${ref.origin}|${ref.accountNumber ?? ""}|${ref.id}`;
+
+export const dataOf = (
+  ref: NotificationRef,
+  url: string,
+  inTheApp: boolean,
+): ShownData => ({
+  identityNumber: ref.identityNumber.toString(),
+  origin: ref.origin,
+  accountNumber: ref.accountNumber?.toString() ?? "",
+  appCanisterId: ref.appCanisterId,
+  id: ref.id.toString(),
+  url,
+  inTheApp,
+});
+
+/** Whether a click on this notification goes through the doorway. Anything this worker
+ *  did not write reads as a browser, which opens its link directly. */
+export const inTheAppOf = (data: unknown): boolean => {
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+  return (data as Partial<ShownData>).inTheApp === true;
+};
+
+/** Where a click on this notification goes, or `undefined` for data this worker did not
+ *  write. */
+export const urlOf = (data: unknown): string | undefined => {
+  if (typeof data !== "object" || data === null) {
+    return undefined;
+  }
+  const { url } = data as Partial<ShownData>;
+  return typeof url === "string" ? url : undefined;
+};
+
+/** The notification some data belongs to, or `undefined` for anything this worker did
+ *  not write — an older version's notification, or a browser that dropped the data. */
+export const refOf = (data: unknown): NotificationRef | undefined => {
+  if (typeof data !== "object" || data === null) {
+    return undefined;
+  }
+  const { identityNumber, origin, accountNumber, appCanisterId, id } =
+    data as Partial<ShownData>;
+  if (
+    typeof identityNumber !== "string" ||
+    typeof origin !== "string" ||
+    typeof accountNumber !== "string" ||
+    typeof appCanisterId !== "string" ||
+    typeof id !== "string"
+  ) {
+    return undefined;
+  }
+  try {
+    return {
+      identityNumber: BigInt(identityNumber),
+      origin,
+      accountNumber: accountNumber === "" ? undefined : BigInt(accountNumber),
+      appCanisterId,
+      id: BigInt(id),
+    };
+  } catch {
+    return undefined;
+  }
+};

@@ -213,13 +213,10 @@ pub fn identity_registration_finish(
 /// inside.
 pub fn verify_openid_for_registration(
     arg: &OpenIDRegFinishArg,
+    discovery_domain: Option<&openid::Domain>,
 ) -> Result<openid::Cached<openid::OpenIdCredential>, IdRegFinishError> {
-    openid::prefetch_sso(arg.discovery_domain.as_deref());
-    Ok(openid::verify_jwt(
-        &arg.jwt,
-        &arg.salt,
-        arg.discovery_domain.as_deref(),
-    )?)
+    openid::prefetch_sso(discovery_domain);
+    Ok(openid::verify_jwt(&arg.jwt, &arg.salt, discovery_domain)?)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -335,17 +332,18 @@ fn create_identity(
     now: u64,
     verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<IdentityNumber, IdRegFinishError> {
-    // Enforce global uniqueness of passkey pubkeys across all anchors.
+    // Enforce global uniqueness of passkey and recovery phrase pubkeys across all anchors.
     if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
-        authn_method:
-            AuthnMethodData {
-                authn_method: AuthnMethod::WebAuthn(webauthn),
-                ..
-            },
+        authn_method: AuthnMethodData { authn_method, .. },
         ..
     }) = &arg
     {
-        anchor_management::check_passkey_pubkey_is_not_used(&webauthn.pubkey)
+        let pubkey = match authn_method {
+            AuthnMethod::WebAuthn(webauthn) => &webauthn.pubkey,
+            AuthnMethod::PubKey(pubkey_authn) => &pubkey_authn.pubkey,
+        };
+        anchor_management::check_passkey_pubkey_is_not_used(pubkey)
+            .and_then(|()| anchor_management::check_recovery_phrase_pubkey_is_not_used(pubkey))
             .map_err(IdRegFinishError::InvalidAuthnMethod)?;
     }
 

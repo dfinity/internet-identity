@@ -23,7 +23,6 @@
   } from "$app/navigation";
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
   import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
   import {
@@ -86,6 +85,9 @@
   );
   const openIdCredentials = $derived(
     accessMethods.filter((m) => "openid" in m).map(({ openid }) => openid),
+  );
+  const recoveryHref = $derived(
+    `/recovery?${new URLSearchParams({ identity: data.identityNumber.toString() })}`,
   );
   let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
     () => {
@@ -272,8 +274,7 @@
               : undefined;
         let jwt: string;
         let ssoDiscoveryPromise:
-          | ReturnType<typeof discoverSsoConfig>
-          | undefined;
+          ReturnType<typeof discoverSsoConfig> | undefined;
         if (ssoDomain !== undefined) {
           ssoDiscoveryPromise = discoverSsoConfig(ssoDomain);
           jwt = await requestWithPopup(
@@ -389,14 +390,17 @@
           ])
           .then(throwCanisterError);
       }
-      // Logout and forget identity if it's the current access method
+      // The method in use cannot be removed, so nothing here signs the user out. Both
+      // item components disable Remove while `isCurrentAccessMethod` holds unless it is
+      // also the last method, and removing the last one requires `isSignedInWithRecovery`
+      // — which reads the same `authMethod` and is true only for a recovery phrase or
+      // recovery email, so it cannot hold at the same time as `isCurrentAccessMethod`.
+      // Refused rather than handled, so a change to either guard fails loudly instead of
+      // quietly ending the session the user is using.
       if (isCurrentAccessMethod($authenticatedStore, removingAccessMethod)) {
-        const identityNumber = $authenticatedStore.identityNumber;
-        lastUsedIdentitiesStore.removeIdentity(identityNumber);
-        void purgeSession(identityNumber);
-        sessionStore.reset();
-        location.replace("/login");
-        return;
+        throw new Error(
+          "the access method in use cannot be removed; switch to another first",
+        );
       }
       // Optimistic update
       accessMethods = accessMethods
@@ -459,6 +463,7 @@
               onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
               onRemove={() => (removingAccessMethodKey = toKey(accessMethod))}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
+              {recoveryHref}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,

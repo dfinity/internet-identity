@@ -1,0 +1,79 @@
+// Browser-side Web Push subscription: register the push service worker, ask for
+// permission, and subscribe with Internet Identity's own VAPID key. The relay binds the
+// subscription to that key and accepts only pushes carrying a JWT signed by its private
+// half, which is a threshold key the canister holds.
+//
+// The subscription's own p256dh and auth keys are what a wake-up's payload is sealed
+// against; see transportSeal.
+
+import { bufFromBufLike } from "$lib/utils/utils";
+import { agentOptions, canisterId } from "$lib/globals";
+import { workerConfigUrl } from "./workerConfig";
+
+// Registered on opt-in rather than on every load (kit.serviceWorker.register is off).
+const serviceWorkerUrl = (): string =>
+  workerConfigUrl({ canisterId: canisterId.toText(), agentOptions });
+
+export const isPushSupported = (): boolean =>
+  "serviceWorker" in navigator &&
+  "PushManager" in window &&
+  "Notification" in window;
+
+/** Prompts for notification permission, and answers what the user chose. A prompt
+ *  closed without an answer leaves it at `default`, which can be asked again. */
+export const requestNotificationPermission =
+  (): Promise<NotificationPermission> => Notification.requestPermission();
+
+const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
+  await navigator.serviceWorker.register(serviceWorkerUrl(), {
+    type: "module",
+  });
+  return navigator.serviceWorker.ready;
+};
+
+/**
+ * Subscribes this device to `applicationServerKey`. Any prior subscription is dropped
+ * first: it is bound to a VAPID key the canister does not sign with, so its endpoint
+ * would reject every push.
+ */
+export const subscribeToPush = async (
+  applicationServerKey: Uint8Array,
+): Promise<PushSubscription> => {
+  const registration = await registerServiceWorker();
+  await (await registration.pushManager.getSubscription())?.unsubscribe();
+  // `userVisibleOnly` is mandatory, and obliges the worker to show something per push.
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: bufFromBufLike(applicationServerKey),
+  });
+};
+
+/**
+ * Whether this subscription was minted with `applicationServerKey`.
+ *
+ * A relay binds a subscription to the key it was made with and refuses a push whose
+ * `k=` is any other, so one made with a key the canister does not sign with is dead
+ * however live it looks. What the browser remembers is the only way to tell.
+ */
+export const subscribedWith = (
+  subscription: PushSubscription,
+  applicationServerKey: Uint8Array,
+): boolean => {
+  const minted = subscription.options.applicationServerKey;
+  if (minted === null || minted === undefined) {
+    return false;
+  }
+  const bytes = new Uint8Array(minted);
+  return (
+    bytes.length === applicationServerKey.length &&
+    bytes.every((byte, at) => byte === applicationServerKey[at])
+  );
+};
+
+/** This browser's current push subscription, or `undefined` if not subscribed. */
+export const currentDeviceSubscription = async (): Promise<
+  PushSubscription | undefined
+> => {
+  const registration = await navigator.serviceWorker.getRegistration();
+  return (await registration?.pushManager.getSubscription()) ?? undefined;
+};

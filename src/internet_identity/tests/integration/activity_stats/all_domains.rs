@@ -19,7 +19,7 @@ fn should_report_daily_active_anchors() -> Result<(), RejectResponse> {
     assert!(!get_metrics(&env, canister_id).contains("internet_identity_daily_active_anchors"));
 
     let anchor_number = flows::register_anchor(&env, canister_id);
-    flows::register_anchor(&env, canister_id);
+    flows::register_anchor_with_device(&env, canister_id, &device_data_2());
 
     // repeated activity within the 24h collection period should not increase the counter
     api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
@@ -47,7 +47,7 @@ fn should_report_monthly_active_anchors() -> Result<(), RejectResponse> {
     assert!(!get_metrics(&env, canister_id).contains("internet_identity_monthly_active_anchors"));
 
     let anchor_number = flows::register_anchor(&env, canister_id);
-    flows::register_anchor(&env, canister_id);
+    flows::register_anchor_with_device(&env, canister_id, &device_data_2());
 
     // repeated activity within the 30-day collection period should not increase the counter
     api::get_anchor_info(&env, canister_id, principal_1(), anchor_number)?;
@@ -75,7 +75,7 @@ fn should_update_monthly_active_anchors_every_day() -> Result<(), RejectResponse
     assert!(!get_metrics(&env, canister_id).contains("internet_identity_monthly_active_anchors"));
 
     let anchor_number = flows::register_anchor(&env, canister_id);
-    flows::register_anchor(&env, canister_id);
+    flows::register_anchor_with_device(&env, canister_id, &device_data_2());
 
     // advance by 24h to record in the shifted 30-day period
     env.advance_time(Duration::from_secs(DAY_SECONDS));

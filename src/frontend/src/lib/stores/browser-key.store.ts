@@ -1,0 +1,427 @@
+import {
+  createStore,
+  get as idbGet,
+  keys as idbKeys,
+  set as idbSet,
+} from "idb-keyval";
+import type { SignIdentity } from "@icp-sdk/core/agent";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+import type { BrowserDescription } from "$lib/generated/internet_identity_types";
+
+/**
+ * The key this browser proves itself with when it creates a session, and the id the
+ * canister attributed it to.
+ *
+ * The key never leaves this origin: it appears in no delegation chain and in nothing an app
+ * receives, which is what lets it identify the browser without letting two apps recognise
+ * it. It is replaced at every sign-in, so a copy of it taken off disk stops working as soon
+ * as this browser signs in again.
+ */
+interface BrowserKeyRecord {
+  keyPair: CryptoKeyPair;
+  /** The successor announced at the last sign-in, kept from before the call until that
+   *  sign-in is known to have been accepted. The canister reaches this browser's entry
+   *  only through the successor it announced, so losing this key while the canister kept
+   *  it would leave the browser unable to prove it is itself ever again. */
+  announcedSuccessor?: CryptoKeyPair;
+  /** Absent until a sign-in has told us which browser we are. */
+  browserId?: number;
+  /** What was reported when this browser registered, so a change can be noticed.
+   *  Written with the key pair and never on its own: compared against what the canister
+   *  stored, it has to be what we actually sent when the entry was created. */
+  description?: BrowserDescription;
+}
+
+/**
+ * Thrown by a sign-in the canister refused because this browser's key is one it has
+ * already retired, which is what a lost response leaves behind.
+ *
+ * Raised by the caller that can read the canister's answer; handled here, because this is
+ * where the successor that does resolve is kept.
+ */
+export class StaleBrowserKeyError extends Error {
+  constructor() {
+    super("the canister has already retired this browser's key");
+    this.name = "StaleBrowserKeyError";
+  }
+}
+
+/** Kept apart from an absent key: reading the one as the other walks the user through the install again. */
+export class BrowserKeyUnreadableError extends Error {
+  constructor(cause: unknown) {
+    super("this browser's key store refused to answer");
+    this.name = "BrowserKeyUnreadableError";
+    this.cause = cause;
+  }
+}
+
+const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
+
+/** Must match the domains the canister verifies the two signatures under. */
+const SIGNATURE_DOMAIN = new TextEncoder().encode("ii-session-browser-key");
+/** Must match `NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN` in `browser_key.rs`. */
+const CLAIM_SIGNATURE_DOMAIN = new TextEncoder().encode(
+  "ii-notification-app-claim",
+);
+const SUCCESSOR_SIGNATURE_DOMAIN = new TextEncoder().encode(
+  "ii-session-browser-successor",
+);
+
+/**
+ * One key per identity, so nothing stored here links two of the user's identities to the
+ * same browser.
+ */
+const storageKey = (identityNumber: bigint): string =>
+  identityNumber.toString();
+
+const generate = (): Promise<CryptoKeyPair> =>
+  crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, [
+    "sign",
+    "verify",
+  ]) as Promise<CryptoKeyPair>;
+
+/** The stored record, raising {@link BrowserKeyUnreadableError} where storage refused to answer. */
+const readOrThrow = async (
+  identityNumber: bigint,
+): Promise<BrowserKeyRecord | undefined> => {
+  try {
+    return await idbGet<BrowserKeyRecord>(
+      storageKey(identityNumber),
+      BROWSER_KEY_STORE,
+    );
+  } catch (error) {
+    throw new BrowserKeyUnreadableError(error);
+  }
+};
+
+/** The stored record, with a storage failure read as no record. */
+const read = (identityNumber: bigint): Promise<BrowserKeyRecord | undefined> =>
+  readOrThrow(identityNumber).catch(() => undefined);
+
+const write = async (
+  identityNumber: bigint,
+  record: BrowserKeyRecord,
+): Promise<void> => {
+  try {
+    await idbSet(storageKey(identityNumber), record, BROWSER_KEY_STORE);
+  } catch {
+    // A browser that cannot keep its key signs in as a new one next time, which the
+    // identity sees as a new browser rather than as a failure.
+  }
+};
+
+const exported = (key: CryptoKey): Promise<Uint8Array> =>
+  crypto.subtle.exportKey("spki", key).then((spki) => new Uint8Array(spki));
+
+const signed = async (
+  key: CryptoKey,
+  domain: Uint8Array,
+  sessionKey: Uint8Array,
+  otherKey: Uint8Array,
+): Promise<Uint8Array> => {
+  const message = new Uint8Array(
+    domain.length + sessionKey.length + otherKey.length,
+  );
+  message.set(domain);
+  message.set(sessionKey, domain.length);
+  message.set(otherKey, domain.length + sessionKey.length);
+  return new Uint8Array(
+    await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, message),
+  );
+};
+
+export interface BrowserProof {
+  publicKey: Uint8Array;
+  nextPublicKey: Uint8Array;
+  signature: Uint8Array;
+  /** By the successor itself, so a key the browser does not hold cannot be announced. */
+  nextSignature: Uint8Array;
+}
+
+/** Serialises sign-ins for one identity: two at once would leave us holding a key the
+ *  canister never accepted, which reads as a different browser. */
+const exclusively = async <T>(
+  identityNumber: bigint,
+  run: () => Promise<T>,
+): Promise<T> => {
+  const locks = navigator.locks;
+  if (locks === undefined) {
+    return run();
+  }
+  // Awaited, because `request` types its callback's return as the value it resolves to,
+  // so the promise `run` returns would otherwise nest.
+  return await locks.request(`ii-browser-key:${identityNumber}`, run);
+};
+
+/** The variant's tag and its payload, which is all a description is made of. */
+const token = (variant: object): string => Object.entries(variant)[0].join(":");
+
+const sameDescription = (
+  one: BrowserDescription,
+  other: BrowserDescription,
+): boolean =>
+  token(one.brand) === token(other.brand) &&
+  token(one.os) === token(other.os) &&
+  token(one.form_factor) === token(other.form_factor) &&
+  (one.model[0] ?? "") === (other.model[0] ?? "");
+
+/**
+ * Returns the stored record unless the browser description changed; in that case, rotates
+ * to a fresh record so this sign-in registers as a new browser.
+ *
+ * A registered entry keeps the description it was created with, so a browser reporting
+ * something else is one the canister has not seen. Rather than ask for an entry to be
+ * changed, this presents a key pair no entry holds, which registers under its own — and
+ * because nothing has been sent yet, a browser that gets this far has not disturbed the
+ * entry it is leaving behind.
+ */
+const forDescription = async (
+  identityNumber: bigint,
+  description: BrowserDescription,
+): Promise<BrowserKeyRecord | undefined> => {
+  // A storage failure reads as no record, which signs this browser in under a key pair of its own.
+  const stored = await read(identityNumber);
+  if (
+    stored?.description === undefined ||
+    sameDescription(stored.description, description)
+  ) {
+    return stored;
+  }
+  const fresh: BrowserKeyRecord = {
+    keyPair: await generate(),
+    announcedSuccessor: await generate(),
+  };
+  await write(identityNumber, fresh);
+  return fresh;
+};
+
+/** The record a sign-in proves with: what is stored, completed with whatever it lacks. */
+const prepared = async (
+  identityNumber: bigint,
+  from?: BrowserKeyRecord,
+): Promise<
+  Required<Pick<BrowserKeyRecord, "keyPair" | "announcedSuccessor">>
+> => {
+  // A storage failure reads as no record: raising would refuse a sign-in over a read the ceremony can do without.
+  const stored = from ?? (await read(identityNumber));
+  const keyPair = stored?.keyPair ?? (await generate());
+  // Both halves go on disk before the call. The canister may accept this sign-in and
+  // never tell us, and from that moment the only key that reaches our entry is the
+  // successor we announced — a successor generated and discarded per attempt would be
+  // gone with the response that carried it.
+  const announcedSuccessor = stored?.announcedSuccessor ?? (await generate());
+  if (
+    stored?.keyPair !== keyPair ||
+    stored?.announcedSuccessor !== announcedSuccessor
+  ) {
+    await write(identityNumber, { ...stored, keyPair, announcedSuccessor });
+  }
+  return { keyPair, announcedSuccessor };
+};
+
+/** One attempt, proving `keyPair` and announcing `announcedSuccessor`. */
+const attempt = async <T>(
+  identityNumber: bigint,
+  sessionKey: Uint8Array,
+  description: BrowserDescription,
+  signIn: (proof: BrowserProof) => Promise<T>,
+  browserIdOf: (value: T) => number,
+  from?: BrowserKeyRecord,
+): Promise<T> => {
+  const { keyPair, announcedSuccessor: successor } = await prepared(
+    identityNumber,
+    from,
+  );
+
+  const [publicKey, nextPublicKey] = await Promise.all([
+    exported(keyPair.publicKey),
+    exported(successor.publicKey),
+  ]);
+
+  const [signature, nextSignature] = await Promise.all([
+    signed(keyPair.privateKey, SIGNATURE_DOMAIN, sessionKey, nextPublicKey),
+    signed(
+      successor.privateKey,
+      SUCCESSOR_SIGNATURE_DOMAIN,
+      sessionKey,
+      publicKey,
+    ),
+  ]);
+
+  const value = await signIn({
+    publicKey,
+    nextPublicKey,
+    signature,
+    nextSignature,
+  });
+
+  // The canister accepted, so this browser is now the successor it announced. Done here
+  // rather than handed back as something to call: a caller that forgot would keep
+  // proving with the key the canister has just retired, and pay a recovery round-trip at
+  // every later sign-in with nothing to say why.
+  await write(identityNumber, {
+    keyPair: successor,
+    browserId: browserIdOf(value),
+    description,
+  });
+  return value;
+};
+
+/**
+ * Proves possession of this browser's key and announces the successor it rotates to.
+ *
+ * The proof covers the session key, which is fresh for every session, so it is good for
+ * exactly one sign-in. Advancing to the successor is this function's own job, done once
+ * the canister has answered — which is why the id is asked for as `browserIdOf` rather
+ * than left to the caller to hand back.
+ *
+ * The canister accepts only the successor an entry is waiting for, so a sign-in whose
+ * response was lost leaves this browser proving with a key that has since been retired.
+ * That is refused rather than registered afresh, and this is the only party holding the
+ * key that does resolve: on refusal the announced successor is promoted and the sign-in
+ * runs once more. The old key is discarded only after that succeeds.
+ */
+export const withBrowserProof = <T>(
+  identityNumber: bigint,
+  sessionKey: Uint8Array,
+  description: BrowserDescription,
+  signIn: (proof: BrowserProof) => Promise<T>,
+  /** Which browser the canister said this is, read off whatever `signIn` returned. A
+   *  required argument rather than a callback to remember: the id and the rotation are
+   *  written together, and `tsc` refuses a caller that offers neither. */
+  browserIdOf: (value: T) => number,
+): Promise<T> =>
+  exclusively(identityNumber, async () => {
+    const from = await forDescription(identityNumber, description);
+    try {
+      return await attempt(
+        identityNumber,
+        sessionKey,
+        description,
+        signIn,
+        browserIdOf,
+        from,
+      );
+    } catch (error) {
+      if (!(error instanceof StaleBrowserKeyError)) {
+        throw error;
+      }
+      // No successor to promote starts this browser over on a fresh key: a second row in the user's list beats a browser that can never sign in again.
+      const stored = await read(identityNumber);
+      const promoted: BrowserKeyRecord = {
+        keyPair: stored?.announcedSuccessor ?? (await generate()),
+      };
+      // Carried into the retry rather than read back, so a storage failure costs the
+      // rotation and not the sign-in.
+      await write(identityNumber, promoted);
+      return await attempt(
+        identityNumber,
+        sessionKey,
+        description,
+        signIn,
+        browserIdOf,
+        promoted,
+      );
+    }
+  });
+
+/** A storage failure reads as no record, so the list goes unmarked. */
+export const currentBrowserId = async (
+  identityNumber: bigint,
+): Promise<number | undefined> => (await read(identityNumber))?.browserId;
+
+/**
+ * The identities this browser holds a key for.
+ *
+ * A Web Push wake-up says nothing about which identity it is for, so the service
+ * worker asks after each of them.
+ *
+ * Raises {@link BrowserKeyUnreadableError} where the store refused to answer, which is
+ * not a browser nothing has signed in on: a caller reading the one as the other takes a
+ * storage hiccup for an identity that has no app to lend and sends the user to install
+ * the one they already have. A key that is not a number is skipped rather than raised,
+ * since that is an answer and not a refusal.
+ */
+export const registeredIdentityNumbers = async (): Promise<bigint[]> => {
+  let stored;
+  try {
+    stored = await idbKeys(BROWSER_KEY_STORE);
+  } catch (error) {
+    throw new BrowserKeyUnreadableError(error);
+  }
+  return stored.flatMap((key) => {
+    try {
+      return [BigInt(String(key))];
+    } catch {
+      return [];
+    }
+  });
+};
+
+/** `undefined` before any sign-in has completed, since the id is what says the canister accepted this key.
+ *  Raises {@link BrowserKeyUnreadableError} where storage refused, which a caller must not read as a browser holding no key. */
+const signAsBrowser = async (
+  identityNumber: bigint,
+  message: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array | undefined> => {
+  const stored = await readOrThrow(identityNumber);
+  if (stored?.browserId === undefined) {
+    return undefined;
+  }
+  return new Uint8Array(
+    await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" },
+      stored.keyPair.privateKey,
+      message,
+    ),
+  );
+};
+
+/** Must match `claim_token_message` in `browser_key.rs` byte for byte: the domain, then the offering anchor, the claiming anchor and the expiry as big-endian `u64`s. */
+export const notificationAppClaimMessage = (
+  offeringIdentityNumber: bigint,
+  claimingIdentityNumber: bigint,
+  expiresAtNs: bigint,
+): Uint8Array<ArrayBuffer> => {
+  const message = new Uint8Array(CLAIM_SIGNATURE_DOMAIN.length + 24);
+  message.set(CLAIM_SIGNATURE_DOMAIN);
+  const numbers = new DataView(
+    message.buffer,
+    message.byteOffset + CLAIM_SIGNATURE_DOMAIN.length,
+  );
+  numbers.setBigUint64(0, offeringIdentityNumber, false);
+  numbers.setBigUint64(8, claimingIdentityNumber, false);
+  numbers.setBigUint64(16, expiresAtNs, false);
+  return message;
+};
+
+/** Signed as the offering identity, which is the party the canister verifies it against; `undefined` where no sign-in has registered that identity's browser here. */
+export const signNotificationAppClaim = ({
+  offeringIdentityNumber,
+  claimingIdentityNumber,
+  expiresAtNs,
+}: {
+  offeringIdentityNumber: bigint;
+  claimingIdentityNumber: bigint;
+  expiresAtNs: bigint;
+}): Promise<Uint8Array | undefined> =>
+  signAsBrowser(
+    offeringIdentityNumber,
+    notificationAppClaimMessage(
+      offeringIdentityNumber,
+      claimingIdentityNumber,
+      expiresAtNs,
+    ),
+  );
+
+/** `undefined` before any sign-in has completed, when there is no entry to sign as.
+ *  Raises {@link BrowserKeyUnreadableError} where storage refused, which a caller must not read as a browser the canister never registered. */
+export const browserKeyIdentity = async (
+  identityNumber: bigint,
+): Promise<SignIdentity | undefined> => {
+  const stored = await readOrThrow(identityNumber);
+  if (stored?.browserId === undefined) {
+    return undefined;
+  }
+  return ECDSAKeyIdentity.fromKeyPair(stored.keyPair);
+};

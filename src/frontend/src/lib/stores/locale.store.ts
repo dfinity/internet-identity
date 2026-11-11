@@ -1,8 +1,8 @@
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
-import { derived, get, readable, Readable } from "svelte/store";
+import { derived, fromStore, get, readable, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
 import { building } from "$app/environment";
-import { i18n } from "@lingui/core";
+import { i18n, MessageDescriptor } from "@lingui/core";
 import { MacroMessageDescriptor, ChoiceOptions } from "@lingui/core/macro";
 import {
   availableLocales,
@@ -81,41 +81,49 @@ export const localeStore: LocaleStore = {
   },
 };
 
-/**
- * Usage: <span>{$t`Hello ${planet}`}</span>
- */
-export const t = derived(
-  localeStore,
-  () =>
-    function (
-      _descriptor: string | MacroMessageDescriptor | TemplateStringsArray,
-      ..._parts: unknown[]
-    ) {
-      // eslint-disable-next-line prefer-rest-params
-      return i18n.t(arguments[0]);
-    },
-);
+const currentLocale = fromStore(localeStore);
+
+const translateDescriptor = (descriptor: MessageDescriptor): string => {
+  // Subscribes a surrounding $derived, $effect or template to locale changes
+  void currentLocale.current;
+  return i18n.t(descriptor);
+};
+
+// The preprocessor rewrites each call into a single `MessageDescriptor` argument,
+// these types are the syntax written before that rewrite
+const translate = ((descriptor: MessageDescriptor) =>
+  translateDescriptor(descriptor)) as unknown as (
+  descriptor: string | MacroMessageDescriptor | TemplateStringsArray,
+  ...parts: unknown[]
+) => string;
+const pluralize = ((descriptor: MessageDescriptor) =>
+  translateDescriptor(descriptor)) as unknown as (
+  value: number,
+  options: ChoiceOptions & { [digit: `=${number}`]: string },
+) => string;
 
 /**
- * Usage:
+ * Usage in a component: <span>{$t`Hello ${planet}`}</span>
+ * Usage in a module: t`Hello ${planet}`
+ */
+export const t = Object.assign(translate, {
+  subscribe: derived(localeStore, () => translate).subscribe,
+});
+
+/**
+ * Usage in a component:
  * <p>
  *   {$plural(numBooks, {
  *     one: `One ${genre} book`,
  *     other: `# ${genre} books`
  *   })}
  * </p>
+ *
+ * Usage in a module: plural(numBooks, { one: `One ${genre} book`, other: `# ${genre} books` })
  */
-export const plural = derived(
-  localeStore,
-  () =>
-    function (
-      _value: number,
-      _options: ChoiceOptions & { [digit: `=${number}`]: string },
-    ) {
-      // eslint-disable-next-line prefer-rest-params
-      return i18n.t(arguments[0]);
-    },
-);
+export const plural = Object.assign(pluralize, {
+  subscribe: derived(localeStore, () => pluralize).subscribe,
+});
 
 /**
  * Usage: <span>{$formatDate(dateObj, { dateStyle: "short" })}</span>

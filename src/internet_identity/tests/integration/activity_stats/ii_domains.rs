@@ -31,12 +31,13 @@ fn should_report_daily_active_anchors() -> Result<(), RejectResponse> {
 
     let ic0_app_anchor = flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
 
+    let both_domains_device = distinct_device(&ic0_app_device, 0);
     let both_domains_anchor =
-        flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
+        flows::register_anchor_with_device(&env, canister_id, &both_domains_device);
     api::add(
         &env,
         canister_id,
-        principal(&ic0_app_device),
+        principal(&both_domains_device),
         both_domains_anchor,
         &internetcomputer_org_device,
     )?;
@@ -49,13 +50,18 @@ fn should_report_daily_active_anchors() -> Result<(), RejectResponse> {
     )?;
 
     // more activity to get #active users different from 1
-    for _ in 0..5 {
-        flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
+    for i in 1..=5 {
+        flows::register_anchor_with_device(&env, canister_id, &distinct_device(&ic0_app_device, i));
     }
-    flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
-    flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
+    for i in 1..=2 {
+        flows::register_anchor_with_device(
+            &env,
+            canister_id,
+            &distinct_device(&internetcomputer_org_device, i),
+        );
+    }
     flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
-    flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
+    flows::register_anchor_with_device(&env, canister_id, &distinct_device(&id_ai_device, 1));
     flows::register_anchor_with_device(&env, canister_id, &other_origin_device);
     flows::register_anchor_with_device(&env, canister_id, &no_origin_device);
 
@@ -111,12 +117,13 @@ fn should_report_monthly_active_anchors() -> Result<(), RejectResponse> {
 
     let ic0_app_anchor = flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
 
+    let both_domains_device = distinct_device(&ic0_app_device, 0);
     let both_domains_anchor =
-        flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
+        flows::register_anchor_with_device(&env, canister_id, &both_domains_device);
     api::add(
         &env,
         canister_id,
-        principal(&ic0_app_device),
+        principal(&both_domains_device),
         both_domains_anchor,
         &internetcomputer_org_device,
     )?;
@@ -129,12 +136,16 @@ fn should_report_monthly_active_anchors() -> Result<(), RejectResponse> {
     )?;
 
     // more activity to get #active users different from 1
-    flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
-    flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
-    flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
-    flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
+    flows::register_anchor_with_device(&env, canister_id, &distinct_device(&ic0_app_device, 1));
+    for i in 1..=3 {
+        flows::register_anchor_with_device(
+            &env,
+            canister_id,
+            &distinct_device(&internetcomputer_org_device, i),
+        );
+    }
     flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
-    flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
+    flows::register_anchor_with_device(&env, canister_id, &distinct_device(&id_ai_device, 1));
     flows::register_anchor_with_device(&env, canister_id, &other_origin_device);
     flows::register_anchor_with_device(&env, canister_id, &no_origin_device);
 
@@ -233,7 +244,7 @@ fn should_update_monthly_active_anchors_every_day() -> Result<(), RejectResponse
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
     let anchor_number = flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
-    flows::register_anchor_with_device(&env, canister_id, &ic0_app_device);
+    flows::register_anchor_with_device(&env, canister_id, &distinct_device(&ic0_app_device, 1));
 
     // advance by 24h to record in the shifted 30-day period
     env.advance_time(Duration::from_secs(DAY_SECONDS));

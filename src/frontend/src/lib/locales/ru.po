@@ -19,6 +19,9 @@ msgstr "(что угодно, оставьте пустым)"
 msgid "{0} logo"
 msgstr "{0} логотип"
 
+msgid "{0} no longer has access to your apps."
+msgstr "{0} больше не имеет доступа к вашим приложениям."
+
 msgid "{0} user"
 msgstr "{0} пользователь"
 
@@ -37,6 +40,10 @@ msgstr "приложение {application} переехало на новую в
 msgid "{attribute}:"
 msgstr "{attribute}:"
 
+msgctxt "Browsers are grouped by platform, which cannot tell one device from several, so the plural hedges with device(s) instead of naming a number"
+msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
+msgstr "{count, plural, one {# браузер на {platform}} few {# браузера на {platform}} many {# браузеров на {platform}} other {# браузера на {platform}}}"
+
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} из {capacity} подтверждённых email-адресов"
 
@@ -54,6 +61,9 @@ msgstr "SSO домена {domainInput} вернул «{0}»: {1}"
 
 msgid "{domainInput}'s SSO returned error \"{0}\"."
 msgstr "SSO домена {domainInput} вернул ошибку «{0}»."
+
+msgid "{enteredDomain} isn't the domain it was linked through."
+msgstr "{enteredDomain} — это не тот домен, через который была выполнена привязка."
 
 msgid "{identityName} has been removed from this device."
 msgstr "Данные {identityName} были удалены с этого устройства."
@@ -124,8 +134,17 @@ msgstr "Фраза из 24 слов, которую вы записываете 
 msgid "A few things could be going on:"
 msgstr "Возможны несколько причин:"
 
+msgid "A local program"
+msgstr "Локальная программа"
+
+msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
+msgstr "Локальный сервер каждый раз выбирает новый порт, поэтому любая программа на этом компьютере может запросить подключение. Удалите его, когда не используете."
+
 msgid "About"
 msgstr "О сервисе"
+
+msgid "About Safari"
+msgstr "О Safari"
 
 msgid "Access"
 msgstr "Доступ"
@@ -217,14 +236,26 @@ msgstr "Доступ AI"
 msgid "All options"
 msgstr "Все параметры"
 
+msgid "Allow"
+msgstr "Разрешить"
+
 msgid "Allow access"
 msgstr "Разрешить доступ"
 
 msgid "Allow CLI access"
 msgstr "Разрешить доступ CLI"
 
+msgid "Allow local programs to connect?"
+msgstr "Разрешить локальным программам подключаться?"
+
+msgid "Allow notifications"
+msgstr "Разрешить уведомления"
+
 msgid "Allow to access this info"
 msgstr "Разрешить доступ к этим данным"
+
+msgid "Allowed"
+msgstr "Разрешено"
 
 msgid "Allowing access"
 msgstr "Разрешение доступа"
@@ -240,6 +271,24 @@ msgstr "Вы уже вошли"
 
 msgid "Also makes changes on your behalf."
 msgstr "Также вносит изменения от вашего имени."
+
+msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
+msgstr "Аккаунт, привязанный через SSO, выполняет вход через домен, с которым он был связан. Этот аккаунт связан с учётной записью, поэтому его нельзя использовать для создания новой."
+
+msgid "Any local program can connect"
+msgstr "Любая локальная программа может подключиться"
+
+msgid "Any program on this computer can ask."
+msgstr "Любая программа на этом компьютере может отправить запрос."
+
+msgid "Applications"
+msgstr "Приложения"
+
+msgid "Apps you sign in to will show up here."
+msgstr "Приложения, в которые вы входите, появятся здесь."
+
+msgid "Apps you've signed in to with this identity."
+msgstr "Приложения, в которые вы вошли с этой учётной записью."
 
 msgid "Are you sure?"
 msgstr "Вы уверены?"
@@ -283,8 +332,14 @@ msgstr "Назад к способам входа"
 msgid "Before you continue"
 msgstr "Прежде чем продолжить"
 
+msgid "Blocked"
+msgstr "Заблокировано"
+
 msgid "Body"
 msgstr "Тело письма"
+
+msgid "Bookmarks"
+msgstr "Закладки"
 
 msgid "Both are on the <0>{host}</0> domain."
 msgstr "Оба находятся на домене <0>{host}</0>."
@@ -294,6 +349,9 @@ msgstr "Браузер открыт"
 
 msgid "By showing all options, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo)."
 msgstr "Показывая все параметры, вы можете выбрать, как долго длится сессия до следующего входа, и создать несколько аккаунтов для одного приложения (например, рабочий, личный или демо)."
+
+msgid "Camera"
+msgstr "Камера"
 
 msgid "Can't find your identity?"
 msgstr "Не получилось зайти?"
@@ -348,6 +406,12 @@ msgstr "Выберите, какими данными вы хотите поде
 
 msgid "Clear all"
 msgstr "Очистить все"
+
+msgid "Clear History…"
+msgstr "Очистить историю…"
+
+msgid "Clear the block"
+msgstr "Снять блокировку"
 
 msgid "CLI access"
 msgstr "Доступ CLI"
@@ -409,6 +473,12 @@ msgstr "Соединение закрыто"
 msgid "Connection duration"
 msgstr "Продолжительность соединения"
 
+msgid "Connection is secure"
+msgstr "Соединение защищено"
+
+msgid "Connector type"
+msgstr "Тип коннектора"
+
 msgid "Connector URL"
 msgstr "URL коннектора"
 
@@ -451,8 +521,8 @@ msgstr "Скопировать тему"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не удалось загрузить настройки SSO с {domainInput}. Попросите вашего администратора SSO убедиться, что /.well-known/ii-openid-configuration доступен."
 
-msgid "Couldn't load your AI access settings."
-msgstr "Не удалось загрузить настройки доступа AI."
+msgid "Couldn't load the SSO settings of {registeredDomain}. Try again later or use a different method."
+msgstr "Не удалось загрузить настройки SSO для {registeredDomain}. Повторите попытку позже или используйте другой метод."
 
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Не удалось удалить коннектор. Пожалуйста, попробуйте снова."
@@ -462,6 +532,9 @@ msgstr "Не удалось сохранить изменение. Пожалу�
 
 msgid "Couldn't save your connector. Please try again."
 msgstr "Не удалось сохранить коннектор. Пожалуйста, попробуйте снова."
+
+msgid "Couldn't sign this browser out"
+msgstr "Не удалось выйти из этого браузера"
 
 msgid "Couldn't validate MCP support"
 msgstr "Не удалось проверить поддержку MCP"
@@ -505,6 +578,9 @@ msgstr "Создано {0}"
 msgid "Created {date}"
 msgstr "Создано {date}"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Создана на старом сайте Internet Identity. Может использоваться только для <0>восстановления</0> при обновлении с идентификационного номера."
+
 msgid "Creating account..."
 msgstr "Создание аккаунта..."
 
@@ -541,14 +617,23 @@ msgstr "Настроить доступ AI"
 msgid "Default"
 msgstr "По умолчанию"
 
+msgid "Deny"
+msgstr "Запретить"
+
 msgid "Deny all"
 msgstr "Запретить всё"
+
+msgid "Devices"
+msgstr "Устройства"
 
 msgid "Discoverable passkeys"
 msgstr "Вход без паролей"
 
 msgid "Do you want to continue?"
 msgstr "Хотите продолжить?"
+
+msgid "Don't recognize a browser? Sign it out, then <0>review your access methods</0>."
+msgstr "Не узнаёте браузер? Выйдите из него, затем <0>проверьте методы доступа</0>."
 
 msgid "Done"
 msgstr "Готово"
@@ -647,8 +732,17 @@ msgstr "Часто задаваемые вопросы"
 msgid "Featured apps"
 msgstr "Популярные приложения"
 
+msgid "File"
+msgstr "Файл"
+
+msgid "First seen"
+msgstr "Впервые замечен"
+
 msgid "First sign-in with {name}"
 msgstr "Первый вход с {name}"
+
+msgid "Follow these steps to turn them back on:"
+msgstr "Выполните следующие действия, чтобы включить их снова:"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Например, пользователь А входит в Internet Identity через свой аккаунт Google «A@gmail.com», а затем использует Internet Identity для аутентификации в приложении Z. Google никогда не узнает, что пользователь вошёл в приложение Z через Internet Identity. Приложение Z тоже не узнает, что пользователь А использовал Google для входа в Internet Identity."
@@ -659,11 +753,17 @@ msgstr "В целях безопасности Internet Identity запреща�
 msgid "For security, Internet Identity only connects the MCP server you've set as trusted. Set this server in Settings, then try again."
 msgstr "В целях безопасности Internet Identity подключается только к MCP-серверу, который вы установили как доверенный. Укажите этот сервер в Настройках и попробуйте снова."
 
+msgid "Forget"
+msgstr "Забыть"
+
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Забудьте о запоминании сложных имён пользователей и паролей. С Passkeys достаточно просто выбрать своё имя для входа. Быстро, безопасно и без лишних усилий."
 
 msgid "Forget this email?"
 msgstr "Забыть этот email?"
+
+msgid "Forgetting..."
+msgstr "Удаление..."
 
 msgid "From"
 msgstr "От"
@@ -674,11 +774,17 @@ msgstr "Полный контроль"
 msgid "Full ownership"
 msgstr "Полное владение"
 
+msgid "General"
+msgstr "Основные"
+
 msgid "Generating code..."
 msgstr "Генерация кода..."
 
 msgid "Generating phrase..."
 msgstr "Генерация фразы..."
+
+msgid "Get notifications from this app when something needs your attention. You can turn them off anytime."
+msgstr "Получайте уведомления от этого приложения, когда что-то требует вашего внимания. Вы можете отключить их в любое время."
 
 msgid "Get started"
 msgstr "Начать восстановление"
@@ -694,6 +800,9 @@ msgstr "Перейти в приложение"
 
 msgid "Go to the app - (<0>{countdown}</0>)"
 msgstr "Перейти в приложение - (<0>{countdown}</0>)"
+
+msgid "Go to Websites"
+msgstr "Перейти к Сайтам"
 
 msgid "Has not been used yet"
 msgstr "Еще не использовано"
@@ -713,6 +822,9 @@ msgstr "Скрытый email"
 msgid "Hide all"
 msgstr "Скрыть все"
 
+msgid "History"
+msgstr "История"
+
 msgid "Hold for a few seconds. Release to cancel."
 msgstr "Удерживайте несколько секунд. Отпустите для отмены."
 
@@ -724,6 +836,9 @@ msgstr "Удерживайте для продолжения"
 
 msgid "Home"
 msgstr "Главная"
+
+msgid "Hosted, by URL"
+msgstr "Размещённый, по URL"
 
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
 msgstr "Как интеграции Google, Microsoft и Apple работают с Internet Identity?"
@@ -905,6 +1020,12 @@ msgstr "Язык"
 msgid "Last used"
 msgstr "Последнее использование"
 
+msgid "Last visited"
+msgstr "Последнее посещение"
+
+msgid "Last visited yesterday"
+msgstr "Последнее посещение вчера"
+
 msgid "Learn how to open links in your browser"
 msgstr "Узнайте, как открывать ссылки в браузере"
 
@@ -913,6 +1034,12 @@ msgstr "Устаревший"
 
 msgid "Legacy identity"
 msgstr "Устаревшая учётная запись"
+
+msgid "Let {app} notify you"
+msgstr "Разрешить {app} отправлять вам уведомления"
+
+msgid "Let {name} notify you."
+msgstr "Разрешить {name} отправлять уведомления."
 
 msgid "Let AI access your apps."
 msgstr "Разрешите AI доступ к вашим приложениям."
@@ -929,11 +1056,23 @@ msgstr "Достигнут лимит"
 msgid "Link copied to clipboard"
 msgstr "Ссылка скопирована в буфер обмена"
 
+msgid "Linked through {registeredDomain}"
+msgstr "Привязан через {registeredDomain}"
+
+msgid "Linked through another domain"
+msgstr "Привязан через другой домен"
+
+msgid "Linked through another SSO domain"
+msgstr "Привязан через другой SSO-домен"
+
 msgid "Linking Internet Identity"
 msgstr "Привязка Internet Identity"
 
 msgid "Loading permissions"
 msgstr "Загрузка разрешений"
+
+msgid "Local server"
+msgstr "Локальный сервер"
 
 msgid "Long-press the link that opened this page."
 msgstr "Нажмите и удерживайте ссылку, открывшую эту страницу."
@@ -961,6 +1100,9 @@ msgstr "Убедитесь, что URL из надёжного источник�
 
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Обязательно добавьте новый метод доступа, чтобы вы могли войти в систему в следующий раз или сбросить свою резервную фразу."
+
+msgid "Manage {name}"
+msgstr "Управление {name}"
 
 msgid "Manage how other tools connect to your identity."
 msgstr "Управляйте тем, как другие инструменты подключаются к вашей учётной записи."
@@ -1016,6 +1158,9 @@ msgstr "Придумайте имя"
 msgid "Name:"
 msgstr "Имя:"
 
+msgid "New message"
+msgstr "Новое сообщение"
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Никакие данные о том, в какие приложения вы входите с помощью Internet Identity, не передаются Google, Microsoft или Apple."
 
@@ -1034,11 +1179,20 @@ msgstr "Нет резервной фразы"
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Нет. Face ID или отпечаток пальца используются только для создания или разблокировки вашего ключа доступа. Ваши биометрические данные никогда не передаются в Internet Identity и недоступны сайтам или приложениям, которыми вы пользуетесь."
 
+msgid "None yet"
+msgstr "Пока нет"
+
 msgid "Not activated"
 msgstr "Не активирован"
 
+msgid "Not allowed"
+msgstr "Запрещено"
+
 msgid "Not connected yet"
 msgstr "Ещё не подключён"
+
+msgid "Not now"
+msgstr "Не сейчас"
 
 msgid "Not upgraded"
 msgstr "Не обновлено"
@@ -1046,8 +1200,32 @@ msgstr "Не обновлено"
 msgid "Not verified"
 msgstr "Не подтверждён"
 
+msgid "Notification"
+msgstr "Уведомление"
+
+msgid "Notification setup failed"
+msgstr "Сбой настройки уведомлений"
+
+msgid "Notifications"
+msgstr "Уведомления"
+
+msgid "Notifications are blocked"
+msgstr "Уведомления заблокированы"
+
+msgid "Notifications blocked"
+msgstr "Уведомления заблокированы"
+
+msgid "Notifications unavailable"
+msgstr "Уведомления недоступны"
+
+msgid "now"
+msgstr "сейчас"
+
 msgid "Official · Hosted by DFINITY"
 msgstr "Официальный · Размещён DFINITY"
+
+msgid "On this computer"
+msgstr "На этом компьютере"
 
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "После включения любой инструмент командной строки на этом устройстве сможет использовать вашу учётную запись для входа в приложения."
@@ -1057,6 +1235,9 @@ msgstr "Одно или несколько слов введены неверн�
 
 msgid "Only add trusted connectors"
 msgstr "Добавляйте только доверенные коннекторы"
+
+msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
+msgstr "Продолжайте только в том случае, если вы знаете эти домены. Если приложение или инструкция попросили вас ввести незнакомый домен, остановитесь здесь и используйте домен, предоставленный вашей организацией."
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Включайте это только для официального <0>ICP CLI</0>. Если вы не уверены, переустановите его из <1>официального источника</1>."
@@ -1079,11 +1260,26 @@ msgstr "Открыть управление"
 msgid "Open menu"
 msgstr "Открыть меню"
 
+msgid "Open notification settings"
+msgstr "Открыть настройки уведомлений"
+
+msgid "Open permissions"
+msgstr "Открыть разрешения"
+
+msgid "Open Safari settings"
+msgstr "Открыть настройки Safari"
+
 msgid "Open Settings"
 msgstr "Открыть настройки"
 
 msgid "Open Settings in a new tab to set your trusted MCP server."
 msgstr "Откройте Настройки в новой вкладке, чтобы указать доверенный MCP-сервер."
+
+msgid "Open site permissions"
+msgstr "Открыть разрешения сайта"
+
+msgid "Open site settings"
+msgstr "Открыть настройки сайта"
 
 msgid "Or sign in with another identity"
 msgstr "Или войдите с другой учётной записью"
@@ -1130,6 +1326,9 @@ msgstr "Без паролей"
 msgid "Permissions"
 msgstr "Разрешения"
 
+msgid "Permissions for {host}"
+msgstr "Разрешения для {host}"
+
 msgid "Pick a recovery method below to sign back in."
 msgstr "Выберите метод восстановления ниже, чтобы снова войти."
 
@@ -1150,6 +1349,15 @@ msgstr "Пожалуйста, войдите снова для продолже�
 
 msgid "Powered by"
 msgstr "Разработано"
+
+msgid "Privacy"
+msgstr "Конфиденциальность"
+
+msgid "Privacy Report…"
+msgstr "Отчёт о конфиденциальности…"
+
+msgid "Profiles"
+msgstr "Профили"
 
 msgid "Questions only"
 msgstr "Только вопросы"
@@ -1195,6 +1403,18 @@ msgstr "Резервная фраза активирована"
 
 msgid "Recovery phrase set"
 msgstr "Резервная фраза установлена"
+
+msgid "Remember"
+msgstr "Запомнить"
+
+msgid "Remember this browser?"
+msgstr "Запомнить этот браузер?"
+
+msgid "Reminder"
+msgstr "Напоминание"
+
+msgid "Remote server"
+msgstr "Удалённый сервер"
 
 msgid "Remove"
 msgstr "Удалить"
@@ -1253,6 +1473,9 @@ msgstr "Заменить"
 msgid "Replace it anytime"
 msgstr "Замените её в любое время"
 
+msgid "Request approved"
+msgstr "Запрос одобрен"
+
 msgid "Requested by"
 msgstr "Запрос от"
 
@@ -1283,20 +1506,32 @@ msgstr "Вернуться в приложение"
 msgid "Return to application"
 msgstr "Вернуться к приложению"
 
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
+msgstr "Ознакомьтесь с <0>Политикой конфиденциальности</0> и <1>Условиями использования</1> {serverDisplayName}."
+
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0>."
+msgstr "Ознакомьтесь с <0>Политикой конфиденциальности</0> {serverDisplayName}."
+
+msgid "Review {serverDisplayName}'s <0>Terms of Service</0>."
+msgstr "Ознакомьтесь с <0>Условиями использования</0> {serverDisplayName}."
+
 msgid "Review permissions"
 msgstr "Просмотреть разрешения"
 
 msgid "Revoke access anytime"
 msgstr "Отзовите доступ в любой момент"
 
-msgid "Revoke access anytime in your <0>settings</0>."
-msgstr "Отзовите доступ в любой момент в ваших <0>настройках</0>."
-
 msgid "Right now"
 msgstr "Прямо сейчас"
 
 msgid "Run a passkey test to see results"
 msgstr "Запустить тест ключа доступа, чтобы увидеть результаты"
+
+msgid "Runs on your own computer · Any port"
+msgstr "Работает на вашем компьютере · Любой порт"
+
+msgid "Safari Extensions…"
+msgstr "Расширения Safari…"
 
 msgid "Save changes"
 msgstr "Сохранить изменения"
@@ -1313,11 +1548,26 @@ msgstr "Отсканируйте приведенный выше QR-код с в
 msgid "Seamless access"
 msgstr "Бесшовный доступ"
 
+msgid "Secure connection"
+msgstr "Защищённое соединение"
+
 msgid "Securely connecting your identity to the server."
 msgstr "Безопасное подключение вашей учётной записи к серверу."
 
+msgid "See where you're signed in to apps and sign out remotely."
+msgstr "Посмотрите, в каких приложениях вы вошли, и выйдите из них удалённо."
+
+msgid "Select <0>Blocked ×</0> to clear it."
+msgstr "Выберите <0>Заблокировано ×</0>, чтобы снять блокировку."
+
+msgid "Select <0>Notifications</0>, set {host} to <1>Allow</1>."
+msgstr "Выберите <0>Уведомления</0>, установите для {host} значение <1>Разрешить</1>."
+
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Выберите <0>Открыть в Safari</0> или <1>Открыть в Chrome</1>."
+
+msgid "Select <0>Safari</0> › <1>Settings…</1> in the menu bar."
+msgstr "Выберите <0>Safari</0> › <1>Настройки…</1> в строке меню."
 
 msgid "Select a passkey"
 msgstr "Выберите ключ доступа"
@@ -1325,8 +1575,20 @@ msgstr "Выберите ключ доступа"
 msgid "Select each word in the correct order:"
 msgstr "Выберите каждое слово в правильном порядке:"
 
+msgid "Select the <0>Websites</0> tab."
+msgstr "Выберите вкладку <0>Сайты</0>."
+
+msgid "Select the highlighted <0>permissions</0> icon."
+msgstr "Выберите выделенный значок <0>разрешений</0>."
+
+msgid "Select the highlighted <0>site settings</0> icon."
+msgstr "Выберите выделенный значок <0>настроек сайта</0>."
+
 msgid "Send an email from your inbox."
 msgstr "Отправьте письмо из вашего почтового ящика."
+
+msgid "Send notifications"
+msgstr "Отправлять уведомления"
 
 msgid "Send the email below to confirm."
 msgstr "Отправьте письмо ниже для подтверждения."
@@ -1349,8 +1611,14 @@ msgstr "Настроить резервную фразу"
 msgid "Set up your private, passwordless identity."
 msgstr "Создайте вашу приватную учётную запись без пароля."
 
+msgid "Setting up…"
+msgstr "Настройка…"
+
 msgid "Settings"
 msgstr "Настройки"
+
+msgid "Settings…"
+msgstr "Настройки…"
 
 msgid "Share {label}"
 msgstr "Поделиться: {label}"
@@ -1363,6 +1631,9 @@ msgstr "Показать все"
 
 msgid "Show all options"
 msgstr "Показать все параметры"
+
+msgid "Show notifications"
+msgstr "Показывать уведомления"
 
 msgid "Sign in"
 msgstr "Войти"
@@ -1385,6 +1656,9 @@ msgstr "Вход через знакомые сервисы"
 msgid "Sign in with {name}"
 msgstr "Войти через {name}"
 
+msgid "Sign in with {registeredDomain}"
+msgstr "Войти через {registeredDomain}"
+
 msgid "Sign in with another identity"
 msgstr "Войти с другой учётной записью"
 
@@ -1406,14 +1680,11 @@ msgstr "Входите со своего аккаунта {displayName} с лю�
 msgid "Sign out"
 msgstr "Выйти"
 
-msgid "Sign out and keep identity"
-msgstr "Выйти, сохранив учётную запись на этом устройстве"
+msgid "Sign out {0}?"
+msgstr "Выйти из {0}?"
 
-msgid "Sign out and remove from device"
-msgstr "Выйти и убрать учётную запись с устройства"
-
-msgid "Sign out from this device"
-msgstr "Выйти с этого устройства"
+msgid "Sign out of all apps"
+msgstr "Выйти из всех приложений"
 
 msgid "Sign out to remove"
 msgstr "Выйти и удалить"
@@ -1433,14 +1704,26 @@ msgstr "Регистрация"
 msgid "Signed in"
 msgstr "Вы зашли"
 
+msgid "Signed out"
+msgstr "Вы вышли"
+
+msgid "Signed out of all apps"
+msgstr "Вы вышли из всех приложений"
+
 msgid "Signing in"
 msgstr "Выполняется вход"
 
 msgid "Signing in securely"
 msgstr "Безопасный вход"
 
+msgid "Signing in with the provider directly doesn't reach it."
+msgstr "Прямой вход через провайдера не достигает учётной записи."
+
 msgid "Signing in..."
 msgstr "Вход..."
+
+msgid "Signing out…"
+msgstr "Выход…"
 
 msgid "Simplify your sign-in"
 msgstr "Новый способ входа"
@@ -1460,6 +1743,9 @@ msgstr "Что-то пошло не так"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Что-то пошло не так при создании делегирования. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
+
+msgid "Something went wrong while setting up notifications. Please try again; if the issue persists, contact support."
+msgstr "Что-то пошло не так при настройке уведомлений. Попробуйте снова; если проблема не исчезнет, обратитесь в службу поддержки."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "Что-то пошло не так при передаче атрибутов. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
@@ -1551,11 +1837,26 @@ msgstr "Переключение..."
 msgid "Taking you to the server to finish connecting…"
 msgstr "Переход на сервер для завершения подключения…"
 
+msgid "Tap <0>Blocked</0> to allow."
+msgstr "Нажмите <0>Заблокировано</0>, чтобы разрешить."
+
+msgid "Tap <0>Notifications</0>."
+msgstr "Нажмите <0>Уведомления</0>."
+
+msgid "Tap <0>Permissions</0>."
+msgstr "Нажмите <0>Разрешения</0>."
+
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Нажмите на <0>адресную строку</0> и <1>откройте в браузере</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Нажмите на выделенную кнопку <0>«Назад»</0>."
+
+msgid "Tap the highlighted <0>shield</0> icon."
+msgstr "Нажмите выделенный значок <0>щита</0>."
+
+msgid "Tap the highlighted <0>site settings</0> icon."
+msgstr "Нажмите выделенный значок <0>настроек сайта</0>."
 
 msgid "Test passkey support"
 msgstr "Проверить поддержку ключей доступа"
@@ -1605,6 +1906,18 @@ msgstr "Фраза была введена правильно, но принад
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Возникла проблема с подключением к приложению. Попробуйте другой браузер; если проблема сохраняется, свяжитесь с разработчиком."
 
+msgid "This {providerName} account is already linked to an Internet Identity through an SSO domain."
+msgstr "Этот аккаунт {providerName} уже привязан к учётной записи Internet Identity через SSO-домен."
+
+msgid "This {providerName} account is already linked to an Internet Identity through the SSO domain {registeredDomain}."
+msgstr "Этот аккаунт {providerName} уже привязан к учётной записи Internet Identity через SSO-домен {registeredDomain}."
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through {registeredDomain} rather than {enteredDomain}."
+msgstr "Этот аккаунт {providerName} уже привязан к учётной записи Internet Identity, но через {registeredDomain}, а не через {enteredDomain}."
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through a different SSO domain than {enteredDomain}."
+msgstr "Этот аккаунт {providerName} уже привязан к учётной записи Internet Identity, но через другой SSO-домен, отличный от {enteredDomain}."
+
 msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
 msgstr "Этот аккаунт {resolvedProviderName} уже подключён к учётной записи Internet Identity."
 
@@ -1614,11 +1927,17 @@ msgstr "Этот аккаунт {resolvedProviderName} ещё не подклю�
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Этот аккаунт уже прикреплён к вашей учётной записи. Ваш активный метод доступа будет переключён на него."
 
+msgid "this app"
+msgstr "это приложение"
+
 msgid "This app has moved to the new Internet Identity"
 msgstr "Это приложение переехало на новую версию Internet Identity"
 
 msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
 msgstr "Приложение запрашивает ваш адрес электронной почты. Вы можете подтвердить его сейчас и поделиться, или пропустить и продолжить без передачи."
+
+msgid "This browser"
+msgstr "Этот браузер"
 
 msgid "This browser is not supported."
 msgstr "Этот браузер не поддерживается."
@@ -1646,9 +1965,6 @@ msgstr "Это метод доступа, с помощью которого в�
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Это метод восстановления, с помощью которого вы в данный момент вошли."
-
-msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "Этот устаревший ключ доступа больше не может быть использован и должен быть удален."
 
 msgid "This may take a few seconds"
 msgstr "Это может занять несколько секунд."
@@ -1709,6 +2025,12 @@ msgstr "Попробуйте другой адрес"
 
 msgid "Try again"
 msgstr "Попробовать снова"
+
+msgid "Turn on <0>Notifications</0>."
+msgstr "Включите <0>Уведомления</0>."
+
+msgid "Turn on <0>Show notifications</0>."
+msgstr "Включите <0>Показывать уведомления</0>."
 
 msgid "Type each word in the correct order:"
 msgstr "Введите каждое слово в правильном порядке:"
@@ -1854,6 +2176,9 @@ msgstr "Проверка..."
 msgid "Verifying…"
 msgstr "Проверка…"
 
+msgid "View"
+msgstr "Просмотр"
+
 msgid "View your last used identities"
 msgstr "Просмотреть ваши последние использованные учётные записи"
 
@@ -1877,6 +2202,9 @@ msgstr "Мы не распознали этот код активации."
 
 msgid "We'll ask you to send an email from this inbox to confirm."
 msgstr "Мы попросим вас отправить письмо с этого ящика для подтверждения."
+
+msgid "Websites"
+msgstr "Сайты"
 
 msgid "Welcome, <0>{name}</0>."
 msgstr "Добро пожаловать, <0>{name}</0>."
@@ -1956,9 +2284,6 @@ msgstr "Вы можете закрыть это окно."
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Вы можете продолжить с <0>Использовать существующий ключ доступа</0> в процессе входа."
 
-msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "Вы можете выйти, сохранив свои данные для более быстрого входа в следующий раз, или полностью убрать их с этого устройства."
-
 msgid "You can manage your access methods on this page."
 msgstr "Вы можете управлять своими методами доступа на этой странице."
 
@@ -1968,11 +2293,17 @@ msgstr "Вы можете сбросить свою резервную фраз�
 msgid "You can return to your agent."
 msgstr "Вы можете вернуться к своему агенту."
 
+msgid "You can sign in again at any time."
+msgstr "Вы можете войти снова в любое время."
+
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "Вы можете использовать её сейчас для восстановления, но убедитесь, что сохранили её правильно, чтобы впоследствии можно было на неё рассчитывать."
 
 msgid "You control both devices."
 msgstr "Оба устройства принадлежат вам."
+
+msgid "You have 1 new message."
+msgstr "У вас 1 новое сообщение."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Вы достигли максимального количества ключей доступа"
@@ -2025,6 +2356,15 @@ msgstr "Вы достигли лимита в {capacity} подтверждён�
 msgid "You've reached the limit of {limit} verified emails. Remove one to add another."
 msgstr "Вы достигли лимита в {limit} подтверждённых email-адресов. Удалите один, чтобы добавить другой."
 
+msgid "Your apps stay signed in and your identity is ready the next time you come back."
+msgstr "Ваши приложения остаются авторизованными, а ваша учётная запись готова к следующему посещению."
+
+msgid "Your event starts in 15 minutes."
+msgstr "Ваше мероприятие начинается через 15 минут."
+
+msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
+msgstr "Ваш локальный сервер сообщит вам, когда будет готов к подключению. Здесь ничего вводить не нужно."
+
 msgid "Your organization hasn't granted this app access via {domainInput}."
 msgstr "Ваша организация не предоставила этому приложению доступ через {domainInput}."
 
@@ -2045,3 +2385,6 @@ msgstr "Резервная фраза даёт полный контроль н�
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Ваша резервная фраза теперь активна и может быть сброшена в любое время."
+
+msgid "Your request was approved."
+msgstr "Ваш запрос одобрен."

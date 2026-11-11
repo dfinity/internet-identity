@@ -135,6 +135,8 @@ fn ii_canister_serves_http_metrics() -> Result<(), RejectResponse> {
         "internet_identity_doh_cache_in_flight",
         "internet_identity_doh_cache_max_entries",
         "internet_identity_doh_cache_inconsistencies",
+        r#"internet_identity_notification_wake_ups{outcome="sent"}"#,
+        "internet_identity_notifications_waiting",
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // Advance time to see it reflected on the metrics endpoint
@@ -205,7 +207,11 @@ fn metrics_user_count_should_increase_after_register() -> Result<(), RejectRespo
         0f64,
     );
     for count in 0..2 {
-        flows::register_anchor(&env, canister_id);
+        flows::register_anchor_with_device(
+            &env,
+            canister_id,
+            &distinct_device(&device_data_1(), count),
+        );
         assert_metric(
             &get_metrics(&env, canister_id),
             "internet_identity_user_count",
@@ -431,8 +437,9 @@ fn metrics_inflight_challenges() -> Result<(), RejectResponse> {
 fn metrics_device_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let device_2 = distinct_device(&device_data_1(), 0);
     let user_number_1 = flows::register_anchor(&env, canister_id);
-    let user_number_2 = flows::register_anchor(&env, canister_id);
+    let user_number_2 = flows::register_anchor_with_device(&env, canister_id, &device_2);
 
     let metrics = get_metrics(&env, canister_id);
     let (challenge_count, _) =
@@ -440,7 +447,7 @@ fn metrics_device_registration_mode() -> Result<(), RejectResponse> {
     assert_eq!(challenge_count, 0f64);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_1)?;
-    api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number_2)?;
+    api::enter_device_registration_mode(&env, canister_id, device_2.principal(), user_number_2)?;
 
     let metrics = get_metrics(&env, canister_id);
     let (challenge_count, _) =
@@ -884,6 +891,8 @@ fn should_report_registration_rates() -> Result<(), RejectResponse> {
 fn should_report_total_account_metrics() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
+    // A deployment sets the salt once; account principals cannot be derived without it.
+    api::init_salt(&env, canister_id)?;
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
@@ -902,11 +911,6 @@ fn should_report_total_account_metrics() -> Result<(), RejectResponse> {
     assert_metric(
         &initial_metrics,
         "internet_identity_total_application_count",
-        0f64,
-    );
-    assert_metric(
-        &initial_metrics,
-        "internet_identity_account_counter_discrepancy_count",
         0f64,
     );
 
@@ -972,6 +976,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         InternetIdentitySynchronizedConfig {
             openid_configs: Some(openid_configs),
             mcp_official_url: None,
+            notifications_enabled: Some(false),
         }
     );
 
@@ -979,6 +984,65 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
 
     let result = verify_response_certification(&env, canister_id, request, http_response, 2);
     assert_eq!(result.verification_version, 2);
+
+    Ok(())
+}
+
+/// Verifies that the frontend is told whether this deployment notifies: the canister
+/// refuses every notification endpoint while it does not, so the frontend has no
+/// business offering the feature then.
+#[test]
+fn ii_canister_serves_whether_it_notifies() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
+
+    let enabled = |canister_id| -> Result<Option<bool>, RejectResponse> {
+        let response = http_request(
+            &env,
+            canister_id,
+            &HttpRequest {
+                method: "GET".to_string(),
+                url: "/.config.did.bin".to_string(),
+                headers: vec![],
+                body: ByteBuf::new(),
+                certificate_version: Some(2),
+            },
+        )?;
+        let config: InternetIdentitySynchronizedConfig =
+            candid::decode_one(&response.body).expect("the config decodes");
+        Ok(config.notifications_enabled)
+    };
+
+    assert_eq!(
+        enabled(canister_id)?,
+        Some(false),
+        "a deployment that never enabled notifications does not notify"
+    );
+
+    let upgrade_to = |notifications_enabled| {
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled,
+                ..Default::default()
+            }),
+        )
+    };
+
+    upgrade_to(Some(true)).expect("upgrading with notifications enabled");
+    assert_eq!(enabled(canister_id)?, Some(true));
+
+    upgrade_to(None).expect("upgrading without the field");
+    assert_eq!(
+        enabled(canister_id)?,
+        Some(true),
+        "omitting the field keeps the stored value"
+    );
+
+    upgrade_to(Some(false)).expect("upgrading with notifications disabled");
+    assert_eq!(enabled(canister_id)?, Some(false));
 
     Ok(())
 }

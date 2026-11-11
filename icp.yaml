@@ -22,22 +22,27 @@ canisters:
     init_args:
       path: src/internet_identity/local_test_arg.did
 
+  # Built in dfinity/internet-identity-test-app; the pinned release is fetched
+  # rather than built from source.
   - name: test_app
     build:
       steps:
         - type: script
           commands:
-            - "demos/test-app/build.sh"
-            - "cp demos/test-app/test_app.wasm \"$ICP_WASM_OUTPUT_PATH\""
+            - "scripts/fetch-test-app"
+            - "cp .test-app/test_app.wasm \"$ICP_WASM_OUTPUT_PATH\""
 
+  # The VC demo issuer lives in dfinity/internet-identity-vc-demo-issuer; we
+  # install the release pinned in .github/versions/vc-issuer rather than
+  # building it here.
   - name: issuer
     build:
       steps:
         - type: script
           commands:
-            - "demos/vc_issuer/build.sh"
-            - "cp demos/vc_issuer/vc_demo_issuer.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
+            - "scripts/fetch-vc-issuer"
+            - "cp .vc-issuer/vc_demo_issuer.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
     sync:
       steps:
         - type: script
-          command: "demos/vc_issuer/provision"
+          command: "scripts/provision-issuer"

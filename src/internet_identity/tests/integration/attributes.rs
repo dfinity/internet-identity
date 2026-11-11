@@ -1585,3 +1585,159 @@ fn should_return_error_for_unavailable_icrc3_attributes() {
         other => panic!("Expected AttributeMismatch error, got {:?}", other),
     }
 }
+
+/// Emails from Apple credentials, under the `Apple` email verification scheme:
+/// Apple vouches for real addresses and private relay addresses alike, but only
+/// real ones are kept, and they count as verified.
+mod apple_verified_email {
+    use super::*;
+    use crate::v2_api::authn_method_test_helpers::{
+        create_identity_with_authn_method, test_authn_method,
+    };
+    use canister_tests::api::internet_identity::api_v2;
+    use internet_identity_interface::internet_identity::types::OpenIdEmailVerificationScheme;
+    use pretty_assertions::assert_eq;
+
+    const APPLE_ISSUER: &str = "https://appleid.apple.com";
+    const APPLE_CLIENT_ID: &str = "ai.id.auth";
+    const APPLE_JWKS_URI: &str = "https://appleid.apple.com/auth/keys";
+
+    /// Links an Apple credential carrying `email` and the `extra_claims` to a
+    /// new identity, and returns what the identity then has: its verified
+    /// emails and its available attributes.
+    fn link_apple_credential(
+        email: &str,
+        extra_claims: &[(&str, &str)],
+    ) -> (Vec<String>, Vec<(String, String)>) {
+        let env = env();
+        let authn_method = test_authn_method();
+        let principal = authn_method.principal();
+
+        let test_time_ms: u64 = 1_800_000_000_000;
+        let iat_secs = test_time_ms / 1_000 - 300;
+        let salt = [7u8; 32];
+        let (jwt, jwks_json) = build_fake_google_jwt_and_jwks(FakeJwtInput {
+            salt: &salt,
+            principal: &principal,
+            issuer: APPLE_ISSUER,
+            aud: APPLE_CLIENT_ID,
+            sub: "001234.0123456789abcdef0123456789abcdef.0789",
+            email,
+            name: "",
+            email_verified: true,
+            iat_secs,
+            exp_secs: iat_secs + 3_600,
+            extra_claims,
+        });
+
+        let mut init_args = arg_with_wasm_hash(ARCHIVE_WASM.clone()).unwrap();
+        init_args.openid_configs = Some(vec![OpenIdConfig {
+            name: "Apple".into(),
+            logo: "logo".into(),
+            issuer: APPLE_ISSUER.into(),
+            client_id: APPLE_CLIENT_ID.into(),
+            jwks_uri: APPLE_JWKS_URI.into(),
+            auth_uri: "https://appleid.apple.com/auth/authorize".into(),
+            auth_scope: vec!["openid".into(), "email".into()],
+            fedcm_uri: None,
+            email_verification: Some(OpenIdEmailVerificationScheme::Apple),
+            seed_jwks: None,
+        }]);
+        let canister_id = install_ii_canister_with_arg_and_cycles(
+            &env,
+            II_WASM.clone(),
+            Some(init_args),
+            1_000_000_000_000_000,
+        );
+        crate::openid::mock_certs_response(&env, APPLE_JWKS_URI, &jwks_json);
+        deploy_archive_via_ii(&env, canister_id);
+
+        let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+        env.advance_time(Duration::from_millis(test_time_ms) - Duration::from_nanos(time(&env)));
+        api::openid_credential_add(&env, canister_id, principal, identity_number, &jwt, &salt)
+            .expect("failed to add openid credential")
+            .expect("openid_credential_add error");
+
+        let verified_emails = api_v2::identity_info(&env, canister_id, principal, identity_number)
+            .expect("failed to call identity_info")
+            .expect("identity_info error")
+            .verified_emails
+            .unwrap_or_default()
+            .into_iter()
+            .map(|verified_email| verified_email.address)
+            .collect();
+        let attributes = api::list_available_attributes(
+            &env,
+            canister_id,
+            principal,
+            ListAvailableAttributesRequest {
+                identity_number,
+                attributes: None,
+            },
+        )
+        .expect("failed to call list_available_attributes")
+        .expect("list_available_attributes error")
+        .into_iter()
+        .map(|(key, value)| (key, String::from_utf8(value).expect("attribute is text")))
+        .collect();
+
+        (verified_emails, attributes)
+    }
+
+    #[test]
+    fn should_verify_real_apple_email() {
+        // Apple sends the flags as strings or booleans; the fake JWT carries
+        // `email_verified` as a boolean and `is_private_email` as a string.
+        let (verified_emails, attributes) =
+            link_apple_credential("user@example.com", &[("is_private_email", "false")]);
+
+        assert_eq!(verified_emails, vec!["user@example.com".to_string()]);
+        assert!(
+            attributes.contains(&(
+                format!("openid:{APPLE_ISSUER}:verified_email"),
+                "user@example.com".to_string()
+            )),
+            "expected a verified email, got {attributes:?}"
+        );
+    }
+
+    /// Asserts that the identity got no Apple email at all, verified or not.
+    fn assert_no_apple_email(verified_emails: &[String], attributes: &[(String, String)]) {
+        assert_eq!(verified_emails, Vec::<String>::new());
+        let keys: Vec<&str> = attributes.iter().map(|(key, _)| key.as_str()).collect();
+        for name in ["email", "verified_email"] {
+            assert!(
+                !keys.contains(&format!("openid:{APPLE_ISSUER}:{name}").as_str()),
+                "expected no Apple {name}, got {keys:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn should_not_keep_apple_private_relay_email() {
+        let (verified_emails, attributes) = link_apple_credential(
+            "ep9ks2tnph@privaterelay.appleid.com",
+            &[("email_verified", "true"), ("is_private_email", "true")],
+        );
+
+        assert_no_apple_email(&verified_emails, &attributes);
+    }
+
+    #[test]
+    fn should_not_keep_apple_relay_email_flagged_only_by_is_private_email() {
+        // A relay address can end in `@icloud.com`, which no domain rule
+        // catches; only the `is_private_email` claim does.
+        let (verified_emails, attributes) =
+            link_apple_credential("relay-alias@icloud.com", &[("is_private_email", "true")]);
+
+        assert_no_apple_email(&verified_emails, &attributes);
+    }
+
+    #[test]
+    fn should_drop_empty_apple_email() {
+        // Apple may send an empty email for Work & School accounts.
+        let (verified_emails, attributes) = link_apple_credential("", &[]);
+
+        assert_no_apple_email(&verified_emails, &attributes);
+    }
+}

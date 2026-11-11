@@ -14,15 +14,16 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
-        create_account, get_mcp_registration_delegation, mcp_get_accounts, mcp_get_config,
-        mcp_get_delegation, mcp_prepare_delegation, mcp_register_v2, mcp_set_config,
-        prepare_account_delegation, prepare_mcp_registration_delegation, set_default_account,
-        AccountDelegationParams,
+        create_account, get_mcp_registration_delegation, identity_info, mcp_get_accounts,
+        mcp_get_config, mcp_get_delegation, mcp_prepare_delegation, mcp_register_v2,
+        mcp_set_config, prepare_account_delegation, prepare_mcp_registration_delegation,
+        set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
         assert_metric, device_data_2, env, get_metrics, install_ii_canister_with_arg, principal_1,
-        principal_2, time, upgrade_ii_canister, verify_delegation, II_WASM,
+        principal_2, time, upgrade_ii_canister, upgrade_ii_canister_with_arg, verify_delegation,
+        II_WASM,
     },
 };
 use internet_identity_interface::internet_identity::types::{
@@ -46,7 +47,11 @@ const GRANT_TTL_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
 // The `/mcp` path is not gated by a global config; each identity trusts the
 // server it chooses via its synced config. So a plain install suffices.
 fn install_with_mcp(env: &PocketIc) -> Principal {
-    install_ii_canister_with_arg(env, II_WASM.clone(), None)
+    let canister_id = install_ii_canister_with_arg(env, II_WASM.clone(), None);
+    // A deployment sets the salt once; account principals cannot be derived without it.
+    canister_tests::api::internet_identity::init_salt(env, canister_id)
+        .expect("failed to initialize the salt");
+    canister_id
 }
 
 /// The official MCP connector a deployment can ship. Deliberately a different
@@ -146,6 +151,28 @@ fn register_session(
         grant_ttl_ns,
         false,
     )
+}
+
+/// The trusted URL `prepare` resolves for `anchor` — the only endpoint that
+/// reports it, and the value a connect is bound to.
+fn prepared_trusted_url(
+    env: &PocketIc,
+    canister_id: Principal,
+    sender: Principal,
+    anchor: AnchorNumber,
+) -> String {
+    prepare_mcp_registration_delegation(
+        env,
+        canister_id,
+        sender,
+        anchor,
+        ByteBuf::from("browser registration key Z (prepared_trusted_url helper)"),
+        None,
+        None,
+    )
+    .unwrap()
+    .unwrap()
+    .trusted_url
 }
 
 /// The happy path: a registered session mints a per-app delegation by caller
@@ -1082,6 +1109,52 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     Ok(())
 }
 
+/// `identity_info` carries the same config `mcp_get_config` serves. That is
+/// what lets Settings render the trusted server — and base the config it
+/// writes back — on a certified value: `identity_info` is an update call,
+/// whereas a query reply is signed by a single node and can be forged.
+#[test]
+fn identity_info_carries_the_mcp_config() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let authn_method = test_authn_method();
+    let anchor = create_identity_with_authn_method(&env, canister_id, &authn_method);
+
+    // This deployment ships no official connector, so registration wrote no
+    // config and the identity starts out with nothing stored.
+    assert_eq!(
+        identity_info(&env, canister_id, authn_method.principal(), anchor)
+            .unwrap()
+            .unwrap()
+            .mcp_config,
+        None
+    );
+
+    let config = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+    mcp_set_config(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        anchor,
+        config.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(
+        identity_info(&env, canister_id, authn_method.principal(), anchor)
+            .unwrap()
+            .unwrap()
+            .mcp_config,
+        Some(config)
+    );
+
+    Ok(())
+}
+
 /// What `mcp_get_config` reports for an unauthorized caller: the switched-off
 /// shape rather than `None`, so a read neither leaks the real config nor makes
 /// the anchor look like it may connect.
@@ -1116,6 +1189,58 @@ fn mcp_registration_enables_the_official_connector() -> Result<(), RejectRespons
     assert_eq!(
         mcp_get_config(&env, canister_id, authn_method.principal(), v2_anchor).unwrap(),
         enabled_on_official
+    );
+
+    Ok(())
+}
+
+/// `mcp_official_url` is the live source of the official connector, not a
+/// one-time seed read at install: an identity storing "official" (`{ enabled:
+/// true, url: None }`) resolves whatever URL the deployment currently ships, so
+/// re-pointing it on upgrade reaches every such identity without touching a
+/// single config row. This is what makes the arg sufficient on its own — there
+/// is no companion migration to run when the URL changes.
+#[test]
+fn mcp_official_url_upgrade_repoints_the_official_connector() -> Result<(), RejectResponse> {
+    const RELOCATED_OFFICIAL_MCP_URL: &str = "https://official-mcp.id.ai/v2/mcp";
+
+    let env = env();
+    let canister_id = install_with_official_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let on_official = Some(McpConfig {
+        enabled: true,
+        url: None,
+    });
+
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        on_official
+    );
+    assert_eq!(
+        prepared_trusted_url(&env, canister_id, principal_1(), anchor),
+        OFFICIAL_MCP_URL
+    );
+
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            mcp_official_url: Some(Some(RELOCATED_OFFICIAL_MCP_URL.to_string())),
+            ..Default::default()
+        }),
+    )
+    .expect("upgrade re-pointing the official connector failed");
+
+    // The identity's own row is untouched — `url: None` is a reference to the
+    // deployment's connector, not a copy of its URL.
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        on_official
+    );
+    assert_eq!(
+        prepared_trusted_url(&env, canister_id, principal_1(), anchor),
+        RELOCATED_OFFICIAL_MCP_URL
     );
 
     Ok(())

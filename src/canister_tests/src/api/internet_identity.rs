@@ -13,6 +13,9 @@ use pocket_ic::{
 /// The experimental v2 API
 pub mod api_v2;
 
+/// The notification API: per-app consent and Web Push device subscriptions.
+pub mod notifications;
+
 // API of verifiable credentials MVP.
 pub mod vc_mvp;
 
@@ -377,6 +380,28 @@ pub fn discover_sso(
         "discover_sso",
         (domain,),
     )
+}
+
+pub fn app_sso_domain_check(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+) -> Result<(), RejectResponse> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "app_sso_domain_check",
+        (domain,),
+    )
+}
+
+pub fn app_sso_domain_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+) -> Result<types::AppSsoDomainStatus, RejectResponse> {
+    query_candid(env, canister_id, "app_sso_domain_status", (domain,)).map(|(x,)| x)
 }
 
 pub fn get_sso_discovery(

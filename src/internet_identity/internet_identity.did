@@ -123,6 +123,8 @@ type RegisterResponse = variant {
     canister_full;
     // The challenge was not successful.
     bad_challenge;
+    // The device (its public key or credential id) is already used by an identity.
+    device_already_used;
 };
 
 type AddTentativeDeviceResponse = variant {
@@ -259,19 +261,6 @@ type CaptchaConfig = record {
     };
 };
 
-// One entry of the `sso_credential_migration` backfill. Maps the
-// (iss, aud) pair of a stored SSO credential to the discovery domain and
-// optional human-readable name it resolves to.
-type SsoCredentialMigrationEntry = record {
-    discovery_domain : text;
-    // Matches the stored credential's `iss`.
-    issuer : text;
-    // Matches the stored credential's `aud`.
-    client_id : text;
-    // Human-readable SSO label; stamped onto the credential's `sso_name`.
-    name : opt text;
-};
-
 // Init arguments of II which can be supplied on install and upgrade.
 //
 // Each field is wrapped is `opt` to indicate whether the field should
@@ -312,13 +301,16 @@ type InternetIdentityInit = record {
     // `https` for every discovery host. Never enable in production — non-loopback
     // hosts always require `https` regardless.
     sso_allow_insecure_discovery : opt bool;
-    // One-shot backfill of the `sso_domain` / `sso_name` fields on stored
-    // OpenID credentials. When set, a batched timer-driven migration stamps
-    // every stored credential whose (iss, aud) matches an entry and whose
-    // `sso_domain` is not set yet. Idempotent — already-stamped credentials
-    // are skipped, so re-submitting (e.g. with a corrected list) is safe.
-    // When unset, no backfill runs.
-    sso_credential_migration : opt vec SsoCredentialMigrationEntry;
+    // Deploy flag relaxing the https requirement for sender-list outcalls to
+    // loopback hosts (localhost / 127.0.0.1) so e2e tests and local development can
+    // serve the list over plain http. null / opt false (the default) require https
+    // for every notifying origin, and a non-loopback origin always requires https.
+    notifications_allow_insecure_sender_list : opt bool;
+    // Deploy flag relaxing the https requirement for the Web Push endpoint a
+    // browser registers, for a deployment whose relay is a local server rather
+    // than a push service. As above, only loopback hosts (localhost / 127.0.0.1)
+    // may then be plain http; null / opt false (the default) require https.
+    notifications_allow_insecure_endpoint : opt bool;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
     // Configuration to show dapps explorer or not
@@ -354,12 +346,11 @@ type InternetIdentityInit = record {
     // set/clear pattern as `dnssec_config`: null keeps the previously stored
     // value, `opt null` clears it, `opt opt "https://..."` sets it.
     mcp_official_url : opt opt text;
-    // One-shot upgrade arg driving the MCP config migration: `opt true` gives
-    // every anchor "enabled, official connector", since neither a value stored
-    // before the official connector existed nor an absent config was ever a
-    // choice about it. Unset means no migration, and the migration is refused
-    // when the deployment ships no `mcp_official_url`.
-    mcp_config_migration : opt bool;
+    // Server-side switch for the notifications feature. `opt true` enables every
+    // notification endpoint, for any app; `opt false` disables them. Omitting it on
+    // upgrade keeps the stored value, and a canister that never stored one has them
+    // disabled.
+    notifications_enabled : opt bool;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -466,6 +457,10 @@ type OpenIdEmailVerification = variant {
     Unknown;
     Google;
     Microsoft;
+    // Trusts email_verified like Google. Apple's private relay addresses,
+    // which only senders registered with II's Apple developer team can deliver
+    // mail to, are not kept on the credential at all.
+    Apple;
 };
 
 type OpenIdConfig = record {
@@ -501,14 +496,29 @@ type SsoDiscovery = record {
     name : opt text;
     // Client the target origin runs its ceremony against; `null` when denied.
     resolved_client_id : opt text;
+    // How long a sign-in through this domain stays valid, in nanoseconds, from
+    // the domain's optional `session_max_age_seconds` (8 hours when unset).
+    session_max_age_ns : nat64;
 };
 
-// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
-// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
-// times out — so the statuses are: resolved, or in flight.
+// Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
+// `Failed.retry_after` is when II fetches the domain again (a retry before then
+// fails the same way), and is absent when no retry can help, such as a value
+// that is not a domain. `reason` explains the failure, to show as is, when II
+// has one.
 type SsoDiscoveryStatus = variant {
     Resolved : SsoDiscovery;
     Pending;
+    Failed : record { retry_after : opt Timestamp; reason : opt text };
+};
+
+// Whether an organization domain can be used for SSO sign-in, read by
+// `app_sso_domain_status`. `name` is the organization's display name;
+// `retry_after` and `reason` are as for `SsoDiscoveryStatus.Failed`.
+type AppSsoDomainStatus = variant {
+    Available : record { name : opt text };
+    Pending;
+    Unavailable : record { retry_after : opt Timestamp; reason : opt text };
 };
 
 // Request for `get_sso_discovery_status`.
@@ -563,6 +573,14 @@ type OpenIdDelegationError = variant {
     JwtVerificationFailed;
     NoSuchDelegation;
     JwtExpired;
+    // The credential is registered on an anchor, but through a different SSO
+    // discovery domain than the one this login was verified through, so the
+    // domain-scoped anchor lookup cannot resolve it. `registered_sso_domain` is
+    // the domain the credential is registered through (`null` for a credential
+    // stored without a domain stamp). A sign-up with the same credential would be
+    // rejected with `OpenIdCredentialAlreadyRegistered`, since registration
+    // uniqueness spans all discovery domains.
+    SsoDomainMismatch : record { registered_sso_domain : opt text };
 };
 
 type OpenIdPrepareDelegationResponse = record {
@@ -1029,6 +1047,200 @@ type IdentityAuthnInfo = record {
     recovery_authn_methods : vec AuthnMethod;
 };
 
+// Which browser a sign-in came from, as a token rather than a name to show. Products
+// get renamed — "Chrome OS" became "ChromeOS", "Mac OS X" became "macOS" — so the name
+// the user reads is derived in the frontend, where a rename reaches every stored record
+// at once. "Brand" is what the client hints call this, and BrowserInfo below is the
+// entry it describes.
+type BrowserBrand = variant {
+    Chrome; Safari; Firefox; Edge; Opera; SamsungInternet;
+    // A browser this list does not name, shown as the client resolved it. Worth seeing
+    // rather than hiding behind a generic label. Named variants are the six that hold
+    // 97% of the web between them, because a variant is what earns an icon.
+    Other : text;
+};
+
+type OperatingSystem = variant {
+    Macos; Ios; Ipados; Windows; Android; ChromeOs; Linux; Other : text;
+};
+
+// Reported where the client can state it and inferred where it cannot, so unknown is a
+// real answer: the browsers exposing no client hints are the ones this is least sure of.
+type FormFactor = variant { Desktop; Mobile; Tablet; Unknown };
+
+// What a browser reported about itself when it registered. Self-reported, so it is
+// something the user reads to recognise their own browser rather than evidence about
+// where a session came from. The canister stores these and never interprets them.
+type BrowserDescription = record {
+    brand : BrowserBrand;
+    os : OperatingSystem;
+    form_factor : FormFactor;
+    // The hardware, where the client can name it — Android is the only place that does.
+    model : opt text;
+};
+
+type BrowserInfo = record {
+    id : nat32;
+    // Fixed at registration. A sign-in reporting something else registers its own entry,
+    // so this describes a registration rather than the last sign-in.
+    description : BrowserDescription;
+    created_at : Timestamp;
+    // Advanced by a sign-in from this browser and by every session refresh it drives.
+    last_used : Timestamp;
+    // Sessions this browser holds. Zero means it is signed in to nothing.
+    session_count : nat32;
+    // The Home Screen app this browser points at, where it has one. Absent is "not
+    // installed, or installed and never opened": the record is created by the app's
+    // first open, so there is nothing to point at before that. Absent too where the
+    // record this browser points at is gone, and where this deployment does not notify.
+    notification_app : opt NotificationAppInfo;
+};
+
+// Asks what this browser's entry says about the app it points at, for a page that has
+// the browser key and no session.
+type GetNotificationAppStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+type NotificationAppInfo = record {
+    // Whether the app has registered for Web Push. False means it has been opened and
+    // the permission has not been given yet.
+    subscribed : bool;
+    // Whether this identity wants it to deliver.
+    enabled : bool;
+    // When the app last called, which is the only evidence there is that it still
+    // exists: nothing says when a user deletes a web app from their Home Screen.
+    last_seen_ns : nat64;
+};
+
+// What a browser has. An install reads as AwaitingInstall only while its key can still be
+// spent; past that the app holding it can never finish, so it reads as nothing.
+type NotificationAppStatus = variant {
+    Linked : NotificationAppInfo;
+    // When the key this browser handed its install stops being spendable.
+    AwaitingInstall : nat64;
+    NoApp;
+};
+
+type PrepareAccountSessionRequest = record {
+    identity_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;
+    // The II frontend's own public key.
+    session_key : SessionKey;
+    // What this browser is, for the user's session list.
+    browser_description : BrowserDescription;
+    // The browser's own public key, DER-encoded, as the registry currently holds it. A
+    // key this anchor has not seen registers a browser under it.
+    current_browser_key : PublicKey;
+    // What the browser rotates to once this sign-in succeeds. Must differ from
+    // current_browser_key: a browser that never rotates keeps a leaked key useful.
+    next_browser_key : PublicKey;
+    // Signature over session_key and next_browser_key, verified with current_browser_key.
+    current_browser_key_signature : blob;
+    // Signature by next_browser_key over session_key and current_browser_key, proving the
+    // browser holds the key it is announcing.
+    next_browser_key_signature : blob;
+    // The consented access level, fixed for the session's life.
+    permissions : opt Permissions;
+    // Clamped to the session maximum.
+    valid_for : opt nat64;
+    // How long the session may go unminted before it is over, clamped to between
+    // 10 minutes and the session's own granted length. Absent leaves the
+    // canister's own default.
+    max_idle : opt nat64;
+};
+
+type PrepareAccountSessionResponse = record {
+    user_key : PublicKey;
+    // The session's valid_till.
+    expiration : Timestamp;
+    // Names the session this ceremony created, and is what get_account_session is given
+    // to collect the delegation signed for it. Not a credential: it names a session, it
+    // does not authorise one.
+    session_id : nat64;
+    // Which browser this sign-in was attributed to, so the settings list can mark the one
+    // the user is looking at, and so the browser knows which registration its key now
+    // belongs to. Not a credential: a caller never presents it.
+    browser_id : nat32;
+    // The principal apps see for this account, so the frontend can tell its own
+    // sessions apart without minting a delegation to learn it.
+    account_principal : principal;
+};
+
+type GetAccountSessionRequest = record {
+    identity_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;
+    session_key : SessionKey;
+    expiration : Timestamp;
+    // The session prepare_account_session created.
+    session_id : nat64;
+};
+
+type GetAccountSessionResponse = record {
+    signed_delegation : SignedDelegation;
+};
+
+type AccountSessionError = variant {
+    Unauthorized : principal;
+    NoSuchAccount;
+    NoSuchSession;
+    // The session is there, but no delegation was signed for the session_key and
+    // expiration asked for. Ask again with the ones prepare_account_session returned;
+    // signing in afresh is not the remedy.
+    NoSuchDelegation;
+    // The browser's key is unusable, or its signature does not verify against it.
+    InvalidBrowserKey;
+    // The browser presented a key it has already rotated away from, which happens when it
+    // never learned that its last sign-in succeeded. It holds the successor that does
+    // resolve, so the answer is to promote that one and present it.
+    StaleBrowserKey;
+    InternalCanisterError : text;
+};
+
+type AppPrepareDelegationRequest = record {
+    // The key the app delegation delegates to. Nothing about the account is named:
+    // the caller's own session chain is what identifies it.
+    session_key : SessionKey;
+};
+
+type AppPrepareDelegationResponse = record {
+    user_key : PublicKey;
+    expiration : Timestamp;
+};
+
+type AppGetDelegationRequest = record {
+    session_key : SessionKey;
+    // Must match the prepared value.
+    expiration : Timestamp;
+};
+
+
+type RevokeBrowserSessionsRequest = record {
+    identity_number : UserNumber;
+    browser_id : nat32;
+};
+
+type SessionRevokeError = variant {
+    Unauthorized : principal;
+    // Raised before the sweep writes anything, so a browser is never left signed out of
+    // some of its applications and not others.
+    InternalCanisterError : text;
+};
+
+type AppSessionError = variant {
+    // No usable session behind this caller: revoked, expired, pruned, or never one at
+    // all. One outcome, because which of those it is depends on whether a prune has run
+    // yet, and because an app can act on none of them differently.
+    NoSuchSession;
+    // The session is live, but nothing was signed for the session_key and expiration
+    // asked for — so the expiration is one app_prepare_delegation never returned. Prepare
+    // again and use what comes back; signing in afresh is not the remedy.
+    NoSuchDelegation;
+    InternalCanisterError : text;
+};
+
 type IdentityInfo = record {
     authn_methods : vec AuthnMethodData;
     authn_method_registration : opt AuthnMethodRegistrationInfo;
@@ -1049,6 +1261,17 @@ type IdentityInfo = record {
     // shows a "limit reached" notice in the wizard when adding
     // beyond the cap.
     verified_emails : opt vec VerifiedEmail;
+    // Browsers this anchor has signed in from (absent when it has never
+    // created a session), so the Settings UI can offer "sign this browser
+    // out" without a separate call.
+    browsers : opt vec BrowserInfo;
+    // The anchor's synced trusted-MCP-server config (absent when the
+    // anchor never wrote one). Carried here rather than read from the
+    // mcp_get_config query so the Settings UI has a certified value to
+    // render and to base its writes on: identity_info is an update
+    // call, so its response is certified through consensus, whereas a
+    // query reply a single malicious node could forge is not.
+    mcp_config : opt McpConfig;
 };
 
 type IdentityInfoError = variant {
@@ -1339,6 +1562,43 @@ type AccountUpdate = record {
     name : opt text;
 };
 
+// An app the identity decided a permission for, allowed or denied, for the user's own
+// list of their apps.
+type ApplicationInfo = record {
+    // The origin the app's identity is derived for: what its accounts and its
+    // notification consent are stored under.
+    origin : FrontendHostname;
+    // The latest sign-in to any of the identity's accounts at the app, or null where
+    // none was used.
+    last_used : opt Timestamp;
+    // Whether the app may notify the identity: it holds consent, and this deployment
+    // notifies for it, as notification_consent_granted answers.
+    notifications_allowed : bool;
+    // When the app last had a notification queued for one of the identity's browsers,
+    // or null where it never has.
+    last_notified : opt Timestamp;
+};
+
+type ListApplicationsRequest = record {
+    anchor_number : UserNumber;
+};
+
+type ListApplicationsError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type ForgetApplicationsRequest = record {
+    anchor_number : UserNumber;
+    // As list_applications spells them.
+    origins : vec FrontendHostname;
+};
+
+type ForgetApplicationsError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
 type DummyAuthConfig = record {
     // Prompts user for a index value (0 - 255) when set to true,
     // this is used in e2e to have multiple dummy auth identities.
@@ -1581,6 +1841,441 @@ type ListAvailableAttributesError = variant {
     AuthorizationError : principal;
 };
 
+// Why a notification call was refused.
+type NotificationGrantConsentError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type NotificationRevokeConsentError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+// What an app is told about its own consent. A record rather than a bare bool, so a
+// second fact about the decision can be added without a breaking change.
+type AppNotificationConsentStatusResponse = record {
+    is_granted : bool;
+};
+
+type AppNotificationConsentStatusError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
+type AppRevokeNotificationConsentError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
+type NotificationGrantConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type NotificationRevokeConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type NotificationConsentGrantedRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+// What a browser uploads when it registers for Web Push. Signed with the browser key it
+// signs in with, which is what says the subscription is this browser's.
+type SetWebPushSubscriptionRequest = record {
+    anchor_number : UserNumber;
+    endpoint : text;                   // the relay URL the browser was issued
+    // The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+    // nothing without a private scalar and forges nothing without the auth secret.
+    p256dh : blob;                     // 65 bytes
+    // The public half of the pair the browser minted to encrypt the auth secret with,
+    // uncompressed SEC1 P-256. The canister needs it to run its half of the agreement.
+    transport_key : blob;              // 65 bytes
+    // The subscription's 16-byte auth secret under AES-128-GCM, 32 bytes with its tag.
+    // Encrypted because an ingress call is not confidential, and (endpoint, p256dh, auth)
+    // is all a forged push the browser will decrypt needs. It is encrypted to the
+    // transport key prepare_webpush_subscription minted for this caller, whose private half
+    // never leaves the canister and is dropped as soon as this call spends it.
+    sealed_auth : blob;                // 32 bytes
+};
+
+// Both keys a browser needs before it can subscribe.
+type PrepareWebPushSubscriptionResponse = record {
+    vapid_public_key : blob;           // uncompressed SEC1 P-256
+    transport_public_key : blob;       // minted for this caller and this attempt
+};
+
+type PrepareWebPushSubscriptionError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
+type RemoveWebPushSubscriptionRequest = record {
+    anchor_number : UserNumber;
+    browser_id : nat32;
+};
+
+type SetWebPushSubscriptionError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // Nothing here can open sealed_auth: the transport key it was encrypted to has
+    // expired, or a later prepare_webpush_subscription from this browser replaced it. Fetch the
+    // keys again and re-send.
+    TransportKeyExpired;
+    InternalCanisterError : text;
+};
+
+type RemoveWebPushSubscriptionError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+// Registers the one-shot key a browser is about to hand its install, so the app that
+// spends it is the one this browser sent. Authorized by the caller being a browser this
+// identity is signed in from; the principal named here is what authorizes the
+// link_notification_app call that follows.
+type PrepareNotificationAppLinkRequest = record {
+    anchor_number : UserNumber;
+    // The principal of the one-shot key this browser puts in the install URL.
+    link_principal : principal;
+};
+
+type PrepareNotificationAppLinkError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // The anonymous principal is held by everyone, so an install offered to it is one
+    // anybody could complete.
+    LinkPrincipalIsAnonymous;
+    // This browser already points at an app that is delivering for this identity, and
+    // an install takes delivery off it.
+    AppAlreadyDelivering;
+    InternalCanisterError : text;
+};
+
+// Numbers a Home Screen app's record. Public, so every call naming one is checked
+// against the principal the record belongs to.
+type NotificationAppId = nat64;
+
+type LinkNotificationAppRequest = record {
+    anchor_number : UserNumber;
+    // The principal the app signs as, over the key it generated in its own partition.
+    app_principal : principal;
+    // The record this app already has, where it is linking a second identity to the app
+    // it is running as. Null is a first install and takes a record of its own.
+    app_id : opt NotificationAppId;
+};
+
+type LinkNotificationAppResponse = record {
+    // Kept by the app, so a later link names the record it already has.
+    app_id : NotificationAppId;
+};
+
+type LinkNotificationAppError = variant {
+    // The record is keyed by this principal, and the anonymous one is held by everyone,
+    // so any caller at all would resolve to that record.
+    AppPrincipalIsAnonymous;
+    // No browser of this identity is waiting for this caller, or the install it started
+    // has expired.
+    NoPendingLink;
+    // A browser of this identity already signs as that principal.
+    PrincipalAlreadyInUse;
+    InternalCanisterError : text;
+};
+
+// This identity asking the app its browser points at to deliver for it, which is also
+// what asks the app to prove it is still there: a reference that is off is skipped when
+// the canister picks who to send to, so the two cannot be separated. Probing first would
+// find nothing to wake, and switching on first would announce it and then say the same
+// thing again on the probe. The probe is the announcement. Where nothing can be woken the
+// switch does not stay on.
+//
+// Never a subscription write: the subscription is the app's and is shared.
+type EnableNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type EnableNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app.
+    NoNotificationApp;
+    // Nothing could be woken, so nothing was switched on: the app has registered
+    // nothing, the browser counts as gone, or there was no room for another outcall.
+    NotReachable;
+    InternalCanisterError : text;
+};
+
+// This identity asking the app its browser points at to stop delivering for it. Never a
+// subscription removal: the subscription is the app's and is shared with every other
+// identity pointing at it.
+type DisableNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type DisableNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+// Asks which identities a Home Screen app delivers for, named by the app's own record.
+type NotificationAppAnchorsRequest = record {
+    app_id : NotificationAppId;
+};
+
+// Offers the Home Screen app this browser has to another identity signed in on the
+// same browser, which is the only party that can reach both. The handle says nothing
+// about which app it is.
+type OfferNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type OfferNotificationAppError = variant {
+    // The caller is no browser of this identity.
+    Unauthorized : principal;
+    // This browser has no app to offer.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+// Points a browser of the identity being added at the Home Screen app another identity on
+// the same device already has. One device has one such app, so a second identity joins the
+// existing one rather than installing its own.
+//
+// The signature is the whole authority and nothing is stored between the two halves: a
+// browser of the offering identity signs over both anchor numbers and the expiry, and this
+// call spends it. Only a key that identity still holds verifies, and the expiry is bounded
+// from above, so an old signature is worthless.
+type ClaimNotificationAppRequest = record {
+    anchor_number : UserNumber;            // the identity being added; the caller is a browser of it
+    offering_anchor_number : UserNumber;   // the identity that has the app
+    expires_at_ns : nat64;                 // no more than 30 minutes ahead of canister time
+    signature : blob;                      // made by a browser of the offering identity
+};
+
+type ClaimNotificationAppError = variant {
+    // The key the caller signed with is no browser key of the identity it named.
+    InvalidBrowserKey;
+    // No browser of the offering identity signed this, or the one that did has
+    // rotated its key past it since.
+    InvalidClaimToken;
+    ClaimTokenExpired;
+    // The offering identity's browser points at no app to hand over.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+type GetWebPushSubscriptionStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+// What a browser is registered with, so the frontend can tell a registration that is
+// still live from one another identity's re-subscribe left behind.
+type WebPushSubscriptionStatus = record {
+    endpoint : text;        // compared against the one the browser holds
+};
+
+// ===== Notifications sent by an app =====
+
+// Scoped to (origin, recipient), and shared across the canisters sending for
+// one origin.
+type NotificationId = nat64;
+
+// Internet Identity's own id for one entry in one browser's inbox, assigned when the entry
+// is deposited and unique within that inbox. A wake-up names its entry by this, so the
+// service worker shows the notification the push was sent for.
+type InboxNotificationId = nat64;
+
+type Urgency = variant { VeryLow; Low; Normal; High };
+
+type Notification = record {
+    id : NotificationId;
+    recipient : principal;
+    // Null means II's default retention, which is also the ceiling.
+    expires_at : opt Timestamp;
+    // Null means Normal.
+    urgency : opt Urgency;
+};
+
+// Applies in order: a later entry for a (recipient, id) replaces an earlier
+// one, as a re-send replaces a notification that is still pending.
+type SendNotificationArg = record {
+    origin : FrontendHostname;
+    notifications : vec Notification;
+};
+
+type NotAcceptedReason = variant {
+    NoSuchRecipient;
+    NoChannel;
+    Deferred : record { retry_after : Timestamp };
+};
+
+type NotAccepted = record {
+    id : NotificationId;
+    recipient : principal;
+    reason : NotAcceptedReason;
+};
+
+// Anything not_accepted does not name was accepted.
+type SendNotificationResponse = record {
+    not_accepted : vec NotAccepted;
+};
+
+type SendNotificationError = variant {
+    // The origin lists no such sender: no file, an empty or unusable one, or
+    // one that does not name the caller.
+    NoSuchSender;
+    TooManyNotifications : record { limit : nat32 };
+    InternalCanisterError : text;
+};
+
+// ===== Notification pull delegation =====
+
+type PrepareNotificationDelegationRequest = record {
+    anchor_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
+    session_key : SessionKey;
+};
+
+type PrepareNotificationDelegationResponse = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    // Goes in the sender_info field of every call made with this delegation;
+    // tells the app which account it is being called for.
+    sender_info : blob;
+};
+
+type GetNotificationDelegationRequest = record {
+    anchor_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
+    session_key : SessionKey;
+    expiration : Timestamp;
+};
+
+type GetNotificationDelegationResponse = record {
+    signed_delegation : SignedDelegation;
+    // Authenticates sender_info on those calls.
+    sender_info_signature : blob;
+};
+
+type NotificationDelegationError = variant {
+    // The caller is no browser of this identity, that browser is not registered
+    // for Web Push, or the identity has not allowed this app to notify it.
+    NoNotificationAccess;
+    NoSuchDelegation;
+    InternalCanisterError : text;
+};
+
+// ===== Notifications a browser has yet to show =====
+
+type GetNotificationRequest = record {
+    anchor_number : UserNumber;
+    // Whose inbox holds it. An app's key signs for every browser pointing at the app, so
+    // the browser cannot be taken from the caller alone.
+    browser_id : nat32;
+    inbox_notification_id : InboxNotificationId;
+};
+
+// What a service worker shows for one wake-up: the app and account it is for, the
+// canister holding its content, and which notification.
+type NotificationToShow = record {
+    // Null where Internet Identity sent this itself: it is about the identity rather
+    // than an app, so there is no origin to name and none is looked up.
+    origin : opt FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
+    canister_id : principal;
+    id : NotificationId;
+    // Set where Internet Identity sent this itself, and what it has to say. An app's
+    // notification carries no text: the service worker fetches it from the app with a
+    // delegation it mints for the purpose, which is what keeps the content off the push
+    // service. One of these carries no text either, for the same reason, but there is
+    // nothing to fetch and nobody to mint for. The words are the frontend's, so this
+    // says what happened rather than what to show.
+    event : opt NotificationEvent;
+};
+
+// Something Internet Identity has to tell the user about their own identity.
+type NotificationEvent = variant {
+    // This device now receives this identity's notifications.
+    NotificationsOn : IdentityForNotification;
+};
+
+// Which identity a notification is about, in the terms the user knows it by: nobody
+// recognises an identity by its number.
+type IdentityForNotification = record {
+    anchor_number : UserNumber;
+    name : opt text;
+};
+
+// Asks the canister to wake the Home Screen app this browser points at, so the browser
+// can learn whether it is still there. Nothing says when a user deletes a web app, so
+// the only way to find out is to send it something and see what happens.
+type ProbeNotificationAppRequest = record {
+    anchor_number : UserNumber;
+};
+
+type ProbeNotificationAppError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // This browser points at no app, so there is nothing to wake.
+    NoNotificationApp;
+    // Nothing was sent, so there is nothing to watch for: the app has registered
+    // nothing, this identity has it switched off or is signed out on this browser, the
+    // browser counts as gone, or there was no room for another outcall. The browser's
+    // own registration is never woken instead.
+    NotReachable;
+    InternalCanisterError : text;
+};
+
+// Null where the named entry is gone: taken, expired, or dropped with the registration.
+type GetNotificationResponse = record {
+    notification : opt NotificationToShow;
+};
+
+type GetNotificationError = variant {
+    // The caller signs with no key this identity is signed in from, and with no key of
+    // an app one of its browsers routes through.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
+type RemoveNotificationRequest = record {
+    anchor_number : UserNumber;
+    browser_id : nat32;
+    // As the wake-up that announced it named it.
+    inbox_notification_id : InboxNotificationId;
+    // Why the worker could not show it. Absent where it did.
+    not_shown : opt NotShownReason;
+};
+
+// Why the service worker could not show a notification: its call to the app's canister
+// for the content failed, which only the device sees.
+type NotShownReason = variant {
+    // The call got no answer.
+    PayloadUnreachable;
+    // The app's canister rejected the call or trapped.
+    PayloadRejected;
+};
+
+type RemoveNotificationResponse = record {};
+
+type RemoveNotificationError = variant {
+    // The caller signs with no key this identity is signed in from, and with no key of
+    // an app one of its browsers routes through.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -1723,15 +2418,23 @@ service : (opt InternetIdentityInit) -> {
     openid_prepare_delegation : (JWT, Salt, SessionKey, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
-    // SSO discovery for the sign-in initiation flow. The frontend polls
-    // `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
-    // on-demand two-hop discovery fetch with `discover_sso` (update); once the
-    // fetch completes the query returns `Resolved` with the config.
+    // SSO discovery for the sign-in initiation flow. The frontend calls
+    // `discover_sso` (update) once, which starts the two-hop discovery fetch and
+    // the domain's key fetch, or refreshes a stale result, then polls
+    // `get_sso_discovery_status` (query) until it reads `Resolved` or `Failed`.
     //
     // The optional second argument is the target dapp origin; when supplied,
     // `resolved_client_id` reports the client that origin must use (`null` = denied).
     discover_sso : (text) -> ();
     get_sso_discovery_status : (GetSsoDiscoveryStatusRequest) -> (SsoDiscoveryStatus) query;
+
+    // Whether an organization domain can be used for SSO sign-in, for apps that
+    // check a domain before sending the user into the flow. Call
+    // `app_sso_domain_check` (update) once to start the fetch, then poll
+    // `app_sso_domain_status` (query) until it reads `Available` or
+    // `Unavailable`.
+    app_sso_domain_check : (text) -> ();
+    app_sso_domain_status : (text) -> (AppSsoDomainStatus) query;
 
     // SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
     // client the target origin resolves to. `Pending` means the discovery/JWKS
@@ -1859,6 +2562,15 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
     ) -> (variant { Ok : vec AccountInfo; Err: GetAccountsError }) query;
 
+    // Every app the identity decided a permission for, so the user can change or forget
+    // what they decided. Authorized by the identity's own access methods.
+    list_applications : (ListApplicationsRequest) -> (variant { Ok : vec ApplicationInfo; Err : ListApplicationsError }) query;
+    // Undoes every permission decision for the apps, drops what they queued for the
+    // identity's browsers and signs out every session at them, as one write. Accounts and
+    // the default account stay. An origin the identity holds nothing at is already
+    // forgotten.
+    forget_applications : (ForgetApplicationsRequest) -> (variant { Ok; Err : ForgetApplicationsError });
+
     create_account : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
@@ -1871,6 +2583,31 @@ service : (opt InternetIdentityInit) -> {
         account_number : opt AccountNumber, // Null is unreserved default account
         update : AccountUpdate
     ) ->  (variant { Ok : AccountInfo; Err: UpdateAccountError });
+
+    // Creates or reuses a revocable session at one account and signs its identity to
+    // the II frontend's own key. Called only by the II frontend, which ships with the
+    // canister; requires an anchor access method, so a session can neither spawn nor
+    // extend itself.
+    prepare_account_session : (PrepareAccountSessionRequest) -> (variant { Ok : PrepareAccountSessionResponse; Err : AccountSessionError });
+    get_account_session : (GetAccountSessionRequest) -> (variant { Ok : GetAccountSessionResponse; Err : AccountSessionError }) query;
+
+    // Mints a short-lived app delegation from a live session. Called by app frontends
+    // with the session chain, so revoking the session ends access within one delegation
+    // lifetime.
+    app_prepare_delegation : (AppPrepareDelegationRequest) -> (variant { Ok : AppPrepareDelegationResponse; Err : AppSessionError });
+    app_get_delegation : (AppGetDelegationRequest) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
+
+    // Signs the calling session out. A session that is already gone is success, so a
+    // client that retries, or that signs out twice, does not have to reason about whether
+    // its session was still there. An app can revoke only its own session.
+    app_revoke_session : () -> (variant { Ok; Err : AppSessionError });
+    // Whether the calling session is still usable. For the II frontend's silent
+    // re-auth path, which must decide whether it can answer without rendering
+    // anything. Advisory: a query reply is not certified, and every mint enforces
+    // the same conditions regardless of the answer here.
+    check_session : () -> (bool) query;
+
+    revoke_browser_sessions : (RevokeBrowserSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
 
     prepare_account_delegation : (
         anchor_number : UserNumber,
@@ -1899,9 +2636,13 @@ service : (opt InternetIdentityInit) -> {
 
     // Read the identity's synced trusted-MCP-server config (master toggle + the
     // trusted server URL). Persisted on-chain, so it follows the identity across
-    // devices. Read by the Settings UI and the /mcp connect flow (which verifies
-    // the connecting origin against it). Returns the disabled, no-server default
-    // for an unauthorized caller or an anchor that never wrote a config.
+    // devices. Being a query, the reply is signed by a single node: the /mcp
+    // connect flow uses it only to pick which screen to show, and gates delivery
+    // on the certified trusted_url from prepare_mcp_registration_delegation.
+    // Callers that render trust, or write the config back, take it from
+    // IdentityInfo.mcp_config on the identity_info update call instead. Returns
+    // the disabled, no-server default for an unauthorized caller or an anchor
+    // that never wrote a config.
     // `null` means the identity has never written a config — distinct from a
     // stored one that is switched off. The two behave differently at /mcp: the
     // first may connect the deployment's official connector (completing the
@@ -2026,4 +2767,77 @@ service : (opt InternetIdentityInit) -> {
 
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
+
+    // ===== Notifications =====
+    notification_grant_consent : (NotificationGrantConsentRequest) -> (variant { Ok; Err : NotificationGrantConsentError });
+    notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationRevokeConsentError });
+    notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
+
+    // Authorized by the browser key the caller signs with.
+    prepare_notification_delegation : (PrepareNotificationDelegationRequest) -> (variant { Ok : PrepareNotificationDelegationResponse; Err : NotificationDelegationError });
+    get_notification_delegation : (GetNotificationDelegationRequest) -> (variant { Ok : GetNotificationDelegationResponse; Err : NotificationDelegationError }) query;
+
+    // Called by the service worker on a wake-up, signed with the browser key: the entry
+    // that wake-up named, where it has not expired and the identity still allows it.
+    browser_get_notification : (GetNotificationRequest) -> (variant { Ok : GetNotificationResponse; Err : GetNotificationError }) query;
+    // Called by the service worker for the one it shows, while it fetches the content.
+    browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
+
+    // The key a browser subscribes with and every push names. Absent only in the moment
+    // between the install returning and the answer to the read it starts.
+    // Both keys a browser needs before it subscribes: the one every push is signed with,
+    // and a one-shot key it encrypts this subscription's auth secret to.
+    //
+    // An update call, because a query reply is signed by one replica. One that answered
+    // with a VAPID key of its own choosing would bind the subscription to it permanently,
+    // and the browser has nothing to check the answer against.
+    // A cold randomness pool yields the `Pending` result arm — a retry signal, not an
+    // error: asking put the draw in flight, so the caller re-calls the method.
+    prepare_webpush_subscription : (UserNumber) -> (variant { Ok : PrepareWebPushSubscriptionResponse; Pending; Err : PrepareWebPushSubscriptionError });
+    // Called by the browser, or by the Home Screen app it points at: what the app
+    // registers belongs to its own record, which every identity pointing at it is
+    // delivered through, so the anchor named here is what authorized the call rather
+    // than where the subscription goes.
+    set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
+    // Called by the identity, so one browser can silence another.
+    remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
+
+    // Called by the browser starting an install, naming the one-shot key it puts in the
+    // install URL as the only caller that may complete the link.
+    prepare_notification_app_link : (PrepareNotificationAppLinkRequest) -> (variant { Ok; Err : PrepareNotificationAppLinkError });
+    // Called by the Home Screen app on its first open, signed with that one-shot key.
+    // Creates the app's record where its key has none, and points the browser at it.
+    link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok : LinkNotificationAppResponse; Err : LinkNotificationAppError });
+
+    // Called by the Home Screen app, naming the record it holds and signing as the
+    // principal that record belongs to. The identities whose browsers point at it, which
+    // is the whole of what it can deliver for. Empty in four cases, which all mean the
+    // same thing to the app: the id names nothing, nothing points at it, this deployment
+    // does not notify, or the caller is not the app that record belongs to.
+    notification_app_anchors : (NotificationAppAnchorsRequest) -> (vec UserNumber) query;
+    get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
+
+    // Called by an app's backend canister for the origin it names.
+    app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });
+
+    // Called by the identity being added, from its own browser on the device, with a
+    // token the identity that has the app signed for it.
+    claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+
+    // Called by the browser, which may hold nothing but its key: the install page is a
+    // tab of its own with no session.
+    get_notification_app_status : (GetNotificationAppStatusRequest) -> (NotificationAppStatus) query;
+
+    // Called by the identity, from the browser that points at the app.
+    enable_notification_app : (EnableNotificationAppRequest) -> (variant { Ok : NotificationId; Err : EnableNotificationAppError });
+    disable_notification_app : (DisableNotificationAppRequest) -> (variant { Ok; Err : DisableNotificationAppError });
+
+    // Called by the browser, which watches for the answer leaving its own queue: that
+    // is what says the app this browser points at is still installed.
+    probe_notification_app : (ProbeNotificationAppRequest) -> (variant { Ok : NotificationId; Err : ProbeNotificationAppError });
+
+
+    // Called by an app's frontend, as its session.
+    app_notification_consent_status : () -> (variant { Ok : AppNotificationConsentStatusResponse; Err : AppNotificationConsentStatusError }) query;
+    app_revoke_notification_consent : () -> (variant { Ok; Err : AppRevokeNotificationConsentError });
 };

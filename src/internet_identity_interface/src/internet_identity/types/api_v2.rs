@@ -1,5 +1,7 @@
 use crate::internet_identity::types::openid::OpenIdCredentialData;
-use crate::internet_identity::types::{CredentialId, PublicKey, Timestamp};
+use crate::internet_identity::types::{
+    BrowserDescription, BrowserId, CredentialId, NotificationAppInfo, PublicKey, Timestamp,
+};
 use candid::{CandidType, Deserialize, Principal};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -77,6 +79,20 @@ pub struct IdentityAuthnInfo {
     pub recovery_authn_methods: Vec<AuthnMethod>,
 }
 
+/// A browser this anchor has signed in from, as it described itself when it registered.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct BrowserInfo {
+    pub id: BrowserId,
+    pub description: BrowserDescription,
+    pub created_at: Timestamp,
+    pub last_used: Timestamp,
+    /// Sessions this browser holds, counted from the stored records.
+    pub session_count: u32,
+    /// The Home Screen app this browser points at, where it has one. Absent where there is
+    /// none, where its record is gone, and where this deployment does not notify.
+    pub notification_app: Option<NotificationAppInfo>,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdentityInfo {
     pub authn_methods: Vec<AuthnMethodData>,
@@ -99,6 +115,18 @@ pub struct IdentityInfo {
     /// `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub verified_emails:
         Option<Vec<crate::internet_identity::types::verified_email::VerifiedEmail>>,
+    /// Browsers this anchor has signed in from. `None` if it has never created a session.
+    pub browsers: Option<Vec<BrowserInfo>>,
+    /// The anchor's synced trusted-MCP-server config (master toggle +
+    /// trusted server URL). `None` for an anchor that never wrote one.
+    ///
+    /// Carried here — rather than read from the `mcp_get_config` query —
+    /// so the Settings UI has a *certified* value: `identity_info` is an
+    /// update call, so its response goes through consensus, while a single
+    /// malicious node can forge a query reply. Settings both renders the
+    /// trusted server from this value and uses it as the basis of the
+    /// config it writes back with `mcp_set_config`.
+    pub mcp_config: Option<crate::internet_identity::types::McpConfig>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

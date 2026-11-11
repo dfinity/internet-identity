@@ -507,8 +507,12 @@ mod pull_entries_tests {
         let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
         assert_eq!(entries.entries.len(), 1);
 
-        for _ in 0..3 {
-            flows::register_anchor(&env, ii_canister);
+        for i in 0..3 {
+            flows::register_anchor_with_device(
+                &env,
+                ii_canister,
+                &distinct_device(&device_data_1(), i),
+            );
         }
 
         // the archive polls for entries once per second
@@ -553,8 +557,12 @@ mod pull_entries_tests {
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
         assert!(env.canister_exists(archive_canister));
 
-        for _ in 0..3 {
-            flows::register_anchor(&env, ii_canister);
+        for i in 0..3 {
+            flows::register_anchor_with_device(
+                &env,
+                ii_canister,
+                &distinct_device(&device_data_1(), i),
+            );
         }
 
         // the archive polls for entries once per second
@@ -659,8 +667,12 @@ mod pull_entries_tests {
         env.stop_canister(archive_canister, Some(ii_canister))
             .expect("failed to stop archive");
 
-        for _ in 0..3 {
-            flows::register_anchor(&env, ii_canister);
+        for i in 0..3 {
+            flows::register_anchor_with_device(
+                &env,
+                ii_canister,
+                &distinct_device(&device_data_1(), i),
+            );
         }
 
         assert_metric(
@@ -775,8 +787,12 @@ mod pull_entries_tests {
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
         assert!(env.canister_exists(archive_canister));
 
-        for _ in 0..3 {
-            flows::register_anchor(&env, ii_canister);
+        for i in 0..3 {
+            flows::register_anchor_with_device(
+                &env,
+                ii_canister,
+                &distinct_device(&device_data_1(), i),
+            );
         }
 
         let entries = ii_api::fetch_entries(&env, ii_canister, archive_canister)?;

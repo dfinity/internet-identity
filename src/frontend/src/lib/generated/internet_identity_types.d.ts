@@ -19,6 +19,32 @@ export interface AccountInfo {
   'last_used' : [] | [Timestamp],
 }
 export type AccountNumber = bigint;
+export type AccountSessionError = {
+    /**
+     * The browser's key is unusable, or its signature does not verify against it.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  {
+    /**
+     * The session is there, but no delegation was signed for the session_key and
+     * expiration asked for. Ask again with the ones prepare_account_session returned;
+     * signing in afresh is not the remedy.
+     */
+    'NoSuchDelegation' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
+  {
+    /**
+     * The browser presented a key it has already rotated away from, which happens when it
+     * never learned that its last sign-in succeeded. It holds the successor that does
+     * resolve, so the answer is to promote that one and present it.
+     */
+    'StaleBrowserKey' : null
+  } |
+  { 'NoSuchSession' : null } |
+  { 'NoSuchAccount' : null };
 export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
     /**
@@ -62,6 +88,103 @@ export interface AnchorCredentials {
   'recovery_phrases' : Array<PublicKey>,
   'credentials' : Array<WebAuthnCredential>,
   'recovery_credentials' : Array<WebAuthnCredential>,
+}
+export interface AppGetDelegationRequest {
+  'session_key' : SessionKey,
+  /**
+   * Must match the prepared value.
+   */
+  'expiration' : Timestamp,
+}
+export type AppNotificationConsentStatusError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+/**
+ * What an app is told about its own consent. A record rather than a bare bool, so a
+ * second fact about the decision can be added without a breaking change.
+ */
+export interface AppNotificationConsentStatusResponse { 'is_granted' : boolean }
+export interface AppPrepareDelegationRequest {
+  /**
+   * The key the app delegation delegates to. Nothing about the account is named:
+   * the caller's own session chain is what identifies it.
+   */
+  'session_key' : SessionKey,
+}
+export interface AppPrepareDelegationResponse {
+  'user_key' : PublicKey,
+  'expiration' : Timestamp,
+}
+export type AppRevokeNotificationConsentError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+export type AppSessionError = {
+    /**
+     * The session is live, but nothing was signed for the session_key and expiration
+     * asked for — so the expiration is one app_prepare_delegation never returned. Prepare
+     * again and use what comes back; signing in afresh is not the remedy.
+     */
+    'NoSuchDelegation' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No usable session behind this caller: revoked, expired, pruned, or never one at
+     * all. One outcome, because which of those it is depends on whether a prune has run
+     * yet, and because an app can act on none of them differently.
+     */
+    'NoSuchSession' : null
+  };
+/**
+ * Whether an organization domain can be used for SSO sign-in, read by
+ * `app_sso_domain_status`. `name` is the organization's display name;
+ * `retry_after` and `reason` are as for `SsoDiscoveryStatus.Failed`.
+ */
+export type AppSsoDomainStatus = { 'Available' : { 'name' : [] | [string] } } |
+  {
+    'Unavailable' : {
+      'retry_after' : [] | [Timestamp],
+      'reason' : [] | [string],
+    }
+  } |
+  { 'Pending' : null };
+/**
+ * An app the identity decided a permission for, allowed or denied, for the user's own
+ * list of their apps.
+ */
+export interface ApplicationInfo {
+  /**
+   * The origin the app's identity is derived for: what its accounts and its
+   * notification consent are stored under.
+   */
+  'origin' : FrontendHostname,
+  /**
+   * Whether the app may notify the identity: it holds consent, and this deployment
+   * notifies for it, as notification_consent_granted answers.
+   */
+  'notifications_allowed' : boolean,
+  /**
+   * When the app last had a notification queued for one of the identity's browsers,
+   * or null where it never has.
+   */
+  'last_notified' : [] | [Timestamp],
+  /**
+   * The latest sign-in to any of the identity's accounts at the app, or null where
+   * none was used.
+   */
+  'last_used' : [] | [Timestamp],
 }
 /**
  * Configuration parameters related to the archive.
@@ -286,6 +409,65 @@ export interface AuthnMethodSessionInfo {
   'name' : [] | [string],
   'created_at' : [] | [Timestamp],
 }
+/**
+ * Which browser a sign-in came from, as a token rather than a name to show. Products
+ * get renamed — "Chrome OS" became "ChromeOS", "Mac OS X" became "macOS" — so the name
+ * the user reads is derived in the frontend, where a rename reaches every stored record
+ * at once. "Brand" is what the client hints call this, and BrowserInfo below is the
+ * entry it describes.
+ */
+export type BrowserBrand = { 'Edge' : null } |
+  { 'Firefox' : null } |
+  { 'Safari' : null } |
+  { 'SamsungInternet' : null } |
+  { 'Opera' : null } |
+  {
+    /**
+     * A browser this list does not name, shown as the client resolved it. Worth seeing
+     * rather than hiding behind a generic label. Named variants are the six that hold
+     * 97% of the web between them, because a variant is what earns an icon.
+     */
+    'Other' : string
+  } |
+  { 'Chrome' : null };
+/**
+ * What a browser reported about itself when it registered. Self-reported, so it is
+ * something the user reads to recognise their own browser rather than evidence about
+ * where a session came from. The canister stores these and never interprets them.
+ */
+export interface BrowserDescription {
+  'os' : OperatingSystem,
+  /**
+   * The hardware, where the client can name it — Android is the only place that does.
+   */
+  'model' : [] | [string],
+  'form_factor' : FormFactor,
+  'brand' : BrowserBrand,
+}
+export interface BrowserInfo {
+  'id' : number,
+  /**
+   * Sessions this browser holds. Zero means it is signed in to nothing.
+   */
+  'session_count' : number,
+  /**
+   * The Home Screen app this browser points at, where it has one. Absent is "not
+   * installed, or installed and never opened": the record is created by the app's
+   * first open, so there is nothing to point at before that. Absent too where the
+   * record this browser points at is gone, and where this deployment does not notify.
+   */
+  'notification_app' : [] | [NotificationAppInfo],
+  /**
+   * Fixed at registration. A sign-in reporting something else registers its own entry,
+   * so this describes a registration rather than the last sign-in.
+   */
+  'description' : BrowserDescription,
+  'created_at' : Timestamp,
+  /**
+   * Advanced by a sign-in from this browser and by every session refresh it drives.
+   */
+  'last_used' : Timestamp,
+}
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -369,6 +551,43 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
+export type ClaimNotificationAppError = {
+    /**
+     * The offering identity's browser points at no app to hand over.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The key the caller signed with is no browser key of the identity it named.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No browser of the offering identity signed this, or the one that did has
+     * rotated its key past it since.
+     */
+    'InvalidClaimToken' : null
+  } |
+  { 'ClaimTokenExpired' : null };
+/**
+ * Points a browser of the identity being added at the Home Screen app another identity on
+ * the same device already has. One device has one such app, so a second identity joins the
+ * existing one rather than installing its own.
+ * 
+ * The signature is the whole authority and nothing is stored between the two halves: a
+ * browser of the offering identity signs over both anchor numbers and the expiry, and this
+ * call spends it. Only a key that identity still holds verifies, and the expiry is bounded
+ * from above, so an old signature is worthless.
+ */
+export interface ClaimNotificationAppRequest {
+  'signature' : Uint8Array | number[],
+  'offering_anchor_number' : UserNumber,
+  'anchor_number' : UserNumber,
+  'expires_at_ns' : bigint,
+}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -476,6 +695,25 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
+export type DisableNotificationAppError = {
+    /**
+     * This browser points at no app.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+/**
+ * This identity asking the app its browser points at to stop delivering for it. Never a
+ * subscription removal: the subscription is the app's and is shared with every other
+ * identity pointing at it.
+ */
+export interface DisableNotificationAppRequest { 'anchor_number' : UserNumber }
 export interface DnsProofBundle {
   'root_dnskey' : SignedRRset,
   /**
@@ -660,14 +898,6 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
-/**
- * Email-recovery types
- * ====================
- * See `docs/ongoing/email-recovery.md` for the full design. Covers
- * both halves of the flow: setup (binding a recovery email to an
- * anchor) and recovery (proving control of a previously-bound
- * address to obtain a signed delegation).
- */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -678,6 +908,54 @@ export interface EmailRecoveryGetDelegationArgs {
   'expiration' : Timestamp,
   'nonce' : string,
 }
+export type EnableNotificationAppError = {
+    /**
+     * This browser points at no app.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing could be woken, so nothing was switched on: the app has registered
+     * nothing, the browser counts as gone, or there was no room for another outcall.
+     */
+    'NotReachable' : null
+  };
+/**
+ * This identity asking the app its browser points at to deliver for it, which is also
+ * what asks the app to prove it is still there: a reference that is off is skipped when
+ * the canister picks who to send to, so the two cannot be separated. Probing first would
+ * find nothing to wake, and switching on first would announce it and then say the same
+ * thing again on the probe. The probe is the announcement. Where nothing can be woken the
+ * switch does not stay on.
+ * 
+ * Never a subscription write: the subscription is the app's and is shared.
+ */
+export interface EnableNotificationAppRequest { 'anchor_number' : UserNumber }
+export type ForgetApplicationsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export interface ForgetApplicationsRequest {
+  /**
+   * As list_applications spells them.
+   */
+  'origins' : Array<FrontendHostname>,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Reported where the client can state it and inferred where it cannot, so unknown is a
+ * real answer: the browsers exposing no client hints are the ones this is least sure of.
+ */
+export type FormFactor = { 'Unknown' : null } |
+  { 'Tablet' : null } |
+  { 'Desktop' : null } |
+  { 'Mobile' : null };
 export type FrontendHostname = string;
 export type GetAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
@@ -688,6 +966,20 @@ export type GetAccountError = {
       'anchor_number' : UserNumber,
     }
   };
+export interface GetAccountSessionRequest {
+  /**
+   * The session prepare_account_session created.
+   */
+  'session_id' : bigint,
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+  'identity_number' : UserNumber,
+}
+export interface GetAccountSessionResponse {
+  'signed_delegation' : SignedDelegation,
+}
 export type GetAccountsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type GetAttributesError = { 'AuthorizationError' : Principal } |
@@ -790,11 +1082,58 @@ export interface GetIdAliasRequest {
   'identity_number' : IdentityNumber,
 }
 /**
+ * Asks what this browser's entry says about the app it points at, for a page that has
+ * the browser key and no session.
+ */
+export interface GetNotificationAppStatusRequest {
+  'anchor_number' : UserNumber,
+}
+export interface GetNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
+export interface GetNotificationDelegationResponse {
+  /**
+   * Authenticates sender_info on those calls.
+   */
+  'sender_info_signature' : Uint8Array | number[],
+  'signed_delegation' : SignedDelegation,
+}
+export type GetNotificationError = {
+    /**
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+export interface GetNotificationRequest {
+  'inbox_notification_id' : InboxNotificationId,
+  /**
+   * Whose inbox holds it. An app's key signs for every browser pointing at the app, so
+   * the browser cannot be taken from the caller alone.
+   */
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Null where the named entry is gone: taken, expired, or dropped with the registration.
+ */
+export interface GetNotificationResponse {
+  'notification' : [] | [NotificationToShow],
+}
+/**
  * Request for `get_sso_discovery_status`.
  */
 export interface GetSsoDiscoveryStatusRequest {
   'target_app_origin' : [] | [FrontendHostname],
   'org_domain' : string,
+}
+export interface GetWebPushSubscriptionStatusRequest {
+  'anchor_number' : UserNumber,
 }
 export type HeaderField = [string, string];
 export interface HttpRequest {
@@ -810,10 +1149,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -916,6 +1251,14 @@ export interface IdentityAuthnInfo {
   'authn_methods' : Array<AuthnMethod>,
   'recovery_authn_methods' : Array<AuthnMethod>,
 }
+/**
+ * Which identity a notification is about, in the terms the user knows it by: nobody
+ * recognises an identity by its number.
+ */
+export interface IdentityForNotification {
+  'name' : [] | [string],
+  'anchor_number' : UserNumber,
+}
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   /**
@@ -942,6 +1285,21 @@ export interface IdentityInfo {
    * The timestamp at which the anchor was created
    */
   'created_at' : [] | [Timestamp],
+  /**
+   * Browsers this anchor has signed in from (absent when it has never
+   * created a session), so the Settings UI can offer "sign this browser
+   * out" without a separate call.
+   */
+  'browsers' : [] | [Array<BrowserInfo>],
+  /**
+   * The anchor's synced trusted-MCP-server config (absent when the
+   * anchor never wrote one). Carried here rather than read from the
+   * mcp_get_config query so the Settings UI has a certified value to
+   * render and to base its writes on: identity_info is an update
+   * call, so its response is certified through consensus, whereas a
+   * query reply a single malicious node could forge is not.
+   */
+  'mcp_config' : [] | [McpConfig],
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
   'openid_credentials' : [] | [Array<OpenIdCredential>],
 }
@@ -996,6 +1354,12 @@ export type IdentityPropertiesReplaceError = {
     }
   };
 /**
+ * Internet Identity's own id for one entry in one browser's inbox, assigned when the entry
+ * is deposited and unique within that inbox. A wake-up names its entry by this, so the
+ * service worker shows the notification the push was sent for.
+ */
+export type InboxNotificationId = bigint;
+/**
  * Init arguments of II which can be supplied on install and upgrade.
  * 
  * Each field is wrapped is `opt` to indicate whether the field should
@@ -1013,26 +1377,10 @@ export interface InternetIdentityInit {
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**
-   * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
-   * OpenID credentials. When set, a batched timer-driven migration stamps
-   * every stored credential whose (iss, aud) matches an entry and whose
-   * `sso_domain` is not set yet. Idempotent — already-stamped credentials
-   * are skipped, so re-submitting (e.g. with a corrected list) is safe.
-   * When unset, no backfill runs.
-   */
-  'sso_credential_migration' : [] | [Array<SsoCredentialMigrationEntry>],
-  /**
    * Configuration to set the canister as production mode.
    * For now, this is used only to show or hide the banner.
    */
   'is_production' : [] | [boolean],
-  /**
-   * One-shot upgrade arg driving the MCP config migration: `opt true`
-   * rewrites every stored config to "enabled, official connector", since a
-   * value stored before the official connector existed was never a choice
-   * about it. Runs at most once per deployment; unset means no migration.
-   */
-  'mcp_config_migration' : [] | [boolean],
   /**
    * Backend canister ID, needed for backward compatibility.
    */
@@ -1062,6 +1410,20 @@ export interface InternetIdentityInit {
    * sets it to `c`.
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
+  /**
+   * Deploy flag relaxing the https requirement for the Web Push endpoint a
+   * browser registers, for a deployment whose relay is a local server rather
+   * than a push service. As above, only loopback hosts (localhost / 127.0.0.1)
+   * may then be plain http; null / opt false (the default) require https.
+   */
+  'notifications_allow_insecure_endpoint' : [] | [boolean],
+  /**
+   * Server-side switch for the notifications feature. `opt true` enables every
+   * notification endpoint, for any app; `opt false` disables them. Omitting it on
+   * upgrade keeps the stored value, and a canister that never stored one has them
+   * disabled.
+   */
+  'notifications_enabled' : [] | [boolean],
   /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
@@ -1112,6 +1474,13 @@ export interface InternetIdentityInit {
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   /**
+   * Deploy flag relaxing the https requirement for sender-list outcalls to
+   * loopback hosts (localhost / 127.0.0.1) so e2e tests and local development can
+   * serve the list over plain http. null / opt false (the default) require https
+   * for every notifying origin, and a non-loopback origin always requires https.
+   */
+  'notifications_allow_insecure_sender_list' : [] | [boolean],
+  /**
    * Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
    * loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
    * mock IdPs served over plain `http`. Unset / `false` (the default) require
@@ -1146,6 +1515,48 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
+  {
+    /**
+     * A browser of this identity already signs as that principal.
+     */
+    'PrincipalAlreadyInUse' : null
+  } |
+  {
+    /**
+     * No browser of this identity is waiting for this caller, or the install it started
+     * has expired.
+     */
+    'NoPendingLink' : null
+  } |
+  {
+    /**
+     * The record is keyed by this principal, and the anonymous one is held by everyone,
+     * so any caller at all would resolve to that record.
+     */
+    'AppPrincipalIsAnonymous' : null
+  };
+export interface LinkNotificationAppRequest {
+  /**
+   * The principal the app signs as, over the key it generated in its own partition.
+   */
+  'app_principal' : Principal,
+  /**
+   * The record this app already has, where it is linking a second identity to the app
+   * it is running as. Null is a first install and takes a record of its own.
+   */
+  'app_id' : [] | [NotificationAppId],
+  'anchor_number' : UserNumber,
+}
+export interface LinkNotificationAppResponse {
+  /**
+   * Kept by the app, so a later link names the record it already has.
+   */
+  'app_id' : NotificationAppId,
+}
+export type ListApplicationsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
 export type ListAvailableAttributesError = {
     'AuthorizationError' : Principal
   } |
@@ -1227,6 +1638,167 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface NotAccepted {
+  'id' : NotificationId,
+  'recipient' : Principal,
+  'reason' : NotAcceptedReason,
+}
+export type NotAcceptedReason = { 'NoSuchRecipient' : null } |
+  { 'NoChannel' : null } |
+  { 'Deferred' : { 'retry_after' : Timestamp } };
+/**
+ * Why the service worker could not show a notification: its call to the app's canister
+ * for the content failed, which only the device sees.
+ */
+export type NotShownReason = {
+    /**
+     * The call got no answer.
+     */
+    'PayloadUnreachable' : null
+  } |
+  {
+    /**
+     * The app's canister rejected the call or trapped.
+     */
+    'PayloadRejected' : null
+  };
+export interface Notification {
+  'id' : NotificationId,
+  /**
+   * Null means Normal.
+   */
+  'urgency' : [] | [Urgency],
+  'recipient' : Principal,
+  /**
+   * Null means II's default retention, which is also the ceiling.
+   */
+  'expires_at' : [] | [Timestamp],
+}
+/**
+ * Asks which identities a Home Screen app delivers for, named by the app's own record.
+ */
+export interface NotificationAppAnchorsRequest { 'app_id' : NotificationAppId }
+/**
+ * Numbers a Home Screen app's record. Public, so every call naming one is checked
+ * against the principal the record belongs to.
+ */
+export type NotificationAppId = bigint;
+export interface NotificationAppInfo {
+  /**
+   * When the app last called, which is the only evidence there is that it still
+   * exists: nothing says when a user deletes a web app from their Home Screen.
+   */
+  'last_seen_ns' : bigint,
+  /**
+   * Whether this identity wants it to deliver.
+   */
+  'enabled' : boolean,
+  /**
+   * Whether the app has registered for Web Push. False means it has been opened and
+   * the permission has not been given yet.
+   */
+  'subscribed' : boolean,
+}
+/**
+ * What a browser has. An install reads as AwaitingInstall only while its key can still be
+ * spent; past that the app holding it can never finish, so it reads as nothing.
+ */
+export type NotificationAppStatus = { 'Linked' : NotificationAppInfo } |
+  { 'NoApp' : null } |
+  {
+    /**
+     * When the key this browser handed its install stops being spendable.
+     */
+    'AwaitingInstall' : bigint
+  };
+export interface NotificationConsentGrantedRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+export type NotificationDelegationError = {
+    /**
+     * The caller is no browser of this identity, that browser is not registered
+     * for Web Push, or the identity has not allowed this app to notify it.
+     */
+    'NoNotificationAccess' : null
+  } |
+  { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string };
+/**
+ * Something Internet Identity has to tell the user about their own identity.
+ */
+export type NotificationEvent = {
+    /**
+     * This device now receives this identity's notifications.
+     */
+    'NotificationsOn' : IdentityForNotification
+  };
+/**
+ * Why a notification call was refused.
+ */
+export type NotificationGrantConsentError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface NotificationGrantConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Scoped to (origin, recipient), and shared across the canisters sending for
+ * one origin.
+ */
+export type NotificationId = bigint;
+export type NotificationRevokeConsentError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface NotificationRevokeConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+/**
+ * What a service worker shows for one wake-up: the app and account it is for, the
+ * canister holding its content, and which notification.
+ */
+export interface NotificationToShow {
+  'id' : NotificationId,
+  /**
+   * Null where Internet Identity sent this itself: it is about the identity rather
+   * than an app, so there is no origin to name and none is looked up.
+   */
+  'origin' : [] | [FrontendHostname],
+  'canister_id' : Principal,
+  /**
+   * Set where Internet Identity sent this itself, and what it has to say. An app's
+   * notification carries no text: the service worker fetches it from the app with a
+   * delegation it mints for the purpose, which is what keeps the content off the push
+   * service. One of these carries no text either, for the same reason, but there is
+   * nothing to fetch and nobody to mint for. The words are the frontend's, so this
+   * says what happened rather than what to show.
+   */
+  'event' : [] | [NotificationEvent],
+  'account_number' : [] | [AccountNumber],
+}
+export type OfferNotificationAppError = {
+    /**
+     * This browser has no app to offer.
+     */
+    'NoNotificationApp' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The caller is no browser of this identity.
+     */
+    'Unauthorized' : Principal
+  };
+/**
+ * Offers the Home Screen app this browser has to another identity signed in on the
+ * same browser, which is the only party that can reach both. The handle says nothing
+ * about which app it is.
+ */
+export interface OfferNotificationAppRequest { 'anchor_number' : UserNumber }
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -1292,18 +1864,46 @@ export type OpenIdCredentialKey = [Iss, Sub, Aud];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |
   { 'Unauthorized' : Principal };
-export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
+export type OpenIdDelegationError = {
+    /**
+     * The credential is registered on an anchor, but through a different SSO
+     * discovery domain than the one this login was verified through, so the
+     * domain-scoped anchor lookup cannot resolve it. `registered_sso_domain` is
+     * the domain the credential is registered through (`null` for a credential
+     * stored without a domain stamp). A sign-up with the same credential would be
+     * rejected with `OpenIdCredentialAlreadyRegistered`, since registration
+     * uniqueness spans all discovery domains.
+     */
+    'SsoDomainMismatch' : { 'registered_sso_domain' : [] | [string] }
+  } |
+  { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
   { 'JwtExpired' : null } |
   { 'JwtVerificationFailed' : null };
 export type OpenIdEmailVerification = { 'Google' : null } |
   { 'Unknown' : null } |
+  {
+    /**
+     * Trusts email_verified like Google. Apple's private relay addresses,
+     * which only senders registered with II's Apple developer team can deliver
+     * mail to, are not kept on the credential at all.
+     */
+    'Apple' : null
+  } |
   { 'Microsoft' : null };
 export interface OpenIdPrepareDelegationResponse {
   'user_key' : UserKey,
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+export type OperatingSystem = { 'Ios' : null } |
+  { 'Linux' : null } |
+  { 'Android' : null } |
+  { 'Macos' : null } |
+  { 'ChromeOs' : null } |
+  { 'Windows' : null } |
+  { 'Other' : string } |
+  { 'Ipados' : null };
 /**
  * The delegation permissions a caller requests, mirroring the ICP protocol's
  * request-delegation `permissions` values. `queries` yields a queries-only
@@ -1318,6 +1918,76 @@ export type Permissions = { 'all' : null } |
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
+}
+export interface PrepareAccountSessionRequest {
+  /**
+   * The consented access level, fixed for the session's life.
+   */
+  'permissions' : [] | [Permissions],
+  /**
+   * What this browser is, for the user's session list.
+   */
+  'browser_description' : BrowserDescription,
+  /**
+   * How long the session may go unminted before it is over, clamped to between
+   * 10 minutes and the session's own granted length. Absent leaves the
+   * canister's own default.
+   */
+  'max_idle' : [] | [bigint],
+  /**
+   * The II frontend's own public key.
+   */
+  'session_key' : SessionKey,
+  /**
+   * Clamped to the session maximum.
+   */
+  'valid_for' : [] | [bigint],
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  /**
+   * What the browser rotates to once this sign-in succeeds. Must differ from
+   * current_browser_key: a browser that never rotates keeps a leaked key useful.
+   */
+  'next_browser_key' : PublicKey,
+  /**
+   * Signature by next_browser_key over session_key and current_browser_key, proving the
+   * browser holds the key it is announcing.
+   */
+  'next_browser_key_signature' : Uint8Array | number[],
+  /**
+   * Signature over session_key and next_browser_key, verified with current_browser_key.
+   */
+  'current_browser_key_signature' : Uint8Array | number[],
+  /**
+   * The browser's own public key, DER-encoded, as the registry currently holds it. A
+   * key this anchor has not seen registers a browser under it.
+   */
+  'current_browser_key' : PublicKey,
+  'identity_number' : UserNumber,
+}
+export interface PrepareAccountSessionResponse {
+  'user_key' : PublicKey,
+  /**
+   * Which browser this sign-in was attributed to, so the settings list can mark the one
+   * the user is looking at, and so the browser knows which registration its key now
+   * belongs to. Not a credential: a caller never presents it.
+   */
+  'browser_id' : number,
+  /**
+   * Names the session this ceremony created, and is what get_account_session is given
+   * to collect the delegation signed for it. Not a credential: it names a session, it
+   * does not authorise one.
+   */
+  'session_id' : bigint,
+  /**
+   * The session's valid_till.
+   */
+  'expiration' : Timestamp,
+  /**
+   * The principal apps see for this account, so the frontend can tell its own
+   * sessions apart without minting a delegation to learn it.
+   */
+  'account_principal' : Principal,
 }
 export type PrepareAttributeError = { 'AuthorizationError' : Principal } |
   { 'ValidationError' : { 'problems' : Array<string> } } |
@@ -1430,19 +2100,86 @@ export interface PrepareIdAliasRequest {
 }
 /**
  * Result of prepare_mcp_registration_delegation: the canister-signature public
- * key the registration delegation is rooted at (P_reg), and the (short)
- * expiration of that delegation. The frontend fetches the signed delegation via
- * get_mcp_registration_delegation and delivers the chain to the trusted MCP
+ * key the registration delegation is rooted at (P_reg), the (short) expiration
+ * of that delegation, and the identity's resolved trusted_url (the anchor's own
+ * server if set, else the official connector). trusted_url is certified (this
+ * is an update call), so the frontend can gate delivery on it - delivering the
+ * chain only when the connect link's origin matches - rather than trusting an
+ * uncertified mcp_get_config query. The frontend fetches the signed delegation
+ * via get_mcp_registration_delegation and delivers the chain to the trusted MCP
  * server, which redeems it with mcp_register_v2.
  */
 export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
-  'expiration' : Timestamp,
   'trusted_url' : string,
+  'expiration' : Timestamp,
+}
+export type PrepareNotificationAppLinkError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The anonymous principal is held by everyone, so an install offered to it is one
+     * anybody could complete.
+     */
+    'LinkPrincipalIsAnonymous' : null
+  } |
+  {
+    /**
+     * This browser already points at an app that is delivering for this identity, and
+     * an install takes delivery off it.
+     */
+    'AppAlreadyDelivering' : null
+  };
+/**
+ * Registers the one-shot key a browser is about to hand its install, so the app that
+ * spends it is the one this browser sent. Authorized by the caller being a browser this
+ * identity is signed in from; the principal named here is what authorizes the
+ * link_notification_app call that follows.
+ */
+export interface PrepareNotificationAppLinkRequest {
+  /**
+   * The principal of the one-shot key this browser puts in the install URL.
+   */
+  'link_principal' : Principal,
+  'anchor_number' : UserNumber,
+}
+export interface PrepareNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'anchor_number' : UserNumber,
+}
+export interface PrepareNotificationDelegationResponse {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+  /**
+   * Goes in the sender_info field of every call made with this delegation;
+   * tells the app which account it is being called for.
+   */
+  'sender_info' : Uint8Array | number[],
 }
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
+}
+export type PrepareWebPushSubscriptionError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+/**
+ * Both keys a browser needs before it can subscribe.
+ */
+export interface PrepareWebPushSubscriptionResponse {
+  'vapid_public_key' : Uint8Array | number[],
+  'transport_public_key' : Uint8Array | number[],
 }
 /**
  * The prepared id alias contains two (still unsigned) credentials in JWT format,
@@ -1453,6 +2190,34 @@ export interface PreparedIdAlias {
   'issuer_id_alias_jwt' : string,
   'canister_sig_pk_der' : PublicKey,
 }
+export type ProbeNotificationAppError = {
+    /**
+     * This browser points at no app, so there is nothing to wake.
+     */
+    'NoNotificationApp' : null
+  } |
+  {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing was sent, so there is nothing to watch for: the app has registered
+     * nothing, this identity has it switched off or is signed out on this browser, the
+     * browser counts as gone, or there was no room for another outcall. The browser's
+     * own registration is never woken instead.
+     */
+    'NotReachable' : null
+  };
+/**
+ * Asks the canister to wake the Home Screen app this browser points at, so the browser
+ * can learn whether it is still there. Nothing says when a user deletes a web app, so
+ * the only way to find out is to send it something and see what happens.
+ */
+export interface ProbeNotificationAppRequest { 'anchor_number' : UserNumber }
 export type PublicKey = Uint8Array | number[];
 /**
  * Authentication method using generic signatures
@@ -1477,6 +2242,12 @@ export interface RateLimitConfig {
   'time_per_token_ns' : bigint,
 }
 export type RegisterResponse = {
+    /**
+     * The device (its public key or credential id) is already used by an identity.
+     */
+    'device_already_used' : null
+  } |
+  {
     /**
      * The challenge was not successful.
      */
@@ -1512,6 +2283,39 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
+export type RemoveNotificationError = {
+    /**
+     * The caller signs with no key this identity is signed in from, and with no key of
+     * an app one of its browsers routes through.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+export interface RemoveNotificationRequest {
+  /**
+   * As the wake-up that announced it named it.
+   */
+  'inbox_notification_id' : InboxNotificationId,
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+  /**
+   * Why the worker could not show it. Absent where it did.
+   */
+  'not_shown' : [] | [NotShownReason],
+}
+export type RemoveNotificationResponse = {};
+export type RemoveWebPushSubscriptionError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface RemoveWebPushSubscriptionRequest {
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
+export interface RevokeBrowserSessionsRequest {
+  'browser_id' : number,
+  'identity_number' : UserNumber,
+}
 /**
  * DNSSEC proof bundle and supporting types — see
  * `internet_identity_interface::types::dnssec`.
@@ -1528,10 +2332,43 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+/**
+ * Applies in order: a later entry for a (recipient, id) replaces an earlier
+ * one, as a re-send replaces a notification that is still pending.
+ */
+export interface SendNotificationArg {
+  'notifications' : Array<Notification>,
+  'origin' : FrontendHostname,
+}
+export type SendNotificationError = {
+    'TooManyNotifications' : { 'limit' : number }
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The origin lists no such sender: no file, an empty or unusable one, or
+     * one that does not name the caller.
+     */
+    'NoSuchSender' : null
+  };
+/**
+ * Anything not_accepted does not name was accepted.
+ */
+export interface SendNotificationResponse {
+  'not_accepted' : Array<NotAccepted>,
+}
 export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type SessionKey = PublicKey;
+export type SessionRevokeError = {
+    /**
+     * Raised before the sweep writes anything, so a browser is never left signed out of
+     * some of its applications and not others.
+     */
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
   } |
@@ -1544,6 +2381,47 @@ export type SetDefaultAccountError = {
       'anchor_number' : UserNumber,
     }
   };
+export type SetWebPushSubscriptionError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing here can open sealed_auth: the transport key it was encrypted to has
+     * expired, or a later prepare_webpush_subscription from this browser replaced it. Fetch the
+     * keys again and re-send.
+     */
+    'TransportKeyExpired' : null
+  };
+/**
+ * What a browser uploads when it registers for Web Push. Signed with the browser key it
+ * signs in with, which is what says the subscription is this browser's.
+ */
+export interface SetWebPushSubscriptionRequest {
+  /**
+   * The subscription's 16-byte auth secret under AES-128-GCM, 32 bytes with its tag.
+   * Encrypted because an ingress call is not confidential, and (endpoint, p256dh, auth)
+   * is all a forged push the browser will decrypt needs. It is encrypted to the
+   * transport key prepare_webpush_subscription minted for this caller, whose private half
+   * never leaves the canister and is dropped as soon as this call spends it.
+   */
+  'sealed_auth' : Uint8Array | number[],
+  'endpoint' : string,
+  'anchor_number' : UserNumber,
+  /**
+   * The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+   * nothing without a private scalar and forges nothing without the auth secret.
+   */
+  'p256dh' : Uint8Array | number[],
+  /**
+   * The public half of the pair the browser minted to encrypt the auth secret with,
+   * uncompressed SEC1 P-256. The canister needs it to run its half of the agreement.
+   */
+  'transport_key' : Uint8Array | number[],
+}
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
   'delegation' : Delegation,
@@ -1627,26 +2505,6 @@ export interface SmtpRequestError { 'code' : bigint, 'message' : string }
 export type SmtpResponse = { 'Ok' : {} } |
   { 'Err' : SmtpRequestError };
 /**
- * One entry of the `sso_credential_migration` backfill. Maps the
- * (iss, aud) pair of a stored SSO credential to the discovery domain and
- * optional human-readable name it resolves to.
- */
-export interface SsoCredentialMigrationEntry {
-  /**
-   * Human-readable SSO label; stamped onto the credential's `sso_name`.
-   */
-  'name' : [] | [string],
-  /**
-   * Matches the stored credential's `iss`.
-   */
-  'issuer' : string,
-  'discovery_domain' : string,
-  /**
-   * Matches the stored credential's `aud`.
-   */
-  'client_id' : string,
-}
-/**
  * Fully resolved SSO discovery result for the sign-in initiation flow,
  * returned by `discover_sso` / `discover_sso_query`. The canister resolves it
  * from the domain's two-hop discovery documents, on demand and cached.
@@ -1665,13 +2523,23 @@ export interface SsoDiscovery {
    * The org's primary OIDC client.
    */
   'client_id' : string,
+  /**
+   * How long a sign-in through this domain stays valid, in nanoseconds, from
+   * the domain's optional `session_max_age_seconds` (8 hours when unset).
+   */
+  'session_max_age_ns' : bigint,
 }
 /**
- * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
- * failed fetch isn't a distinct status — it reads as `Pending` and the frontend
- * times out — so the statuses are: resolved, or in flight.
+ * Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
+ * `Failed.retry_after` is when II fetches the domain again (a retry before then
+ * fails the same way), and is absent when no retry can help, such as a value
+ * that is not a domain. `reason` explains the failure, to show as is, when II
+ * has one.
  */
-export type SsoDiscoveryStatus = { 'Resolved' : SsoDiscovery } |
+export type SsoDiscoveryStatus = {
+    'Failed' : { 'retry_after' : [] | [Timestamp], 'reason' : [] | [string] }
+  } |
+  { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
 /**
  * Request for `sso_get_delegation`.
@@ -1725,6 +2593,10 @@ export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'NameTooLong' : null };
+export type Urgency = { 'Low' : null } |
+  { 'High' : null } |
+  { 'VeryLow' : null } |
+  { 'Normal' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 /**
@@ -1784,6 +2656,11 @@ export interface WebAuthnCredential {
   'pubkey' : PublicKey,
   'credential_id' : CredentialId,
 }
+/**
+ * What a browser is registered with, so the frontend can tell a registration that is
+ * still live from one another identity's re-subscribe left behind.
+ */
+export interface WebPushSubscriptionStatus { 'endpoint' : string }
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
@@ -1791,6 +2668,61 @@ export interface _SERVICE {
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
   >,
+  'app_get_delegation' : ActorMethod<
+    [AppGetDelegationRequest],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : AppSessionError }
+  >,
+  /**
+   * Called by an app's frontend, as its session.
+   */
+  'app_notification_consent_status' : ActorMethod<
+    [],
+    { 'Ok' : AppNotificationConsentStatusResponse } |
+      { 'Err' : AppNotificationConsentStatusError }
+  >,
+  /**
+   * Mints a short-lived app delegation from a live session. Called by app frontends
+   * with the session chain, so revoking the session ends access within one delegation
+   * lifetime.
+   */
+  'app_prepare_delegation' : ActorMethod<
+    [AppPrepareDelegationRequest],
+    { 'Ok' : AppPrepareDelegationResponse } |
+      { 'Err' : AppSessionError }
+  >,
+  'app_revoke_notification_consent' : ActorMethod<
+    [],
+    { 'Ok' : null } |
+      { 'Err' : AppRevokeNotificationConsentError }
+  >,
+  /**
+   * Signs the calling session out. A session that is already gone is success, so a
+   * client that retries, or that signs out twice, does not have to reason about whether
+   * its session was still there. An app can revoke only its own session.
+   */
+  'app_revoke_session' : ActorMethod<
+    [],
+    { 'Ok' : null } |
+      { 'Err' : AppSessionError }
+  >,
+  /**
+   * Called by an app's backend canister for the origin it names.
+   */
+  'app_send_notification' : ActorMethod<
+    [SendNotificationArg],
+    { 'Ok' : SendNotificationResponse } |
+      { 'Err' : SendNotificationError }
+  >,
+  /**
+   * Whether an organization domain can be used for SSO sign-in, for apps that
+   * check a domain before sending the user into the flow. Call
+   * `app_sso_domain_check` (update) once to start the fetch, then poll
+   * `app_sso_domain_status` (query) until it reads `Available` or
+   * `Unavailable`.
+   */
+  'app_sso_domain_check' : ActorMethod<[string], undefined>,
+  'app_sso_domain_status' : ActorMethod<[string], AppSsoDomainStatus>,
   /**
    * Adds a new authentication method to the identity.
    * Requires authentication.
@@ -1897,6 +2829,23 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegisterError }
   >,
   /**
+   * Called by the service worker on a wake-up, signed with the browser key: the entry
+   * that wake-up named, where it has not expired and the identity still allows it.
+   */
+  'browser_get_notification' : ActorMethod<
+    [GetNotificationRequest],
+    { 'Ok' : GetNotificationResponse } |
+      { 'Err' : GetNotificationError }
+  >,
+  /**
+   * Called by the service worker for the one it shows, while it fetches the content.
+   */
+  'browser_remove_notification' : ActorMethod<
+    [RemoveNotificationRequest],
+    { 'Ok' : RemoveNotificationResponse } |
+      { 'Err' : RemoveNotificationError }
+  >,
+  /**
    * Check the captcha challenge
    * If successful, the registration can be finished with `identity_registration_finish`.
    */
@@ -1904,6 +2853,22 @@ export interface _SERVICE {
     [CheckCaptchaArg],
     { 'Ok' : IdRegNextStepResult } |
       { 'Err' : CheckCaptchaError }
+  >,
+  /**
+   * Whether the calling session is still usable. For the II frontend's silent
+   * re-auth path, which must decide whether it can answer without rendering
+   * anything. Advisory: a query reply is not certified, and every mint enforces
+   * the same conditions regardless of the answer here.
+   */
+  'check_session' : ActorMethod<[], boolean>,
+  /**
+   * Called by the identity being added, from its own browser on the device, with a
+   * token the identity that has the app signed for it.
+   */
+  'claim_notification_app' : ActorMethod<
+    [ClaimNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimNotificationAppError }
   >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
@@ -1917,11 +2882,16 @@ export interface _SERVICE {
    */
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
+  'disable_notification_app' : ActorMethod<
+    [DisableNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : DisableNotificationAppError }
+  >,
   /**
-   * SSO discovery for the sign-in initiation flow. The frontend polls
-   * `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
-   * on-demand two-hop discovery fetch with `discover_sso` (update); once the
-   * fetch completes the query returns `Resolved` with the config.
+   * SSO discovery for the sign-in initiation flow. The frontend calls
+   * `discover_sso` (update) once, which starts the two-hop discovery fetch and
+   * the domain's key fetch, or refreshes a stale result, then polls
+   * `get_sso_discovery_status` (query) until it reads `Resolved` or `Failed`.
    * 
    * The optional second argument is the target dapp origin; when supplied,
    * `resolved_client_id` reports the client that origin must use (`null` = denied).
@@ -2027,6 +2997,14 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : EmailChallengeError }
   >,
+  /**
+   * Called by the identity, from the browser that points at the app.
+   */
+  'enable_notification_app' : ActorMethod<
+    [EnableNotificationAppRequest],
+    { 'Ok' : NotificationId } |
+      { 'Err' : EnableNotificationAppError }
+  >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   /**
@@ -2035,6 +3013,17 @@ export interface _SERVICE {
    * Only callable by this IIs archive canister.
    */
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
+  /**
+   * Undoes every permission decision for the apps, drops what they queued for the
+   * identity's browsers and signs out every session at them, as one write. Accounts and
+   * the default account stay. An origin the identity holds nothing at is already
+   * forgotten.
+   */
+  'forget_applications' : ActorMethod<
+    [ForgetApplicationsRequest],
+    { 'Ok' : null } |
+      { 'Err' : ForgetApplicationsError }
+  >,
   'get_account_delegation' : ActorMethod<
     [
       UserNumber,
@@ -2046,6 +3035,11 @@ export interface _SERVICE {
     ],
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
+  >,
+  'get_account_session' : ActorMethod<
+    [GetAccountSessionRequest],
+    { 'Ok' : GetAccountSessionResponse } |
+      { 'Err' : AccountSessionError }
   >,
   /**
    * Multiple accounts
@@ -2092,6 +3086,19 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the browser, which may hold nothing but its key: the install page is a
+   * tab of its own with no session.
+   */
+  'get_notification_app_status' : ActorMethod<
+    [GetNotificationAppStatusRequest],
+    NotificationAppStatus
+  >,
+  'get_notification_delegation' : ActorMethod<
+    [GetNotificationDelegationRequest],
+    { 'Ok' : GetNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
@@ -2101,6 +3108,10 @@ export interface _SERVICE {
   'get_sso_discovery_status' : ActorMethod<
     [GetSsoDiscoveryStatusRequest],
     SsoDiscoveryStatus
+  >,
+  'get_webpush_subscription_status' : ActorMethod<
+    [GetWebPushSubscriptionStatusRequest],
+    [] | [WebPushSubscriptionStatus]
   >,
   /**
    * HTTP Gateway protocol
@@ -2169,6 +3180,24 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  /**
+   * Called by the Home Screen app on its first open, signed with that one-shot key.
+   * Creates the app's record where its key has none, and points the browser at it.
+   */
+  'link_notification_app' : ActorMethod<
+    [LinkNotificationAppRequest],
+    { 'Ok' : LinkNotificationAppResponse } |
+      { 'Err' : LinkNotificationAppError }
+  >,
+  /**
+   * Every app the identity decided a permission for, so the user can change or forget
+   * what they decided. Authorized by the identity's own access methods.
+   */
+  'list_applications' : ActorMethod<
+    [ListApplicationsRequest],
+    { 'Ok' : Array<ApplicationInfo> } |
+      { 'Err' : ListApplicationsError }
+  >,
   'list_available_attributes' : ActorMethod<
     [ListAvailableAttributesRequest],
     { 'Ok' : ListAvailableAttributesResponse } |
@@ -2211,9 +3240,13 @@ export interface _SERVICE {
   /**
    * Read the identity's synced trusted-MCP-server config (master toggle + the
    * trusted server URL). Persisted on-chain, so it follows the identity across
-   * devices. Read by the Settings UI and the /mcp connect flow (which verifies
-   * the connecting origin against it). Returns the disabled, no-server default
-   * for an unauthorized caller or an anchor that never wrote a config.
+   * devices. Being a query, the reply is signed by a single node: the /mcp
+   * connect flow uses it only to pick which screen to show, and gates delivery
+   * on the certified trusted_url from prepare_mcp_registration_delegation.
+   * Callers that render trust, or write the config back, take it from
+   * IdentityInfo.mcp_config on the identity_info update call instead. Returns
+   * the disabled, no-server default for an unauthorized caller or an anchor
+   * that never wrote a config.
    * `null` means the identity has never written a config — distinct from a
    * stored one that is switched off. The two behave differently at /mcp: the
    * first may connect the deployment's official connector (completing the
@@ -2284,6 +3317,34 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
+   * Called by the Home Screen app, naming the record it holds and signing as the
+   * principal that record belongs to. The identities whose browsers point at it, which
+   * is the whole of what it can deliver for. Empty in four cases, which all mean the
+   * same thing to the app: the id names nothing, nothing points at it, this deployment
+   * does not notify, or the caller is not the app that record belongs to.
+   */
+  'notification_app_anchors' : ActorMethod<
+    [NotificationAppAnchorsRequest],
+    BigUint64Array | bigint[]
+  >,
+  'notification_consent_granted' : ActorMethod<
+    [NotificationConsentGrantedRequest],
+    boolean
+  >,
+  /**
+   * ===== Notifications =====
+   */
+  'notification_grant_consent' : ActorMethod<
+    [NotificationGrantConsentRequest],
+    { 'Ok' : null } |
+      { 'Err' : NotificationGrantConsentError }
+  >,
+  'notification_revoke_consent' : ActorMethod<
+    [NotificationRevokeConsentRequest],
+    { 'Ok' : null } |
+      { 'Err' : NotificationRevokeConsentError }
+  >,
+  /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct
    * provider). For SSO sign-ins a cold discovery/JWKS cache yields the
    * `Pending` result arm — a retry signal, not an error: the caller re-calls
@@ -2334,6 +3395,17 @@ export interface _SERVICE {
     ],
     { 'Ok' : PrepareAccountDelegation } |
       { 'Err' : AccountDelegationError }
+  >,
+  /**
+   * Creates or reuses a revocable session at one account and signs its identity to
+   * the II frontend's own key. Called only by the II frontend, which ships with the
+   * canister; requires an anchor access method, so a session can neither spawn nor
+   * extend itself.
+   */
+  'prepare_account_session' : ActorMethod<
+    [PrepareAccountSessionRequest],
+    { 'Ok' : PrepareAccountSessionResponse } |
+      { 'Err' : AccountSessionError }
   >,
   /**
    * Attribute sharing protocol
@@ -2388,10 +3460,54 @@ export interface _SERVICE {
     { 'Ok' : PrepareMcpRegistrationDelegation } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the browser starting an install, naming the one-shot key it puts in the
+   * install URL as the only caller that may complete the link.
+   */
+  'prepare_notification_app_link' : ActorMethod<
+    [PrepareNotificationAppLinkRequest],
+    { 'Ok' : null } |
+      { 'Err' : PrepareNotificationAppLinkError }
+  >,
+  /**
+   * Authorized by the browser key the caller signs with.
+   */
+  'prepare_notification_delegation' : ActorMethod<
+    [PrepareNotificationDelegationRequest],
+    { 'Ok' : PrepareNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
+  >,
   'prepare_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
+  >,
+  /**
+   * The key a browser subscribes with and every push names. Absent only in the moment
+   * between the install returning and the answer to the read it starts.
+   * Both keys a browser needs before it subscribes: the one every push is signed with,
+   * and a one-shot key it encrypts this subscription's auth secret to.
+   * 
+   * An update call, because a query reply is signed by one replica. One that answered
+   * with a VAPID key of its own choosing would bind the subscription to it permanently,
+   * and the browser has nothing to check the answer against.
+   * A cold randomness pool yields the `Pending` result arm — a retry signal, not an
+   * error: asking put the draw in flight, so the caller re-calls the method.
+   */
+  'prepare_webpush_subscription' : ActorMethod<
+    [UserNumber],
+    { 'Ok' : PrepareWebPushSubscriptionResponse } |
+      { 'Err' : PrepareWebPushSubscriptionError } |
+      { 'Pending' : null }
+  >,
+  /**
+   * Called by the browser, which watches for the answer leaving its own queue: that
+   * is what says the app this browser points at is still installed.
+   */
+  'probe_notification_app' : ActorMethod<
+    [ProbeNotificationAppRequest],
+    { 'Ok' : NotificationId } |
+      { 'Err' : ProbeNotificationAppError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
@@ -2399,13 +3515,37 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
+   * Called by the identity, so one browser can silence another.
+   */
+  'remove_webpush_subscription' : ActorMethod<
+    [RemoveWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : RemoveWebPushSubscriptionError }
+  >,
+  /**
    * Atomically replace device matching the device key with the new device data
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
+  'revoke_browser_sessions' : ActorMethod<
+    [RevokeBrowserSessionsRequest],
+    { 'Ok' : null } |
+      { 'Err' : SessionRevokeError }
+  >,
   'set_default_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber]],
     { 'Ok' : AccountInfo } |
       { 'Err' : SetDefaultAccountError }
+  >,
+  /**
+   * Called by the browser, or by the Home Screen app it points at: what the app
+   * registers belongs to its own record, which every identity pointing at it is
+   * delivered through, so the anchor named here is what authorized the call rather
+   * than where the subscription goes.
+   */
+  'set_webpush_subscription' : ActorMethod<
+    [SetWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : SetWebPushSubscriptionError }
   >,
   /**
    * ===================================================================

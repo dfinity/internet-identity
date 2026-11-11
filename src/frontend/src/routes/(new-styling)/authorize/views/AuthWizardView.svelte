@@ -2,7 +2,7 @@
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { authorizationStore } from "$lib/stores/authorization.store";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { t } from "$lib/stores/locale.store";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
@@ -21,12 +21,17 @@
     mode = $bindable("both"),
   }: Props = $props();
 
-  const dapps = getDapps();
-  const dapp = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
+  // Metadata comes from the origin the identity is derived for (the app's
+  // derivation origin when it uses one); the badge in the header keeps showing
+  // the origin the user is signing in from.
+  const metadataOrigin = $derived(
+    $authorizationStore?.effectiveOrigin ?? $establishedChannelStore.origin,
+  );
+  const metadataStore = $derived(
+    getAppMetadataStore(metadataOrigin, $establishedChannelStore.origin),
   );
   const dappName = $derived(
-    dapp?.name ?? new URL($establishedChannelStore.origin).hostname,
+    $metadataStore.name ?? new URL($establishedChannelStore.origin).hostname,
   );
 </script>
 
@@ -37,7 +42,7 @@
   bind:mode
   ssoOrigin={$authorizationStore?.effectiveOrigin}
 >
-  <AuthorizeHeader origin={$establishedChannelStore.origin} />
+  <AuthorizeHeader origin={$establishedChannelStore.origin} {metadataOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {mode === "signup"
       ? $t`Create an Identity`

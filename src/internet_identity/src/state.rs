@@ -1,5 +1,8 @@
 use crate::anchor_management::tentative_device_registration::ValidatedRegistrationId;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
+use crate::notifications::backlog::app::{AppBacklog, APP_BACKLOG};
+use crate::notifications::backlog::identity::{IdentityBacklog, IDENTITY_BACKLOG};
+use crate::notifications::delivery_metrics;
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -116,6 +119,9 @@ pub struct PersistentState {
     // `.well-known/ic-domains` asset so the backend is reachable on its
     // custom domain.
     pub backend_origin: Option<String>,
+    /// That key's public half, uncompressed SEC1. Asked of the management canister once
+    /// and kept, because a browser subscribes with it and every push names it.
+    pub vapid_public_key: Option<Vec<u8>>,
     // Configuration for New Flow Origins
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
@@ -125,6 +131,17 @@ pub struct PersistentState {
     // `Some(false)` (the default) require https for every discovery host;
     // non-loopback always requires https. See `sso::validate_discovery_domain`.
     pub sso_allow_insecure_discovery: Option<bool>,
+    // Deploy flag relaxing the `https` requirement for sender-list outcalls to
+    // loopback hosts (localhost/127.0.0.1) so e2e and local development can serve
+    // the list over http. `None`/`Some(false)` (the default) require https for every
+    // notifying origin; non-loopback always requires https. See
+    // `notifications::validation`.
+    pub notifications_allow_insecure_sender_list: Option<bool>,
+    /// Lets a browser register a plain-http push endpoint, for a deployment whose
+    /// relay is a local server rather than a push service. Never set in production:
+    /// a wake-up carries the browser's authorization, and http hands it to anyone
+    /// on the path.
+    pub notifications_allow_insecure_endpoint: Option<bool>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
@@ -152,6 +169,8 @@ pub struct PersistentState {
     /// `docs/ongoing/email-recovery.md` §7.6.
     pub doh_config: Option<DohConfig>,
     pub mcp_official_url: Option<String>,
+    /// Deploy flag for the notifications feature. `None`/`Some(false)` => disabled; `Some(true)` => enabled.
+    pub notifications_enabled: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -166,10 +185,13 @@ impl Default for PersistentState {
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
+            vapid_public_key: None,
             backend_origin: None,
             new_flow_origins: None,
             openid_configs: None,
             sso_allow_insecure_discovery: None,
+            notifications_allow_insecure_sender_list: None,
+            notifications_allow_insecure_endpoint: None,
             oidc_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,
@@ -180,6 +202,7 @@ impl Default for PersistentState {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
+            notifications_enabled: None,
         }
     }
 }
@@ -243,31 +266,36 @@ struct State {
     registration_rate_limit: RefCell<Option<RateLimitState>>,
     // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
     event_data_uniqueness_counter: Cell<u16>,
+    // Notifications apps have submitted and the dispatcher has not sent yet. Absent
+    // until the first one arrives, so the queue's clocks start from canister time
+    // rather than the epoch. An upgrade drops what is still here.
+    notification_backlog: RefCell<Option<AppBacklog>>,
+    // Internet Identity's own wake-ups the dispatcher has not posted yet, taking turns
+    // across identities. Absent and dropped on upgrade for the same reasons as above.
+    identity_backlog: RefCell<Option<IdentityBacklog>>,
 }
 
-// Checks if salt is empty and calls `init_salt` to set it.
-pub async fn ensure_salt_set() {
-    let salt = storage_borrow(|storage| storage.salt().cloned());
-    if salt.is_none() {
-        init_salt().await;
+/// Gives the canister a salt where it has none, and does nothing where it already has one.
+///
+/// Deriving one needs raw randomness, so it needs an await that `init` cannot make; a
+/// zero-delay timer installed from there calls this instead.
+///
+/// A canister that already has a salt is the answer this asks for, not a fault, so it says
+/// so by returning rather than by trapping a caller who wanted exactly that.
+pub async fn set_salt_if_unset() {
+    if storage_borrow(|storage| storage.salt().is_some()) {
+        return;
     }
 
-    storage_borrow(|storage| {
-        if storage.salt().is_none() {
-            trap("Salt is not set. Try calling init_salt() to set it");
-        }
-    });
-}
-
-pub async fn init_salt() {
-    storage_borrow(|storage| {
-        if storage.salt().is_some() {
-            trap("Salt already set");
-        }
-    });
-
     let salt = random_salt().await;
-    storage_borrow_mut(|storage| storage.update_salt(salt)); // update_salt() traps if salt has already been set
+    storage_borrow_mut(|storage| {
+        // Re-checked after the await, which is where a second message can have gone all
+        // the way through. Both salts are random, so the loser discards its own rather
+        // than trapping a caller whose request was perfectly good.
+        if storage.salt().is_none() {
+            storage.update_salt(salt);
+        }
+    });
 }
 
 pub fn salt() -> [u8; 32] {
@@ -401,6 +429,47 @@ pub fn signature_map<R>(f: impl FnOnce(&SignatureMap) -> R) -> R {
 
 pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut s.sigs.borrow_mut()))
+}
+
+/// Initialize the backlog at `now_ns` on first use.
+pub fn notification_backlog_mut<R>(now_ns: Timestamp, f: impl FnOnce(&mut AppBacklog) -> R) -> R {
+    let (result, expired_items) = STATE.with(|s| {
+        let mut backlog = s.notification_backlog.borrow_mut();
+        let backlog = backlog.get_or_insert_with(|| AppBacklog::new(APP_BACKLOG, now_ns));
+        let result = f(backlog);
+        (result, backlog.drain_expired())
+    });
+    for expired_item in expired_items {
+        let labels = delivery_metrics::Labels::app_number(
+            expired_item.item.application_number,
+            &expired_item.item.urgency,
+        );
+        delivery_metrics::count_lost(expiry_reason(expired_item.by_own_deadline), &labels);
+    }
+    result
+}
+
+fn expiry_reason(by_own_deadline: bool) -> delivery_metrics::Reason {
+    if by_own_deadline {
+        delivery_metrics::Reason::ExpiredAppDeadline
+    } else {
+        delivery_metrics::Reason::ExpiredInBacklog
+    }
+}
+
+/// Initialize the identity backlog at `now_ns` on first use.
+pub fn identity_backlog_mut<R>(now_ns: Timestamp, f: impl FnOnce(&mut IdentityBacklog) -> R) -> R {
+    let (result, expired_items) = STATE.with(|s| {
+        let mut backlog = s.identity_backlog.borrow_mut();
+        let backlog = backlog.get_or_insert_with(|| IdentityBacklog::new(IDENTITY_BACKLOG, now_ns));
+        let result = f(backlog);
+        (result, backlog.drain_expired())
+    });
+    for expired_item in expired_items {
+        let labels = delivery_metrics::Labels::identity(&expired_item.item.urgency);
+        delivery_metrics::count_lost(expiry_reason(expired_item.by_own_deadline), &labels);
+    }
+    result
 }
 
 pub fn storage_borrow<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {

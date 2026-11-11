@@ -113,7 +113,7 @@
        padding. Inner padding gives the first/last pill breathing
        room when fully visible. -->
   <div
-    class="-mx-4 mt-10 overflow-x-auto [scrollbar-width:none] sm:mx-0 [&::-webkit-scrollbar]:hidden"
+    class="-mx-4 mt-10 [scrollbar-width:none] overflow-x-auto sm:mx-0 [&::-webkit-scrollbar]:hidden"
   >
     <div class="flex gap-2 px-4 sm:px-0">
       {#each smartActions as action (action.id)}

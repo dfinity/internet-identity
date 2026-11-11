@@ -14,10 +14,14 @@
 //! A caller-supplied discovery domain is validated as a bare authority (see
 //! `validate_discovery_domain`); there is no domain allowlist.
 
+use super::domain::Domain;
 use super::verify::{Descriptor, SsoProvider};
 use super::OpenIDJWTVerificationError;
 use crate::openid::AudClaim;
-use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
+use crate::single_flight_cache::{
+    self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
+};
+use crate::HOUR_NS;
 use identity_jose::jwk::Jwk;
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
@@ -35,6 +39,11 @@ pub(super) fn non_default_stable_claim(claim: &str) -> Option<String> {
     (claim != DEFAULT_STABLE_IDENTIFIER_CLAIM).then(|| claim.to_string())
 }
 
+/// Default session length for an org that doesn't set `session_max_age_seconds`
+/// in its well-known: how long II's assertions about a user stay valid before
+/// they authenticate against the org's IdP again.
+pub(super) const DEFAULT_SESSION_MAX_AGE_NS: u64 = 8 * HOUR_NS;
+
 /// Max `app_clients` entries accepted from an org's well-known. The parsed map
 /// is retained in the in-memory SSO discovery cache (one per cached domain), so
 /// this bounds its heap footprint there — a generous per-org ceiling. An
@@ -43,6 +52,14 @@ pub(super) const MAX_APP_CLIENTS: usize = 100;
 
 /// Maximum length of an app_clients client_id.
 const MAX_APP_CLIENT_ID_LENGTH: usize = 255;
+
+/// Maximum length of an app_clients key (a cleartext origin or `hash:salt`).
+const MAX_APP_CLIENT_KEY_LENGTH: usize = 255;
+
+/// Total bytes of `app_clients` keys and client ids accepted from one
+/// well-known: room for `MAX_APP_CLIENTS` entries averaging 160 bytes, or for a
+/// few entries at the per-field maximums.
+const MAX_APP_CLIENTS_BYTES: usize = 16 * 1024;
 
 #[cfg(not(test))]
 use crate::state;
@@ -55,49 +72,48 @@ use crate::state;
 //
 // Discovery and JWKS are a single coupled flow (`domain → discovery cache →
 // jwks_uri → JWKS cache`): a verification needs *both* the domain's discovery
-// entry and its JWKS entry warm. So the two caches share one budget rather than
-// sizing independently — different caps would just leave one cache holding
-// entries the other can't back. The shared cap is bounded by the larger (JWKS)
-// entry (≤ `jwks::JWKS_MAX_RESPONSE_BYTES`, 32 KiB); every fill is also bounded
-// in bytes (see `DISCOVERY_MAX_RESPONSE_BYTES` and `jwks::JWKS_MAX_RESPONSE_BYTES`).
+// entry and its JWKS entry warm. So the two caches share one entry cap rather
+// than sizing independently — different caps would just leave one cache
+// holding entries the other can't back.
+//
+// Every retained field is bounded, so an entry's size is bounded regardless of
+// the response it was parsed from: a discovery entry holds at most ~2 KiB of
+// fixed fields plus its `app_clients` (`MAX_APP_CLIENTS_BYTES` and the vector
+// holding them), ~22 KiB in all; a JWKS entry holds at most
+// `jwks::JWKS_MAX_KEYS` keys reduced to what verification reads, ~24 KiB.
 
-/// Entry lifetime for both caches: discovery metadata and JWKS change
+/// Freshness for both caches: discovery metadata and JWKS change
 /// infrequently, so an hour balances freshness against outcall volume.
 const FRESH_FOR_SECONDS: u64 = 60 * 60;
-/// Stale-if-error window: serve the last-good value through a transient fill
-/// failure for up to this long past freshness before failing the caller.
-const STALE_FOR_SECONDS: u64 = 60 * 60;
+/// How long a discovery result is kept past freshness. A sign-in through a
+/// domain seen in this window starts from the cached result while it refreshes,
+/// instead of waiting on the two-hop fetch.
+const DISCOVERY_STALE_FOR_SECONDS: u64 = 7 * 24 * 60 * 60;
+/// How long a key set is kept past freshness. Short, so a provider's key
+/// rotation is picked up within this window.
+const JWKS_STALE_FOR_SECONDS: u64 = 60 * 60;
+/// How long past freshness either cache keeps serving its last-good value once
+/// a refresh has failed, before failing the caller.
+const STALE_IF_ERROR_FOR_SECONDS: u64 = 60 * 60;
 /// Shared LRU cap for both SSO caches — they back one coupled flow, so one
 /// budget keeps them coherent (this many domains cached end-to-end,
-/// discovery → keys). Worst-case memory is dominated by the JWKS cache at
-/// `jwks::JWKS_MAX_RESPONSE_BYTES` (32 KiB) per entry: 5k × 32 KiB ≈ 160 MB,
-/// plus ~10 MB of (much smaller) discovery entries ≈ ~170 MB — about 5-6 % of
-/// the ~3 GB Wasm heap, leaving the bulk for core II operations while keeping
-/// wide headroom so a flood of distinct domains can't evict the providers real
-/// users rely on.
+/// discovery → keys). Worst case 5k × (~22 KiB + ~24 KiB) ≈ 230 MB — about
+/// 7-8 % of the ~3 GB Wasm heap, leaving the bulk for core II operations while
+/// keeping wide headroom so a flood of distinct domains can't evict the
+/// providers real users rely on.
 const SSO_CACHE_MAX_ENTRIES: usize = 5_000;
 const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 
 /// Response-size cap for the two discovery hops (`ii-openid-configuration` and
-/// the OIDC discovery document). Sized to fit up to `MAX_APP_CLIENTS`
-/// `origin -> client_id` entries (each key up to ~140 bytes when hashed) with
-/// headroom.
+/// the OIDC discovery document). Sized to fit `MAX_APP_CLIENTS_BYTES` of
+/// `app_clients` plus the JSON around them, with headroom.
 #[cfg(not(test))]
 const DISCOVERY_MAX_RESPONSE_BYTES: u64 = 64 * 1024;
-/// Cap on the number of `scopes_supported` stored per discovery entry. `scopes`
-/// is the only unbounded field in `DiscoveredConfig`; capping it keeps a
-/// discovery entry ~1-2 KB so its share of the shared budget stays small. II
-/// only needs `openid`/`email`/`profile`, so extra advertised scopes are
-/// irrelevant.
-#[cfg(not(test))]
-const DISCOVERY_MAX_SCOPES: usize = 32;
-
-/// Default scopes requested when a provider's discovery document doesn't
-/// advertise `scopes_supported`.
-#[cfg(not(test))]
-const DEFAULT_SCOPES: [&str; 3] = ["openid", "profile", "email"];
+/// The scopes II requests. A provider's `scopes_supported` is kept only as far
+/// as it lists these, and all of them are assumed when it advertises none.
+const REQUESTED_SCOPES: [&str; 3] = ["openid", "profile", "email"];
 
 /// Maximum length of the client_id from the well-known.
 #[cfg(not(test))]
@@ -108,11 +124,15 @@ const MAX_ISSUER_LENGTH: usize = 255;
 /// Maximum length of the jwks_uri from the OIDC configuration.
 #[cfg(not(test))]
 const MAX_JWKS_URI_LENGTH: usize = 255;
+/// Maximum length of the authorization_endpoint from the OIDC configuration.
+#[cfg(not(test))]
+const MAX_AUTHORIZATION_ENDPOINT_LENGTH: usize = 255;
+/// Maximum length of the stable_identifier_claim from the well-known.
+#[cfg(not(test))]
+const MAX_STABLE_IDENTIFIER_CLAIM_LENGTH: usize = 255;
 /// Maximum length of the display name from the well-known.
 #[cfg(not(test))]
 const MAX_SSO_NAME_LENGTH: usize = 255;
-/// Maximum length of an SSO discovery domain.
-const MAX_DOMAIN_LENGTH: usize = 255;
 
 /// The result of resolving a discovery domain (hop 1 + hop 2). Carries
 /// everything the redemption path needs (`issuer`, `jwks_uri`) and everything
@@ -132,6 +152,10 @@ pub(super) struct DiscoveredConfig {
     pub gate_all_apps: bool,
     /// Claim holding the cross-client-stable identifier (default `sub`).
     pub stable_identifier_claim: String,
+    /// How long a sign-in through this domain stays valid, in nanoseconds.
+    /// Seconds exist only in the well-known and its parser; everything from
+    /// here on is nanoseconds.
+    pub session_max_age_ns: u64,
 }
 
 /// One `origin -> client_id` entry from `app_clients`.
@@ -185,8 +209,8 @@ impl AppClientKey {
 pub(super) struct Forbidden;
 
 /// Parse the raw `app_clients` map, rejecting (never truncating) a map over
-/// `MAX_APP_CLIENTS` — truncation could silently drop a gated origin into the
-/// open fallback.
+/// `MAX_APP_CLIENTS` entries or `MAX_APP_CLIENTS_BYTES` — truncation could
+/// silently drop a gated origin into the open fallback.
 pub(super) fn validate_app_clients(
     entries: &std::collections::HashMap<String, String>,
 ) -> Result<Vec<AppClient>, String> {
@@ -196,20 +220,48 @@ pub(super) fn validate_app_clients(
             entries.len()
         ));
     }
-    entries
+    let bytes: usize = entries
         .iter()
-        .map(|(key, client_id)| {
-            if client_id.len() > MAX_APP_CLIENT_ID_LENGTH {
-                return Err(format!(
-                    "app_clients client_id exceeds the {MAX_APP_CLIENT_ID_LENGTH}-byte cap"
-                ));
-            }
-            Ok(AppClient {
-                key: AppClientKey::parse(key),
-                client_id: client_id.clone(),
-            })
-        })
-        .collect()
+        .map(|(key, client_id)| key.len() + client_id.len())
+        .sum();
+    if bytes > MAX_APP_CLIENTS_BYTES {
+        return Err(format!(
+            "app_clients exceeds the {MAX_APP_CLIENTS_BYTES}-byte cap ({bytes} bytes)"
+        ));
+    }
+    let mut app_clients = Vec::with_capacity(entries.len());
+    for (key, client_id) in entries {
+        if key.len() > MAX_APP_CLIENT_KEY_LENGTH {
+            return Err(format!(
+                "app_clients key exceeds the {MAX_APP_CLIENT_KEY_LENGTH}-byte cap"
+            ));
+        }
+        if client_id.len() > MAX_APP_CLIENT_ID_LENGTH {
+            return Err(format!(
+                "app_clients client_id exceeds the {MAX_APP_CLIENT_ID_LENGTH}-byte cap"
+            ));
+        }
+        app_clients.push(AppClient {
+            key: AppClientKey::parse(key),
+            client_id: client_id.clone(),
+        });
+    }
+    Ok(app_clients)
+}
+
+/// The [`REQUESTED_SCOPES`] a provider advertises in `scopes_supported`, each
+/// once and in its order; all of them when it advertises none.
+pub(super) fn requested_scopes(scopes_supported: Option<Vec<String>>) -> Vec<String> {
+    let Some(scopes) = scopes_supported.filter(|scopes| !scopes.is_empty()) else {
+        return REQUESTED_SCOPES.iter().map(|s| (*s).to_string()).collect();
+    };
+    let mut requested: Vec<String> = Vec::new();
+    for scope in &scopes {
+        if REQUESTED_SCOPES.contains(&scope.as_str()) && !requested.contains(scope) {
+            requested.push(scope.clone());
+        }
+    }
+    requested
 }
 
 impl DiscoveredConfig {
@@ -238,22 +290,23 @@ thread_local! {
     static JWKS_CACHE: RefCell<JwksCache> = RefCell::new(new_jwks_cache());
 }
 
-fn cache_config(max_entries: usize) -> CacheConfig {
+fn cache_config(stale_for: u64) -> CacheConfig {
     CacheConfig {
         fresh_for: FRESH_FOR_SECONDS,
-        stale_for: STALE_FOR_SECONDS,
-        max_entries,
+        stale_for,
+        stale_if_error_for: STALE_IF_ERROR_FOR_SECONDS,
+        max_entries: SSO_CACHE_MAX_ENTRIES,
         backoff: RetryBackoff::new(RETRY_BASE_SECONDS, RETRY_MULTIPLIER),
         abandon_fill_after: ABANDON_FILL_AFTER_SECONDS,
     }
 }
 
 fn new_discovery_cache() -> DiscoveryCache {
-    SingleFlightCache::new(discovery_fill, cache_config(SSO_CACHE_MAX_ENTRIES))
+    SingleFlightCache::new(discovery_fill, cache_config(DISCOVERY_STALE_FOR_SECONDS))
 }
 
 fn new_jwks_cache() -> JwksCache {
-    SingleFlightCache::new(jwks_fill, cache_config(SSO_CACHE_MAX_ENTRIES))
+    SingleFlightCache::new(jwks_fill, cache_config(JWKS_STALE_FOR_SECONDS))
 }
 
 // ---------------------------------------------------------------------------
@@ -264,46 +317,36 @@ fn new_jwks_cache() -> JwksCache {
 /// is running, and once discovery has resolved, ensure the JWKS fill for its
 /// `jwks_uri` is running too. Only an update may call this — it can spawn the
 /// outcalls the fills make. Reads ([`peek_discovery`], [`read_jwks`]) stay
-/// peek-only, so a query never needs this and never spawns. A no-op for a
-/// disallowed domain.
-pub(super) fn prefetch(domain: &str) {
-    let domain = domain.to_ascii_lowercase();
-    if validate_discovery_domain(&domain).is_err() {
-        return;
-    }
-    if let Cached::Ready(discovery_config) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
+/// peek-only, so a query never needs this and never spawns.
+pub(super) fn prefetch(domain: &Domain) {
+    if let Cached::Ready(discovery_config) =
+        single_flight_cache::get(&DISCOVERY_CACHE, domain.as_str().to_string())
+    {
         single_flight_cache::get(&JWKS_CACHE, discovery_config.jwks_uri);
     }
 }
 
-/// Drive the discovery fetch for `domain` (the discovery cache only — JWKS is a
-/// verify-time concern). For the sign-in initiation poll, where the frontend
-/// hits this from a query that read no value yet. A no-op for a disallowed
-/// domain.
-pub(super) fn drive_discovery(domain: &str) {
-    let domain = domain.to_ascii_lowercase();
-    if validate_discovery_domain(&domain).is_ok() {
-        single_flight_cache::get(&DISCOVERY_CACHE, domain);
-    }
+/// Read the cached discovery result for `domain`, peek-only (never spawns) so
+/// it's safe from a query. `Pending` means no cached value yet.
+pub(super) fn peek_discovery(domain: &Domain) -> Cached<DiscoveredConfig> {
+    single_flight_cache::peek(&DISCOVERY_CACHE, &domain.as_str().to_string())
 }
 
-/// Read the cached discovery result for `domain`, peek-only (never spawns) so
-/// it's safe from a query. `Pending` means no cached value yet; the caller
-/// gates on [`validate_discovery_domain`] separately where it needs to
-/// tell a disallowed domain apart from a cold one.
-pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
-    single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
+/// When the discovery fetch for `domain` is retried, in absolute nanoseconds,
+/// while it is parked after a failed fetch and has no value to serve. Peek-only.
+pub(super) fn discovery_retry_at_ns(domain: &Domain) -> Option<u64> {
+    single_flight_cache::retry_at(&DISCOVERY_CACHE, &domain.as_str().to_string())
+        .map(|retry_at_secs| retry_at_secs.saturating_mul(1_000_000_000))
 }
 
 /// Resolve an SSO domain into a verify descriptor + `jwks_uri` from the cached
 /// discovery result, cross-checking the JWT's issuer against the discovered
 /// issuer. Peek-only.
 pub(super) fn resolve(
-    domain: &str,
+    domain: &Domain,
     jwt_iss: &str,
     jwt_aud: &AudClaim,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    validate_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
     let discovery_config = match peek_discovery(domain) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(discovery_config) => discovery_config,
@@ -325,7 +368,7 @@ pub(super) fn resolve(
         issuer: discovery_config.issuer,
         client_id: discovery_config.client_id,
         sso: Some(SsoProvider {
-            domain: domain.to_string(),
+            domain: domain.clone(),
             name: discovery_config.name,
             stable_identifier_claim: non_default_stable_claim(
                 &discovery_config.stable_identifier_claim,
@@ -359,68 +402,12 @@ fn sso_allow_insecure_discovery() -> bool {
     }
 }
 
-/// Validate a caller-supplied SSO discovery domain: it must be within the length
-/// cap and a bare URL authority (a host, optionally `host:port`, and nothing
-/// else). The bare-authority check is the security boundary — `domain` is
-/// interpolated into a discovery URL (`{scheme}://{domain}/.well-known/...`), so
-/// inputs carrying userinfo (`evil.com@127.0.0.1`), a path, a query, or a
-/// fragment could otherwise change the effective request target.
-pub fn validate_discovery_domain(domain: &str) -> Result<(), String> {
-    if domain.len() > MAX_DOMAIN_LENGTH {
-        return Err(format!(
-            "SSO discovery domain exceeds {MAX_DOMAIN_LENGTH} bytes"
-        ));
-    }
-    if !is_bare_authority(domain) {
-        return Err(format!(
-            "SSO discovery domain is not a bare authority: {domain}"
-        ));
-    }
-    Ok(())
-}
-
-/// True if `domain` is a bare URL authority — a host, optionally `host:port`,
-/// and nothing else: no scheme, userinfo, path, query, or fragment. It is
-/// parsed the same way it is later used (as the authority of an `https`
-/// discovery URL) and required to round-trip exactly, so anything the URL
-/// parser would reinterpret — embedded userinfo/path/query/fragment, stripped
-/// control characters, an injected scheme — is rejected. (A redundant
-/// `:443`/`:80` default port is normalized away by the parser and thus rejected
-/// too; real discovery domains don't carry one.)
-fn is_bare_authority(domain: &str) -> bool {
-    let Ok(url) = url::Url::parse(&format!("https://{domain}")) else {
-        return false;
-    };
-    if !url.username().is_empty()
-        || url.password().is_some()
-        || url.query().is_some()
-        || url.fragment().is_some()
-        || !matches!(url.path(), "" | "/")
-    {
-        return false;
-    }
-    let Some(host) = url.host_str() else {
-        return false;
-    };
-    let authority = match url.port() {
-        Some(port) => format!("{host}:{port}"),
-        None => host.to_string(),
-    };
-    authority == domain.to_ascii_lowercase()
-}
-
-/// True if `host` (host or `host:port`) is loopback.
-fn is_loopback_host(host: &str) -> bool {
-    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    matches!(bare.as_str(), "localhost" | "127.0.0.1")
-}
-
 /// `http` discovery is permitted only for a loopback host, and only when the
 /// `sso_allow_insecure_discovery` deploy flag is set (e2e mock IdPs). Every
 /// other host — and everything in production, where the flag is off — requires
 /// `https`, so an un-flagged caller can never trigger an `http` outcall.
 fn allow_insecure_scheme(host: &str) -> bool {
-    sso_allow_insecure_discovery() && is_loopback_host(host)
+    sso_allow_insecure_discovery() && crate::utils::is_loopback_host(host)
 }
 
 // ---------------------------------------------------------------------------
@@ -445,6 +432,10 @@ struct IIOpenIdConfiguration {
     /// Cross-client-stable identifier claim (default `sub`).
     #[serde(default)]
     stable_identifier_claim: Option<String>,
+    /// How long a sign-in stays valid, in seconds. The only place seconds
+    /// appear: `validate_session_max_age` converts once, to nanoseconds.
+    #[serde(default)]
+    session_max_age_seconds: Option<u64>,
 }
 
 /// OIDC discovery document — only the fields the canister needs.
@@ -458,9 +449,29 @@ struct DiscoveryDocument {
     scopes_supported: Option<Vec<String>>,
 }
 
-/// Reject over-length values from the untrusted well-known configuration.
+/// The hop-1 document once every field has been checked, bounded, defaulted and
+/// converted. Produced only by [`validate_ii_config`], which consumes the raw
+/// [`IIOpenIdConfiguration`], so nothing downstream can reach an unvalidated
+/// field by accident.
 #[cfg(not(test))]
-fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<(), String> {
+struct ValidatedIIOpenIdConfiguration {
+    client_id: String,
+    /// The hop-2 URL, checked before it is fetched.
+    openid_configuration: String,
+    name: Option<String>,
+    app_clients: Vec<AppClient>,
+    gate_all_apps: bool,
+    stable_identifier_claim: String,
+    session_max_age_ns: u64,
+}
+
+/// Validate the untrusted well-known configuration: bound its lengths, parse its
+/// `app_clients` keys, default its stable-identifier claim, and convert its
+/// session length to nanoseconds.
+#[cfg(not(test))]
+fn validate_ii_config(
+    config: IIOpenIdConfiguration,
+) -> Result<ValidatedIIOpenIdConfiguration, String> {
     if config.client_id.len() > MAX_CLIENT_ID_LENGTH {
         return Err(format!(
             "SSO client_id exceeds {MAX_CLIENT_ID_LENGTH} bytes"
@@ -473,19 +484,111 @@ fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<(), String> {
     {
         return Err(format!("SSO name exceeds {MAX_SSO_NAME_LENGTH} bytes"));
     }
-    Ok(())
+    let openid_configuration = validate_discovery_url(config.openid_configuration)?;
+    let app_clients = validate_app_clients(&config.app_clients)?;
+    let session_max_age_ns = validate_session_max_age(config.session_max_age_seconds)?;
+    if config
+        .stable_identifier_claim
+        .as_ref()
+        .is_some_and(|claim| claim.len() > MAX_STABLE_IDENTIFIER_CLAIM_LENGTH)
+    {
+        return Err(format!(
+            "SSO stable_identifier_claim exceeds {MAX_STABLE_IDENTIFIER_CLAIM_LENGTH} bytes"
+        ));
+    }
+    let stable_identifier_claim = config
+        .stable_identifier_claim
+        .filter(|claim| !claim.is_empty())
+        .unwrap_or_else(|| DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string());
+
+    Ok(ValidatedIIOpenIdConfiguration {
+        client_id: config.client_id,
+        openid_configuration,
+        name: config.name,
+        app_clients,
+        gate_all_apps: config.gate_all_apps,
+        stable_identifier_claim,
+        session_max_age_ns,
+    })
 }
 
-/// Reject over-length values from the untrusted OIDC discovery document.
+/// Convert `session_max_age_seconds` from the well-known into nanoseconds,
+/// rejecting a value that is zero or over the delegation ceiling. This is the
+/// only seconds-to-nanoseconds conversion in the SSO path: an invalid value is
+/// rejected here, so it never reaches the cache as a nanosecond number.
+fn validate_session_max_age(seconds: Option<u64>) -> Result<u64, String> {
+    const NS_PER_SECOND: u64 = 1_000_000_000;
+    let Some(seconds) = seconds else {
+        return Ok(DEFAULT_SESSION_MAX_AGE_NS);
+    };
+    if seconds == 0 {
+        return Err("SSO session_max_age_seconds must be greater than zero".to_string());
+    }
+    // `checked_mul` rather than saturating: a garbage value must be rejected,
+    // not silently clamped to the ceiling.
+    let max_age_ns = seconds
+        .checked_mul(NS_PER_SECOND)
+        .ok_or_else(|| format!("SSO session_max_age_seconds is out of range: {seconds}"))?;
+    if max_age_ns > crate::delegation::MAX_EXPIRATION_PERIOD_NS {
+        return Err(format!(
+            "SSO session_max_age_seconds exceeds the {} second maximum",
+            crate::delegation::MAX_EXPIRATION_PERIOD_NS / NS_PER_SECOND
+        ));
+    }
+    Ok(max_age_ns)
+}
+
+/// The hop-2 document once its URLs have been checked against each other and
+/// against the hop-1 URL, its lengths bounded and its scopes reduced to the
+/// ones II requests. Produced only by [`validate_discovery_document`], which
+/// consumes the raw [`DiscoveryDocument`].
 #[cfg(not(test))]
-fn validate_discovery_document(doc: &DiscoveryDocument) -> Result<(), String> {
+struct ValidatedDiscoveryDocument {
+    issuer: String,
+    jwks_uri: String,
+    authorization_endpoint: String,
+    scopes: Vec<String>,
+}
+
+/// Validate the untrusted OIDC discovery document against the hop-1 document it
+/// was fetched from: bound its lengths, enforce the host relationships, and
+/// keep the scopes II requests. Takes the validated hop-1 document, so the URL
+/// the self-assertion checks compare against is itself already checked.
+#[cfg(not(test))]
+fn validate_discovery_document(
+    doc: DiscoveryDocument,
+    ii_config: &ValidatedIIOpenIdConfiguration,
+) -> Result<ValidatedDiscoveryDocument, String> {
+    let openid_configuration = &ii_config.openid_configuration;
     if doc.issuer.len() > MAX_ISSUER_LENGTH {
         return Err(format!("SSO issuer exceeds {MAX_ISSUER_LENGTH} bytes"));
     }
     if doc.jwks_uri.len() > MAX_JWKS_URI_LENGTH {
         return Err(format!("SSO jwks_uri exceeds {MAX_JWKS_URI_LENGTH} bytes"));
     }
-    Ok(())
+    if doc.authorization_endpoint.len() > MAX_AUTHORIZATION_ENDPOINT_LENGTH {
+        return Err(format!(
+            "SSO authorization_endpoint exceeds {MAX_AUTHORIZATION_ENDPOINT_LENGTH} bytes"
+        ));
+    }
+    // The discovered issuer's host must match the openid_configuration host
+    // (standard OIDC self-assertion; defends against a compromised hop-1 that
+    // points jwks_uri at an unrelated issuer). The discovery domain itself is
+    // allowed to differ — it hosts a custom SSO indirection.
+    validate_issuer_host(openid_configuration, &doc.issuer)?;
+    let jwks_uri = validate_discovery_url(doc.jwks_uri)?;
+    // The authorization_endpoint must live on the same host as the issuer, so a
+    // tampered discovery doc can't bounce the user's auth off-host after we've
+    // committed to a provider.
+    validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
+    let authorization_endpoint = validate_discovery_url(doc.authorization_endpoint)?;
+
+    Ok(ValidatedDiscoveryDocument {
+        issuer: doc.issuer,
+        jwks_uri,
+        authorization_endpoint,
+        scopes: requested_scopes(doc.scopes_supported),
+    })
 }
 
 /// The discovery cache fill: hop 1 (`ii-openid-configuration`) then hop 2 (the
@@ -493,56 +596,47 @@ fn validate_discovery_document(doc: &DiscoveryDocument) -> Result<(), String> {
 /// them. Errors are surfaced as `Err` (the cache backs off and serves
 /// stale-if-error).
 #[cfg(not(test))]
-async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
+async fn discovery_fill(domain: String) -> FillOutcome<DiscoveredConfig, String> {
+    // One outcall slot for the whole two-hop fetch. No slot → abandon: the cache
+    // records nothing (no backoff) and the next poll retries once capacity frees.
+    let Some(_permit) = crate::concurrency::acquire(&DISCOVERY_OUTCALL_LIMIT) else {
+        return FillOutcome::Abandoned;
+    };
+    match discovery_fetch(domain).await {
+        Ok(config) => FillOutcome::Ready(config),
+        Err(err) => FillOutcome::Failed(err),
+    }
+}
+
+#[cfg(not(test))]
+async fn discovery_fetch(domain: String) -> Result<DiscoveredConfig, String> {
     // Hop 1: fetch /.well-known/ii-openid-configuration. `https` by default; a
     // loopback host may use `http` under the `sso_allow_insecure_discovery` flag
     // (the e2e mock provider, which can't serve TLS).
     let hop1_scheme = scheme_for_host(&domain);
     let hop1_url = format!("{hop1_scheme}://{domain}/.well-known/ii-openid-configuration");
-    let ii_config = fetch_ii_openid_configuration(hop1_url).await?;
-    validate_discovery_url(&ii_config.openid_configuration)?;
-
-    let app_clients = validate_app_clients(&ii_config.app_clients)?;
-    let stable_identifier_claim = ii_config
-        .stable_identifier_claim
-        .clone()
-        .filter(|c| !c.is_empty())
-        .unwrap_or_else(|| DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string());
-    let gate_all_apps = ii_config.gate_all_apps;
+    let ii_config = validate_ii_config(fetch_ii_openid_configuration(hop1_url).await?)?;
 
     // Hop 2: fetch the standard OIDC discovery document.
-    let doc = fetch_discovery(ii_config.openid_configuration.clone()).await?;
+    let doc = validate_discovery_document(
+        fetch_discovery(ii_config.openid_configuration.clone()).await?,
+        &ii_config,
+    )?;
 
-    // The discovered issuer's host must match the openid_configuration host
-    // (standard OIDC self-assertion; defends against a compromised hop-1 that
-    // points jwks_uri at an unrelated issuer). The discovery domain itself is
-    // allowed to differ — it hosts a custom SSO indirection.
-    validate_issuer_host(&ii_config.openid_configuration, &doc.issuer)?;
-    validate_discovery_url(&doc.jwks_uri)?;
-    // The authorization_endpoint must live on the same host as the issuer, so a
-    // tampered discovery doc can't bounce the user's auth off-host after we've
-    // committed to a provider.
-    validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
-    validate_discovery_url(&doc.authorization_endpoint)?;
-
-    validate_ii_config(&ii_config)?;
-    validate_discovery_document(&doc)?;
-
-    let mut scopes = doc
-        .scopes_supported
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| DEFAULT_SCOPES.iter().map(|s| (*s).to_string()).collect());
-    // Bound the only unbounded field stored per discovery entry.
-    scopes.truncate(DISCOVERY_MAX_SCOPES);
-
-    let DiscoveryDocument {
+    let ValidatedDiscoveryDocument {
         issuer,
         jwks_uri,
         authorization_endpoint,
-        ..
+        scopes,
     } = doc;
-    let IIOpenIdConfiguration {
-        client_id, name, ..
+    let ValidatedIIOpenIdConfiguration {
+        client_id,
+        name,
+        app_clients,
+        gate_all_apps,
+        stable_identifier_claim,
+        session_max_age_ns,
+        ..
     } = ii_config;
 
     Ok(DiscoveredConfig {
@@ -555,28 +649,38 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
         app_clients,
         gate_all_apps,
         stable_identifier_claim,
+        session_max_age_ns,
     })
 }
 
 /// The JWKS cache fill: fetch and parse the keys at `jwks_uri`.
 #[cfg(not(test))]
-async fn jwks_fill(jwks_uri: String) -> Result<Vec<Jwk>, String> {
-    super::jwks::fetch_jwks(jwks_uri).await
+async fn jwks_fill(jwks_uri: String) -> FillOutcome<Vec<Jwk>, String> {
+    // One outcall slot per refresh. No slot → abandon (no backoff), retry later.
+    let Some(_permit) = crate::concurrency::acquire(&JWKS_OUTCALL_LIMIT) else {
+        return FillOutcome::Abandoned;
+    };
+    match super::jwks::fetch_jwks(jwks_uri).await {
+        Ok(keys) => FillOutcome::Ready(keys),
+        Err(err) => FillOutcome::Failed(err),
+    }
 }
 
 // In test builds the fills read from injected state instead of doing outcalls.
 #[cfg(test)]
-async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
-    tests::TEST_DISCOVERY
-        .with_borrow(|m| m.get(&domain).cloned())
-        .ok_or_else(|| format!("no test discovery for {domain}"))
+async fn discovery_fill(domain: String) -> FillOutcome<DiscoveredConfig, String> {
+    match tests::TEST_DISCOVERY.with_borrow(|m| m.get(&domain).cloned()) {
+        Some(config) => FillOutcome::Ready(config),
+        None => FillOutcome::Failed(format!("no test discovery for {domain}")),
+    }
 }
 
 #[cfg(test)]
-async fn jwks_fill(jwks_uri: String) -> Result<Vec<Jwk>, String> {
-    tests::TEST_JWKS
-        .with_borrow(|m| m.get(&jwks_uri).cloned())
-        .ok_or_else(|| format!("no test jwks for {jwks_uri}"))
+async fn jwks_fill(jwks_uri: String) -> FillOutcome<Vec<Jwk>, String> {
+    match tests::TEST_JWKS.with_borrow(|m| m.get(&jwks_uri).cloned()) {
+        Some(keys) => FillOutcome::Ready(keys),
+        None => FillOutcome::Failed(format!("no test jwks for {jwks_uri}")),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -585,6 +689,26 @@ async fn jwks_fill(jwks_uri: String) -> Result<Vec<Jwk>, String> {
 
 #[cfg(not(test))]
 const DISCOVERY_CALL_CYCLES: u128 = 30_000_000_000;
+
+#[cfg(not(test))]
+thread_local! {
+    /// Caps how many discovery fetches (the two-hop configuration fetch) run at
+    /// once, so a wave of first-time sign-ins doesn't fan out all at the same
+    /// moment. The 90s reclaim age is kept above the ~60s outcall timeout so a
+    /// still-live call is never reclaimed early. See [`crate::concurrency`].
+    static DISCOVERY_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+        RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig { max_concurrent: 80, max_age_secs: 90 },
+        ));
+
+    /// Caps how many key-set refreshes run at once (roughly one per provider).
+    /// The 90s reclaim age is kept above the ~60s outcall timeout so a still-live
+    /// call is never reclaimed early. See [`crate::concurrency`].
+    static JWKS_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+        RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig { max_concurrent: 80, max_age_secs: 90 },
+        ));
+}
 
 #[cfg(not(test))]
 async fn fetch_ii_openid_configuration(url: String) -> Result<IIOpenIdConfiguration, String> {
@@ -669,17 +793,18 @@ fn transform_discovery(
     }
 }
 
-/// Ensure a URL is syntactically valid and uses an acceptable scheme. `https`
-/// is always accepted; `http` only when the host is on the SSO allowlist.
+/// Check that a URL is syntactically valid and uses an acceptable scheme, and
+/// hand it back so the caller uses the checked value rather than the input.
+/// `https` is always accepted; `http` only when the host is on the SSO allowlist.
 #[cfg(not(test))]
-fn validate_discovery_url(url: &str) -> Result<(), String> {
-    let parsed = url::Url::parse(url).map_err(|e| format!("parse error: {e}"))?;
+fn validate_discovery_url(url: String) -> Result<String, String> {
+    let parsed = url::Url::parse(&url).map_err(|e| format!("parse error: {e}"))?;
     match parsed.scheme() {
-        "https" => Ok(()),
+        "https" => Ok(url),
         "http" => {
             let host = host_with_port(&parsed).ok_or_else(|| format!("URL has no host: {url}"))?;
             if allow_insecure_scheme(&host) {
-                Ok(())
+                Ok(url)
             } else {
                 Err(format!(
                     "http scheme not allowed for non-allowlisted host '{host}'"
@@ -759,9 +884,10 @@ pub(super) fn test_setup_discovery(
         m.insert(discovery_config.jwks_uri.clone(), jwks);
     });
     // First pass warms discovery; the second warms JWKS now that discovery is Ready.
-    prefetch(domain);
+    let domain = Domain::try_from(domain).expect("a test domain");
+    prefetch(&domain);
     run_detached();
-    prefetch(domain);
+    prefetch(&domain);
     run_detached();
 }
 
@@ -790,6 +916,38 @@ mod tests {
         JWKS_CACHE.with(|c| *c.borrow_mut() = new_jwks_cache());
     }
 
+    #[test]
+    fn session_max_age_defaults_when_absent() {
+        assert_eq!(
+            validate_session_max_age(None),
+            Ok(DEFAULT_SESSION_MAX_AGE_NS)
+        );
+    }
+
+    #[test]
+    fn session_max_age_converts_seconds_once() {
+        assert_eq!(validate_session_max_age(Some(28_800)), Ok(8 * HOUR_NS));
+        assert_eq!(validate_session_max_age(Some(1)), Ok(1_000_000_000));
+    }
+
+    #[test]
+    fn session_max_age_rejects_zero() {
+        assert!(validate_session_max_age(Some(0)).is_err());
+    }
+
+    #[test]
+    fn session_max_age_rejects_above_the_delegation_ceiling() {
+        let max_seconds = crate::delegation::MAX_EXPIRATION_PERIOD_NS / 1_000_000_000;
+        assert!(validate_session_max_age(Some(max_seconds)).is_ok());
+        assert!(validate_session_max_age(Some(max_seconds + 1)).is_err());
+    }
+
+    #[test]
+    fn session_max_age_rejects_a_value_that_overflows_nanoseconds() {
+        // Rejected outright rather than saturated to the ceiling.
+        assert!(validate_session_max_age(Some(u64::MAX)).is_err());
+    }
+
     fn sample_config() -> DiscoveredConfig {
         DiscoveredConfig {
             issuer: "https://idp.example.org".to_string(),
@@ -801,6 +959,7 @@ mod tests {
             app_clients: vec![],
             gate_all_apps: false,
             stable_identifier_claim: DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string(),
+            session_max_age_ns: DEFAULT_SESSION_MAX_AGE_NS,
         }
     }
 
@@ -808,32 +967,152 @@ mod tests {
         AudClaim::Single(sample_config().client_id)
     }
 
-    fn allowed(domain: &str) -> bool {
-        validate_discovery_domain(domain).is_ok()
+    fn domain(value: &str) -> Domain {
+        Domain::try_from(value).expect("a test domain")
+    }
+
+    fn seed(domain: &str) -> DiscoveredConfig {
+        let config = sample_config();
+        TEST_DISCOVERY.with_borrow_mut(|m| m.insert(domain.to_string(), config.clone()));
+        TEST_JWKS.with_borrow_mut(|m| m.insert(config.jwks_uri.clone(), vec![]));
+        config
+    }
+
+    mod status {
+        use super::*;
+        use crate::openid::{app_sso_domain_status, get_sso_discovery_status};
+        use internet_identity_interface::internet_identity::types::{
+            AppSsoDomainStatus, SsoDiscoveryStatus,
+        };
+
+        const NOW_SECS: u64 = 1_700_000_000;
+
+        #[test]
+        fn unfetched_domain_is_pending() {
+            reset();
+            assert_eq!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Pending
+            );
+            assert_eq!(
+                app_sso_domain_status(&domain("example.org")),
+                AppSsoDomainStatus::Pending
+            );
+        }
+
+        #[test]
+        fn resolved_domain_is_available_with_its_name() {
+            reset();
+            seed("example.org");
+            prefetch(&domain("example.org"));
+            run_detached();
+            assert!(matches!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+            assert_eq!(
+                app_sso_domain_status(&domain("example.org")),
+                AppSsoDomainStatus::Available {
+                    name: Some("Example".to_string())
+                }
+            );
+        }
+
+        #[test]
+        fn failed_fetch_fails_until_its_retry() {
+            reset();
+            prefetch(&domain("example.org")); // nothing seeded: the fill fails
+            run_detached();
+            let retry_after = Some((NOW_SECS + RETRY_BASE_SECONDS) * 1_000_000_000);
+            assert_eq!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Failed {
+                    retry_after,
+                    reason: None
+                }
+            );
+            assert_eq!(
+                app_sso_domain_status(&domain("example.org")),
+                AppSsoDomainStatus::Unavailable {
+                    retry_after,
+                    reason: None
+                }
+            );
+
+            // Once the backoff ends a retry is due, which reads as pending.
+            set_test_now(NOW_SECS + RETRY_BASE_SECONDS);
+            assert_eq!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Pending
+            );
+        }
+
+        #[test]
+        fn failed_refresh_keeps_a_cached_result_resolved() {
+            reset();
+            seed("example.org");
+            prefetch(&domain("example.org"));
+            run_detached();
+            TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
+
+            set_test_now(NOW_SECS + FRESH_FOR_SECONDS);
+            prefetch(&domain("example.org"));
+            run_detached();
+
+            assert!(matches!(
+                get_sso_discovery_status(&domain("example.org"), None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+        }
     }
 
     #[test]
-    fn resolve_rejects_non_authority_domain() {
+    fn discover_sso_fetches_an_expired_jwks_for_a_cached_discovery() {
         reset();
-        // No allowlist: any bare authority is accepted; a non-authority is not.
-        assert!(allowed("not-allowed.com"));
-        assert!(!allowed("evil.com@127.0.0.1"));
-        // The verify path rejects a non-authority domain.
-        assert!(resolve(
-            "evil.com@127.0.0.1",
-            "https://idp.example.org",
-            &test_aud_claim()
-        )
-        .is_err());
+        let config = seed("example.org");
+        prefetch(&domain("example.org"));
+        run_detached();
+        set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + JWKS_STALE_FOR_SECONDS);
+        assert!(matches!(read_jwks(&config.jwks_uri), Cached::Pending));
+
+        prefetch(&domain("example.org"));
+        run_detached();
+
+        assert!(matches!(read_jwks(&config.jwks_uri), Cached::Ready(_)));
     }
 
     #[test]
-    fn any_bare_authority_is_allowed() {
+    fn discovery_outlives_the_jwks() {
         reset();
-        // No allowlist: any bare-authority domain passes the discovery gate.
-        assert!(allowed("not-allowed.com"));
-        assert!(allowed("example.org"));
-        assert!(allowed("sub.example.com:8443"));
+        let config = seed("example.org");
+        prefetch(&domain("example.org"));
+        run_detached();
+
+        set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + DISCOVERY_STALE_FOR_SECONDS - 1);
+
+        assert!(matches!(
+            peek_discovery(&domain("example.org")),
+            Cached::Ready(_)
+        ));
+        assert!(matches!(read_jwks(&config.jwks_uri), Cached::Pending));
+    }
+
+    #[test]
+    fn failed_discovery_refresh_stops_serving_an_old_result() {
+        reset();
+        seed("example.org");
+        prefetch(&domain("example.org"));
+        run_detached();
+        TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
+
+        set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + 24 * 60 * 60);
+        prefetch(&domain("example.org"));
+        run_detached();
+
+        assert!(matches!(
+            peek_discovery(&domain("example.org")),
+            Cached::Pending
+        ));
     }
 
     #[test]
@@ -854,60 +1133,19 @@ mod tests {
     }
 
     #[test]
-    fn non_authority_domain_is_rejected() {
-        reset();
-
-        // Bare authorities pass: host, sub-host, and explicit (non-default)
-        // port, case-insensitively.
-        assert!(allowed("example.com"));
-        assert!(allowed("sub.example.com"));
-        assert!(allowed("example.com:8443"));
-        assert!(allowed("Example.COM"));
-
-        // Anything that isn't a bare host[:port] is rejected even with the flag
-        // on, so the caller-controlled value can't reshape the interpolated
-        // discovery URL (`{scheme}://{domain}/.well-known/...`).
-        for bad in [
-            "evil.com@127.0.0.1",    // userinfo — real host is 127.0.0.1
-            "user:pass@example.com", // userinfo
-            "example.com/..",        // path traversal
-            "example.com/foo",       // path
-            "example.com?x=1",       // query
-            "example.com#frag",      // fragment
-            "https://example.com",   // injected scheme
-            "example.com:443",       // redundant default port (normalized away)
-            "exa mple.com",          // whitespace in host
-            "",                      // empty
-        ] {
-            assert!(!allowed(bad), "expected `{bad}` to be rejected");
-        }
-    }
-
-    #[test]
-    fn over_long_domain_is_rejected() {
-        reset();
-        let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
-        assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
-        assert!(allowed(&at_cap));
-        let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
-        assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
-        assert!(!allowed(&over_cap));
-    }
-
-    #[test]
     fn prefetch_then_peek_resolves() {
         reset();
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
         // Reading without prefetching stays Pending — no fill was spawned.
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
         // Prefetch spawns the discovery fill; the read is still Pending until
         // the detached fill runs.
-        prefetch("example.org");
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        prefetch(&domain("example.org"));
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
         run_detached();
-        match peek_discovery("example.org") {
+        match peek_discovery(&domain("example.org")) {
             Cached::Ready(discovery_config) => {
                 assert_eq!(discovery_config.issuer, "https://idp.example.org")
             }
@@ -923,13 +1161,17 @@ mod tests {
         });
         // peek_discovery/resolve are peek-only: without a prefetch they stay
         // Pending even after draining detached tasks, because none was spawned.
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
         assert!(matches!(
-            resolve("example.org", "https://idp.example.org", &test_aud_claim()),
+            resolve(
+                &domain("example.org"),
+                "https://idp.example.org",
+                &test_aud_claim()
+            ),
             Ok(Cached::Pending),
         ));
         run_detached();
-        assert_eq!(peek_discovery("example.org"), Cached::Pending);
+        assert_eq!(peek_discovery(&domain("example.org")), Cached::Pending);
     }
 
     #[test]
@@ -1040,6 +1282,87 @@ mod tests {
     }
 
     #[test]
+    fn app_clients_over_long_key_rejected() {
+        let mut entries = std::collections::HashMap::new();
+        entries.insert(
+            "a".repeat(MAX_APP_CLIENT_KEY_LENGTH + 1),
+            "client".to_string(),
+        );
+        assert!(validate_app_clients(&entries).is_err());
+
+        entries.clear();
+        entries.insert("a".repeat(MAX_APP_CLIENT_KEY_LENGTH), "client".to_string());
+        assert!(validate_app_clients(&entries).is_ok());
+    }
+
+    #[test]
+    fn app_clients_over_byte_budget_rejected() {
+        // Entries at both per-field maximums: 510 bytes each.
+        let entry = |i: usize| {
+            let key = format!("{i:03}{}", "k".repeat(MAX_APP_CLIENT_KEY_LENGTH - 3));
+            (key, "c".repeat(MAX_APP_CLIENT_ID_LENGTH))
+        };
+        let fitting =
+            MAX_APP_CLIENTS_BYTES / (MAX_APP_CLIENT_KEY_LENGTH + MAX_APP_CLIENT_ID_LENGTH);
+
+        let mut entries: std::collections::HashMap<_, _> = (0..fitting).map(entry).collect();
+        assert!(validate_app_clients(&entries).is_ok());
+
+        entries.extend([entry(fitting)]);
+        assert!(validate_app_clients(&entries).is_err());
+    }
+
+    #[test]
+    fn app_clients_allocation_matches_entry_count() {
+        let entries: std::collections::HashMap<_, _> = (0..MAX_APP_CLIENTS)
+            .map(|i| (format!("https://app{i}.com"), format!("client{i}")))
+            .collect();
+        let app_clients = validate_app_clients(&entries).unwrap();
+        assert_eq!(app_clients.capacity(), MAX_APP_CLIENTS);
+    }
+
+    #[test]
+    fn requested_scopes_keeps_only_scopes_ii_requests() {
+        let advertised = ["address", "email", "openid", "offline_access", "profile"]
+            .map(String::from)
+            .to_vec();
+        assert_eq!(
+            requested_scopes(Some(advertised)),
+            vec!["email", "openid", "profile"]
+        );
+        assert_eq!(
+            requested_scopes(Some(vec!["phone".to_string()])),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn requested_scopes_keeps_each_scope_once() {
+        let mut advertised = vec!["openid".to_string(); 10_000];
+        advertised.push("email".to_string());
+        advertised.push("openid".to_string());
+
+        let scopes = requested_scopes(Some(advertised));
+
+        assert_eq!(scopes, vec!["openid", "email"]);
+        assert!(scopes.capacity() <= REQUESTED_SCOPES.len() + 1);
+    }
+
+    #[test]
+    fn requested_scopes_defaults_when_none_advertised() {
+        assert_eq!(requested_scopes(None), REQUESTED_SCOPES.to_vec());
+        assert_eq!(requested_scopes(Some(vec![])), REQUESTED_SCOPES.to_vec());
+    }
+
+    #[test]
+    fn requested_scopes_drops_an_oversized_advertised_list() {
+        let advertised = vec![String::new(); 20_000];
+        let scopes = requested_scopes(Some(advertised));
+        assert!(scopes.is_empty());
+        assert_eq!(scopes.capacity(), 0);
+    }
+
+    #[test]
     fn app_client_key_parse_distinguishes_cleartext_from_hashed() {
         assert_eq!(
             AppClientKey::parse("https://payroll.com"),
@@ -1060,13 +1383,22 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        prefetch("example.org");
+        prefetch(&domain("example.org"));
         run_detached();
         // Wrong issuer is rejected (the audience matches, so it's the issuer
         // cross-check that fails).
-        assert!(resolve("example.org", "https://evil.example.org", &test_aud_claim()).is_err());
+        assert!(resolve(
+            &domain("example.org"),
+            "https://evil.example.org",
+            &test_aud_claim()
+        )
+        .is_err());
         // Matching issuer resolves to a descriptor + jwks_uri.
-        match resolve("example.org", "https://idp.example.org", &test_aud_claim()) {
+        match resolve(
+            &domain("example.org"),
+            "https://idp.example.org",
+            &test_aud_claim(),
+        ) {
             Ok(Cached::Ready((descriptor, jwks_uri))) => {
                 assert_eq!(jwks_uri, "https://idp.example.org/jwks");
                 assert!(descriptor.sso.is_some());

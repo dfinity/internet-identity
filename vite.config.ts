@@ -68,7 +68,18 @@ export default defineConfig(({ command, mode }): UserConfig => {
             {
               // `denied-app.com` is a second test-app origin used as an unlisted
               // (denied) dapp in the per-app gating e2e test.
-              hosts: ["nice-name.com", "denied-app.com"],
+              // `a.` and `b.` are siblings of one domain, with `auth.` as the
+              // derivation origin they share, so the session designs'
+              // cross-subdomain behaviour has somewhere to happen. All of them
+              // are the same canister, so one alternative-origins list serves
+              // every one of them.
+              hosts: [
+                "nice-name.com",
+                "a.nice-name.com",
+                "b.nice-name.com",
+                "auth.nice-name.com",
+                "denied-app.com",
+              ],
               canisterName: "test_app",
             },
             {
@@ -80,7 +91,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
                   {
                     hosts: [
                       "id.ai",
-                      "cli.id.ai",
                       "identity.ic0.app",
                       "identity.internetcomputer.org",
                     ],
@@ -117,7 +127,17 @@ export default defineConfig(({ command, mode }): UserConfig => {
         : {
             https: process.env.TLS_DEV_SERVER === "1" ? {} : undefined,
             proxy: {
-              "/api": `http://127.0.0.1:${readReplicaPort()}`,
+              "/api": {
+                // `readReplicaPort` shells out to `icp`, so it must not run while
+                // the config is merely being resolved — svelte-check resolves it
+                // in serve mode to preprocess `<style>` blocks, where no replica
+                // is running. Vite reads `target` when it creates the proxy at
+                // dev-server start, by which point the replica is up.
+                get target() {
+                  return `http://127.0.0.1:${readReplicaPort()}`;
+                },
+                changeOrigin: true,
+              },
             },
             allowedHosts: ["icp-api.io"],
             cors: {
@@ -126,6 +146,9 @@ export default defineConfig(({ command, mode }): UserConfig => {
                 "https://identity.internetcomputer.org",
                 "https://identity.ic0.app",
                 "https://nice-name.com",
+                "https://a.nice-name.com",
+                "https://b.nice-name.com",
+                "https://auth.nice-name.com",
                 "https://denied-app.com",
                 "https://nice-issuer-custom-orig.com",
                 "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",

@@ -1,4 +1,11 @@
-import { resolveAttributeGroups } from "./attributes";
+import {
+  discoverSsoNames,
+  resolveAttributeGroups,
+  ssoDomainsOf,
+} from "./attributes";
+import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+
+vi.mock("$lib/utils/ssoDiscovery", () => ({ discoverSsoConfig: vi.fn() }));
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
 const APPLE_ISSUER = "https://appleid.apple.com";
@@ -407,5 +414,86 @@ describe("resolveAttributeGroups", () => {
       expect(groups[0].options[0].displayValue).toBe("plain");
       expect(arrayOf(groups[0].options[0].rawValue)).toEqual(arrayOf(utf8));
     });
+  });
+});
+
+describe("ssoDomainsOf", () => {
+  const group = (...keys: string[]) => ({
+    name: "email",
+    options: keys.map((key) => ({
+      key,
+      displayValue: key,
+      rawValue: new Uint8Array(),
+      omitScope: false,
+    })),
+  });
+
+  it("finds nothing in groups with no sso scope", () => {
+    expect(
+      ssoDomainsOf([
+        group("email", "openid:https://accounts.google.com:email"),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("names each sso domain once", () => {
+    expect(
+      ssoDomainsOf([
+        group("sso:acme.example:email", "sso:acme.example:name"),
+        group("sso:other.example:email"),
+      ]),
+    ).toEqual(["acme.example", "other.example"]);
+  });
+
+  /** The domain is everything after the `sso:` prefix, so a scope naming a host with
+   *  its own colon still resolves to one domain rather than being cut at it. */
+  it("keeps a domain that carries a port", () => {
+    expect(ssoDomainsOf([group("sso:acme.example:8443:email")])).toEqual([
+      "acme.example:8443",
+    ]);
+  });
+});
+
+describe("discoverSsoNames", () => {
+  const group = (...keys: string[]) => ({
+    name: "email",
+    options: keys.map((key) => ({
+      key,
+      displayValue: key,
+      rawValue: new Uint8Array(),
+      omitScope: false,
+    })),
+  });
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("discovers nothing where no group carries an sso scope", async () => {
+    await expect(discoverSsoNames([group("email")])).resolves.toEqual({});
+    expect(discoverSsoConfig).not.toHaveBeenCalled();
+  });
+
+  it("names each domain by what it published", async () => {
+    vi.mocked(discoverSsoConfig).mockImplementation((domain: string) =>
+      Promise.resolve({ name: `The ${domain} company` } as never),
+    );
+    await expect(
+      discoverSsoNames([group("sso:acme.example:email")]),
+    ).resolves.toEqual({ "acme.example": "The acme.example company" });
+  });
+
+  /** The row falls back to the bare domain, so a domain that cannot be discovered is
+   *  left out rather than failing the context the screen is chosen from. */
+  it("leaves out a domain it could not discover", async () => {
+    vi.mocked(discoverSsoConfig).mockRejectedValue(new Error("no such domain"));
+    await expect(
+      discoverSsoNames([group("sso:acme.example:email")]),
+    ).resolves.toEqual({});
+  });
+
+  it("leaves out a domain that published no name", async () => {
+    vi.mocked(discoverSsoConfig).mockResolvedValue({ name: "" } as never);
+    await expect(
+      discoverSsoNames([group("sso:acme.example:email")]),
+    ).resolves.toEqual({});
   });
 });

@@ -14,6 +14,82 @@ pub type CanisterSigPublicKeyDer = PublicKey;
 pub type FrontendHostname = String;
 pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
+/// Per-anchor label for one browser, so a browser's sessions can be revoked together.
+pub type BrowserId = u32;
+/// Names one session for as long as the canister runs. Allocated from a single
+/// counter, so no two sessions ever share one, and a revoked session's id is never
+/// handed out again.
+pub type SessionId = u64;
+
+/// Which browser a sign-in came from, as a token rather than a name to show.
+///
+/// Named for the six that hold 97% of the web between them; everything else arrives as
+/// `Other`, which still names it. A variant is what earns an icon, and an icon nobody
+/// recognises is worse than the name written out.
+///
+/// `Brand` because that is what the client hints call it, and because `Browser` names the
+/// registry entry these describe.
+///
+/// Tokens rather than display strings because products get renamed — "Chrome OS" became
+/// "ChromeOS", "Mac OS X" became "macOS" — and the stored record has to be able to
+/// outlive that. The name a user reads is derived in the frontend, so a rename reaches
+/// every stored record at once.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum BrowserBrand {
+    Chrome,
+    Safari,
+    Firefox,
+    Edge,
+    Opera,
+    SamsungInternet,
+    /// Whatever the client resolved for a browser this list does not name. Shown as it
+    /// arrived: an unrecognised browser is worth seeing, not worth hiding behind a
+    /// generic label.
+    Other(String),
+}
+
+/// The operating system a sign-in came from. A token, for the same reason as
+/// [`BrowserBrand`].
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum OperatingSystem {
+    Macos,
+    Ios,
+    Ipados,
+    Windows,
+    Android,
+    ChromeOs,
+    Linux,
+    Other(String),
+}
+
+/// What shape of thing a browser is running on.
+///
+/// Reported where the client can state it and inferred where it cannot, so `Unknown` is a
+/// real answer rather than a failure: the browsers that expose no client hints are the
+/// ones this is least certain about.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum FormFactor {
+    Desktop,
+    Mobile,
+    Tablet,
+    Unknown,
+}
+
+/// What a browser reported about itself when it registered.
+///
+/// Self-reported, so it is something the user reads to recognise their own browser rather
+/// than evidence about where a session came from. Resolved by the client into the tokens
+/// above; the canister stores them and never interprets them.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct BrowserDescription {
+    pub brand: BrowserBrand,
+    pub os: OperatingSystem,
+    pub form_factor: FormFactor,
+    /// The hardware, where the client can name it — Android is the only place that does.
+    /// Free text because it is a product name reported verbatim, and unlike a brand a
+    /// shipped model never gets renamed.
+    pub model: Option<String>,
+}
 pub type Signature = ByteBuf;
 pub type DeviceConfirmationCode = String;
 pub type FailedAttemptsCounter = u8;
@@ -90,6 +166,8 @@ pub enum RegisterResponse {
     CanisterFull,
     #[serde(rename = "bad_challenge")]
     BadChallenge,
+    #[serde(rename = "device_already_used")]
+    DeviceAlreadyUsed,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -282,6 +360,7 @@ pub struct InternetIdentityFrontendArgs {
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub mcp_official_url: Option<String>,
+    pub notifications_enabled: Option<bool>,
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
@@ -307,14 +386,14 @@ pub struct InternetIdentityInit {
     /// require `https` for every discovery host. Never enable in production —
     /// non-loopback hosts always require `https` regardless of this flag.
     pub sso_allow_insecure_discovery: Option<bool>,
-    /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
-    /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
-    /// §8.6). When `Some`, a batched timer-driven migration stamps every
-    /// stored credential whose `(iss, aud)` matches an entry and whose
-    /// `sso_domain` is not set yet. Idempotent — already-stamped credentials
-    /// are skipped, so re-submitting (e.g. with a corrected list) is safe.
-    /// When `None`, no backfill runs.
-    pub sso_credential_migration: Option<Vec<SsoCredentialMigrationEntry>>,
+    /// Deploy flag relaxing the `https` requirement for sender-list outcalls to
+    /// loopback hosts (`localhost` / `127.0.0.1`) so e2e tests and local
+    /// development can serve the list over plain `http`. `None` / `Some(false)`
+    /// (the default) require `https` for every notifying origin. Never enable in
+    /// production — a non-loopback origin always requires `https` regardless of
+    /// this flag.
+    pub notifications_allow_insecure_sender_list: Option<bool>,
+    pub notifications_allow_insecure_endpoint: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
@@ -348,22 +427,9 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
-    pub mcp_config_migration: Option<bool>,
-}
-
-/// One entry of the `sso_credential_migration` backfill (see
-/// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
-/// pair of a stored SSO credential to the discovery domain and optional
-/// human-readable name it resolves to.
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct SsoCredentialMigrationEntry {
-    pub discovery_domain: String,
-    /// Matches the stored credential's `iss`.
-    pub issuer: String,
-    /// Matches the stored credential's `aud`.
-    pub client_id: String,
-    /// Human-readable SSO label; stamped onto the credential's `sso_name`.
-    pub name: Option<String>,
+    /// Server-side switch for the notifications feature, for every app at once.
+    /// Omitted on upgrade keeps the stored value; never stored means disabled.
+    pub notifications_enabled: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -459,6 +525,10 @@ pub enum OpenIdEmailVerificationScheme {
     Unknown,
     Google,
     Microsoft,
+    /// Trusts `email_verified` like `Google`. Apple's private relay addresses,
+    /// which only senders registered with II's Apple developer team can deliver
+    /// mail to, are not kept on the credential at all.
+    Apple,
 }
 
 #[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
@@ -516,11 +586,12 @@ pub struct SsoDiscovery {
     /// Client the frontend runs the ceremony against for the requested origin;
     /// `None` when the origin is denied.
     pub resolved_client_id: Option<String>,
+    /// How long a sign-in through this domain stays valid, in nanoseconds, from
+    /// the domain's optional `session_max_age_seconds` (8 hours when unset).
+    pub session_max_age_ns: u64,
 }
 
-/// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
-/// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
-/// times out — so the statuses are: resolved, or in flight.
+/// Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SsoDiscoveryStatus {
     /// Discovery completed; the resolved configuration.
@@ -528,6 +599,34 @@ pub enum SsoDiscoveryStatus {
     /// Discovery is in flight (or not yet started) — drive it with
     /// `discover_sso` and poll again.
     Pending,
+    /// Discovery failed. `retry_after` is when II fetches the domain again; a
+    /// retry before then fails the same way. `None` when no retry can help,
+    /// such as a value that is not a domain. `reason` explains the failure,
+    /// to show as is, when II has one.
+    Failed {
+        retry_after: Option<Timestamp>,
+        reason: Option<String>,
+    },
+}
+
+/// Whether an organization domain can be used for SSO sign-in, read by
+/// `app_sso_domain_status`. The app-facing counterpart of
+/// [`SsoDiscoveryStatus`], without the configuration an app has no use for.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppSsoDomainStatus {
+    /// The domain resolves; `name` is the organization's display name, if it
+    /// publishes one.
+    Available { name: Option<String> },
+    /// Not resolved yet: call `app_sso_domain_check` if nothing has, and poll
+    /// again.
+    Pending,
+    /// The domain cannot be used. `retry_after` is when II fetches it again;
+    /// `None` when no retry can help. `reason` explains why, to show as is,
+    /// when II has one.
+    Unavailable {
+        retry_after: Option<Timestamp>,
+        reason: Option<String>,
+    },
 }
 
 /// Request for `get_sso_discovery_status`.
@@ -539,6 +638,7 @@ pub struct GetSsoDiscoveryStatusRequest {
     pub target_app_origin: Option<FrontendHostname>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
     OpenIdCredentialKey((OpenIdCredentialKey, Option<ConfigIss>)),
@@ -620,6 +720,46 @@ impl From<AccountNameValidationError> for UpdateAccountError {
 pub enum GetAccountsError {
     InternalCanisterError(String),
     Unauthorized(Principal),
+}
+
+/// An app the identity decided a permission for, for the user's own list of their apps.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ApplicationInfo {
+    /// The origin the app's identity is derived for: what its accounts and its
+    /// notification consent are stored under.
+    pub origin: FrontendHostname,
+    /// The latest sign-in to any of the identity's accounts at the app, or `None` where
+    /// none was used.
+    pub last_used: Option<Timestamp>,
+    /// Whether the app may notify the identity: it holds consent, and this deployment
+    /// notifies for it.
+    pub notifications_allowed: bool,
+    /// When the app last had a notification queued for one of the identity's browsers,
+    /// or `None` where it never has.
+    pub last_notified: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ListApplicationsRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ForgetApplicationsRequest {
+    pub anchor_number: AnchorNumber,
+    pub origins: Vec<FrontendHostname>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ForgetApplicationsError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ListApplicationsError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
 }
 
 #[derive(CandidType, Deserialize)]
@@ -772,4 +912,679 @@ pub enum SetDefaultAccountError {
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
     },
+}
+
+/// Creates or reuses a revocable session at one account and signs its identity to the
+/// II frontend's own key.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareAccountSessionRequest {
+    pub identity_number: IdentityNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    /// Labels the browser in the user's session list, e.g. "Chrome on MacBook".
+    pub browser_description: BrowserDescription,
+    /// The browser's own public key, DER-encoded, as the registry currently holds it. A
+    /// key this anchor has not seen registers a browser under it.
+    pub current_browser_key: PublicKey,
+    /// What the browser rotates to once this sign-in succeeds.
+    pub next_browser_key: PublicKey,
+    /// Signature over `session_key` and `next_browser_key`, verified with
+    /// `current_browser_key`. A second signature by `next_browser_key` proves the browser
+    /// holds the key it is announcing.
+    pub current_browser_key_signature: ByteBuf,
+    pub next_browser_key_signature: ByteBuf,
+    /// The consented access level, fixed for the session's life.
+    pub permissions: Option<Permissions>,
+    /// Clamped to the session maximum.
+    pub valid_for: Option<u64>,
+    /// How long the session may go unminted before it is over. Clamped to between
+    /// 10 minutes and the session's own granted length; absent leaves the
+    /// canister's own default.
+    pub max_idle: Option<u64>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareAccountSessionResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    /// Names the session this ceremony created, and is what `get_account_session` is
+    /// given to collect the delegation signed for it. Not a credential: it names a
+    /// session, it does not authorise one, and the caller has just proved it owns this
+    /// one anyway.
+    pub session_id: SessionId,
+    /// Which browser this sign-in was attributed to, so the settings list can mark the one
+    /// the user is looking at, and so the browser knows which registration its key now
+    /// belongs to. Not a credential: a caller never presents it.
+    pub browser_id: BrowserId,
+    /// The principal apps see for this account. The caller is the anchor that owns it
+    /// and can mint a delegation for it at any time, so this reveals nothing new; it
+    /// saves the II frontend from having to mint one just to learn it.
+    pub account_principal: Principal,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetAccountSessionRequest {
+    pub identity_number: IdentityNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+    /// The session `prepare_account_session` created, named exactly rather than
+    /// searched for.
+    pub session_id: SessionId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct GetAccountSessionResponse {
+    pub signed_delegation: SignedDelegation,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AccountSessionError {
+    Unauthorized(Principal),
+    NoSuchAccount,
+    NoSuchSession,
+    /// The session is there, but no delegation was signed for the session key and
+    /// expiration asked for. Told apart from `NoSuchSession` because the remedies differ:
+    /// this one is answered by asking with the parameters `prepare_account_session`
+    /// signed, not by signing in again.
+    NoSuchDelegation,
+    /// The browser's key is unusable, or its signature does not verify against it.
+    InvalidBrowserKey,
+    /// The browser presented a key it has already rotated away from, which happens when
+    /// it never learned that its last sign-in succeeded. It holds the successor that does
+    /// resolve, so the answer is to promote that one and present it.
+    StaleBrowserKey,
+    InternalCanisterError(String),
+}
+
+/// Mints an app delegation from a live session. The session is proven by the caller's
+/// own chain, so nothing about the account is named in the request.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPrepareDelegationRequest {
+    pub session_key: SessionKey,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPrepareDelegationResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppGetDelegationRequest {
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppSessionError {
+    /// No usable session behind this caller: revoked, expired, pruned, or never one at
+    /// all. One outcome, because which of those it is depends on whether a prune has run
+    /// yet, and because an app can act on none of them differently.
+    ///
+    /// The same fact its counterpart on [`AccountSessionError`] names, and named the
+    /// same: the only difference is that this side matches the caller rather than being
+    /// handed a session id.
+    NoSuchSession,
+    /// The session is live, but nothing was signed for the `(session_key, expiration)`
+    /// asked for — so the expiration is one `app_prepare_delegation` never returned.
+    /// Told apart from `NoSuchSession` because the remedy differs: prepare again and use
+    /// what comes back, rather than sign in again.
+    NoSuchDelegation,
+    InternalCanisterError(String),
+}
+
+/// Signs one browser out of every app it is signed into.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RevokeBrowserSessionsRequest {
+    pub identity_number: IdentityNumber,
+    pub browser_id: BrowserId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionRevokeError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationGrantConsentError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationRevokeConsentError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+/// What an app is told about its own consent. A record rather than a bare `bool`, so a
+/// second fact about the decision can be added without a breaking change.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppNotificationConsentStatusResponse {
+    pub is_granted: bool,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppNotificationConsentStatusError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppRevokeNotificationConsentError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationGrantConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationRevokeConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationConsentGrantedRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+/// Everything a browser uploads when it registers for Web Push.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SetWebPushSubscriptionRequest {
+    pub anchor_number: AnchorNumber,
+    pub endpoint: String,
+    /// The subscription's own public key, uncompressed SEC1 P-256. Public: it decrypts
+    /// nothing without a private scalar and forges nothing without `auth`.
+    pub p256dh: ByteBuf,
+    /// The public half of the pair the browser minted to encrypt `auth` with, uncompressed
+    /// SEC1 P-256. Sent because the canister needs it to run its half of the agreement.
+    pub transport_key: ByteBuf,
+    /// The subscription's 16-byte `auth` secret under AES-128-GCM, 32 bytes with its tag.
+    ///
+    /// Encrypted because an ingress call is not confidential, and `(endpoint, p256dh,
+    /// auth)` is all a forged push the browser will decrypt needs. What stands in for the
+    /// private channel RFC 8291 assumes is the transport key this caller's key fetch
+    /// minted, which exists only inside the canister and only until this call lands.
+    pub sealed_auth: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveWebPushSubscriptionRequest {
+    pub anchor_number: AnchorNumber,
+    pub browser_id: BrowserId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SetWebPushSubscriptionError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// Nothing here can open `sealed_auth`: the transport key it was encrypted to has
+    /// expired, or a later key fetch from this browser replaced it. Fetch the keys again
+    /// and re-send.
+    TransportKeyExpired,
+    InternalCanisterError(String),
+}
+
+/// What a browser needs before it can subscribe: the key every push is signed with, and
+/// the one-shot key it encrypts `auth` to.
+///
+/// Answered by an update call rather than a query. A query reply is signed by one replica,
+/// which could hand over a VAPID key of its own choosing, and a subscription binds to that
+/// key permanently.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareWebPushSubscriptionResponse {
+    /// Internet Identity's own VAPID public key, uncompressed SEC1 P-256.
+    pub vapid_public_key: ByteBuf,
+    /// Minted for this caller and this attempt, uncompressed SEC1 P-256. Its private half
+    /// never leaves the canister and is dropped as soon as a subscribe spends it.
+    pub transport_public_key: ByteBuf,
+}
+
+/// What `prepare_webpush_subscription` answers.
+///
+/// `Pending` is a retry signal rather than an error: the keys are derived from randomness
+/// the canister keeps pooled, a pool nobody has subscribed through for a while has none
+/// to serve, and asking is what puts the draw in flight. The caller re-calls the method.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareWebPushSubscriptionResult {
+    Ok(PrepareWebPushSubscriptionResponse),
+    Pending,
+    Err(PrepareWebPushSubscriptionError),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareWebPushSubscriptionError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RemoveWebPushSubscriptionError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+/// Registers the one-shot key a browser is about to hand its install, so the app that
+/// spends it is the one this browser sent.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareNotificationAppLinkRequest {
+    pub anchor_number: AnchorNumber,
+    /// The principal of the one-shot key this browser is putting in the install URL.
+    pub link_principal: Principal,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PrepareNotificationAppLinkError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// The anonymous principal is held by everyone, so an install offered to it is one
+    /// anybody could complete.
+    LinkPrincipalIsAnonymous,
+    /// This browser already points at an app that is delivering for this identity, and
+    /// an install takes delivery off it. Switching delivery off clears the way, as does
+    /// an app that never registered for Web Push.
+    AppAlreadyDelivering,
+    InternalCanisterError(String),
+}
+
+/// Numbers a Home Screen app's record. Public, so every call naming one is checked
+/// against the principal the record belongs to.
+pub type NotificationAppId = u64;
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+    /// The principal the app signs as, self-authenticating over the key it generated in
+    /// its own partition.
+    pub app_principal: Principal,
+    /// The record this app already has, where it is linking a second identity to the app
+    /// it is running as. Absent is a first install and takes a record of its own.
+    pub app_id: Option<NotificationAppId>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct LinkNotificationAppResponse {
+    /// Kept by the app, so a later link names the record it already has rather than
+    /// taking a second one and leaving the anchors on the first.
+    pub app_id: NotificationAppId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum LinkNotificationAppError {
+    /// The principal offered is not one a key can sign as, so no app could ever present
+    /// it. Refused before the pending link is read, so the install is unspent and the app
+    /// may call again until that link expires.
+    AppPrincipalIsAnonymous,
+    /// No browser of this identity is waiting for this caller, or the install it started
+    /// has expired.
+    NoPendingLink,
+    /// A browser of this identity already signs as that principal.
+    PrincipalAlreadyInUse,
+    InternalCanisterError(String),
+}
+
+/// This identity asking the app its browser points at to deliver for it, which is also
+/// what asks the app to prove it is still there: a reference that is off is skipped when
+/// the canister picks who to send to, so the two cannot be separated. Probing first would
+/// find nothing to wake, and switching on first would announce it and then say the same
+/// thing again on the probe.
+///
+/// Never a subscription write: the subscription is the app's and is shared.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct EnableNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum EnableNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app.
+    NoNotificationApp,
+    /// Nothing could be woken, so nothing was switched on: the app has registered
+    /// nothing, the browser counts as gone, or there was no room for another outcall.
+    NotReachable,
+    InternalCanisterError(String),
+}
+
+/// This identity asking the app its browser points at to stop delivering for it. Never a
+/// subscription removal: the subscription is the app's and is shared with every other
+/// identity pointing at it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct DisableNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum DisableNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+/// Asks which identities a Home Screen app delivers for, named by the app's own record.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppAnchorsRequest {
+    pub app_id: NotificationAppId,
+}
+
+/// Asks what this browser's entry says about the app it points at, with no session.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What a browser's entry says about the app it points at.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppInfo {
+    /// Whether the app has registered for Web Push; false means opened without permission.
+    pub subscribed: bool,
+    /// Whether this identity wants it to deliver.
+    pub enabled: bool,
+    /// When the app last called, which is the only evidence there is that it still exists.
+    pub last_seen_ns: Timestamp,
+}
+
+/// What a browser has. An install reads as `AwaitingInstall` only while its key can still
+/// be spent; past that the app holding it can never finish, so it reads as nothing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationAppStatus {
+    Linked(NotificationAppInfo),
+    /// When the key this browser handed its install stops being spendable.
+    AwaitingInstall(Timestamp),
+    NoApp,
+}
+
+/// Points this browser at the Home Screen app another identity on the device has, on the
+/// authority of a token that identity signed. Spending it again changes nothing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ClaimNotificationAppRequest {
+    /// The claiming identity, whose browser ends up pointing at the app. The caller must be
+    /// a browser of it.
+    pub anchor_number: AnchorNumber,
+    /// The identity that has the app, whose browser list the signature is verified against.
+    pub offering_anchor_number: AnchorNumber,
+    /// When the offering browser's signature stops being accepted.
+    pub expires_at_ns: Timestamp,
+    /// The offering browser's signature over both anchor numbers and that expiry.
+    pub signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ClaimNotificationAppError {
+    /// The key the caller signed with is no browser key of the identity it named.
+    InvalidBrowserKey,
+    /// No browser of the offering identity signed this, or the one that did has rotated it.
+    InvalidClaimToken,
+    /// The token's expiry has passed.
+    ClaimTokenExpired,
+    /// The offering identity's browser points at no app to hand over.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetWebPushSubscriptionStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What a browser is registered with, so the frontend can tell a registration that is
+/// still live from one another identity's re-subscribe left behind.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct WebPushSubscriptionStatus {
+    /// The relay endpoint this browser is registered with. Compared against the one the
+    /// browser holds: a registration naming any other endpoint is stale.
+    pub endpoint: String,
+}
+
+/// Scoped to `(origin, recipient)`: the same id sent to two recipients is two
+/// notifications. The canisters sending for one origin share its id space.
+pub type NotificationId = u64;
+
+/// Internet Identity's own id for one entry in one browser's inbox, assigned when the
+/// entry is deposited. Unique within that inbox, which is what a wake-up names it by.
+pub type InboxNotificationId = u64;
+
+/// Orders an origin's entries against its own only, so marking everything
+/// `High` gains nothing. Web Push's levels, forwarded as sent.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum Urgency {
+    VeryLow,
+    Low,
+    Normal,
+    High,
+}
+
+/// A content-free signal: the app holds the content, the recipient's device
+/// fetches it. A re-send means that content changed, and replaces the entry
+/// while it is still pending; once delivered the id is forgotten.
+///
+/// Acceptance is not a delivery guarantee — an entry may expire, be displaced
+/// by a more urgent one from the same origin, or fail at the channel.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct Notification {
+    pub id: NotificationId,
+    pub recipient: Principal,
+    /// Dropped undelivered once passed. `None` means II's default retention,
+    /// which is also the ceiling.
+    pub expires_at: Option<Timestamp>,
+    /// `None` means `Normal`.
+    pub urgency: Option<Urgency>,
+}
+
+/// Applies in order: a later entry for a `(recipient, id)` supersedes an
+/// earlier one, and the reply names each pair at most once.
+impl Notification {
+    /// A notification with no expiry and no urgency, which II reads as its
+    /// default retention and `Normal`.
+    pub fn new(id: NotificationId, recipient: Principal) -> Self {
+        Self {
+            id,
+            recipient,
+            expires_at: None,
+            urgency: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SendNotificationArg {
+    pub origin: FrontendHostname,
+    pub notifications: Vec<Notification>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotAcceptedReason {
+    /// No such recipient at this origin.
+    NoSuchRecipient,
+    /// The recipient has no notification channel enabled.
+    NoChannel,
+    /// No room. Send it again from `retry_after`.
+    Deferred { retry_after: Timestamp },
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotAccepted {
+    pub id: NotificationId,
+    pub recipient: Principal,
+    pub reason: NotAcceptedReason,
+}
+
+/// Anything `not_accepted` does not name was accepted.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SendNotificationResponse {
+    pub not_accepted: Vec<NotAccepted>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SendNotificationError {
+    /// The origin lists no such sender: no file, an empty or unusable one, or
+    /// one that does not name the caller.
+    NoSuchSender,
+    /// More entries than II will process in one call; nothing was enqueued.
+    /// `limit` is fixed, not a measure of how much the queue holds.
+    TooManyNotifications { limit: u32 },
+    /// Also a malformed or non-canonical origin, carrying the reason.
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareNotificationDelegationRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareNotificationDelegationResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    /// Goes in the sender_info field of every call made with this delegation;
+    /// tells the app which account it is being called for.
+    pub sender_info: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationDelegationRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct GetNotificationDelegationResponse {
+    pub signed_delegation: SignedDelegation,
+    /// Authenticates sender_info on those calls.
+    pub sender_info_signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationDelegationError {
+    /// The caller is no browser of this identity, that browser is not
+    /// registered for Web Push, or the identity has not allowed this app to
+    /// notify it.
+    NoNotificationAccess,
+    NoSuchDelegation,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationRequest {
+    pub anchor_number: AnchorNumber,
+    /// Whose inbox holds it. An app's key signs for every browser pointing at the app,
+    /// so the browser cannot be taken from the caller alone.
+    pub browser_id: BrowserId,
+    pub inbox_notification_id: InboxNotificationId,
+}
+
+/// What a service worker shows for one wake-up: the app and account it is for, the
+/// canister holding its content, and which notification.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationToShow {
+    /// `None` where Internet Identity sent this itself: it is about the identity rather
+    /// than an app, so there is no origin to name.
+    pub origin: Option<FrontendHostname>,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
+    pub canister_id: Principal,
+    pub id: NotificationId,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    pub event: Option<NotificationEvent>,
+}
+
+/// Asks the canister to wake the Home Screen app this browser points at, so the browser
+/// can learn whether it is still there.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ProbeNotificationAppRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ProbeNotificationAppError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// This browser points at no app, so there is nothing to wake.
+    NoNotificationApp,
+    /// Nothing was sent, so there is nothing to watch for: the app has registered nothing,
+    /// this identity has it switched off or is signed out, or there was no room to send.
+    NotReachable,
+    InternalCanisterError(String),
+}
+
+/// Something Internet Identity has to tell the user about their own identity.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationEvent {
+    /// This device now receives this identity's notifications.
+    NotificationsOn(IdentityForNotification),
+}
+
+/// Which identity a notification is about, in the terms the user knows it by.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdentityForNotification {
+    pub anchor_number: AnchorNumber,
+    /// What the user called it, where they have named it.
+    pub name: Option<String>,
+}
+
+/// `None` once nothing is left to show.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationResponse {
+    pub notification: Option<NotificationToShow>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum GetNotificationError {
+    /// The caller signs with no key of this identity, and none of an app it routes through.
+    InvalidBrowserKey,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveNotificationRequest {
+    pub anchor_number: AnchorNumber,
+    pub browser_id: BrowserId,
+    /// As the wake-up that announced it named it.
+    pub inbox_notification_id: InboxNotificationId,
+    /// Why the worker could not show it. Absent where it did.
+    pub not_shown: Option<NotShownReason>,
+}
+
+/// Why the service worker could not show a notification: its call to the app's canister
+/// for the content failed, which only the device sees.
+#[derive(Clone, Copy, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotShownReason {
+    /// The call got no answer.
+    PayloadUnreachable,
+    /// The app's canister rejected the call or trapped.
+    PayloadRejected,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveNotificationResponse {}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RemoveNotificationError {
+    /// The caller signs with no key of this identity, and none of an app it routes through.
+    InvalidBrowserKey,
+    InternalCanisterError(String),
 }

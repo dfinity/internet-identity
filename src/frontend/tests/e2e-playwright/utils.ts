@@ -1,7 +1,6 @@
-import { CDPSession, expect, Page } from "@playwright/test";
+import { CDPSession, ConsoleMessage, expect, Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
-import Protocol from "devtools-protocol";
 import { DER_COSE_OID, wrapDER } from "@icp-sdk/core/identity";
 import {
   Actor,
@@ -18,10 +17,15 @@ import { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
+const iiCanisterId = readCanisterId({ canisterName: "internet_identity" });
 export const II_URL = "https://id.ai";
 export const LEGACY_II_URL = "https://identity.ic0.app";
 export const ALT_LEGACY_II_URL = "https://identity.internetcomputer.org";
 export const TEST_APP_URL = "https://nice-name.com";
+/** Siblings of one domain, sharing `TEST_APP_DERIVATION_ORIGIN`. */
+export const TEST_APP_SIBLING_A_URL = "https://a.nice-name.com";
+export const TEST_APP_SIBLING_B_URL = "https://b.nice-name.com";
+export const TEST_APP_DERIVATION_ORIGIN = "https://auth.nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 
@@ -65,6 +69,101 @@ export const authorize = (
 };
 
 /**
+ * Installs the page's clock, anchored at the real time and still ticking.
+ *
+ * Before the page is navigated, so every timer it creates is one a scenario can
+ * move: `install` only replaces the timer functions from that moment, and a
+ * refresh scheduled during sign-in would otherwise keep running on real time
+ * where `fastForward` cannot reach it.
+ *
+ * Anchored, because `install()` on its own starts the page at the Unix epoch —
+ * and a delegation the canister issues for this year is then never due, so
+ * ageing it moves nothing. Resumed, because the app polls: a frozen clock would
+ * stop it reporting.
+ *
+ * Both paths into the test app call this. Leaving it to one of them is what let
+ * the fixture-driven scenarios fast-forward a page whose clock had never been
+ * installed, where the base is zero and the jump means nothing.
+ * @param page The page about to be navigated to the test app.
+ */
+export const installTestAppClock = async (page: Page): Promise<void> => {
+  await page.clock.install({ time: new Date() });
+  await page.clock.resume();
+};
+
+/**
+ * Reports what the test app only tells its own console.
+ *
+ * The app writes a failed call to `console.error` and leaves the element it was
+ * filling reading "Loading...", so a rejected call and a slow one look alike
+ * from outside: the assertion waits for text that is never coming and reports a
+ * timeout rather than the refusal that caused it. Chromium's own notices about
+ * a response's status are left out — those name a request, not a cause, and the
+ * app makes failing ones it goes on to handle.
+ * @param message A console message the test app's page emitted.
+ */
+export const reportPageError = (message: ConsoleMessage): void => {
+  if (message.type() !== "error") return;
+  if (message.text().startsWith("Failed to load resource")) return;
+  console.error(`test app console: ${message.text()}`);
+};
+
+/**
+ * States which identity provider the test app signs in with.
+ *
+ * The canister id is filled in beside the URL, because a session chain names
+ * the provider that signed it and the client refuses one naming any other. The
+ * client takes the two together or not at all, so a page that sets only the URL
+ * is configured for neither and signs in against mainnet.
+ * @param page The test app's page.
+ * @param authorizeUrl The provider's authorize URL.
+ */
+export const setTestAppProvider = async (
+  page: Page,
+  authorizeUrl: string,
+): Promise<void> => {
+  await page
+    .getByRole("textbox", { name: "Identity Provider" })
+    .fill(authorizeUrl);
+  await page
+    .getByRole("textbox", { name: "II canister id:" })
+    .fill(readCanisterId({ canisterName: "internet_identity" }));
+};
+
+/**
+ * States which protocol the test app signs in with.
+ *
+ * Two boxes rather than one: the app carries the request over ICRC-25, and a
+ * session is what it asks for across it. They moved apart when the app gained a
+ * plain app-delegation path, so a caller that ticked one box now has to say
+ * whether it meant a session too.
+ * @param page The test app's page.
+ * @param useSessions Whether to use ICRC-25 and ask for a session over it.
+ */
+export const setTestAppProtocol = async (
+  page: Page,
+  useSessions: boolean,
+): Promise<void> => {
+  await page
+    .getByRole("checkbox", { name: "Use ICRC-25:" })
+    .setChecked(useSessions);
+  await page
+    .getByRole("checkbox", { name: "Use session:" })
+    .setChecked(useSessions);
+};
+
+/**
+ * Selects the raw postMessage protocol, which creates no session.
+ *
+ * The test app defaults to the session path, so a test that drives it directly
+ * has to say which protocol it means rather than inherit whichever the app
+ * happens to prefer.
+ */
+export const useLegacyProtocol = async (page: Page): Promise<void> => {
+  await setTestAppProtocol(page, false);
+};
+
+/**
  * Authorize with a custom app URL
  * @param page The page that will load the test app
  * @param appUrl The URL of the app to authorize with
@@ -82,10 +181,16 @@ export const authorizeWithUrl = async (
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(appUrl);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(iiURL);
+  // Set either way rather than relying on the test app's default, which selects
+  // the session path and would otherwise decide this for every caller.
+  await setTestAppProtocol(page, useIcrc25 === true);
   if (useIcrc25 === true) {
+    // The session the client is handed is restricted to one identity provider,
+    // and the client refuses a chain that names any other. Its default is the
+    // mainnet canister, so a local sign-in needs this filled in.
     await page
-      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-      .setChecked(true);
+      .getByRole("textbox", { name: "II canister id:" })
+      .fill(iiCanisterId);
 
     // If also requesting attributes, fill them in the textarea
     if (attributes !== undefined) {
@@ -107,6 +212,11 @@ export const authorizeWithUrl = async (
   // Wait for II window to close.
   // During the identity upgrade flow there is a delay of 5s
   await authPage.waitForEvent("close", { timeout: 15_000 });
+
+  // The window closing is not the app being finished: over the session protocol
+  // it has still to mint a delegation, and it keeps `#principal` hidden until it
+  // has one.
+  await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
 
   // Assert that the user is authenticated (valid principal)
   const principal = (await page.locator("#principal").textContent()) ?? "";
@@ -383,13 +493,24 @@ export const removeVirtualAuthenticator = async (
 export const getCredentialsFromVirtualAuthenticator = async (
   page: Page,
   authenticatorId: string,
-): Promise<Protocol.WebAuthn.Credential[]> => {
+) => {
   const client = await getWebAuthnClient(page);
   const { credentials } = await client.send("WebAuthn.getCredentials", {
     authenticatorId,
   });
   return credentials;
 };
+
+/**
+ * A CDP WebAuthn credential, derived from the CDP protocol types Playwright
+ * bundles rather than from a separate `devtools-protocol` dependency. Playwright
+ * type-checks `CDPSession.send` against its own bundled copy, so deriving the
+ * type from a session call is what keeps it assignable in both directions —
+ * an independently versioned copy drifts as Chrome changes the protocol.
+ */
+export type WebAuthnCredential = Awaited<
+  ReturnType<typeof getCredentialsFromVirtualAuthenticator>
+>[number];
 
 /**
  * Adds a credential to a virtual authenticator
@@ -400,7 +521,7 @@ export const getCredentialsFromVirtualAuthenticator = async (
 export const addCredentialToVirtualAuthenticator = async (
   page: Page,
   authenticatorId: string,
-  credential: Protocol.WebAuthn.Credential,
+  credential: WebAuthnCredential,
 ): Promise<void> => {
   const client = await getWebAuthnClient(page);
   await client.send("WebAuthn.addCredential", {
@@ -458,13 +579,13 @@ export const toBase64URL = (bytes: Uint8Array): string =>
 export class CredentialIdentity extends SignIdentity {
   #privateKey: CryptoKey;
   #derPublicKey: DerEncodedPublicKey;
-  #credential: Protocol.WebAuthn.Credential;
+  #credential: WebAuthnCredential;
   #originHost: string;
 
   private constructor(
     privateKey: CryptoKey,
     derPublicKey: Uint8Array,
-    credential: Protocol.WebAuthn.Credential,
+    credential: WebAuthnCredential,
     originHost: string,
   ) {
     super();
@@ -475,7 +596,7 @@ export class CredentialIdentity extends SignIdentity {
   }
 
   static async fromCredential(
-    credential: Protocol.WebAuthn.Credential,
+    credential: WebAuthnCredential,
   ): Promise<CredentialIdentity> {
     if (credential.rpId === undefined) {
       throw new Error("Credential rpId is required");
@@ -656,7 +777,7 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
 export const createActorForCredential = async (
   host: string,
   canisterId: Principal,
-  credential: Protocol.WebAuthn.Credential,
+  credential: WebAuthnCredential,
 ): Promise<ActorSubclass<_SERVICE>> => {
   const identity = await CredentialIdentity.fromCredential(credential);
   const agent = await HttpAgent.create({
@@ -682,7 +803,7 @@ export const LEGACY_PASSKEY_ALIAS = "pre-upgrade-passkey";
  */
 export const createLegacyCredential = async (
   page: Page,
-): Promise<Protocol.WebAuthn.Credential> => {
+): Promise<WebAuthnCredential> => {
   await page.goto(LEGACY_II_URL + "/self-service");
   const legacyAuthenticatorId = await addVirtualAuthenticator(page);
   await page.evaluate(
@@ -725,9 +846,9 @@ export const swapToLegacyOnlyIdentity = async (
   actor: ActorSubclass<_SERVICE>,
   identity: {
     identityNumber: bigint;
-    credentials: Protocol.WebAuthn.Credential[];
+    credentials: WebAuthnCredential[];
   },
-  legacyCredential: Protocol.WebAuthn.Credential,
+  legacyCredential: WebAuthnCredential,
   alias: string = LEGACY_PASSKEY_ALIAS,
 ): Promise<void> => {
   const legacyIdentity =

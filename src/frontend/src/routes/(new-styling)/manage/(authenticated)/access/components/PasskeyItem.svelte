@@ -14,9 +14,9 @@
   import { aaguidToString, getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { onMount } from "svelte";
   import type { Provider } from "$lib/assets/aaguid";
-  import { getMetadataString } from "$lib/utils/openID";
-  import { getPrimaryOrigin } from "$lib/globals";
   import Badge from "$lib/components/ui/Badge.svelte";
+  import { Trans } from "$lib/components/locale";
+  import { isLegacyPasskey } from "../utils";
 
   interface Props {
     passkey: AuthnMethodData;
@@ -24,6 +24,7 @@
     onRename?: () => void;
     onRemove?: () => void;
     onSwitch?: () => void;
+    recoveryHref: string;
     isCurrentAccessMethod?: boolean;
     isLastAccessMethod?: boolean;
     isSignedInWithRecovery?: boolean;
@@ -35,6 +36,7 @@
     onRename,
     onRemove,
     onSwitch,
+    recoveryHref,
     isCurrentAccessMethod = false,
     isLastAccessMethod = false,
     isSignedInWithRecovery = false,
@@ -64,11 +66,7 @@
       ? knownProviders[aaguid]
       : undefined,
   );
-  const isLegacy = $derived.by(() => {
-    const primaryOrigin = getPrimaryOrigin();
-    const origin = getMetadataString(passkey.metadata, "origin");
-    return primaryOrigin !== undefined && origin !== primaryOrigin;
-  });
+  const isLegacy = $derived(isLegacyPasskey(passkey));
 
   const options = $derived([
     ...(onRename !== undefined
@@ -224,7 +222,16 @@
   </div>
   <div class="text-text-primary text-xs">
     {#if isLegacy}
-      {$t`This legacy passkey is no longer usable and should be removed.`}
+      <Trans>
+        Created on the old Internet Identity site. Can only be used to
+        <a
+          href={recoveryHref}
+          target="_blank"
+          rel="noopener"
+          class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
+          >recover</a
+        >, when upgrading from an identity number.
+      </Trans>
     {:else if provider?.type === "cloud"}
       {provider.platform === undefined
         ? $t`Stored in your ${provider.account} account and synced across your devices.`

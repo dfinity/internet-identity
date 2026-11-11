@@ -1,0 +1,13 @@
+name: "fetch-test-app"
+description: Download the pinned dfinity/internet-identity-test-app release into .test-app/
+runs:
+  using: "composite"
+  steps:
+    # The `gh` CLI requires a token to run at all. The release lives in a public
+    # repository, so the workflow's own token is enough — including on pull
+    # requests from forks, which get a token but no secrets.
+    - name: Fetch test app
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: scripts/fetch-test-app

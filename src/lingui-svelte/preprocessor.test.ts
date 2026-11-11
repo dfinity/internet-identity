@@ -1,5 +1,5 @@
 import { describe, expect } from "vitest";
-import { svelteTransform } from "./preprocessor";
+import { moduleTransform, svelteTransform } from "./preprocessor";
 
 describe("sveltePreprocessor", () => {
   describe("tagged template", () => {
@@ -283,7 +283,7 @@ describe("sveltePreprocessor", () => {
     it.each([
       {
         case: "$t with double quote",
-        source: "{$t`Say \"Hi\"`}",
+        source: '{$t`Say "Hi"`}',
         build: '{$t({ id: "ID_PLACEHOLDER" })}',
         dev: '{$t({ id: "ID_PLACEHOLDER", message: "Say \\"Hi\\"" })}',
       },
@@ -328,5 +328,154 @@ describe("sveltePreprocessor", () => {
         expect(stripId(devOutput)).toEqual(dev);
       },
     );
+  });
+
+  describe("nested message formats", () => {
+    it.each([
+      {
+        case: "plural in <Trans>",
+        source:
+          '<Trans>{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+        build: '<Trans id={"hJrI3o"} values={{ count }}></Trans>',
+        dev: '<Trans id={"hJrI3o"} message={"{count, plural, one {# browser} other {# browsers}}"} values={{ count }}></Trans>',
+      },
+      {
+        case: "plural in <Trans> with variables in its categories",
+        source:
+          "<Trans>{$plural(count, { one: `# browser on ${platform}`, other: `# browsers on ${platform} device(s)` })}</Trans>",
+        build: '<Trans id={"qnKbCL"} values={{ count, platform }}></Trans>',
+        dev: '<Trans id={"qnKbCL"} message={"{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"} values={{ count, platform }}></Trans>',
+      },
+      {
+        case: "plural inside a tag in <Trans>",
+        source:
+          '<Trans>Click <strong>{$plural(count, { one: "# time", other: "# times" })}</strong> now</Trans>',
+        build:
+          '<Trans id={"7LlTh4"} values={{ count }}>{#snippet renderNode(__children, __index)}{#if __index === 0}<strong>{@render __children()}</strong>{/if}{/snippet}</Trans>',
+        dev: '<Trans id={"7LlTh4"} message={"Click <0>{count, plural, one {# time} other {# times}}</0> now"} values={{ count }}>{#snippet renderNode(__children, __index)}{#if __index === 0}<strong>{@render __children()}</strong>{/if}{/snippet}</Trans>',
+      },
+      {
+        case: "plural as a $t descriptor message",
+        source:
+          '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }) })}',
+        build: '{$t({ id: "hJrI3o", values: { count } })}',
+        dev: '{$t({ id: "hJrI3o", message: "{count, plural, one {# browser} other {# browsers}}", values: { count } })}',
+      },
+      {
+        case: "plural in a $t template literal",
+        source:
+          '{$t`You have ${$plural(count, { one: "# browser", other: "# browsers" })} open`}',
+        build: '{$t({ id: "mkftPL", values: { count } })}',
+        dev: '{$t({ id: "mkftPL", message: "You have {count, plural, one {# browser} other {# browsers}} open", values: { count } })}',
+      },
+      {
+        case: "$t in a plural category",
+        source:
+          "{$plural(n, { one: $t`One ${genre} book`, other: $t`# ${genre} books` })}",
+        build: '{$plural({ id: "ogxDi4", values: { n, genre } })}',
+        dev: '{$plural({ id: "ogxDi4", message: "{n, plural, one {One {genre} book} other {# {genre} books}}", values: { n, genre } })}',
+      },
+      {
+        case: "plural in a plural category",
+        source:
+          '{$plural(n, { one: "one", other: $plural(m, { one: "# inner", other: "# inners" }) })}',
+        build: '{$plural({ id: "mmCxuq", values: { n, m } })}',
+        dev: '{$plural({ id: "mmCxuq", message: "{n, plural, one {one} other {{m, plural, one {# inner} other {# inners}}}}", values: { n, m } })}',
+      },
+    ])("should transform code with $case", ({ source, build, dev }) => {
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
+    });
+
+    // A message in an attribute of a nested node is rewritten too, and the
+    // enclosing rewrite has to read that node through its original offsets —
+    // the inner rewrite has already changed how long its text is.
+    it("should rewrite a message in an attribute of a nested node", () => {
+      const source = "<Trans>Hi <a title={$t`Profile`}>there</a></Trans>";
+      const build =
+        '<Trans id={"QP4LbZ"}>{#snippet renderNode(__children, __index)}{#if __index === 0}<a title={$t({ id: "vERlcd" })}>{@render __children()}</a>{/if}{/snippet}</Trans>';
+      const dev =
+        '<Trans id={"QP4LbZ"} message={"Hi <0>there</0>"}>{#snippet renderNode(__children, __index)}{#if __index === 0}<a title={$t({ id: "vERlcd", message: "Profile" })}>{@render __children()}</a>{/if}{/snippet}</Trans>';
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
+    });
+
+    it.each([
+      {
+        case: "<Trans>",
+        source:
+          '<Trans>{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+      },
+      {
+        case: "a $t descriptor",
+        source:
+          '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }) })}',
+      },
+      {
+        case: "a $t template literal",
+        source:
+          '{$t`You have ${$plural(count, { one: "# browser", other: "# browsers" })} open`}',
+      },
+    ])(
+      "should leave no nested call behind for a plural in $case",
+      ({ source }) => {
+        expect(svelteTransform(true, source).code).not.toContain("one:");
+        expect(svelteTransform(false, source).code).not.toContain("one:");
+      },
+    );
+  });
+
+  describe("module", () => {
+    const IMPORT = 'import { t, plural } from "$lib/stores/locale.store";\n';
+
+    it("should transform a tagged template", () => {
+      const source = `${IMPORT}const greet = (name: string): string => t\`Hello \${name}\`;`;
+      expect(moduleTransform(true, source)?.code).toEqual(
+        `${IMPORT}const greet = (name: string): string => t({ id: "OVaF9k", values: { name } });`,
+      );
+      expect(moduleTransform(false, source)?.code).toEqual(
+        `${IMPORT}const greet = (name: string): string => t({ id: "OVaF9k", message: "Hello {name}", values: { name } });`,
+      );
+    });
+
+    it("should transform a plural", () => {
+      const source = `${IMPORT}plural(count, { one: "# browser", other: "# browsers" });`;
+      expect(moduleTransform(true, source)?.code).not.toContain("one:");
+      expect(moduleTransform(true, source)?.code).toMatch(
+        /^import .*\nplural\(\{ id: "[^"]+", values: \{ count \} \}\);$/,
+      );
+    });
+
+    it("should follow a renamed import", () => {
+      const source =
+        'import { t as translate } from "$lib/stores/locale.store";\ntranslate`Hello World`;';
+      expect(moduleTransform(true, source)?.code).toEqual(
+        'import { t as translate } from "$lib/stores/locale.store";\ntranslate({ id: "mY42CM" });',
+      );
+    });
+
+    it.each([
+      {
+        case: "a parameter",
+        source: `${IMPORT}t\`Hello World\`;\nconst f = (t: typeof String.raw) => t\`Shadowed\`;`,
+      },
+      {
+        case: "a block declaration",
+        source: `${IMPORT}t\`Hello World\`;\n{\n  const t = String.raw;\n  t\`Shadowed\`;\n}`,
+      },
+      {
+        case: "a parameter shadowing a renamed import",
+        source:
+          'import { t as translate } from "$lib/stores/locale.store";\ntranslate`Hello World`;\nconst f = (translate: typeof String.raw) => translate`Shadowed`;',
+      },
+    ])("should leave a call to $case alone", ({ source }) => {
+      const code = moduleTransform(true, source)?.code;
+      expect(code).toContain('({ id: "mY42CM" })');
+      expect(code).toContain("`Shadowed`");
+    });
+
+    it("should leave a module without the import alone", () => {
+      expect(moduleTransform(true, "t`Hello World`;")).toBeUndefined();
+    });
   });
 });

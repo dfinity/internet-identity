@@ -8,6 +8,11 @@ base64.workspace = true
 flate2 = "1.0"
 hex.workspace = true
 lazy_static.workspace = true
+# Signs the browser-key proof `prepare_account_session` requires, and encrypts the
+# subscription's auth secret to the transport key the canister mints for a subscribe.
+p256.workspace = true
+hkdf.workspace = true
+aes-gcm.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_cbor.workspace = true

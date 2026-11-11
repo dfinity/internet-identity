@@ -9,6 +9,7 @@
 //! — this module is "the implementation up to the JWK read", and one step past
 //! it.
 
+use super::domain::Domain;
 use super::{
     get_all_claims, get_issuer_placeholders, replace_issuer_placeholders, AudClaim,
     OpenIDJWTVerificationError, OpenIdCredential,
@@ -34,6 +35,14 @@ use std::collections::HashMap;
 // As the JWT is also used for registration, which may include longer user interaction,
 // we are using 10 minutes to account for potential clock offsets as well as users.
 const MAX_VALIDITY_WINDOW_SECONDS: u64 = 10 * 60; // Same as ingress expiry
+
+// Tolerance for the identity provider's clock running ahead of the subnet's.
+// Without any leeway, a provider a second or two fast makes a JWT that was just
+// issued fail as "not valid yet" until the subnet catches up, which the user
+// only sees as a sign-in that failed for no reason. This widens the *lower*
+// bound only: `exp` and the `iat + MAX_VALIDITY_WINDOW_SECONDS` check above
+// still bound how long a token stays usable.
+const CLOCK_SKEW_LEEWAY_SECONDS: u64 = 30;
 
 // Maximum length of the email claim in the JWT, in practice we expect the identity provider to
 // already validate it on their end for a sane maximum length. This is an additional sanity check.
@@ -74,6 +83,53 @@ impl EmailVerifiedClaim {
     }
 }
 
+/// Reads a claim that is present, even as `null`, as `Some`; an absent one
+/// falls back to `None` through `#[serde(default)]`.
+fn present_claim<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<serde_json::Value>, D::Error> {
+    serde_json::Value::deserialize(deserializer).map(Some)
+}
+
+/// Domains of Apple's private relay addresses. A relay address can also end in
+/// `@icloud.com`; only the `is_private_email` claim tells that one apart.
+///
+/// See https://developer.apple.com/documentation/signinwithapple/communicating-using-the-private-email-relay-service
+const APPLE_RELAY_DOMAINS: [&str; 2] = ["privaterelay.appleid.com", "private.icloud.com"];
+
+/// Whether Apple's `is_private_email` (a boolean or a string) flags the email
+/// as a private relay address: anything but a plain `false`, so that an
+/// unexpected value fails closed rather than failing the sign-in.
+fn flags_private_email(claim: &serde_json::Value) -> bool {
+    match claim {
+        serde_json::Value::Bool(false) => false,
+        serde_json::Value::String(value) => !value.eq_ignore_ascii_case("false"),
+        _ => true,
+    }
+}
+
+/// The `email` claim, if it is an address apps can reach. An empty email
+/// (Apple sends one for some Work & School accounts) is no address at all.
+/// Apple's private relay addresses only take mail from senders registered with
+/// II's Apple developer team, so they are left out too, as if the token had no
+/// email: flagged by `is_private_email`, or by their domain when the flag is
+/// missing.
+fn reachable_email(
+    email: Option<String>,
+    is_private_email: Option<&serde_json::Value>,
+) -> Option<String> {
+    let email = email.filter(|email| !email.is_empty())?;
+    if is_private_email.is_some_and(flags_private_email) {
+        return None;
+    }
+    let relay_domain = email.rsplit_once('@').is_some_and(|(_, domain)| {
+        APPLE_RELAY_DOMAINS
+            .iter()
+            .any(|relay| domain.eq_ignore_ascii_case(relay))
+    });
+    (!relay_domain).then_some(email)
+}
+
 #[derive(Deserialize)]
 struct Claims {
     iss: String,
@@ -86,6 +142,9 @@ struct Claims {
     email: Option<String>,
     name: Option<String>,
     email_verified: Option<EmailVerifiedClaim>,
+    // Apple only: whether `email` is a private relay address.
+    #[serde(default, deserialize_with = "present_claim")]
+    is_private_email: Option<serde_json::Value>,
 }
 
 /// What the resolver determined about a provider, independent of the JWK
@@ -107,7 +166,7 @@ pub(super) struct Descriptor {
 /// written onto the built credential, plus the claim (if any) carrying its
 /// cross-client-stable identifier.
 pub(super) struct SsoProvider {
-    pub domain: String,
+    pub domain: Domain,
     pub name: Option<String>,
     /// Claim holding the cross-client-stable id (e.g. Entra `oid`). `None` for a
     /// `sub` org, which keys identity on the token `sub` and needs no bridge.
@@ -186,10 +245,9 @@ pub(super) fn verify_and_build(
         .verify(&JwsVerifierFn::from(verify_signature), cert)
         .map_err(|_| OpenIDJWTVerificationError::GenericError("Invalid signature".to_string()))?;
 
-    // Destructure the verified claims. `aud` is intentionally dropped: it was
-    // only weakly checked (`AudClaim::matches` accepts a single value or any
-    // member of an array), so the canonical `descriptor.client_id` is stored on
-    // the credential instead. `nonce` / `exp` / `iat` were consumed by
+    // Destructure the verified claims. `aud` is intentionally dropped: it may be
+    // encoded as a string or an array, so the canonical `descriptor.client_id`
+    // is stored on the credential instead. `nonce` / `exp` / `iat` were consumed by
     // `verify_claims` and aren't persisted.
     let Claims {
         iss,
@@ -197,6 +255,7 @@ pub(super) fn verify_and_build(
         email,
         name,
         email_verified,
+        is_private_email,
         aud: _,
         nonce: _,
         exp: _,
@@ -205,7 +264,7 @@ pub(super) fn verify_and_build(
 
     // Assemble metadata
     let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
-    if let Some(email) = email {
+    if let Some(email) = reachable_email(email, is_private_email.as_ref()) {
         metadata.insert("email".into(), MetadataEntryV2::String(email));
     }
     if let Some(email_verified) = email_verified {
@@ -361,7 +420,9 @@ fn verify_claims(
     if now_secs > max_valid_until_secs {
         return Err(OpenIDJWTVerificationError::JWTExpired);
     }
-    if now_secs < claims.iat {
+    // `saturating_add` keeps this panic-free for the same reason as the
+    // `checked_add` above: the leeway is applied to the clock, not the claim.
+    if now_secs.saturating_add(CLOCK_SKEW_LEEWAY_SECONDS) < claims.iat {
         return Err(OpenIDJWTVerificationError::GenericError(
             "JWT is not valid yet".into(),
         ));
@@ -514,14 +575,17 @@ mod tests {
             issuer: "https://accounts.google.com".to_string(),
             client_id: TEST_AUD.to_string(),
             sso: Some(SsoProvider {
-                domain: "example.org".to_string(),
+                domain: Domain::try_from("example.org").unwrap(),
                 name: Some("Example".to_string()),
                 stable_identifier_claim: None,
             }),
         };
         let credential = verify_and_build(VALID_JWT, &descriptor, &test_certs(), &test_salt())
             .expect("expected verification to succeed");
-        assert_eq!(credential.sso_domain, Some("example.org".to_string()));
+        assert_eq!(
+            credential.sso_domain,
+            Some(Domain::try_from("example.org").unwrap())
+        );
         assert_eq!(credential.sso_name, Some("Example".to_string()));
     }
 
@@ -638,13 +702,27 @@ mod tests {
     #[test]
     fn should_reject_jwt_issued_in_the_future() {
         reset_test_env();
-        // One second before the token's `iat`.
-        TEST_TIME.set(secs_to_nanos(TEST_IAT_SECONDS - 1));
+        // One second before the leeway's reach: a provider clock this far ahead
+        // is a real mismatch, not the second or two of skew we tolerate.
+        TEST_TIME.set(secs_to_nanos(
+            TEST_IAT_SECONDS - CLOCK_SKEW_LEEWAY_SECONDS - 1,
+        ));
         let err =
             verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt()).unwrap_err();
         assert!(
             matches!(err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("not valid yet"))
         );
+    }
+
+    #[test]
+    fn should_accept_jwt_issued_within_clock_skew_leeway() {
+        reset_test_env();
+        // The subnet clock trails the provider's, so the JWT looks issued in the
+        // future — by less than the leeway, which is what a provider running a
+        // little fast looks like. It must verify instead of failing the sign-in.
+        TEST_TIME.set(secs_to_nanos(TEST_IAT_SECONDS - CLOCK_SKEW_LEEWAY_SECONDS));
+        verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt())
+            .expect("expected verification to succeed within the clock-skew leeway");
     }
 
     #[test]
@@ -674,6 +752,7 @@ mod tests {
                 email: None,
                 name: None,
                 email_verified: None,
+                is_private_email: None,
             },
             &test_salt(),
         );
@@ -708,6 +787,7 @@ mod tests {
                 email: None,
                 name: None,
                 email_verified: None,
+                is_private_email: None,
             },
             &test_salt(),
         );
@@ -717,6 +797,81 @@ mod tests {
                 "Subject too long".to_string()
             ))
         );
+    }
+
+    fn parse_claims(extra: &str) -> Result<Claims, serde_json::Error> {
+        serde_json::from_str(&format!(
+            r#"{{"iss":"https://appleid.apple.com","sub":"sub","aud":"aud","nonce":"n","exp":1,"iat":1{extra}}}"#
+        ))
+    }
+
+    #[test]
+    fn should_parse_apple_bool_claims_as_bool_or_string() {
+        // Apple sends `email_verified` and `is_private_email` as either a
+        // boolean or a string.
+        for value in ["true", "\"true\""] {
+            let claims = parse_claims(&format!(
+                r#","email_verified":{value},"is_private_email":{value}"#
+            ))
+            .expect("claims should parse");
+            assert_eq!(claims.email_verified.unwrap().into_string(), "true");
+            assert!(flags_private_email(&claims.is_private_email.unwrap()));
+        }
+    }
+
+    #[test]
+    fn should_flag_private_email_unless_plainly_false() {
+        for (claim, flagged) in [
+            ("false", false),
+            ("\"false\"", false),
+            ("\"FALSE\"", false),
+            ("true", true),
+            ("\"true\"", true),
+            ("\"unexpected\"", true),
+            // Neither `null` nor another type can pass for "not private", and
+            // neither fails the sign-in.
+            ("null", true),
+            ("0", true),
+            ("{}", true),
+        ] {
+            let claims = parse_claims(&format!(r#","is_private_email":{claim}"#))
+                .expect("claims should parse");
+            assert_eq!(
+                claims.is_private_email.as_ref().map(flags_private_email),
+                Some(flagged),
+                "is_private_email: {claim}"
+            );
+        }
+        // A missing claim stays unknown.
+        let claims = parse_claims("").expect("claims should parse");
+        assert_eq!(claims.is_private_email, None);
+    }
+
+    #[test]
+    fn should_keep_only_reachable_emails() {
+        let not_private = serde_json::Value::Bool(false);
+        let private = serde_json::Value::Bool(true);
+        for (email, is_private_email, kept) in [
+            ("user@example.com", None, true),
+            ("user@icloud.com", Some(&not_private), true),
+            // A relay address is flagged on any domain, `@icloud.com` included.
+            ("relay-alias@icloud.com", Some(&private), false),
+            // Without the flag, the relay domains still give it away.
+            ("ep9ks2tnph@privaterelay.appleid.com", None, false),
+            ("ep9ks2tnph@PrivateRelay.AppleID.com", None, false),
+            ("ep9ks2tnph@private.icloud.com", None, false),
+            // An empty email is no address at all.
+            ("", None, false),
+            // Anything else is kept as before, for every provider.
+            ("not-an-address", None, true),
+        ] {
+            assert_eq!(
+                reachable_email(Some(email.to_string()), is_private_email),
+                kept.then(|| email.to_string()),
+                "{email} with is_private_email {is_private_email:?}"
+            );
+        }
+        assert_eq!(reachable_email(None, None), None);
     }
 
     #[test]
@@ -736,6 +891,7 @@ mod tests {
                 email: None,
                 name: None,
                 email_verified: None,
+                is_private_email: None,
             },
             &test_salt(),
         );

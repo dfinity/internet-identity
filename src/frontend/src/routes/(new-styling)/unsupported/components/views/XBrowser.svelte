@@ -8,9 +8,9 @@
     XIcon,
   } from "@lucide/svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import Toolbar from "../ui/Toolbar.svelte";
-  import ToolbarButton from "../ui/ToolbarButton.svelte";
-  import ToolbarHighlight from "../ui/ToolbarHighlight.svelte";
+  import Toolbar from "$lib/components/ui/browserMock/Toolbar.svelte";
+  import ToolbarButton from "$lib/components/ui/browserMock/ToolbarButton.svelte";
+  import ToolbarHighlight from "$lib/components/ui/browserMock/ToolbarHighlight.svelte";
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">

@@ -61,8 +61,9 @@
    * through some other method (passkey, direct OpenID), so we can't
    * rely on a name being threaded through from sign-in.
    *
-   * Populated up-front during the skeleton so the first row paint has
-   * the discovered names — see the `prepared` promise below.
+   * Seeded from the context, which carries the names resolved for the groups it
+   * came with, so the first row paint has them. Discovery runs here only for a
+   * group that appears later, when an email verified inline re-lists them.
    */
   const ssoNamesByDomain = new SvelteMap<string, string>();
 
@@ -183,7 +184,9 @@
   const prepared = (async () => {
     const ctx = await context;
     const groups = sortGroupsUnscopedFirst(mergeGroups(ctx.groups));
-    await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
+    for (const [domain, name] of Object.entries(ctx.ssoNames)) {
+      ssoNamesByDomain.set(domain, name);
+    }
     const savedEmail = lastSharedEmailsStore.get(
       $authenticatedStore.identityNumber,
       ctx.effectiveOrigin,

@@ -6,19 +6,24 @@
     attributeConsentStore,
   } from "$lib/stores/attributeConsent.store";
   import {
+    notificationConsentSettledStore,
+    notificationConsentStore,
+  } from "$lib/stores/notificationConsent.store";
+  import {
     authorizationContextStore,
     authorizationStore,
     authorizedStore,
   } from "$lib/stores/authorization.store";
+  import { authorizationPromptStore } from "$lib/stores/authorization.store";
+  import { resolvePromptParams, stripPromptParams } from "./promptParams";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import { handleError } from "$lib/components/utils/error";
   import { sessionStore } from "$lib/stores/session.store";
   import { t } from "$lib/stores/locale.store";
-  import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { throwCanisterError } from "$lib/utils/utils";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -61,6 +66,16 @@
     }
     return "normal" as const;
   })();
+
+  // Set before the channel is established, so the delegation handler has the prompt
+  // context by the time a request arrives.
+  authorizationPromptStore.set(
+    resolvePromptParams(
+      new URL(window.location.href),
+      flow === "openid-resume",
+    ),
+  );
+  stripPromptParams();
 
   // --- Channel establishment ---
   $effect.pre(() => {
@@ -119,9 +134,16 @@
     $attributeConsentStore !== undefined &&
       $attributeConsentResultStore === undefined,
   );
+  // Notification consent runs after authorize for the same reason, so it needs
+  // the same exemption.
+  const isNotificationConsenting = $derived(
+    $notificationConsentStore !== undefined &&
+      $notificationConsentSettledStore === undefined,
+  );
   const showHeaderFooter = $derived(
     isReady &&
       (isAttributeConsenting ||
+        isNotificationConsenting ||
         ($authorizedStore === undefined &&
           flow !== "openid-init" &&
           flow !== "sso-init" &&
@@ -189,7 +211,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    void forgetIdentity(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -243,16 +265,27 @@
     }
   };
 
-  // Pre-fetch passkey credential ids
-  $effect(() =>
+  // Both of these belong to a request that puts something on screen, and neither can be
+  // decided at mount: `prompt: "none"` is known only once the request is parsed. That is
+  // what `isReady` reports — a silently answered request never sets the authorization
+  // context, so it never turns true. Gating on it skips the credential pre-fetch's one
+  // canister query per remembered identity, none of which a silent request uses, and
+  // stops counting a page view for a page nobody was shown.
+  //
+  // The interactive path loses only the gap between mount and request parse, which is
+  // over well before the user could act on either.
+  let viewCounted = false;
+  $effect(() => {
+    if (!isReady) {
+      return;
+    }
     authLastUsedFlow.init(
       lastUsedIdentities.map(({ identityNumber }) => identityNumber),
-    ),
-  );
-
-  // Track page view for authorization flow
-  onMount(() => {
-    analytics.pageView();
+    );
+    if (!viewCounted) {
+      viewCounted = true;
+      analytics.pageView();
+    }
   });
 </script>
 

@@ -1,17 +1,20 @@
 import { get } from "svelte/store";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-const { mockGetConfiguredFeatureFlag, mockGetPrimaryOrigin } = vi.hoisted(
-  () => ({
-    mockGetConfiguredFeatureFlag:
-      vi.fn<(name: string) => boolean | undefined>(),
-    mockGetPrimaryOrigin: vi.fn<() => string | undefined>(() => undefined),
-  }),
-);
+const {
+  mockGetConfiguredFeatureFlag,
+  mockGetPrimaryOrigin,
+  mockNotificationsEnabled,
+} = vi.hoisted(() => ({
+  mockGetConfiguredFeatureFlag: vi.fn<(name: string) => boolean | undefined>(),
+  mockGetPrimaryOrigin: vi.fn<() => string | undefined>(() => undefined),
+  mockNotificationsEnabled: vi.fn<() => boolean>(() => false),
+}));
 
 vi.mock("$lib/globals", () => ({
   getConfiguredFeatureFlag: mockGetConfiguredFeatureFlag,
   getPrimaryOrigin: mockGetPrimaryOrigin,
+  notificationsEnabled: mockNotificationsEnabled,
 }));
 
 // Imported after the mock so the store factory picks up the mocked globals.
@@ -20,6 +23,7 @@ const {
   MIN_GUIDED_UPGRADE,
   EMAIL_RECOVERY,
   EMAIL_RECOVERY_SETUP,
+  PUSH_NOTIFICATIONS,
 } = await import("$lib/state/featureFlags");
 
 // `window.location` is read-only, so swap it for a writable stand-in we can
@@ -152,4 +156,34 @@ test("the two email-recovery flags resolve independently from config", () => {
   // off-domain default.
   expect(get(EMAIL_RECOVERY)).toEqual(false);
   expect(get(EMAIL_RECOVERY_SETUP)).toEqual(true);
+});
+
+test("push notifications follow a backend that notifies", () => {
+  mockNotificationsEnabled.mockReturnValue(false);
+  PUSH_NOTIFICATIONS.initialize();
+  expect(get(PUSH_NOTIFICATIONS)).toBe(false);
+
+  mockNotificationsEnabled.mockReturnValue(true);
+  PUSH_NOTIFICATIONS.initialize();
+  expect(get(PUSH_NOTIFICATIONS)).toBe(true);
+});
+
+test("push notifications are not persisted by following the backend", () => {
+  mockNotificationsEnabled.mockReturnValue(true);
+  PUSH_NOTIFICATIONS.initialize();
+
+  // `temporaryOverride`, so the next load derives it again rather than being
+  // stuck with what this one found.
+  expect(PUSH_NOTIFICATIONS.getFeatureFlag()?.isSet()).toBe(false);
+});
+
+test("a value set by hand wins over the backend", () => {
+  mockNotificationsEnabled.mockReturnValue(true);
+  // The persisting setter — what the browser console and a `?feature_flag_*`
+  // param reach. The store's own `set` is in-memory only.
+  PUSH_NOTIFICATIONS.getFeatureFlag()?.set(false);
+
+  PUSH_NOTIFICATIONS.initialize();
+
+  expect(get(PUSH_NOTIFICATIONS)).toBe(false);
 });

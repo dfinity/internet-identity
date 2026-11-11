@@ -301,8 +301,14 @@ fn get_asset_headers(
 ///   - https://*.icp0.io: HTTP fetches for /.well-known/ii-alternative-origins
 ///   - https://*.ic0.app: legacy domain support for alternative origins
 ///
-/// img-src 'self' data: https://*.googleusercontent.com:
-///   Allow images from same origin, data URIs, and Google profile pictures
+/// img-src 'self' data: blob: https://*.googleusercontent.com:
+///   Allow images from same origin, data URIs, blob URLs, and Google profile
+///   pictures. `blob:` covers images the frontend has produced itself and
+///   holds in the browser's blob store rather than in the DOM — currently the
+///   app logos from `/.well-known/ii-app-metadata`, which are downloaded,
+///   decoded and re-encoded before they are rendered. It does not let a remote
+///   origin's asset be loaded directly: only this origin's scripts can mint a
+///   `blob:` URL, and it resolves entirely within the browser.
 ///
 /// script-src 'unsafe-inline' 'unsafe-eval':
 ///   - 'unsafe-inline': Allow inline scripts (required for SvelteKit)
@@ -390,7 +396,7 @@ fn get_content_security_policy(
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
-         img-src 'self' data: https://*.googleusercontent.com;\
+         img-src 'self' data: blob: https://*.googleusercontent.com;\
          script-src {script_src};\
          base-uri 'none';\
          form-action {form_action};\

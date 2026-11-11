@@ -11,9 +11,9 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { AuthWizard, SignUpHero } from "$lib/components/wizards/auth";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
-  import { afterNavigate, beforeNavigate, preloadData } from "$app/navigation";
+  import { beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import {
@@ -91,12 +91,13 @@
       duration: 2000,
     });
   };
+  // Every identity here is removable, the selected one included: this page passes no
+  // `selected` to `ManageIdentities`, because nobody is signed in on it. Only
+  // `manage/(authenticated)` passes one, where the identity in use cannot be removed.
   const handleRemoveIdentity = (identityNumber: bigint) => {
-    // If the removed identity is currently selected,
-    // switch to the next available one in the list.
-    //
-    // The last identity cannot be removed, so there will
-    // always be at least one next identity available.
+    // Removing the selected identity would leave the selection naming an entry that is
+    // gone, which renders as signed out with other identities still present. Moved on
+    // before the delete, and moved back by Undo.
     const isCurrent = selectedIdentity?.identityNumber === identityNumber;
     if (isCurrent) {
       const nextIdentity = lastUsedIdentities.find(
@@ -110,7 +111,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    void forgetIdentity(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -138,8 +139,11 @@
 
   // When another page (e.g. `/login`) redirects here with a `next`
   // target in `page.state.login`, capture it so post-auth navigation
-  // returns the user where they were headed.
-  afterNavigate(() => {
+  // returns the user where they were headed. Read `page.state` reactively:
+  // this component mounts as part of the navigation that carries the state,
+  // and an `afterNavigate` callback registered during that mount does not
+  // see it.
+  $effect(() => {
     if ("login" in page.state && typeof page.state.login === "string") {
       next = page.state.login;
     }

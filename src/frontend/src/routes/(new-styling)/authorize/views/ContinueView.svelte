@@ -1,7 +1,12 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
+  import {
+    CheckIcon,
+    HelpCircleIcon,
+    PlusIcon,
+    PencilIcon,
+  } from "@lucide/svelte";
   import { handleError } from "$lib/components/utils/error";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
@@ -9,7 +14,7 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { plural, t } from "$lib/stores/locale.store";
   import Toggle from "$lib/components/ui/Toggle.svelte";
@@ -31,7 +36,7 @@
     AccountNumber,
   } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
-  import { slide, fade, scale } from "svelte/transition";
+  import { slide, fade } from "svelte/transition";
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import { accessLevelStore } from "$lib/stores/access-level.store";
@@ -41,6 +46,8 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
   import {
+    SESSION_DURATION_PRESETS,
+    cappedSessionDurations,
     sessionDurationCeilingSeconds,
     sessionDurationToNanos,
   } from "$lib/utils/sessionDuration";
@@ -85,14 +92,15 @@
     continueLabel,
   }: Props = $props();
 
+  const id = $props.id();
+
   type PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
 
   // The largest duration the picker offers: the app's requested value, capped
   // at the 30-day maximum, or the maximum itself when the app didn't request
-  // one. Defaulting the selection to it means a plain "Continue" grants exactly
-  // what the app asked for (as before this picker existed); the user can shorten
-  // it first.
+  // one. A plain "Continue" grants exactly this; with all options shown the
+  // picker starts on the duration last chosen for this app on this browser.
   const ceilingSeconds = sessionDurationCeilingSeconds(requestedMaxTimeToLive);
   let selectedTtlSeconds = $state(ceilingSeconds);
   const selectedMaxTimeToLive = $derived(
@@ -169,13 +177,56 @@
   $effect(() => {
     if (!isMultipleAccountsEnabled) {
       accounts = undefined;
+      selectedAccountNumber = null;
     }
+  });
+
+  // The account and duration last chosen for this app with all options shown,
+  // on this browser.
+  const rememberedOptions = $derived(
+    $lastUsedIdentitiesStore.selected?.authorizeOptions?.[effectiveOrigin],
+  );
+  const rememberedTtlSeconds = (): number => {
+    const remembered = rememberedOptions?.sessionDurationSeconds;
+    return remembered !== undefined &&
+      cappedSessionDurations(ceilingSeconds, SESSION_DURATION_PRESETS).includes(
+        remembered,
+      )
+      ? remembered
+      : ceilingSeconds;
+  };
+
+  // The account picked in the list, or `null` until the user picks one, in
+  // which case Continue signs in with the remembered account if it still
+  // exists, or else the default account.
+  let selectedAccountNumber = $state<
+    AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
+  >(null);
+  const chosenAccountNumber = $derived.by(() => {
+    if (selectedAccountNumber !== null) {
+      return selectedAccountNumber;
+    }
+    if (
+      rememberedOptions !== undefined &&
+      accounts?.some(
+        (account) =>
+          account.account_number[0] === rememberedOptions.accountNumber,
+      ) === true
+    ) {
+      return rememberedOptions.accountNumber;
+    }
+    return defaultAccountNumber ?? undefined;
   });
 
   let isCreateAccountDialogVisible = $state(false);
   let isEditAccountDialogVisibleForNumber = $state<
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
+  // The fallback label the edit dialog opened with. The live value can change
+  // while the dialog is open (the app's metadata resolves asynchronously),
+  // which would shift an unnamed account's baseline under an untouched form
+  // and persist the stale fallback as an explicit name on save.
+  let editDialogFallbackName = $state<string>();
 
   const isEditAccountDialogVisibleFor = $derived(
     accounts?.find(
@@ -183,17 +234,36 @@
         account.account_number[0] === isEditAccountDialogVisibleForNumber,
     ),
   );
+  // Continue looks unchanged while the account list loads, but does nothing
+  // until it has.
+  const isLoadingAccounts = $derived(
+    isMultipleAccountsEnabled && accounts === undefined,
+  );
   const isAccountLimitReached = $derived(
     accounts !== undefined && accounts.length >= 5,
   );
-  const dapps = getDapps();
-  const application = $derived(
-    dapps.find((dapp) => dapp.hasOrigin(displayOrigin))?.name,
+  // The app's metadata is published on the origin its identity is derived for
+  // (`effectiveOrigin`), which is also where its accounts live — so the account
+  // labels below stay stable no matter which of its origins the user signs in
+  // from. `displayOrigin` remains what the header shows.
+  const metadataStore = $derived(
+    getAppMetadataStore(effectiveOrigin, displayOrigin),
   );
+  const application = $derived($metadataStore.name);
   const dappName = $derived(application ?? new URL(displayOrigin).hostname);
-  const primaryAccountName = $derived(
-    application !== undefined ? $t`My ${application} account` : $t`My account`,
-  );
+  // Account names are capped at 32 characters in `EditAccount`; a longer
+  // (e.g. app-provided) name would make the fallback label unsaveable there,
+  // so it falls back to the generic label instead.
+  const MAX_ACCOUNT_NAME_LENGTH = 32;
+  const primaryAccountName = $derived.by(() => {
+    if (application !== undefined) {
+      const label = $t`My ${application} account`;
+      if (label.length <= MAX_ACCOUNT_NAME_LENGTH) {
+        return label;
+      }
+    }
+    return $t`My account`;
+  });
   const existingNames = $derived(
     accounts?.map((account) => account.name[0] ?? primaryAccountName) ?? [],
   );
@@ -216,6 +286,7 @@
       selectedIdentityNumber,
     );
     defaultAccountNumber = null;
+    selectedAccountNumber = null;
     if (hydrated) {
       void handleEnableMultipleAccounts();
     }
@@ -268,12 +339,14 @@
       onAuthorize(
         accountNumberPromise,
         effectiveAccessLevel,
-        selectedMaxTimeToLive,
+        sessionDurationToNanos(ceilingSeconds),
       );
     } catch (error) {
-      handleError(error);
-    } finally {
+      // Left busy on the way out: this view stays up while a request that still owes
+      // the flow a screen works out what to show, and the button the user pressed is
+      // where that wait belongs. Cleared only here, where they stay and can retry.
       isAuthenticatingDefault = false;
+      handleError(error);
     }
   };
   const handleContinueAs = async (
@@ -288,15 +361,20 @@
           effectiveOrigin,
         );
       }
+      lastUsedIdentitiesStore.setAuthorizeOptions(
+        selectedIdentityNumber,
+        effectiveOrigin,
+        { accountNumber, sessionDurationSeconds: selectedTtlSeconds },
+      );
       onAuthorize(
         Promise.resolve(accountNumber),
         effectiveAccessLevel,
         selectedMaxTimeToLive,
       );
     } catch (error) {
-      handleError(error);
-    } finally {
+      // See `handleContinueDefault`: the busy state outlives a successful authorize.
       isAuthenticatingDefault = false;
+      handleError(error);
     }
   };
   const loadAccountsViaActor = async (
@@ -320,6 +398,9 @@
   };
 
   const handleEnableMultipleAccounts = async () => {
+    // Untracked: this runs inside the identity effect, which must not rerun
+    // when Continue saves the options.
+    selectedTtlSeconds = untrack(rememberedTtlSeconds);
     try {
       const sessionActor = await actorForIdentity(selectedIdentityNumber);
       if (sessionActor !== undefined) {
@@ -390,6 +471,12 @@
       isCreateAccountDialogVisible = false;
     }
   };
+  const openEditAccountDialog = (
+    accountNumber: AccountNumber | PRIMARY_ACCOUNT_NUMBER,
+  ): void => {
+    editDialogFallbackName = primaryAccountName;
+    isEditAccountDialogVisibleForNumber = accountNumber;
+  };
   const handleEditAccount = async (account: {
     name: string;
     isDefaultSignIn: boolean;
@@ -405,7 +492,10 @@
         return;
       }
       const nameChanged =
-        account.name !== (accounts[index].name[0] ?? primaryAccountName);
+        account.name !==
+        (accounts[index].name[0] ??
+          editDialogFallbackName ??
+          primaryAccountName);
       const defaultChanged =
         account.isDefaultSignIn &&
         defaultAccountNumber !== accounts[index].account_number[0];
@@ -502,106 +592,159 @@
   });
 </script>
 
-{#snippet accountListItem(account: AccountInfo)}
+{#snippet accountRow(account: AccountInfo)}
   {@const name = account.name[0] ?? primaryAccountName}
-  <div in:slide={{ duration: 300, delay: 300, axis: "y" }}>
-    <div
-      in:scale={{ duration: 300, delay: 450, start: 0.95 }}
-      class={[
-        // Layout
-        "relative flex flex-row items-stretch gap-3",
-        // Styling
-        "border-border-secondary bg-bg-primary rounded-sm border shadow-xs",
-        // Animate scale and shadow
-        "transition-all duration-100 ease-out",
-        // While an access level still needs choosing, the card can't authorize
-        // yet: drop the interactive affordances and dim it.
-        mustChooseAccess
-          ? "opacity-60"
-          : [
-              // Apply scale effect on hover
-              "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
-              // Also apply scale effect on keyboard focus besides hover
-              "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
-              // When cursor is between two items, we still want an item
-              // to be scaled and the cursor to be a pointer nonetheless.
-              "cursor-pointer after:absolute after:-inset-2 after:-z-1",
-            ],
-      ]}
+  {@const isSelected = account.account_number[0] === chosenAccountNumber}
+  <div
+    class={[
+      "border-border-tertiary flex h-13 flex-row items-center border-b pe-1.5",
+      isSelected ? "bg-bg-quaternary" : "hover:bg-bg-tertiary",
+    ]}
+  >
+    <label
+      class="relative flex min-w-0 flex-1 flex-row items-center gap-3 self-stretch ps-4 pe-3 not-has-disabled:cursor-pointer"
     >
-      <button
-        onclick={() => handleContinueAs(account.account_number[0])}
-        disabled={mustChooseAccess}
-        class="flex flex-1 flex-row items-center text-start outline-0"
-        aria-label={$t`Continue with ${name}`}
-      >
-        <span class="text-text-primary flex-1 py-3 ps-5 text-sm font-semibold">
-          {name}
-        </span>
-        {#if account.account_number[0] === defaultAccountNumber}
-          <Badge size="sm">{$t`Default`}</Badge>
-        {/if}
-      </button>
-      <button
-        class="btn btn-tertiary btn-sm btn-icon my-3 me-3 shrink-0"
-        onclick={() =>
-          (isEditAccountDialogVisibleForNumber = account.account_number[0])}
-        aria-label={$t`Edit ${name}`}
-      >
-        <PencilIcon class="size-5" />
-      </button>
-    </div>
+      <input
+        type="radio"
+        name="{id}-account"
+        checked={isSelected}
+        onchange={() => (selectedAccountNumber = account.account_number[0])}
+        class="absolute inset-0 appearance-none opacity-0"
+      />
+      <CheckIcon
+        class={["size-4.5 shrink-0", isSelected ? "opacity-100" : "opacity-0"]}
+        aria-hidden="true"
+      />
+      <span class="text-text-primary flex-1 truncate text-sm font-semibold">
+        {name}
+      </span>
+      {#if account.account_number[0] === defaultAccountNumber}
+        <Badge size="sm" class="shrink-0 !bg-transparent">{$t`Default`}</Badge>
+      {/if}
+    </label>
+    <button
+      class={[
+        "btn btn-tertiary btn-sm btn-icon shrink-0",
+        isSelected ? "hover:!bg-bg-tertiary" : "hover:!bg-bg-quaternary",
+      ]}
+      onclick={() => openEditAccountDialog(account.account_number[0])}
+      aria-label={$t`Edit ${name}`}
+    >
+      <PencilIcon class="size-5" />
+    </button>
   </div>
 {/snippet}
 
-{#snippet accountList(accounts: AccountInfo[])}
-  <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
-    <div class="!min-h-18" out:slide={{ axis: "y", duration: 300 }}>
-      <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
-        <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
-          <ul class="contents" aria-label={$t`Choose an account`}>
-            {#each accounts as account (account.account_number[0])}
-              <li class="contents">
-                {@render accountListItem(account)}
-              </li>
-            {/each}
-          </ul>
-          <Tooltip
-            label={$t`Limit reached`}
-            description={$plural(MAX_ACCOUNTS, {
-              one: `You have reached the maximum of # account for a single app.`,
-              other: `You have reached the maximum of # accounts for a single app.`,
-            })}
-            direction="up"
-            align="center"
-            hidden={!isAccountLimitReached}
+{#snippet allOptions(accounts: AccountInfo[])}
+  <div
+    class="col-start-1 row-start-1"
+    transition:slide={{ axis: "y", duration: 300 }}
+  >
+    <div
+      class="flex flex-col pb-6"
+      in:fade={{ duration: 300 }}
+      out:fade={{ duration: 100 }}
+    >
+      <span
+        id="{id}-account-label"
+        class="text-text-tertiary mb-2 text-sm font-medium"
+      >
+        {$t`Account`}
+      </span>
+      <div
+        class={[
+          "border-border-secondary bg-bg-primary mb-5 flex flex-col overflow-hidden rounded-xl border",
+          "has-[input:focus-visible]:outline-focus-ring has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2",
+        ]}
+      >
+        <!-- Native radios: arrow keys, a single tab stop and the radio
+               announcement come from the browser. -->
+        <fieldset
+          class="flex min-w-0 flex-col"
+          aria-labelledby="{id}-account-label"
+          disabled={isAuthenticatingDefault}
+        >
+          {#each accounts as account (account.account_number[0])}
+            {@render accountRow(account)}
+          {/each}
+        </fieldset>
+        <Tooltip
+          label={$t`Limit reached`}
+          description={$plural(MAX_ACCOUNTS, {
+            one: `You have reached the maximum of # account for a single app.`,
+            other: `You have reached the maximum of # accounts for a single app.`,
+          })}
+          direction="up"
+          align="center"
+          hidden={!isAccountLimitReached}
+        >
+          <button
+            class={[
+              "text-fg-primary hover:not-disabled:bg-bg-tertiary disabled:text-fg-disabled flex h-13 w-full cursor-pointer flex-row items-center gap-3 px-4 text-start text-sm font-semibold disabled:cursor-default",
+              "focus-visible:outline-focus-ring rounded-b-[calc(var(--radius-xl)-1px)] focus-visible:outline-2 focus-visible:-outline-offset-2",
+            ]}
+            onclick={() => (isCreateAccountDialogVisible = true)}
+            disabled={isAccountLimitReached}
           >
-            <div class="mt-3 shrink-0">
-              <button
-                class="btn btn-tertiary w-full"
-                onclick={() => (isCreateAccountDialogVisible = true)}
-                disabled={isAccountLimitReached}
-              >
-                <PlusIcon class="size-5" />
-                {$t`Add another account`}
-              </button>
-            </div>
-          </Tooltip>
-        </div>
+            <PlusIcon class="size-4.5 shrink-0" />
+            {$t`Add another account`}
+          </button>
+        </Tooltip>
+      </div>
+      <span class="text-text-tertiary mb-2 text-sm font-medium">
+        {$t`Session`}
+      </span>
+      <!-- How long the sign-in lasts before the user must sign in again,
+             capped at the duration the app requested (see `ceilingSeconds`). -->
+      <div
+        class="border-border-secondary bg-bg-primary flex h-13 flex-row items-center gap-3 rounded-xl border ps-4 pe-1.5"
+      >
+        <span class="text-text-secondary flex-1 text-sm">
+          {$t`Stay signed in for`}
+        </span>
+        <SessionDurationSelect
+          maxSeconds={ceilingSeconds}
+          bind:value={selectedTtlSeconds}
+          disabled={isAuthenticatingDefault}
+          variant="tertiary"
+        />
       </div>
     </div>
   </div>
 {/snippet}
 
-{#snippet continueDefault()}
-  <div
-    class="col-start-1 row-start-1 pb-6"
-    in:fade={{ duration: 200, delay: 100 }}
-  >
+<div class="flex flex-1 flex-col">
+  {#if header}
+    {@render header()}
+  {:else}
+    <AuthorizeHeader origin={displayOrigin} metadataOrigin={effectiveOrigin} />
+    <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
+      {$t`Continue to ${dappName}`}
+    </h1>
+    <p class="text-text-secondary mb-6 self-start text-sm">
+      {$t`with your Internet Identity`}
+    </p>
+  {/if}
+  <div class="grid grid-cols-1">
+    {#if isMultipleAccountsEnabled && accounts !== undefined}
+      {@render allOptions(accounts)}
+    {/if}
+  </div>
+  <div class="pb-6">
     <button
       class="btn btn-primary btn-xl w-full"
-      onclick={handleContinueDefault}
+      onclick={() => {
+        if (!isMultipleAccountsEnabled) {
+          void handleContinueDefault();
+          return;
+        }
+        if (isLoadingAccounts) {
+          return;
+        }
+        void handleContinueAs(chosenAccountNumber);
+      }}
       disabled={isAuthenticatingDefault || mustChooseAccess}
+      aria-disabled={isLoadingAccounts}
     >
       {#if isAuthenticatingDefault}
         <ProgressRing />
@@ -610,59 +753,6 @@
         <span>{continueLabel ?? $t`Continue`}</span>
       {/if}
     </button>
-  </div>
-{/snippet}
-
-<div class="flex flex-1 flex-col">
-  {#if header}
-    {@render header()}
-  {:else}
-    <AuthorizeHeader origin={displayOrigin} />
-    <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-      {$t`Continue to ${dappName}`}
-    </h1>
-    <p class="text-text-secondary mb-6 self-start text-sm">
-      {$t`with your Internet Identity`}
-    </p>
-  {/if}
-  {#if isMultipleAccountsEnabled}
-    <!-- Session: how long the sign-in lasts before the user must sign in
-         again, capped at the duration the app requested (see `ceilingSeconds`).
-         Revealed alongside the account choices when "all options" is on. -->
-    <div class="border-border-tertiary mb-6 flex flex-col border-t pt-4">
-      <span class="text-text-primary mb-0.5 text-base font-medium">
-        {$t`Session duration`}
-      </span>
-      <div class="flex flex-row items-center justify-between gap-2">
-        <span class="text-text-tertiary text-base">
-          {$t`until you have to sign in again`}
-        </span>
-        <SessionDurationSelect
-          maxSeconds={ceilingSeconds}
-          bind:value={selectedTtlSeconds}
-          disabled={isAuthenticatingDefault}
-        />
-      </div>
-    </div>
-    <span class="text-text-primary mb-3 self-start text-base font-medium">
-      {$t`Available accounts`}
-    </span>
-  {/if}
-  <div class="grid">
-    <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
-    {#if isMultipleAccountsEnabled && accounts !== undefined}
-      {@render accountList(accounts)}
-    {:else if isMultipleAccountsEnabled}
-      <div
-        class="col-start-1 row-start-1 flex min-h-18 items-center justify-center pb-6"
-        in:fade={{ duration: 100, delay: 300 }}
-        out:fade={{ duration: 100 }}
-      >
-        <ProgressRing class="text-fg-tertiary size-8" />
-      </div>
-    {:else}
-      {@render continueDefault()}
-    {/if}
   </div>
   <div class="flex flex-row items-center">
     <!-- Intentionally we use onclick here instead of onchange to make sure it's a user gesture-->
@@ -713,7 +803,10 @@
 
 {#if isEditAccountDialogVisibleFor !== undefined}
   {@const account = {
-    name: isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName,
+    name:
+      isEditAccountDialogVisibleFor.name[0] ??
+      editDialogFallbackName ??
+      primaryAccountName,
     isDefaultSignIn:
       defaultAccountNumber === isEditAccountDialogVisibleForNumber,
   }}

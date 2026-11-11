@@ -5,7 +5,12 @@ import { Principal } from "@icp-sdk/core/principal";
 
 // See: https://www.jsonrpc.org/specification#error_object
 export const INVALID_PARAMS_ERROR_CODE = -32602;
+export const METHOD_NOT_FOUND_ERROR_CODE = -32601;
 // See: https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md#errors-3
+/// Placed in ICRC-25's 3xxx "user action" range, so a client can tell a silent request
+/// that needs a ceremony apart from a real failure.
+export const INTERACTION_REQUIRED_ERROR_CODE = 3002;
+
 export const GENERIC_ERROR_CODE = 1000;
 
 export interface ChannelOptions {
@@ -134,6 +139,41 @@ export const StringToBigIntCodec = z.codec(z.string(), z.bigint(), {
   decode: (str) => BigInt(str),
   encode: (bigint) => bigint.toString(),
 });
+
+/**
+ * A `nat64` as the decimal string JSON-RPC carries it.
+ *
+ * `BigInt` reads more than that — `""` and `" "` are `0n`, `"+1"` is `1n`, `"0x10"` is
+ * `16n` — and the bounds below reject none of them, so a malformed duration would arrive
+ * as a number the canister silently clamps rather than as an error the app can act on.
+ * Digits only, therefore, checked before converting. What is left is reported rather than
+ * thrown: a throw inside a codec escapes `safeParse` instead of becoming a validation
+ * issue, and a caller sending nonsense would get no answer at all.
+ */
+const DECIMAL_DIGITS = /^\d+$/;
+
+export const Nat64StringCodec = z.codec(
+  z.string(),
+  z
+    .bigint()
+    .min(BigInt(0))
+    .max(BigInt(2) ** BigInt(64) - BigInt(1)),
+  {
+    decode: (value, ctx) => {
+      if (!DECIMAL_DIGITS.test(value)) {
+        ctx.issues.push({
+          code: "invalid_format",
+          format: "nat64",
+          input: value,
+          message: "expected a nat64 as a decimal string",
+        });
+        return z.NEVER;
+      }
+      return BigInt(value);
+    },
+    encode: (value) => value.toString(),
+  },
+);
 
 export const StringOrNumberToBigIntCodec = z.codec(
   z.union([z.string(), z.number(), z.bigint()]),

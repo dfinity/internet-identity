@@ -75,11 +75,17 @@ pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) ->
 }
 
 pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
-    let salt = state::salt();
+    calculate_anchor_seed_with_salt(&state::salt(), anchor_number, frontend)
+}
 
+pub fn calculate_anchor_seed_with_salt(
+    salt: &[u8; 32],
+    anchor_number: AnchorNumber,
+    frontend: &FrontendHostname,
+) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
-    blob.extend_from_slice(&salt);
+    blob.extend_from_slice(salt);
 
     let anchor_number_str = anchor_number.to_string();
     let anchor_number_blob = anchor_number_str.bytes();
@@ -95,12 +101,14 @@ pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHos
 /// Calculate a seed only from an `AccountNumber` and `FrontendHostname`.
 /// This is only called when we're not dealing with a default account.
 /// The anchor number is not included because accounts are not tied to specific anchors.
-pub fn calculate_account_seed(account_number: AccountNumber, frontend: &FrontendHostname) -> Hash {
-    let salt = state::salt();
-
+pub fn calculate_account_seed_with_salt(
+    salt: &[u8; 32],
+    account_number: AccountNumber,
+    frontend: &FrontendHostname,
+) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
-    blob.extend_from_slice(&salt);
+    blob.extend_from_slice(salt);
 
     blob.push(ACCOUNT_SEED_PREFIX.len() as u8);
     blob.extend(ACCOUNT_SEED_PREFIX.bytes());
@@ -116,6 +124,34 @@ pub fn calculate_account_seed(account_number: AccountNumber, frontend: &Frontend
     hash_bytes(blob)
 }
 
+const SESSION_SEED_PREFIX: &str = "session";
+
+/// The seed of a session's canister-signed identity.
+///
+/// Built on the account's own seed, so a session survives anything that leaves the
+/// account's principal unchanged, including naming a default account. `session_id` is
+/// the only other input, and no two sessions are ever allocated the same one, so a
+/// revoked session's identity can never be arrived at a second time. Unguessability
+/// comes from the salt.
+pub fn calculate_session_seed_with_salt(
+    salt: &[u8; 32],
+    account_seed: &Hash,
+    session_id: SessionId,
+) -> Hash {
+    fn push_field(blob: &mut Vec<u8>, data: &[u8]) {
+        blob.extend_from_slice(&(data.len() as u64).to_be_bytes());
+        blob.extend_from_slice(data);
+    }
+
+    let mut blob: Vec<u8> = vec![];
+    push_field(&mut blob, salt);
+    push_field(&mut blob, SESSION_SEED_PREFIX.as_bytes());
+    push_field(&mut blob, account_seed);
+    push_field(&mut blob, &session_id.to_be_bytes());
+
+    hash_bytes(blob)
+}
+
 fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(value.as_ref());
@@ -123,27 +159,57 @@ fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
 }
 
 pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
-    let my_canister_id = id();
-    CanisterSigPublicKey::new(my_canister_id, seed).to_der()
+    der_encode_canister_sig_key_for(id(), seed)
 }
 
-/// Adds a delegation signature for `pk` to the signature map. `permissions`
-/// is the delegation's optional `permissions` field (folded into the signed
-/// message when present) — pass `access.permissions()` of a
-/// [`DelegationAccess`], or `None` for flows that never restrict.
+pub(crate) fn der_encode_canister_sig_key_for(canister_id: Principal, seed: Vec<u8>) -> Vec<u8> {
+    CanisterSigPublicKey::new(canister_id, seed).to_der()
+}
+
+/// The principal a dapp sees for an account: the self-authenticating principal over
+/// the DER-encoded canister signature key for the account's seed.
+pub(crate) fn canister_sig_principal(canister_id: Principal, seed: Vec<u8>) -> Principal {
+    Principal::self_authenticating(der_encode_canister_sig_key_for(canister_id, seed))
+}
+
+/// Adds a delegation signature for `pk` to the signature map.
+///
+/// `targets` is the delegation's optional `targets` field and `permissions` its optional
+/// `permissions` field, both folded into the signed message when present — pass
+/// `access.permissions()` of a [`DelegationAccess`], and `None` for flows that never
+/// restrict. Whatever is passed here has to be passed again when the signature is
+/// fetched: the two messages must match byte for byte or the lookup finds nothing.
 pub fn add_delegation_signature(
     sigs: &mut SignatureMap,
     pk: PublicKey,
     seed: &[u8],
     expiration: Timestamp,
+    targets: Option<&[Principal]>,
     permissions: Option<&str>,
 ) {
+    let targets = targets.map(target_bytes);
     let inputs = CanisterSigInputs {
         domain: DELEGATION_SIG_DOMAIN,
         seed,
-        message: &delegation_signature_msg_with_permissions(&pk, expiration, None, permissions),
+        message: &delegation_signature_msg_with_permissions(
+            &pk,
+            expiration,
+            targets.as_ref(),
+            permissions,
+        ),
     };
     sigs.add_signature(&inputs);
+}
+
+/// The `targets` field as the signed message carries it: each principal as raw bytes.
+///
+/// The side that adds a signature and the side that fetches it both convert through
+/// here, because the two messages have to be identical or the lookup finds nothing.
+pub fn target_bytes(targets: &[Principal]) -> Vec<Vec<u8>> {
+    targets
+        .iter()
+        .map(|target| target.as_slice().to_vec())
+        .collect()
 }
 
 /// The value of a delegation's `permissions` field that restricts the
@@ -230,15 +296,31 @@ pub fn delegation_signature_msg_with_permissions(
     representation_independent_hash(m.as_slice()).to_vec()
 }
 
-pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
-    const FRONTEND_HOSTNAME_LIMIT: usize = 255;
+pub(crate) const FRONTEND_HOSTNAME_LIMIT: usize = 255;
 
+pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
     let n = frontend.len();
     if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
         trap(&format!(
             "frontend hostname {n} exceeds the limit of {FRONTEND_HOSTNAME_LIMIT} bytes",
         ));
     }
+}
+
+/// The same bound as [`check_frontend_length`], answered rather than trapped.
+///
+/// A hostname this long is not reachable through any client, so what comes back says
+/// only that it was refused — for callers whose response already carries a variant for
+/// the unreachable edges, which is a better answer than a rejected message the caller
+/// cannot read as one.
+pub(crate) fn frontend_length_within_limit(frontend: &FrontendHostname) -> Result<(), String> {
+    if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
+        return Err(format!(
+            "frontend hostname {} exceeds the limit of {FRONTEND_HOSTNAME_LIMIT} bytes",
+            frontend.len()
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -10,6 +10,9 @@
 # icp-cli temporary files
 .icp/
 
+# test app release assets downloaded by scripts/fetch-test-app
+.test-app/
+
 # frontend code
 node_modules/
 src/frontend/generated/
@@ -19,7 +22,6 @@ dist/
 lib
 !src/frontend/src/lib
 src/frontend/src/lib/generated
-demos/vc_issuer/app/generated/
 
 # Cargo build output
 target/

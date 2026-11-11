@@ -26,17 +26,8 @@ import {
   attributeConsentStore,
 } from "$lib/stores/attributeConsent.store";
 import { get } from "svelte/store";
-
-/** Serialize delegation requests so a malicious dapp sending several in
- *  parallel can't race the authorization state (effective origin, auth
- *  flow, authorized account) against itself. */
-let delegationQueueTail: Promise<unknown> = Promise.resolve();
-const serializeDelegationRequest = <T>(fn: () => Promise<T>): Promise<T> => {
-  const prev = delegationQueueTail;
-  const next = prev.then(fn);
-  delegationQueueTail = next.catch(() => {});
-  return next;
-};
+import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
+import { grantedTimeToLive } from "$lib/utils/sessionDuration";
 
 /**
  * ICRC-34: handle a delegation request from the relying party.
@@ -66,7 +57,7 @@ export const handleDelegationRequest =
       return;
     }
 
-    await serializeDelegationRequest(async () => {
+    await serializeSignInRequest(async () => {
       try {
         const params = result.data;
 
@@ -117,10 +108,15 @@ export const handleDelegationRequest =
 
         // Read the identity *after* authorization so we capture whichever
         // identity the user settled on (they may have switched mid-flow).
-        const [accountNumber, { identityNumber, actor }] = await Promise.all([
-          authorized.accountNumberPromise,
-          waitForStore(authenticationStore),
-        ]);
+        const [accountNumber, { identityNumber, actor, authMethod }] =
+          await Promise.all([
+            authorized.accountNumberPromise,
+            waitForStore(authenticationStore),
+          ]);
+        const ssoSessionMaxAgeNs =
+          "openid" in authMethod
+            ? authMethod.openid.ssoSessionMaxAgeNs
+            : undefined;
 
         const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 
@@ -140,11 +136,14 @@ export const handleDelegationRequest =
         // omitted-arg default.
         const permissions = toPermissionsArg(authorized.accessLevel);
 
-        // Prefer the duration the user chose on the sign-in screen; it's already
-        // capped at the app's request. Fall back to the app's requested value
-        // for flows without a picker (e.g. 1-click OpenID/SSO), and to the
-        // backend default when neither is set.
-        const maxTimeToLive = authorized.maxTimeToLive ?? params.maxTimeToLive;
+        // An SSO organization caps how long its sign-ins stay valid, and the
+        // delegation must not outlive that, so an SSO session sends a duration
+        // even when neither the picker nor the app asked for one.
+        const maxTimeToLive = grantedTimeToLive({
+          authorized: authorized.maxTimeToLive,
+          requested: params.maxTimeToLive,
+          ssoSessionMaxAgeNs,
+        });
 
         const { user_key, expiration } = await actor
           .prepare_account_delegation(

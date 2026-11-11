@@ -10,7 +10,7 @@ use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
     OpenIdCredentialAddError, OpenIdCredentialKey, OpenIdDelegationError, OpenIdResult,
-    PublicKeyAuthn, SsoCredentialMigrationEntry,
+    PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{PocketIc, RejectResponse};
@@ -685,71 +685,6 @@ fn can_remove_google_account() -> Result<(), RejectResponse> {
             _ => panic!("We should get a NoSuchAnchor error here!"),
         },
     }
-}
-
-/// Verifies that the `sso_credential_migration` upgrade arg backfills the
-/// `sso_domain` / `sso_name` fields of stored credentials via the batched
-/// timer migration (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
-#[test]
-fn should_backfill_sso_fields_via_credential_migration() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = setup_canister(&env);
-    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
-        openid_google_test_data();
-
-    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
-
-    sync_time(&env, test_time);
-
-    let _ = api::openid_credential_add(
-        &env,
-        canister_id,
-        test_principal,
-        identity_number,
-        &jwt,
-        &salt,
-    )?;
-
-    // The credential was written by a direct provider, so it carries no SSO
-    // stamp — the exact shape pre-migration SSO credentials are stored in.
-    let credentials = api::get_anchor_info(&env, canister_id, test_principal, identity_number)?
-        .openid_credentials
-        .expect("Could not fetch credentials!");
-    assert_eq!(credentials[0].sso_domain, None);
-    assert_eq!(credentials[0].sso_name, None);
-
-    // Upgrade with a migration entry matching the stored credential's
-    // `(iss, aud)`. The stamped values `acme.com` / `Acme Corp` exist ONLY
-    // in this arg: no discovery task is ever registered in this test, so the
-    // response-shaping fallback (`sso_fields_for`, which reads
-    // `DISCOVERY_TASKS`) can only ever yield `(None, None)` here. The
-    // post-upgrade assertions below therefore prove the values came from the
-    // stored stamp written by the migration, not from the live fallback.
-    let arg = InternetIdentityInit {
-        sso_credential_migration: Some(vec![SsoCredentialMigrationEntry {
-            discovery_domain: "acme.com".into(),
-            issuer: claims.iss.clone(),
-            client_id: claims.aud.clone(),
-            name: Some("Acme Corp".into()),
-        }]),
-        ..Default::default()
-    };
-    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(arg))
-        .expect("Failed to upgrade canister");
-
-    // Let the interval timer drive the batch migration to completion.
-    for _ in 0..5 {
-        env.advance_time(Duration::from_secs(1));
-        env.tick();
-    }
-
-    let credentials = api::get_anchor_info(&env, canister_id, test_principal, identity_number)?
-        .openid_credentials
-        .expect("Could not fetch credentials!");
-    assert_eq!(credentials[0].sso_domain, Some("acme.com".to_string()));
-    assert_eq!(credentials[0].sso_name, Some("Acme Corp".to_string()));
-
-    Ok(())
 }
 
 /// Verifies that valid JWT delegations are issued based on added credential.
@@ -1466,6 +1401,132 @@ fn number_of_openid_credentials(
     Ok(openid_credentials.len())
 }
 
+/// A second discovery domain that publishes the same `client_id` and points at
+/// the same IdP as `SSO_DOMAIN`.
+const OTHER_SSO_DOMAIN: &str = "other.example.org";
+
+/// [`sso_http_responses`] with the hop-1 well-known served from
+/// `OTHER_SSO_DOMAIN` instead; hop 2 and the JWKS stay the same.
+fn sso_http_responses_on_other_domain() -> Vec<(String, String)> {
+    let mut responses = sso_http_responses();
+    responses[0].0 = format!("https://{OTHER_SSO_DOMAIN}/.well-known/ii-openid-configuration");
+    responses
+}
+
+/// A credential linked through one discovery domain does not sign in through
+/// another: the anchor lookup is scoped to the domain the credential was
+/// established through, while registration uniqueness is not. The delegation
+/// endpoints report that as `SsoDomainMismatch`, naming the registered domain,
+/// rather than as `NoSuchAnchor`, which a client would answer with a sign-up
+/// that `openid_identity_registration_finish` then rejects as already registered.
+#[test]
+fn sso_delegation_through_other_domain_reports_registered_domain() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = setup_sso_canister(&env);
+    let responses = sso_http_responses();
+    let other_responses = sso_http_responses_on_other_domain();
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+    sync_time(&env, test_time);
+
+    // Link the credential through `SSO_DOMAIN` (stamps `sso_domain = SSO_DOMAIN`).
+    drive_sso_until_ready(&env, &responses, || {
+        api::openid_credential_add_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            identity_number,
+            &jwt,
+            &salt,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap()
+    })
+    .expect("SSO credential add failed");
+
+    let pub_session_key = ByteBuf::from("session public key");
+    let expected = OpenIdDelegationError::SsoDomainMismatch {
+        registered_sso_domain: Some(SSO_DOMAIN.to_string()),
+    };
+
+    // The same token verified through `OTHER_SSO_DOMAIN` finds no anchor
+    // established through that domain, but the credential is registered.
+    let prepared = drive_sso_until_ready(&env, &other_responses, || {
+        api::openid_prepare_delegation_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            &jwt,
+            &salt,
+            &pub_session_key,
+            Some(OTHER_SSO_DOMAIN),
+        )
+        .unwrap()
+    });
+    assert_eq!(prepared.err(), Some(expected.clone()));
+
+    // The query path (caches warm now) reports the same.
+    let delegation = api::openid_get_delegation_with_discovery(
+        &env,
+        canister_id,
+        test_principal,
+        &jwt,
+        &salt,
+        &pub_session_key,
+        &0,
+        Some(OTHER_SSO_DOMAIN),
+    )?;
+    assert!(
+        matches!(&delegation, OpenIdResult::Err(err) if *err == expected),
+        "expected {expected:?}, got {delegation:?}"
+    );
+
+    // Through the domain it was linked with, the credential still signs in.
+    drive_sso_until_ready(&env, &responses, || {
+        api::openid_prepare_delegation_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            &jwt,
+            &salt,
+            &pub_session_key,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap()
+    })
+    .expect("SSO prepare delegation through the registered domain failed");
+
+    // A credential no anchor holds is still `NoSuchAnchor`.
+    api::openid_credential_remove(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &claims.key(),
+    )?
+    .expect("credential remove failed");
+    let removed = drive_sso_until_ready(&env, &other_responses, || {
+        api::openid_prepare_delegation_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            &jwt,
+            &salt,
+            &pub_session_key,
+            Some(OTHER_SSO_DOMAIN),
+        )
+        .unwrap()
+    });
+    assert!(
+        matches!(removed, Err(OpenIdDelegationError::NoSuchAnchor)),
+        "expected NoSuchAnchor for an unregistered credential, got {removed:?}"
+    );
+
+    Ok(())
+}
+
 // End-to-end tests for the `sso_prepare_delegation` / `sso_get_delegation` gate path.
 mod sso_gating {
     use super::*;
@@ -1603,8 +1664,22 @@ mod sso_gating {
 
     /// Assemble the well-known (`app_clients` map JSON, gate flag, stable claim).
     fn well_known(app_clients_json: &str, gate_all_apps: bool, stable_claim: &str) -> String {
+        well_known_with_session_max_age(app_clients_json, gate_all_apps, stable_claim, None)
+    }
+
+    /// Like [`well_known`] but declares `session_max_age_seconds`. `None` omits
+    /// the field, so the canister's eight-hour default applies.
+    fn well_known_with_session_max_age(
+        app_clients_json: &str,
+        gate_all_apps: bool,
+        stable_claim: &str,
+        session_max_age_seconds: Option<u64>,
+    ) -> String {
+        let session_max_age = session_max_age_seconds
+            .map(|seconds| format!(r#","session_max_age_seconds":{seconds}"#))
+            .unwrap_or_default();
         format!(
-            r#"{{"client_id":"{II_CLIENT}","openid_configuration":"{GATE_ISSUER}/.well-known/openid-configuration","name":"Gate","app_clients":{app_clients_json},"gate_all_apps":{gate_all_apps},"stable_identifier_claim":"{stable_claim}"}}"#
+            r#"{{"client_id":"{II_CLIENT}","openid_configuration":"{GATE_ISSUER}/.well-known/openid-configuration","name":"Gate","app_clients":{app_clients_json},"gate_all_apps":{gate_all_apps},"stable_identifier_claim":"{stable_claim}"{session_max_age}}}"#
         )
     }
 
@@ -1675,10 +1750,6 @@ mod sso_gating {
             .unwrap()
         })
         .expect("II-client SSO credential add failed");
-        // Initialize the salt so `prepare_icrc3_attributes`'s SSO-session seed
-        // computation has a salt to hash against; otherwise it traps with
-        // "Salt is not set".
-        api::init_salt(env, canister_id).unwrap();
         identity_number
     }
 
@@ -1860,6 +1931,67 @@ mod sso_gating {
             matches!(via_b, Err(OpenIdDelegationError::NoSuchAnchor)),
             "a gated login through a foreign discovery domain must not resolve \
              onto an identity established through another domain, got {via_b:?}"
+        );
+
+        Ok(())
+    }
+
+    /// The ungated gate-path counterpart of
+    /// [`gated_login_cannot_resolve_across_discovery_domains`]: an II-client
+    /// login through domain B, for a credential established through A, does not
+    /// resolve either — and since the credential is registered, the SSO
+    /// endpoints report `SsoDomainMismatch` naming A rather than `NoSuchAnchor`.
+    /// A gated (per-app) login through B stays `NoSuchAnchor`: it never reaches
+    /// the II-client credential, so nothing is disclosed to a foreign domain's
+    /// per-app client.
+    #[test]
+    fn ungated_login_through_other_domain_reports_registered_domain() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
+        let responses_a = responses(well_known("{}", false, "sub"), jwks.clone());
+        register_with_ii_client_credential(&env, canister_id, &responses_a, &ii_client_jwt);
+
+        // Domain B declares the same II client and IdP; at an ungated origin the
+        // II-client token resolves to the II-client credential itself.
+        let responses_b = responses_on_domain(FOREIGN_DOMAIN, well_known("{}", false, "sub"), jwks);
+        let session_key = ByteBuf::from("dapp session key");
+        let expected = OpenIdDelegationError::SsoDomainMismatch {
+            registered_sso_domain: Some(GATE_DOMAIN.to_string()),
+        };
+
+        let via_b = drive_sso_until_ready(&env, &responses_b, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &ii_client_jwt,
+                &test_salt(),
+                &session_key,
+                FOREIGN_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert_eq!(via_b.err(), Some(expected.clone()));
+
+        let via_b_query = api::sso_get_delegation(
+            &env,
+            canister_id,
+            test_principal(),
+            &ii_client_jwt,
+            &test_salt(),
+            &session_key,
+            &0,
+            FOREIGN_DOMAIN,
+            UNGATED_ORIGIN,
+            &[],
+        )?;
+        assert!(
+            matches!(&via_b_query, OpenIdResult::Err(err) if *err == expected),
+            "expected {expected:?}, got {via_b_query:?}"
         );
 
         Ok(())
@@ -2938,6 +3070,110 @@ mod sso_gating {
         assert!(
             with_bundle.iter().any(|(k, _)| *k == sso_email_key),
             "an SSO session with a certified bundle must be offered sso:<domain> rows, got {with_bundle:?}"
+        );
+        Ok(())
+    }
+
+    /// Reads `sso:<domain>:expires_at_timestamp_ns` out of a certified bundle.
+    fn session_expiry_from_message(message: &[u8]) -> u64 {
+        use candid::Decode;
+        use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+        let key = format!("sso:{GATE_DOMAIN}:expires_at_timestamp_ns");
+        let value: Icrc3Value =
+            candid::Decode!(message, Icrc3Value).expect("failed to decode ICRC-3 value");
+        let Icrc3Value::Map(entries) = value else {
+            panic!("expected a map, got {value:?}");
+        };
+        let (_, expiry) = entries
+            .iter()
+            .find(|(k, _)| *k == key)
+            .unwrap_or_else(|| panic!("expected {key} in {entries:?}"));
+        match expiry {
+            Icrc3Value::Nat(nat) => u64::try_from(nat.0.clone()).expect("expiry fits in u64"),
+            other => panic!("expected {key} to be a Nat, got {other:?}"),
+        }
+    }
+
+    /// The certified bundle carries the domain's session deadline, and it is the
+    /// org's value rather than the bundle's own five-minute freshness window.
+    #[test]
+    fn sso_attributes_carry_the_domains_session_deadline() -> Result<(), RejectResponse> {
+        const SESSION_MAX_AGE_SECONDS: u64 = 15 * 60;
+        let env = env();
+        let canister_id = install(&env);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(
+            well_known_with_session_max_age(
+                &app_clients,
+                false,
+                "sub",
+                Some(SESSION_MAX_AGE_SECONDS),
+            ),
+            jwks,
+        );
+
+        // The deadline is stamped from the ceremony's clock, so bracket it.
+        let before_ns = env.get_time().as_nanos_since_unix_epoch();
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
+        let after_ns = env.get_time().as_nanos_since_unix_epoch();
+
+        let prepared = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?
+        .expect("prepare_icrc3_attributes succeeds");
+
+        let expiry = session_expiry_from_message(&prepared.message);
+        let max_age_ns = SESSION_MAX_AGE_SECONDS * 1_000_000_000;
+        assert!(
+            expiry >= before_ns + max_age_ns && expiry <= after_ns + max_age_ns,
+            "expected a deadline {max_age_ns}ns after the ceremony (between {} and {}), got {expiry}",
+            before_ns + max_age_ns,
+            after_ns + max_age_ns
+        );
+        // Distinct from the bundle's own freshness window, which is five minutes.
+        assert!(
+            expiry > after_ns + 5 * 60 * 1_000_000_000,
+            "the session deadline must outlive the bundle's freshness window, got {expiry}"
+        );
+        Ok(())
+    }
+
+    /// A domain that declares no `session_max_age_seconds` gets the eight-hour default.
+    #[test]
+    fn sso_attributes_default_to_an_eight_hour_session() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+
+        let before_ns = env.get_time().as_nanos_since_unix_epoch();
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
+        let after_ns = env.get_time().as_nanos_since_unix_epoch();
+
+        let prepared = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?
+        .expect("prepare_icrc3_attributes succeeds");
+
+        let expiry = session_expiry_from_message(&prepared.message);
+        let eight_hours_ns = 8 * 60 * 60 * 1_000_000_000;
+        assert!(
+            expiry >= before_ns + eight_hours_ns && expiry <= after_ns + eight_hours_ns,
+            "expected the eight-hour default (between {} and {}), got {expiry}",
+            before_ns + eight_hours_ns,
+            after_ns + eight_hours_ns
         );
         Ok(())
     }

@@ -64,8 +64,8 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
 };
 use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
 use internet_identity_interface::internet_identity::types::smtp::{
-    smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
-    SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
+    smtp_err, validate_header_values, validate_smtp_request, SmtpRequest, SmtpResponse,
+    SMTP_ERR_MAILBOX_UNAVAILABLE, SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
@@ -237,6 +237,15 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         }
     };
 
+    // A header value carrying a control character or a bare CR/LF did
+    // not come from a conforming MTA, and is not the value that was
+    // signed. Drop it here rather than returning an error: the response
+    // goes back as a bounce to whatever envelope sender the message
+    // claimed, so per-message problems answer `Ok` (see the module note).
+    if validate_header_values(message).is_err() {
+        return SmtpResponse::Ok {};
+    }
+
     // Extract the canister-issued nonce from the Subject header. If
     // there's no Subject, no II-Recovery- prefix, or no pending
     // challenge for the discovered nonce, treat the message as not
@@ -276,16 +285,28 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             c.message_id = request.message_id.clone();
         }
         let kind = match (&c.kind, recipient_flow) {
-            (PendingKind::Register { anchor }, RecipientFlow::Setup) => {
-                SnapshotKind::Setup { anchor: *anchor }
-            }
+            // `authorization_key` is not needed on the SMTP snapshot —
+            // re-auth runs at finalize (submit_leaf / resolve_via_doh)
+            // where the bind actually happens. SMTP only stashes the
+            // partial and flips status to NeedDkimLeaf / ResolvingDoh.
+            (
+                PendingKind::Register {
+                    anchor,
+                    authorization_key: _,
+                },
+                RecipientFlow::Setup,
+            ) => SnapshotKind::Setup { anchor: *anchor },
             // VerifyEmail rides the Setup recipient: the magic email
             // is addressed to `register@id.ai` (same as Register).
             // The Subject prefix (`II-Verify-…`) and the `PendingKind`
             // are what disambiguate the two flows from here on.
-            (PendingKind::VerifyEmail { anchor }, RecipientFlow::Setup) => {
-                SnapshotKind::VerifyEmail { anchor: *anchor }
-            }
+            (
+                PendingKind::VerifyEmail {
+                    anchor,
+                    authorization_key: _,
+                },
+                RecipientFlow::Setup,
+            ) => SnapshotKind::VerifyEmail { anchor: *anchor },
             (PendingKind::Recover { session_pk }, RecipientFlow::Recovery) => {
                 SnapshotKind::Recovery {
                     session_pk: session_pk.clone(),
@@ -656,22 +677,17 @@ pub(super) fn extract_from_address(
         .iter()
         .find(|h| h.name.eq_ignore_ascii_case("From"))
         .ok_or(EmailChallengeError::AddressMismatch)?;
-    let value = from_header.value.trim();
-    // `From:` is RFC 5322 `address-list` in the general case, but
-    // DMARC requires exactly one mailbox. The DMARC verifier already
-    // enforced that, so by the time we're here the value is a
-    // single mailbox in either `addr-spec` or `name-addr` form.
-    let addr_spec = if let Some(start) = value.rfind('<') {
-        let end = value
-            .rfind('>')
-            .ok_or(EmailChallengeError::AddressMismatch)?;
-        if end <= start + 1 {
-            return Err(EmailChallengeError::AddressMismatch);
-        }
-        &value[start + 1..end]
-    } else {
-        value
-    };
+    // `From:` is RFC 5322 `address-list` in the general case, but the
+    // recovery flow needs exactly one mailbox. Parse it with the same
+    // single-mailbox parser DMARC alignment uses (`dmarc::from_header`)
+    // rather than a second, looser scan here — one parser, one set of
+    // rules for what counts as a single mailbox (no address-list, no
+    // group syntax, display name tolerated). Any parse failure maps to
+    // `AddressMismatch`: by this point DKIM verify has accepted the
+    // message, so a `From:` we can't resolve to one mailbox is
+    // observably "doesn't match".
+    let addr_spec = crate::dmarc::parse_single_mailbox_addr_spec(&from_header.value)
+        .map_err(|_| EmailChallengeError::AddressMismatch)?;
     // Apply the same RFC 5321 §4.5.3.1 caps as `prepare_add` did
     // when accepting the claimed address. Defense in depth: a real
     // SMTP path won't deliver an oversized address (RFC 5321 line
@@ -871,7 +887,7 @@ pub(super) fn recovery_snapshot(
 /// `RecoveryReady { user_key, expiration, anchor_number }`, and
 /// `email_recovery_get_delegation` reads the cached `seed` to look
 /// up the signature without re-deriving from the anchor.
-pub(super) async fn stamp_recovery_delegation(
+pub(super) fn stamp_recovery_delegation(
     snapshot: &PendingSnapshot,
     session_pk: &SessionKey,
 ) -> Result<super::pending::RecoveryOutcome, EmailChallengeError> {
@@ -887,12 +903,6 @@ pub(super) async fn stamp_recovery_delegation(
     })
     .ok_or(EmailChallengeError::AddressNotRegistered)?;
 
-    // The signature-map operations need the canister salt. In
-    // production it's already initialised (every prior delegation
-    // call paid that cost); we await defensively in case this is
-    // the very first delegation since deploy.
-    state::ensure_salt_set().await;
-
     let expiration =
         ic_cdk::api::time().saturating_add(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS);
     let seed: Hash = calculate_email_recovery_seed(&snapshot.claimed_address, anchor_number);
@@ -904,6 +914,7 @@ pub(super) async fn stamp_recovery_delegation(
             session_pk.clone(),
             &seed,
             expiration,
+            None,
             None,
         );
     });
@@ -1101,6 +1112,160 @@ mod tests {
             body: ByteBuf::new(),
         };
         assert_eq!(extract_from_address(&msg).unwrap(), "alice@gmail.com");
+    }
+
+    #[test]
+    fn extract_from_single_mailbox() {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        let msg = |value: &str| SmtpMessage {
+            headers: vec![SmtpHeader {
+                name: "From".into(),
+                value: value.into(),
+            }],
+            body: ByteBuf::new(),
+        };
+        assert!(matches!(
+            extract_from_address(&msg("Alice <alice@example.com>, Bob <bob@example.com>")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("group: alice@example.com;")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+    }
+
+    #[test]
+    fn extract_from_rejects_crlf_spliced_header() {
+        // A `From:` value carrying a second mailbox smuggled behind an
+        // embedded CRLF must not resolve to that second mailbox — it is
+        // not a single mailbox, so extraction fails closed. Before the
+        // single-mailbox parser this returned the *last* angle-bracket
+        // pair, i.e. the attacker-chosen `victim@`.
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        let msg = SmtpMessage {
+            headers: vec![SmtpHeader {
+                name: "From".into(),
+                value: "Attacker <attacker@example.com>\r\nto:Victim <victim@example.com>".into(),
+            }],
+            body: ByteBuf::new(),
+        };
+        assert!(matches!(
+            extract_from_address(&msg),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+    }
+
+    #[test]
+    fn crlf_splice_preserves_dkim_signed_bytes() {
+        // Documents *why* the forgery kept a valid signature: relocating
+        // the `To:` header's canonical bytes into the `From:` value (via
+        // an embedded CRLF) and dropping the `To:` header leaves the DKIM
+        // signed-header input byte-for-byte identical. So a genuine
+        // signature over the honest message also verifies over the forged
+        // one — the only thing that changes is which mailbox the sender
+        // resolves to. The fix is therefore in `extract_from_address`
+        // (asserted above), not in the signature check.
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+
+        // A DKIM-Signature covering From:To (order matters for the hash
+        // input). Its other tag values (d=, s=, bh=, ...) are arbitrary
+        // only because the *same* DKIM-Signature value is reused for both
+        // the honest and forged messages: build_header_hash_input
+        // canonicalises the signature header itself (with `b=` blanked)
+        // into the signed bytes, so those tags do contribute — identically
+        // on both sides.
+        let dkim_value = "v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; \
+                          s=sel; h=From:To; bh=MTIzNDU2; b=YWJj";
+        let sig = crate::dkim::parse_dkim_signature(dkim_value).expect("parse DKIM-Signature");
+
+        let honest = vec![
+            SmtpHeader {
+                name: "From".into(),
+                value: "Attacker <attacker@example.com>".into(),
+            },
+            SmtpHeader {
+                name: "To".into(),
+                value: "Victim <victim@example.com>".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: dkim_value.into(),
+            },
+        ];
+        // The forged message: the `To:` canonical line is smuggled into
+        // the `From:` value behind a CRLF, and the real `To:` header is
+        // dropped.
+        let forged = vec![
+            SmtpHeader {
+                name: "From".into(),
+                value: "Attacker <attacker@example.com>\r\nto:Victim <victim@example.com>".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: dkim_value.into(),
+            },
+        ];
+
+        let honest_signed = crate::dkim::build_header_hash_input(&honest, &sig, dkim_value);
+        let forged_signed = crate::dkim::build_header_hash_input(&forged, &sig, dkim_value);
+        assert_eq!(
+            honest_signed, forged_signed,
+            "CRLF splice must reproduce the honest signed-header bytes exactly"
+        );
+
+        // ...yet the two resolve to different senders: the honest message
+        // to the real sender, the forged one to nothing (rejected).
+        let with_body = |headers: Vec<SmtpHeader>| SmtpMessage {
+            headers,
+            body: ByteBuf::new(),
+        };
+        assert_eq!(
+            extract_from_address(&with_body(honest)).unwrap(),
+            "attacker@example.com"
+        );
+        assert!(matches!(
+            extract_from_address(&with_body(forged)),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+    }
+
+    #[test]
+    fn extract_from_rejects_second_at() {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        let msg = |value: &str| SmtpMessage {
+            headers: vec![SmtpHeader {
+                name: "From".into(),
+                value: value.into(),
+            }],
+            body: ByteBuf::new(),
+        };
+        // `prepare` splits from the right to name the domain, this
+        // extractor splits from the left. One `@` per address keeps
+        // the two from ever disagreeing.
+        assert!(matches!(
+            extract_from_address(&msg("alice@example.org@example.com")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("\"a@b\"@example.com")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("Alice <alice@example.org@example.com>")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
     }
 
     fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {

@@ -63,4 +63,13 @@ describe("requestedMaxTimeToLiveStore", () => {
     authorizationStore.setRequestContext("https://example.com", undefined);
     expect(get(requestedMaxTimeToLiveStore)).toBeUndefined();
   });
+
+  // A second request on the same channel names its own origin but says nothing
+  // about duration, and the duration belongs to the request that asked for it.
+  it("keeps the requested duration when a later request only sets an origin", () => {
+    const maxTimeToLive = BigInt(3600) * BigInt(1_000_000_000);
+    authorizationStore.setRequestContext("https://example.com", maxTimeToLive);
+    authorizationStore.setRequestOrigin("https://other.example");
+    expect(get(requestedMaxTimeToLiveStore)).toBe(maxTimeToLive);
+  });
 });

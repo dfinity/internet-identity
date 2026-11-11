@@ -1,20 +1,34 @@
 <script lang="ts">
   import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { authorizationStore } from "$lib/stores/authorization.store";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
+  import { originLabel } from "$lib/utils/urlUtils";
   import { t } from "$lib/stores/locale.store";
   import { draw, fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import Logo from "$lib/components/ui/Logo.svelte";
+  import Badge from "$lib/components/ui/Badge.svelte";
+  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import { waitFor } from "$lib/utils/utils";
   import BreatheSparkleCanvas from "$lib/components/backgrounds/BreatheSparkleCanvas.svelte";
 
-  const dapps = getDapps();
-  const dapp = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
+  // Metadata from the origin the identity is derived for; the badge below
+  // keeps showing the origin the user signed in from.
+  const metadataStore = $derived(
+    getAppMetadataStore(
+      $authorizationStore?.effectiveOrigin ?? $establishedChannelStore.origin,
+      $establishedChannelStore.origin,
+    ),
   );
+  const dapp = $derived($metadataStore);
+  // A logo that fails to decode falls back to the default animation instead
+  // of a broken image; keyed by value so a later (valid) logo still renders.
+  let failedLogo = $state<string>();
+  const logo = $derived(dapp.logo !== failedLogo ? dapp.logo : undefined);
+  const hostname = $derived(originLabel($establishedChannelStore.origin));
 </script>
 
 <div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">
@@ -22,7 +36,7 @@
     in:scale={{ duration: 500, easing: cubicOut, start: 0.9 }}
     class="flex flex-col items-center justify-center"
   >
-    {#if dapp?.logoSrc !== undefined}
+    {#if logo !== undefined}
       <div class="relative">
         <svg viewBox="0 0 92 92" width="92" height="92" class="mb-4">
           <path
@@ -49,9 +63,10 @@
           </g>
         </svg>
         <img
-          src={dapp.logoSrc}
-          alt={$t`${dapp.name} logo`}
+          src={logo}
+          alt={$t`${dapp.name ?? hostname} logo`}
           class="absolute inset-1 size-[84px] rounded-[18px] object-cover"
+          onerror={() => (failedLogo = dapp.logo)}
         />
       </div>
     {:else}
@@ -85,6 +100,12 @@
         </g>
       </svg>
     {/if}
+    <!-- The logo above is app-provided (permissionless) metadata, so the
+         app's origin stays visible next to it as the trust anchor the user
+         can verify — same pairing as on the authorize screens. -->
+    <Badge size="sm" class="mb-4 max-w-75">
+      <Ellipsis text={hostname} position="middle" />
+    </Badge>
     <p class="text-text-primary mb-2 text-2xl font-medium">
       {$t`Signing in securely`}
     </p>

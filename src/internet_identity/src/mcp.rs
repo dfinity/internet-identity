@@ -44,7 +44,7 @@ use crate::{
     account_management,
     delegation::DelegationAccess,
     state::{persistent_state, storage_borrow, storage_borrow_mut},
-    storage::account::{Account, AccountDelegationError, ReadAccountParams},
+    storage::account::{AccountDelegationError, AccountKey},
     storage::storable::mcp_config::StorableMcpConfig,
     storage::storable::mcp_grant::StorableMcpGrant,
     storage::Storage,
@@ -129,35 +129,26 @@ pub fn resolve_connect_url(anchor_number: AnchorNumber) -> Option<String> {
         .and_then(trusted_url)
 }
 
-/// The anchor's default account at `origin` (synthetic when none is reserved).
-fn default_account(anchor_number: AnchorNumber, origin: &FrontendHostname) -> Account {
-    storage_borrow(|storage| {
-        let Some(app_num) = storage.lookup_application_number_with_origin(origin) else {
-            return Account::synthetic(anchor_number, origin.clone());
-        };
-        let Some(default_num) = storage
-            .lookup_anchor_application_config(anchor_number, app_num)
-            .default_account_number
-        else {
-            return Account::synthetic(anchor_number, origin.clone());
-        };
-        storage
-            .read_account(ReadAccountParams {
-                account_number: Some(default_num),
-                anchor_number,
-                origin,
-                known_app_num: Some(app_num),
-            })
-            .unwrap_or_else(|| Account::synthetic(anchor_number, origin.clone()))
-    })
-}
-
 /// The default-account number for `(anchor, origin)` (None = unreserved default).
 fn default_account_number(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Option<AccountNumber> {
-    default_account(anchor_number, origin).account_number
+    storage_borrow(|storage| {
+        // What the anchor reserved here, if anything. Read back through the account so
+        // a config left naming an account the anchor no longer holds answers the same
+        // as no reservation at all.
+        let reserved = storage
+            .read_anchor_application_config(anchor_number, origin)
+            .and_then(|config| config.default_account_number);
+
+        storage.read_account(&AccountKey {
+            anchor_number,
+            origin: origin.clone(),
+            account_number: reserved,
+        })
+    })?
+    .account_number
 }
 
 /// Register the trusted MCP server's session key for `anchor_number`, granting
@@ -243,8 +234,9 @@ pub fn register(
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL), or `None` when the anchor has never written one, which
-/// Settings renders the same as switched off. The caller must already be
-/// authorized for `anchor_number` (checked by the canister method). The stored
+/// Settings renders the same as switched off. Serves both the `mcp_get_config`
+/// query and `IdentityInfo::mcp_config`. The caller must already be authorized
+/// for `anchor_number` (checked by the canister method). The stored
 /// `session_principal` pointer is internal bookkeeping and not exposed.
 pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     storage_borrow(|storage| storage.lookup_mcp_config(anchor_number)).map(|config| McpConfig {
@@ -485,17 +477,17 @@ impl McpSession {
     /// default account at an origin is mutable, so if `get` re-resolved it
     /// independently and it had changed in between, it would look under a
     /// different account's seed and `NoSuchDelegation`.
-    pub async fn prepare_delegation(
+    pub fn prepare_delegation(
         self,
         target_origin: FrontendHostname,
         account_number: Option<AccountNumber>,
         session_key: SessionKey,
         max_ttl: Option<u64>,
+        now: Timestamp,
     ) -> Result<McpPrepareDelegation, AccountDelegationError> {
         let anchor_number = self.grant.anchor_number;
         // Cap at 5 minutes; the grant expiry is passed as an *absolute* cap so
-        // the delegation can't outlive the session even by the time an await
-        // spans.
+        // the delegation cannot outlive the session.
         let capped_ttl = Some(u64::min(
             max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
             MCP_MAX_EXPIRATION_PERIOD_NS,
@@ -512,8 +504,8 @@ impl McpSession {
             Some(self.grant.expires_at_ns),
             DelegationAccess::from_read_only(self.grant.read_only),
             &None,
-        )
-        .await?;
+            now,
+        )?;
         Ok(McpPrepareDelegation {
             user_key: prepared.user_key,
             expiration: prepared.expiration,

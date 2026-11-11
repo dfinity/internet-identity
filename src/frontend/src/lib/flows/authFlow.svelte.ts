@@ -71,6 +71,7 @@ export class AuthFlow {
     | "setupNewIdentity"
     | "signInWithSso"
     | "openIdNotConnected"
+    | "ssoDomainMismatch"
     | "openIdAlreadyLinked"
     | "confirmMethodSwitch"
   >("chooseMethod");
@@ -93,6 +94,16 @@ export class AuthFlow {
   #sso = $state<{ origin: string }>();
   #mode = $state<AuthMode>("both");
   #pendingOpenIdSignIn = $state<bigint>();
+  // A credential the canister does know, but stamped with another discovery
+  // domain than the one the user just signed in through
+  // (`SsoDomainMismatch`). `enteredDomain` is undefined for a configured
+  // provider (Google / Microsoft / Apple: no domain was entered);
+  // `registeredDomain` is undefined when the stored credential carries no
+  // stamp at all.
+  #ssoDomainMismatch = $state<{
+    enteredDomain?: string;
+    registeredDomain?: string;
+  }>();
   #pendingMethodSwitch = $state<{
     previousIdentity: LastUsedIdentity;
     newMethod: MethodTag;
@@ -146,6 +157,10 @@ export class AuthFlow {
 
   get pendingMethodSwitch() {
     return this.#pendingMethodSwitch;
+  }
+
+  get ssoDomainMismatch() {
+    return this.#ssoDomainMismatch;
   }
 
   setMode = (mode: AuthMode): void => {
@@ -213,6 +228,7 @@ export class AuthFlow {
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
     this.#sso = undefined;
+    this.#ssoDomainMismatch = undefined;
     this.#view = "chooseMethod";
     return identityNumber;
   };
@@ -226,6 +242,7 @@ export class AuthFlow {
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
     this.#sso = undefined;
+    this.#ssoDomainMismatch = undefined;
     this.#view = "chooseMethod";
   };
 
@@ -271,7 +288,13 @@ export class AuthFlow {
       }
     | undefined
   > => {
-    const { resolvedClientId, discovery, domain, name: ssoName } = ssoResult;
+    const {
+      resolvedClientId,
+      discovery,
+      domain,
+      name: ssoName,
+      sessionMaxAgeNs,
+    } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
     const sso = dappOrigin !== undefined ? { origin: dappOrigin } : undefined;
     const result = await this.#openIdJwtSignIn(
@@ -283,6 +306,7 @@ export class AuthFlow {
       undefined,
       domain,
       sso,
+      sessionMaxAgeNs,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -325,6 +349,17 @@ export class AuthFlow {
     this.#ssoJwt = result.jwt;
     this.#ssoDomain = domain;
     this.#ssoName = ssoName;
+    if (result.type === "domainMismatch") {
+      // The account is linked to an identity, but through another discovery
+      // domain. A sign-up would be rejected as a duplicate, so surface the
+      // domain it is linked through instead of the "not connected" prompt.
+      this.#ssoDomainMismatch = {
+        enteredDomain: domain,
+        registeredDomain: result.registeredDomain,
+      };
+      this.#view = "ssoDomainMismatch";
+      return undefined;
+    }
     if (mode === "signin") {
       this.#view = "openIdNotConnected";
       return undefined;
@@ -562,6 +597,18 @@ export class AuthFlow {
     this.#jwt = result.jwt;
     this.#configIssuer = config.issuer;
     this.#openIdDiscoveryDomain = discoveryDomain;
+    if (result.type === "domainMismatch") {
+      // See `continueWithSso`. A configured provider passes no discovery
+      // domain; the credential can still be stamped with one if an org's SSO
+      // well-known publishes the same client, so leave `enteredDomain` unset
+      // rather than passing the provider's name off as a domain.
+      this.#ssoDomainMismatch = {
+        enteredDomain: discoveryDomain,
+        registeredDomain: result.registeredDomain,
+      };
+      this.#view = "ssoDomainMismatch";
+      return undefined;
+    }
     if (mode === "signin") {
       this.#view = "openIdNotConnected";
       return undefined;
@@ -585,6 +632,10 @@ export class AuthFlow {
     discoveryDomain?: string,
     // Dapp SSO context; when set, redeems the JWT via the SSO gate path (`discoveryDomain` is always present alongside).
     sso?: { origin: string },
+    // The org's session length, from its discovery document. Carried onto the
+    // authenticated session so the delegation handler can cap the account
+    // delegation it requests.
+    ssoSessionMaxAgeNs?: bigint,
   ): Promise<
     | {
         type: "signIn";
@@ -600,6 +651,14 @@ export class AuthFlow {
         jwt: string;
         suggestedName?: string;
         email?: string;
+      }
+    | {
+        // Registered, but through another discovery domain: see
+        // `OpenIdDelegationError::SsoDomainMismatch`. Interactive flows only;
+        // a caller-supplied JWT surfaces the canister error instead.
+        type: "domainMismatch";
+        jwt: string;
+        registeredDomain?: string;
       }
   > => {
     this.#sso = sso;
@@ -644,7 +703,7 @@ export class AuthFlow {
       await authenticationStore.set({
         identity,
         identityNumber,
-        authMethod: { openid: { iss, sub } },
+        authMethod: { openid: { iss, sub, ssoSessionMaxAgeNs } },
       });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
@@ -667,6 +726,22 @@ export class AuthFlow {
           AuthenticationV2Events.RegisterWithOpenID,
         );
         return { type: "signUp", jwt, suggestedName: name, email };
+      }
+      if (
+        isCanisterError<OpenIdDelegationError>(error) &&
+        error.type === "SsoDomainMismatch" &&
+        // Only the interactive wizard flows get the guided view: there the
+        // user typed the domain themselves. A caller-supplied JWT is the
+        // non-interactive 1-click resume, where the *dapp* chose the domain, so
+        // guiding the user (or offering recovery) there would let a malicious
+        // dapp script the "fix". Those callers get the plain error instead.
+        existingJwt === undefined
+      ) {
+        return {
+          type: "domainMismatch",
+          jwt,
+          registeredDomain: error.value(error.type).registered_sso_domain[0],
+        };
       }
       throw error;
     }

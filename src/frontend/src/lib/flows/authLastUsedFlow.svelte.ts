@@ -121,7 +121,7 @@ export class AuthLastUsedFlow {
         // Calling `requestWithPopup` directly (rather than `requestJWT`)
         // with a `Promise<RequestConfig>` so the popup opens synchronously
         // in the same task as the user click — discovery resolves while
-        // the popup shows about:blank, then navigates to the IdP. Awaiting
+        // the popup shows /sso-connecting, then navigates to the IdP. Awaiting
         // discovery before `window.open` would let Safari block the popup.
         const { domain, loginHint } = lastUsedIdentity.authMethod.sso;
         const jwt = await requestWithPopup(

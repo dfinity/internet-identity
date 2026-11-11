@@ -2,29 +2,28 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
     delegation::{
-        add_delegation_signature, check_frontend_length, delegation_bookkeeping,
-        delegation_signature_msg_with_permissions, der_encode_canister_sig_key, DelegationAccess,
+        add_delegation_signature, delegation_bookkeeping,
+        delegation_signature_msg_with_permissions, der_encode_canister_sig_key,
+        frontend_length_within_limit, DelegationAccess,
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            validate_account_name, Account, AccountDelegationError, AccountsCounter,
-            CreateAccountParams, PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+            validate_account_name, Account, AccountDelegationError, AccountKey,
+            PrepareAccountDelegation,
         },
-        storable::anchor_application_config::AnchorApplicationConfig,
-        Storage,
+        StorageError,
     },
     update_root_hash,
 };
 use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
-use ic_cdk::{api::time, caller};
-use ic_stable_structures::DefaultMemoryImpl;
+use ic_cdk::caller;
 use internet_identity_interface::{
     archive::types::{Operation, Private},
     internet_identity::types::{
-        AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, ApplicationNumber,
-        CheckMaxAccountError, CreateAccountError, Delegation, FrontendHostname, GetAccountError,
+        AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, ApplicationInfo,
+        CreateAccountError, Delegation, ForgetApplicationsError, FrontendHostname, GetAccountError,
         GetDefaultAccountError, SessionKey, SetDefaultAccountError, SignedDelegation, Timestamp,
         UpdateAccountError,
     },
@@ -33,8 +32,6 @@ use internet_identity_interface::{
 use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 
-const MAX_ANCHOR_ACCOUNTS: usize = 500;
-
 pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
@@ -42,44 +39,66 @@ pub fn get_accounts_for_origin(
     storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
 }
 
-/// Helper function to read an account by application number, unlike `storage.read_account` this
-/// returns `Result` instead of `Option`.
-///
-/// This function is applicable only to numbered accounts; synthetic accounts are not currently
-/// stored in the memory and thus cannot be fetched from the storage.
+/// The apps the identity has signed in to, for its own list of them. An app is allowed to
+/// notify only where it holds consent and this deployment notifies, as
+/// `notification_consent_granted` answers.
+pub fn list_applications(anchor_number: AnchorNumber) -> Vec<ApplicationInfo> {
+    storage_borrow(|storage| storage.list_applications(anchor_number))
+        .into_iter()
+        .map(|(origin, last_used, config)| ApplicationInfo {
+            notifications_allowed: config.notifications_allowed()
+                && crate::notifications::notifications_enabled(),
+            last_notified: config.last_notified_at_ns,
+            origin,
+            last_used,
+        })
+        .collect()
+}
+
+/// Forgets the identity's apps at `origins`, as one write.
+pub fn forget_applications(
+    anchor_number: AnchorNumber,
+    origins: Vec<FrontendHostname>,
+) -> Result<(), ForgetApplicationsError> {
+    let origins = origins.into_iter().collect();
+    storage_borrow_mut(|storage| {
+        storage.forget_applications(anchor_number, &origins, ic_cdk::api::time())
+    })
+    .map_err(|err| ForgetApplicationsError::InternalCanisterError(err.to_string()))
+}
+
+/// Helper function to read an account, unlike `storage.read_account` this returns
+/// `Result` instead of `Option`.
 fn try_read_account(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
-    application_number: ApplicationNumber,
-    account_number: AccountNumber,
+    account_number: Option<AccountNumber>,
 ) -> Result<Account, String> {
-    let Some(account) = storage_borrow(|storage| {
-        storage.read_account(ReadAccountParams {
-            account_number: Some(account_number),
+    storage_borrow(|storage| {
+        storage.read_account(&AccountKey {
             anchor_number,
-            origin,
-            known_app_num: Some(application_number),
+            origin: origin.clone(),
+            account_number,
         })
-    }) else {
-        let message = format!(
+    })
+    .ok_or_else(|| match account_number {
+        Some(account_number) => format!(
             "Account #{} does not exist for anchor {} and origin {}.",
             account_number, anchor_number, origin
-        );
-
-        return Err(message);
-    };
-
-    Ok(account)
+        ),
+        None => format!(
+            "Anchor {} has no default account at origin {}.",
+            anchor_number, origin
+        ),
+    })
 }
 
 fn try_read_account_info(
     anchor_number: AnchorNumber,
-    origin: FrontendHostname,
-    application_number: ApplicationNumber,
-    account_number: AccountNumber,
+    origin: &FrontendHostname,
+    account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, String> {
-    try_read_account(anchor_number, &origin, application_number, account_number)
-        .map(|account| account.to_info())
+    try_read_account(anchor_number, origin, account_number).map(|account| account.to_info())
 }
 
 pub fn get_account_for_origin(
@@ -87,104 +106,79 @@ pub fn get_account_for_origin(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<Account, GetAccountError> {
-    // If the account_number is not specific, there is a *synthetic account* to return for any
-    // (anchor, origin) pair.
-    let Some(account_number) = account_number else {
-        return Ok(Account::synthetic(anchor_number, origin));
-    };
+    // Including the tracked default, which the storage read answers for: it is the
+    // identity's only where its list still names it, and no account at all where it was
+    // named or moved away.
+    if let Ok(account) = try_read_account(anchor_number, &origin, account_number) {
+        return Ok(account);
+    }
 
-    // If the account is specified, there must be a known app for this origin.
-    let Some(application_number) =
-        storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
-    else {
+    // A named account at an origin nothing has ever been stored under is reported as
+    // the origin being unknown, which is more than "no such account" tells a client.
+    if account_number.is_some()
+        && storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
+            .is_none()
+    {
         return Err(GetAccountError::NoSuchOrigin { anchor_number });
-    };
+    }
 
-    // Once we know the (anchor, origin, app, account_number), we can try reading  the corresponding
-    // account.
-    let account = try_read_account(anchor_number, &origin, application_number, account_number)
-        .map_err(|_| GetAccountError::NoSuchAccount {
-            anchor_number,
-            origin,
-        })?;
-
-    Ok(account)
+    Err(GetAccountError::NoSuchAccount {
+        anchor_number,
+        origin,
+    })
 }
 
-/// Best effort to determine the default account for the given (anchor, origin).
-/// - If the application is not found, returns a "synthetic" account.
-/// - If no default account stored, returns a "synthetic" account.
-/// - Else, read from storage, returning an Err result if not found.
+/// The account this identity signs in with at `origin` by default: the one it reserved,
+/// or its tracked default where it reserved none.
 ///
-/// An Err case indicates internal inconsistency in the canister state.
+/// An `Err` means the identity has no account at this origin at all, which it can only
+/// reach by moving every account away from it.
 pub fn get_default_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
-    let Some(application_number) =
-        storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
-    else {
-        return Ok(Account::synthetic(anchor_number, origin).to_info());
-    };
-
-    let AnchorApplicationConfig {
-        default_account_number,
-    } = storage_borrow(|storage| {
-        storage.lookup_anchor_application_config(anchor_number, application_number)
+    let reserved = storage_borrow(|storage| {
+        storage
+            .read_anchor_application_config(anchor_number, &origin)
+            .and_then(|config| config.default_account_number)
     });
 
-    let Some(default_account_number) = default_account_number else {
-        return Ok(Account::synthetic(anchor_number, origin).to_info());
-    };
+    // A `None` here reads the tracked default, so an anchor that reserved nothing and
+    // one whose reservation is still the default answer the same way.
+    if let Ok(account) = try_read_account_info(anchor_number, &origin, reserved) {
+        return Ok(account);
+    }
 
-    let account = try_read_account_info(
-        anchor_number,
-        origin,
-        application_number,
-        default_account_number,
-    )
-    .map_err(GetDefaultAccountError::InternalCanisterError)?;
-
-    Ok(account)
+    // A reservation naming an account this identity no longer holds answers the same as
+    // no reservation at all, which is what `mcp::default_account_number` already does
+    // with the same config. Reporting an internal error here would tell an identity that
+    // still holds its tracked default that it has no default, over a state a rename or a
+    // move can leave behind.
+    try_read_account_info(anchor_number, &origin, None)
+        .map_err(GetDefaultAccountError::InternalCanisterError)
 }
 
-/// Sets the default account for the given (anchor, origin) to the specified `account_number`.
+/// Reserves `account_number` as this identity's default at `origin`, or clears the
+/// reservation where it is `None`, leaving the tracked default in its place.
 ///
-/// If the `account_number` is `None`, then the synthetic account is returned, and also `None`
-/// is stored (just so that the previous default account is not retained).
-///
-/// If this is the first time an origin is seen for the anchor, a new application number is created.
+/// The account is read first, so an identity cannot reserve one it does not hold.
 pub fn set_default_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
+    now: Timestamp,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    let application_number = storage_borrow_mut(|storage| {
-        storage.lookup_or_insert_application_number_with_origin(&origin)
-    });
-
-    let account = if let Some(account_number) = account_number {
-        try_read_account_info(
+    let account = try_read_account_info(anchor_number, &origin, account_number).map_err(|_| {
+        SetDefaultAccountError::NoSuchAccount {
             anchor_number,
-            origin.clone(),
-            application_number,
-            account_number,
-        )
-        .map_err(|_| SetDefaultAccountError::NoSuchAccount {
-            anchor_number,
-            origin,
-        })?
-    } else {
-        Account::synthetic(anchor_number, origin).to_info()
-    };
-
-    let config = AnchorApplicationConfig {
-        default_account_number: account_number,
-    };
+            origin: origin.clone(),
+        }
+    })?;
 
     storage_borrow_mut(|storage| {
-        storage.set_anchor_application_config(anchor_number, application_number, config);
-    });
+        storage.set_default_account(anchor_number, origin, account_number, now)
+    })
+    .map_err(|err| SetDefaultAccountError::InternalCanisterError(err.to_string()))?;
 
     Ok(account)
 }
@@ -193,24 +187,19 @@ pub fn create_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     name: String,
+    now: Timestamp,
 ) -> Result<Account, CreateAccountError> {
     validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
-        check_or_rebuild_max_anchor_accounts(
-            storage,
-            anchor_number,
-            MAX_ANCHOR_ACCOUNTS as u64,
-            true,
-        )
-        .map_err(Into::<CreateAccountError>::into)?;
-
         storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number,
-                name: name.clone(),
-                origin,
+            .create_account(anchor_number, origin, name.clone(), now)
+            .map_err(|err| match err {
+                // The cap is the write path's rule, so it says so rather than the caller
+                // asking first — and naming a tracked default reaches it the same way,
+                // because naming one is what makes it a stored account.
+                StorageError::AccountLimitReached { .. } => CreateAccountError::AccountLimitReached,
+                err => CreateAccountError::InternalCanisterError(format!("{err}")),
             })
-            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })?;
 
     post_account_operation_bookkeeping(
@@ -228,6 +217,7 @@ pub fn update_account_for_origin(
     account_number: Option<AccountNumber>,
     origin: FrontendHostname,
     update: AccountUpdate,
+    now: Timestamp,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(new_name) => {
@@ -235,36 +225,29 @@ pub fn update_account_for_origin(
             let (updated_account, old_account_name) =
                 // Type annotation was necessary for the compiler to infer the correct type
                 storage_borrow_mut(|storage| -> Result<(Account, Option<String>), UpdateAccountError> {
-                    // If the account to be updated is a default account
-                    // Check if we have reached account limit
-                    // Because editing a default account turns it into a stored account
-                    if account_number.is_none() {
-                        check_or_rebuild_max_anchor_accounts(
-                            storage,
-                            anchor_number,
-                            MAX_ANCHOR_ACCOUNTS as u64,
-                            true,
-                        )
-                        .map_err(Into::<UpdateAccountError>::into)?
-                    }
-
+                    // A caller reaches this with nothing readable in two ways: the
+                    // account belongs to another identity, or the tracked default has
+                    // already been named and so is no longer numberless. Both are the
+                    // caller naming an account it does not have, which is what
+                    // `prepare_account_delegation` answers for the same read.
                     let old_account = storage
-                        .read_account(ReadAccountParams {
-                            account_number,
+                        .read_account(&AccountKey {
                             anchor_number,
-                            origin: &origin,
-                            known_app_num: None
-                        })
-                        .expect("Updating an unreadable account should be impossible!");
-
-                    let updated_account = storage
-                        .update_account(UpdateAccountParams {
-                            account_number,
-                            anchor_number,
-                            name: new_name.clone(),
                             origin: origin.clone(),
+                            account_number,
                         })
-                        .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
+                        .ok_or_else(|| UpdateAccountError::Unauthorized(caller()))?;
+
+                    let mut renamed_account = old_account.clone();
+                    renamed_account.name = Some(new_name.clone());
+                    let updated_account = storage
+                        .write_account(renamed_account, now)
+                        .map_err(|err| match err {
+                            StorageError::AccountLimitReached { .. } => {
+                                UpdateAccountError::AccountLimitReached
+                            }
+                            err => UpdateAccountError::InternalCanisterError(err.to_string()),
+                        })?;
 
                     Ok((updated_account, old_account.name))
                 })?;
@@ -298,7 +281,7 @@ pub fn update_account_for_origin(
 // and the delegation access level through to the signature; the parameter list
 // is wide but each argument is distinct and load-bearing.
 #[allow(clippy::too_many_arguments)]
-pub async fn prepare_account_delegation(
+pub fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
@@ -307,17 +290,16 @@ pub async fn prepare_account_delegation(
     max_expiration: Option<Timestamp>,
     access: DelegationAccess,
     ii_domain: &Option<IIDomain>,
+    now: Timestamp,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    state::ensure_salt_set().await;
-    check_frontend_length(&origin);
+    frontend_length_within_limit(&origin).map_err(AccountDelegationError::InternalCanisterError)?;
 
     let account = storage_borrow(|storage| {
         storage
-            .read_account(ReadAccountParams {
-                account_number,
+            .read_account(&AccountKey {
                 anchor_number,
-                origin: &origin,
-                known_app_num: None,
+                origin: origin.clone(),
+                account_number,
             })
             .ok_or(AccountDelegationError::Unauthorized(caller()))
     })?;
@@ -327,29 +309,36 @@ pub async fn prepare_account_delegation(
         crate::delegation::MAX_EXPIRATION_PERIOD_NS,
     );
     // `max_expiration` is an *absolute* cap (e.g. the MCP session grant's
-    // expiry): a relative TTL computed by the caller before the await above
-    // could drift past it by however much time the await spans. By the same
-    // token the cap itself can already have passed once the await resolves
-    // (the caller checked it *before* awaiting) — refuse rather than sign a
-    // delegation that is already expired on arrival, which would read as
-    // success while wasting a signature-map entry on an unusable delegation.
-    // For the MCP path this is exactly the session-over signal: the grant
-    // expired mid-call.
-    if max_expiration.is_some_and(|cap| cap <= time()) {
+    // expiry), and the caller checked it before calling. Checked again here
+    // because a cap that has passed must not be signed over: a delegation that
+    // is already expired on arrival reads as success while spending a
+    // signature-map entry on something unusable. For the MCP path this is
+    // exactly the session-over signal: the grant expired mid-call.
+    if max_expiration.is_some_and(|cap| cap <= now) {
         return Err(AccountDelegationError::Unauthorized(caller()));
     }
     let expiration = u64::min(
-        time().saturating_add(session_duration_ns),
+        now.saturating_add(session_duration_ns),
         max_expiration.unwrap_or(u64::MAX),
     );
     // The metrics duration is the delegation's *effective* lifetime: the
     // absolute `max_expiration` cap can shorten it below the requested
     // `session_duration_ns` (e.g. an MCP grant near expiry). With no cap the two
     // are equal, so this matches the regular path exactly while keeping the
-    // recorded duration honest when the cap binds. `time()` is stable here (no
-    // await since it was read for `expiration`).
-    let effective_duration_ns = expiration.saturating_sub(time());
+    // recorded duration honest when the cap binds.
+    let effective_duration_ns = expiration.saturating_sub(now);
     let seed = account.calculate_seed();
+
+    // Stamped before the delegation is signed. On the IC returning `Err` commits every
+    // write that came before it, so propagating a failure from here once the signature
+    // was in the map would report an error for a delegation that has already been
+    // issued.
+    storage_borrow_mut(|storage| {
+        let mut used_account = account;
+        used_account.last_used = Some(now);
+        storage.write_account(used_account, now)
+    })
+    .map_err(|err| AccountDelegationError::InternalCanisterError(err.to_string()))?;
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
@@ -357,15 +346,11 @@ pub async fn prepare_account_delegation(
             session_key,
             seed.as_ref(),
             expiration,
+            None,
             access.permissions(),
         );
     });
     update_root_hash();
-
-    // Update last used timestamp
-    storage_borrow_mut(|storage| {
-        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
-    });
 
     delegation_bookkeeping(origin, ii_domain.clone(), effective_duration_ns);
 
@@ -383,15 +368,14 @@ pub fn get_account_delegation(
     expiration: Timestamp,
     access: DelegationAccess,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    check_frontend_length(origin);
+    frontend_length_within_limit(origin).map_err(AccountDelegationError::InternalCanisterError)?;
 
     storage_borrow(|storage| {
         let account = storage
-            .read_account(ReadAccountParams {
-                account_number,
+            .read_account(&AccountKey {
                 anchor_number,
-                origin,
-                known_app_num: None,
+                origin: origin.clone(),
+                account_number,
             })
             .ok_or(AccountDelegationError::Unauthorized(caller()))?;
 
@@ -423,36 +407,6 @@ pub fn get_account_delegation(
     })
 }
 
-/// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
-/// If it does, it rebuilds the counter. If it still exceeds, it will return an error.
-fn check_or_rebuild_max_anchor_accounts(
-    storage: &mut Storage<DefaultMemoryImpl>,
-    anchor_number: AnchorNumber,
-    max_anchor_accounts: u64,
-    first_time: bool, // required for safe recursion
-) -> Result<(), CheckMaxAccountError> {
-    let AccountsCounter {
-        stored_accounts,
-        stored_account_references: _,
-    } = storage.get_account_counter(anchor_number);
-
-    if stored_accounts >= max_anchor_accounts {
-        // check whether we actually have reached the number
-        if first_time {
-            storage.rebuild_identity_account_counters(anchor_number);
-            return check_or_rebuild_max_anchor_accounts(
-                storage,
-                anchor_number,
-                max_anchor_accounts,
-                false,
-            );
-        } else {
-            return Err(CheckMaxAccountError::AccountLimitReached);
-        }
-    }
-    Ok(())
-}
-
 #[cfg(not(test))]
 #[allow(dead_code)]
 fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operation) {
@@ -463,19 +417,34 @@ fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Op
 #[cfg(test)]
 fn post_account_operation_bookkeeping(_anchor_number: AnchorNumber, _operation: Operation) {}
 
+#[cfg(test)]
+fn storage_with_salt() -> crate::storage::Storage<ic_stable_structures::VectorMemory> {
+    let mut storage =
+        crate::storage::Storage::new((0, 10000), ic_stable_structures::VectorMemory::default());
+    storage.update_salt([17u8; 32]);
+    storage
+}
+
 #[test]
 fn should_create_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
 
     assert_eq!(
-        create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone()),
+        create_account_for_origin(
+            anchor.anchor_number(),
+            origin.clone(),
+            name.clone(),
+            crate::storage::TEST_NOW
+        ),
         Ok(Account::new_full(
             anchor.anchor_number(),
             origin,
@@ -490,16 +459,23 @@ fn should_create_account_for_origin() {
 #[test]
 fn should_fail_to_create_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
-        let result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        let result = create_account_for_origin(
+            anchor.anchor_number(),
+            origin.clone(),
+            name.clone(),
+            crate::storage::TEST_NOW,
+        );
         if i == MAX_ANCHOR_ACCOUNTS {
             assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
         } else {
@@ -511,16 +487,23 @@ fn should_fail_to_create_accounts_above_max() {
 #[test]
 fn should_fail_to_update_default_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
     for i in 0..MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
-        let create_result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        let create_result = create_account_for_origin(
+            anchor.anchor_number(),
+            origin.clone(),
+            name.clone(),
+            crate::storage::TEST_NOW,
+        );
 
         assert!(create_result.is_ok())
     }
@@ -531,6 +514,7 @@ fn should_fail_to_update_default_accounts_above_max() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
+        crate::storage::TEST_NOW,
     );
     assert_eq!(result, Err(UpdateAccountError::AccountLimitReached))
 }
@@ -538,18 +522,30 @@ fn should_fail_to_update_default_accounts_above_max() {
 #[test]
 fn should_get_accounts_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -578,20 +574,36 @@ fn should_get_accounts_for_origin() {
 #[test]
 fn should_only_get_own_accounts_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-    let anchor_two = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
+    let anchor_two = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
     let anchor_number_two = anchor_two.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number_two,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -627,18 +639,30 @@ fn should_only_get_own_accounts_for_origin() {
 #[test]
 fn should_update_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -670,7 +694,8 @@ fn should_update_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            }
+            },
+            crate::storage::TEST_NOW
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -709,18 +734,30 @@ fn should_update_account_for_origin() {
 #[test]
 fn should_update_default_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -752,7 +789,8 @@ fn should_update_default_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            }
+            },
+            crate::storage::TEST_NOW
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -796,145 +834,106 @@ fn should_update_default_account_for_origin() {
 }
 
 #[test]
-// This test is to make sure that the check_or_rebuild_max_anchor_accounts function correctly errors
-// It should error when the counters are at or above max and argument 'first_time' is false
-fn should_fail_check_or_rebuild_when_not_first_time() {
+fn naming_a_tracked_default_at_the_account_limit_is_refused() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
+    let origin = "https://example.com".to_string();
+    create_account_for_origin(
+        anchor.anchor_number(),
+        origin.clone(),
+        "first".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
 
-    // create faulty counter entries
+    // At the limit, and naming another account is the one thing that cannot be done —
+    // said by the write itself rather than by a caller asking first.
     storage_borrow_mut(|storage| {
         storage.set_counters_for_testing(
             anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        );
-        let res = check_or_rebuild_max_anchor_accounts(
-            storage,
-            anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            false,
-        );
-        assert!(res.is_err())
+            MAX_ANCHOR_ACCOUNTS,
+            MAX_ANCHOR_ACCOUNTS,
+        )
     });
+
+    assert_eq!(
+        create_account_for_origin(
+            anchor.anchor_number(),
+            origin,
+            "second".to_string(),
+            crate::storage::TEST_NOW
+        ),
+        Err(CreateAccountError::AccountLimitReached)
+    );
 }
 
 #[test]
-fn should_properly_recalculate_faulty_account_counter() {
+fn a_drifted_account_counter_is_not_repaired_and_costs_the_identity_its_limit() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
 
-    // create faulty counter entries
+    // A counter that says this identity is at its limit when it holds nothing.
     storage_borrow_mut(|storage| {
         storage.set_counters_for_testing(
             anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS,
+            MAX_ANCHOR_ACCOUNTS,
         )
     });
 
-    for i in 0..=MAX_ANCHOR_ACCOUNTS {
-        let origin = format!("https://example-{i}.com");
-        let result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
-        if i == MAX_ANCHOR_ACCOUNTS {
-            assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
-        } else {
-            assert!(result.is_ok())
-        }
-    }
-}
-
-#[test]
-fn should_properly_recalculate_faulty_account_counter_when_updating() {
-    use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
-
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-
-    // create faulty counter entries
-    storage_borrow_mut(|storage| {
-        storage.set_counters_for_testing(
+    assert_eq!(
+        create_account_for_origin(
             anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        )
-    });
-
-    let result = update_account_for_origin(
-        anchor.anchor_number(),
-        None,
-        "https://example-1.com".to_string(),
-        AccountUpdate {
-            name: Some("Gabriel".to_string()),
-        },
+            "https://example.com".to_string(),
+            name,
+            crate::storage::TEST_NOW,
+        ),
+        Err(CreateAccountError::AccountLimitReached)
     );
-    assert!(result.is_ok())
-}
-
-#[test]
-fn should_increment_discrepancy_counter() {
-    use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
-
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-
-    // create faulty counter entries
-    storage_borrow_mut(|storage| {
-        storage.set_counters_for_testing(
-            anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        )
-    });
-
-    storage_borrow(|storage| {
-        let discrepancy_counter_before = storage.get_discrepancy_counter();
-        assert_eq!(discrepancy_counter_before.account_counter_rebuilds, 0);
-    });
-
-    let result = update_account_for_origin(
-        anchor.anchor_number(),
-        None,
-        "https://example-1.com".to_string(),
-        AccountUpdate {
-            name: Some("Gabriel".to_string()),
-        },
-    );
-    assert!(result.is_ok());
-
-    storage_borrow(|storage| {
-        let discrepancy_counter_after = storage.get_discrepancy_counter();
-        assert_eq!(discrepancy_counter_after.account_counter_rebuilds, 1);
-    });
 }
 
 #[test]
 fn should_get_default_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
-    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string()).unwrap();
-    create_account_for_origin(anchor_number, origin.clone(), "Bob".to_string()).unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        "Alice".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        "Bob".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
 
     // Smoke test
     assert_eq!(
@@ -1064,6 +1063,7 @@ fn should_get_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 default_account_number,
+                crate::storage::TEST_NOW,
             );
 
             assert_eq!(
@@ -1084,11 +1084,13 @@ fn should_get_default_account_for_origin() {
 #[test]
 fn can_get_default_before_update_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
@@ -1104,11 +1106,13 @@ fn can_get_default_before_update_account_for_origin() {
 #[test]
 fn should_get_updated_default_account_after_modification() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
@@ -1120,6 +1124,7 @@ fn should_get_updated_default_account_after_modification() {
         AccountUpdate {
             name: Some("Default Account".to_string()),
         },
+        crate::storage::TEST_NOW,
     )
     .unwrap();
 
@@ -1140,10 +1145,8 @@ fn should_get_updated_default_account_after_modification() {
 #[test]
 fn should_succeed_get_default_account_for_nonexistent_anchor() {
     use crate::state::storage_replace;
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let nonexistent_anchor = 99999;
     let origin = "https://example.com".to_string();
 
@@ -1161,21 +1164,95 @@ fn should_succeed_get_default_account_for_nonexistent_anchor() {
     );
 }
 
+/// A reservation can outlive the account it names — a rename or a move leaves the config
+/// pointing at a number this identity no longer holds. That identity still has its
+/// tracked default, so answering with an internal error would tell it it has no default
+/// when it does, and would disagree with `mcp::default_account_number`, which reads the
+/// same config and falls back.
 #[test]
-fn should_get_default_account_for_different_origins() {
+fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
     use crate::state::{storage_borrow_mut, storage_replace};
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let mut storage = Storage::new((0, 10000), VectorMemory::default());
+    // A write of this list derives account principals on later branches, so the salt has
+    // to be there for the same test to hold all the way up the stack.
+    storage.update_salt([17u8; 32]);
+    storage_replace(storage);
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
+    let anchor_number = anchor.anchor_number();
+    let origin = "https://example.com".to_string();
+    storage_borrow_mut(|storage| storage.write(anchor)).unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        "Alice".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
+
+    // A number this identity does not hold. The write does not store it: the default is
+    // related to the account reference list and moved to a reference that is there, which
+    // is the tracked default here. So this asserts the repair rather than a tolerance —
+    // the read below answers from a default that exists, because no other kind was left
+    // behind.
+    storage_borrow_mut(|storage| {
+        storage.set_default_account(
+            anchor_number,
+            origin.clone(),
+            Some(9_999),
+            crate::storage::TEST_NOW,
+        )
+    })
+    .unwrap();
+
+    let result = get_default_account_for_origin(anchor_number, origin.clone());
+
+    assert_eq!(
+        result,
+        Ok(AccountInfo {
+            account_number: None,
+            origin,
+            last_used: None,
+            name: None,
+        })
+    );
+}
+
+#[test]
+fn should_get_default_account_for_different_origins() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+
+    storage_replace(storage_with_salt());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin1 = "https://app1.com".to_string();
     let origin2 = "https://app2.com".to_string();
     let anchor_number = anchor.anchor_number();
 
     // Create accounts for both origins
-    create_account_for_origin(anchor_number, origin1.clone(), "Alice".to_string()).unwrap();
-    create_account_for_origin(anchor_number, origin2.clone(), "Bob".to_string()).unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin1.clone(),
+        "Alice".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin2.clone(),
+        "Bob".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
 
     // Run code under test
     let result1 = get_default_account_for_origin(anchor_number, origin1.clone());

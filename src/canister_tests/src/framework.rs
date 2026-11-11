@@ -188,6 +188,14 @@ pub fn install_ii_canister_with_arg_and_cycles(
     let canister_id = env.create_canister();
     env.add_cycles(canister_id, amount);
     env.install_canister(canister_id, wasm, bytes, None);
+    // Every seed is hashed against the salt, so a canister needs one before anything can
+    // sign in or derive a principal. Asked for here rather than in each test that happens
+    // to need it, so it is set at a fixed point in every test's timeline.
+    //
+    // Attempted rather than demanded: some tests install a canister that has no such
+    // method, or an older release that refuses a salt it already has. A test that needs a
+    // salt and did not get one fails on its own, saying so.
+    let _ = api::internet_identity::init_salt(env, canister_id);
     canister_id
 }
 
@@ -213,6 +221,14 @@ pub fn arg_with_captcha_disabled() -> Option<InternetIdentityInit> {
             captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
         }),
         ..InternetIdentityInit::default()
+    })
+}
+
+/// The only test arg with notifications enabled.
+pub fn arg_with_notifications_enabled() -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        notifications_enabled: Some(true),
+        ..arg_with_captcha_disabled().unwrap()
     })
 }
 
@@ -319,6 +335,12 @@ pub fn upgrade_ii_canister_with_arg(
 
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
     env.upgrade_canister(canister_id, wasm, byts, None)?;
+    // An upgrade from a release that derived the salt lazily leaves a canister without one
+    // where it never issued a delegation, and no lifecycle hook can derive one, so the
+    // upgraded canister is asked for its salt the same way a fresh one is. Attempted
+    // rather than demanded for the same reason as at install — a rollback lands on a
+    // release that refuses a salt it already has.
+    let _ = api::internet_identity::init_salt(env, canister_id);
 
     let post_upgrade_module_hash = env
         .canister_status(canister_id, None)
@@ -359,6 +381,95 @@ pub fn restore_compressed_stable_memory(env: &PocketIc, canister_id: CanisterId,
     file.read_to_end(&mut buffer)
         .expect("Failed to read stable memory file");
     env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip);
+}
+
+/// A browser key of the kind `prepare_account_session` demands a proof from.
+///
+/// The DER encoding and the domain prefix have to match what the canister verifies,
+/// so both are spelled out here rather than derived.
+pub struct BrowserKey {
+    signing_key: p256::ecdsa::SigningKey,
+}
+
+/// The SPKI header WebCrypto emits for an `ECDSA` P-256 public key, ahead of the 65-byte
+/// uncompressed point.
+const P256_SPKI_HEADER: [u8; 26] = [
+    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
+    0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00,
+];
+
+const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
+const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
+const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
+
+impl BrowserKey {
+    pub fn new(seed: u8) -> Self {
+        Self {
+            signing_key: p256::ecdsa::SigningKey::from_bytes(&[seed; 32].into())
+                .expect("failed to build a browser key"),
+        }
+    }
+
+    /// The key a browser rotates to after `self`, so a test can walk the chain.
+    pub fn successor(&self) -> Self {
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&self.signing_key.to_bytes());
+        seed[0] = seed[0].wrapping_add(1);
+        Self {
+            signing_key: p256::ecdsa::SigningKey::from_bytes(&seed.into())
+                .expect("failed to build a browser key"),
+        }
+    }
+
+    pub fn public_key(&self) -> PublicKey {
+        let point = p256::ecdsa::VerifyingKey::from(&self.signing_key).to_encoded_point(false);
+        let mut der = P256_SPKI_HEADER.to_vec();
+        der.extend_from_slice(point.as_bytes());
+        ByteBuf::from(der)
+    }
+
+    pub fn sign(&self, session_key: &SessionKey, next_browser_key: &PublicKey) -> ByteBuf {
+        self.sign_with(BROWSER_KEY_SIGNATURE_DOMAIN, session_key, next_browser_key)
+    }
+
+    /// The successor's own signature, proving the browser holds the key it announces.
+    pub fn sign_as_successor(&self, session_key: &SessionKey, device_key: &PublicKey) -> ByteBuf {
+        self.sign_with(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key)
+    }
+
+    /// The principal a call signed with this key arrives as, which is how the canister
+    /// tells one browser from another.
+    pub fn principal(&self) -> Principal {
+        Principal::self_authenticating(self.public_key())
+    }
+
+    /// The token the identity that has the app signs for another identity on the device,
+    /// which that identity spends to point its own browser at the same app.
+    pub fn sign_claim_token(
+        &self,
+        offering_anchor_number: AnchorNumber,
+        claiming_anchor_number: AnchorNumber,
+        expires_at_ns: Timestamp,
+    ) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let mut message = NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(&offering_anchor_number.to_be_bytes());
+        message.extend_from_slice(&claiming_anchor_number.to_be_bytes());
+        message.extend_from_slice(&expires_at_ns.to_be_bytes());
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
+    }
+
+    fn sign_with(&self, domain: &[u8], session_key: &SessionKey, other: &PublicKey) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let mut message = domain.to_vec();
+        message.extend_from_slice(session_key);
+        message.extend_from_slice(other);
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
+    }
 }
 
 pub const PUBKEY_1: &str = "test";
@@ -440,9 +551,28 @@ pub fn device_with_origin(origin: Option<String>) -> DeviceData {
     DeviceData {
         pubkey: ByteBuf::from(origin.as_deref().unwrap_or(PUBKEY_1)),
         alias: "My Device".to_string(),
-        credential_id: Some(ByteBuf::from("credential id 1")),
+        credential_id: Some(ByteBuf::from(
+            origin
+                .as_deref()
+                .map_or("credential id 1".to_string(), |origin| {
+                    format!("credential id {origin}")
+                }),
+        )),
         origin,
         ..DeviceData::auth_test_device()
+    }
+}
+
+/// Returns a copy of `device` with a pubkey and credential id derived from `n`, so that it can be
+/// registered on another anchor (devices must be unique across anchors).
+pub fn distinct_device(device: &DeviceData, n: u64) -> DeviceData {
+    let pubkey = [device.pubkey.as_slice(), format!(" #{n}").as_bytes()].concat();
+    DeviceData {
+        pubkey: ByteBuf::from(pubkey.clone()),
+        credential_id: Some(ByteBuf::from(
+            [b"credential id of ".as_slice(), &pubkey].concat(),
+        )),
+        ..device.clone()
     }
 }
 

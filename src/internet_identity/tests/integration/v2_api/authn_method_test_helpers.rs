@@ -155,7 +155,7 @@ pub fn sample_webauthn_authn_method(i: u8) -> AuthnMethodData {
     }
 }
 
-fn sample_recovery_authn_method(i: u8) -> AuthnMethodData {
+pub fn sample_recovery_authn_method(i: u8) -> AuthnMethodData {
     AuthnMethodData {
         authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
             pubkey: ByteBuf::from(vec![i; 32]),

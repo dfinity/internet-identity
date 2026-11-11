@@ -30,6 +30,8 @@
 //! - `fresh_until = filled_at + fresh_for` — fresh below it, stale above.
 //! - `stale_for` — extra window a stale value is still served as a fallback.
 //! - `evict_at = fresh_until + stale_for` — hard deadline; dropped at/after it.
+//! - `stale_if_error_for` — once a refresh fails, `evict_at` is pulled in to
+//!   `fresh_until + stale_if_error_for` if that is sooner.
 //! - `retry_at` — a failed fill parks the key until here, capped by `evict_at`.
 //!
 //! ## What a `get` resolves to
@@ -105,11 +107,16 @@ pub struct CacheConfig {
     /// window skip the fill entirely; longer means fewer fills (more
     /// available) but staler values.
     pub fresh_for: u64,
-    /// Extra window a value is served past `fresh_for` once a refresh has
-    /// failed (stale-if-error) — serves the last-good value through a
-    /// transient fill failure instead of failing the caller. `0` disables
-    /// stale-serving (every miss past `fresh_for` must refill).
+    /// Extra window a value is kept and served past `fresh_for`: immediately
+    /// while a refresh runs (stale-while-revalidate), and through a failed
+    /// refresh within `stale_if_error_for`. `0` disables stale-serving (every
+    /// miss past `fresh_for` must refill).
     pub stale_for: u64,
+    /// How long past `fresh_for` a value may still be served once a refresh
+    /// has failed (stale-if-error); never longer than `stale_for`. Also the
+    /// extra lifetime of a failure marker for a key with no value, after which
+    /// its backoff resets.
+    pub stale_if_error_for: u64,
     /// Hard cap on cached keys; over it the least-recently-used is evicted.
     /// Bounds heap for an unbounded key space.
     pub max_entries: usize,
@@ -159,8 +166,21 @@ struct InFlight {
     claimed_at: u64,
 }
 
+/// What a fill resolves to. `Ready`/`Failed` are the usual store / back-off
+/// outcomes. `Abandoned` means the fill chose not to run at all — it did no
+/// work and produced neither a value nor a failure. The cache then releases the
+/// in-flight marker and records *nothing*: the key keeps whatever state it had
+/// (cold stays cold, a stale value stays served) and the next `get` retries
+/// immediately, with no backoff. It lets a fill decline under a resource limit
+/// without that decline being mistaken for the resource being unavailable.
+pub enum FillOutcome<V, E> {
+    Ready(V),
+    Failed(E),
+    Abandoned,
+}
+
 /// A boxed fill future and the boxed fill function that produces one per key.
-type BoxFuture<V, E> = Pin<Box<dyn Future<Output = Result<V, E>>>>;
+type BoxFuture<V, E> = Pin<Box<dyn Future<Output = FillOutcome<V, E>>>>;
 type FillFn<K, V, E> = Box<dyn Fn(K) -> BoxFuture<V, E>>;
 
 /// In-memory single-flight cache keyed by `K`, holding values of type `V`
@@ -176,6 +196,7 @@ pub struct SingleFlightCache<K, V, E> {
     access_clock: u64,
     fresh_for: u64,
     stale_for: u64,
+    stale_if_error_for: u64,
     max_entries: usize,
     backoff: RetryBackoff,
     abandon_fill_after: u64,
@@ -218,7 +239,7 @@ impl<K, V, E> SingleFlightCache<K, V, E> {
     /// knob is required; see `CacheConfig` for why there are no defaults.
     pub fn new<Fut>(fill: impl Fn(K) -> Fut + 'static, config: CacheConfig) -> Self
     where
-        Fut: Future<Output = Result<V, E>> + 'static,
+        Fut: Future<Output = FillOutcome<V, E>> + 'static,
     {
         Self {
             entries: BTreeMap::new(),
@@ -228,6 +249,7 @@ impl<K, V, E> SingleFlightCache<K, V, E> {
             access_clock: 0,
             fresh_for: config.fresh_for,
             stale_for: config.stale_for,
+            stale_if_error_for: config.stale_if_error_for,
             max_entries: config.max_entries.max(1),
             backoff: config.backoff,
             abandon_fill_after: config.abandon_fill_after,
@@ -299,6 +321,17 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
         }
     }
 
+    /// A fresh success parks nothing (its `retry_at` is the freshness
+    /// deadline), so `failures` is what tells the two apart.
+    fn parked_until(&self, key: &K, now: u64) -> Option<u64> {
+        let entry = self.entries.get(key)?;
+        (entry.failures > 0
+            && entry.is_alive(now)
+            && entry.is_throttled(now)
+            && !self.in_flight.contains_key(key))
+        .then_some(entry.retry_at)
+    }
+
     /// Apply the outcome of the fill identified by `token`. `Ok` stores fresh
     /// and resets backoff; `Err` keeps any prior value for stale-serving and
     /// parks a backoff cooldown. A no-op if the marker is no longer ours (a
@@ -342,20 +375,28 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
                     .saturating_add(1);
                 let retry_at = now.saturating_add(self.backoff.delay_secs(failures));
                 if let Some(e) = self.entries.get_mut(key) {
-                    // Stale-if-error: keep the value and its `evict_at` (it
-                    // dies relative to the last success); just bump the
-                    // throttle. For a value-less marker, refresh life.
+                    // Stale-if-error: keep the value, which dies relative to
+                    // the last success, at most `stale_if_error_for` after it
+                    // went stale; bump the throttle. A value past that point
+                    // is dropped and the entry becomes a failure marker, so the
+                    // backoff still holds.
                     e.retry_at = retry_at;
                     e.failures = failures;
-                    if e.value.is_none() {
+                    let serve_until = e
+                        .evict_at
+                        .min(e.fresh_until.saturating_add(self.stale_if_error_for));
+                    if e.value.is_some() && serve_until > now {
+                        e.evict_at = serve_until;
+                    } else {
+                        e.value = None;
                         e.evict_at = now
                             .saturating_add(self.fresh_for)
-                            .saturating_add(self.stale_for);
+                            .saturating_add(self.stale_if_error_for);
                     }
                 } else {
                     let evict_at = now
                         .saturating_add(self.fresh_for)
-                        .saturating_add(self.stale_for);
+                        .saturating_add(self.stale_if_error_for);
                     self.upsert(
                         key,
                         Entry {
@@ -371,6 +412,22 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
             }
         }
 
+        self.sweep_expired(now);
+    }
+
+    /// Apply an [`FillOutcome::Abandoned`] fill: release the in-flight marker
+    /// and record nothing — no value, no failure, no backoff. A no-op if a
+    /// takeover already replaced our marker. The entry (if any) is left exactly
+    /// as it was, so a stale value keeps serving and a cold key stays cold; the
+    /// next `get` starts a fresh fill with no penalty.
+    fn abandon_fill(&mut self, key: &K, token: FillToken, now: u64) {
+        let still_ours = self
+            .in_flight
+            .get(key)
+            .is_some_and(|f| f.fill_id == token.fill_id);
+        if still_ours {
+            self.in_flight.remove(key);
+        }
         self.sweep_expired(now);
     }
 
@@ -586,6 +643,23 @@ where
         .map_or(Cached::Pending, Cached::Ready)
 }
 
+/// When the cache will next attempt a fill for `key`, in absolute seconds, or
+/// `None` when nothing is parked. Read-only, like [`peek`], and the only way
+/// to tell a [`Cached::Pending`] that is parked in backoff from one whose fill
+/// is in flight.
+pub fn retry_at<K, V, E>(
+    cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>,
+    key: &K,
+) -> Option<u64>
+where
+    K: Ord + Clone + 'static,
+    V: Clone + 'static,
+    E: 'static,
+{
+    let now = now();
+    cache.with_borrow(|c| c.parked_until(key, now))
+}
+
 /// Snapshot the cache's state for external observability (metrics). Read-only
 /// and non-blocking; uses the cache's own clock, like [`get`].
 pub fn stats<K, V, E>(cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>) -> CacheStats
@@ -611,9 +685,13 @@ fn spawn_fill<K, V, E>(
 {
     let fill_fut = cache.with_borrow(|c| (c.fill)(key.clone()));
     detach(async move {
-        let result = fill_fut.await;
+        let outcome = fill_fut.await;
         let now = now();
-        cache.with_borrow_mut(|c| c.complete_fill(&key, token, result, now));
+        cache.with_borrow_mut(|c| match outcome {
+            FillOutcome::Ready(v) => c.complete_fill(&key, token, Ok(v), now),
+            FillOutcome::Failed(e) => c.complete_fill(&key, token, Err(e), now),
+            FillOutcome::Abandoned => c.abandon_fill(&key, token, now),
+        });
     });
 }
 
@@ -698,13 +776,14 @@ mod tests {
         CacheConfig {
             fresh_for: 0,
             stale_for: 0,
+            stale_if_error_for: 0,
             max_entries: usize::MAX,
             backoff: RetryBackoff::new(60, 2),
             abandon_fill_after: 120,
         }
     }
     fn cache(config: CacheConfig) -> SingleFlightCache<&'static str, &'static str, ()> {
-        SingleFlightCache::new(|_k| async { Err(()) }, config)
+        SingleFlightCache::new(|_k| async { FillOutcome::Failed(()) }, config)
     }
 
     fn expect_fill(state: Lookup<&'static str>) -> FillToken {
@@ -715,11 +794,44 @@ mod tests {
     }
 
     #[test]
+    fn abandoned_cold_fill_records_nothing_and_retries_immediately() {
+        let mut c = cache(base_config());
+        let t = expect_fill(c.lookup(&"k", 0)); // cold → claim the marker
+        c.abandon_fill(&"k", t, 0);
+        let s = c.stats(0);
+        assert_eq!(s.in_flight, 0, "the marker is released");
+        assert_eq!(s.entries, 0, "no value and no failure marker recorded");
+        // No backoff parked the key: the next lookup starts a fresh fill.
+        expect_fill(c.lookup(&"k", 0));
+    }
+
+    #[test]
+    fn abandoned_refresh_keeps_the_stale_value_and_backoff_free() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 50,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("v"), 0);
+        // Stale at 120 → refresh due, StartFill hands back the stale value.
+        let t2 = expect_fill(c.lookup(&"k", 120));
+        c.abandon_fill(&"k", t2, 120);
+        // The stale value is untouched and still served; nothing was penalised.
+        assert!(matches!(
+            c.lookup(&"k", 120),
+            Lookup::StartFill(_, Some("v"))
+        ));
+    }
+
+    #[test]
     fn fresh_then_stale_then_dead() {
         // fresh_for 100, stale_for 50 → fresh [0,100), stale [100,150), dead ≥150.
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -729,6 +841,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -740,6 +853,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -762,6 +876,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 1000,
+            stale_if_error_for: 1000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -775,6 +890,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 1000,
+            stale_if_error_for: 1000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -788,10 +904,77 @@ mod tests {
     }
 
     #[test]
+    fn stale_value_is_served_while_revalidating_past_stale_if_error_for() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("good"), 0);
+        // Long past `fresh_until + stale_if_error_for`, still within `stale_for`.
+        assert!(matches!(
+            c.lookup(&"k", 500),
+            Lookup::StartFill(_, Some("good"))
+        ));
+        assert!(matches!(c.lookup(&"k", 501), Lookup::Ready("good")));
+    }
+
+    #[test]
+    fn failed_refresh_serves_stale_only_within_stale_if_error_for() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("good"), 0);
+        let t2 = expect_fill(c.lookup(&"k", 120));
+        c.complete_fill(&"k", t2, Err(()), 120);
+        // Served until `fresh_until + stale_if_error_for` = 150, then gone.
+        assert!(matches!(c.lookup(&"k", 149), Lookup::Ready("good")));
+        assert!(matches!(c.lookup(&"k", 150), Lookup::StartFill(_, None)));
+    }
+
+    #[test]
+    fn failed_refresh_past_stale_if_error_for_drops_the_value() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("good"), 0);
+        let t2 = expect_fill(c.lookup(&"k", 500));
+        c.complete_fill(&"k", t2, Err(()), 500);
+        assert!(c.peek_value(&"k", 500).is_none());
+        // The failure still parks the key: no new fill until the backoff ends.
+        assert!(matches!(c.lookup(&"k", 501), Lookup::Pending));
+        assert!(matches!(c.lookup(&"k", 560), Lookup::StartFill(_, None)));
+    }
+
+    #[test]
+    fn failure_marker_lives_for_stale_if_error_for() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Err(()), 0);
+        assert_eq!(c.entries.get("k").map(|e| e.evict_at), Some(150));
+    }
+
+    #[test]
     fn cold_failure_pending_then_retries() {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 1000,
+            stale_if_error_for: 1000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -805,6 +988,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 1000,
             stale_for: 100_000,
+            stale_if_error_for: 100_000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -956,6 +1140,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 100,
+            stale_if_error_for: 100,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"stale", 0));
@@ -992,6 +1177,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 0,
+            stale_if_error_for: 0,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -1043,6 +1229,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 0,
+            stale_if_error_for: 0,
             ..base_config()
         });
         for k in ["a", "b", "c"] {
@@ -1065,6 +1252,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 0,
+            stale_if_error_for: 0,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -1089,6 +1277,7 @@ mod tests {
         CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         }
     }
@@ -1096,7 +1285,10 @@ mod tests {
         SingleFlightCache::new(
             |_k| async {
                 FILL_COUNT.with(|c| c.set(c.get() + 1));
-                FILL_RESULT.with(|r| r.get())
+                match FILL_RESULT.with(|r| r.get()) {
+                    Ok(v) => FillOutcome::Ready(v),
+                    Err(e) => FillOutcome::Failed(e),
+                }
             },
             e2e_config(),
         )

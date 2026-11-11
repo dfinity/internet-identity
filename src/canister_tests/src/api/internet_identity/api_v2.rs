@@ -372,6 +372,43 @@ pub fn get_accounts(
     .map(|(x,)| x)
 }
 
+pub fn list_applications(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+) -> Result<Result<Vec<ApplicationInfo>, ListApplicationsError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "list_applications",
+        (ListApplicationsRequest { anchor_number },),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn forget_applications(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    origins: Vec<FrontendHostname>,
+) -> Result<Result<(), ForgetApplicationsError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "forget_applications",
+        (ForgetApplicationsRequest {
+            anchor_number,
+            origins,
+        },),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn get_default_account(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -743,6 +780,100 @@ pub fn get_account_delegation_with_read_only(
             expiration,
             permissions_arg(read_only),
         ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_account_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: PrepareAccountSessionRequest,
+) -> Result<Result<PrepareAccountSessionResponse, AccountSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_account_session",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_account_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: GetAccountSessionRequest,
+) -> Result<Result<GetAccountSessionResponse, AccountSessionError>, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "get_account_session", (request,)).map(|(x,)| x)
+}
+
+/// The II frontend's liveness check, called as the query it is declared as.
+pub fn check_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<bool, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "check_session", ()).map(|(x,)| x)
+}
+
+pub fn app_prepare_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppPrepareDelegationRequest,
+) -> Result<Result<AppPrepareDelegationResponse, AppSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_prepare_delegation",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_get_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppGetDelegationRequest,
+) -> Result<Result<SignedDelegation, AppSessionError>, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "app_get_delegation", (request,)).map(|(x,)| x)
+}
+
+pub fn app_revoke_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<(), AppSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_revoke_session",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn revoke_browser_sessions(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: RevokeBrowserSessionsRequest,
+) -> Result<Result<(), SessionRevokeError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "revoke_browser_sessions",
+        (request,),
     )
     .map(|(x,)| x)
 }

@@ -72,6 +72,14 @@ pub fn pending_diagnostics(
     pending::diagnostics_of(nonce, now_secs)
 }
 
+/// Drop in-flight setup / verified-email challenges for `anchor`.
+/// See [`pending::drop_challenges_for_anchor`].
+pub fn drop_challenges_for_anchor(
+    anchor: internet_identity_interface::internet_identity::types::AnchorNumber,
+) {
+    pending::drop_challenges_for_anchor(anchor)
+}
+
 /// Whether the legacy DNSSEC email-recovery path is enabled. Off by
 /// default — the canister runs DoH-only and `prepare_*` ignores any
 /// client-supplied `dns_proof`.

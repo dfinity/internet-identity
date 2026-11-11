@@ -4,6 +4,17 @@ import { ExtractedMessage } from "@lingui/conf";
 
 const FILE_NAME = "test.svelte";
 
+const extractAll = async (
+  code: string,
+  filename = FILE_NAME,
+): Promise<ExtractedMessage[]> => {
+  const messages: ExtractedMessage[] = [];
+  await svelteExtractor.extract(filename, code, (message) =>
+    messages.push(message),
+  );
+  return messages;
+};
+
 const extract = (code: string): Promise<ExtractedMessage> =>
   new Promise<ExtractedMessage>((resolve, reject) => {
     try {
@@ -211,6 +222,249 @@ describe("svelteExtractor", () => {
     ])("should extract message $case", async ({ code, expected }) => {
       const { message } = await extract(code);
       expect(message).toEqual(expected);
+    });
+  });
+
+  describe("nested message formats", () => {
+    it.each([
+      {
+        case: "plural in <Trans>",
+        code: '<Trans>{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+        expected: "{count, plural, one {# browser} other {# browsers}}",
+      },
+      {
+        case: "plural in <Trans> among text",
+        code: '<Trans>You have {$plural(count, { one: "# browser", other: "# browsers" })} open</Trans>',
+        expected:
+          "You have {count, plural, one {# browser} other {# browsers}} open",
+      },
+      {
+        case: "plural in <Trans> with variables in its categories",
+        code: "<Trans>{$plural(count, { one: `# browser on ${platform}`, other: `# browsers on ${platform} device(s)` })}</Trans>",
+        expected:
+          "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}",
+      },
+      {
+        case: "plural inside a tag in <Trans>",
+        code: '<Trans>Click <strong>{$plural(count, { one: "# time", other: "# times" })}</strong> now</Trans>',
+        expected:
+          "Click <0>{count, plural, one {# time} other {# times}}</0> now",
+      },
+      {
+        case: "plural as a $t descriptor message",
+        code: '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }) })}',
+        expected: "{count, plural, one {# browser} other {# browsers}}",
+      },
+      {
+        case: "$t in a plural category",
+        code: "{$plural(n, { one: $t`One ${genre} book`, other: $t`# ${genre} books` })}",
+        expected: "{n, plural, one {One {genre} book} other {# {genre} books}}",
+      },
+      {
+        case: "plural in a plural category",
+        code: '{$plural(n, { one: "one", other: $plural(m, { one: "# inner", other: "# inners" }) })}',
+        expected:
+          "{n, plural, one {one} other {{m, plural, one {# inner} other {# inners}}}}",
+      },
+      {
+        case: "plural in a $t template literal",
+        code: '{$t`You have ${$plural(count, { one: "# browser", other: "# browsers" })} open`}',
+        expected:
+          "You have {count, plural, one {# browser} other {# browsers}} open",
+      },
+    ])("should extract message with $case", async ({ code, expected }) => {
+      const { message } = await extract(code);
+      expect(message).toEqual(expected);
+    });
+
+    it.each([
+      {
+        case: "<Trans> attribute",
+        code: '<Trans context="Browsers group by platform">{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+      },
+      {
+        case: "$t descriptor",
+        code: '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }), context: "Browsers group by platform" })}',
+      },
+    ])("should extract context from the $case", async ({ code }) => {
+      const { context } = await extract(code);
+      expect(context).toEqual("Browsers group by platform");
+    });
+
+    // The nested format is part of the enclosing message, so it must not also
+    // be extracted on its own — that would put an unused entry in the
+    // catalogue for every nested plural.
+    it.each([
+      {
+        case: "<Trans>",
+        code: '<Trans>{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+      },
+      {
+        case: "a $t descriptor",
+        code: '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }) })}',
+      },
+      {
+        case: "a plural category",
+        code: "{$plural(n, { one: $t`One book`, other: $t`# books` })}",
+      },
+    ])("should extract one message for a plural in $case", async ({ code }) => {
+      const messages = await extractAll(code);
+      expect(messages).toHaveLength(1);
+    });
+
+    it("should keep positional keys distinct across nesting", async () => {
+      const { message } = await extract(
+        '<Trans>{"a"} and {$plural(n, { one: `${"b"} x`, other: `${"c"} y` })}</Trans>',
+      );
+      expect(message).toEqual("{0} and {n, plural, one {{1} x} other {{1} y}}");
+    });
+
+    it.each([
+      {
+        case: "a string",
+        code: '<Trans>Hello {"John"}</Trans>',
+      },
+      {
+        case: "a template literal",
+        code: "<Trans>Hello {`Mr ${name}`}</Trans>",
+      },
+    ])(
+      "should leave a placeholder for an expression holding $case",
+      async ({ code }) => {
+        const { message } = await extract(code);
+        expect(message).toEqual("Hello {0}");
+      },
+    );
+  });
+
+  // Each finder is handed only the names it matches. A component is a message
+  // only when it is named `Trans`, whatever the message functions are called,
+  // so widening one cannot quietly widen another.
+  describe("tag matching", () => {
+    it.each([
+      { case: "<Plural>", code: "<Plural>Hello world</Plural>" },
+      { case: "<T>", code: "<T>Hello world</T>" },
+      { case: "<Translate>", code: "<Translate>Hello world</Translate>" },
+      { case: "<Message>", code: "<Message>Hello world</Message>" },
+    ])("should extract nothing from $case", async ({ code }) => {
+      expect(await extractAll(code)).toEqual([]);
+    });
+
+    it.each([
+      { case: "a tagged template", code: "{t`Hello world`}" },
+      { case: "a call expression", code: '{t({ message: "Hello world" })}' },
+      {
+        case: "a plural",
+        code: '{plural(1, { one: "One", other: "# many" })}',
+      },
+    ])(
+      "should extract nothing from $case without the $ prefix",
+      async ({ code }) => {
+        expect(await extractAll(code)).toEqual([]);
+      },
+    );
+  });
+
+  describe("module", () => {
+    const MODULE_NAME = "test.ts";
+    const IMPORT = 'import { t, plural } from "$lib/stores/locale.store";\n';
+
+    it.each([
+      { case: "a .ts module", filename: "error.ts", matches: true },
+      {
+        case: "a .svelte.ts module",
+        filename: "flow.svelte.ts",
+        matches: true,
+      },
+      { case: "a declaration file", filename: "types.d.ts", matches: false },
+    ])("should match $case: $matches", ({ filename, matches }) => {
+      expect(svelteExtractor.match(filename)).toBe(matches);
+    });
+
+    it("should extract a tagged template with its line and column", async () => {
+      const messages = await extractAll(
+        `${IMPORT}export const greet = (name: string): string => t\`Hello \${name}\`;`,
+        MODULE_NAME,
+      );
+      expect(messages).toEqual([
+        expect.objectContaining({
+          message: "Hello {name}",
+          origin: [MODULE_NAME, 2, 47],
+        }),
+      ]);
+    });
+
+    it("should give a message the same id as in a component", async () => {
+      const [fromModule] = await extractAll(
+        `${IMPORT}t\`Hello World\`;`,
+        MODULE_NAME,
+      );
+      const [fromComponent] = await extractAll("{$t`Hello World`}");
+      expect(fromModule.id).toEqual(fromComponent.id);
+    });
+
+    it("should extract a descriptor and a plural", async () => {
+      const messages = await extractAll(
+        `${IMPORT}t({ message: "Hello", context: "greeting" });\nplural(count, { one: "# browser", other: "# browsers" });`,
+        MODULE_NAME,
+      );
+      expect(
+        messages.map(({ message, context }) => ({ message, context })),
+      ).toEqual([
+        { message: "Hello", context: "greeting" },
+        {
+          message: "{count, plural, one {# browser} other {# browsers}}",
+          context: undefined,
+        },
+      ]);
+    });
+
+    it("should follow a renamed import", async () => {
+      const messages = await extractAll(
+        'import { t as translate } from "$lib/stores/locale.store";\ntranslate`Hello World`;\nt`Not a message`;',
+        MODULE_NAME,
+      );
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it.each([
+      {
+        case: "a parameter",
+        code: `${IMPORT}const f = (t: (s: TemplateStringsArray) => string) => t\`Shadowed\`;\nt\`Hello World\`;`,
+      },
+      {
+        case: "a block declaration",
+        code: `${IMPORT}{\n  const t = String.raw;\n  t\`Shadowed\`;\n}\nt\`Hello World\`;`,
+      },
+      {
+        case: "a parameter shadowing a renamed import",
+        code: 'import { t as translate } from "$lib/stores/locale.store";\nfunction f(translate: typeof String.raw) {\n  return translate`Shadowed`;\n}\ntranslate`Hello World`;',
+      },
+    ])("should skip a call to $case", async ({ code }) => {
+      const messages = await extractAll(code, MODULE_NAME);
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it("should extract a call inside a nested function", async () => {
+      const messages = await extractAll(
+        `${IMPORT}export const f = () => () => t\`Hello World\`;`,
+        MODULE_NAME,
+      );
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it.each([
+      { case: "no import", code: "t`Hello World`;" },
+      {
+        case: "t from another module",
+        code: 'import { t } from "./other";\nt`Hello World`;',
+      },
+      {
+        case: "the component syntax",
+        code: `${IMPORT}$t\`Hello World\`;`,
+      },
+    ])("should extract nothing with $case", async ({ code }) => {
+      expect(await extractAll(code, MODULE_NAME)).toEqual([]);
     });
   });
 });

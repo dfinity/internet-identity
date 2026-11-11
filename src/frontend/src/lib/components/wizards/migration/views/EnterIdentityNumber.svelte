@@ -11,6 +11,7 @@
   import { getPrimaryOrigin } from "$lib/globals";
 
   interface Props {
+    initialIdentityNumber?: bigint;
     onSubmit: (
       identityNumber: bigint,
       attachElement?: HTMLElement,
@@ -23,9 +24,9 @@
       ? window.location.origin
       : "https://identity.ic0.app";
 
-  let { onSubmit }: Props = $props();
+  let { initialIdentityNumber, onSubmit }: Props = $props();
 
-  let identityNumber = $state<string>("");
+  let identityNumber = $state<string>(initialIdentityNumber?.toString() ?? "");
   let inputElement = $state<HTMLInputElement>();
   let attachElement = $state<HTMLElement>();
   let isSubmitting = $state(false);

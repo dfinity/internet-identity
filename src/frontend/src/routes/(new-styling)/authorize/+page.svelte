@@ -9,7 +9,7 @@
     channelStore,
     establishedChannelStore,
   } from "$lib/stores/channelStore";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { t } from "$lib/stores/locale.store";
@@ -22,18 +22,28 @@
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
+  import SsoConnectErrorView from "./views/SsoConnectErrorView.svelte";
+  import SsoConnectingView from "$lib/components/views/SsoConnectingView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
+  import NotifOptInView from "./views/NotifOptInView.svelte";
   import {
     type AttributeConsent,
     attributeConsentStore,
+    attributeConsentResolvedStore,
     attributeConsentResultStore,
   } from "$lib/stores/attributeConsent.store";
+  import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
+  import {
+    notificationConsentSettledStore,
+    notificationConsentStore,
+  } from "$lib/stores/notificationConsent.store";
 
   // --- OpenID resume imports ---
   import {
@@ -44,6 +54,7 @@
   import {
     decodeJWT,
     findConfig,
+    isAppleSignInSheetBrowser,
     isOpenIdCancelError,
     selectAuthScopes,
   } from "$lib/utils/openID";
@@ -70,7 +81,26 @@
 
   // --- Local state ---
   let upgradeSuccess = $state(false);
-  let openIdResumeProcessing = $state(false);
+  // Whether a request was still working out its screen when the user authorized.
+  // Only then is there a screen of theirs worth keeping: the 1-click flows and an
+  // identity switch authorize without one, and their redirect animation stands.
+  let heldAtAuthorize = $state(false);
+  // The 1-click OpenID resume load shows the redirect animation from its very
+  // first frame. `resumeOpenId` runs in `onMount`, i.e. *after* that first
+  // render, so starting at `false` renders the returning-user account picker
+  // for one frame — and that picker immediately starts origin-bound canister
+  // work, which throws "Authorization context is not available yet": the
+  // dapp's authorize request cannot have arrived yet on a freshly resumed
+  // channel. The early exits below (and a failure in `resumeOpenId`) set this
+  // back to `false`, which is what surfaces the regular fall-back UI.
+  let openIdResumeProcessing = $state(data.flow === "openid-resume");
+  // The redirect to Apple is waiting behind the native Sign in with Apple
+  // sheet, which keeps this page on screen.
+  let isBehindAppleSheet = $state(false);
+  // iOS tells this page nothing when the sheet is canceled, so a way back to
+  // the app shows up after a moment.
+  let canReturnToApp = $state(false);
+  let ssoInitError = $state<{ cause: unknown }>();
   // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
   // Holds everything the dialog needs to run one normal (primary-client)
   // sign-in, then replay the stashed gated JWT and authorize.
@@ -99,13 +129,23 @@
     );
   });
 
-  const dapps = getDapps();
-  const dapp = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
+  // The app's display metadata is published on the origin its identity is
+  // derived for; screens fall back to the channel origin until the
+  // authorization context is established (and for apps without a derivation
+  // origin the two are the same origin anyway).
+  const metadataStore = $derived(
+    getAppMetadataStore(
+      $authorizationStore?.effectiveOrigin ?? $establishedChannelStore.origin,
+      $establishedChannelStore.origin,
+    ),
   );
+  const dapp = $derived($metadataStore);
 
   // --- View selection ---
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
+  // Keeps the screen the user authorized from until the request that owes us one
+  // has it, so the flow never passes through a half-built screen to get there.
+  const holdingScreen = $derived(heldAtAuthorize && $pendingScreenStore);
 
   // --- Handlers ---
   const handleAuthWizardSignIn = (identityNumber: bigint): Promise<void> => {
@@ -176,6 +216,10 @@
     accessLevel: AccessLevel,
     maxTimeToLive?: bigint,
   ) => {
+    // Read before authorizing, because authorizing is what would otherwise replace
+    // this screen: a request that already owed us one gets to keep it, and one that
+    // arrives after this point has nothing of the user's to keep.
+    heldAtAuthorize = get(pendingScreenStore);
     authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
   };
 
@@ -221,7 +265,64 @@
       "ii-openid-authorize-state",
       next.searchParams.get("state")!,
     );
+    if (
+      next.origin === "https://appleid.apple.com" &&
+      isAppleSignInSheetBrowser(navigator.userAgent)
+    ) {
+      isBehindAppleSheet = true;
+      closeWhenAppleSheetIsCanceled();
+      setTimeout(() => (canReturnToApp = true), 10_000);
+    }
     window.location.assign(next);
+  };
+
+  /**
+   * Canceling the sheet can drop the redirect without telling this page: the
+   * window only gets its focus back. A completed sheet gives focus back too,
+   * but the redirect then goes on and `beforeunload` follows within
+   * milliseconds, so focus that stays without one is a cancel.
+   *
+   * A cancel can also let the redirect go on towards Apple's web page, which
+   * fires `beforeunload` as well. A completed sheet replaces this page with
+   * Apple's reply within moments, so a page still here seconds after the
+   * sheet closed is a cancel either way.
+   */
+  const closeWhenAppleSheetIsCanceled = () => {
+    let sheetOpened = false;
+    let leaving = false;
+    let returned = false;
+    const returnOnce = () => {
+      if (returned) {
+        return;
+      }
+      returned = true;
+      returnToApp();
+    };
+    window.addEventListener("blur", () => (sheetOpened = true));
+    window.addEventListener("beforeunload", () => (leaving = true));
+    window.addEventListener("focus", () => {
+      if (!sheetOpened) {
+        return;
+      }
+      setTimeout(() => {
+        if (leaving) {
+          return;
+        }
+        returnOnce();
+      }, 500);
+      setTimeout(returnOnce, 5000);
+    });
+  };
+
+  /**
+   * Close this window when the app opened it; in a tab the app navigated to
+   * II instead (the URL transport), closing does nothing, so go back to it.
+   */
+  const returnToApp = () => {
+    window.close();
+    if (!window.closed) {
+      window.history.back();
+    }
   };
 
   /**
@@ -314,6 +415,7 @@
     // popup sign-in from this tab.
     sessionStorage.removeItem("ii-openid-authorize-state");
     if (storedPayload === null || openIdAuthorizeState === null) {
+      openIdResumeProcessing = false;
       return;
     }
     let jwt: string;
@@ -326,6 +428,7 @@
       // A state mismatch, an IdP error report or a missing token is not
       // recoverable here; fall back to the regular flow so the user can
       // start sign-in again.
+      openIdResumeProcessing = false;
       return;
     }
     const { iss, aud, ...metadata } = decodeJWT(jwt);
@@ -338,8 +441,6 @@
     sessionStorage.removeItem("ii-sso-1-click-domain");
     // SSO is never tracked as a last-used identity.
     const authFlow = new AuthFlow({ trackLastUsed: ssoDomain === null });
-    // Show the redirect animation now so the wait below doesn't flash the wizard.
-    openIdResumeProcessing = true;
     // Redeem through the origin-bound gate path so the session certifies
     // `sso:<domain>` attributes.
     let sso: { origin: string } | undefined;
@@ -379,6 +480,7 @@
         ]),
       );
       if (config === undefined) {
+        openIdResumeProcessing = false;
         return;
       }
       authorizationStore.setFlow({
@@ -449,24 +551,41 @@
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
   };
 
+  const startSso = (domain: string, derivationOrigin?: string) => {
+    ssoInitError = undefined;
+    initiateSso(domain, derivationOrigin).catch((error: unknown) => {
+      console.error("1-click SSO failed", error);
+      ssoInitError = { cause: error };
+    });
+  };
+
   onMount(() => {
     if (data.flow === "openid-init") {
       initiateOpenId(data.config);
     } else if (data.flow === "sso-init") {
-      // Discovery + redirect runs async; the page renders nothing while
-      // it's in flight (mirrors the openid-init render branch).
-      initiateSso(data.domain, data.derivationOrigin).catch(handleError);
+      startSso(data.domain, data.derivationOrigin);
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
-      resumeOpenId().catch(handleError);
+      resumeOpenId().catch((error) => {
+        // Bring the regular UI back rather than leaving the redirect animation
+        // up for a resume that has already failed.
+        openIdResumeProcessing = false;
+        handleError(error);
+      });
     } else {
       authorizationStore.setFlow({ type: "regular" });
     }
   });
 </script>
 
-{#snippet upgradePanel()}
+<!-- `showsAppOrigin` tells the panel whether the view rendered beneath it
+     displays the *same* origin this panel's metadata came from (the channel
+     origin). App-provided names are permissionless, so one may only be shown
+     next to the hostname that vouches for it; wrappers that show no origin
+     (upgrade success, the SSO fail-safe) or a different one (attribute consent
+     shows the effective/derivation origin) get the generic copy instead. -->
+{#snippet upgradePanel(showsAppOrigin: boolean)}
   <div
     class={[
       "relative overflow-hidden rounded-xl border-1 transition-all duration-200 max-sm:mx-4",
@@ -495,7 +614,7 @@
       <h2
         class="mx-6 mb-3 text-center text-lg font-medium text-balance text-black dark:text-white"
       >
-        {#if dapp?.name !== undefined}
+        {#if showsAppOrigin && dapp.name !== undefined}
           {@const application = dapp.name}
           {$t`${application} has moved to the new Internet Identity`}
         {:else}
@@ -553,13 +672,13 @@
   {/if}
 {/snippet}
 
-{#snippet panelWrapper(content: Snippet)}
+{#snippet panelWrapper(content: Snippet, showsAppOrigin = false)}
   <div
     class="grid w-full flex-1 items-center max-sm:items-stretch sm:w-100 sm:max-w-100"
   >
     <div class="relative col-start-1 row-start-1 flex min-w-0 flex-col gap-5">
       {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
-        {@render upgradePanel()}
+        {@render upgradePanel(showsAppOrigin)}
       {/if}
       <AuthPanel
         class={[
@@ -575,12 +694,41 @@
   </div>
 {/snippet}
 
-{#if data.flow === "openid-init" || data.flow === "sso-init"}
-  <!-- OpenID/SSO init — nothing to render, onMount redirects to provider. -->
-{:else if $attributeConsentStore !== undefined && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
-  <!-- Consent needed (or loading) — consent view handles its own loading state. -->
+{#if data.flow === "openid-init"}
+  <!-- OpenID init — onMount redirects to the provider; only Apple's native sheet keeps this page on screen. -->
+  {#if isBehindAppleSheet}
+    <div
+      role="status"
+      class="flex flex-col items-center gap-3 px-8 text-center"
+    >
+      <ProgressRing class="size-8" />
+      <p class="text-text-primary text-base font-medium">
+        {$t`Connecting to Apple`}
+      </p>
+      {#if canReturnToApp}
+        <button class="btn btn-secondary mt-3" onclick={returnToApp}>
+          {$t`Return to app`}
+        </button>
+      {/if}
+    </div>
+  {/if}
+{:else if data.flow === "sso-init"}
+  {#if ssoInitError !== undefined}
+    <SsoConnectErrorView
+      error={ssoInitError.cause}
+      domain={data.domain}
+      onRetry={() => startSso(data.domain, data.derivationOrigin)}
+    />
+  {:else}
+    <SsoConnectingView />
+  {/if}
+{:else if $attributeConsentStore !== undefined && $attributeConsentResolvedStore && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
+  <!-- Consent needed — what it asks about has been read, so it paints in full. -->
   {@render panelWrapper(attributeConsentContent)}
-{:else if $authorizedStore !== undefined || (data.flow === "openid-resume" && openIdResumeProcessing)}
+{:else if $notificationConsentStore !== undefined && $notificationConsentSettledStore === undefined}
+  <!-- Notification consent — runs after authorize, before the redirect. -->
+  {@render panelWrapper(notificationConsentContent)}
+{:else if (!holdingScreen && $authorizedStore !== undefined) || (data.flow === "openid-resume" && openIdResumeProcessing)}
   <!-- Authorized or OpenID callback processing — show redirect animation. -->
   <RedirectAnimationView />
 {:else if upgradeSuccess && $isAuthenticatedStore}
@@ -591,11 +739,13 @@
        "First sign-in with X" dialog instead of proceeding. -->
   {@render panelWrapper(ssoNormalLoginContent)}
 {:else if selectedIdentity !== undefined}
-  <!-- Returning user with a selected identity — show account selection. -->
-  {@render panelWrapper(continueContent)}
+  <!-- Returning user with a selected identity — show account selection.
+       Its header shows the channel origin, so the panel may name the app. -->
+  {@render panelWrapper(continueContent, true)}
 {:else}
-  <!-- New user or no identity selected — show authentication methods. -->
-  {@render panelWrapper(authWizardContent)}
+  <!-- New user or no identity selected — show authentication methods.
+       Its header shows the channel origin, so the panel may name the app. -->
+  {@render panelWrapper(authWizardContent, true)}
 {/if}
 
 {#snippet attributeConsentContent()}
@@ -605,6 +755,24 @@
         context={$attributeConsentStore}
         variant={data.flow === "openid-resume" ? "openid" : "normal"}
         onConsent={handleAttributeConsent}
+      />
+    {/key}
+  {/if}
+{/snippet}
+
+{#snippet notificationConsentContent()}
+  {#if $notificationConsentStore !== undefined}
+    {#key $notificationConsentStore}
+      <NotifOptInView
+        appName={dapp.name}
+        appLogo={dapp.logo}
+        identityNumber={$notificationConsentStore.identityNumber}
+        origin={$notificationConsentStore.effectiveOrigin}
+        actor={$notificationConsentStore.actor}
+        device={$notificationConsentStore.device}
+        consented={$notificationConsentStore.consented}
+        installFirst={$notificationConsentStore.installFirst}
+        onDone={() => notificationConsentStore.settle()}
       />
     {/key}
   {/if}

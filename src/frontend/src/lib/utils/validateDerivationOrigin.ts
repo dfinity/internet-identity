@@ -1,12 +1,11 @@
 import { resolveCanisterId as resolveCanisterIdFn } from "$lib/utils/canisterIdResolution";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
+import { MAX_ALTERNATIVE_ORIGINS } from "$lib/utils/urlUtils";
 import { wrapError } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 
-const MAX_ALTERNATIVE_ORIGINS = 10;
 type ValidationResult =
-  | { result: "valid" }
-  | { result: "invalid"; message: string };
+  { result: "valid" } | { result: "invalid"; message: string };
 
 /**
  * Function to validate the derivationOrigin. The derivationOrigin allows an application to request principals of a

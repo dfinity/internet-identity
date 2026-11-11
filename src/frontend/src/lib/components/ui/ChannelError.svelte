@@ -39,6 +39,10 @@
       title: $t`Attribute sharing failed`,
       description: $t`Something went wrong while sharing attributes. Please try again; if the issue persists, contact support.`,
     },
+    "notification-consent-failed": {
+      title: $t`Notification setup failed`,
+      description: $t`Something went wrong while setting up notifications. Please try again; if the issue persists, contact support.`,
+    },
   };
 
   interface Props {

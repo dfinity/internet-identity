@@ -70,7 +70,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
       },
     });
 
@@ -172,6 +171,9 @@ test.describe("Authorize with 1-click OpenID", () => {
         const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
         await signInWithOpenId(popup, openIdUsers[0].id);
         await closePromise;
+        // The popup closes once it hands back the token, before the credential is
+        // added; the dialog closes only once it has been.
+        await expect(page.getByRole("dialog")).toBeHidden();
         // Empty the last-used list so the assertion can only be satisfied by
         // the sign-in commit, and drop the IdP cookie so the linking session
         // isn't reused — otherwise the IdP auto-approves and skips its consent
@@ -234,7 +236,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`,
@@ -309,7 +310,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         icrc3Nonce: knownNonce,
         attributes: [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
       },
@@ -361,7 +361,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
@@ -396,6 +395,9 @@ test.describe("Authorize with 1-click OpenID", () => {
           const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
           await signInWithOpenId(popup, user.id);
           await closePromise;
+          // The popup closes once it hands back the token, before the credential is
+          // added; the dialog closes only once it has been.
+          await expect(page.getByRole("dialog")).toBeHidden();
         }
       },
     );
@@ -459,7 +461,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`,
         ],

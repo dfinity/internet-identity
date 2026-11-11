@@ -19,6 +19,12 @@ export type LastUsedAccounts = {
     [accountNumber: string]: LastUsedAccount;
   };
 };
+/** The account and session duration last chosen for an app with all options
+ *  shown, on this browser. */
+export type AuthorizeOptions = {
+  accountNumber: bigint | undefined;
+  sessionDurationSeconds: number;
+};
 export type LastUsedIdentity = {
   identityNumber: bigint;
   name?: string;
@@ -50,8 +56,15 @@ export type LastUsedIdentity = {
         };
       };
   accounts?: LastUsedAccounts;
+  /** Keyed by the app's origin. */
+  authorizeOptions?: { [origin: string]: AuthorizeOptions };
   lastUsedTimestampMillis: number;
   createdAtMillis?: number;
+  /** When this browser first saw this identity, which is not when the identity was
+   *  created and not when the canister first registered a browser for it. The devices
+   *  page shows it for a browser the canister holds no record of yet — one signed in to
+   *  Internet Identity but to no app. Written once and left alone afterwards. */
+  firstSeenTimestampMillis?: number;
 };
 export type LastUsedIdentities = {
   [identityNumber: string]: LastUsedIdentity;
@@ -74,6 +87,11 @@ type LastUsedIdentitiesStore = Readable<{
   ) => void;
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
+  ) => void;
+  setAuthorizeOptions: (
+    identityNumber: bigint,
+    origin: string,
+    options: AuthorizeOptions,
   ) => void;
   restoreIdentity: (identity: LastUsedIdentity) => void;
   removeIdentity: (identityNumber: bigint) => void;
@@ -119,8 +137,13 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         const identity = lastUsedIdentities[params.identityNumber.toString()];
         lastUsedIdentities[params.identityNumber.toString()] = {
           accounts: identity?.accounts,
+          authorizeOptions: identity?.authorizeOptions,
           ...params,
           lastUsedTimestampMillis: Date.now(),
+          // Kept from the first time this browser saw the identity, so it does not
+          // advance every time the identity is used.
+          firstSeenTimestampMillis:
+            identity?.firstSeenTimestampMillis ?? Date.now(),
         };
         return lastUsedIdentities;
       });
@@ -135,6 +158,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
           accounts: undefined,
           ...params,
           lastUsedTimestampMillis: Date.now(),
+          firstSeenTimestampMillis: Date.now(),
         };
         return lastUsedIdentities;
       });
@@ -158,6 +182,19 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         ] = {
           ...params,
           lastUsedTimestampMillis: Date.now(),
+        };
+        return lastUsedIdentities;
+      });
+    },
+    setAuthorizeOptions: (identityNumber, origin, options) => {
+      lastUsedStore.update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[identityNumber.toString()];
+        if (identity === undefined) {
+          return lastUsedIdentities;
+        }
+        identity.authorizeOptions = {
+          ...identity.authorizeOptions,
+          [origin]: options,
         };
         return lastUsedIdentities;
       });

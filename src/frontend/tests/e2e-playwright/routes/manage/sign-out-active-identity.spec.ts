@@ -70,12 +70,9 @@ test.describe("Sign-out confirmation targets the active identity", () => {
       .findPasskey(DEFAULT_PASSKEY_NAME)
       .switch((dialog) => dialog.confirm());
 
-    await managePage.signOut(async (confirmation) => {
-      const dialog = page.getByRole("dialog");
-      await expect(dialog.getByText(identityY.name)).toBeVisible();
-      await expect(dialog.getByText(identityX.name)).toBeHidden();
-      await confirmation.removeFromDevice();
-    });
+    // The dialog names no identity, so which one is being signed out is read from what
+    // the sign-out leaves behind rather than from the screen.
+    await managePage.signOut((confirmation) => confirmation.removeFromDevice());
 
     const raw = await page.evaluate(() =>
       localStorage.getItem("ii-last-used-identities"),

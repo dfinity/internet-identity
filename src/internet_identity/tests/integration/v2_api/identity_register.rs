@@ -2,7 +2,8 @@ mod dynamic_captcha;
 
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_method_and_name,
-    sample_webauthn_authn_method, test_authn_method,
+    create_identity_with_authn_methods, sample_recovery_authn_method, sample_webauthn_authn_method,
+    test_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::{api_v2, get_anchor_info};
@@ -13,9 +14,9 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::IdentityInfoError::Unauthorized;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, CaptchaTrigger, CheckCaptchaError, IdRegFinishError, IdRegStartError,
-    InternetIdentityInit, MetadataEntryV2, RateLimitConfig, RegistrationFlowNextStep,
-    StaticCaptchaTrigger,
+    AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, CheckCaptchaError,
+    IdRegFinishError, IdRegStartError, InternetIdentityInit, MetadataEntryV2, PublicKeyAuthn,
+    RateLimitConfig, RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 use pocket_ic::RejectResponse;
 use pretty_assertions::assert_eq;
@@ -43,6 +44,43 @@ fn should_register_multiple_identities() {
         create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(1));
 
     assert_ne!(identity_number_1, identity_number_2);
+}
+
+/// Tests that an identity cannot be registered with a public key that is already used by another
+/// identity, neither as a passkey nor as a recovery phrase, since the registration flow does not
+/// require proof of possession of the key.
+#[test]
+fn should_not_register_identity_with_pubkey_used_by_another_identity() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let passkey = sample_webauthn_authn_method(0);
+    let recovery_phrase = sample_recovery_authn_method(4);
+    create_identity_with_authn_methods(
+        &env,
+        canister_id,
+        &[passkey.clone(), recovery_phrase.clone()],
+    );
+
+    // Same pubkey as the existing passkey, registered as a non-WebAuthn public key.
+    let passkey_pubkey = AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: passkey.public_key(),
+        }),
+        ..recovery_phrase.clone()
+    };
+    assert_eq!(
+        create_identity_with_authn_method_and_name(&env, canister_id, &passkey_pubkey, None),
+        Err("InvalidAuthnMethod(\"passkey with this public key is already used\")".to_string())
+    );
+
+    // The existing recovery phrase.
+    assert_eq!(
+        create_identity_with_authn_method_and_name(&env, canister_id, &recovery_phrase, None),
+        Err(
+            "InvalidAuthnMethod(\"recovery phrase with this public key is already used\")"
+                .to_string()
+        )
+    );
 }
 
 #[test]

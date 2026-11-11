@@ -16,9 +16,10 @@
   interface Props {
     onSuccess: (identityNumber: bigint) => void;
     onError: (error: unknown) => void;
+    initialIdentityNumber?: bigint;
   }
 
-  const { onSuccess, onError }: Props = $props();
+  const { onSuccess, onError, initialIdentityNumber }: Props = $props();
 
   onMount(() => {
     upgradeIdentityFunnel.init();
@@ -69,7 +70,7 @@
 {#if migrationFlow.view === "alreadyMigrated"}
   <AlreadyMigrated onUpgradeAgain={migrationFlow.upgradeAgain} />
 {:else if migrationFlow.view === "enterNumber"}
-  <EnterIdentityNumber onSubmit={handleSubmit} />
+  <EnterIdentityNumber {initialIdentityNumber} onSubmit={handleSubmit} />
   <!-- User can't move to this step if identityNumber is undefined so no need to manage that case. -->
 {:else if migrationFlow.view === "enterName" && migrationFlow.identityNumber !== undefined}
   <UpgradePasskey

@@ -27,8 +27,7 @@ const pageContent = (options: ErrorOptions) =>
             ? html`<div class="l-stack">
                 <h4>Error details:</h4>
                 <pre data-role="error-detail" class="t-paragraph">
-${options.detail}</pre
-                >
+${options.detail}</pre>
               </div>`
             : undefined,
       })}

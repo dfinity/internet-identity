@@ -9,6 +9,7 @@
 
   const connection = new Connection(canisterId.toText(), {
     is_production: [],
+    notifications_enabled: [],
     backend_canister_id: [frontendCanisterConfig.backend_canister_id],
     enable_dapps_explorer: [],
     assigned_user_number_range: [],
@@ -19,7 +20,8 @@
     related_origins: frontendCanisterConfig.related_origins,
     openid_configs: [],
     sso_allow_insecure_discovery: [],
-    sso_credential_migration: [],
+    notifications_allow_insecure_sender_list: [],
+    notifications_allow_insecure_endpoint: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     captcha_config: [],
     dummy_auth: [],
@@ -28,7 +30,6 @@
     doh_config: [],
     dnssec_config: [],
     mcp_official_url: [],
-    mcp_config_migration: [],
   });
 </script>
 

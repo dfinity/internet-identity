@@ -11,7 +11,13 @@ import {
   SSO_ENTRA_OPENID_PORT,
   SSO_ENTRA_NAME,
 } from "../../fixtures/sso";
-import { fromBase64, II_URL, TEST_APP_URL } from "../../utils";
+import {
+  fromBase64,
+  II_URL,
+  setTestAppProtocol,
+  setTestAppProvider,
+  TEST_APP_URL,
+} from "../../utils";
 
 // Attribute scope keys for SSO-sourced credentials are
 // `sso:<domain>:<name>`, distinct from the `openid:<issuer>:<name>` form
@@ -81,7 +87,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
       },
     });
 
@@ -150,7 +155,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -228,7 +232,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         icrc3Nonce: knownNonce,
         attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:name`],
       },
@@ -273,7 +276,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_DISCOVERY_DOMAIN}:email`, // Unavailable scoped attribute
@@ -333,7 +335,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:verified_email`],
       },
     });
@@ -413,7 +414,6 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       authorizeConfig: {
         protocol: "icrc25",
         testAppURL: GATED_ORIGIN,
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`,
@@ -575,15 +575,8 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
         SSO_GATING_DISCOVERY_DOMAIN,
       )}`;
-      await page
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(ssoUrl);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-        .setChecked(true);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-        .setChecked(true);
+      await setTestAppProvider(page, ssoUrl);
+      await setTestAppProtocol(page, true);
       await page
         .getByRole("textbox", { name: "Request attributes:" })
         .fill(
@@ -682,15 +675,8 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
         SSO_GATING_DISCOVERY_DOMAIN,
       )}&derivationOrigin=${encodeURIComponent(TEST_APP_URL)}`;
-      await page
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(ssoUrl);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-        .setChecked(true);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-        .setChecked(true);
+      await setTestAppProvider(page, ssoUrl);
+      await setTestAppProtocol(page, true);
       await page
         .getByRole("textbox", { name: "Request attributes:" })
         .fill(
@@ -728,7 +714,6 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       authorizeConfig: {
         protocol: "icrc25",
         testAppURL: DENIED_ORIGIN,
-        useIcrc3Attributes: true,
       },
     });
 
@@ -758,10 +743,9 @@ test.describe("Authorize with IdP-side per-app gating", () => {
 
   // Same deny, reached via the 1-click `?sso=` path: discovery runs in the
   // popup's onMount and the gate refuses the origin, so the redemption throws
-  // before ever redirecting to the IdP. Unlike the manual wizard (which renders
-  // the tailored "not granted" copy), the 1-click path routes the throw through
-  // the generic error handler. What matters is that the gate can't be bypassed:
-  // the flow errors and the app is never reached.
+  // before ever redirecting to the IdP and the page shows the same "not
+  // granted" copy as the manual wizard. What matters is that the gate can't be
+  // bypassed: the flow errors and the app is never reached.
   test.describe("denied origin via 1-click ?sso=", () => {
     test.use({
       openIdConfig: {
@@ -779,20 +763,21 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
         SSO_GATING_DISCOVERY_DOMAIN,
       )}`;
-      await page
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(ssoUrl);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-        .setChecked(true);
+      await setTestAppProvider(page, ssoUrl);
+      await setTestAppProtocol(page, true);
       await expect(page.locator("#principal")).toBeHidden();
       const popupPromise = page.context().waitForEvent("page");
       await page.getByRole("button", { name: "Sign In" }).click();
       const popup = await popupPromise;
       // Gate deny → the discovery throws `origin-denied`; no IdP redirect, no app.
-      await expect(popup.getByText(/origin-denied/i)).toBeVisible({
-        timeout: 30_000,
-      });
+      await expect(
+        popup.getByRole("heading", {
+          name: "Couldn't connect to your organization",
+        }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        popup.getByText(/hasn't granted this app access/i),
+      ).toBeVisible();
       await expect(
         popup.getByRole("heading", { name: "Sign-in" }),
       ).toBeHidden();
@@ -825,7 +810,6 @@ test.describe("Authorize with manual Sign in with SSO", () => {
     // No `sso:` field → the wizard entry, not the `?sso=` 1-click path.
     authorizeConfig: {
       protocol: "icrc25",
-      useIcrc3Attributes: true,
       attributes: [
         `sso:${SSO_DISCOVERY_DOMAIN}:name`,
         `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -910,7 +894,6 @@ test.describe("Continue as a last-used SSO identity", () => {
     // that entry to run the ContinueView path.
     authorizeConfig: {
       protocol: "icrc25",
-      useIcrc3Attributes: true,
       attributes: [
         `sso:${SSO_DISCOVERY_DOMAIN}:name`,
         `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -964,15 +947,8 @@ test.describe("Continue as a last-used SSO identity", () => {
     // last-used SSO identity persists across the reload, so the II popup shows
     // the ContinueView "Continue" path.
     await page.goto("https://nice-name.com");
-    await page
-      .getByRole("textbox", { name: "Identity Provider" })
-      .fill(II_URL + "/authorize");
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-      .setChecked(true);
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-      .setChecked(true);
+    await setTestAppProvider(page, II_URL + "/authorize");
+    await setTestAppProtocol(page, true);
     await page
       .getByRole("textbox", { name: "Request attributes:" })
       .fill(
@@ -1054,10 +1030,8 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     userId: string,
   ): Promise<Page> => {
     await page.goto(GATED_ORIGIN);
-    await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-      .setChecked(true);
+    await setTestAppProvider(page, ssoUrl);
+    await setTestAppProtocol(page, true);
     await expect(page.locator("#principal")).toBeHidden();
     const popupPromise = page.context().waitForEvent("page");
     await page.getByRole("button", { name: "Sign In" }).click();
@@ -1102,6 +1076,9 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     userId: string,
   ): Promise<void> => {
     const popup = await startGatedLogin(page, signInWithOpenId, userId);
+    // Armed early (60s to span the steps below) so the close isn't missed; the
+    // app reuses a named window, so the next login needs a fresh one to open.
+    const popupClosePromise = popup.waitForEvent("close", { timeout: 60_000 });
     await expect(
       popup.getByRole("heading", {
         name: `First sign-in with ${SSO_ENTRA_NAME}`,
@@ -1112,6 +1089,7 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     const normalPopup = await normalPopupPromise;
     await signInWithOpenId(normalPopup, userId);
     await expect(page.locator("#principal")).toBeVisible({ timeout: 25_000 });
+    await popupClosePromise;
   };
 
   test("first gated 1-click prompts one normal sign-in, then reaches the app", async ({
@@ -1143,10 +1121,8 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     // the dialog to reappear, nobody advances it and #principal below would
     // never show.
     await page.goto(GATED_ORIGIN);
-    await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-      .setChecked(true);
+    await setTestAppProvider(page, ssoUrl);
+    await setTestAppProtocol(page, true);
     await expect(page.locator("#principal")).toBeHidden();
     const popup2Promise = page.context().waitForEvent("page");
     await page.getByRole("button", { name: "Sign In" }).click();

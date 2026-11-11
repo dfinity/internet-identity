@@ -68,4 +68,5 @@ pub use verify::verify_email;
 // without re-running the full `verify_email` pipeline (which expects
 // the message body the body has already been dropped).
 pub(crate) use alignment::aligns;
+pub(crate) use from_header::parse_single_mailbox_addr_spec;
 pub(crate) use parse::parse_dmarc_txt;

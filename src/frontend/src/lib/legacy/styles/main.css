@@ -704,6 +704,16 @@ a:hover,
   font-size: 1.1rem;
 }
 
+/*
+  Text rendered exactly as received: line breaks are kept and any markup
+  characters in it stay visible. Used for untrusted text shown as-is rather
+  than parsed.
+*/
+.t-formatted--verbatim {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
 .t-formatted hr {
   border: none;
   border-top: var(--rs-line) solid var(--rc-line);

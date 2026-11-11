@@ -13,6 +13,8 @@ import { test as emailRecoveryTest } from "./emailRecovery";
 import { test as verifiedEmailTest } from "./verifiedEmail";
 import { test as cliTest } from "./cli";
 import { test as mcpTest } from "./mcp";
+import { test as testAppTest } from "./testApp";
+import { test as appleTest } from "./apple";
 
 export const test = mergeTests(
   inertWorkaroundTest,
@@ -29,4 +31,6 @@ export const test = mergeTests(
   verifiedEmailTest,
   cliTest,
   mcpTest,
+  testAppTest,
+  appleTest,
 );

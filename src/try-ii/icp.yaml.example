@@ -1,5 +1,0 @@
-canisters:
-  - name: try-ii-frontend
-    type: assets
-    source:
-      - src/try-ii-frontend/dist

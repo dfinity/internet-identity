@@ -4,7 +4,7 @@ use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
-#[derive(Encode, Decode, Clone)]
+#[derive(Encode, Decode, Clone, Debug, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableAccount {
     #[n(0)]

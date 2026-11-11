@@ -10,15 +10,16 @@
   import TerminalBlock from "../components/TerminalBlock.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
+  import { originLabel } from "$lib/utils/urlUtils";
 
   interface Props {
-    /** Hostname of the app the CLI is being authorized for, or undefined for
+    /** Origin of the app the CLI is being authorized for, or undefined for
      *  generic mode. */
-    domain?: string;
+    appOrigin?: string;
     onAuthorize: (accessLevel: AccessLevel) => Promise<void>;
   }
 
-  const { domain, onAuthorize }: Props = $props();
+  const { appOrigin, onAuthorize }: Props = $props();
 
   let busy = $state(false);
   // The access-level selector (shown only when READ_ONLY_MODE is on) starts on
@@ -70,17 +71,19 @@
 
   // Title is short and constant; the app hostname lives in the badge under
   // the connector visual (CliHeader handles it).
-  const isAppMode = $derived(domain !== undefined);
+  const isAppMode = $derived(appOrigin !== undefined);
+  // `originLabel` drops the scheme of a plain https origin, so the echoed
+  // command reads back as the user typed it in both forms of `--app`.
   const command = $derived(
-    isAppMode
-      ? `icp identity link web --app ${domain}`
+    appOrigin !== undefined
+      ? `icp identity link web --app ${originLabel(appOrigin)}`
       : "icp identity link web",
   );
 </script>
 
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
-    <CliHeader appOrigin={isAppMode ? `https://${domain}` : undefined} />
+    <CliHeader {appOrigin} />
 
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
       {isAppMode ? $t`Allow CLI access` : $t`Sign in`}

@@ -17,7 +17,6 @@ use std::collections::HashMap;
 fn should_lookup() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
     api::add(
         &env,

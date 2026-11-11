@@ -13,6 +13,16 @@ const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+/** The named durations (seconds, ascending) a session-duration picker offers. */
+export const SESSION_DURATION_PRESETS = [
+  10 * MINUTE,
+  HOUR,
+  8 * HOUR,
+  DAY,
+  7 * DAY,
+  30 * DAY,
+];
+
 /** The longest session II grants, in seconds. Matches the backend's 30-day
  *  session-delegation cap (`MAX_SESSION_DELEGATION_TTL_NS`), which is also the
  *  default when a request omits `maxTimeToLive`. Flows use it as the ceiling
@@ -94,3 +104,33 @@ export const sessionDurationCeilingSeconds = (
 /** Convert a duration in seconds to the nanoseconds the canister expects. */
 export const sessionDurationToNanos = (seconds: number): bigint =>
   BigInt(seconds) * NANOS_PER_SECOND;
+
+/**
+ * The session duration (nanoseconds) to ask the canister for: the shortest of
+ * the duration the user picked, the app's requested `maxTimeToLive` and an SSO
+ * organization's cap on its sign-ins. A pick never stretches past the app's
+ * request, even where the picker was shown before the request was known. A
+ * non-positive request counts as no request, as it does for the picker's
+ * ceiling in {@link sessionDurationCeilingSeconds}. `undefined` when none of
+ * them applies, which leaves the canister's default.
+ */
+export const grantedTimeToLive = ({
+  authorized,
+  requested,
+  ssoSessionMaxAgeNs,
+}: {
+  authorized: bigint | undefined;
+  requested: bigint | undefined;
+  ssoSessionMaxAgeNs: bigint | undefined;
+}): bigint | undefined =>
+  [
+    authorized,
+    requested !== undefined && requested > BigInt(0) ? requested : undefined,
+    ssoSessionMaxAgeNs,
+  ].reduce<bigint | undefined>(
+    (shortest, limit) =>
+      limit === undefined || (shortest !== undefined && shortest <= limit)
+        ? shortest
+        : limit,
+    undefined,
+  );

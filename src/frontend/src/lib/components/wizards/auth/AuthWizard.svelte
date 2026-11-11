@@ -19,7 +19,11 @@
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
   import SsoNormalLoginRequired from "$lib/components/wizards/auth/views/SsoNormalLoginRequired.svelte";
-  import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+  import SsoDomainMismatch from "$lib/components/wizards/auth/views/SsoDomainMismatch.svelte";
+  import {
+    discoverSsoConfig,
+    type SsoDiscoveryResult,
+  } from "$lib/utils/ssoDiscovery";
   import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import {
     lastUsedIdentitiesStore,
@@ -88,6 +92,40 @@
   // Set when a gated non-`sub` login can't resolve directly; drives the
   // "First sign-in with X" dialog (SsoNormalLoginRequired).
   let ssoNormalLoginResult = $state<SsoDiscoveryResult>();
+
+  // Discovery for the domain an `SsoDomainMismatch` names, started as soon as
+  // that view opens so its "Sign in with <domain>" button can hand off to
+  // `continueWithSso` synchronously — the popup has to open in the click task
+  // (see SignInWithSso.svelte), so the lookup can't wait for the click.
+  let mismatchRetryResult = $state<SsoDiscoveryResult>();
+  let mismatchRetryFailed = $state(false);
+  $effect(() => {
+    const mismatch =
+      authFlow.view === "ssoDomainMismatch"
+        ? authFlow.ssoDomainMismatch
+        : undefined;
+    mismatchRetryResult = undefined;
+    mismatchRetryFailed = false;
+    const registeredDomain = mismatch?.registeredDomain;
+    if (registeredDomain === undefined) return;
+    const controller = new AbortController();
+    discoverSsoConfig(registeredDomain, controller.signal, ssoOrigin)
+      .then((result) => {
+        if (!controller.signal.aborted) mismatchRetryResult = result;
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) mismatchRetryFailed = true;
+      });
+    return () => controller.abort();
+  });
+
+  // Primary action of the SsoDomainMismatch view: run the SSO sign-in again
+  // through the domain the credential is registered with. No `await` before
+  // `continueWithSso` — the popup opens synchronously inside it.
+  const handleSignInWithRegisteredDomain = (): void => {
+    if (mismatchRetryResult === undefined) return;
+    void handleContinueWithSso(mismatchRetryResult);
+  };
 
   const dismissSsoNormalLogin = () => {
     ssoNormalLoginResult = undefined;
@@ -207,6 +245,7 @@
     // (e.g. restoring lastUsedIdentities for a cancelled method switch).
     if (
       authFlow.view === "openIdNotConnected" ||
+      authFlow.view === "ssoDomainMismatch" ||
       authFlow.view === "openIdAlreadyLinked" ||
       authFlow.view === "confirmMethodSwitch"
     ) {
@@ -226,6 +265,7 @@
     if (isAuthenticating) return;
     if (
       authFlow.view === "openIdNotConnected" ||
+      authFlow.view === "ssoDomainMismatch" ||
       authFlow.view === "openIdAlreadyLinked"
     ) {
       authFlow.cancelOpenIdDisambiguation();
@@ -521,6 +561,23 @@
       userName={authFlow.userName}
       userEmail={authFlow.userEmail}
       onSignUp={handleConfirmOpenIdSignUp}
+      onRecover={handleRecoverFromNotConnected}
+      onCancel={cancelSubView}
+      loading={isAuthenticating}
+    />
+  {:else if authFlow.view === "ssoDomainMismatch" && authFlow.ssoDomainMismatch !== undefined}
+    <SsoDomainMismatch
+      enteredDomain={authFlow.ssoDomainMismatch.enteredDomain}
+      registeredDomain={authFlow.ssoDomainMismatch.registeredDomain}
+      providerName={authFlow.providerName}
+      userName={authFlow.userName}
+      userEmail={authFlow.userEmail}
+      retryState={mismatchRetryFailed
+        ? "failed"
+        : mismatchRetryResult !== undefined
+          ? "ready"
+          : "loading"}
+      onSignInWithRegisteredDomain={handleSignInWithRegisteredDomain}
       onRecover={handleRecoverFromNotConnected}
       onCancel={cancelSubView}
       loading={isAuthenticating}

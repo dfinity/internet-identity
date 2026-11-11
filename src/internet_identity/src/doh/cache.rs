@@ -61,7 +61,7 @@
 use std::future::Future;
 
 use super::types::{DohError, DEFAULT_CACHE_AGE_SECS};
-use crate::single_flight_cache::{CacheConfig, RetryBackoff, SingleFlightCache};
+use crate::single_flight_cache::{CacheConfig, FillOutcome, RetryBackoff, SingleFlightCache};
 
 /// A cached DoH answer: the TXT-record bytes, or a definitive "no such
 /// record" verdict. Both are stable, shareable answers — see the module
@@ -108,7 +108,7 @@ pub const DOH_ABANDON_FILL_AFTER_SECS: u64 = 120;
 /// the cache's lifetime.
 pub fn new_doh_cache<Fut>(fill: impl Fn(String) -> Fut + 'static) -> DohCache
 where
-    Fut: Future<Output = Result<DohRecord, DohError>> + 'static,
+    Fut: Future<Output = FillOutcome<DohRecord, DohError>> + 'static,
 {
     let fresh_for = crate::state::persistent_state(|p| {
         p.doh_config.as_ref().and_then(|c| c.max_cache_age_secs)
@@ -119,6 +119,7 @@ where
         CacheConfig {
             fresh_for,
             stale_for: DOH_STALE_SECS,
+            stale_if_error_for: DOH_STALE_SECS,
             max_entries: DOH_MAX_ENTRIES,
             backoff: RetryBackoff::new(DOH_RETRY_BASE_SECS, DOH_RETRY_MULTIPLIER),
             abandon_fill_after: DOH_ABANDON_FILL_AFTER_SECS,

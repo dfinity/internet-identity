@@ -23,6 +23,8 @@ import {
   handlePermissions,
 } from "$lib/stores/channelHandlers/icrc25";
 import { handleDelegationRequest } from "$lib/stores/channelHandlers/delegation";
+import { handleSessionDelegationRequest } from "$lib/stores/channelHandlers/sessionDelegation";
+import { handleNotificationConsentRequest } from "$lib/stores/channelHandlers/notificationConsent";
 import {
   handleLegacyAttributes,
   handleIcrc3OneClickOpenIdAttributes,
@@ -41,7 +43,8 @@ export type ChannelError =
   | "unverified-origin"
   | "unsupported-browser"
   | "delegation-failed"
-  | "attributes-failed";
+  | "attributes-failed"
+  | "notification-consent-failed";
 
 type ChannelStore = Readable<Channel | undefined> & {
   establish: (options?: ChannelOptions) => void;
@@ -53,9 +56,18 @@ type ChannelStore = Readable<Channel | undefined> & {
 
 const getTransports = (): Transport[] => {
   const primaryOrigin = getPrimaryOrigin();
+  // A document loaded from a related origin is already redirecting to the
+  // primary origin. An ICRC-29 client pins the signer origin as soon as it
+  // answers the handshake, so establishing one here would leave it talking to a
+  // document that is about to be replaced, until its disconnect timeout closes
+  // the window. The legacy transport is exempt: it takes its own request to the
+  // primary origin rather than handshaking here.
+  const offPrimaryOrigin =
+    primaryOrigin !== undefined && window.location.origin !== primaryOrigin;
   return [
-    new PostMessageTransport(),
-    new UrlTransport(),
+    ...(offPrimaryOrigin
+      ? []
+      : [new PostMessageTransport(), new UrlTransport()]),
     new LegacyTransport(
       // Redirect requests and responses between related origins and primary origin
       primaryOrigin !== undefined
@@ -98,6 +110,14 @@ export const channelStore: ChannelStore = {
       channel.addEventListener(
         "request",
         handleDelegationRequest(channel, onError),
+      );
+      channel.addEventListener(
+        "request",
+        handleSessionDelegationRequest(channel, onError),
+      );
+      channel.addEventListener(
+        "request",
+        handleNotificationConsentRequest(channel, onError),
       );
       channel.addEventListener(
         "request",

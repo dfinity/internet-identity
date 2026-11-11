@@ -2,6 +2,8 @@
 # This is to increase security and prevent accidentally updating files that shouldn't be changed by a bot
 .didc-checksums
 .didc-release
+.github/versions/test-app
+.github/versions/vc-issuer
 .icp-cli-version
 .node-version
 .nvmrc
@@ -9,3 +11,6 @@ README.md
 rust-toolchain.toml
 src/frontend/src/lib/assets/aaguid/password_managers.json
 src/frontend/src/lib/assets/aaguid/security_keys.json
+src/frontend/src/lib/generated/vc_issuer_idl.js
+src/vc-api/src/generated/vc_issuer_types.ts
+src/vc-api/vc_demo_issuer.did

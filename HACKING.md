@@ -149,6 +149,14 @@ To run the canister tests, run the following command from the root directory:
 ./scripts.test-canisters.sh
 ```
 
+##### Tests against the previous release
+
+Some canister tests (upgrade, rollback and a few others) install the wasms of the release currently in production, then upgrade from or roll back to them. CI downloads those wasms from the latest GitHub release (`releases/latest`) as `internet_identity_previous.wasm.gz` and `archive_previous.wasm.gz`; the paths can be overridden with the `II_WASM_PREVIOUS` and `ARCHIVE_WASM_PREVIOUS` environment variables.
+
+On a `release-*` tag, CI skips the canister tests when the tagged commit is on `main`: `main`'s own run already tested that commit against the release then in production. Running them on the tag would not work anyway, because the tag's run publishes the new release in parallel, so "latest" becomes the release under test (or one whose assets are still uploading).
+
+Releases are only cut from commits on `main`. There is no hotfix process: a tag on a commit that is not on `main` runs the canister tests, but they still download `releases/latest` while that same run publishes the release, so they can race with it. Supporting hotfixes would need the tests to resolve the release before the tag explicitly, or the `release` job to wait for the tests.
+
 ### Building the backend
 
 The Internet Identity backend is a Wasm canister implemented in Rust and built from the `internet_identity` cargo package (`src/internet_identity`).
@@ -180,13 +188,28 @@ icp deploy issuer
 ```
 
 This will deploy also `internet_identity`, and provision the issuer for the testing environment.
-See [VC issuer documentation](./demos/vc_issuer/README.md) for details.
+The issuer canister is not built from this repository: `icp deploy issuer` runs
+`scripts/fetch-vc-issuer`, which downloads the release pinned in
+[`.github/versions/vc-issuer`](./.github/versions/vc-issuer) from
+[dfinity/internet-identity-vc-demo-issuer](https://github.com/dfinity/internet-identity-vc-demo-issuer).
+The `gh` CLI needs to be authenticated to download it — run `gh auth login` (or
+export `GH_TOKEN`) first.
+See the [VC issuer documentation](https://github.com/dfinity/internet-identity-vc-demo-issuer#readme) for details.
 
-Our [`test-app`](./demos/test-app) offers a simple relying party functionality and can be deployed using
+Our [`test-app`](https://github.com/dfinity/internet-identity-test-app) offers a simple relying party functionality and can be deployed using
 
 ```bash
 icp deploy test_app
 ```
+
+The test app is not built from this repository. `icp deploy test_app` runs
+[`scripts/fetch-test-app`](./scripts/fetch-test-app), which downloads the
+release pinned in [`.github/versions/test-app`](./.github/versions/test-app)
+into `.test-app/` — the canister Wasm plus the frontend the Playwright
+chrome-extension tests load as an unpacked extension. It needs the `gh` CLI
+authenticated with an account that can read the repository. To pick up a new
+test app build, bump the tag in that file (a scheduled workflow opens that pull
+request automatically).
 
 Afterward one can serve the frontends locally via:
 

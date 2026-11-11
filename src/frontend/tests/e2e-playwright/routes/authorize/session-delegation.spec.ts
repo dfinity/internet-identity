@@ -1,6 +1,11 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize, TEST_APP_URL, II_URL } from "../../utils";
+import {
+  authorize,
+  TEST_APP_URL,
+  II_URL,
+  useLegacyProtocol,
+} from "../../utils";
 
 test.describe("session delegation — multiple accounts without re-auth", () => {
   test("after sign-in, reloading authorize and toggling multiple accounts loads accounts without WebAuthn ceremony", async ({
@@ -18,6 +23,7 @@ test.describe("session delegation — multiple accounts without re-auth", () => 
 
     const authPagePromise = page.context().waitForEvent("page");
     await page.goto(TEST_APP_URL);
+    await useLegacyProtocol(page);
     await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
     await page.getByRole("button", { name: "Sign In" }).click();
     const authPage = await authPagePromise;
@@ -34,9 +40,7 @@ test.describe("session delegation — multiple accounts without re-auth", () => 
       authPage.getByRole("switch", { name: "Show all options" }),
     ).toBeChecked();
 
-    await expect(
-      authPage.getByRole("button", { name: /Continue with/ }),
-    ).toBeVisible();
+    await expect(authPage.getByRole("radio").first()).toBeVisible();
 
     const credentialDialog = await Promise.race([
       credentialPromise,

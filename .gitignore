@@ -15,6 +15,12 @@
 # icp-cli temporary files
 .icp/
 
+# test app release assets downloaded by scripts/fetch-test-app
+.test-app/
+
+# VC demo issuer release assets downloaded by scripts/fetch-vc-issuer
+.vc-issuer/
+
 # frontend code
 node_modules/
 dist/
@@ -22,7 +28,6 @@ dist-showcase/
 .env
 lib
 !src/frontend/src/lib
-!src/try-ii/src/try-ii-frontend/src/lib
 .svelte-kit/
 
 # Cargo build output

@@ -20,6 +20,17 @@ export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
 export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
 
 /**
+ * A second discovery domain for the *same* accounts as `SSO_DISCOVERY_DOMAIN`:
+ * the provider on this port only serves a well-known whose `openid_configuration`
+ * points at the 11107 IdP (see dev-e2e-setup), so a sign-in through it yields the
+ * same `(iss, sub, aud)` credential under a different `sso_domain` stamp. Backs the
+ * domain-mismatch tests. Never gated, so the un-gated discovery-cache entry the
+ * gating tests rely on for `SSO_GATING_DISCOVERY_DOMAIN` stays untouched.
+ */
+export const SSO_ALIAS_OPENID_PORT = 11109;
+export const SSO_ALIAS_DISCOVERY_DOMAIN = `localhost:${SSO_ALIAS_OPENID_PORT}`;
+
+/**
  * Entra-style provider: pairwise `sub` (different per OIDC client) plus a stable
  * `oid` claim. Backs the non-`sub` gating tests where the identity must be
  * bridged via `oid`. Its own port/domain so its pairwise config never touches

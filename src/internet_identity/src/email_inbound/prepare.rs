@@ -16,6 +16,18 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
 /// render the user-facing label, and the canister accepts mail at
 /// any of the configured `related_origins` aliases (see
 /// [`super::mailbox_domains`]).
+///
+/// # Await / authz linearization
+///
+/// This function's **only** await is [`ensure_seeded`] (after input
+/// validation, only on the first call after install/upgrade).
+/// Authenticated callers that pin an [`AuthorizationKey`] in `kind`
+/// **must** call `ensure_seeded().await` *before* taking that snapshot
+/// (see `email_recovery_credential_prepare_add` /
+/// `verified_email_prepare_add`). Then this await is a no-op and the
+/// path from authz → insert does not yield, so a concurrent
+/// remove/replace cannot race while the pending map is still empty
+/// (`drop_challenges_for_anchor` would have had nothing to drop).
 pub(crate) async fn prepare_common(
     dns_input: EmailChallengeDnsInput,
     now_secs: u64,
@@ -74,8 +86,9 @@ pub(crate) async fn prepare_common(
         }
     };
 
-    // Now we can mutate state. The async raw_rand fetch happens at
-    // most once per canister lifetime (see `rng::ensure_seeded`).
+    // Only await in this function. Authenticated entry points pre-seed so
+    // this is a no-op and the remainder of the function (nonce + insert)
+    // cannot interleave with remove/replace. See module docs above.
     ensure_seeded().await;
 
     // Loop guards against the (vanishingly improbable) event of a
@@ -254,8 +267,8 @@ fn verify_dnssec_skeleton(
 
 /// Normalise an email address to the canonical `lowercase(local) +
 /// "@" + lowercase(domain)` form. Returns `None` if the address is
-/// obviously malformed (no `@`, empty local-part, empty domain,
-/// embedded whitespace).
+/// obviously malformed (no `@`, more than one `@`, empty local-part,
+/// empty domain, embedded whitespace).
 ///
 /// Stricter normalisation (IDN, RFC 5322 quoted local-parts) is the
 /// mail-auth verifier's job — here we just want to reject the
@@ -278,6 +291,12 @@ fn normalize_address(input: &str) -> Option<String> {
     if local.is_empty() || domain.is_empty() {
         return None;
     }
+    // `registered_domain_of` splits from the right and the verifier
+    // splits from the left, so a second `@` would leave them naming
+    // different domains for one address. Require one answer.
+    if domain.contains('@') {
+        return None;
+    }
     if local.len() > super::MAX_LOCAL_PART || domain.len() > super::MAX_DOMAIN {
         return None;
     }
@@ -295,4 +314,47 @@ fn normalize_address(input: &str) -> Option<String> {
 /// value, which is what the operator configures.
 fn registered_domain_of(address: &str) -> Option<String> {
     address.rsplit_once('@').map(|(_, d)| d.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_lowercases_both_parts() {
+        assert_eq!(
+            normalize_address(" Alice@GMAIL.com ").as_deref(),
+            Some("alice@gmail.com")
+        );
+    }
+
+    #[test]
+    fn normalize_rejects_malformed() {
+        for input in ["", "alice", "@gmail.com", "alice@", "ali ce@gmail.com"] {
+            assert_eq!(normalize_address(input), None, "accepted {input:?}");
+        }
+    }
+
+    #[test]
+    fn normalize_rejects_second_at() {
+        for input in [
+            "alice@example.org@example.com",
+            "\"a@b\"@example.com",
+            "alice@example.com@example.org",
+        ] {
+            assert_eq!(normalize_address(input), None, "accepted {input:?}");
+        }
+    }
+
+    #[test]
+    fn accepted_addresses_agree_on_their_domain() {
+        // The invariant the `@` cap buys: for anything
+        // `normalize_address` accepts, a left split and a right split
+        // name the same domain.
+        let address = normalize_address("alice@example.com").unwrap();
+        assert_eq!(
+            registered_domain_of(&address).as_deref(),
+            address.split_once('@').map(|(_, d)| d)
+        );
+    }
 }

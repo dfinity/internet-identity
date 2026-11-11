@@ -10,6 +10,12 @@ on:
   pull_request:
   merge_group:
 
+# Cancelling is limited to pull requests, because a cancelled merge-queue run fails
+# the queue and a release tag has nothing to supersede it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   #####################
   # The docker builds #
@@ -176,108 +182,42 @@ jobs:
             exit 1
           fi
 
-  vc_demo_issuer-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            demos/vc_issuer/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
-      - uses: ./.github/actions/bootstrap
-      - uses: ./.github/actions/setup-node
-      - run: npm ci
-      - name: "Build VC issuer canister"
-        working-directory: demos/vc_issuer
-        run: ./build.sh
-      - run: sha256sum vc_demo_issuer.wasm.gz
-        working-directory: demos/vc_issuer
-      - name: "Upload VC issuer"
-        uses: actions/upload-artifact@v4
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: vc_demo_issuer.wasm.gz
-          # path is the name used as the file to upload and the name of the
-          # downloaded file
-          path: ./demos/vc_issuer/vc_demo_issuer.wasm.gz
-
-  test-app-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            demos/test-app/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('demos/test-app/Cargo.lock', 'rust-toolchain.toml') }}
-      - uses: ./.github/actions/bootstrap
-      - uses: ./.github/actions/setup-node
-      - run: npm ci
-      - name: "Build test app canister"
-        working-directory: demos/test-app
-        run: ./build.sh
-      - name: "Upload test app"
-        uses: actions/upload-artifact@v4
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: test_app.wasm
-          # path is the name used as the file to upload and the name of the
-          # downloaded file
-          path: ./demos/test-app/test_app.wasm
-
-  #####################################
-  # The Rust vc issuer canister tests #
-  #####################################
-
-  vc-issuer-test:
-    runs-on: ubuntu-latest
-    needs: [docker-build-internet_identity, vc_demo_issuer-build]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            demos/vc_issuer/target
-          key: ${{ runner.os }}-cargo-vc-tests-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
-      - uses: ./.github/actions/bootstrap
-      - name: "Download VC issuer wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: vc_demo_issuer.wasm.gz
-          path: demos/vc_issuer
-      - name: "Download II wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_backend.wasm.gz
-          path: .
-      - run: mv internet_identity_backend.wasm.gz internet_identity.wasm.gz
-      - name: Install PocketIC server
-        uses: dfinity/pocketic@main
-        with:
-          pocket-ic-server-version: "15.0.0"
-      - name: "Run VC issuer canister tests"
-        working-directory: demos/vc_issuer
-        run: |
-          # create dummy assets
-          mkdir dist
-          touch dist/index.{html,css,js}
-          touch dist/index2.js
-          cargo test
-
   ###########################
   # The Rust canister tests #
   ###########################
 
+  # A release tag on a commit from main skips the canister tests: main's own run
+  # already tested that commit, against the release then in production. On the
+  # tag's run the "previous" release would be the one this run is publishing,
+  # so the upgrade and rollback tests would compare it with itself, or fail
+  # while its assets are still uploading. A tag on a commit that is not on
+  # main (e.g. a hotfix) still runs them.
+  canister-tests-needed:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run=true
+          if [[ "$GITHUB_REF" == refs/tags/release-* ]]; then
+            # If the lookup fails, run the tests rather than skip them
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .status || echo unknown)
+            echo "$GITHUB_SHA compared to main: $status"
+            if [[ "$status" == "identical" || "$status" == "behind" ]]; then
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   # Run the tests, user the output of the docker build as Wasm module
   # (note: this runs _all_ cargo tests)
+  # canister-tests-run needs this job, so it is skipped along with it.
   canister-tests-build:
+    needs: canister-tests-needed
+    if: needs.canister-tests-needed.outputs.run == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -374,7 +314,10 @@ jobs:
       - name: Install PocketIC server
         uses: dfinity/pocketic@main
         with:
-          pocket-ic-server-version: "15.0.0"
+          # 16.1.0 or newer: the first server holding a threshold key over secp256r1,
+          # which is what Internet Identity signs its VAPID JWTs with. Keep in step with
+          # scripts/test-canisters.sh and the pocket-ic client in Cargo.toml.
+          pocket-ic-server-version: "16.1.0"
 
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
@@ -416,7 +359,13 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
-    needs: [docker-build-internet_identity, docker-build-archive]
+    needs:
+      [
+        canister-tests-needed,
+        docker-build-internet_identity,
+        docker-build-archive,
+      ]
+    if: needs.canister-tests-needed.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -469,7 +418,7 @@ jobs:
 
   e2e-playwright:
     runs-on: ubuntu-latest
-    needs: [docker-build-internet_identity, docker-build-internet_identity_frontend, test-app-build]
+    needs: [docker-build-internet_identity, docker-build-internet_identity_frontend]
     strategy:
       matrix:
         device: ["desktop", "mobile"]
@@ -487,10 +436,21 @@ jobs:
       # /src/test_openid_provider). 11105 / 11106 back the direct OpenID
       # fixtures; 11107 backs the SSO discovery (two-hop) fixture; 11108 is an
       # Entra-style provider (pairwise `sub` + stable `oid`) for the non-`sub`
-      # gating tests.
-      openid_providers: "11105 11106 11107 11108"
+      # gating tests; 11109 only serves a well-known pointing at the 11107 IdP,
+      # a second SSO discovery domain for the same accounts (domain-mismatch
+      # tests); 11110 issues the tokens of the "Apple" provider.
+      openid_providers: "11105 11106 11107 11108 11109 11110"
       # The Entra-style provider port — started with pairwise env below.
       pairwise_openid_provider: "11108"
+      # The alias discovery-domain port and the IdP it points at.
+      alias_openid_provider: "11109"
+      alias_openid_target: "11107"
+      # The "Apple" provider: configured with Apple's real authorize URL so the
+      # frontend takes its Sign in with Apple paths, while its tokens come from
+      # this port. The tests route https://appleid.apple.com to it and back (see
+      # fixtures/apple.ts), the only redirect URI it accepts.
+      apple_openid_provider: "11110"
+      apple_redirect_uri: "https://appleid.apple.com/e2e/callback"
       # Direct OpenID provider ports — only these get an `openid_configs`
       # entry on the canister. 11107 is intentionally excluded: it's
       # registered exclusively as an SSO `DiscoverableOidcConfig`, so the
@@ -515,19 +475,15 @@ jobs:
         run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
       # Pin the network launcher (which bundles pocket-ic) because
-      # `icp network start` otherwise fetches `releases/latest`. The
-      # current `latest` (v13.x, published 2026-05-13) ships a
-      # pocket-ic build that strictly rejects canister-signature
-      # delegations whose subnet certificate omits `subnet_type` —
-      # which pocket-ic itself emits on every delegation, breaking
-      # any flow that round-trips a canister sig through the replica
-      # (notably the OpenID + consent e2e tests). Tracked upstream by
-      # dfinity/ic#10226 (fix not yet in any launcher release).
-      # Remove this step once a launcher release including that fix
-      # exists.
-      - name: Pin icp-cli-network-launcher to last working v12
+      # `icp network start` otherwise fetches `releases/latest`, and
+      # hold it at v16.1.0 or newer: that is the first launcher whose
+      # pocket-ic holds a threshold key over secp256r1, which is what
+      # Internet Identity signs its VAPID JWTs with. Without one, no
+      # browser can subscribe and every notification test fails.
+      # Keep in step with scripts/dev-e2e-setup.
+      - name: Pin icp-cli-network-launcher
         run: |
-          launcher_tag=v12.0.0-2026-04-16-04-20
+          launcher_tag=v16.1.0-2026-10-22-03-29
           launcher_dir="$RUNNER_TEMP/icp-cli-network-launcher-x86_64-linux-$launcher_tag"
           curl --proto '=https' --tlsv1.2 -fsSL \
             -o "$RUNNER_TEMP/launcher.tar.gz" \
@@ -556,6 +512,15 @@ jobs:
               # dialog copy. Pairwise needs single-host redirect_uris; the e2e II
               # origin is https://id.ai, so restrict to that one callback.
               OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" OIDC_REDIRECT_URIS="https://id.ai/callback" \
+                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
+            elif [ "$port" = "${{ env.apple_openid_provider }}" ]; then
+              OIDC_REDIRECT_URIS="${{ env.apple_redirect_uri }}" \
+                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
+            elif [ "$port" = "${{ env.alias_openid_provider }}" ]; then
+              # Alias discovery domain: its well-known hands II the target
+              # provider's OIDC configuration, so sign-ins through it hit the
+              # same IdP and accounts (see fixtures/sso.ts).
+              OIDC_ISSUER="http://localhost:${{ env.alias_openid_target }}" OIDC_SSO_NAME="Test SSO alias" \
                 npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
             else
               npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
@@ -586,11 +551,11 @@ jobs:
           name: internet_identity_frontend.wasm.gz
           path: .
 
-      - name: "Download test app wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: test_app.wasm
-          path: demos/test-app
+      # Puts the wasm at .test-app/test_app.wasm and the frontend (which the
+      # chrome-extension project loads as an unpacked extension) at
+      # .test-app/dist.
+      - name: "Fetch test app"
+        uses: ./.github/actions/fetch-test-app
 
       - name: Create Canisters
         run: |
@@ -606,6 +571,8 @@ jobs:
           for port in ${{ env.direct_openid_providers }}; do
             configs+=("record { name = \\\"Test OpenID $port\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$port/jwks\\\"; auth_uri = \\\"http://localhost:$port/auth\\\"; auth_scope = vec { \\\"openid\\\"; \\\"profile\\\"; \\\"email\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Google }; }")
           done
+          apple_port=${{ env.apple_openid_provider }}
+          configs+=("record { name = \\\"Apple\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$apple_port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$apple_port/jwks\\\"; auth_uri = \\\"https://appleid.apple.com/auth/authorize\\\"; auth_scope = vec { \\\"openid\\\"; \\\"email\\\"; \\\"name\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Apple }; }")
           openid_configs="$(IFS='; '; echo "${configs[*]}")"
           echo "OPENID_CONFIGS=$openid_configs" >> "$GITHUB_OUTPUT"
 
@@ -617,14 +584,28 @@ jobs:
           # Derived fresh from the signer's seed so there's no hardcoded
           # digest to drift out of sync.
           dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
-          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { mcp_official_url = opt opt \"https://official-mcp.id.ai/mcp\"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; dnssec_config = $dnssec_config })"
+          # The test app as the local gateway serves it, which is the one origin both
+          # a browser and the replica itself can reach: the notification delivery test
+          # has the canister read the app's sender list over an outcall, and
+          # `nice-name.com` resolves in the browser alone. A loopback origin means a
+          # loopback push endpoint and a plain-HTTP sender list, so both escapes are
+          # opened too (matches dev-e2e-setup).
+          TEST_APP_CANISTER_ID=$(icp canister status test_app --id-only)
+          TEST_APP_LOCAL_ORIGIN="http://$TEST_APP_CANISTER_ID.localhost:8000"
+          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { mcp_official_url = opt opt \"https://official-mcp.id.ai/mcp\"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; notifications_enabled = opt true; notifications_allow_insecure_endpoint = opt true; notifications_allow_insecure_sender_list = opt true; dnssec_config = $dnssec_config })"
           II_CANISTER_ID=$(icp canister status internet_identity --id-only)
           icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
           # The e2e serves the test app from the nice-name.com alt-origin, so its
           # ICRC-167 callback (https://nice-name.com/callback) isn't one of the
           # canister-id gateway origins the app derives on its own — declare it
           # explicitly so II's allow-list check passes (matches dev-e2e-setup).
-          icp canister install test_app --wasm demos/test-app/test_app.wasm --args "(opt record { auth_callbacks = vec { \"https://nice-name.com/callback\" } })"
+          icp canister install test_app --wasm .test-app/test_app.wasm --args "(opt record { auth_callbacks = vec { \"https://nice-name.com/callback\" } })"
+          # The test app's notification library reads where it is served and which
+          # Internet Identity to send through from the canister's environment. Without
+          # them it refuses to send at all.
+          icp canister settings update test_app \
+            --add-environment-variable "notification_origin=$TEST_APP_LOCAL_ORIGIN" \
+            --add-environment-variable "notification_sender=$II_CANISTER_ID"
 
       - name: Run dev server
         id: dev-server-start
@@ -632,13 +613,6 @@ jobs:
           SEPARATE_FRONTEND_CANISTER=1 TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
-
-      - name: Build test app frontend (chrome extension)
-        if: matrix.device == 'chrome-extension'
-        working-directory: demos/test-app
-        run: |
-          npm ci --no-audit --no-fund
-          npm run build
 
       - name: Run Playwright tests
         run: |
@@ -680,104 +654,6 @@ jobs:
     steps:
       - run: echo e2e ok
 
-  # This deploys the production build to mainnet (to a canister that we use for release testing) alongside
-  # some other canisters useful for testing & playing with II.
-  deploy:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/release-')
-    needs:
-      [
-        docker-build-internet_identity,
-        docker-build-archive,
-        test-app-build,
-        vc_demo_issuer-build,
-      ]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install icp-cli
-        run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
-
-      - name: "Download II wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_backend.wasm.gz
-          path: .
-
-      - name: "Download archive wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: archive.wasm.gz
-          path: .
-
-      # Render the frontend canister's init_args file from the template
-      # so `icp.yaml`'s `init_args.path` resolves when icp-cli loads the
-      # project. This deploy targets mainnet via `--args` overrides, so
-      # the rendered placeholder content is never parsed.
-      - name: "Render frontend init_args stub"
-        run: scripts/render-local-init-args
-
-      - name: "Install key"
-        env:
-          ICP_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
-        run: |
-          key_pem=$(mktemp)
-          printenv "ICP_DEPLOY_KEY" > "$key_pem"
-          icp identity import --disable-encryption --force default "$key_pem"
-          rm "$key_pem"
-
-      - name: "Deploy II"
-        run: |
-          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          sha=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1 | sed 's/../\\&/g')
-          icp canister install y2aaj-miaaa-aaaad-aacxq-cai \
-            -e ic --proxy "$wallet" --mode upgrade \
-            --args "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
-            --wasm internet_identity_backend.wasm.gz
-
-      - name: "Download test app wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: test_app.wasm
-          path: .
-
-      - name: "Deploy test app"
-        run: |
-          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          icp canister install vt36r-2qaaa-aaaad-aad5a-cai \
-            -e ic --proxy "$wallet" --mode upgrade \
-            --wasm ./test_app.wasm
-
-      - name: "Download VC issuer wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: vc_demo_issuer.wasm.gz
-          path: .
-
-      - name: "Deploy Issuer"
-        run: |
-          wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          icp canister install v2yvn-myaaa-aaaad-aad4q-cai \
-            -e ic --proxy "$wallet" --mode upgrade \
-            --wasm vc_demo_issuer.wasm.gz
-          ./demos/vc_issuer/provision \
-            --ii-canister-id y2aaj-miaaa-aaaad-aacxq-cai \
-            --icp-network ic \
-            --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \
-            --proxy "$wallet"
-
-      - name: "Deploy archive"
-        run: |
-          # Needed to suppress icp-cli warning about insecure plaintext identity
-          export ICP_WARNING=-mainnet_plaintext_identity
-          scripts/deploy-archive --wasm archive.wasm.gz --canister-id y2aaj-miaaa-aaaad-aacxq-cai --network ic
-
   # This prepares all the files necessary for a release (all flavors of Wasm, release notes).
   # On release tags, a new release is created and the assets are uploaded.
   release:
@@ -788,7 +664,6 @@ jobs:
         docker-build-internet_identity,
         docker-build-archive,
         docker-build-internet_identity_frontend,
-        vc_demo_issuer-build,
       ]
 
     steps:
@@ -812,11 +687,16 @@ jobs:
           name: internet_identity_frontend.wasm.gz
           path: .
 
-      - name: "Download issuer"
-        uses: actions/download-artifact@v4
-        with:
-          name: vc_demo_issuer.wasm.gz
-          path: .
+      # The issuer is released from dfinity/internet-identity-vc-demo-issuer; we
+      # re-publish the pinned build here so the II release notes keep offering a
+      # matching issuer wasm. Only the "Publish release" step below consumes it,
+      # so this is gated on the same release tag.
+      - name: "Fetch VC issuer release"
+        if: startsWith(github.ref, 'refs/tags/release-')
+        uses: ./.github/actions/fetch-vc-issuer
+
+      - if: startsWith(github.ref, 'refs/tags/release-')
+        run: cp .vc-issuer/vc_demo_issuer.wasm.gz vc_demo_issuer.wasm.gz
 
       - name: "Get GHA job IDs"
         uses: actions/github-script@v7
