@@ -24,12 +24,12 @@ Canisters must not trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`,
 Exceptions, each to be kept as narrow as it is:
 - `Storable::from_bytes` cannot return an error, so it may `expect` with an actionable message. Make decoding unable to fail instead: see `stable-memory.md`, and use the bounded helpers (`slice_to_bounded_32`) rather than `copy_from_slice`.
 - HTTP outcall transform functions cannot return or log errors, so they may trap on a response that is unusable as a whole. Skip a single malformed element (a key without a `kid`) rather than rejecting the response.
-- A trap is the only way to roll back writes. Keep a deliberate trap where rollback is the point (an anchor write that must not commit without its archive entry) or where init or upgrade must abort, and say so in a comment. Don't convert such a trap into an `Err`.
+- A trap is the only way to roll back state changes (see State changes, errors and `await`). Keep a deliberate trap where rollback is the point (an anchor write that must not commit without its archive entry) or where init or upgrade must abort, and say so in a comment. Don't convert such a trap into an `Err`.
 - `#[cfg(test)]` code may `unwrap`/`expect`; prefer `expect("context")`.
 
 ## State changes, errors and `await`
 
-- On the IC, returning `Err` commits every write made before it; only a trap rolls back. Run every check that can fail before the first write, and never `?` after a write.
+- On the IC, returning `Err` doesn't undo state changes. Every mutation made before it is committed: stable-memory writes (`Storage::write`, map inserts and removes, counter bumps) and changes to heap state (`state` module, `thread_local!`). Reads, locals and building the response don't count. Only a trap rolls back. Run every check that can fail before the first mutation, and never use `?` after one. Each `await` commits the same way (next rule).
 - Every `await` is a commit point and lets other messages run. Re-read and re-check (authorization, existence, generation) anything captured before it; never write back a value loaded before it. A lock or "in progress" flag written before an `await` needs a recovery path.
 - Don't check, await, then write (lazy salts, get-or-create with `raw_rand`). Initialize at install, or refuse.
 - Never drop a result: no `let _ =` on a `Result`, check what `.remove()`/`.insert()` return, and use `#[must_use]` where a value must be consumed. A map insert must not silently overwrite an existing binding: detect the collision and return an error.
