@@ -18,7 +18,7 @@ use crate::state::{self, storage_borrow_mut};
 use crate::storage::anchor::{Browser, InboxNotification, ReadySubscription, WebPushSubscription};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::Storage;
-use crate::SECOND_NS;
+use crate::{DAY_NS, HOUR_NS, SECOND_NS};
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use ic_stable_structures::Memory;
@@ -573,7 +573,7 @@ fn fan_out_to_browsers(
         event: None,
         sender: pending.sender,
         notification_id: pending.notification_id,
-        expires_at_ns: taken.entry.expires_at_ns,
+        expires_at_ns: app_expiry_ns(pending.expires_at_ns, taken.entry.received_at_ns),
         account_number: pending.account_number,
     };
     let ttl_seconds = queued_entry.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
@@ -714,8 +714,29 @@ impl Deposits {
     }
 }
 
+/// How long an app's notification is worth showing where the app named no deadline of
+/// its own.
+const DEFAULT_APP_NOTIFICATION_TTL_NS: u64 = HOUR_NS;
+
+/// The longest an app may ask for. Its deadline holds an inbox entry and a relay's
+/// storage, both of which are somebody else's room to take.
+const MAX_APP_NOTIFICATION_TTL_NS: u64 = DAY_NS;
+
+/// The deadline an app named, within what Internet Identity keeps one for. It says how
+/// long the notification is worth showing, which is how long its inbox entry stands and
+/// how long a relay may store the wake-up carrying it. How long the notification has to
+/// be posted at all is the backlog's own window, and a shorter one.
+///
+/// Counted from when the app sent it, so waiting in the backlog spends the window
+/// rather than extending it.
+fn app_expiry_ns(chosen_ns: Option<Timestamp>, sent_at_ns: Timestamp) -> Timestamp {
+    chosen_ns
+        .unwrap_or_else(|| sent_at_ns.saturating_add(DEFAULT_APP_NOTIFICATION_TTL_NS))
+        .min(sent_at_ns.saturating_add(MAX_APP_NOTIFICATION_TTL_NS))
+}
+
 /// It says something just happened, so one reaching a device a day later says nothing true.
-const IDENTITY_NOTIFICATION_TTL_NS: u64 = 60 * 60 * SECOND_NS;
+const IDENTITY_NOTIFICATION_TTL_NS: u64 = HOUR_NS;
 
 /// Submits one of Internet Identity's own wake-ups for one entry. Silent where the entry
 /// cannot be woken or the identity's own share of the backlog is full.
@@ -1225,7 +1246,13 @@ mod tests {
         expires_at_ns: Timestamp,
         now_ns: Timestamp,
     ) {
-        submit_for(anchor_number, 1, notification_id, expires_at_ns, now_ns);
+        submit_for(
+            anchor_number,
+            1,
+            notification_id,
+            Some(expires_at_ns),
+            now_ns,
+        );
     }
 
     /// For a test that looks at the app the notification comes from, which has to be one
@@ -1234,7 +1261,7 @@ mod tests {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
         notification_id: u64,
-        expires_at_ns: Timestamp,
+        expires_at_ns: Option<Timestamp>,
         now_ns: Timestamp,
     ) {
         state::notification_backlog_mut(now_ns, |backlog| {
@@ -1248,7 +1275,7 @@ mod tests {
                     sender: sender(),
                     notification_id,
                     urgency: Urgency::Normal,
-                    expires_at_ns: Some(expires_at_ns),
+                    expires_at_ns,
                 }],
                 now_ns,
             );
@@ -1732,7 +1759,7 @@ mod tests {
         setup();
         let (recipient, _) = subscribed_recipient(2);
         let app = allow_app(recipient);
-        submit_for(recipient, app, 7, 10 * SECOND_NS, 0);
+        submit_for(recipient, app, 7, Some(10 * SECOND_NS), 0);
 
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
@@ -1744,7 +1771,7 @@ mod tests {
         setup();
         let (recipient, _) = anchor_with_browsers(1);
         let app = allow_app(recipient);
-        submit_for(recipient, app, 7, 10 * SECOND_NS, 0);
+        submit_for(recipient, app, 7, Some(10 * SECOND_NS), 0);
 
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
@@ -1758,7 +1785,7 @@ mod tests {
         let (recipient, _) = subscribed_recipient(1);
         let app =
             storage_borrow_mut(|storage| storage.sign_in_for_testing(recipient, &APP.to_string()));
-        submit_for(recipient, app, 7, 10 * SECOND_NS, 0);
+        submit_for(recipient, app, 7, Some(10 * SECOND_NS), 0);
 
         assert!(!plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
 
@@ -1812,6 +1839,51 @@ mod tests {
                 account_number: Some(2),
                 event: None,
             })
+        );
+    }
+
+    #[test]
+    fn an_apps_deadline_outlives_the_window_it_had_to_be_posted_in() {
+        setup();
+        let (recipient, _) = subscribed_recipient(1);
+        submit(recipient, 7, 60 * MINUTE_NS);
+
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+
+        assert_eq!(
+            delivery.notification.map(|one| one.expires_at_ns),
+            Some(60 * MINUTE_NS),
+            "the hour the app asked for, which the backlog's five minutes is not"
+        );
+        assert_eq!(delivery.ttl_seconds, 3_599);
+    }
+
+    #[test]
+    fn a_notification_whose_app_named_no_deadline_gets_the_default() {
+        setup();
+        let (recipient, _) = subscribed_recipient(1);
+        submit_for(recipient, 1, 7, None, 0);
+
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+
+        assert_eq!(
+            delivery.notification.map(|one| one.expires_at_ns),
+            Some(DEFAULT_APP_NOTIFICATION_TTL_NS),
+            "an hour from when it was sent, which is where this test's clock starts"
+        );
+    }
+
+    #[test]
+    fn a_deadline_past_the_ceiling_is_cut_to_it() {
+        setup();
+        let (recipient, _) = subscribed_recipient(1);
+        submit(recipient, 7, 7 * 24 * 60 * MINUTE_NS);
+
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+
+        assert_eq!(
+            delivery.notification.map(|one| one.expires_at_ns),
+            Some(MAX_APP_NOTIFICATION_TTL_NS)
         );
     }
 
