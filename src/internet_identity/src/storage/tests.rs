@@ -8329,6 +8329,7 @@ mod secondary_passkey_pubkey_holders_tests {
         while let Some(next) = storage.backfill_secondary_passkey_pubkey_holders_batch(start, 1) {
             start = next;
         }
+        while !storage.reconcile_passkey_pubkeys_awaiting_backfill_batch(1) {}
     }
 
     /// While the sweep runs, an indexed anchor dropping a shared key whose other holder is
@@ -8351,6 +8352,11 @@ mod secondary_passkey_pubkey_holders_tests {
             Some(second)
         );
         assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+        assert_eq!(
+            storage.backfill_secondary_passkey_pubkey_holders_batch(second, 1),
+            None
+        );
+        assert_eq!(holders(&storage, 0), (Some(first), vec![second]));
 
         sweep_all(&mut storage);
         assert_eq!(holders(&storage, 0), (Some(second), vec![]));
@@ -8387,5 +8393,45 @@ mod secondary_passkey_pubkey_holders_tests {
 
         sweep_all(&mut storage);
         assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+    }
+
+    /// An upgrade restarts the sweep, and the entries kept before it are still settled.
+    #[test]
+    fn should_settle_keys_dropped_during_the_sweep_after_an_upgrade() {
+        let memory = VectorMemory::default();
+        let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1)]);
+        storage.start_secondary_passkey_pubkey_holders_backfill();
+        remove_passkey(&mut storage, first, 0);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+
+        let mut storage = Storage::from_memory(memory);
+        assert_eq!(holders(&storage, 0), (Some(first), vec![]));
+        storage.start_secondary_passkey_pubkey_holders_backfill();
+        sweep_all(&mut storage);
+        assert_eq!(holders(&storage, 0), (None, vec![]));
+    }
+
+    #[test]
+    fn should_settle_keys_dropped_during_the_sweep_in_bounded_batches() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = write_anchor(&mut storage, &[passkey(0), passkey(1), passkey(2)]);
+        storage.start_secondary_passkey_pubkey_holders_backfill();
+        remove_passkey(&mut storage, first, 0);
+        remove_passkey(&mut storage, first, 1);
+        assert_eq!(
+            storage.backfill_secondary_passkey_pubkey_holders_batch(0, u64::MAX),
+            None
+        );
+
+        assert!(!storage.reconcile_passkey_pubkeys_awaiting_backfill_batch(1));
+        assert!(storage.reconcile_passkey_pubkeys_awaiting_backfill_batch(1));
+        assert_eq!(holders(&storage, 0), (None, vec![]));
+        assert_eq!(holders(&storage, 1), (None, vec![]));
+        assert_eq!(holders(&storage, 2), (Some(first), vec![]));
+
+        // The sweep is over, so dropping a key frees it right away.
+        remove_passkey(&mut storage, first, 2);
+        assert_eq!(holders(&storage, 2), (None, vec![]));
     }
 }

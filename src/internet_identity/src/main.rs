@@ -1830,7 +1830,9 @@ const SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BACKOFF: Duration = Duration::fr
 const SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BATCH_SIZE: u64 = 2_000;
 
 thread_local! {
-    static SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR: RefCell<AnchorNumber> = const { RefCell::new(0) };
+    /// The anchor the next batch starts from, or `None` once every anchor has been examined
+    /// and what is left is settling the entries kept while the sweep ran.
+    static SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR: RefCell<Option<AnchorNumber>> = const { RefCell::new(Some(0)) };
     static SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_DONE: RefCell<bool> = const { RefCell::new(false) };
     static SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
 }
@@ -1857,25 +1859,30 @@ fn run_secondary_passkey_pubkey_holders_backfill_batch() {
         clear_secondary_passkey_pubkey_holders_backfill_timer();
         return;
     }
-    let start = SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR.with_borrow(|cursor| *cursor);
-    let next_anchor_number = state::storage_borrow_mut(|storage| {
-        storage.backfill_secondary_passkey_pubkey_holders_batch(
-            start,
+    if let Some(start) =
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR.with_borrow(|cursor| *cursor)
+    {
+        let next_anchor_number = state::storage_borrow_mut(|storage| {
+            storage.backfill_secondary_passkey_pubkey_holders_batch(
+                start,
+                SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BATCH_SIZE,
+            )
+        });
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR.replace(next_anchor_number);
+        return;
+    }
+    let done = state::storage_borrow_mut(|storage| {
+        storage.reconcile_passkey_pubkeys_awaiting_backfill_batch(
             SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BATCH_SIZE,
         )
     });
-    match next_anchor_number {
-        Some(next_anchor_number) => {
-            SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR.replace(next_anchor_number);
-        }
-        None => {
-            SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_DONE.replace(true);
-            clear_secondary_passkey_pubkey_holders_backfill_timer();
-            let (shared, _) = secondary_passkey_pubkey_holders_backfill_status();
-            ic_cdk::println!(
-                "Secondary passkey pubkey holders backfill COMPLETED ({shared} shared pubkeys)."
-            );
-        }
+    if done {
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_DONE.replace(true);
+        clear_secondary_passkey_pubkey_holders_backfill_timer();
+        let (shared, _) = secondary_passkey_pubkey_holders_backfill_status();
+        ic_cdk::println!(
+            "Secondary passkey pubkey holders backfill COMPLETED ({shared} shared pubkeys)."
+        );
     }
 }
 
