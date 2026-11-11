@@ -482,8 +482,9 @@ fn should_complete_the_secondary_passkey_pubkey_holders_backfill_after_an_upgrad
     api::remove(&env, canister_id, principal_1(), first, &dropped.pubkey)?;
     assert!(api::add(&env, canister_id, principal_2(), second, &dropped).is_err());
 
-    env.advance_time(Duration::from_secs(5));
+    // The sweep examines the anchors, then settles the dropped key, one timer firing each.
     for _ in 0..5 {
+        env.advance_time(Duration::from_secs(1));
         env.tick();
     }
 
