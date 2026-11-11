@@ -11,9 +11,9 @@
 
 ## Comments and doc comments
 
-Reviewers remove more comments than they ask for. Let names carry the meaning, and write a comment only for what the code cannot say.
+Reviewers remove more comments than they ask for. Make the code say it first: let names carry the meaning, and write a comment only for what the code cannot say.
 
-- Comment the *why* that isn't visible: the constraint, the threat guarded against, the bug avoided, where a value comes from. Never narrate what the next line does.
+- Fix the code rather than explain it. Remove hidden catches, implicit fallbacks and surprising behaviour instead of commenting on them. A *why* comment is only for the rare case where the code genuinely can't be made clearer: then name the constraint, the threat guarded against, the bug avoided or where a value comes from. Never narrate what the next line does.
 - Every constant and every new type gets a doc comment. A module that implements a non-trivial mechanism opens with a doc comment stating the problem it solves and how.
 - Doc comments must make sense on their own: name every value they mention and define any term. Don't explain a function by pointing at its call site.
 - Comments describe the current code only. No history ("previously", "now uses"), no PR or issue numbers, no reasons for what is absent, no design-process justification ("we chose this because the reviewer..."). History belongs in git and the PR.
