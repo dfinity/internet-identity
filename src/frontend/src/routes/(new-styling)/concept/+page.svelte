@@ -349,7 +349,7 @@
   // --- Apps grid pages ---
 
   const PAGES = [
-    { id: "mine", label: "Your apps" },
+    { id: "mine", label: "My apps" },
     { id: "explore", label: "Explore" },
     { id: "create", label: "Create" },
   ] as const;
