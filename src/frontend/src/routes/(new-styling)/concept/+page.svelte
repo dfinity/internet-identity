@@ -347,6 +347,29 @@
   const pageRefs = $state<HTMLElement[]>([]);
   const tabRefs = $state<HTMLElement[]>([]);
 
+  // The header is a row of pills in the canvas's own colour, so at rest they
+  // don't show. Once a page's content reaches the header they lift off the
+  // canvas, as the dock's pills sit over it, and keep the header readable
+  // over whatever runs under it.
+  /** The scroll at which a page's content reaches the header: the 3rem PAGE
+   *  keeps under it. */
+  const UNDER_HEADER_AT = 48;
+  const underHeader = $state(PAGES.map(() => false));
+  const headerLifted = $derived(underHeader[activePage]);
+  /** The pages scroll on their own; the pager hears them while capturing. */
+  const onPageScroll = (event: Event) => {
+    const index = pageRefs.indexOf(event.target as HTMLElement);
+    if (index !== -1) {
+      underHeader[index] = pageRefs[index].scrollTop > UNDER_HEADER_AT;
+    }
+  };
+  const pill = $derived([
+    "pointer-events-auto rounded-full border border-transparent",
+    headerLifted ? "ii-elevation-6 bg-(--ii-surface-6)" : "bg-(--ii-surface-3)",
+  ]);
+  const PILL_MOTION =
+    "transition-[background-color,box-shadow] duration-200 ease-out motion-reduce:transition-none";
+
   const goToPage = (index: number) => {
     activePage = index;
     pageRefs[index]?.scrollIntoView({
@@ -744,12 +767,21 @@
 
     <!-- On desktop one row: the logo, the pages centered on the canvas, and an
          empty column that keeps them centered. A phone has no room for the
-         pages beside its controls, so they drop to a row of their own. -->
+         pages beside its controls, so they drop to a row of their own. Each
+         is a pill (see `pill`); between them the pages show through. From
+         `md` the inset is 20px, where the account's pill ends. -->
     <header
       bind:clientHeight={headerHeight}
-      class="relative z-10 grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr]"
+      class="pointer-events-none relative z-10 grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr] md:px-5"
     >
-      <div dir="ltr" class="flex h-16 items-center gap-3 justify-self-start">
+      <div
+        dir="ltr"
+        class={[
+          pill,
+          PILL_MOTION,
+          "my-3 flex h-10 items-center gap-3 justify-self-start px-4",
+        ]}
+      >
         <Logo class="text-fg-primary h-4" />
         <span class="text-text-primary text-base font-semibold"> id.ai </span>
       </div>
@@ -758,7 +790,11 @@
         aria-label="Apps"
         tabindex="-1"
         onkeydown={onTabKeydown}
-        class="col-span-2 row-start-2 mt-2 flex gap-6 justify-self-center md:col-span-1 md:col-start-2 md:row-start-1 md:mt-0"
+        class={[
+          pill,
+          PILL_MOTION,
+          "col-span-2 row-start-2 mt-2 flex h-10 items-center gap-6 justify-self-center px-5 md:col-span-1 md:col-start-2 md:row-start-1 md:mt-0",
+        ]}
       >
         <!-- No underline: the selected tab reads by its darker text alone. -->
         {#each PAGES as page, index (page.id)}
@@ -786,6 +822,9 @@
         class={[
           "col-start-2 row-start-1 flex items-center gap-1 justify-self-end md:col-start-3",
           layout !== "top" && "md:hidden",
+          // A phone's controls share one pill; on desktop the account has its
+          // own, under it, below.
+          !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
         ]}
       >
         <!-- Phone only: on desktop it keeps to the bottom-left corner. -->
@@ -794,11 +833,14 @@
         </div>
         {#if layout === "top"}
           <!-- Desktop: room for the account, which floats over this corner
-               (CornerAccount). It folds away while the account sits on the
-               panel, and opens again for it to come back. -->
+               (CornerAccount), and its pill. It folds away while the account
+               sits on the panel, and opens again for it to come back. -->
           <div
             aria-hidden="true"
-            class="shrink-0 transition-[width,margin] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none max-md:hidden"
+            class={[
+              pill,
+              "shrink-0 transition-[width,margin,background-color,box-shadow] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none max-md:hidden",
+            ]}
             style:width={`${panelVisible ? 0 : accountWidth}px`}
             style:height={`${accountHeight}px`}
             style:margin-inline-start={panelVisible ? "0px" : "0.5rem"}
@@ -833,6 +875,7 @@
          trackpad a swipe does too, landing on a page. -->
       <div
         bind:this={pager}
+        onscrollcapture={onPageScroll}
         class="flex min-h-0 flex-1 snap-x snap-mandatory [scrollbar-width:none] overflow-x-auto overscroll-x-contain [&::-webkit-scrollbar]:hidden"
       >
         <div
@@ -978,17 +1021,8 @@
           <CreateBento />
         </div>
       </div>
-      <!-- Content leaves under the header through a blur that deepens into
-           the canvas, and comes up from under the island the same way. The
-           top one starts inside the header, a rem above its bottom, so the
-           header is the solid end of the fade rather than a slab over it. A
-           page keeps clear of both at rest (PAGE's top padding and pb-32). -->
-      <ProgressiveBlur
-        side="top"
-        fade
-        hold="calc(var(--header-h) - 1rem)"
-        class="h-[calc(var(--header-h)+3rem)]"
-      />
+      <!-- Content comes up from under the island through a blur that deepens
+           into the canvas. A page keeps clear of it at rest (PAGE's pb-32). -->
       <ProgressiveBlur side="bottom" fade class="h-24" />
     </div>
   </Elevated>

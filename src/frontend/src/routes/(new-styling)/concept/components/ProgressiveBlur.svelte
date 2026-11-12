@@ -14,15 +14,11 @@
     /** Also fade into the surface underneath, so what passes the edge is gone
      *  by the time it gets there rather than cut off. */
     fade?: boolean;
-    /** With `fade`, this much at the edge is the surface itself, for what
-     *  stands there (a header's controls); the blur and the fade take the rest
-     *  of the box. Any CSS length. */
-    hold?: string;
     /** Size and placement; the blur fills whatever box this gives it. */
     class?: ClassValue;
   }
 
-  const { side, fade = false, hold, class: className }: Props = $props();
+  const { side, fade = false, class: className }: Props = $props();
 
   // The surface is fixed for a component's life, like the place it renders in.
   const surface = `var(--ii-surface-${useSurface()})`;
@@ -52,16 +48,6 @@
   const fadeStyle = $derived(
     `background: linear-gradient(to ${side}, transparent 30%, color-mix(in srgb, ${surface} 60%, transparent) 70%, ${surface})`,
   );
-
-  const OPPOSITE = {
-    top: "bottom",
-    bottom: "top",
-    left: "right",
-    right: "left",
-  };
-  const holdSize = $derived(
-    side === "top" || side === "bottom" ? "height" : "width",
-  );
 </script>
 
 <div
@@ -77,21 +63,10 @@
     className,
   ]}
 >
-  <div
-    class="absolute inset-0"
-    style={fade && hold !== undefined ? `${side}: ${hold}` : undefined}
-  >
-    {#each LEVELS as level, index (level)}
-      <div class="absolute inset-0" style={layerStyle(level, index)}></div>
-    {/each}
-    {#if fade}
-      <div class="absolute inset-0" style={fadeStyle}></div>
-    {/if}
-  </div>
-  {#if fade && hold !== undefined}
-    <div
-      class="absolute inset-0"
-      style={`${OPPOSITE[side]}: auto; ${holdSize}: ${hold}; background: ${surface}`}
-    ></div>
+  {#each LEVELS as level, index (level)}
+    <div class="absolute inset-0" style={layerStyle(level, index)}></div>
+  {/each}
+  {#if fade}
+    <div class="absolute inset-0" style={fadeStyle}></div>
   {/if}
 </div>
