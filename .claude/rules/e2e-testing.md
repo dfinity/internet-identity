@@ -13,7 +13,7 @@ Three scripts in `scripts/` wrap the full e2e stack. Use them instead of running
 
 - `scripts/dev-e2e-setup`: idempotent setup. Builds canisters, starts the icp network, OpenID providers and the dev server, and exits 0 when the stack is ready. Re-running rebuilds only what changed (about 1s as a no-op, about 25s after a backend change).
 - `scripts/dev-e2e-setup --teardown`: tears the stack down.
-- `scripts/dev-e2e`: interactive. Runs setup plus a file watcher and opens Playwright in `--ui` mode; tears down on Ctrl+C.
+- `scripts/dev-e2e`: interactive. Runs setup plus a file watcher, opens Playwright in `--ui` mode, and tears down on Ctrl+C. Use it when the user asks to run the e2e tests themselves. When it fits, offer it to them too: it helps for visually reviewing a flow as a user, or when a run gets stuck or unclear and needs a human's eyes and judgement.
 
 The `e2e-playwright` job in `.github/workflows/canister-tests.yml` is the CI reference if the scripts drift from it.
 
@@ -30,8 +30,6 @@ npx playwright test --project=desktop --workers=1 src/frontend/tests/e2e-playwri
 # When done:
 ./scripts/dev-e2e-setup --teardown
 ```
-
-For the user (interactive): `./scripts/dev-e2e`.
 
 Run with `--workers=1`, as CI does: specs share canister state, and parallel workers produce false failures. For broad frontend changes (auth flows, consent, sessions), run the full suite, not just the new spec.
 
