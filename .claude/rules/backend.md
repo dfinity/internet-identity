@@ -59,7 +59,7 @@ Exceptions, each to be kept as narrow as it is:
 
 ## Clippy
 
-Run `cargo fmt` and `cargo clippy` after Rust changes, before committing. CI (`.github/workflows/rust.yml`) runs two passes, and both must be clean:
+Run `cargo fmt` before committing Rust changes, and `cargo clippy` after pushing, while CI runs. CI (`.github/workflows/rust.yml`) runs two passes, and both must be clean:
 
 ```bash
 cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains

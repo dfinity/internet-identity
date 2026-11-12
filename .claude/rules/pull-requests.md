@@ -1,13 +1,11 @@
 # Commits, pull requests and reviews
 
-## Before committing
+## Local checks
 
-Run the checks CI runs, even if a pre-commit hook would; hooks aren't installed in fresh clones, containers or CI:
+Run the checks CI runs yourself; hooks aren't installed in fresh clones, containers or CI. Don't hold a push back for the slow ones: push, run them locally while CI runs, and push a fix for anything either one catches.
 
-- Rust: `cargo fmt`, then `cargo clippy` with the flags in `backend.md`.
-- JS/TS/Svelte: `npm run format`, `npm run lint:eslint -- --fix`, `npm run lint`, `npm run check`. CI stops at the first failure, so fix all three.
-- After a `.did` change: `npm run generate` (see `candid-api.md`).
-- Revert any `src/frontend/src/lib/locales/*.po` diff (see `i18n-and-copy.md`).
+- Before committing, since they are fast and a miss is a guaranteed red run: `cargo fmt` and `npm run format`; `npm run generate` after a `.did` change (see `candid-api.md`); revert any `src/frontend/src/lib/locales/*.po` diff (see `i18n-and-copy.md`).
+- After pushing, in parallel with CI: `cargo clippy` with the flags in `backend.md`; `npm run lint:eslint -- --fix`, `npm run lint`, `npm run check`. CI stops at the first failure, so fix all three.
 
 Never add "Generated with Claude" or similar attribution footers to commits, PR descriptions, review replies or code.
 
@@ -54,7 +52,7 @@ PR titles follow conventional commits with a scope naming the product surface th
 
 ## CI
 
-After pushing, watch the PR's checks and fix failures proactively. Read a failure's logs before rerunning it, and land a fix together with its regression test; never leave `main` red.
+After pushing, watch the PR's checks alongside the local checks and fix failures proactively. Read a failure's logs before rerunning it, and land a fix together with its regression test; never leave `main` red.
 
 ## Reviews
 

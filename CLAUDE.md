@@ -12,7 +12,7 @@ Conventions live in `.claude/rules/`, one file per topic. Most are scoped with
 
 | File | Applies to | Covers |
 | --- | --- | --- |
-| `pull-requests.md` | everything | pre-commit checks, scope, titles, descriptions, stacks, CI, reviews |
+| `pull-requests.md` | everything | local checks, scope, titles, descriptions, stacks, CI, reviews |
 | `code-style.md` | everything | naming, comments and doc comments, scope, reuse |
 | `handle-all-type-variants.md` | everything | exhaustive handling of candid variants, Rust enums, TS unions |
 | `security.md` | `src/**` | bounded resources, authorization, origins, delegations, leaks |
