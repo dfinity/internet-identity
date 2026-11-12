@@ -1019,17 +1019,18 @@
               {#if showRecent && !managing}
                 <!-- Recent repeats apps from the grid below, so it sits on a
                      shelf of its own, like Suggestions in the App Library: the
-                     same apps, plainly a different list. The shelf is flat, as
-                     a shadow here means something waits for you. Its heading
-                     sits above it, on the edge of All apps' heading, so the
-                     shelf holds only logos, the same distance from every edge:
-                     16px on a phone (the 10px a column leaves, plus 6px), 32px
-                     from `@lg` (24px, plus 8px). The section bleeds out by the
-                     shelf's padding, so the logos stay in All apps' columns
-                     and the slide, which clips the section while it opens,
-                     doesn't cut the shelf's sides. The 48px under it, twice
-                     the 24px from a heading to its logos, keeps All apps'
-                     heading with its own grid. -->
+                     same apps, plainly a different list. The shelf is a raised
+                     card, like the account's groups in the panel: white, with
+                     a shadow, where a grey well read as a hole in the canvas.
+                     Its heading sits above it, on the edge of All apps'
+                     heading, so the shelf holds only logos, the same distance
+                     from every edge: 16px on a phone (the 10px a column
+                     leaves, plus 6px), 32px from `@lg` (24px, plus 8px). The
+                     section bleeds out by the shelf's padding, so the logos
+                     stay in All apps' columns and the slide, which clips the
+                     section while it opens, doesn't cut the shelf's sides. The
+                     48px under it, twice the 24px from a heading to its logos,
+                     keeps All apps' heading with its own grid. -->
                 <section
                   transition:slide={{
                     duration: reduced ? 0 : 260,
@@ -1045,8 +1046,10 @@
                   >
                     Recent
                   </h2>
-                  <div
-                    class="ii-shelf w-fit rounded-[1.75rem] px-1.5 pb-1 @lg:px-2 @lg:pt-4 @lg:pb-5"
+                  <!-- A tile's badge cuts itself out of the card it sits on. -->
+                  <Elevated
+                    offset={1}
+                    class="w-fit rounded-[1.75rem] px-1.5 pb-1 [--ii-tile-backdrop:var(--ii-surface-4)] @lg:px-2 @lg:pt-4 @lg:pb-5"
                   >
                     <ul class={RECENT_GRID}>
                       {#each recentApps as app, index (app.origin)}
@@ -1067,7 +1070,7 @@
                         </li>
                       {/each}
                     </ul>
-                  </div>
+                  </Elevated>
                 </section>
               {/if}
               <section class="flex flex-col gap-2">
