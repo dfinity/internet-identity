@@ -282,50 +282,39 @@
       rel="noopener noreferrer"
       style:background-color={CAFFEINE_COLOR}
       class={[
-        "group relative isolate flex min-h-[28rem] flex-col overflow-hidden text-white @2xl:col-span-2 @4xl:col-span-4 @4xl:row-span-2",
+        "group relative isolate flex flex-col overflow-hidden text-white @2xl:col-span-2 @4xl:col-span-4 @4xl:row-span-2",
         TILE,
         FOCUS,
         "@2xl:p-9",
       ]}
     >
-      <p class="text-xs font-semibold tracking-[0.08em] uppercase opacity-70">
-        No code
-      </p>
       <h3
-        class="mt-2 max-w-[16ch] text-[1.75rem] leading-[1.1] font-semibold tracking-tight text-balance @2xl:text-[2.5rem]"
+        class="max-w-[16ch] text-[1.75rem] leading-[1.1] font-semibold tracking-tight text-balance @2xl:text-[2.5rem]"
       >
         Say what you want. Get a live app.
       </h3>
-      <p class="mt-3 max-w-[44ch] text-sm text-pretty opacity-75">
-        Chat with Caffeine and it writes the app, puts it on the Internet
-        Computer and keeps changing it as you ask.
+      <p class="mt-3 text-sm text-pretty opacity-75">
+        Chat with Caffeine. It writes the app and puts it online.
       </p>
 
-      <!-- The art: a prompt as Caffeine takes one. -->
+      <!-- The art: a prompt as Caffeine takes one, in one line. -->
       <div
         aria-hidden="true"
-        class="mt-8 w-full max-w-md rounded-[1.25rem] bg-white/[0.07] p-4 ring-1 ring-white/10 transition-transform duration-500 ease-(--ii-ease-out) group-hover:-translate-y-1 motion-reduce:transition-none"
+        class="mt-6 flex items-center gap-3 rounded-3xl bg-white/[0.07] py-2 ps-4 pe-2 ring-1 ring-white/10 transition-transform duration-500 ease-(--ii-ease-out) group-hover:-translate-y-1 motion-reduce:transition-none @2xl:ps-5"
       >
-        <p class="text-[15px] leading-6 text-white/90">
-          A booking page for my yoga studio, with a class schedule and a
-          waitlist<span class="caret"></span>
-        </p>
-        <div class="mt-4 flex items-end justify-between gap-3">
-          <span class="flex flex-wrap gap-1.5">
-            {#each ["Motoko backend", "React frontend", "On ICP"] as chip (chip)}
-              <span
-                class="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70"
-              >
-                {chip}
-              </span>
-            {/each}
-          </span>
-          <span
-            class="grid size-8 shrink-0 place-items-center rounded-full bg-white text-neutral-950"
+        <!-- The caret stays with the last word, never on a line of its own. -->
+        <p
+          class="min-w-0 flex-1 text-sm leading-6 text-white/90 @2xl:text-[15px]"
+        >
+          A booking page for my yoga <span class="whitespace-nowrap"
+            >studio<span class="caret"></span></span
           >
-            <ArrowUpIcon class="size-4" />
-          </span>
-        </div>
+        </p>
+        <span
+          class="grid size-8 shrink-0 place-items-center rounded-full bg-white text-neutral-950"
+        >
+          <ArrowUpIcon class="size-4" />
+        </span>
       </div>
 
       <div class="mt-auto flex items-center gap-3 pt-8">
@@ -346,30 +335,33 @@
     <!-- What every app gets: the part to stress, whichever way it's built. -->
     <section
       class={[
-        "ii-shelf flex flex-col gap-5 @2xl:col-span-2 @4xl:row-span-2",
+        "ii-shelf flex flex-col gap-4 @2xl:col-span-2 @4xl:row-span-2",
         TILE,
       ]}
     >
-      <div class="flex flex-col gap-1.5">
+      <div class="flex flex-col gap-1">
         <h3 class={TILE_TITLE}>What every app here gets</h3>
         <p class={TILE_BODY}>Whichever way you build it.</p>
       </div>
-      <ul class="grid gap-5 @2xl:grid-cols-2 @4xl:grid-cols-1">
+      <!-- Each icon sits in its title's line, so the text below gets the
+           tile's whole width and the tile stays as low as Caffeine's. -->
+      <ul class="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-1">
         {#each WHY as item (item.title)}
           {@const Icon = item.icon}
-          <li class="flex gap-3">
-            <span aria-hidden="true" class={ICON_CHIP}>
-              <Icon class="size-5" />
-            </span>
-            <span class="flex flex-col gap-0.5">
+          <li class="flex flex-col gap-0.5">
+            <span class="flex items-center gap-2">
+              <Icon
+                class="text-fg-secondary size-4 shrink-0"
+                aria-hidden="true"
+              />
               <span class="text-text-primary text-sm font-medium">
                 {item.title}
               </span>
-              <span
-                class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
-              >
-                {item.body}
-              </span>
+            </span>
+            <span
+              class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
+            >
+              {item.body}
             </span>
           </li>
         {/each}
