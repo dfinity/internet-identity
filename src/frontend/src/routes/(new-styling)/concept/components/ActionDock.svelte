@@ -19,8 +19,6 @@
     KeyRoundIcon,
     MonitorSmartphoneIcon,
   } from "@lucide/svelte";
-  import { flip } from "svelte/animate";
-  import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { shellIn, shellOut, widgetIn, widgetOut } from "../motion";
 
@@ -53,34 +51,138 @@
     risk: "text-error-400 dark:text-error-600",
     action: "text-warning-400 dark:text-warning-600",
   };
+
+  // The widgets lie in a stack: the most urgent in front, the rest tucked
+  // under it with only their top edges showing. Hovering, tabbing in or
+  // tapping an edge spreads them into a column, each at its own width.
+  /** A widget's height (h-11), and the room between spread widgets. */
+  const ROW = 44;
+  const GAP = 8;
+  /** How far each tucked widget shows above the one in front of it. */
+  const PEEK = 9;
+  /** A widget's inline padding (ps-3.75 + pe-4.5) around its glyph and label. */
+  const PADDING = 33;
+
+  let stack = $state<HTMLElement>();
+  const inStack = (target: EventTarget | null) =>
+    target instanceof Node && stack?.contains(target) === true;
+  let hovered = $state(false);
+  let focused = $state(false);
+  /** A tap on a tucked edge spreads the stack until a tap lands outside it. */
+  let tapped = $state(false);
+  const spread = $derived((hovered || focused || tapped) && items.length > 1);
+
+  /** Each widget's glyph and label, measured, so a widget can take its own
+   *  width when spread and the front one's when tucked under it. */
+  const contentWidths = $state<Partial<Record<CardKind, number>>>({});
+  const widthOf = (kind: CardKind) => (contentWidths[kind] ?? 0) + PADDING;
+  const measured = $derived(
+    items.every(({ kind }) => (contentWidths[kind] ?? 0) > 0),
+  );
+  const frontWidth = $derived(items.length > 0 ? widthOf(items[0].kind) : 0);
+  const stackWidth = $derived(
+    spread ? Math.max(...items.map(({ kind }) => widthOf(kind))) : frontWidth,
+  );
+  const stackHeight = $derived(
+    spread
+      ? items.length * ROW + (items.length - 1) * GAP
+      : ROW + (items.length - 1) * PEEK,
+  );
+
+  /** Sizes only move once the widgets are measured, so the stack doesn't
+   *  grow out of nothing as it first appears. */
+  let settled = $state(false);
+  $effect(() => {
+    if (!measured || settled) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => (settled = true));
+    return () => cancelAnimationFrame(frame);
+  });
 </script>
+
+<svelte:document
+  onpointerdown={(event) => {
+    if (!inStack(event.target)) {
+      tapped = false;
+    }
+  }}
+/>
 
 <!-- The page with everything closed: what needs the user waits here, one
      button per step, and goes away once the step is done. -->
 <div
   in:shellIn={{ reduced }}
   out:shellOut={{ reduced }}
-  class="pointer-events-none fixed inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 flex justify-center"
+  class="pointer-events-none fixed inset-x-0 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-20 flex justify-center"
 >
   <ul
+    bind:this={stack}
     aria-label="Needs your attention"
-    class="pointer-events-auto relative flex max-w-full snap-x snap-mandatory scroll-px-3 [scrollbar-width:none] gap-2.5 overflow-x-auto px-3 pt-2 pb-3 [&::-webkit-scrollbar]:hidden"
+    onpointerenter={(event) => {
+      if (event.pointerType === "mouse") {
+        hovered = true;
+      }
+    }}
+    onpointerleave={(event) => {
+      if (event.pointerType === "mouse") {
+        hovered = false;
+      }
+    }}
+    onfocusin={(event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.matches(":focus-visible")
+      ) {
+        focused = true;
+      }
+    }}
+    onfocusout={(event) => {
+      if (!inStack(event.relatedTarget)) {
+        focused = false;
+      }
+    }}
+    class={[
+      "pointer-events-auto relative",
+      settled &&
+        "transition-[width,height] duration-450 ease-(--ii-ease-out) motion-reduce:transition-none",
+    ]}
+    style:width={`${stackWidth}px`}
+    style:height={`${stackHeight}px`}
   >
     {#each items as item, index (item.kind)}
       {@const Icon = ICON[item.kind]}
+      {@const tucked = !spread && index > 0}
       <li
-        animate:flip={{ duration: reduced ? 0 : 320, easing: quintOut }}
-        in:widgetIn={{ reduced, index }}
-        out:widgetOut={{ reduced }}
-        class="flex shrink-0 snap-start"
+        class={[
+          "absolute bottom-0 left-1/2 flex",
+          settled &&
+            "transition-[transform,width] duration-450 ease-(--ii-ease-out) motion-reduce:transition-none",
+        ]}
+        style:width={`${spread ? widthOf(item.kind) : frontWidth}px`}
+        style:transform={`translateX(-50%) translateY(${-index * (spread ? ROW + GAP : PEEK)}px) scale(${spread ? 1 : 1 - index * 0.05})`}
+        style:z-index={items.length - index}
       >
         <button
           type="button"
-          onclick={() => onAction(item.kind)}
+          in:widgetIn={{ reduced, index }}
+          out:widgetOut={{ reduced }}
+          tabindex={tucked ? -1 : undefined}
+          onclick={(event) => {
+            // A tap on a tucked edge spreads the stack first. A click with no
+            // pointer (a screen reader's) takes the step straight away.
+            if (tucked && event.detail > 0) {
+              tapped = true;
+              return;
+            }
+            onAction(item.kind);
+          }}
           class={[
-            "ii-elevation-6 flex h-11 max-w-[calc(100vw-3rem)] items-center gap-2 rounded-full ps-3.75 pe-4.5 text-sm font-medium whitespace-nowrap outline-none",
+            "flex h-11 w-full items-center justify-center overflow-hidden rounded-full ps-3.75 pe-4.5 text-sm font-medium whitespace-nowrap outline-none",
             "focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary focus-visible:ring-2 focus-visible:ring-offset-2",
-            "transition-[scale,background-color] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100",
+            "transition-[scale,background-color,box-shadow] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100",
+            // A tucked widget is only an edge, so it casts a shorter shadow.
+            tucked ? "ii-elevation-2" : "ii-elevation-6",
             // A utility, not `ii-surface-6`: the reset for buttons outranks
             // the surface classes, and the widget must not show the page through.
             item.primary
@@ -88,15 +190,23 @@
               : "ii-hover text-text-primary bg-(--ii-surface-6)",
           ]}
         >
-          <Icon
-            aria-hidden="true"
+          <span
+            bind:offsetWidth={contentWidths[item.kind]}
             class={[
-              "size-4 shrink-0",
-              (item.primary ? GLYPH_ON_PRIMARY : GLYPH)[item.tone] ??
-                "text-fg-tertiary",
+              "flex shrink-0 items-center gap-2 transition-opacity duration-200 ease-out",
+              tucked && "opacity-0",
             ]}
-          />
-          <span class="min-w-0 truncate">{item.label}</span>
+          >
+            <Icon
+              aria-hidden="true"
+              class={[
+                "size-4 shrink-0",
+                (item.primary ? GLYPH_ON_PRIMARY : GLYPH)[item.tone] ??
+                  "text-fg-tertiary",
+              ]}
+            />
+            <span class="max-w-[calc(100vw-7rem)] truncate">{item.label}</span>
+          </span>
         </button>
       </li>
     {/each}
