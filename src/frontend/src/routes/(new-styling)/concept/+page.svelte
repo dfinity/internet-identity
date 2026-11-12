@@ -26,6 +26,7 @@
   import AppTile from "./components/AppTile.svelte";
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
+  import CreateBento from "./components/CreateBento.svelte";
   import Elevated from "./components/Elevated.svelte";
   import ExploreBanner from "./components/ExploreBanner.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
@@ -946,14 +947,17 @@
           </div>
         </div>
 
-        <!-- Create: a page of its own, empty for now. -->
+        <!-- Create: every way to build an app of your own on the Internet
+             Computer, as a bento grid. -->
         <div
           bind:this={pageRefs[2]}
           id="page-create"
           role="tabpanel"
           aria-labelledby="tab-create"
           class={PAGE}
-        ></div>
+        >
+          <CreateBento />
+        </div>
       </div>
       <!-- Content leaves under the header through a blur that deepens into
            the canvas, and comes up from under the island the same way. The

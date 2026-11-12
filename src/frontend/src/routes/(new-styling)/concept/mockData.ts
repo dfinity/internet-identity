@@ -307,6 +307,15 @@ export const exploreFeed: (
   },
 ];
 
+/** Not in Internet Identity today: the apps the Create page sends people to
+ *  for building their own. From the curated dapps list, so their logos and
+ *  links match Explore. */
+export const createApps = {
+  caffeine: featured("Caffeine"),
+  openCloud: featured("Open Cloud"),
+  juno: featured("Juno"),
+};
+
 export interface MockIdentity {
   identity: LastUsedIdentity;
   /** The access method this browser signed in with. */
