@@ -37,7 +37,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 
 ## Lifecycle and async
 
-- Clean up every timer, RAF, observer, listener, poll loop and in-flight request in the `$effect` cleanup or `onDestroy`, and on dialog close. Use `AbortController` (plus `setTimeout` for timeouts; not `AbortSignal.timeout`) and honour the signal in every await.
+- Clean up every timer, RAF, observer, listener, poll loop and in-flight request in the `$effect` cleanup or `onDestroy`, and on dialog close. Use `AbortController` and honour the signal in every await.
 - Reset loading and submitting flags in `finally`. Disable a control while its write runs, ignore stale async results, and reconcile optimistic updates with the authoritative state.
 - Reset per-request store state, and don't render until async-derived state is ready.
 - Open popups and tabs synchronously inside the click handler; do the async work after.
