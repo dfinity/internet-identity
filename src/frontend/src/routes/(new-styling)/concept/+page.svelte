@@ -2,6 +2,7 @@
   import "./surfaces.css";
   import {
     CheckIcon,
+    ChevronsRightIcon,
     ChevronsUpDownIcon,
     FlaskConicalIcon,
     LayoutGridIcon,
@@ -10,7 +11,6 @@
     PanelTopIcon,
     MoonIcon,
     SunIcon,
-    XIcon,
   } from "@lucide/svelte";
   import type { Component } from "svelte";
   import { flip } from "svelte/animate";
@@ -671,13 +671,18 @@
         </button>
         {#if closable}
           <!-- Drawn like the switch control beside it: same circle, same 16px
-             glyph, same muted tone, so neither outweighs the other. -->
+             glyph, same muted tone, so neither outweighs the other. Its
+             glyph points the way the panel leaves (see the corner's Close). -->
           <button
             type="button"
             onclick={() => (panelOpen = false)}
+            title="Close"
             class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
           >
-            <XIcon class="size-4" aria-hidden="true" />
+            <ChevronsRightIcon
+              class="size-4 rtl:-scale-x-100"
+              aria-hidden="true"
+            />
             <span class="sr-only">Close</span>
           </button>
         {/if}
@@ -769,16 +774,20 @@
          header's line, 64px tall from 9px down (the aside's 4px of padding
          less 3px), so the account doesn't move up or down between the two.
          The row stays put when the panel scrolls under it. Close's glyph
-         lines up with the rows below. -->
+         lines up with the rows below. The panel isn't a dialog over the
+         page: it slides in beside the canvas and pushes it aside. So Close
+         isn't a cross but two chevrons pointing where the panel goes back
+         to, as a side panel folds away in Notion or Linear. -->
     <div
       class="ii-surface-1 sticky -top-[3px] z-10 -mt-[3px] mb-1 flex h-16 shrink-0 items-center"
     >
       <button
         type="button"
         onclick={() => (panelOpen = false)}
+        title="Close"
         class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring -ms-2 grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
       >
-        <XIcon class="size-4" aria-hidden="true" />
+        <ChevronsRightIcon class="size-4 rtl:-scale-x-100" aria-hidden="true" />
         <span class="sr-only">Close</span>
       </button>
       <!-- Concept only, to test both themes: it stands just before the
