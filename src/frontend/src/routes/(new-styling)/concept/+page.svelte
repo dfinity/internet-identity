@@ -25,6 +25,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import ActionDock, { type DockItem } from "./components/ActionDock.svelte";
   import AppTile from "./components/AppTile.svelte";
+  import AttentionDot from "./components/AttentionDot.svelte";
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
   import CreateBento from "./components/CreateBento.svelte";
@@ -330,6 +331,15 @@
       label: card.ask ?? card.sentence,
       primary: isLoud(card),
     })),
+  );
+  /** The closed account's dot, while something needs the user (as the panel
+   *  layout's avatar on a phone has it): red for a risk, amber otherwise. */
+  const accountAttention = $derived<"risk" | "action" | undefined>(
+    cards.some(({ tone }) => tone === "risk")
+      ? "risk"
+      : needsAttention(cards)
+        ? "action"
+        : undefined,
   );
   /** The account opens on its overview, unless apps are being managed. */
   const openAccount = () => {
@@ -988,7 +998,7 @@
           <button
             type="button"
             onclick={openAccount}
-            aria-label={`${identityName}. Open identity`}
+            aria-label={`${identityName}. Open identity${accountAttention !== undefined ? ", needs your attention" : ""}`}
             class="ii-hover focus-visible:ring-focus-ring -me-1 flex min-w-0 items-center gap-2.5 rounded-full py-1 ps-3 pe-1 outline-none focus-visible:ring-2 active:bg-(--ii-selected) md:hidden"
           >
             <span
@@ -996,7 +1006,19 @@
             >
               {identityName}
             </span>
-            <IdentityAvatar {identity} size="sm" />
+            <!-- On a phone the controls share one pill: the dot cuts itself
+                 out of it. -->
+            <span
+              class="relative"
+              style:--ii-dot-backdrop={headerLifted
+                ? "var(--ii-surface-6)"
+                : "var(--ii-surface-3)"}
+            >
+              <IdentityAvatar {identity} size="sm" />
+              {#if accountAttention !== undefined}
+                <AttentionDot tone={accountAttention} />
+              {/if}
+            </span>
           </button>
         {/if}
         {#if layout === "panel"}
@@ -1232,6 +1254,8 @@
       bind:width={accountWidth}
       bind:height={accountHeight}
       {switching}
+      attention={accountAttention}
+      lifted={headerLifted}
       onOpen={openAccount}
       onSwitch={toggleSwitcher}
     />

@@ -2,6 +2,7 @@
   import { tick, untrack } from "svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+  import AttentionDot from "./AttentionDot.svelte";
   import { SWITCH_LIST_ID } from "./IdentityCard.svelte";
 
   interface Props {
@@ -13,6 +14,12 @@
     height?: number;
     /** Whether the open panel lists the identities to switch to. */
     switching: boolean;
+    /** Something in the account needs the user: the closed account says so
+     *  with a dot, and the panel, once open, says what. */
+    attention?: "risk" | "action";
+    /** Whether the header's pill under the account is lifted off the canvas,
+     *  for the colour the dot cuts itself out of. */
+    lifted?: boolean;
     onOpen: () => void;
     /** The open account lists the identities to switch to, in the panel. */
     onSwitch: () => void;
@@ -24,6 +31,8 @@
     width = $bindable(0),
     height = $bindable(0),
     switching,
+    attention,
+    lifted = false,
     onOpen,
     onSwitch,
   }: Props = $props();
@@ -76,7 +85,9 @@
     bind:offsetHeight={height}
     type="button"
     onclick={() => (open ? onSwitch() : onOpen())}
-    aria-label={open ? `${name}. Switch identity` : `${name}. Open identity`}
+    aria-label={open
+      ? `${name}. Switch identity`
+      : `${name}. Open identity${attention !== undefined ? ", needs your attention" : ""}`}
     aria-expanded={open ? switching : false}
     aria-controls={open && switching ? SWITCH_LIST_ID : undefined}
     class="ii-hover focus-visible:ring-focus-ring flex items-center gap-2.5 rounded-full py-1 ps-3 pe-1 outline-none focus-visible:ring-2 active:bg-(--ii-selected)"
@@ -86,6 +97,16 @@
     <span class="text-text-primary max-w-40 truncate text-sm font-medium">
       {name}
     </span>
-    <IdentityAvatar {identity} size="sm" />
+    <span
+      class="relative"
+      style:--ii-dot-backdrop={lifted
+        ? "var(--ii-surface-6)"
+        : "var(--ii-surface-3)"}
+    >
+      <IdentityAvatar {identity} size="sm" />
+      {#if attention !== undefined && !open}
+        <AttentionDot tone={attention} />
+      {/if}
+    </span>
   </button>
 </div>
