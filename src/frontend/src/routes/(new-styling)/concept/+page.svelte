@@ -357,6 +357,18 @@
   let pager = $state<HTMLElement>();
   const pageRefs = $state<HTMLElement[]>([]);
   const tabRefs = $state<HTMLElement[]>([]);
+  /** Each tab's width, for the thumb under the selected one. The tabs sit
+   *  edge to edge after the pill's 4px of padding, so a tab starts where the
+   *  ones before it end. */
+  const tabWidths = $state(PAGES.map(() => 0));
+  const thumb = $derived(
+    tabWidths.every((width) => width > 0)
+      ? {
+          start: 4 + tabWidths.slice(0, activePage).reduce((a, b) => a + b, 0),
+          width: tabWidths[activePage],
+        }
+      : undefined,
+  );
 
   // The header is a row of pills in the canvas's own colour, so at rest they
   // don't show. Once a page's content reaches the header they lift off the
@@ -903,13 +915,27 @@
         class={[
           pill,
           PILL_MOTION,
-          "col-span-2 row-start-2 mt-2 flex h-10 items-center gap-6 justify-self-center px-5 md:col-span-1 md:col-start-2 md:row-start-1 md:mt-0",
+          "relative col-span-2 row-start-2 mt-2 flex h-10 items-center justify-self-center p-1 md:col-span-1 md:col-start-2 md:row-start-1 md:mt-0",
         ]}
       >
-        <!-- No underline: the selected tab reads by its darker text alone. -->
+        <!-- The selected tab sits on a thumb, as in a segmented control, so it
+             reads by its shape and not only by its darker text. The thumb is
+             the selected overlay, so it shows on the pill at rest, in the
+             canvas's colour, and on the lifted one; it slides to a tab picked
+             or swiped to. Mounted once the tabs are measured, so it doesn't
+             grow in from nothing on load. -->
+        {#if thumb !== undefined}
+          <span
+            aria-hidden="true"
+            class="absolute inset-y-1 rounded-full bg-(--ii-selected) transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none"
+            style:inset-inline-start={`${thumb.start}px`}
+            style:width={`${thumb.width}px`}
+          ></span>
+        {/if}
         {#each PAGES as page, index (page.id)}
           <button
             bind:this={tabRefs[index]}
+            bind:offsetWidth={tabWidths[index]}
             type="button"
             role="tab"
             id={`tab-${page.id}`}
@@ -918,7 +944,7 @@
             tabindex={activePage === index ? 0 : -1}
             onclick={() => goToPage(index)}
             class={[
-              "focus-visible:outline-focus-ring rounded-sm py-1 text-sm font-semibold transition-colors duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none",
+              "focus-visible:outline-focus-ring relative h-8 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
               activePage === index
                 ? "text-text-primary"
                 : "text-text-tertiary hover:text-text-secondary",
