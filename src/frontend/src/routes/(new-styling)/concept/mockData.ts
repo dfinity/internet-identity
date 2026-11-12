@@ -271,8 +271,8 @@ export const exploreFeed: (
     app: featured("Caffeine"),
     eyebrow: "Build with AI",
     title: "Describe an app. Caffeine builds it.",
-    // The same pale blue as Open Cloud's banner.
-    background: "#dbe7ff",
+    // As light as Open Cloud's banner, in the hue of Caffeine's own sky.
+    background: "#d6e9fe",
     dark: false,
   },
   { kind: "featured", title: "Featured on Internet Identity" },
