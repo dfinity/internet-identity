@@ -11,7 +11,7 @@ paths:
 
 ## Translations
 
-- Never commit `src/frontend/src/lib/locales/*.po` changes in a feature PR. Feature PRs add source strings only; a bot extracts and translates them in separate `chore(fe): update translations` PRs. Revert any `.po` diff before staging.
+- Never edit `src/frontend/src/lib/locales/*.po` files. They are generated from the source strings, so change the text in the `.svelte` or `.ts` file instead. A bot extracts and translates them in separate `chore(fe): update translations` PRs; revert any `.po` diff before staging.
 - Don't reword an existing source string outside the PR's scope: `lingui extract --clean` drops its translations in every locale.
 - Never edit an existing `context` (msgctxt) string, for the same reason. Add a `context` when one English string carries two meanings.
 - Translate every visible word, including "now", units and fallbacks.
