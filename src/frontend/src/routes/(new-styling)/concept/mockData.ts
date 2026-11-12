@@ -96,7 +96,56 @@ const notification = (
   agoMillis: number,
 ): MockNotification => ({ id, title, body, sentMillis: now - agoMillis });
 
+// Listed in the order the apps were added, which All apps keeps. It differs
+// from the order of use so Recent doesn't just repeat the grid's first row.
 const thomasApps: ConceptApp[] = [
+  app("NNS Dapp", {
+    lastUsedMillis: now - 3 * HOUR,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 3 * HOUR,
+    lastBrowser: "Chrome on Mac",
+    unread: [
+      notification(
+        "nns-1",
+        "Vote now",
+        "A proposal you follow is open until Friday.",
+        3 * HOUR,
+      ),
+    ],
+  }),
+  app("Funded", {
+    lastUsedMillis: now - 64 * DAY,
+    notificationsAllowed: false,
+    lastBrowser: "Safari on iPhone",
+    unread: [],
+  }),
+  app("TAGGR", {
+    lastUsedMillis: now - 4 * DAY,
+    notificationsAllowed: false,
+    lastBrowser: "Safari on iPhone",
+    unread: [],
+  }),
+  app("OpenChat", {
+    lastUsedMillis: now - 40 * MINUTE,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 25 * MINUTE,
+    lastBrowser: "Safari on iPhone",
+    aiUsedMillis: now - 5 * MINUTE,
+    unread: [
+      notification(
+        "oc-1",
+        "New message",
+        "Sam: Are we still on for tomorrow?",
+        25 * MINUTE,
+      ),
+    ],
+  }),
+  app("Juno", {
+    lastUsedMillis: now - 30 * DAY,
+    notificationsAllowed: false,
+    lastBrowser: "Firefox on Windows",
+    unread: [],
+  }),
   app("OISY Wallet", {
     lastUsedMillis: now - 12 * MINUTE,
     notificationsAllowed: true,
@@ -123,34 +172,19 @@ const thomasApps: ConceptApp[] = [
       ),
     ],
   }),
-  app("OpenChat", {
-    lastUsedMillis: now - 40 * MINUTE,
-    notificationsAllowed: true,
-    lastNotifiedMillis: now - 25 * MINUTE,
-    lastBrowser: "Safari on iPhone",
-    aiUsedMillis: now - 5 * MINUTE,
-    unread: [
-      notification(
-        "oc-1",
-        "New message",
-        "Sam: Are we still on for tomorrow?",
-        25 * MINUTE,
-      ),
-    ],
-  }),
-  app("NNS Dapp", {
-    lastUsedMillis: now - 3 * HOUR,
-    notificationsAllowed: true,
-    lastNotifiedMillis: now - 3 * HOUR,
+  app("ICPSwap", {
+    lastUsedMillis: now - 16 * DAY,
+    notificationsAllowed: false,
     lastBrowser: "Chrome on Mac",
-    unread: [
-      notification(
-        "nns-1",
-        "Vote now",
-        "A proposal you follow is open until Friday.",
-        3 * HOUR,
-      ),
-    ],
+    unread: [],
+  }),
+  app("Water Neuron", {
+    lastUsedMillis: now - 9 * DAY,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 5 * DAY,
+    lastBrowser: "Chrome on Mac",
+    aiUsedMillis: now - 2 * DAY,
+    unread: [],
   }),
   app("KongSwap", {
     lastUsedMillis: now - DAY,
@@ -164,38 +198,6 @@ const thomasApps: ConceptApp[] = [
     notificationsAllowed: true,
     lastNotifiedMillis: now - 2 * DAY,
     lastBrowser: "Firefox on Windows",
-    unread: [],
-  }),
-  app("TAGGR", {
-    lastUsedMillis: now - 4 * DAY,
-    notificationsAllowed: false,
-    lastBrowser: "Safari on iPhone",
-    unread: [],
-  }),
-  app("Water Neuron", {
-    lastUsedMillis: now - 9 * DAY,
-    notificationsAllowed: true,
-    lastNotifiedMillis: now - 5 * DAY,
-    lastBrowser: "Chrome on Mac",
-    aiUsedMillis: now - 2 * DAY,
-    unread: [],
-  }),
-  app("ICPSwap", {
-    lastUsedMillis: now - 16 * DAY,
-    notificationsAllowed: false,
-    lastBrowser: "Chrome on Mac",
-    unread: [],
-  }),
-  app("Juno", {
-    lastUsedMillis: now - 30 * DAY,
-    notificationsAllowed: false,
-    lastBrowser: "Firefox on Windows",
-    unread: [],
-  }),
-  app("Funded", {
-    lastUsedMillis: now - 64 * DAY,
-    notificationsAllowed: false,
-    lastBrowser: "Safari on iPhone",
     unread: [],
   }),
 ];
