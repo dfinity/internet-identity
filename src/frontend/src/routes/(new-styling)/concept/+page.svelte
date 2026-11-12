@@ -27,6 +27,7 @@
   import Elevated from "./components/Elevated.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
+  import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StatusRow from "./components/StatusRow.svelte";
   import TopAccount from "./components/TopAccount.svelte";
@@ -756,7 +757,7 @@
     <!-- On a phone the grid starts at the top like a home screen; on desktop it
          sits in the middle of the free space, and the room kept for the island
          below lifts it a little above center. -->
-    <div class="flex flex-1 flex-col md:my-auto md:flex-none">
+    <div class="relative flex flex-1 flex-col md:my-auto md:flex-none">
       <!-- The pages side by side: the tabs move between them, and on touch or a
          trackpad a swipe does too, landing on a page. -->
       <div
@@ -858,6 +859,18 @@
           class="w-full shrink-0 snap-start snap-always px-2 pt-6 pb-32 sm:px-6"
         ></div>
       </div>
+      <!-- Tiles blur deeper the nearer they get to either edge while a page
+           slides. Each side takes all the room up to the first logo, so tiles
+           at rest stay sharp: half of what GRID leaves (21.75rem wide, 29.5rem
+           from @lg) plus the logo's inset in its column, less a hair. -->
+      <ProgressiveBlur
+        side="left"
+        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)]"
+      />
+      <ProgressiveBlur
+        side="right"
+        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)]"
+      />
     </div>
   </Elevated>
 
