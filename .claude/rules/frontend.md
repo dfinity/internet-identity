@@ -66,7 +66,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 - Co-locate helpers with the route or component that uses them. Move to `$lib/utils/` only when unrelated routes share it; a `$lib` module never lives under `routes/`.
 - Import through `$lib/...`, not long `../` chains.
 - Before writing a utility, weigh the existing options (local utils, `$lib/utils/`, `@icp-sdk` helpers, browser APIs) and recommend one in the PR description, as in `code-style.md`. Notable ones:
-  - Canister calls and errors: `throwCanisterError`, `isCanisterError` and `throwTextCanisterError` (`$lib/utils/utils.ts`); `handleError` (`$lib/components/utils/error.ts`) for the user-visible error path; `anonymousActor` (`$lib/globals.ts`) for public data.
+  - Canister calls and errors: `throwCanisterError` and `isCanisterError` (`$lib/utils/utils.ts`); `handleError` (`$lib/components/utils/error.ts`) for the user-visible error path; `anonymousActor` (`$lib/globals.ts`) for public data.
   - Encoding: `toBase64`/`fromBase64`, `toBase64URL`/`fromBase64URL`, `toHex`/`fromHex` (`$lib/utils/utils.ts`).
   - Async: `promiseQueue` (`$lib/utils/promiseQueue.ts`) to serialize work, `retryFor`, `waitFor`, `waitForStore` (`$lib/utils/utils.ts`).
   - Origins and URLs: `OriginSchema` (`$lib/utils/transport/utils.ts`), `validateDerivationOrigin` (`$lib/utils/validateDerivationOrigin.ts`), `isSameOrigin` and `originLabel` (`$lib/utils/urlUtils.ts`).
