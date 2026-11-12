@@ -6,21 +6,26 @@
    * as strong as the one before it.
    */
   import type { ClassValue } from "svelte/elements";
+  import { useSurface } from "./Elevated.svelte";
 
   interface Props {
     /** The edge where the blur is strongest. */
-    side: "left" | "right";
+    side: "top" | "bottom" | "left" | "right";
+    /** Also fade into the surface underneath, so what passes the edge is gone
+     *  by the time it gets there rather than cut off. */
+    fade?: boolean;
     /** Size and placement; the blur fills whatever box this gives it. */
     class?: ClassValue;
   }
 
-  const { side, class: className }: Props = $props();
+  const { side, fade = false, class: className }: Props = $props();
+
+  // The surface is fixed for a component's life, like the place it renders in.
+  const surface = `var(--ii-surface-${useSurface()})`;
 
   /** From 0.5px at the inner edge to 64px at the outer one. */
   const LEVELS = [0.5, 1, 2, 4, 8, 16, 32, 64];
   const BAND = 100 / LEVELS.length;
-
-  const towardEdge = $derived(side === "left" ? "to left" : "to right");
 
   /** A layer fades in over one band, holds for two and fades out over the
    *  next; the strongest holds right up to the edge. */
@@ -30,7 +35,7 @@
       index === LEVELS.length - 1
         ? `transparent ${from}%, black 100%`
         : `transparent ${from}%, black ${from + BAND}%, black ${from + 2 * BAND}%, transparent ${from + 3 * BAND}%`;
-    const mask = `linear-gradient(${towardEdge}, ${stops})`;
+    const mask = `linear-gradient(to ${side}, ${stops})`;
     return [
       `backdrop-filter: blur(${level}px)`,
       `-webkit-backdrop-filter: blur(${level}px)`,
@@ -38,17 +43,30 @@
       `-webkit-mask-image: ${mask}`,
     ].join("; ");
   };
+
+  /** Clear for the first third, then easing into the surface at the edge. */
+  const fadeStyle = $derived(
+    `background: linear-gradient(to ${side}, transparent 30%, color-mix(in srgb, ${surface} 60%, transparent) 70%, ${surface})`,
+  );
 </script>
 
 <div
   aria-hidden="true"
   class={[
-    "pointer-events-none absolute inset-y-0",
-    side === "left" ? "left-0" : "right-0",
+    "pointer-events-none absolute",
+    {
+      top: "inset-x-0 top-0",
+      bottom: "inset-x-0 bottom-0",
+      left: "inset-y-0 left-0",
+      right: "inset-y-0 right-0",
+    }[side],
     className,
   ]}
 >
   {#each LEVELS as level, index (level)}
     <div class="absolute inset-0" style={layerStyle(level, index)}></div>
   {/each}
+  {#if fade}
+    <div class="absolute inset-0" style={fadeStyle}></div>
+  {/if}
 </div>

@@ -111,6 +111,13 @@
     ),
   );
 
+  // A page scrolls on its own under the fixed header. On a phone the grid
+  // starts at the top like a home screen; on desktop it sits in the middle of
+  // the free space (md:my-auto inside), and the room kept for the island
+  // below lifts it a little above center.
+  const PAGE =
+    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-12 pb-32 sm:px-6";
+
   // Columns follow the canvas the way Apple's home screens do: four on a
   // phone, five on a tablet, seven on a desktop (the Mac's Applications
   // grid). Recent and All apps share them, so they line up tile for tile.
@@ -676,11 +683,12 @@
 <div
   class="concept ii-surface-1 text-text-primary min-h-dvh md:flex md:h-dvh md:p-2"
 >
-  <!-- The canvas: the apps, in a frame on the page. -->
+  <!-- The canvas: the apps, in a frame on the page. It doesn't scroll: the
+       header stays put and each page scrolls on its own under it. -->
   <Elevated
     offset={2}
     as="main"
-    class="@container flex min-h-dvh min-w-0 flex-1 flex-col max-md:rounded-none max-md:border-0 max-md:shadow-none md:min-h-0 md:overflow-y-auto md:rounded-[1.25rem]"
+    class="@container flex h-dvh min-w-0 flex-1 flex-col overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none md:h-auto md:min-h-0 md:rounded-[1.25rem]"
   >
     <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
     <h1 class="sr-only">Apps</h1>
@@ -766,25 +774,22 @@
       </div>
     </header>
 
-    <!-- On a phone the grid starts at the top like a home screen; on desktop it
-         sits in the middle of the free space, and the room kept for the island
-         below lifts it a little above center. -->
-    <div class="relative flex flex-1 flex-col md:my-auto md:flex-none">
+    <div class="relative flex min-h-0 flex-1 flex-col">
       <!-- The pages side by side: the tabs move between them, and on touch or a
          trackpad a swipe does too, landing on a page. -->
       <div
         bind:this={pager}
-        class="flex flex-1 snap-x snap-mandatory [scrollbar-width:none] overflow-x-auto overscroll-x-contain md:flex-none [&::-webkit-scrollbar]:hidden"
+        class="flex min-h-0 flex-1 snap-x snap-mandatory [scrollbar-width:none] overflow-x-auto overscroll-x-contain [&::-webkit-scrollbar]:hidden"
       >
         <div
           bind:this={pageRefs[0]}
           id="page-mine"
           role="tabpanel"
           aria-labelledby="tab-mine"
-          class="w-full shrink-0 snap-start snap-always px-2 pt-6 pb-32 sm:px-6"
+          class={PAGE}
         >
           {#if current.apps.length > 0}
-            <div class="mx-auto flex w-fit flex-col">
+            <div class="mx-auto flex w-fit flex-col md:my-auto">
               <!-- Recent is ordered by use, not by hand, so it steps aside while
                    apps are managed and All apps is the one grid to arrange. -->
               {#if showRecent && !managing}
@@ -827,7 +832,7 @@
             </div>
           {:else}
             <div
-              class="border-border-tertiary mx-auto flex max-w-md flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-6 py-10 text-center"
+              class="border-border-tertiary mx-auto flex max-w-md flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-6 py-10 text-center md:my-auto"
             >
               <LayoutGridIcon
                 class="text-fg-quaternary size-7"
@@ -852,9 +857,9 @@
           id="page-explore"
           role="tabpanel"
           aria-labelledby="tab-explore"
-          class="w-full shrink-0 snap-start snap-always px-2 pt-6 pb-32 sm:px-6"
+          class={PAGE}
         >
-          <div class="mx-auto flex w-fit flex-col gap-2">
+          <div class="mx-auto flex w-fit flex-col gap-2 md:my-auto">
             <h2 class={["text-text-tertiary text-sm font-medium", INSET]}>
               Featured on Internet Identity
             </h2>
@@ -885,22 +890,14 @@
           id="page-create"
           role="tabpanel"
           aria-labelledby="tab-create"
-          class="w-full shrink-0 snap-start snap-always px-2 pt-6 pb-32 sm:px-6"
+          class={PAGE}
         ></div>
       </div>
-      <!-- Tiles blur deeper the nearer they get to either edge while a page
-           slides. Each side takes all the room up to the first logo, so tiles
-           at rest stay sharp: half of what GRID leaves (21.75rem wide, 29.5rem
-           from @lg, 37rem from @2xl, 52rem from @4xl) plus the logo's inset
-           in its column, less a hair. -->
-      <ProgressiveBlur
-        side="left"
-        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)] @2xl:w-[calc((100%_-_37rem)/2_+_1.25rem)] @4xl:w-[calc((100%_-_52rem)/2_+_1.25rem)]"
-      />
-      <ProgressiveBlur
-        side="right"
-        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)] @2xl:w-[calc((100%_-_37rem)/2_+_1.25rem)] @4xl:w-[calc((100%_-_52rem)/2_+_1.25rem)]"
-      />
+      <!-- Content leaves under the header through a blur that deepens into
+           the canvas, and comes up from under the island the same way. A
+           page keeps clear of both at rest (PAGE's pt-12 and pb-32). -->
+      <ProgressiveBlur side="top" fade class="h-12" />
+      <ProgressiveBlur side="bottom" fade class="h-24" />
     </div>
   </Elevated>
 
