@@ -1,6 +1,6 @@
 <script lang="ts">
-  /** iOS gives a standalone web app an in-app browser view, with storage of its own, for any window opened on another origin, so `x-safari-https:` hands the link to Safari instead.
-   *  It is honoured for a navigation a page makes and not for a window a service worker opens, and nothing about it is documented, so it is attempted and then offered. */
+  /** iOS gives a standalone web app an in-app browser view, with storage of its own, for any window opened on another origin, so `webapp:` hands the link to the destination's own Home Screen app, and `x-safari-https:` to Safari where that is refused.
+   *  Both are honoured for a navigation a page makes and not for a window a service worker opens, and nothing about it is documented, so it is attempted and then offered. */
   import { onMount } from "svelte";
   import LockIcon from "@lucide/svelte/icons/lock";
   import { t } from "$lib/stores/locale.store";
@@ -16,6 +16,20 @@
 
   const viaSafari = (url: string): string =>
     url.replace(/^https:/, "x-safari-https:");
+
+  /** `webapp:` needs a path after the host, which a parsed `https:` URL always has. */
+  const viaWebApp = (url: string): string => url.replace(/^https:/, "webapp:");
+
+  const handOff = (url: string): void => {
+    for (const via of [viaWebApp, viaSafari]) {
+      try {
+        window.location.href = via(url);
+        return;
+      } catch {
+        continue;
+      }
+    }
+  };
 
   /** Only `https`, and only what parses: this page follows what it is handed. */
   const carried = (
@@ -78,7 +92,7 @@
       if (target === undefined) {
         return;
       }
-      window.location.href = viaSafari(target);
+      handOff(target);
       // Long enough that a handover which worked has already taken the page away.
       waited = setTimeout(() => (stillHere = true), 1_200);
     };
