@@ -1,0 +1,260 @@
+/**
+ * What each card in the identity panel says, and how loudly.
+ *
+ * Three rules, carried over from the team's prototype:
+ * 1. One situation is told once, by the card that can resolve it.
+ * 2. During an ongoing situation or a real risk, only the cards that resolve it stay
+ *    loud; every other to-do drops to a tip.
+ * 3. Only one card asks for action; further to-dos wait quietly behind it.
+ */
+
+export type RecoveryState =
+  | "none"
+  | "unverified"
+  | "usedPhrase"
+  | "emailPending"
+  | "phraseReset"
+  | "noEmail"
+  | "calm";
+export type AccessState = "one" | "newPasskey" | "unused" | "calm";
+export type DevicesState = "newBrowser" | "many" | "calm";
+export type IntegrationsState = "local" | "cliConfirm" | "off" | "calm";
+
+export interface Scenario {
+  recovery: RecoveryState;
+  access: AccessState;
+  devices: DevicesState;
+  integrations: IntegrationsState;
+}
+
+/** From most to least urgent. `queued` is an action waiting behind the one that leads. */
+export type Tone =
+  "risk" | "action" | "queued" | "now" | "recent" | "pending" | "tip" | "calm";
+
+export type CardKind =
+  "access" | "devices" | "recovery" | "apps" | "integrations";
+
+export interface CardStatus {
+  kind: CardKind;
+  tone: Tone;
+  sentence: string;
+}
+
+export interface StatusInput {
+  scenario: Scenario;
+  /** Browsers signed out from the Devices section since the page opened. */
+  signedOut: ReadonlySet<string>;
+  /** Browsers left in the list, after those signed out. */
+  browserCount: number;
+  apps: { total: number; notifying: number };
+  /** The access method the identity is signed in with right now. */
+  signedInWith: string;
+}
+
+/** The order the cards are shown in. */
+export const CARD_ORDER: CardKind[] = [
+  "access",
+  "devices",
+  "recovery",
+  "apps",
+  "integrations",
+];
+
+/** Which card leads when several ask for action. */
+const PRIORITY: CardKind[] = [
+  "recovery",
+  "access",
+  "devices",
+  "integrations",
+  "apps",
+];
+
+type Said = Pick<CardStatus, "tone" | "sentence">;
+
+const RECOVERY: Record<RecoveryState, Said> = {
+  none: { tone: "action", sentence: "No recovery set up yet" },
+  unverified: { tone: "action", sentence: "Recovery phrase not verified yet" },
+  usedPhrase: { tone: "now", sentence: "You're signed in with your phrase" },
+  emailPending: { tone: "pending", sentence: "Waiting for your email" },
+  phraseReset: { tone: "recent", sentence: "Your recovery phrase was reset" },
+  noEmail: { tone: "tip", sentence: "Phrase set up, no email yet" },
+  calm: { tone: "calm", sentence: "Phrase and email set up" },
+};
+
+const accessSaid = ({ scenario, signedInWith }: StatusInput): Said =>
+  ({
+    one: { tone: "action", sentence: "Only one way to sign in" },
+    newPasskey: { tone: "recent", sentence: "New passkey from another device" },
+    unused: { tone: "tip", sentence: "YubiKey unused for 8 months" },
+    calm: { tone: "calm", sentence: `Signed in with ${signedInWith}` },
+  })[scenario.access] as Said;
+
+const INTEGRATIONS: Record<IntegrationsState, Said> = {
+  local: { tone: "risk", sentence: "Any local program can connect" },
+  cliConfirm: { tone: "pending", sentence: "ICP CLI is waiting for approval" },
+  off: { tone: "tip", sentence: "AI and CLI aren't connected" },
+  calm: { tone: "calm", sentence: "AI and CLI access on" },
+};
+
+const devicesSaid = ({
+  scenario,
+  signedOut,
+  browserCount,
+}: StatusInput): Said => {
+  switch (scenario.devices) {
+    case "newBrowser":
+      return signedOut.has("firefox")
+        ? { tone: "recent", sentence: "Firefox was signed out" }
+        : { tone: "recent", sentence: "New sign-in from Firefox" };
+    case "many":
+      return browserCount > 4
+        ? {
+            tone: "tip",
+            sentence: `Signed in on ${browserCount} browsers`,
+          }
+        : { tone: "calm", sentence: `Signed in on ${browserCount} browsers` };
+    case "calm":
+      return {
+        tone: "calm",
+        sentence: `Signed in on ${browserCount} browsers`,
+      };
+  }
+};
+
+const appsSaid = ({ apps }: StatusInput): Said =>
+  apps.total === 0
+    ? { tone: "calm", sentence: "No apps yet" }
+    : apps.notifying === 0
+      ? { tone: "calm", sentence: "Change permissions or remove apps" }
+      : {
+          tone: "calm",
+          sentence: `${apps.notifying} of ${apps.total} apps can notify you`,
+        };
+
+export const deriveStatus = (input: StatusInput): CardStatus[] => {
+  const { scenario, signedOut } = input;
+  const said: Record<CardKind, Said> = {
+    recovery: RECOVERY[scenario.recovery],
+    access: accessSaid(input),
+    devices: devicesSaid(input),
+    integrations: INTEGRATIONS[scenario.integrations],
+    apps: appsSaid(input),
+  };
+
+  // 1. One situation, told once, by the card that can resolve it.
+  const newBrowserLive =
+    scenario.devices === "newBrowser" && !signedOut.has("firefox");
+  if (scenario.recovery === "usedPhrase") {
+    said.access = {
+      tone: "action",
+      sentence: "Add a passkey to sign in next time",
+    };
+  }
+  if (scenario.recovery === "none" && scenario.access === "one") {
+    said.access = { tone: "action", sentence: "Only one way in, no recovery" };
+  }
+  if (scenario.access === "newPasskey" && newBrowserLive) {
+    said.access = { tone: "recent", sentence: "New passkey from Firefox" };
+  }
+  if (scenario.recovery === "phraseReset" && newBrowserLive) {
+    said.recovery = {
+      tone: "risk",
+      sentence: "Phrase reset from a new browser",
+    };
+    if (scenario.access === "newPasskey") {
+      said.devices = {
+        tone: "risk",
+        sentence: "Firefox changed how you sign in",
+      };
+    }
+  }
+
+  // 2. During an ongoing situation or a risk, only the cards resolving it stay loud.
+  const risks = CARD_ORDER.filter((kind) => said[kind].tone === "risk");
+  const focus: CardKind[] | undefined =
+    scenario.recovery === "usedPhrase"
+      ? ["access", "recovery", ...risks]
+      : risks.length > 0
+        ? risks
+        : undefined;
+  if (focus !== undefined) {
+    for (const kind of CARD_ORDER) {
+      const { tone } = said[kind];
+      if (!focus.includes(kind) && (tone === "action" || tone === "pending")) {
+        said[kind] = { ...said[kind], tone: "tip" };
+      }
+    }
+  }
+
+  // 3. Only one card asks for action; the others wait behind it.
+  const lead = PRIORITY.find((kind) => said[kind].tone === "action");
+  for (const kind of PRIORITY) {
+    if (kind !== lead && said[kind].tone === "action") {
+      said[kind] = { ...said[kind], tone: "queued" };
+    }
+  }
+
+  return CARD_ORDER.map((kind) => ({ kind, ...said[kind] }));
+};
+
+/** Whether anything on the panel waits on the user, for the dot on the mobile button. */
+/** A card that is loud: it holds a risk or the one action the user should take. */
+export const isLoud = ({ tone }: CardStatus): boolean =>
+  tone === "risk" || tone === "action";
+
+/** The card the collapsed panel speaks for: a risk first, then the action. */
+export const leadOf = (cards: CardStatus[]): CardStatus | undefined => {
+  const byPriority = PRIORITY.map((kind) =>
+    cards.find((card) => card.kind === kind),
+  ).filter((card) => card !== undefined);
+  return (
+    byPriority.find(({ tone }) => tone === "risk") ??
+    byPriority.find(({ tone }) => tone === "action")
+  );
+};
+
+/** What the loud card offers. With `resolve`, the step finishes right there, as
+ *  the concept fakes it; without, the button opens the card's section. */
+export interface LeadAction {
+  label: string;
+  resolve?: { patch: Partial<Scenario>; message: string };
+}
+
+export const leadActionOf = (
+  { kind, tone }: CardStatus,
+  scenario: Scenario,
+): LeadAction => {
+  if (tone === "risk") {
+    return { label: "Review" };
+  }
+  if (kind === "recovery" && scenario.recovery === "unverified") {
+    return {
+      label: "Verify phrase",
+      resolve: {
+        patch: { recovery: "calm" },
+        message: "Recovery phrase verified",
+      },
+    };
+  }
+  if (kind === "recovery" && scenario.recovery === "none") {
+    return {
+      label: "Set up recovery",
+      resolve: {
+        patch: { recovery: "calm" },
+        message: "Recovery phrase set up",
+      },
+    };
+  }
+  if (kind === "access") {
+    return {
+      label:
+        scenario.recovery === "usedPhrase" ? "Add a passkey" : "Add a way in",
+    };
+  }
+  return { label: "Review" };
+};
+
+export const needsAttention = (cards: CardStatus[]): boolean =>
+  cards.some(({ tone }) =>
+    (["risk", "action", "queued", "pending"] as Tone[]).includes(tone),
+  );

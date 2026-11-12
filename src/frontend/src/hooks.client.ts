@@ -51,6 +51,15 @@ const overrideFeatureFlags = () => {
 };
 
 export const init: ClientInit = async () => {
+  // The UI concept (`npm run dev:concept`) runs on mock data with no replica:
+  // there is no canister config to read, so only the locale is set up.
+  if (
+    import.meta.env.II_CONCEPT === "1" &&
+    window.location.pathname.startsWith("/concept")
+  ) {
+    await localeStore.init();
+    return;
+  }
   await initGlobals();
   // Redirect related origins to the primary origin here, before any component
   // mounts, so it happens before the authorize layout establishes the ICRC-29

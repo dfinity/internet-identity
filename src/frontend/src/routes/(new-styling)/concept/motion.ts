@@ -1,0 +1,205 @@
+/**
+ * The concept's few transitions, so every part moves the same way.
+ *
+ * Values follow Taste Machine's motion cards, with Emil Kowalski's position where
+ * sources disagree: ease-out for anything that appears, exits quicker and quieter
+ * than entrances, no bounce on a click, and under reduced motion only opacity.
+ */
+import { cubicIn, quintOut } from "svelte/easing";
+import type { TransitionConfig } from "svelte/transition";
+
+interface SwapParams {
+  reduced?: boolean;
+  delay?: number;
+}
+
+/** A glyph arriving in a shared cell: scale 0.25 → 1, blur 4px → 0, 300ms. */
+export const swapIn = (
+  _node: Element,
+  { reduced = false, delay = 0 }: SwapParams = {},
+): TransitionConfig => ({
+  delay,
+  duration: reduced ? 150 : 300,
+  easing: quintOut,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: scale(${0.25 + 0.75 * t}); filter: blur(${(1 - t) * 4}px)`,
+});
+
+/** The glyph it replaces leaves faster, so an arrival outlasts a departure. */
+export const swapOut = (
+  _node: Element,
+  { reduced = false }: SwapParams = {},
+): TransitionConfig => ({
+  duration: reduced ? 100 : 150,
+  easing: cubicIn,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: scale(${0.25 + 0.75 * t}); filter: blur(${(1 - t) * 4}px)`,
+});
+
+interface ShiftParams {
+  /** +1 going deeper, −1 going back; already mirrored for RTL by the caller. */
+  direction: number;
+  reduced?: boolean;
+}
+
+/** A panel view arriving: a short shift from the side it comes from, 200ms. */
+export const viewIn = (
+  _node: Element,
+  { direction, reduced = false }: ShiftParams,
+): TransitionConfig => ({
+  duration: reduced ? 150 : 200,
+  easing: quintOut,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: translateX(${(1 - t) * 16 * direction}px)`,
+});
+
+/** The view it replaces just fades, quicker than the entrance. */
+export const viewOut = (
+  _node: Element,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => ({
+  duration: reduced ? 100 : 120,
+  easing: cubicIn,
+  css: (t) => `opacity: ${t}`,
+});
+
+/** Island content arriving through a blur, after the shell starts to move. */
+export const islandIn = (
+  _node: Element,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => ({
+  delay: reduced ? 0 : 60,
+  duration: reduced ? 150 : 260,
+  easing: quintOut,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: scale(${0.96 + 0.04 * t}); filter: blur(${(1 - t) * 4}px)`,
+});
+
+/** Island content leaving: a plain quick fade, no blur. */
+export const islandOut = (
+  _node: Element,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => ({
+  duration: reduced ? 80 : 100,
+  easing: cubicIn,
+  css: (t) => `opacity: ${t}`,
+});
+
+/** The island rising into place when it appears. */
+export const shellIn = (
+  _node: Element,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => ({
+  duration: reduced ? 150 : 280,
+  easing: quintOut,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: translateY(${(1 - t) * 16}px)`,
+});
+
+/** And sinking away, shorter: a 12px drop over 150ms. */
+export const shellOut = (
+  _node: Element,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => ({
+  duration: reduced ? 100 : 150,
+  easing: cubicIn,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: translateY(${(1 - t) * 12}px)`,
+});
+
+/** CSS `cubic-bezier()` as an easing, so a Svelte transition can match a CSS one. */
+const cubicBezier = (x1: number, y1: number, x2: number, y2: number) => {
+  const axis = (p1: number, p2: number) => (s: number) =>
+    3 * p1 * s * (1 - s) ** 2 + 3 * p2 * s ** 2 * (1 - s) + s ** 3;
+  const x = axis(x1, x2);
+  const y = axis(y1, y2);
+  return (t: number): number => {
+    // x(s) only grows while x1 and x2 stay in [0, 1], so halving finds it.
+    let low = 0;
+    let high = 1;
+    for (let step = 0; step < 20; step++) {
+      const mid = (low + high) / 2;
+      if (x(mid) < t) {
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    return y((low + high) / 2);
+  };
+};
+
+/** The product Popover's curve (`$lib/components/ui/Popover.svelte`). */
+const popoverEase = cubicBezier(0.4, 0, 0.2, 1);
+
+/** A menu opening the way the product's popovers do: scale 0.95 → 1 with
+ *  opacity over 200ms, grown from the point it was opened at. */
+export const menuIn = (
+  _node: Element,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => ({
+  duration: reduced ? 150 : 200,
+  easing: popoverEase,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: scale(${0.95 + 0.05 * t})`,
+});
+
+/** And closing like them too, quicker: back to 0.95 over 160ms. */
+export const menuOut = (
+  _node: Element,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => ({
+  duration: reduced ? 100 : 160,
+  easing: popoverEase,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: scale(${0.95 + 0.05 * t})`,
+});
+
+interface WidgetParams {
+  reduced?: boolean;
+  /** Widgets arrive one after another, 50ms apart. */
+  index?: number;
+}
+
+/** A widget rising into the dock through a blur, each a beat after the last. */
+export const widgetIn = (
+  _node: Element,
+  { reduced = false, index = 0 }: WidgetParams = {},
+): TransitionConfig => ({
+  delay: reduced ? 0 : 40 + index * 50,
+  duration: reduced ? 150 : 320,
+  easing: quintOut,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: translateY(${(1 - t) * 12}px) scale(${0.96 + 0.04 * t}); filter: blur(${(1 - t) * 4}px)`,
+});
+
+/** A widget whose step is done: it shrinks a little and blurs away, quickly. */
+export const widgetOut = (
+  _node: Element,
+  { reduced = false }: WidgetParams = {},
+): TransitionConfig => ({
+  duration: reduced ? 100 : 180,
+  easing: cubicIn,
+  css: (t) =>
+    reduced
+      ? `opacity: ${t}`
+      : `opacity: ${t}; transform: scale(${0.94 + 0.06 * t}); filter: blur(${(1 - t) * 4}px)`,
+});

@@ -1,0 +1,198 @@
+/*
+ * Surface ladder for the concept, after Fluid Functionalism's Surfaces
+ * (https://www.fluidfunctionalism.com/docs/surfaces, MIT, values from
+ * https://www.fluidfunctionalism.com/r/surfaces.json).
+ *
+ * Eight levels, each a background paired with a shadow. In light mode shadow
+ * alone carries elevation (surfaces flatten to white from level 3); in dark
+ * mode every step up is lighter, so a raised surface never reads as sunken.
+ * Scoped to `.concept` so nothing outside this route picks it up.
+ */
+
+.concept {
+  --ii-surface-1: #fafafa;
+  --ii-surface-2: #fcfcfc;
+  --ii-surface-3: #ffffff;
+  --ii-surface-4: #ffffff;
+  --ii-surface-5: #ffffff;
+  --ii-surface-6: #ffffff;
+  --ii-surface-7: #ffffff;
+  --ii-surface-8: #ffffff;
+
+  --ii-shadow-color: rgb(0 0 0 / 0.06);
+  --ii-shadow-1: 0 0 0 1px var(--ii-shadow-color);
+  --ii-shadow-2:
+    0 0 0 1px var(--ii-shadow-color), 0 1px 1px -0.5px var(--ii-shadow-color);
+  --ii-shadow-3:
+    0 0 0 1px var(--ii-shadow-color), 0 1px 1px -0.5px var(--ii-shadow-color),
+    0 3px 3px -1.5px var(--ii-shadow-color);
+  --ii-shadow-4:
+    0 0 0 1px var(--ii-shadow-color), 0 1px 1px -0.5px var(--ii-shadow-color),
+    0 3px 3px -1.5px var(--ii-shadow-color),
+    0 6px 6px -3px var(--ii-shadow-color);
+  --ii-shadow-5:
+    0 0 0 1px var(--ii-shadow-color), 0 1px 1px -0.5px var(--ii-shadow-color),
+    0 3px 3px -1.5px var(--ii-shadow-color),
+    0 6px 6px -3px var(--ii-shadow-color),
+    0 12px 12px -6px var(--ii-shadow-color);
+  --ii-shadow-6:
+    0 0 0 1px var(--ii-shadow-color), 0 1px 1px -0.5px var(--ii-shadow-color),
+    0 3px 3px -1.5px var(--ii-shadow-color),
+    0 6px 6px -3px var(--ii-shadow-color),
+    0 12px 12px -6px var(--ii-shadow-color),
+    0 24px 24px -12px var(--ii-shadow-color);
+  --ii-shadow-7:
+    0 0 0 1px var(--ii-shadow-color), 0 1px 1px -0.5px var(--ii-shadow-color),
+    0 3px 3px -1.5px var(--ii-shadow-color),
+    0 6px 6px -3px var(--ii-shadow-color),
+    0 12px 12px -6px var(--ii-shadow-color),
+    0 24px 24px -12px var(--ii-shadow-color),
+    0 48px 48px -24px var(--ii-shadow-color);
+  --ii-shadow-8:
+    0 0 0 1px var(--ii-shadow-color), 0 1px 1px -0.5px var(--ii-shadow-color),
+    0 3px 3px -1.5px var(--ii-shadow-color),
+    0 6px 6px -3px var(--ii-shadow-color),
+    0 12px 12px -6px var(--ii-shadow-color),
+    0 24px 24px -12px var(--ii-shadow-color),
+    0 48px 48px -24px var(--ii-shadow-color),
+    0 96px 96px -48px var(--ii-shadow-color);
+
+  /* Hover and selected are overlays, not colors, so they work on any level. */
+  --ii-hover: rgb(0 0 0 / 0.04);
+  --ii-selected: rgb(0 0 0 / 0.07);
+
+  /* Emil Kowalski's strong ease-out, for things that enter or settle. */
+  --ii-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .concept {
+    --ii-surface-1: #171717;
+    --ii-surface-2: #1e1e1e;
+    --ii-surface-3: #252525;
+    --ii-surface-4: #2c2c2c;
+    --ii-surface-5: #333333;
+    --ii-surface-6: #3a3a3a;
+    --ii-surface-7: #414141;
+    --ii-surface-8: #484848;
+
+    --ii-hi-base: rgb(255 255 255 / 0.01);
+    --ii-hi-mid: rgb(255 255 255 / 0.02);
+    --ii-hi-high: rgb(255 255 255 / 0.04);
+    --ii-hi-peak: rgb(255 255 255 / 0.06);
+    --ii-ring-base: rgb(255 255 255 / 0.02);
+    --ii-ring-mid: rgb(255 255 255 / 0.04);
+    --ii-ring-high: rgb(255 255 255 / 0.06);
+    --ii-drop: rgb(0 0 0 / 0.18);
+
+    --ii-shadow-1: inset 0 0 0 1px var(--ii-ring-base);
+    --ii-shadow-2:
+      inset 0 1px 0 0 var(--ii-hi-base), inset 0 0 0 1px var(--ii-ring-base),
+      0 1px 1px -0.5px var(--ii-drop);
+    --ii-shadow-3:
+      inset 0 1px 0 0 var(--ii-hi-mid), inset 0 0 0 1px var(--ii-ring-base),
+      0 0 0 1px rgb(0 0 0 / 0.12), 0 1px 1px -0.5px var(--ii-drop),
+      0 3px 3px -1.5px var(--ii-drop);
+    --ii-shadow-4:
+      inset 0 1px 0 0 var(--ii-hi-mid), inset 0 0 0 1px var(--ii-ring-mid),
+      0 0 0 1px rgb(0 0 0 / 0.14), 0 1px 1px -0.5px var(--ii-drop),
+      0 3px 3px -1.5px var(--ii-drop), 0 6px 6px -3px var(--ii-drop);
+    --ii-shadow-5:
+      inset 0 1px 0 0 var(--ii-hi-high), inset 0 0 0 1px var(--ii-ring-mid),
+      0 0 0 1px rgb(0 0 0 / 0.16), 0 1px 1px -0.5px var(--ii-drop),
+      0 3px 3px -1.5px var(--ii-drop), 0 6px 6px -3px var(--ii-drop),
+      0 12px 12px -6px var(--ii-drop);
+    --ii-shadow-6:
+      inset 0 1px 0 0 var(--ii-hi-high), inset 0 0 0 1px var(--ii-ring-high),
+      0 0 0 1px rgb(0 0 0 / 0.18), 0 1px 1px -0.5px var(--ii-drop),
+      0 3px 3px -1.5px var(--ii-drop), 0 6px 6px -3px var(--ii-drop),
+      0 12px 12px -6px var(--ii-drop), 0 24px 24px -12px var(--ii-drop);
+    --ii-shadow-7:
+      inset 0 1px 0 0 var(--ii-hi-peak), inset 0 0 0 1px var(--ii-ring-high),
+      0 0 0 1px rgb(0 0 0 / 0.2), 0 1px 1px -0.5px var(--ii-drop),
+      0 3px 3px -1.5px var(--ii-drop), 0 6px 6px -3px var(--ii-drop),
+      0 12px 12px -6px var(--ii-drop), 0 24px 24px -12px var(--ii-drop),
+      0 48px 48px -24px var(--ii-drop);
+    --ii-shadow-8:
+      inset 0 1px 0 0 var(--ii-hi-peak), inset 0 0 0 1px var(--ii-ring-high),
+      0 0 0 1px rgb(0 0 0 / 0.22), 0 1px 1px -0.5px var(--ii-drop),
+      0 3px 3px -1.5px var(--ii-drop), 0 6px 6px -3px var(--ii-drop),
+      0 12px 12px -6px var(--ii-drop), 0 24px 24px -12px var(--ii-drop),
+      0 48px 48px -24px var(--ii-drop), 0 96px 96px -48px var(--ii-drop);
+
+    --ii-hover: rgb(255 255 255 / 0.06);
+    --ii-selected: rgb(255 255 255 / 0.1);
+  }
+}
+
+/* In `components` so a Tailwind utility on the same element still wins. */
+@layer components {
+  .ii-surface-1 {
+    background-color: var(--ii-surface-1);
+  }
+  .ii-surface-2 {
+    background-color: var(--ii-surface-2);
+  }
+  .ii-surface-3 {
+    background-color: var(--ii-surface-3);
+  }
+  .ii-surface-4 {
+    background-color: var(--ii-surface-4);
+  }
+  .ii-surface-5 {
+    background-color: var(--ii-surface-5);
+  }
+  .ii-surface-6 {
+    background-color: var(--ii-surface-6);
+  }
+  .ii-surface-7 {
+    background-color: var(--ii-surface-7);
+  }
+  .ii-surface-8 {
+    background-color: var(--ii-surface-8);
+  }
+
+  /* A transparent border under the ring keeps the edge in forced-colors mode. */
+  [class*="ii-elevation-"] {
+    border: 1px solid transparent;
+  }
+  .ii-elevation-1 {
+    box-shadow: var(--ii-shadow-1);
+  }
+  .ii-elevation-2 {
+    box-shadow: var(--ii-shadow-2);
+  }
+  .ii-elevation-3 {
+    box-shadow: var(--ii-shadow-3);
+  }
+  .ii-elevation-4 {
+    box-shadow: var(--ii-shadow-4);
+  }
+  .ii-elevation-5 {
+    box-shadow: var(--ii-shadow-5);
+  }
+  .ii-elevation-6 {
+    box-shadow: var(--ii-shadow-6);
+  }
+  .ii-elevation-7 {
+    box-shadow: var(--ii-shadow-7);
+  }
+  .ii-elevation-8 {
+    box-shadow: var(--ii-shadow-8);
+  }
+
+  /* Hover only where a pointer can hover, so a tap leaves nothing lit. */
+  @media (hover: hover) {
+    .ii-hover:hover {
+      background-image: linear-gradient(var(--ii-hover), var(--ii-hover));
+    }
+  }
+  .ii-hover:focus-visible,
+  .ii-hover:active {
+    background-image: linear-gradient(var(--ii-hover), var(--ii-hover));
+  }
+  .ii-selected,
+  .ii-selected:hover {
+    background-image: linear-gradient(var(--ii-selected), var(--ii-selected));
+  }
+}
