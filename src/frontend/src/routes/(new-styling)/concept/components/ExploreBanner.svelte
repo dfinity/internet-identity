@@ -2,7 +2,9 @@
   /**
    * An editorial banner, after the App Store's: a line on what it's for, a
    * headline, the app's own icon large as the art, and the app's lockup with
-   * Open. The whole card opens the app.
+   * Open. One flat color and nothing behind the icon, so a banner stays as
+   * quiet as the shelves around it while the pages are swiped. The whole
+   * card opens the app.
    */
   import AppLogo from "../../manage/(authenticated)/applications/components/AppLogo.svelte";
   import type { ExploreBannerItem } from "../mockData";
@@ -18,7 +20,7 @@
   href={item.app.url}
   target="_blank"
   rel="noopener noreferrer"
-  style:background={item.art}
+  style:background-color={item.color}
   class={[
     "group focus-visible:outline-focus-ring relative isolate grid min-h-[30rem] gap-6 overflow-hidden rounded-[1.75rem] p-6 focus-visible:outline-2 focus-visible:outline-offset-2",
     "grid-rows-[auto_1fr_auto] [grid-template-areas:'text'_'art'_'lockup']",
@@ -37,20 +39,18 @@
     </h3>
   </div>
 
-  <!-- The art: the app's icon, large, over a soft glow of itself. -->
+  <!-- The art: the app's icon, large. -->
   <div
     aria-hidden="true"
-    class="relative grid place-items-center [grid-area:art] @2xl:pe-6"
+    class="grid place-items-center [grid-area:art] @2xl:pe-6"
   >
     <img
       src={item.app.logo}
       alt=""
-      class="absolute size-40 scale-125 rounded-[22%] opacity-50 blur-3xl @2xl:size-56"
-    />
-    <img
-      src={item.app.logo}
-      alt=""
-      class="relative size-40 rounded-[22%] shadow-[0_24px_48px_-12px_rgb(0_0_0/0.45)] ring-1 ring-white/10 transition-transform duration-500 ease-(--ii-ease-out) group-hover:scale-[1.03] motion-reduce:transition-none @2xl:size-56"
+      class={[
+        "size-40 rounded-[22%] ring-1 transition-transform duration-500 ease-(--ii-ease-out) group-hover:scale-[1.03] motion-reduce:transition-none @2xl:size-56",
+        item.dark ? "ring-white/10" : "ring-black/5",
+      ]}
     />
   </div>
 

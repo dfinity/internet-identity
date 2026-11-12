@@ -146,9 +146,8 @@
     copiedTimer = setTimeout(() => (copied = undefined), 1600);
   };
 
-  /** Caffeine's tile, in the colors of its Explore banner. */
-  const CAFFEINE_ART =
-    "radial-gradient(120% 120% at 85% 15%, #7a3b18 0%, #2a130a 48%, #0c0b0b 100%)";
+  /** Caffeine's tile, in the flat color of its Explore banner. */
+  const CAFFEINE_COLOR = "#0c0b0b";
 
   const TILE = "rounded-[1.75rem] p-6 @2xl:p-7";
   const FOCUS =
@@ -281,7 +280,7 @@
       href={caffeine.url}
       target="_blank"
       rel="noopener noreferrer"
-      style:background={CAFFEINE_ART}
+      style:background-color={CAFFEINE_COLOR}
       class={[
         "group relative isolate flex min-h-[28rem] flex-col overflow-hidden text-white @2xl:col-span-2 @4xl:col-span-4 @4xl:row-span-2",
         TILE,
