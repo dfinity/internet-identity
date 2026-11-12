@@ -1,11 +1,11 @@
 /**
- * Colours and initials for an identity's avatar, so that the identities on a
- * device tell apart at a glance.
+ * Colours and the initial for an identity's avatar, so that the identities on
+ * a device tell apart at a glance.
  *
  * The pairs come from mymind's curated palettes
  * (https://access.mymind.com/colors): `background` is a palette's primary
  * colour and `foreground` the colour mymind sets on it, its accent — or, where
- * the accent is too faint for two letters, the palette's darkest companion.
+ * the accent is too faint for a letter, the palette's darkest companion.
  * Every pair keeps a contrast of at least 3.5:1. Most are light grounds with
  * dark letters, the rest saturated grounds with light ones, spread around the
  * hue wheel. Near-black grounds are left out: at 32px they all read as the
@@ -69,23 +69,14 @@ const hash = (text: string): number => {
 export const identityPalette = (identityNumber: bigint): IdentityPalette =>
   IDENTITY_PALETTES[hash(identityNumber.toString()) % IDENTITY_PALETTES.length];
 
-const leadingLetter = /^\p{L}\p{M}*/u;
+const firstLetter = /\p{L}\p{M}*/u;
 
 /**
- * Initials the way DiceBear's initials style takes them: the first letters of
- * the first and last words, or the first two letters of a single word, so
- * "Thomas" and "Testing" stay "TH" and "TE" rather than both "T".
- * `undefined` when the name has no letters to take.
+ * The first letter of the name, with the marks it carries, in upper case; an
+ * email address gives the letter it starts with. One letter can stand in the
+ * middle of the avatar, where two had to move aside for the badge in its
+ * corner; the colours tell apart the identities whose names share a letter.
+ * `undefined` when the name has no letter to take.
  */
-export const identityInitials = (name?: string): string | undefined => {
-  const words = name?.replace(/@.*/u, "").match(/\p{L}[\p{L}\p{M}]*/gu);
-  if (words === null || words === undefined) {
-    return undefined;
-  }
-  const initials =
-    words.length === 1
-      ? (words[0].match(/^(?:\p{L}\p{M}*){1,2}/u)?.[0] ?? "")
-      : (words[0].match(leadingLetter)?.[0] ?? "") +
-        (words[words.length - 1].match(leadingLetter)?.[0] ?? "");
-  return initials.toLocaleUpperCase();
-};
+export const identityInitial = (name?: string): string | undefined =>
+  name?.replace(/@.*/u, "").match(firstLetter)?.[0].toLocaleUpperCase();

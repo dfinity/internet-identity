@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   IDENTITY_PALETTES,
-  identityInitials,
+  identityInitial,
   identityPalette,
 } from "./identityColors";
 
@@ -20,22 +20,25 @@ describe("identityPalette", () => {
   });
 });
 
-describe("identityInitials", () => {
+describe("identityInitial", () => {
   it.each([
-    ["Thomas", "TH"],
-    ["Testing", "TE"],
-    ["work", "WO"],
-    ["Ada Lovelace", "AL"],
-    ["Mary Ann Evans", "ME"],
-    ["  émile zola ", "ÉZ"],
-    ["ana@dfinity.org", "AN"],
+    ["Thomas", "T"],
+    ["work", "W"],
+    ["Ada Lovelace", "A"],
+    ["  émile zola ", "É"],
+    ["e\u0301mile", "E\u0301"],
+    ["ana@dfinity.org", "A"],
     ["X", "X"],
-    ["Тест 2", "ТЕ"],
-  ])("takes %j as %j", (name, initials) => {
-    expect(identityInitials(name)).toBe(initials);
+    ["Тест 2", "Т"],
+    ["2nd account", "N"],
+  ])("takes %j as %j", (name, initial) => {
+    expect(identityInitial(name)).toBe(initial);
   });
 
-  it.each([undefined, "", "123", "🙂"])("has none for %j", (name) => {
-    expect(identityInitials(name)).toBeUndefined();
-  });
+  it.each([undefined, "", "123", "🙂", "@dfinity.org"])(
+    "has none for %j",
+    (name) => {
+      expect(identityInitial(name)).toBeUndefined();
+    },
+  );
 });
