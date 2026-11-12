@@ -4,12 +4,13 @@
    * a bento grid. Room follows reach: Caffeine, which needs nothing but
    * words, gets the most; what every app here gets sits beside it; the ways
    * that take code come next; Open Cloud shows how far it goes; docs close
-   * the page. Tiles lie flat on shelves, as a shadow on the canvas means
-   * something waits for you. Every link leaves for the real site.
+   * the page. Caffeine and Open Cloud are their own banners, in their own
+   * look, as on Explore; the rest lie flat on shelves, as a shadow on the
+   * canvas means something waits for you. Every link leaves for the real
+   * site.
    */
   import type { Component, Snippet } from "svelte";
   import {
-    ArrowUpIcon,
     ArrowUpRightIcon,
     CheckIcon,
     CodeXmlIcon,
@@ -22,10 +23,10 @@
   } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
-  import Badge from "$lib/components/ui/Badge.svelte";
   import { toaster } from "$lib/components/utils/toaster";
-  import AppLogo from "../../manage/(authenticated)/applications/components/AppLogo.svelte";
   import { createApps } from "../mockData";
+  import CaffeineBanner from "./CaffeineBanner.svelte";
+  import OpenCloudBanner from "./OpenCloudBanner.svelte";
 
   const { caffeine, openCloud, juno } = createApps;
 
@@ -74,18 +75,6 @@
     { value: "mcp", label: "MCP" },
   ];
   let agentWay = $state<AgentWay>("skills");
-
-  /** An engine across seven providers with one of them down, as Open Cloud
-   *  shows its own. Illustrative. */
-  const NODES: { code: string; down?: boolean }[] = [
-    { code: "CH" },
-    { code: "DE" },
-    { code: "US" },
-    { code: "BR", down: true },
-    { code: "JP" },
-    { code: "SG" },
-    { code: "AU" },
-  ];
 
   const DOCS: { title: string; detail: string; url: string }[] = [
     {
@@ -145,10 +134,6 @@
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => (copied = undefined), 1600);
   };
-
-  /** Caffeine's tile, in the colors of its Explore banner. */
-  const CAFFEINE_ART =
-    "radial-gradient(120% 120% at 85% 15%, #7a3b18 0%, #2a130a 48%, #0c0b0b 100%)";
 
   const TILE = "rounded-[1.75rem] p-6 @2xl:p-7";
   const FOCUS =
@@ -264,89 +249,23 @@
 {/snippet}
 
 <div class="mx-auto flex w-full max-w-5xl flex-col gap-8 px-2">
-  <header class="flex flex-col gap-3">
+  <header class="flex flex-col gap-1">
     <h2
-      class="text-text-primary max-w-[22ch] text-[1.75rem] leading-[1.1] font-semibold tracking-tight text-balance @2xl:text-[2.5rem]"
+      class="text-text-primary text-2xl leading-8 font-semibold tracking-tight"
     >
-      Build an app no one can tamper with
+      Build on the Internet Computer
     </h2>
-    <p
-      class="text-text-tertiary max-w-[56ch] text-[15px] leading-6 text-pretty"
-    >
-      Every way below ends in the same place: an app on the Internet Computer,
-      spread across independent machines around the world instead of one
-      company's servers.
+    <p class="text-text-tertiary text-[15px] leading-6 text-pretty">
+      Tamperproof apps, on a network no one can switch off.
     </p>
   </header>
 
   <div class="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @4xl:grid-cols-6">
     <!-- Caffeine: the way that needs nothing but words, so the most room. -->
-    <a
-      href={caffeine.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      style:background={CAFFEINE_ART}
-      class={[
-        "group relative isolate flex min-h-[28rem] flex-col overflow-hidden text-white @2xl:col-span-2 @4xl:col-span-4 @4xl:row-span-2",
-        TILE,
-        FOCUS,
-        "@2xl:p-9",
-      ]}
-    >
-      <p class="text-xs font-semibold tracking-[0.08em] uppercase opacity-70">
-        No code
-      </p>
-      <h3
-        class="mt-2 max-w-[16ch] text-[1.75rem] leading-[1.1] font-semibold tracking-tight text-balance @2xl:text-[2.5rem]"
-      >
-        Say what you want. Get a live app.
-      </h3>
-      <p class="mt-3 max-w-[44ch] text-sm text-pretty opacity-75">
-        Chat with Caffeine and it writes the app, puts it on the Internet
-        Computer and keeps changing it as you ask.
-      </p>
-
-      <!-- The art: a prompt as Caffeine takes one. -->
-      <div
-        aria-hidden="true"
-        class="mt-8 w-full max-w-md rounded-[1.25rem] bg-white/[0.07] p-4 ring-1 ring-white/10 transition-transform duration-500 ease-(--ii-ease-out) group-hover:-translate-y-1 motion-reduce:transition-none"
-      >
-        <p class="text-[15px] leading-6 text-white/90">
-          A booking page for my yoga studio, with a class schedule and a
-          waitlist<span class="caret"></span>
-        </p>
-        <div class="mt-4 flex items-end justify-between gap-3">
-          <span class="flex flex-wrap gap-1.5">
-            {#each ["Motoko backend", "React frontend", "On ICP"] as chip (chip)}
-              <span
-                class="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70"
-              >
-                {chip}
-              </span>
-            {/each}
-          </span>
-          <span
-            class="grid size-8 shrink-0 place-items-center rounded-full bg-white text-neutral-950"
-          >
-            <ArrowUpIcon class="size-4" />
-          </span>
-        </div>
-      </div>
-
-      <div class="mt-auto flex items-center gap-3 pt-8">
-        <AppLogo logo={caffeine.logo} size="lg" />
-        <span class="flex min-w-0 flex-col">
-          <span class="text-sm font-semibold">{caffeine.name}</span>
-          <span class="text-xs opacity-70">caffeine.ai</span>
-        </span>
-        <span
-          aria-hidden="true"
-          class="ms-auto shrink-0 rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-neutral-950"
-        >
-          Start building
-        </span>
-      </div>
-    </a>
+    <CaffeineBanner
+      app={caffeine}
+      class="@2xl:col-span-2 @4xl:col-span-4 @4xl:row-span-2"
+    />
 
     <!-- What every app gets: the part to stress, whichever way it's built. -->
     <section
@@ -551,94 +470,7 @@
     )}
 
     <!-- Open Cloud: how far it goes, a whole cloud of your own. -->
-    <a
-      href="https://opencloud.org/#early-access"
-      target="_blank"
-      rel="noopener noreferrer"
-      class={[
-        "ii-shelf ii-hover group grid items-center gap-6 @2xl:col-span-2 @3xl:grid-cols-2 @4xl:col-span-6",
-        TILE,
-        FOCUS,
-      ]}
-    >
-      <div class="flex flex-col gap-4">
-        <div class="flex items-center gap-3">
-          <AppLogo logo={openCloud.logo} size="card" />
-          <span class="text-text-primary text-sm font-semibold">
-            {openCloud.name}
-          </span>
-          <Badge size="sm">Early access</Badge>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <p
-            class="text-text-tertiary text-xs font-semibold tracking-[0.08em] uppercase"
-          >
-            How far it goes
-          </p>
-          <h3 class={["@2xl:text-2xl", TILE_TITLE]}>
-            A cloud of your own that keeps running
-          </h3>
-          <p class={["max-w-[48ch]", TILE_BODY]}>
-            Pick the machines, who runs them and in which countries. Your apps
-            and data are on every one, so the engine carries on when some go
-            down.
-          </p>
-        </div>
-        <span
-          aria-hidden="true"
-          class="bg-fg-primary text-bg-primary w-fit rounded-full px-4 py-1.5 text-sm font-semibold"
-        >
-          Apply for early access
-        </span>
-      </div>
-
-      <!-- The art: an engine across seven providers, one of them down. -->
-      <div
-        aria-hidden="true"
-        class="rounded-2xl bg-(--ii-surface-3) p-4 shadow-(--ii-shadow-1)"
-      >
-        <div class="flex items-center justify-between gap-3">
-          <span class="text-text-secondary truncate font-mono text-xs">
-            cloud-engine-global
-          </span>
-          <span
-            class="text-text-success-primary flex shrink-0 items-center gap-1.5 text-xs font-medium"
-          >
-            <span class="bg-fg-success-primary size-1.5 rounded-full"></span>
-            Running
-          </span>
-        </div>
-        <ul class="mt-4 grid grid-cols-7 gap-1.5">
-          {#each NODES as node (node.code)}
-            <li class="flex flex-col items-center gap-2">
-              <span
-                class={[
-                  "flex h-14 w-full items-end justify-center rounded-lg pb-2",
-                  node.down === true
-                    ? "border-border-secondary border border-dashed"
-                    : "bg-(--ii-selected)",
-                ]}
-              >
-                <span
-                  class={[
-                    "size-1.5 rounded-full",
-                    node.down === true
-                      ? "bg-fg-quaternary"
-                      : "bg-fg-success-primary",
-                  ]}
-                ></span>
-              </span>
-              <span class="text-text-tertiary font-mono text-[10px]">
-                {node.code}
-              </span>
-            </li>
-          {/each}
-        </ul>
-        <p class="text-text-tertiary mt-3 text-xs">
-          6 of 7 machines up · every app still answering
-        </p>
-      </div>
-    </a>
+    <OpenCloudBanner app={openCloud} class="@2xl:col-span-2 @4xl:col-span-6" />
 
     <!-- Docs and guides: where to go once one of the ways above has you. -->
     <section
@@ -706,26 +538,3 @@
     {copied !== undefined ? "Copied" : ""}
   </span>
 </div>
-
-<style>
-  /* The caret in Caffeine's prompt, as if it were still being typed. */
-  .caret {
-    display: inline-block;
-    width: 2px;
-    height: 1.1em;
-    margin-inline-start: 2px;
-    vertical-align: -0.2em;
-    background: currentColor;
-    animation: caret-blink 1.1s steps(1) infinite;
-  }
-  @keyframes caret-blink {
-    50% {
-      opacity: 0;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .caret {
-      animation: none;
-    }
-  }
-</style>
