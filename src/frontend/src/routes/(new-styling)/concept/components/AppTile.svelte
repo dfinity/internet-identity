@@ -214,7 +214,7 @@
           duration: prefersReducedMotion.current ? 0 : 220,
           easing: quintOut,
         }}
-        class="bg-fg-tertiary text-fg-primary-inversed absolute -end-[5px] -bottom-[5px] grid size-4.5 place-items-center rounded-full ring-2 ring-(color:--ii-tile-backdrop)"
+        class="absolute -end-[5px] -bottom-[5px] grid size-4.5 place-items-center rounded-full bg-(--ii-muted) text-white ring-2 ring-(color:--ii-tile-backdrop)"
       >
         <BellOffIcon class="size-3" strokeWidth={2.5} />
       </span>
@@ -280,7 +280,9 @@
          reaches past the badge without growing it, to 44px.
          It sits on the logo's rounded corner rather than hanging off it: 5px
          over the 4rem logo's top and end edges (top: the tile's 1rem padding
-         less 5px; end: half the logo, 2rem, plus 5px from the tile's middle). -->
+         less 5px; end: half the logo, 2rem, plus 5px from the tile's middle).
+         A muted app's count goes grey, as Telegram's does: still there to
+         read, no longer calling. -->
     <button
       bind:this={badgeRef}
       type="button"
@@ -288,7 +290,12 @@
       aria-haspopup="dialog"
       aria-expanded={isUnreadOpen}
       aria-label={`${unread.length} unread from ${name}`}
-      class="bg-bg-brand-solid text-text-primary-inversed focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4"
+      class={[
+        "focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) transition-colors duration-200 ease-out outline-none before:absolute before:-inset-[13px] focus-visible:ring-4",
+        muted
+          ? "bg-(--ii-muted) text-white"
+          : "bg-bg-brand-solid text-text-primary-inversed",
+      ]}
     >
       <span class="cue-figure">{badge}</span>
       <span
@@ -300,10 +307,15 @@
     </button>
   {:else if mode === "open"}
     <!-- Where a count would sit, the same circle with only the arrow, for when
-         the tile is hovered. -->
+         the tile is hovered; grey too on a muted app. -->
     <span
       aria-hidden="true"
-      class="cue-arrow bg-bg-brand-solid text-text-primary-inversed pointer-events-none absolute end-[calc(50%-2.3125rem)] top-[11px] grid size-4.5 place-items-center rounded-full ring-2 ring-(color:--ii-tile-backdrop)"
+      class={[
+        "cue-arrow pointer-events-none absolute end-[calc(50%-2.3125rem)] top-[11px] grid size-4.5 place-items-center rounded-full ring-2 ring-(color:--ii-tile-backdrop)",
+        muted
+          ? "bg-(--ii-muted) text-white"
+          : "bg-bg-brand-solid text-text-primary-inversed",
+      ]}
     >
       <ArrowUpRightIcon class="size-3.5" strokeWidth={2.75} />
     </span>

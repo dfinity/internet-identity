@@ -69,6 +69,11 @@
   --ii-shelf: color-mix(in srgb, var(--ii-surface-3), black 4%);
   /* What a tile sits on, for the ring that cuts its badge out. */
   --ii-tile-backdrop: var(--ii-surface-3);
+  /* A muted app's count and mark, grey where a count is otherwise the brand,
+     the way Telegram greys a muted chat's. One grey for both themes: white on
+     it reads at about 4.5:1, and it stays apart from the near-black and
+     near-white brand. */
+  --ii-muted: var(--color-surface-light-500);
 
   /* Emil Kowalski's strong ease-out, for things that enter or settle. */
   --ii-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
