@@ -20,7 +20,7 @@
     MonitorSmartphoneIcon,
   } from "@lucide/svelte";
   import { prefersReducedMotion } from "svelte/motion";
-  import { shellIn, shellOut, widgetIn, widgetOut } from "../motion";
+  import { hop, shellIn, shellOut, widgetIn, widgetOut } from "../motion";
 
   interface Props {
     items: DockItem[];
@@ -70,7 +70,9 @@
   let focused = $state(false);
   /** A tap on a tucked edge spreads the stack until a tap lands outside it. */
   let tapped = $state(false);
-  const spread = $derived((hovered || focused || tapped) && items.length > 1);
+  /** The user is on the dock: pointing at it, tabbed into it or tapped it. */
+  const engaged = $derived(hovered || focused || tapped);
+  const spread = $derived(engaged && items.length > 1);
 
   /** Each widget's glyph and label, measured, so a widget can take its own
    *  width when spread and the front one's when tucked under it. */
@@ -98,6 +100,52 @@
     }
     const frame = requestAnimationFrame(() => (settled = true));
     return () => cancelAnimationFrame(frame);
+  });
+
+  // A step to take asks for the user now and then, as a Dock icon does: the
+  // stack hops soon after it appears, then less and less often while it's left
+  // waiting. Not while the user is on it, not in a hidden tab,
+  // and not under reduced motion. Something only on its way never asks.
+  /** The first hop, once the widgets have risen in and had a moment. */
+  const NUDGE_FIRST = 1500;
+  /** The wait after that, doubling with each hop up to the cap. */
+  const NUDGE_EVERY = 8000;
+  const NUDGE_CAP = 32000;
+  const asking = $derived(items[0]?.primary === true);
+  const front = $derived(items[0]?.kind);
+  /** Hops so far for the front step; a new step at the front asks afresh. */
+  let nudges = 0;
+  let nudgedFor: CardKind | undefined;
+  $effect(() => {
+    const node = stack;
+    if (front !== nudgedFor) {
+      nudgedFor = front;
+      nudges = 0;
+    }
+    if (engaged) {
+      // The user has seen it: the next hop waits a full round.
+      nudges = Math.max(nudges, 1);
+      return;
+    }
+    if (reduced || !asking || node === undefined) {
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const wait =
+        nudges === 0
+          ? NUDGE_FIRST
+          : Math.min(NUDGE_EVERY * 2 ** (nudges - 1), NUDGE_CAP);
+      timer = setTimeout(() => {
+        if (!document.hidden) {
+          hop(node);
+          nudges += 1;
+        }
+        schedule();
+      }, wait);
+    };
+    schedule();
+    return () => clearTimeout(timer);
   });
 </script>
 

@@ -203,3 +203,48 @@ export const widgetOut = (
       ? `opacity: ${t}`
       : `opacity: ${t}; transform: scale(${0.94 + 0.06 * t}); filter: blur(${(1 - t) * 4}px)`,
 });
+
+/** A thrown thing rising: exactly a parabola, slowing to the top. */
+const RISE = "cubic-bezier(0.333, 0.667, 0.667, 1)";
+/** And falling back down the same parabola, speeding up to the ground. */
+const FALL = "cubic-bezier(0.333, 0, 0.667, 0.333)";
+
+interface HopParams {
+  /** How high the first hop goes, in px. */
+  height?: number;
+  /** How long the first hop stays in the air, in ms. */
+  airtime?: number;
+  /** The share of its speed a landing gives back: each hop after the first is
+   *  that much shorter and restitution² as high. */
+  restitution?: number;
+  hops?: number;
+}
+
+/** Asking for the user the way a Dock icon does: a hop under gravity, then a
+ *  smaller one as it lands. It moves `translate`, so it runs alongside any
+ *  `transform` the element has, and it starts and ends at rest. */
+export const hop = (
+  node: Element,
+  { height = 14, airtime = 440, restitution = 0.5, hops = 2 }: HopParams = {},
+): Animation => {
+  const frames: Keyframe[] = [{ translate: "0 0", easing: RISE }];
+  const times = [0];
+  let elapsed = 0;
+  for (let index = 0; index < hops; index++) {
+    const air = airtime * restitution ** index;
+    const peak = height * restitution ** (2 * index);
+    frames.push(
+      { translate: `0 ${-peak}px`, easing: FALL },
+      { translate: "0 0", easing: RISE },
+    );
+    times.push(elapsed + air / 2, elapsed + air);
+    elapsed += air;
+  }
+  return node.animate(
+    frames.map((frame, index) => ({
+      ...frame,
+      offset: times[index] / elapsed,
+    })),
+    { duration: elapsed },
+  );
+};
