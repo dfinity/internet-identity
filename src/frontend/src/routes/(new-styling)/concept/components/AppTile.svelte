@@ -244,7 +244,10 @@
 
   {#if hasUnread}
     <!-- The count opens what arrived, so it can be read on touch too. The hit area
-         reaches past the badge without growing it. -->
+         reaches past the badge without growing it, to 44px.
+         It sits on the logo's rounded corner rather than hanging off it: 5px
+         over the 4rem logo's top and end edges (top: the tile's 1rem padding
+         less 5px; end: half the logo, 2rem, plus 5px from the tile's middle). -->
     <button
       bind:this={badgeRef}
       type="button"
@@ -252,7 +255,7 @@
       aria-haspopup="dialog"
       aria-expanded={isUnreadOpen}
       aria-label={`${unread.length} unread from ${name}`}
-      class="bg-bg-brand-solid text-text-primary-inversed focus-visible:ring-focus-ring absolute end-[calc(50%-2.5rem)] top-2 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums ring-2 ring-(color:--ii-surface-3) outline-none before:absolute before:-inset-2.5 focus-visible:ring-4"
+      class="bg-bg-brand-solid text-text-primary-inversed focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-surface-3) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4"
     >
       {badge}
     </button>
