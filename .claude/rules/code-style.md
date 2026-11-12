@@ -15,15 +15,15 @@ Reviewers remove more comments than they ask for. Make the code say it first: le
 
 - Fix the code rather than explain it. Remove hidden catches, implicit fallbacks and surprising behaviour instead of commenting on them. A *why* comment is only for the rare case where the code genuinely can't be made clearer: then name the constraint, the threat guarded against, the bug avoided or where a value comes from. Never narrate what the next line does.
 - Every constant and every new type gets a doc comment. A module that implements a non-trivial mechanism opens with a doc comment stating the problem it solves and how.
-- Doc comments must make sense on their own: name every value they mention and define any term. Don't explain a function by pointing at its call site.
+- Doc comments must make sense on their own: name every value, all arguments of the involved functions, and define all the terms they mention. Don't explain a function by pointing at its call site (unless this is a single-use function, in which case that should be indicated).
 - Comments describe the current code only. No history ("previously", "now uses"), no PR or issue numbers, no reasons for what is absent, no design-process justification ("we chose this because the reviewer..."). History belongs in git and the PR.
 - Don't copy the same comment to every place a property appears. Say it once where it is defined.
 - When you change behaviour, re-read every doc comment, `.did` comment and module header that describes it, and fix units and counts. Never cite a test, module, spec or function that doesn't exist.
 
 ## Scope and structure
 
-- Don't add props, options, fields, exports, versions or concepts "for later". Add them with their first caller.
-- Before writing a helper, look at the options: an existing local util, `$lib/utils/` or the crate's `utils.rs`, a dependency already in the tree, a new dependency, the platform, or writing it yourself. There is no fixed order. List the options you considered in the PR description and recommend one for this case, with the reason (fit, maintenance, wasm size, how much code it saves). Crypto is the exception: always use the crypto team's maintained libraries, never hand-rolled crypto.
+- Don't add props, options, fields, exports, versions or concepts "for later". Add them with their first caller, unless a mock function or stub trait has been explicitly requested as the deliverable of a PR, e.g., in a test-driven development approach.
+- Before writing a helper, look at the options: an existing local util, `$lib/utils/` or the crate's `utils.rs`, a dependency already in the tree, a new dependency, the platform, or writing it yourself. There is no fixed order. List the options you considered in the PR description and recommend one for this case, with the reason (fit, maintenance, wasm size, how much code it saves). Crypto is the exception: never hand-roll it (see `security.md`).
 - Accept a little duplication across features over a premature shared abstraction; extract on the third use.
 - Prefer early-return guard clauses over nested `if`/`else`: preconditions first, then the happy path.
 - Use explicit comparisons (`!== undefined`, `=== null`, `.length > 0`) for non-boolean values.

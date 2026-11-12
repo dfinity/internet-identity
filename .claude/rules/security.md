@@ -10,7 +10,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 ## Bounded resources
 
 - Bound everything a caller can grow, by count and by bytes: vector lengths before allocating, stored entries per anchor, caches, metrics label sets, outcall `max_response_bytes`. Never ship growth without the limit that bounds it.
-- Bound every loop over stored data per call (`MAX_TO_PRUNE`-style), counting items examined, not only items produced. Updates are capped at about 20B instructions.
+- Bound every loop over stored data per call (`MAX_TO_PRUNE`-style), counting items examined, not only items produced. Updates are capped at about 40B instructions, per heartbeat or timer.
 - Reject cheaply before doing expensive work on an untrusted call. Give every outcall path a concurrency limit (`ConcurrencyLimiter`).
 - II runs on a system subnet: cycles are not the constraint, and per-endpoint rate limits or per-identity caps don't help (identities are free). Keep state bounded instead.
 - HTTP outcall transforms deserialize into the accepted shape and re-emit only that, with a fixed status and no headers, so replicas agree.
@@ -26,8 +26,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 ## Origins, URLs and hostnames
 
 - Parse URLs with `new URL()` / the `url` crate and compare exact origins (`new URL(x).origin === x`). Never concatenate URL parts or use substring checks.
-- Match a hostname against an allowlist exactly or on a dot boundary (`h === d || h.endsWith("." + d)`), never a bare `endsWith(d)`.
-- Accept only the canonical form of security-relevant input (lowercase origins without default port or userinfo, uncompressed keys); a caller sending another form is refused, not silently normalized. Operator configuration (install args) is canonicalized (trim, ASCII-lowercase) once, before it is persisted.
+- Match a hostname against an allowlist exactly or on a dot boundary (`host === domain || host.endsWith("." + domain)`), never a bare `endsWith(domain)`.
 - Every origin used as an outcall target or derivation input goes through the canonicalizing validator and requires `https`. Plain `http` is allowed only for loopback hosts behind an explicit dev flag.
 - Validate the derivation origin in every channel/RPC handler before using it, with `OriginSchema` rather than `z.url()`.
 - Sanitize navigation targets (`next`, redirects) to same-origin relative paths as early as possible (in `load`). No open redirects.
@@ -38,7 +37,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 - Length-prefix every variable-length field when hashing a seed.
 - Keep delegation seeds minimal and justify every input. Set delegation `targets` where the canister signs, and keep them when rebuilding a chain.
 - Delegation lifetimes that cross the IC are at least 5 minutes, because of replica clock drift.
-- Browser keys are generated with `extractable: false`. Use the crypto team's maintained libraries, never hand-rolled crypto.
+- Browser keys are generated with `extractable: false`. Use the browser's built-in crypto functions, never hand-rolled crypto.
 - Every frontend agent, including ones created in service workers, carries the deployment's `shouldFetchRootKey`.
 
 ## Leaks
