@@ -262,7 +262,7 @@
       aria-haspopup="dialog"
       aria-expanded={isUnreadOpen}
       aria-label={`${unread.length} unread from ${name}`}
-      class="bg-bg-brand-solid text-text-primary-inversed focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-surface-3) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4"
+      class="bg-bg-brand-solid text-text-primary-inversed focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4"
     >
       {badge}
     </button>

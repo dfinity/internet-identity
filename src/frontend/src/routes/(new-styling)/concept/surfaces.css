@@ -63,6 +63,13 @@
   --ii-hover: rgb(0 0 0 / 0.04);
   --ii-selected: rgb(0 0 0 / 0.07);
 
+  /* A shelf groups tiles on the canvas without raising them: the canvas with
+     the hover overlay laid in, as one solid color so a badge can cut itself
+     out of it. */
+  --ii-shelf: color-mix(in srgb, var(--ii-surface-3), black 4%);
+  /* What a tile sits on, for the ring that cuts its badge out. */
+  --ii-tile-backdrop: var(--ii-surface-3);
+
   /* Emil Kowalski's strong ease-out, for things that enter or settle. */
   --ii-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -125,6 +132,7 @@
 
     --ii-hover: rgb(255 255 255 / 0.06);
     --ii-selected: rgb(255 255 255 / 0.1);
+    --ii-shelf: color-mix(in srgb, var(--ii-surface-3), white 6%);
   }
 }
 
@@ -168,6 +176,12 @@
   }
   .ii-surface-8 {
     background-color: var(--ii-surface-8);
+  }
+
+  /* What sits on a shelf cuts its badges out of the shelf, not the canvas. */
+  .ii-shelf {
+    background-color: var(--ii-shelf);
+    --ii-tile-backdrop: var(--ii-shelf);
   }
 
   /* A transparent border under the ring keeps the edge in forced-colors mode. */

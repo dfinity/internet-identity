@@ -11,10 +11,11 @@
     XIcon,
   } from "@lucide/svelte";
   import type { Component } from "svelte";
+  import { flip } from "svelte/animate";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { MediaQuery } from "svelte/reactivity";
-  import { slide } from "svelte/transition";
+  import { scale, slide } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
@@ -136,6 +137,10 @@
   // iOS. The 4rem logo sits centered in its column, so the inset is half of
   // what the column leaves: (5.25rem − 4rem) / 2, then (7rem − 4rem) / 2.
   const INSET = "ps-2.5 @lg:ps-6";
+  // Recent always holds four, so its shelf hugs four columns instead of
+  // stretching across seven with three left empty.
+  const RECENT_GRID =
+    "grid grid-cols-[repeat(4,5.25rem)] gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2";
 
   // --- Layout: the concept compares three ---
 
@@ -441,6 +446,23 @@
     app.unread = [];
   };
 
+  /** Opening an app makes it the most recent. The app opens in a new tab, so
+   *  Recent reorders once this tab is back in view, where the move is seen; a
+   *  tab opened in the background (⌘-click) never hides this one, so the row
+   *  moves right away. */
+  const markUsed = (app: ConceptApp) => {
+    const bump = () => {
+      app.lastUsedMillis = Date.now();
+    };
+    setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        bump();
+      } else {
+        document.addEventListener("visibilitychange", bump, { once: true });
+      }
+    }, 300);
+  };
+
   const read = (app: ConceptApp, id: string) => {
     app.unread = app.unread.filter((notification) => notification.id !== id);
   };
@@ -526,7 +548,10 @@
     selected={selected.includes(app.origin)}
     {index}
     onToggle={() => toggleSelected(app.origin)}
-    onOpen={() => readAll(app)}
+    onOpen={() => {
+      readAll(app);
+      markUsed(app);
+    }}
     onRead={(id) => read(app, id)}
     onClearAll={() => readAll(app)}
     notificationsAllowed={app.notificationsAllowed}
@@ -803,21 +828,49 @@
               <!-- Recent is ordered by use, not by hand, so it steps aside while
                    apps are managed and All apps is the one grid to arrange. -->
               {#if showRecent && !managing}
+                <!-- Recent repeats apps from the grid below, so it sits on a
+                     shelf of its own, like Suggestions in the App Library: the
+                     same apps, plainly a different list. The shelf is flat, as
+                     a shadow here means something waits for you. From `@lg` it
+                     bleeds out by its padding, so its logos stay in the
+                     columns of All apps; on a phone it keeps inside the page's
+                     margin. The bleed is on the section, so the slide that
+                     clips it while it opens doesn't cut the shelf's sides. -->
                 <section
                   transition:slide={{
                     duration: reduced ? 0 : 260,
                     easing: quintOut,
                   }}
-                  class="flex flex-col gap-2 pb-8"
+                  class="pb-6 @lg:-mx-2"
                 >
-                  <h2 class={["text-text-tertiary text-sm font-medium", INSET]}>
-                    Recent
-                  </h2>
-                  <ul class={GRID}>
-                    {#each recentApps as app, index (app.origin)}
-                      <li>{@render appTile(app, index)}</li>
-                    {/each}
-                  </ul>
+                  <div
+                    class="ii-shelf flex w-fit flex-col gap-2 rounded-3xl pt-4 pb-2 @lg:px-2"
+                  >
+                    <h2
+                      class={["text-text-tertiary text-sm font-medium", INSET]}
+                    >
+                      Recent
+                    </h2>
+                    <ul class={RECENT_GRID}>
+                      {#each recentApps as app, index (app.origin)}
+                        <!-- An app just opened slides to the front; one new to
+                             the row grows in where it lands. -->
+                        <li
+                          animate:flip={{
+                            duration: reduced ? 0 : 400,
+                            easing: quintOut,
+                          }}
+                          in:scale={{
+                            duration: reduced ? 0 : 300,
+                            start: 0.8,
+                            easing: quintOut,
+                          }}
+                        >
+                          {@render appTile(app, index)}
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
                 </section>
               {/if}
               <section class="flex flex-col gap-2">
