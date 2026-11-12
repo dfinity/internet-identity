@@ -65,7 +65,15 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 
 - Co-locate helpers with the route or component that uses them. Move to `$lib/utils/` only when unrelated routes share it; a `$lib` module never lives under `routes/`.
 - Import through `$lib/...`, not long `../` chains.
-- Before writing a utility, weigh the existing options (local utils, `$lib/utils/`, `@icp-sdk` helpers, browser APIs) and recommend one in the PR description, as in `code-style.md`. Notable ones: `throwCanisterError`, `writableStored`, `fetchCapped`, `secureRandomId`, `promiseQueue`, the `locale.store` formatters, `anonymousActor` for public data.
+- Before writing a utility, weigh the existing options (local utils, `$lib/utils/`, `@icp-sdk` helpers, browser APIs) and recommend one in the PR description, as in `code-style.md`. Notable ones:
+  - Canister calls and errors: `throwCanisterError`, `isCanisterError` and `throwTextCanisterError` (`$lib/utils/utils.ts`); `handleError` (`$lib/components/utils/error.ts`) for the user-visible error path; `anonymousActor` (`$lib/globals.ts`) for public data.
+  - Encoding: `toBase64`/`fromBase64`, `toBase64URL`/`fromBase64URL`, `toHex`/`fromHex` (`$lib/utils/utils.ts`).
+  - Async: `promiseQueue` (`$lib/utils/promiseQueue.ts`) to serialize work, `retryFor`, `waitFor`, `waitForStore` (`$lib/utils/utils.ts`).
+  - Origins and URLs: `OriginSchema` (`$lib/utils/transport/utils.ts`), `validateDerivationOrigin` (`$lib/utils/validateDerivationOrigin.ts`), `isSameOrigin` and `originLabel` (`$lib/utils/urlUtils.ts`).
+  - Fetching untrusted content: `fetchCapped` (`$lib/utils/appMetadata.ts`).
+  - Ids and time: `secureRandomId` (`$lib/utils/utils.ts`), `nanosToMillis`/`millisToNanos` (`$lib/utils/time.ts`).
+  - Stores and formatting: `writableStored` (`$lib/stores/writable.store.ts`), `$formatRelative` and `$formatDuration` (`$lib/stores/locale.store.ts`).
+  - UI: the components in `$lib/components/ui/` (`Dialog`, `Popover`, `Tooltip`, `Alert`, `Input`, `Select`, `Toggle`, `Checkbox`, `CodeInput`, `HoldToConfirm`) before building a new one.
 - Persist per-identity preferences with a `writableStored` store keyed by anchor, never raw global `localStorage`.
 - Check browser support (older Safari is a real target) before using a new API.
 
