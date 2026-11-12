@@ -550,6 +550,7 @@
     onRead={(id) => read(app, id)}
     onClearAll={() => readAll(app)}
     notificationsAllowed={app.notificationsAllowed}
+    muted={!app.notificationsAllowed && app.lastNotifiedMillis !== undefined}
     onSetNotifications={(allowed) => setNotificationsFromMenu(app, allowed)}
     onManage={() => manageFrom(app)}
     onRemove={() => remove([app])}

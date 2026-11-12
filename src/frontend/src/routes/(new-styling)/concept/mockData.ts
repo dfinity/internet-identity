@@ -42,6 +42,10 @@ export interface ConceptApp {
   lastUsedMillis: number;
   /** From `list_applications`: whether the identity allows the app to notify it. */
   notificationsAllowed: boolean;
+  /** From `list_applications`: when the app last had a notification queued, or
+   *  unset where it never has. An app that has notified but no longer may is one
+   *  the user turned off, so its tile says it's muted. */
+  lastNotifiedMillis?: number;
   /** Not in Internet Identity today: the browser the app was last signed in from. */
   lastBrowser: string;
   /** Not in Internet Identity today: when an AI agent last used the app. */
@@ -96,6 +100,7 @@ const thomasApps: ConceptApp[] = [
   app("OISY Wallet", {
     lastUsedMillis: now - 12 * MINUTE,
     notificationsAllowed: true,
+    lastNotifiedMillis: now - 10 * MINUTE,
     lastBrowser: "Chrome on Mac",
     unread: [
       notification(
@@ -121,6 +126,7 @@ const thomasApps: ConceptApp[] = [
   app("OpenChat", {
     lastUsedMillis: now - 40 * MINUTE,
     notificationsAllowed: true,
+    lastNotifiedMillis: now - 25 * MINUTE,
     lastBrowser: "Safari on iPhone",
     aiUsedMillis: now - 5 * MINUTE,
     unread: [
@@ -135,6 +141,7 @@ const thomasApps: ConceptApp[] = [
   app("NNS Dapp", {
     lastUsedMillis: now - 3 * HOUR,
     notificationsAllowed: true,
+    lastNotifiedMillis: now - 3 * HOUR,
     lastBrowser: "Chrome on Mac",
     unread: [
       notification(
@@ -148,12 +155,14 @@ const thomasApps: ConceptApp[] = [
   app("KongSwap", {
     lastUsedMillis: now - DAY,
     notificationsAllowed: false,
+    lastNotifiedMillis: now - 3 * DAY,
     lastBrowser: "Chrome on Mac",
     unread: [],
   }),
   app("DSCVR", {
     lastUsedMillis: now - 2 * DAY,
     notificationsAllowed: true,
+    lastNotifiedMillis: now - 2 * DAY,
     lastBrowser: "Firefox on Windows",
     unread: [],
   }),
@@ -166,6 +175,7 @@ const thomasApps: ConceptApp[] = [
   app("Water Neuron", {
     lastUsedMillis: now - 9 * DAY,
     notificationsAllowed: true,
+    lastNotifiedMillis: now - 5 * DAY,
     lastBrowser: "Chrome on Mac",
     aiUsedMillis: now - 2 * DAY,
     unread: [],
@@ -194,6 +204,7 @@ const workApps: ConceptApp[] = [
   app("Juno", {
     lastUsedMillis: now - 2 * HOUR,
     notificationsAllowed: true,
+    lastNotifiedMillis: now - 2 * HOUR,
     lastBrowser: "Chrome on Mac",
     aiUsedMillis: now - 30 * MINUTE,
     unread: [
@@ -208,6 +219,7 @@ const workApps: ConceptApp[] = [
   app("NNS Dapp", {
     lastUsedMillis: now - 3 * DAY,
     notificationsAllowed: false,
+    lastNotifiedMillis: now - 6 * DAY,
     lastBrowser: "Chrome on Mac",
     unread: [],
   }),

@@ -42,6 +42,9 @@
     onClearAll?: () => void;
     /** Whether the identity lets the app notify it. */
     notificationsAllowed?: boolean;
+    /** The user turned the app's notifications off: it notified before and
+     *  no longer may. Shown on the logo, since the grid can't tell otherwise. */
+    muted?: boolean;
     /** From the tile's right-click menu: the app's settings, managing apps
      *  starting from this one, or removing it. */
     onSetNotifications?: (allowed: boolean) => void;
@@ -63,6 +66,7 @@
     onRead,
     onClearAll,
     notificationsAllowed = false,
+    muted = false,
     onSetNotifications,
     onManage,
     onRemove,
@@ -199,6 +203,22 @@
         {/if}
       </span>
     {/if}
+    {#if muted}
+      <!-- Notifications turned off: the count's circle, in grey and on the
+           logo's lower corner, where iOS puts a status on an avatar. It stays
+           while managing, so muted apps can be told apart there too. -->
+      <span
+        aria-hidden="true"
+        transition:scale={{
+          start: 0.5,
+          duration: prefersReducedMotion.current ? 0 : 220,
+          easing: quintOut,
+        }}
+        class="bg-fg-tertiary text-fg-primary-inversed absolute -end-[5px] -bottom-[5px] grid size-4.5 place-items-center rounded-full ring-2 ring-(color:--ii-tile-backdrop)"
+      >
+        <BellOffIcon class="size-3" strokeWidth={2.5} />
+      </span>
+    {/if}
   </span>
   <span
     class="text-text-secondary line-clamp-2 w-full text-center text-xs leading-tight text-balance break-words"
@@ -218,9 +238,13 @@
           target="_blank"
           rel="noopener noreferrer"
           onclick={onOpen}
-          aria-label={hasUnread
-            ? `Open ${name}, ${unread.length} unread`
-            : `Open ${name}`}
+          aria-label={[
+            `Open ${name}`,
+            hasUnread && `${unread.length} unread`,
+            muted && "notifications off",
+          ]
+            .filter(Boolean)
+            .join(", ")}
           class={[
             "focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 outline-none focus-visible:ring-2",
             // The tile stays lit while its menu is open, so it's clear whose it is.
@@ -240,9 +264,7 @@
       aria-pressed={mode === "select" ? selected : undefined}
       aria-label={mode === "inert"
         ? `${name}, not used yet`
-        : selected
-          ? `Deselect ${name}`
-          : `Select ${name}`}
+        : `${selected ? "Deselect" : "Select"} ${name}${muted ? ", notifications off" : ""}`}
       class={[
         "focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 outline-none focus-visible:ring-2",
         mode === "inert" && "opacity-40",
