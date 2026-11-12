@@ -16,7 +16,7 @@ Open PRs from a branch in `dfinity/internet-identity`, not from a fork, so maint
 ## Scope and size
 
 - One concern per PR. Refactors, renames, formatting, dependency bumps and CI changes go in separate PRs. Revert unrelated wording, default or behaviour changes; every line of the diff should be justifiable by the PR's purpose.
-- Keep PRs small enough to review in one sitting (roughly under 500 lines of implementation). Split larger work into a stack.
+- Keep PRs small enough to review in one sitting (roughly under 500 lines of implementation). Split larger work into a stack (see Stacked PRs).
 - Settle design questions in a design note before the implementation PR.
 - When porting code from a library, link the exact upstream revision and list every change made.
 
@@ -45,10 +45,7 @@ PR titles follow conventional commits with a scope naming the product surface th
 - Put each change in the layer that introduces it. Don't add something in one PR and rename or remove it in a later one; fix it in the layer where it first appears.
 - Every layer must build and pass CI on its own, so a symbol is defined in the same PR as its first use.
 - Don't ship a change that breaks e2e ahead of the PR that consumes it.
-- Link the stack with footers, and update every PR when one is added:
-  - First PR: `<div align="right">Next: #XXXX</div>`
-  - Middle PR: `<div align="left">Previous: #XXXX</div>` and `<div align="right">Next: #XXXX</div>`
-  - Last PR: `<div align="left">Previous: #XXXX</div>`
+- Create and maintain stacks with the `gh stack` CLI extension (`gh extension install github/gh-stack`) through the `gh-stack` skill: create, push, rebase, sync and submit with it, never with raw `git rebase` or `gh pr create --base`. `gh stack submit` links the PRs with its own footer, so don't add Previous/Next footers by hand.
 
 ## CI
 
