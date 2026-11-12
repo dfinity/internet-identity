@@ -1,12 +1,12 @@
 <script lang="ts">
   import "./surfaces.css";
   import {
+    ArrowRightToLineIcon,
     CheckIcon,
     FlaskConicalIcon,
     LayoutGridIcon,
     LogOutIcon,
     PanelBottomIcon,
-    PanelRightCloseIcon,
     PanelRightIcon,
     PanelTopIcon,
     MoonIcon,
@@ -911,9 +911,9 @@
         {#if isDesktop.current && panelVisible}
           <!-- Desktop, with the panel open: Close stands where the account
                was, on the canvas, which is what the panel pushed aside. The
-               glyph is a panel on the right folding away, as a side panel's
-               toggle is in Notion or Linear. The identity itself heads the
-               panel now, so the canvas doesn't name it twice. -->
+               glyph is an arrow to the edge: the panel goes back to the right
+               edge it came from. The identity itself heads the panel now, so
+               the canvas doesn't name it twice. -->
           <button
             bind:this={closeButton}
             type="button"
@@ -926,7 +926,7 @@
               "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
             ]}
           >
-            <PanelRightCloseIcon
+            <ArrowRightToLineIcon
               class="size-4 rtl:-scale-x-100"
               aria-hidden="true"
             />
