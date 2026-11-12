@@ -28,12 +28,11 @@
   import AppTile from "./components/AppTile.svelte";
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
-  import CaffeineBanner from "./components/CaffeineBanner.svelte";
   import CreateBento from "./components/CreateBento.svelte";
   import Elevated from "./components/Elevated.svelte";
+  import ExploreBanner from "./components/ExploreBanner.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
   import IdentityCard from "./components/IdentityCard.svelte";
-  import OpenCloudBanner from "./components/OpenCloudBanner.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
@@ -1101,11 +1100,7 @@
           <div class="mx-auto flex w-full max-w-5xl flex-col gap-10 px-2">
             {#each exploreFeed as item, index (index)}
               {#if item.kind === "banner"}
-                {#if item.brand === "caffeine"}
-                  <CaffeineBanner app={item.app} />
-                {:else}
-                  <OpenCloudBanner app={item.app} />
-                {/if}
+                <ExploreBanner {item} />
               {:else if item.kind === "shelf"}
                 <ExploreShelf title={item.title} apps={item.apps} />
               {:else if featured.length > 0}
