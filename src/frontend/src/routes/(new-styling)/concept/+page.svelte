@@ -36,6 +36,7 @@
   import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StatusRow from "./components/StatusRow.svelte";
+  import VerifyPhraseDialog from "./components/VerifyPhraseDialog.svelte";
   import CornerAccount from "./components/CornerAccount.svelte";
   import {
     browsersFor,
@@ -413,12 +414,28 @@
     toaster.success({ title: message, duration: 2500 });
   };
 
+  /** The product's phrase check, while it's open, and what passing it resolves. */
+  let verifying = $state<{ patch: Partial<Scenario>; message: string }>();
+  const verifyPhrase = (patch: Partial<Scenario>, message: string) => {
+    verifying = { patch, message };
+  };
+  const passVerify = () => {
+    if (verifying === undefined) return;
+    const { patch, message } = verifying;
+    verifying = undefined;
+    resolve(patch, message);
+  };
+
   /** The loud card's button: finishes the step where the concept can, otherwise
    *  opens the card's section. */
   const runLead = (card: CardStatus) => {
     const action = leadActionOf(card, current.scenario);
     if (action.resolve !== undefined) {
-      resolve(action.resolve.patch, action.resolve.message);
+      if (action.flow === "verifyPhrase") {
+        verifyPhrase(action.resolve.patch, action.resolve.message);
+      } else {
+        resolve(action.resolve.patch, action.resolve.message);
+      }
       return;
     }
     openCard(card.kind);
@@ -681,6 +698,7 @@
       onBack={closeSection}
       onSignOut={signOut}
       onResolve={resolve}
+      onVerifyPhrase={verifyPhrase}
       onUnavailable={unavailable}
     />
   {:else}
@@ -1047,6 +1065,13 @@
 
   {#if layout === "top" && !panelVisible && !managing && dockItems.length > 0}
     <ActionDock items={dockItems} onAction={actFromDock} />
+  {/if}
+
+  {#if verifying !== undefined}
+    <VerifyPhraseDialog
+      onVerified={passVerify}
+      onClose={() => (verifying = undefined)}
+    />
   {/if}
 
   <!-- Concept only: walk the panel through its states, and switch layouts.

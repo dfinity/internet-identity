@@ -268,6 +268,8 @@ export const leadOf = (cards: CardStatus[]): CardStatus | undefined => {
 export interface LeadAction {
   label: string;
   resolve?: { patch: Partial<Scenario>; message: string };
+  /** The product's own flow runs first, and the step resolves once it's done. */
+  flow?: "verifyPhrase";
 }
 
 export const leadActionOf = (
@@ -284,6 +286,7 @@ export const leadActionOf = (
         patch: { recovery: "calm" },
         message: "Recovery phrase verified",
       },
+      flow: "verifyPhrase",
     };
   }
   if (kind === "recovery" && scenario.recovery === "none") {

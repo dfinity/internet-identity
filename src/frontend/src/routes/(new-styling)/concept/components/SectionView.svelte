@@ -40,6 +40,8 @@
     onSignOut: (id: string) => void;
     /** Moves the scenario on, as finishing the step would. */
     onResolve: (patch: Partial<Scenario>, message: string) => void;
+    /** Opens the product's phrase check; the scenario moves on once it passes. */
+    onVerifyPhrase: (patch: Partial<Scenario>, message: string) => void;
     /** For the steps the concept doesn't walk through. */
     onUnavailable: (step: string) => void;
   }
@@ -52,6 +54,7 @@
     onBack,
     onSignOut,
     onResolve,
+    onVerifyPhrase,
     onUnavailable,
   }: Props = $props();
 
@@ -167,7 +170,7 @@
                 label: "Verify",
                 variant: "primary",
                 onclick: () =>
-                  onResolve(
+                  onVerifyPhrase(
                     { recovery: "noEmail" },
                     "Recovery phrase verified",
                   ),
