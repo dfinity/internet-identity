@@ -830,26 +830,34 @@
                 <!-- Recent repeats apps from the grid below, so it sits on a
                      shelf of its own, like Suggestions in the App Library: the
                      same apps, plainly a different list. The shelf is flat, as
-                     a shadow here means something waits for you. From `@lg` it
-                     bleeds out by its padding, so its logos stay in the
-                     columns of All apps; on a phone it keeps inside the page's
-                     margin. The bleed is on the section, so the slide that
-                     clips it while it opens doesn't cut the shelf's sides. -->
+                     a shadow here means something waits for you. Its heading
+                     sits above it, on the edge of All apps' heading, so the
+                     shelf holds only logos, the same distance from every edge:
+                     16px on a phone (the 10px a column leaves, plus 6px), 32px
+                     from `@lg` (24px, plus 8px). The section bleeds out by the
+                     shelf's padding, so the logos stay in All apps' columns
+                     and the slide, which clips the section while it opens,
+                     doesn't cut the shelf's sides. The 48px under it, twice
+                     the 24px from a heading to its logos, keeps All apps'
+                     heading with its own grid. -->
                 <section
                   transition:slide={{
                     duration: reduced ? 0 : 260,
                     easing: quintOut,
                   }}
-                  class="pb-6 @lg:-mx-2"
+                  class="-mx-1.5 flex flex-col gap-2 pb-12 @lg:-mx-2"
                 >
-                  <div
-                    class="ii-shelf flex w-fit flex-col gap-2 rounded-3xl pt-4 pb-2 @lg:px-2"
+                  <h2
+                    class={[
+                      "text-text-tertiary ms-1.5 text-sm font-medium @lg:ms-2",
+                      INSET,
+                    ]}
                   >
-                    <h2
-                      class={["text-text-tertiary text-sm font-medium", INSET]}
-                    >
-                      Recent
-                    </h2>
+                    Recent
+                  </h2>
+                  <div
+                    class="ii-shelf w-fit rounded-[1.75rem] px-1.5 pb-1 @lg:px-2 @lg:pt-4 @lg:pb-5"
+                  >
                     <ul class={RECENT_GRID}>
                       {#each recentApps as app, index (app.origin)}
                         <!-- An app just opened slides to the front; one new to
