@@ -94,6 +94,9 @@
     }),
   );
   const lead = $derived(leadOf(cards));
+  /** The account's rows. Apps are managed from the grid itself (Manage, by
+   *  All apps' heading), so the account doesn't list them too. */
+  const accountCards = $derived(cards.filter(({ kind }) => kind !== "apps"));
   /** What the calm island mentions: something new or waiting, never a tip. */
   const note = $derived(
     cards.find(({ tone }) =>
@@ -668,7 +671,7 @@
       as="ul"
       class="divide-border-tertiary flex flex-col divide-y overflow-hidden rounded-2xl"
     >
-      {#each cards as card (card.kind)}
+      {#each accountCards as card (card.kind)}
         <StatusRow
           kind={card.kind}
           title={TITLES[card.kind]}
@@ -944,9 +947,26 @@
                 </section>
               {/if}
               <section class="flex flex-col gap-2">
-                <h2 class={["text-text-tertiary text-sm font-medium", INSET]}>
-                  All apps
-                </h2>
+                <!-- Manage stands at the heading's other end, like Edit over
+                     a list on iOS: a plain word, ending where the last
+                     column's logo ends, and Done while apps are managed. -->
+                <div
+                  class={[
+                    "flex items-baseline justify-between gap-4 pe-2.5 @lg:pe-6",
+                    INSET,
+                  ]}
+                >
+                  <h2 class="text-text-tertiary text-sm font-medium">
+                    All apps
+                  </h2>
+                  <button
+                    type="button"
+                    onclick={managing ? stopManaging : startManaging}
+                    class="text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -mx-1.5 rounded-md px-1.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2"
+                  >
+                    {managing ? "Done" : "Manage"}
+                  </button>
+                </div>
                 <ReorderGrid
                   items={current.apps}
                   key={(app) => app.origin}
