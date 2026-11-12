@@ -25,6 +25,9 @@
     logo: string;
     url: string;
     unread?: MockNotification[];
+    /** Whether the tile shows its unread count. Off where another tile on the
+     *  page already shows the same app's, so one count is told once. */
+    showCount?: boolean;
     /** `open` opens the app in one click; `select` picks it for managing; `inert` is
      *  shown but can't be picked (an app the identity has never used). */
     mode: "open" | "select" | "inert";
@@ -50,6 +53,7 @@
     logo,
     url,
     unread = [],
+    showCount = true,
     mode,
     selected = false,
     index = 0,
@@ -245,7 +249,7 @@
     </button>
   {/if}
 
-  {#if hasUnread}
+  {#if hasUnread && showCount}
     <!-- The count opens what arrived, so it can be read on touch too. The hit area
          reaches past the badge without growing it, to 44px.
          It sits on the logo's rounded corner rather than hanging off it: 5px

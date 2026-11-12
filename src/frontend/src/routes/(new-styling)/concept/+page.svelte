@@ -108,6 +108,12 @@
       .slice(0, 4),
   );
   const showRecent = $derived(current.apps.length > 6);
+  // An app's unread count is told once, on its first tile: in Recent when the
+  // row is up, so All apps leaves it off those apps. (While apps are managed
+  // Recent steps aside, and no tile shows a count.)
+  const countedInRecent = $derived(
+    new Set(showRecent ? recentApps.map(({ origin }) => origin) : []),
+  );
   const featured = $derived(
     featuredApps.filter(
       ({ origin }) => !current.apps.some((app) => app.origin === origin),
@@ -509,12 +515,13 @@
 
 <svelte:window onkeydown={onWindowKeydown} />
 
-{#snippet appTile(app: ConceptApp, index: number)}
+{#snippet appTile(app: ConceptApp, index: number, showCount = true)}
   <AppTile
     name={app.name}
     logo={app.logo}
     url={app.url}
     unread={app.unread}
+    {showCount}
     mode={managing ? "select" : "open"}
     selected={selected.includes(app.origin)}
     {index}
@@ -828,6 +835,7 @@
                     {@render appTile(
                       app,
                       index + (showRecent && !managing ? 4 : 0),
+                      !countedInRecent.has(app.origin),
                     )}
                   {/snippet}
                 </ReorderGrid>
