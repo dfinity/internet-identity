@@ -299,10 +299,8 @@
   const dockItems = $derived<DockItem[]>(
     attention.slice(0, 3).map((card) => ({
       kind: card.kind,
-      title: TITLES[card.kind],
-      sentence: card.sentence,
       tone: card.tone,
-      action: leadActionOf(card, current.scenario),
+      label: card.ask ?? card.sentence,
       primary: isLoud(card),
     })),
   );
@@ -323,12 +321,6 @@
     if (!managing) {
       section = undefined;
     }
-    panelOpen = true;
-  };
-
-  /** A widget opens the account right at its section. */
-  const openFromDock = (kind: CardKind) => {
-    openCard(kind);
     panelOpen = true;
   };
 
@@ -1027,11 +1019,7 @@
   {/if}
 
   {#if layout === "top" && !panelVisible && !managing && dockItems.length > 0}
-    <ActionDock
-      items={dockItems}
-      onOpen={openFromDock}
-      onAction={actFromDock}
-    />
+    <ActionDock items={dockItems} onAction={actFromDock} />
   {/if}
 
   <!-- Concept only: walk the panel through its states, and switch layouts.

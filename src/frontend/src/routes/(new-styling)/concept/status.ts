@@ -38,6 +38,9 @@ export interface CardStatus {
   kind: CardKind;
   tone: Tone;
   sentence: string;
+  /** The step, as a verb, for the dock's button on the page. Without it, the
+   *  dock says the sentence. */
+  ask?: string;
 }
 
 export interface StatusInput {
@@ -69,29 +72,61 @@ const PRIORITY: CardKind[] = [
   "apps",
 ];
 
-type Said = Pick<CardStatus, "tone" | "sentence">;
+type Said = Pick<CardStatus, "tone" | "sentence" | "ask">;
 
 const RECOVERY: Record<RecoveryState, Said> = {
-  none: { tone: "action", sentence: "No recovery set up yet" },
-  unverified: { tone: "action", sentence: "Recovery phrase not verified yet" },
+  none: {
+    tone: "action",
+    sentence: "No recovery set up yet",
+    ask: "Set up recovery",
+  },
+  unverified: {
+    tone: "action",
+    sentence: "Recovery phrase not verified yet",
+    ask: "Verify your recovery phrase",
+  },
   usedPhrase: { tone: "now", sentence: "You're signed in with your phrase" },
-  emailPending: { tone: "pending", sentence: "Waiting for your email" },
-  phraseReset: { tone: "recent", sentence: "Your recovery phrase was reset" },
+  emailPending: {
+    tone: "pending",
+    sentence: "Waiting for your email",
+    ask: "Confirm your recovery email",
+  },
+  phraseReset: {
+    tone: "recent",
+    sentence: "Your recovery phrase was reset",
+    ask: "Review the phrase reset",
+  },
   noEmail: { tone: "tip", sentence: "Phrase set up, no email yet" },
   calm: { tone: "calm", sentence: "Phrase and email set up" },
 };
 
 const accessSaid = ({ scenario, signedInWith }: StatusInput): Said =>
   ({
-    one: { tone: "action", sentence: "Only one way to sign in" },
-    newPasskey: { tone: "recent", sentence: "New passkey from another device" },
+    one: {
+      tone: "action",
+      sentence: "Only one way to sign in",
+      ask: "Add a second way to sign in",
+    },
+    newPasskey: {
+      tone: "recent",
+      sentence: "New passkey from another device",
+      ask: "Review the new passkey",
+    },
     unused: { tone: "tip", sentence: "YubiKey unused for 8 months" },
     calm: { tone: "calm", sentence: `Signed in with ${signedInWith}` },
   })[scenario.access] as Said;
 
 const INTEGRATIONS: Record<IntegrationsState, Said> = {
-  local: { tone: "risk", sentence: "Any local program can connect" },
-  cliConfirm: { tone: "pending", sentence: "ICP CLI is waiting for approval" },
+  local: {
+    tone: "risk",
+    sentence: "Any local program can connect",
+    ask: "Review local access",
+  },
+  cliConfirm: {
+    tone: "pending",
+    sentence: "ICP CLI is waiting for approval",
+    ask: "Review the ICP CLI request",
+  },
   off: { tone: "tip", sentence: "AI and CLI aren't connected" },
   calm: { tone: "calm", sentence: "AI and CLI access on" },
 };
@@ -105,7 +140,11 @@ const devicesSaid = ({
     case "newBrowser":
       return signedOut.has("firefox")
         ? { tone: "recent", sentence: "Firefox was signed out" }
-        : { tone: "recent", sentence: "New sign-in from Firefox" };
+        : {
+            tone: "recent",
+            sentence: "New sign-in from Firefox",
+            ask: "Review the Firefox sign-in",
+          };
     case "many":
       return browserCount > 4
         ? {
@@ -148,23 +187,34 @@ export const deriveStatus = (input: StatusInput): CardStatus[] => {
     said.access = {
       tone: "action",
       sentence: "Add a passkey to sign in next time",
+      ask: "Add a passkey",
     };
   }
   if (scenario.recovery === "none" && scenario.access === "one") {
-    said.access = { tone: "action", sentence: "Only one way in, no recovery" };
+    said.access = {
+      tone: "action",
+      sentence: "Only one way in, no recovery",
+      ask: "Add a second way to sign in",
+    };
   }
   if (scenario.access === "newPasskey" && newBrowserLive) {
-    said.access = { tone: "recent", sentence: "New passkey from Firefox" };
+    said.access = {
+      tone: "recent",
+      sentence: "New passkey from Firefox",
+      ask: "Review the new passkey",
+    };
   }
   if (scenario.recovery === "phraseReset" && newBrowserLive) {
     said.recovery = {
       tone: "risk",
       sentence: "Phrase reset from a new browser",
+      ask: "Review the phrase reset",
     };
     if (scenario.access === "newPasskey") {
       said.devices = {
         tone: "risk",
         sentence: "Firefox changed how you sign in",
+        ask: "Check what Firefox changed",
       };
     }
   }

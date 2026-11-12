@@ -1,13 +1,12 @@
 <script lang="ts" module>
-  import type { CardKind, LeadAction, Tone } from "../status";
+  import type { CardKind, Tone } from "../status";
 
   export interface DockItem {
     kind: CardKind;
-    title: string;
-    sentence: string;
     tone: Tone;
-    action: LeadAction;
-    /** The one step the user should take; the rest offer a quieter button. */
+    /** The step, as a verb: the widget is the button that takes it. */
+    label: string;
+    /** The one step the user should take shows dark; the rest stay light. */
     primary: boolean;
   }
 </script>
@@ -27,11 +26,10 @@
 
   interface Props {
     items: DockItem[];
-    onOpen: (kind: CardKind) => void;
     onAction: (kind: CardKind) => void;
   }
 
-  const { items, onOpen, onAction }: Props = $props();
+  const { items, onAction }: Props = $props();
 
   const reduced = $derived(prefersReducedMotion.current);
 
@@ -44,18 +42,21 @@
     integrations: BotIcon,
   };
 
-  const TILE: Partial<Record<Tone, string>> = {
-    risk: "bg-bg-error-secondary text-fg-error-primary",
-    action: "bg-bg-warning-secondary text-fg-warning-primary",
-    queued: "bg-bg-warning-secondary text-fg-warning-primary",
+  // The glyph carries the tone. The dark button is inverted, so its glyph
+  // takes the other theme's shade to stay readable on it.
+  const GLYPH: Partial<Record<Tone, string>> = {
+    risk: "text-fg-error-primary",
+    action: "text-fg-warning-primary",
+    queued: "text-fg-warning-primary",
   };
-
-  const PRESS =
-    "transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100";
+  const GLYPH_ON_PRIMARY: Partial<Record<Tone, string>> = {
+    risk: "text-error-400 dark:text-error-600",
+    action: "text-warning-400 dark:text-warning-600",
+  };
 </script>
 
 <!-- The page with everything closed: what needs the user waits here, one
-     widget per step, and goes away once the step is done. -->
+     button per step, and goes away once the step is done. -->
 <div
   in:shellIn={{ reduced }}
   out:shellOut={{ reduced }}
@@ -71,47 +72,31 @@
         animate:flip={{ duration: reduced ? 0 : 320, easing: quintOut }}
         in:widgetIn={{ reduced, index }}
         out:widgetOut={{ reduced }}
-        class="ii-surface-6 ii-elevation-6 flex w-[min(20rem,calc(100vw-3rem))] shrink-0 snap-start items-center gap-1 rounded-[1.375rem] p-1.5"
+        class="flex shrink-0 snap-start"
       >
-        <button
-          type="button"
-          onclick={() => onOpen(item.kind)}
-          aria-label={`${item.title}: ${item.sentence}. Open`}
-          class="ii-hover focus-visible:ring-focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-[1rem] p-1.5 text-start outline-none focus-visible:ring-2"
-        >
-          <span
-            aria-hidden="true"
-            class={[
-              "grid size-9 shrink-0 place-items-center rounded-[0.625rem]",
-              TILE[item.tone] ?? "text-fg-secondary bg-(--ii-selected)",
-            ]}
-          >
-            <Icon class="size-4.5" />
-          </span>
-          <span class="flex min-w-0 flex-col">
-            <span class="text-text-tertiary text-xs">{item.title}</span>
-            <span
-              class={[
-                "line-clamp-2 text-[13px] leading-[18px] font-medium text-pretty",
-                item.tone === "risk"
-                  ? "text-text-error-primary"
-                  : "text-text-primary",
-              ]}
-            >
-              {item.sentence}
-            </span>
-          </span>
-        </button>
         <button
           type="button"
           onclick={() => onAction(item.kind)}
           class={[
-            "btn btn-sm shrink-0 rounded-full",
-            item.primary ? "btn-primary" : "btn-secondary",
-            PRESS,
+            "ii-elevation-6 flex h-11 max-w-[calc(100vw-3rem)] items-center gap-2 rounded-full ps-3.75 pe-4.5 text-sm font-medium whitespace-nowrap outline-none",
+            "focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary focus-visible:ring-2 focus-visible:ring-offset-2",
+            "transition-[scale,background-color] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100",
+            // A utility, not `ii-surface-6`: the reset for buttons outranks
+            // the surface classes, and the widget must not show the page through.
+            item.primary
+              ? "btn-primary"
+              : "ii-hover text-text-primary bg-(--ii-surface-6)",
           ]}
         >
-          {item.action.label}
+          <Icon
+            aria-hidden="true"
+            class={[
+              "size-4 shrink-0",
+              (item.primary ? GLYPH_ON_PRIMARY : GLYPH)[item.tone] ??
+                "text-fg-tertiary",
+            ]}
+          />
+          <span class="min-w-0 truncate">{item.label}</span>
         </button>
       </li>
     {/each}
