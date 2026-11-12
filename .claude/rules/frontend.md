@@ -75,7 +75,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
   - Stores and formatting: `writableStored` (`$lib/stores/writable.store.ts`), `$formatRelative` and `$formatDuration` (`$lib/stores/locale.store.ts`).
   - UI: the components in `$lib/components/ui/` (`Dialog`, `Popover`, `Tooltip`, `Alert`, `Input`, `Select`, `Toggle`, `Checkbox`, `CodeInput`, `HoldToConfirm`) before building a new one.
 - Persist per-identity preferences with a `writableStored` store keyed by anchor, never raw global `localStorage`.
-- Before using a new browser API, check support in older browsers such as older Safari. Core flows (such as sign-up, sign-in, authorize and recovery) must work there: feature-detect and fall back. Elsewhere, degraded styling or polish is acceptable as long as the page stays usable and navigable. Don't hold back the UX in current browsers to match older ones.
+- Before using a new browser API, check its support in older browsers. Core flows must work there: feature-detect and fall back. Elsewhere, degraded styling or polish is acceptable as long as the page stays usable and navigable. Don't hold back the UX in current browsers to match older ones.
 
 ## Accessibility
 
