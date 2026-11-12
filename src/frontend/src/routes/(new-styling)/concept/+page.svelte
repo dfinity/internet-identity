@@ -512,11 +512,12 @@
     }
   };
 
-  /** The tile's menu changes a setting the grid doesn't show, so it says so. */
-  const setNotificationsFromMenu = (app: ConceptApp, allowed: boolean) => {
-    setNotifications([app], allowed);
+  /** The tile's menu and the selection bar change a setting the grid shows
+   *  only for an app that has notified, so they say so. */
+  const setNotificationsAndSay = (apps: ConceptApp[], allowed: boolean) => {
+    setNotifications(apps, allowed);
     toaster.success({
-      title: `Notifications ${allowed ? "on" : "off"} for ${app.name}`,
+      title: `Notifications ${allowed ? "on" : "off"} for ${apps.length === 1 ? apps[0].name : `${apps.length} apps`}`,
       duration: 2500,
     });
   };
@@ -595,7 +596,7 @@
     onClearAll={() => readAll(app)}
     notificationsAllowed={app.notificationsAllowed}
     muted={!app.notificationsAllowed && app.lastNotifiedMillis !== undefined}
-    onSetNotifications={(allowed) => setNotificationsFromMenu(app, allowed)}
+    onSetNotifications={(allowed) => setNotificationsAndSay([app], allowed)}
     onManage={() => manageFrom(app)}
     onRemove={() => remove([app])}
   />
@@ -1115,9 +1116,13 @@
           }
         : undefined}
       selectedCount={selected.length}
+      anyNotifying={selectedApps.some((app) => app.notificationsAllowed)}
       onOpen={() => (panelOpen = true)}
       onAction={() => lead !== undefined && runLead(lead)}
       onDetails={() => (panelOpen = true)}
+      onSetNotifications={(allowed) =>
+        setNotificationsAndSay(selectedApps, allowed)}
+      onRemove={() => remove(selectedApps)}
       onDone={stopManaging}
     />
   {/if}

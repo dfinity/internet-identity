@@ -3,7 +3,13 @@
 </script>
 
 <script lang="ts">
-  import { ChevronUpIcon } from "@lucide/svelte";
+  import {
+    BellIcon,
+    BellOffIcon,
+    ChevronUpIcon,
+    Trash2Icon,
+    XIcon,
+  } from "@lucide/svelte";
   import { untrack } from "svelte";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion, Tween } from "svelte/motion";
@@ -20,9 +26,14 @@
     /** Lead view: the loud card, told the same way the panel tells it. */
     lead?: { title: string; sentence: string; tone: Tone; action: LeadAction };
     selectedCount: number;
+    /** Select view: whether any picked app may notify, so the one button
+     *  mutes them all, or, where none may, unmutes them. */
+    anyNotifying: boolean;
     onOpen: () => void;
     onAction: () => void;
     onDetails: () => void;
+    onSetNotifications: (allowed: boolean) => void;
+    onRemove: () => void;
     onDone: () => void;
   }
 
@@ -32,9 +43,12 @@
     note,
     lead,
     selectedCount,
+    anyNotifying,
     onOpen,
     onAction,
     onDetails,
+    onSetNotifications,
+    onRemove,
     onDone,
   }: Props = $props();
 
@@ -71,6 +85,10 @@
   };
   const PRESS =
     "transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100";
+  // A phone keeps the actions' glyphs and lets their words go to a screen
+  // reader, as the toolbar under a photo selection does.
+  const ACTION = "btn btn-tertiary btn-sm rounded-full max-sm:w-9 max-sm:px-0";
+  const ACTION_LABEL = "max-sm:sr-only";
 </script>
 
 <div
@@ -80,7 +98,7 @@
 >
   <div
     role="region"
-    aria-label="Identity"
+    aria-label={view === "select" ? "Selected apps" : "Identity"}
     aria-live="polite"
     class="ii-surface-6 ii-elevation-6 pointer-events-auto relative overflow-hidden rounded-[1.75rem]"
     style:width={width.current > 0 ? `${width.current}px` : undefined}
@@ -95,29 +113,64 @@
         class="absolute start-0 top-0 flex w-max max-w-[calc(100vw-1.5rem-2px)] items-center gap-1 p-1.5"
       >
         {#if view === "select"}
-          <span
-            class="text-text-primary ps-3.5 pe-2 text-sm font-semibold whitespace-nowrap tabular-nums"
-          >
-            {selectedCount === 0
-              ? "Select apps"
-              : selectedCount === 1
-                ? "1 app selected"
-                : `${selectedCount} apps selected`}
-          </span>
-          <button
-            type="button"
-            onclick={onDetails}
-            disabled={selectedCount === 0}
-            class={["btn btn-secondary btn-sm rounded-full", PRESS]}
-          >
-            Details
-          </button>
+          <!-- A selection bar: the count, what can be done to the picked apps
+               right here, and a close. The count opens them in the panel, as
+               the island's other views open it from their left end. -->
+          {#if selectedCount === 0}
+            <span
+              class="text-text-primary ps-3.5 pe-2 text-sm font-semibold whitespace-nowrap"
+            >
+              Select apps
+            </span>
+          {:else}
+            <button
+              type="button"
+              onclick={onDetails}
+              aria-haspopup="dialog"
+              aria-label={`${selectedCount} selected. Show details`}
+              class={[
+                "ii-hover text-text-primary focus-visible:ring-focus-ring flex h-9 items-center gap-1 rounded-full ps-3.5 pe-2.5 text-sm font-semibold whitespace-nowrap tabular-nums outline-none focus-visible:ring-2",
+                PRESS,
+              ]}
+            >
+              {selectedCount} selected
+              <ChevronUpIcon
+                aria-hidden="true"
+                class="text-fg-quaternary size-4 shrink-0"
+              />
+            </button>
+            <button
+              type="button"
+              onclick={() => onSetNotifications(!anyNotifying)}
+              class={[ACTION, PRESS]}
+            >
+              {#if anyNotifying}
+                <BellOffIcon aria-hidden="true" class="size-4" />
+                <span class={ACTION_LABEL}>Mute</span>
+              {:else}
+                <BellIcon aria-hidden="true" class="size-4" />
+                <span class={ACTION_LABEL}>Unmute</span>
+              {/if}
+            </button>
+            <button
+              type="button"
+              onclick={onRemove}
+              class={[ACTION, "btn-danger", PRESS]}
+            >
+              <Trash2Icon aria-hidden="true" class="size-4" />
+              <span class={ACTION_LABEL}>Remove</span>
+            </button>
+          {/if}
           <button
             type="button"
             onclick={onDone}
-            class={["btn btn-primary btn-sm rounded-full", PRESS]}
+            aria-label="Done"
+            class={[
+              "btn btn-tertiary btn-sm btn-icon text-fg-tertiary rounded-full",
+              PRESS,
+            ]}
           >
-            Done
+            <XIcon aria-hidden="true" class="size-4" />
           </button>
         {:else}
           <button
