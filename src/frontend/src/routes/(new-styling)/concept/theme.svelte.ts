@@ -98,8 +98,7 @@ export class ConceptTheme {
     return this.#forced ?? (this.#system.current ? "dark" : "light");
   }
 
-  toggle = (): void => {
-    const next: Theme = this.current === "dark" ? "light" : "dark";
+  set = (next: Theme): void => {
     const system: Theme = this.#system.current ? "dark" : "light";
     this.#forced = next === system ? undefined : next;
     if (this.#forced === undefined) {

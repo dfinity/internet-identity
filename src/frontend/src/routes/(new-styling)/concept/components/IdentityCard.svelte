@@ -56,8 +56,8 @@
     return "Passkey";
   };
 
-  // The clipboard refuses in some embedded or insecure contexts; then the row
-  // simply doesn't say "copied".
+  // The clipboard refuses in some embedded or insecure contexts; then the
+  // number simply doesn't say "copied".
   let copied = $state(false);
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
   const copyNumber = async () => {
@@ -81,54 +81,65 @@
     "ii-hover focus-visible:ring-focus-ring flex w-full items-center text-start outline-none focus-visible:ring-2 focus-visible:ring-inset";
 </script>
 
-<!-- What the account in the corner leaves out: it shows a name and an avatar,
-     and never changes size. So the identity's number has a row here, a label
-     and its value as in a settings list, and so does switching identity. The
-     other identities open in the card itself, under their row, and push the
-     panel down: nothing floats over the panel the account already opened. -->
+<!-- Whose panel this is, as an account switcher heads its menu (Google's
+     accounts, a workspace or an organization): the identity itself, large,
+     with its name and number, and under it the way to another one. The other
+     identities show as a row of avatars, so the row says who there is at a
+     glance; they open in the card itself and push the panel down, so nothing
+     floats over the panel. -->
 <Elevated
   offset={1}
   as="ul"
   class="ii-rows flex flex-col overflow-hidden rounded-2xl"
 >
-  <li>
-    <button
-      type="button"
-      onclick={copyNumber}
-      aria-label={`Identity number ${identity.identityNumber}. Copy`}
-      class={[ROW, "gap-2 px-4 py-3"]}
-    >
-      <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
-        Identity number
-      </span>
-      <span class="text-text-tertiary text-sm tabular-nums">
-        {identity.identityNumber}
-      </span>
+  <li class="flex items-center gap-3 px-4 pt-4 pb-3.5">
+    <IdentityAvatar {identity} size="lg" />
+    <div class="flex min-w-0 flex-1 flex-col items-start">
       <span
-        aria-hidden="true"
-        class="text-fg-quaternary grid size-4 shrink-0 place-items-center *:col-start-1 *:row-start-1"
+        class="text-text-primary w-full truncate text-base leading-6 font-semibold"
       >
-        {#if copied}
-          <span
-            class="text-fg-success-primary"
-            in:swapIn={{ reduced: prefersReducedMotion.current }}
-            out:swapOut={{ reduced: prefersReducedMotion.current }}
-          >
-            <CheckIcon class="size-4" strokeWidth={2.5} />
-          </span>
-        {:else}
-          <span
-            in:swapIn={{ reduced: prefersReducedMotion.current }}
-            out:swapOut={{ reduced: prefersReducedMotion.current }}
-          >
-            <CopyIcon class="size-4" />
-          </span>
-        {/if}
+        {nameOf(identity)}
       </span>
-    </button>
-    <span class="sr-only" aria-live="polite">
-      {copied ? "Identity number copied" : ""}
-    </span>
+      <!-- The number copies from where it is said, with the glyph after it
+           that says so. -->
+      <button
+        type="button"
+        onclick={copyNumber}
+        aria-label={`Identity number ${identity.identityNumber}. Copy`}
+        class="ii-hover focus-visible:ring-focus-ring text-text-tertiary hover:text-text-secondary -mx-1.5 flex items-center gap-1.5 rounded-md px-1.5 text-sm leading-6 transition-colors duration-150 outline-none focus-visible:ring-2"
+      >
+        <span>
+          Identity number <span class="tabular-nums"
+            >{identity.identityNumber}</span
+          >
+        </span>
+        <span
+          aria-hidden="true"
+          class="grid size-3.5 shrink-0 place-items-center *:col-start-1 *:row-start-1"
+        >
+          {#if copied}
+            <span
+              class="text-fg-success-primary"
+              in:swapIn={{ reduced: prefersReducedMotion.current }}
+              out:swapOut={{ reduced: prefersReducedMotion.current }}
+            >
+              <CheckIcon class="size-3.5" strokeWidth={2.5} />
+            </span>
+          {:else}
+            <span
+              class="text-fg-quaternary"
+              in:swapIn={{ reduced: prefersReducedMotion.current }}
+              out:swapOut={{ reduced: prefersReducedMotion.current }}
+            >
+              <CopyIcon class="size-3.5" />
+            </span>
+          {/if}
+        </span>
+      </button>
+      <span class="sr-only" aria-live="polite">
+        {copied ? "Identity number copied" : ""}
+      </span>
+    </div>
   </li>
   {#if others.length === 0}
     <li>

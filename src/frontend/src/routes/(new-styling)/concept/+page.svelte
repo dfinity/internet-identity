@@ -2,22 +2,22 @@
   import "./surfaces.css";
   import {
     CheckIcon,
-    ChevronsRightIcon,
     FlaskConicalIcon,
     LayoutGridIcon,
     LogOutIcon,
     PanelBottomIcon,
+    PanelRightCloseIcon,
     PanelRightIcon,
     PanelTopIcon,
     MoonIcon,
     SunIcon,
   } from "@lucide/svelte";
-  import { tick, type Component } from "svelte";
+  import { tick, untrack, type Component } from "svelte";
   import { flip } from "svelte/animate";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { MediaQuery } from "svelte/reactivity";
-  import { scale, slide } from "svelte/transition";
+  import { fade, scale, slide } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
@@ -32,9 +32,7 @@
   import Elevated from "./components/Elevated.svelte";
   import ExploreBanner from "./components/ExploreBanner.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
-  import IdentityCard, {
-    SWITCH_LIST_ID,
-  } from "./components/IdentityCard.svelte";
+  import IdentityCard from "./components/IdentityCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
@@ -42,7 +40,6 @@
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StatusRow from "./components/StatusRow.svelte";
   import VerifyPhraseDialog from "./components/VerifyPhraseDialog.svelte";
-  import CornerAccount from "./components/CornerAccount.svelte";
   import {
     browsersFor,
     exploreFeed,
@@ -199,10 +196,6 @@
   const panelVisible = $derived(
     isDesktop.current ? layout === "panel" || panelOpen : panelOpen,
   );
-  /** The account's pill in the top layout, for the room the header keeps. */
-  let accountWidth = $state(0);
-  let accountHeight = $state(0);
-
   const setLayout = (next: Layout) => {
     layout = next;
     localStorage.setItem(LAYOUT_KEY, layout);
@@ -587,31 +580,6 @@
     stopManaging();
   };
 
-  /** The account in the corner, once its panel is open, lists the identities
-   *  to switch to. They open at the top of the overview, so from a section or
-   *  from managing apps the panel goes back there first. */
-  const toggleSwitcher = () => {
-    if (managing) {
-      stopManaging();
-      switching = true;
-    } else if (section !== undefined) {
-      closeSection();
-      switching = true;
-    } else {
-      switching = !switching;
-    }
-    if (switching) {
-      aside?.scrollTo({ top: 0, behavior: reduced ? "instant" : "smooth" });
-      // The account stands after the panel, so focus goes up to the list.
-      void tick().then(() =>
-        document
-          .getElementById(SWITCH_LIST_ID)
-          ?.querySelector("button")
-          ?.focus({ preventScroll: true }),
-      );
-    }
-  };
-
   // A panel that opens again starts with the list folded.
   $effect(() => {
     if (!panelVisible) {
@@ -619,8 +587,39 @@
     }
   });
 
-  /** Light or dark, to try the concept in both; the open panel switches it. */
+  /** Light or dark, to try the concept in both; the panel's foot switches it. */
   const theme = new ConceptTheme();
+  const THEMES = [
+    { value: "light", label: "Light", icon: SunIcon },
+    { value: "dark", label: "Dark", icon: MoonIcon },
+  ] as const;
+
+  // The canvas header's corner holds the account while the panel is closed
+  // and Close while it is open, so focus follows from one to the other: the
+  // control pressed leaves the page, and focus would drop to the body.
+  let accountButton = $state<HTMLButtonElement>();
+  let closeButton = $state<HTMLButtonElement>();
+  let wasVisible = untrack(() => panelVisible);
+  $effect(() => {
+    const visible = panelVisible;
+    if (visible === wasVisible) return;
+    wasVisible = visible;
+    void tick().then(() => {
+      const active = document.activeElement;
+      if (visible) {
+        if (active === null || active === document.body) {
+          closeButton?.focus({ preventScroll: true });
+        }
+      } else if (
+        active === null ||
+        active === document.body ||
+        // The panel goes inert as it closes; focus inside it comes back.
+        aside?.contains(active) === true
+      ) {
+        accountButton?.focus({ preventScroll: true });
+      }
+    });
+  });
 
   const onWindowKeydown = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) {
@@ -682,38 +681,16 @@
   </button>
 {/snippet}
 
-{#snippet overview(closable: boolean, inSheet: boolean, cornered: boolean)}
+{#snippet overview(inSheet: boolean)}
   <div class="flex flex-col gap-5">
-    <!-- With the account in the corner, the account itself is this header. -->
-    {#if !cornered}
-      <!-- The header stands on the panel's edge, not on the icons inside the
-         rows: the avatar lines up with the cards below. It only says whose
-         panel this is, as the account in the corner does on desktop; the
-         number and the other identities are rows of the first card. -->
-      <div class={["flex items-center gap-3 py-2", inSheet && "pe-10"]}>
-        <IdentityAvatar {identity} size="sm" />
-        <span
-          class="text-text-primary min-w-0 flex-1 truncate text-sm font-medium"
-        >
-          {identityName}
-        </span>
-        {#if closable}
-          <!-- A 16px glyph in a muted tone, pointing the way the panel leaves
-             (see the corner's Close). -->
-          <button
-            type="button"
-            onclick={() => (panelOpen = false)}
-            title="Close"
-            class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
-          >
-            <ChevronsRightIcon
-              class="size-4 rtl:-scale-x-100"
-              aria-hidden="true"
-            />
-            <span class="sr-only">Close</span>
-          </button>
-        {/if}
-      </div>
+    <!-- The sheet on a phone needs a title, which keeps clear of its Close;
+         beside the canvas the identity card heads the panel itself. -->
+    {#if inSheet}
+      <h2
+        class="text-text-primary flex h-12 items-center pe-10 text-base font-semibold"
+      >
+        Identity
+      </h2>
     {/if}
     <IdentityCard
       {identity}
@@ -774,7 +751,7 @@
   </div>
 {/snippet}
 
-{#snippet panelBody(closable: boolean, inSheet: boolean, cornered: boolean)}
+{#snippet panelBody(inSheet: boolean)}
   {#if managing}
     {#if selectedApps.length === 1}
       {@const app = selectedApps[0]}
@@ -813,57 +790,11 @@
       onUnavailable={unavailable}
     />
   {:else}
-    {@render overview(closable, inSheet, cornered)}
+    {@render overview(inSheet)}
   {/if}
 {/snippet}
 
-{#snippet panel(closable: boolean, inSheet: boolean, cornered: boolean)}
-  {#if cornered}
-    <!-- The panel's first row: Close at the start, and at the end the account,
-         which stays in the corner (CornerAccount). It runs on the canvas
-         header's line, 64px tall from 9px down (the aside's 4px of padding
-         less 3px), so the account doesn't move up or down between the two.
-         The row stays put when the panel scrolls under it. Close's glyph
-         lines up with the rows below. The panel isn't a dialog over the
-         page: it slides in beside the canvas and pushes it aside. So Close
-         isn't a cross but two chevrons pointing where the panel goes back
-         to, as a side panel folds away in Notion or Linear. -->
-    <div
-      class="ii-surface-1 sticky -top-[3px] z-10 -mt-[3px] mb-1 flex h-16 shrink-0 items-center"
-    >
-      <button
-        type="button"
-        onclick={() => (panelOpen = false)}
-        title="Close"
-        class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring -ms-2 grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
-      >
-        <ChevronsRightIcon class="size-4 rtl:-scale-x-100" aria-hidden="true" />
-        <span class="sr-only">Close</span>
-      </button>
-      <!-- Concept only, to test both themes: it stands just before the
-           account, which floats over the end of this row. -->
-      <button
-        type="button"
-        onclick={theme.toggle}
-        title={theme.current === "dark"
-          ? "Switch to the light theme"
-          : "Switch to the dark theme"}
-        class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring ms-auto grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
-        style:margin-inline-end={`${accountWidth}px`}
-      >
-        {#if theme.current === "dark"}
-          <SunIcon class="size-4" aria-hidden="true" />
-        {:else}
-          <MoonIcon class="size-4" aria-hidden="true" />
-        {/if}
-        <span class="sr-only">
-          {theme.current === "dark"
-            ? "Switch to the light theme"
-            : "Switch to the dark theme"}
-        </span>
-      </button>
-    </div>
-  {/if}
+{#snippet panel(inSheet: boolean)}
   <!-- Views stack in one cell, so the old one fades while the new one arrives. -->
   <div class="grid">
     {#key viewKey}
@@ -872,7 +803,7 @@
         in:viewIn={{ direction: navDirection * readingDirection(), reduced }}
         out:viewOut={{ reduced }}
       >
-        {@render panelBody(closable, inSheet, cornered)}
+        {@render panelBody(inSheet)}
       </div>
     {/key}
   </div>
@@ -967,9 +898,9 @@
       <div
         class={[
           "col-start-2 row-start-1 flex items-center gap-1 justify-self-end md:col-start-3",
-          layout !== "top" && "md:hidden",
-          // A phone's controls share one pill; on desktop the account has its
-          // own, under it, below.
+          layout === "panel" && "md:hidden",
+          // A phone's controls share one pill; on desktop the account, or
+          // Close, has its own.
           !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
         ]}
       >
@@ -977,37 +908,53 @@
         <div class="flex md:hidden">
           {@render conceptControls(true)}
         </div>
-        {#if layout === "top"}
-          <!-- Desktop: room for the account, which floats over this corner
-               (CornerAccount), and its pill. It folds away while the account
-               sits on the panel, and opens again for it to come back. -->
-          <div
-            aria-hidden="true"
+        {#if isDesktop.current && panelVisible}
+          <!-- Desktop, with the panel open: Close stands where the account
+               was, on the canvas, which is what the panel pushed aside. The
+               glyph is a panel on the right folding away, as a side panel's
+               toggle is in Notion or Linear. The identity itself heads the
+               panel now, so the canvas doesn't name it twice. -->
+          <button
+            bind:this={closeButton}
+            type="button"
+            onclick={() => (panelOpen = false)}
+            title="Close"
+            in:fade={{ duration: reduced ? 0 : 200 }}
             class={[
               pill,
-              "shrink-0 transition-[width,margin,background-color,box-shadow] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none max-md:hidden",
+              PILL_MOTION,
+              "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
             ]}
-            style:width={`${panelVisible ? 0 : accountWidth}px`}
-            style:height={`${accountHeight}px`}
-            style:margin-inline-start={panelVisible ? "0px" : "0.5rem"}
-          ></div>
-        {/if}
-        {#if layout === "top"}
-          <!-- Phone: the account as on desktop, name then avatar at the edge;
-               it opens the sheet. -->
+          >
+            <PanelRightCloseIcon
+              class="size-4 rtl:-scale-x-100"
+              aria-hidden="true"
+            />
+            <span class="sr-only">Close identity</span>
+          </button>
+        {:else if layout === "top"}
+          <!-- The account, name then avatar at the edge; it opens the panel
+               on desktop and the sheet on a phone. On desktop it has a pill of
+               its own; on a phone it shares the controls'. -->
           <button
+            bind:this={accountButton}
             type="button"
             onclick={openAccount}
             aria-label={`${identityName}. Open identity${accountAttention !== undefined ? ", needs your attention" : ""}`}
-            class="ii-hover focus-visible:ring-focus-ring -me-1 flex min-w-0 items-center gap-2.5 rounded-full py-1 ps-3 pe-1 outline-none focus-visible:ring-2 active:bg-(--ii-selected) md:hidden"
+            in:fade={{ duration: reduced ? 0 : 200 }}
+            class={[
+              "ii-hover focus-visible:outline-focus-ring flex min-w-0 items-center gap-2.5 rounded-full ps-3 focus-visible:outline-2 focus-visible:outline-offset-2",
+              isDesktop.current
+                ? [pill, PILL_MOTION, "h-10 pe-[3px]"]
+                : "-me-1 py-1 pe-1",
+            ]}
           >
             <span
-              class="text-text-primary max-w-28 truncate text-sm font-medium"
+              class="text-text-primary max-w-28 truncate text-sm font-medium md:max-w-40"
             >
               {identityName}
             </span>
-            <!-- On a phone the controls share one pill: the dot cuts itself
-                 out of it. -->
+            <!-- The dot cuts itself out of the pill the account stands on. -->
             <span
               class="relative"
               style:--ii-dot-backdrop={headerLifted
@@ -1234,37 +1181,64 @@
       inert={!panelVisible}
       class={[
         // 24px of air on both sides: from the canvas frame (8px gap + 16px)
-        // and from the window edge (8px page padding + 16px).
-        "h-full w-[25rem] overflow-y-auto overscroll-contain ps-6 pe-4 pt-1 pb-4",
+        // and from the window edge (8px page padding + 16px). The first card
+        // starts 21px down, on the top of the canvas header's pills (8px page
+        // padding, the frame's 1px, then 12px).
+        "flex h-full w-[25rem] flex-col overflow-y-auto overscroll-contain ps-6 pe-4 pt-[13px] pb-4",
         "transition-[opacity,translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
         !panelVisible && "translate-x-4 opacity-0 rtl:-translate-x-4",
       ]}
     >
       {#if isDesktop.current}
-        {@render panel(layout === "island", false, layout === "top")}
+        <div class="shrink-0">
+          {@render panel(false)}
+        </div>
+        <!-- Concept only, to try both themes: it keeps to the panel's foot, at
+             the bottom of the window while the panel is short, and after the
+             last card once it is long. Two glyphs on a track, the one in use
+             raised, as a footer's theme switch is on Vercel's pages. -->
+        <div class="mt-auto flex shrink-0 items-center gap-3 ps-4 pt-6">
+          <span
+            id="concept-theme-label"
+            class="text-text-tertiary flex-1 text-[13px] leading-[18px] font-medium"
+          >
+            Theme
+          </span>
+          <div
+            role="radiogroup"
+            aria-labelledby="concept-theme-label"
+            class="flex rounded-full bg-(--ii-hover) p-0.5"
+          >
+            {#each THEMES as option (option.value)}
+              {@const Icon = option.icon}
+              {@const checked = theme.current === option.value}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={checked}
+                title={option.label}
+                onclick={() => theme.set(option.value)}
+                class={[
+                  "focus-visible:outline-focus-ring grid size-7 place-items-center rounded-full transition-[color,background-color,box-shadow] duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
+                  checked
+                    ? "text-fg-primary bg-(--ii-surface-6) shadow-(--ii-shadow-2)"
+                    : "text-fg-quaternary hover:text-fg-tertiary",
+                ]}
+              >
+                <Icon class="size-3.5" aria-hidden="true" />
+                <span class="sr-only">{option.label}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
       {/if}
     </aside>
   </div>
 
-  {#if layout === "top" && isDesktop.current}
-    <!-- The account in the top-right corner, over the canvas or on the panel. -->
-    <CornerAccount
-      open={panelOpen}
-      {identity}
-      bind:width={accountWidth}
-      bind:height={accountHeight}
-      {switching}
-      attention={accountAttention}
-      lifted={headerLifted}
-      onOpen={openAccount}
-      onSwitch={toggleSwitcher}
-    />
-  {/if}
-
   <!-- Phone: the panel is a sheet from the bottom, as dialogs are elsewhere. -->
   {#if panelOpen && !isDesktop.current}
     <Dialog onClose={() => (panelOpen = false)}>
-      {@render panel(false, true, false)}
+      {@render panel(true)}
     </Dialog>
   {/if}
 
