@@ -32,6 +32,7 @@
   import CreateBento from "./components/CreateBento.svelte";
   import Elevated from "./components/Elevated.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
+  import IdentityCard from "./components/IdentityCard.svelte";
   import OpenCloudBanner from "./components/OpenCloudBanner.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
@@ -670,6 +671,8 @@
           </button>
         {/if}
       </div>
+    {:else}
+      <IdentityCard {identity} />
     {/if}
     <Elevated
       offset={1}
@@ -740,10 +743,13 @@
 {#snippet panel(closable: boolean, inSheet: boolean, cornered: boolean)}
   {#if cornered}
     <!-- The panel's first row: Close at the start, and at the end the account,
-         which stays in the corner (CornerAccount). The row stays put when the
-         panel scrolls under it. Close's glyph lines up with the rows below. -->
+         which stays in the corner (CornerAccount). It runs on the canvas
+         header's line, 64px tall from 9px down (the aside's 4px of padding
+         less 3px), so the account doesn't move up or down between the two.
+         The row stays put when the panel scrolls under it. Close's glyph
+         lines up with the rows below. -->
     <div
-      class="ii-surface-1 sticky -top-1 z-10 -mt-1 mb-2 flex h-14 shrink-0 items-center"
+      class="ii-surface-1 sticky -top-[3px] z-10 -mt-[3px] mb-1 flex h-16 shrink-0 items-center"
     >
       <button
         type="button"
