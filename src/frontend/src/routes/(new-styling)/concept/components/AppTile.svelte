@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    ArrowUpRightIcon,
     BellIcon,
     BellOffIcon,
     CheckCheckIcon,
@@ -204,12 +205,13 @@
   </span>
 {/snippet}
 
-<div class="relative">
+<div class="tile relative">
   {#if mode === "open"}
     <ContextMenu items={menuItems} title={new URL(url).host} label={name}>
       {#snippet trigger(menu, menuOpen)}
         <a
           {...menu}
+          data-tile-link
           href={url}
           target="_blank"
           rel="noopener noreferrer"
@@ -264,8 +266,23 @@
       aria-label={`${unread.length} unread from ${name}`}
       class="bg-bg-brand-solid text-text-primary-inversed focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4"
     >
-      {badge}
+      <span class="cue-figure">{badge}</span>
+      <span
+        aria-hidden="true"
+        class="cue-arrow absolute inset-0 grid place-items-center"
+      >
+        <ArrowUpRightIcon class="size-3.5" strokeWidth={2.75} />
+      </span>
     </button>
+  {:else if mode === "open"}
+    <!-- Where a count would sit, the same circle with only the arrow, for when
+         the tile is hovered. -->
+    <span
+      aria-hidden="true"
+      class="cue-arrow bg-bg-brand-solid text-text-primary-inversed pointer-events-none absolute end-[calc(50%-2.3125rem)] top-[11px] grid size-4.5 place-items-center rounded-full ring-2 ring-(color:--ii-tile-backdrop)"
+    >
+      <ArrowUpRightIcon class="size-3.5" strokeWidth={2.75} />
+    </span>
   {/if}
 </div>
 
@@ -381,6 +398,46 @@
   @media (prefers-reduced-motion: reduce) {
     .jiggle {
       animation: none;
+    }
+  }
+
+  /* Hovering the tile, not its count, shows where a click goes: the count's
+     circle turns into an arrow up and to the right, a new tab, or the same
+     circle appears where a count would sit. On the count itself it stays a
+     count, since a click there opens what arrived. --cue is 1 meanwhile. */
+  @media (hover: hover) {
+    .tile:has([data-tile-link]:hover) {
+      --cue: 1;
+    }
+  }
+  .tile:has([data-tile-link]:focus-visible) {
+    --cue: 1;
+  }
+  .cue-arrow,
+  .cue-figure {
+    transition: opacity 150ms ease-out;
+  }
+  .cue-arrow {
+    opacity: var(--cue, 0);
+  }
+  .cue-figure {
+    opacity: calc(1 - var(--cue, 0));
+  }
+  /* The contextual icon cross-fade: scale 0.25, blur 4px, 300ms. */
+  @media (prefers-reduced-motion: no-preference) {
+    .cue-arrow,
+    .cue-figure {
+      transition-property: opacity, scale, filter;
+      transition-duration: 300ms;
+      transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+    .cue-arrow {
+      scale: calc(0.25 + 0.75 * var(--cue, 0));
+      filter: blur(calc(4px * (1 - var(--cue, 0))));
+    }
+    .cue-figure {
+      scale: calc(1 - 0.75 * var(--cue, 0));
+      filter: blur(calc(4px * var(--cue, 0)));
     }
   }
 
