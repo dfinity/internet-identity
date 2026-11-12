@@ -9,6 +9,8 @@
   a highlight that glides between rows. Changed: the menu opens the way the
   product's popovers do (see `menuIn` in ../motion.ts) instead of beUI's clip
   morph, grown from the point it was opened at, and it uses the product's tokens.
+  Added: a press held on past the menu hands over to `onHold`, the way holding
+  an icon on an iPhone goes on into editing the home screen.
 -->
 <script lang="ts" module>
   import type { Component } from "svelte";
@@ -38,9 +40,34 @@
     oncontextmenu: (event: TriggerEvent<MouseEvent>) => void;
     onkeydown: (event: TriggerEvent<KeyboardEvent>) => void;
     onpointerdown: (event: TriggerEvent<PointerEvent>) => void;
-    onpointermove: (event: PointerEvent) => void;
-    onpointerup: () => void;
-    onpointercancel: () => void;
+  };
+
+  /** Eats the click the press under way would still produce when it's let
+   *  go. Window-wide, since the trigger may be gone by then (a hold can turn
+   *  it into something else). That click follows the release at once, and a
+   *  release that makes none (it ended over something else) must not leave
+   *  the next click, say a key press on a button, to be eaten instead. */
+  const swallowNextClick = () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const swallow = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      release();
+    };
+    const releaseSoon = () => {
+      timer = setTimeout(release, 100);
+    };
+    const release = () => {
+      clearTimeout(timer);
+      window.removeEventListener("click", swallow, true);
+      window.removeEventListener("pointerdown", release, true);
+      window.removeEventListener("pointerup", releaseSoon, true);
+      window.removeEventListener("pointercancel", releaseSoon, true);
+    };
+    window.addEventListener("click", swallow, true);
+    window.addEventListener("pointerdown", release, true);
+    window.addEventListener("pointerup", releaseSoon, true);
+    window.addEventListener("pointercancel", releaseSoon, true);
   };
 </script>
 
@@ -57,10 +84,21 @@
     label: string;
     /** Leaves the browser's own menu alone. */
     disabled?: boolean;
+    /** A press held on past the menu: the left mouse button held still, or a
+     *  finger kept down after the menu opened. The menu closes and the press
+     *  is handed over; if it moves on, it's the receiver's (e.g. a drag). */
+    onHold?: () => void;
     trigger: Snippet<[props: ContextMenuTriggerProps, open: boolean]>;
   }
 
-  const { items, title, label, disabled = false, trigger }: Props = $props();
+  const {
+    items,
+    title,
+    label,
+    disabled = false,
+    onHold,
+    trigger,
+  }: Props = $props();
 
   interface Point {
     x: number;
@@ -70,6 +108,10 @@
   const VIEWPORT_PADDING = 8;
   const LONG_PRESS_DELAY = 520;
   const LONG_PRESS_TOLERANCE = 10;
+  /** A mouse has no long press of its own, so a hold goes straight to `onHold`. */
+  const MOUSE_HOLD_DELAY = 500;
+  /** A finger first gets the menu, then `onHold` if it stays down. */
+  const TOUCH_HOLD_DELAY = 1100;
   const TYPEAHEAD_RESET = 500;
 
   const menuId = $props.id();
@@ -119,23 +161,12 @@
 
   // --- Trigger ---
 
-  let pressTimer: ReturnType<typeof setTimeout> | undefined;
-  let pressOrigin: Point | undefined;
+  let menuTimer: ReturnType<typeof setTimeout> | undefined;
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
   /** A long press opened the menu during this press. */
   let pressOpened = false;
-  let releasePress: (() => void) | undefined;
-
-  const cancelPress = () => {
-    clearTimeout(pressTimer);
-    pressTimer = undefined;
-    pressOrigin = undefined;
-  };
-
-  const endPress = () => {
-    cancelPress();
-    releasePress?.();
-    releasePress = undefined;
-  };
+  /** Ends the press under way: its timers, its listeners, its selection hold. */
+  let endPress = () => {};
 
   // The platform runs its own long press on the same gesture (text selection,
   // the link preview on iOS) and would take it from us, so the press holds both
@@ -152,13 +183,6 @@
       node.style.webkitUserSelect = webkitUserSelect;
       node.style.setProperty("-webkit-touch-callout", callout);
     };
-  };
-
-  // Lifting the finger after a long press would still click the trigger and,
-  // on a link, open it under the menu.
-  const swallowClick = (event: MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
   };
 
   const onTriggerContextMenu = (event: TriggerEvent<MouseEvent>) => {
@@ -196,40 +220,76 @@
   };
 
   const onTriggerPointerDown = (event: TriggerEvent<PointerEvent>) => {
-    const node = event.currentTarget;
-    node.removeEventListener("click", swallowClick, { capture: true });
+    endPress();
     pressOpened = false;
-    // A mouse has its right button; a finger or a pen holds instead.
-    if (
-      disabled ||
-      event.defaultPrevented ||
-      (event.pointerType !== "touch" && event.pointerType !== "pen")
-    ) {
+    if (disabled || event.defaultPrevented) {
       return;
     }
-    releasePress?.();
-    releasePress = holdPlatformPress(node);
-    const origin = { x: event.clientX, y: event.clientY };
-    pressOrigin = origin;
-    pressTimer = setTimeout(() => {
-      pressTimer = undefined;
-      pressOrigin = undefined;
-      pressOpened = true;
-      node.addEventListener("click", swallowClick, {
-        capture: true,
-        once: true,
-      });
-      openAt(origin, node);
-    }, LONG_PRESS_DELAY);
-  };
+    // A finger or a pen holds for the menu, since there's no right button; a
+    // mouse holds only to go on to `onHold`.
+    const touch = event.pointerType === "touch" || event.pointerType === "pen";
+    const mouseHold =
+      event.pointerType === "mouse" &&
+      event.button === 0 &&
+      onHold !== undefined;
+    if (!touch && !mouseHold) {
+      return;
+    }
 
-  const onTriggerPointerMove = (event: PointerEvent) => {
-    if (
-      pressOrigin !== undefined &&
-      Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y) >
-        LONG_PRESS_TOLERANCE
-    ) {
-      cancelPress();
+    const node = event.currentTarget;
+    const { pointerId } = event;
+    const origin = { x: event.clientX, y: event.clientY };
+    const releaseSelection = touch ? holdPlatformPress(node) : undefined;
+
+    // On the window, so a press that slides off the trigger still ends here.
+    const onMove = (move: PointerEvent) => {
+      if (
+        move.pointerId === pointerId &&
+        Math.hypot(move.clientX - origin.x, move.clientY - origin.y) >
+          LONG_PRESS_TOLERANCE
+      ) {
+        clearTimeout(menuTimer);
+        clearTimeout(holdTimer);
+      }
+    };
+    const onEnd = (end: PointerEvent) => {
+      if (end.pointerId === pointerId) {
+        endPress();
+      }
+    };
+    endPress = () => {
+      clearTimeout(menuTimer);
+      clearTimeout(holdTimer);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      releaseSelection?.();
+      endPress = () => {};
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+
+    if (touch) {
+      menuTimer = setTimeout(() => {
+        pressOpened = true;
+        // Lifting the finger would still click the trigger: on a link, it
+        // would open it under the menu.
+        swallowNextClick();
+        openAt(origin, node);
+      }, LONG_PRESS_DELAY);
+    }
+    if (onHold !== undefined) {
+      const hold = onHold;
+      holdTimer = setTimeout(
+        () => {
+          endPress();
+          close(false);
+          swallowNextClick();
+          hold();
+        },
+        touch ? TOUCH_HOLD_DELAY : MOUSE_HOLD_DELAY,
+      );
     }
   };
 
@@ -240,12 +300,9 @@
     oncontextmenu: onTriggerContextMenu,
     onkeydown: onTriggerKeydown,
     onpointerdown: onTriggerPointerDown,
-    onpointermove: onTriggerPointerMove,
-    onpointerup: endPress,
-    onpointercancel: endPress,
   });
 
-  $effect(() => endPress);
+  $effect(() => () => endPress());
 
   // --- Menu ---
 

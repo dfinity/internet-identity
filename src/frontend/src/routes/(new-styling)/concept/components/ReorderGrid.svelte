@@ -145,13 +145,55 @@
     };
   });
 
+  let unwatchTarget = () => {};
+
+  // A finger's events keep going to the element it came down on even after
+  // that element has left the page, and a long press into managing replaces
+  // the tile's link with a button. Detached, the events no longer reach the
+  // window, so they're taken on the element itself until the press ends.
+  const watchTarget = (target: EventTarget | null) => {
+    unwatchTarget();
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const node = target as HTMLElement;
+    const move = (event: PointerEvent) => {
+      if (!node.isConnected) {
+        onPointerMove(event);
+      }
+    };
+    const up = (event: PointerEvent) => {
+      if (!node.isConnected) {
+        finish(event, false);
+      }
+    };
+    const cancel = (event: PointerEvent) => {
+      if (!node.isConnected) {
+        finish(event, true);
+      }
+    };
+    const touchMove = (event: TouchEvent) => {
+      if (!node.isConnected) {
+        onTouchMove(event);
+      }
+    };
+    node.addEventListener("pointermove", move);
+    node.addEventListener("pointerup", up);
+    node.addEventListener("pointercancel", cancel);
+    node.addEventListener("touchmove", touchMove, { passive: false });
+    unwatchTarget = () => {
+      node.removeEventListener("pointermove", move);
+      node.removeEventListener("pointerup", up);
+      node.removeEventListener("pointercancel", cancel);
+      node.removeEventListener("touchmove", touchMove);
+      unwatchTarget = () => {};
+    };
+  };
+
+  // Taken outside editing too: a tile held until the grid turns editable (a
+  // long press into managing) can go straight on into a drag.
   const onPointerDown = (event: PointerEvent, itemKey: string) => {
-    if (
-      !editing ||
-      !event.isPrimary ||
-      event.button !== 0 ||
-      drag !== undefined
-    ) {
+    if (!event.isPrimary || event.button !== 0 || drag !== undefined) {
       return;
     }
     press = {
@@ -159,6 +201,9 @@
       pointerId: event.pointerId,
       at: { x: event.clientX, y: event.clientY },
     };
+    if (event.pointerType !== "mouse") {
+      watchTarget(event.target);
+    }
   };
 
   const settle = (itemKey: string) => {
@@ -185,108 +230,125 @@
     event.stopPropagation();
   };
 
+  // Leaving editing drops any drag in progress.
   $effect(() => {
     if (!editing) {
+      drag = undefined;
+    }
+  });
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (
+      !editing ||
+      press === undefined ||
+      press.cancelled === true ||
+      event.pointerId !== press.pointerId
+    ) {
       return;
     }
-
-    const onPointerMove = (event: PointerEvent) => {
+    const pointer = { x: event.clientX, y: event.clientY };
+    if (drag === undefined) {
       if (
-        press === undefined ||
-        press.cancelled === true ||
-        event.pointerId !== press.pointerId
+        Math.hypot(pointer.x - press.at.x, pointer.y - press.at.y) <
+        DRAG_THRESHOLD
       ) {
         return;
       }
-      const pointer = { x: event.clientX, y: event.clientY };
-      if (drag === undefined) {
-        if (
-          Math.hypot(pointer.x - press.at.x, pointer.y - press.at.y) <
-          DRAG_THRESHOLD
-        ) {
-          return;
-        }
-        cells = measureCells();
-        drag = {
-          key: press.key,
-          from: indexOf(press.key),
-          start: press.at,
-          pointer,
-        };
-      } else {
-        drag.pointer = pointer;
-      }
-      // Between cells, the tile keeps the place it has.
-      const cell = cells.findIndex(
-        ({ left, top, right, bottom }) =>
-          pointer.x >= left &&
-          pointer.x < right &&
-          pointer.y >= top &&
-          pointer.y < bottom,
+      cells = measureCells();
+      drag = {
+        key: press.key,
+        from: indexOf(press.key),
+        start: press.at,
+        pointer,
+      };
+    } else {
+      drag.pointer = pointer;
+    }
+    // Between cells, the tile keeps the place it has.
+    const cell = cells.findIndex(
+      ({ left, top, right, bottom }) =>
+        pointer.x >= left &&
+        pointer.x < right &&
+        pointer.y >= top &&
+        pointer.y < bottom,
+    );
+    if (cell < 0) {
+      return;
+    }
+    // A free cell means the end of the grid: tiles never leave a gap.
+    const to = Math.min(cell, items.length - 1);
+    const from = indexOf(drag.key);
+    if (to !== from) {
+      onMove(from, to);
+    }
+  };
+
+  const finish = (event: PointerEvent, cancelled: boolean) => {
+    if (press === undefined || event.pointerId !== press.pointerId) {
+      return;
+    }
+    const escaped = press.cancelled === true;
+    press = undefined;
+    unwatchTarget();
+    if (!cancelled && (drag !== undefined || escaped)) {
+      window.addEventListener("click", swallowClick, {
+        capture: true,
+        once: true,
+      });
+      setTimeout(() =>
+        window.removeEventListener("click", swallowClick, { capture: true }),
       );
-      if (cell < 0) {
-        return;
-      }
-      // A free cell means the end of the grid: tiles never leave a gap.
-      const to = Math.min(cell, items.length - 1);
-      const from = indexOf(drag.key);
-      if (to !== from) {
-        onMove(from, to);
-      }
-    };
-
-    const finish = (event: PointerEvent, cancelled: boolean) => {
-      if (press === undefined || event.pointerId !== press.pointerId) {
-        return;
-      }
-      const escaped = press.cancelled === true;
-      press = undefined;
-      if (!cancelled && (drag !== undefined || escaped)) {
-        window.addEventListener("click", swallowClick, {
-          capture: true,
-          once: true,
-        });
-        setTimeout(() =>
-          window.removeEventListener("click", swallowClick, { capture: true }),
-        );
-      }
-      if (drag === undefined) {
-        return;
-      }
-      if (cancelled) {
-        putBack();
-      }
-      const dropped = drag.key;
-      drag = undefined;
-      settle(dropped);
-    };
-    const onPointerUp = (event: PointerEvent) => finish(event, false);
-    const onPointerCancel = (event: PointerEvent) => finish(event, true);
-
-    // Captured, so the page's own Escape doesn't also close its panel.
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || drag === undefined) {
-        return;
-      }
-      event.preventDefault();
+    }
+    if (drag === undefined) {
+      return;
+    }
+    if (cancelled) {
       putBack();
-      const dropped = drag.key;
-      if (press !== undefined) {
-        press.cancelled = true;
-      }
-      drag = undefined;
-      settle(dropped);
-    };
+    }
+    const dropped = drag.key;
+    drag = undefined;
+    settle(dropped);
+  };
+  const onPointerUp = (event: PointerEvent) => finish(event, false);
+  const onPointerCancel = (event: PointerEvent) => finish(event, true);
 
+  // Captured, so the page's own Escape doesn't also close its panel.
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || drag === undefined) {
+      return;
+    }
+    event.preventDefault();
+    putBack();
+    const dropped = drag.key;
+    if (press !== undefined) {
+      press.cancelled = true;
+    }
+    drag = undefined;
+    settle(dropped);
+  };
+
+  // A finger that was already down when editing began started under
+  // `touch-action: auto`, so the page would scroll instead of the tile
+  // moving. Holding still until then kept it from scrolling; this keeps it so.
+  const onTouchMove = (event: TouchEvent) => {
+    if (editing && press !== undefined && press.cancelled !== true) {
+      event.preventDefault();
+    }
+  };
+
+  $effect(() => {
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerCancel);
     window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerCancel);
       window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("touchmove", onTouchMove);
+      unwatchTarget();
       press = undefined;
       drag = undefined;
     };

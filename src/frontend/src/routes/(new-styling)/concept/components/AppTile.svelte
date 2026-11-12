@@ -229,7 +229,14 @@
 
 <div class="tile relative">
   {#if mode === "open"}
-    <ContextMenu items={menuItems} title={new URL(url).host} label={name}>
+    <!-- Held on, the tile goes on into managing apps, as an iPhone icon goes
+         on into editing the home screen. -->
+    <ContextMenu
+      items={menuItems}
+      title={new URL(url).host}
+      label={name}
+      onHold={onManage}
+    >
       {#snippet trigger(menu, menuOpen)}
         <a
           {...menu}

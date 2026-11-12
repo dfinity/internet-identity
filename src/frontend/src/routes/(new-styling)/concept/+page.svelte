@@ -8,6 +8,8 @@
     PanelBottomIcon,
     PanelRightIcon,
     PanelTopIcon,
+    MoonIcon,
+    SunIcon,
     XIcon,
   } from "@lucide/svelte";
   import type { Component } from "svelte";
@@ -48,6 +50,7 @@
     type ConceptApp,
   } from "./mockData";
   import { viewIn, viewOut } from "./motion";
+  import { ConceptTheme } from "./theme.svelte";
   import {
     deriveStatus,
     isLoud,
@@ -312,18 +315,6 @@
       primary: isLoud(card),
     })),
   );
-  const accountStatus = $derived(
-    attention.length === 0
-      ? undefined
-      : {
-          sentence:
-            attention.length === 1
-              ? "1 thing to review"
-              : `${attention.length} things to review`,
-          tone: attention[0].tone,
-        },
-  );
-
   /** The account opens on its overview, unless apps are being managed. */
   const openAccount = () => {
     if (!managing) {
@@ -559,15 +550,27 @@
     return Promise.resolve();
   };
 
+  /** Light or dark, to try the concept in both; the open panel switches it. */
+  const theme = new ConceptTheme();
+
   const onWindowKeydown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented) {
+      return;
+    }
+    // The product's Popover hears Escape only on its backdrop, which focus
+    // never reaches, so the identity switcher is closed here: Escape takes it
+    // first, and the panel with the next press.
+    if (isSwitcherOpen) {
+      event.preventDefault();
+      isSwitcherOpen = false;
+      switcherAnchor?.focus({ preventScroll: true });
+      return;
+    }
     if (
-      event.key === "Escape" &&
-      !event.defaultPrevented &&
       (layout === "island" || layout === "top") &&
       isDesktop.current &&
       panelOpen &&
-      !isSwitcherOpen &&
-      // An open popover takes Escape first.
+      // Any other open popover keeps the panel open.
       document.querySelector(".popover:popover-open") === null
     ) {
       panelOpen = false;
@@ -736,12 +739,43 @@
 
 {#snippet panel(closable: boolean, inSheet: boolean, cornered: boolean)}
   {#if cornered}
-    <!-- The account's row, kept free for it as it arrives from the canvas,
-         and kept clear when the panel scrolls under it. -->
+    <!-- The panel's first row: Close at the start, and at the end the account,
+         which stays in the corner (CornerAccount). The row stays put when the
+         panel scrolls under it. Close's glyph lines up with the rows below. -->
     <div
-      aria-hidden="true"
-      class="ii-surface-1 sticky top-0 z-10 -mt-1 mb-1 h-15 shrink-0"
-    ></div>
+      class="ii-surface-1 sticky -top-1 z-10 -mt-1 mb-2 flex h-14 shrink-0 items-center"
+    >
+      <button
+        type="button"
+        onclick={() => (panelOpen = false)}
+        class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring -ms-2 grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
+      >
+        <XIcon class="size-4" aria-hidden="true" />
+        <span class="sr-only">Close</span>
+      </button>
+      <!-- Concept only, to test both themes: it stands just before the
+           account, which floats over the end of this row. -->
+      <button
+        type="button"
+        onclick={theme.toggle}
+        title={theme.current === "dark"
+          ? "Switch to the light theme"
+          : "Switch to the dark theme"}
+        class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring ms-auto grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
+        style:margin-inline-end={`${accountWidth}px`}
+      >
+        {#if theme.current === "dark"}
+          <SunIcon class="size-4" aria-hidden="true" />
+        {:else}
+          <MoonIcon class="size-4" aria-hidden="true" />
+        {/if}
+        <span class="sr-only">
+          {theme.current === "dark"
+            ? "Switch to the light theme"
+            : "Switch to the dark theme"}
+        </span>
+      </button>
+    </div>
   {/if}
   <!-- Views stack in one cell, so the old one fades while the new one arrives. -->
   <div class="grid">
@@ -851,7 +885,24 @@
             style:margin-inline-start={panelVisible ? "0px" : "0.5rem"}
           ></div>
         {/if}
-        {#if layout === "panel" || layout === "top"}
+        {#if layout === "top"}
+          <!-- Phone: the account as on desktop, name then avatar at the edge;
+               it opens the sheet. -->
+          <button
+            type="button"
+            onclick={openAccount}
+            aria-label={`${identityName}. Open identity`}
+            class="ii-hover focus-visible:ring-focus-ring -me-1 flex min-w-0 items-center gap-2.5 rounded-full py-1 ps-3 pe-1 outline-none focus-visible:ring-2 active:bg-(--ii-selected) md:hidden"
+          >
+            <span
+              class="text-text-primary max-w-28 truncate text-sm font-medium"
+            >
+              {identityName}
+            </span>
+            <IdentityAvatar {identity} size="sm" />
+          </button>
+        {/if}
+        {#if layout === "panel"}
           <!-- Phone: the panel opens from here; the dot says it has something for you. -->
           <button
             type="button"
@@ -1081,11 +1132,9 @@
     <CornerAccount
       open={panelOpen}
       {identity}
-      status={accountStatus}
       bind:width={accountWidth}
       bind:height={accountHeight}
       onOpen={openAccount}
-      onClose={() => (panelOpen = false)}
       onSwitch={(anchor) => {
         switcherAnchor = anchor;
         isSwitcherOpen = true;
