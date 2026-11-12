@@ -1,5 +1,6 @@
 <script lang="ts">
   import "./surfaces.css";
+  import "./swipe.css";
   import {
     CheckIcon,
     ChevronsUpDownIcon,
@@ -109,9 +110,10 @@
   );
 
   // Four columns at every width, centered, so Recent and All apps line up
-  // tile for tile; only the tiles grow with the canvas.
+  // tile for tile; only the tiles grow with the canvas. `swipe-grid` turns
+  // the tiles as their page is swiped (swipe.css counts on the 4 columns).
   const GRID =
-    "grid grid-cols-[repeat(4,5.25rem)] gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2";
+    "swipe-grid grid grid-cols-[repeat(4,5.25rem)] gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2";
   // A heading starts at the edge of the first logo, like a shelf title on
   // iOS. The 4rem logo sits centered in its column, so the inset is half of
   // what the column leaves: (5.25rem − 4rem) / 2, then (7rem − 4rem) / 2.
@@ -761,7 +763,7 @@
          trackpad a swipe does too, landing on a page. -->
       <div
         bind:this={pager}
-        class="flex flex-1 snap-x snap-mandatory [scrollbar-width:none] overflow-x-auto overscroll-x-contain md:flex-none [&::-webkit-scrollbar]:hidden"
+        class="swipe-depth flex flex-1 snap-x snap-mandatory [scrollbar-width:none] overflow-x-auto overscroll-x-contain md:flex-none [&::-webkit-scrollbar]:hidden"
       >
         <div
           bind:this={pageRefs[0]}

@@ -1,0 +1,73 @@
+/*
+ * App tiles turning as their page is swiped, like panels on the inside of a
+ * cylinder: the edge that leads the way comes toward you, and the page that
+ * arrives unfolds from the other side.
+ *
+ * The scroll position drives it, not a clock, so it follows the finger and
+ * adds no time to a swipe. Only transform and opacity change, which the
+ * browser animates off the main thread. Where scroll-driven animations aren't
+ * supported, or motion is reduced, pages slide flat as before.
+ */
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* Each page tracks its place in the pager: 50% while it fills it, 0%
+       one width ahead, 100% one width behind. */
+    .concept .swipe-depth > * {
+      view-timeline: --ii-page inline;
+    }
+
+    .concept .swipe-grid > li {
+      /* Column in reading order. */
+      --col: 0;
+      /* Mirrors the turn for right-to-left, where pages move the other way. */
+      --dir: 1;
+      /* The column nearest the side the page leaves by turns the most. */
+      --tilt-out: calc(var(--dir) * (56deg + (3 - var(--col)) * 6deg));
+      --tilt-in: calc(var(--dir) * (56deg + var(--col) * 6deg));
+      animation: swipe-tile linear both;
+      animation-timeline: --ii-page;
+    }
+    .concept .swipe-grid > li:nth-child(4n + 2) {
+      --col: 1;
+    }
+    .concept .swipe-grid > li:nth-child(4n + 3) {
+      --col: 2;
+    }
+    .concept .swipe-grid > li:nth-child(4n + 4) {
+      --col: 3;
+    }
+    :root[dir="rtl"] .concept .swipe-grid > li {
+      --dir: -1;
+    }
+  }
+}
+
+/* Coming in from ahead, at rest, gone behind. The perspective is close, a
+   little over twice a tile's width, so a turned tile visibly narrows toward
+   its far edge; most of the turn happens in the first half of a swipe. */
+@keyframes swipe-tile {
+  0% {
+    opacity: 0.6;
+    transform: perspective(14rem) translateZ(2.5rem)
+      rotateY(calc(-1 * var(--tilt-in)));
+  }
+  25% {
+    opacity: 0.9;
+    transform: perspective(14rem) translateZ(1.5rem)
+      rotateY(calc(-0.7 * var(--tilt-in)));
+  }
+  50% {
+    opacity: 1;
+    transform: perspective(14rem) translateZ(0) rotateY(0deg);
+  }
+  75% {
+    opacity: 0.9;
+    transform: perspective(14rem) translateZ(1.5rem)
+      rotateY(calc(0.7 * var(--tilt-out)));
+  }
+  100% {
+    opacity: 0.6;
+    transform: perspective(14rem) translateZ(2.5rem) rotateY(var(--tilt-out));
+  }
+}
