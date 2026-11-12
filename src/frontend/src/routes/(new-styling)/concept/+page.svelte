@@ -121,12 +121,14 @@
     ),
   );
 
-  // A page scrolls on its own under the fixed header. On a phone the grid
-  // starts at the top like a home screen; on desktop it sits in the middle of
-  // the free space (md:my-auto inside), and the room kept for the island
-  // below lifts it a little above center.
+  // A page scrolls on its own, up under the fixed header (its height is
+  // --header-h). On a phone the grid starts at the top like a home screen; on
+  // desktop it sits in the middle of the free space (md:my-auto inside), and
+  // the room kept for the island below lifts it a little above center.
   const PAGE =
-    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-12 pb-32 sm:px-6";
+    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-[calc(var(--header-h)+3rem)] pb-32 scroll-pt-[calc(var(--header-h)+3rem)] sm:px-6";
+  /** The header's height: the pages run up under it. */
+  let headerHeight = $state(64);
 
   // Columns follow the canvas the way Apple's home screens do: four on a
   // phone, five on a tablet, seven on a desktop (the Mac's Applications
@@ -724,7 +726,8 @@
          empty column that keeps them centered. A phone has no room for the
          pages beside its controls, so they drop to a row of their own. -->
     <header
-      class="grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr]"
+      bind:clientHeight={headerHeight}
+      class="relative z-10 grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr]"
     >
       <div dir="ltr" class="flex h-16 items-center gap-3 justify-self-start">
         <Logo class="text-fg-primary h-4" />
@@ -801,7 +804,11 @@
       </div>
     </header>
 
-    <div class="relative flex min-h-0 flex-1 flex-col">
+    <!-- Pulled up by the header's height, so the pages run on under it. -->
+    <div
+      class="relative -mt-(--header-h) flex min-h-0 flex-1 flex-col"
+      style:--header-h={`${headerHeight}px`}
+    >
       <!-- The pages side by side: the tabs move between them, and on touch or a
          trackpad a swipe does too, landing on a page. -->
       <div
@@ -941,9 +948,16 @@
         ></div>
       </div>
       <!-- Content leaves under the header through a blur that deepens into
-           the canvas, and comes up from under the island the same way. A
-           page keeps clear of both at rest (PAGE's pt-12 and pb-32). -->
-      <ProgressiveBlur side="top" fade class="h-12" />
+           the canvas, and comes up from under the island the same way. The
+           top one starts inside the header, a rem above its bottom, so the
+           header is the solid end of the fade rather than a slab over it. A
+           page keeps clear of both at rest (PAGE's top padding and pb-32). -->
+      <ProgressiveBlur
+        side="top"
+        fade
+        hold="calc(var(--header-h) - 1rem)"
+        class="h-[calc(var(--header-h)+3rem)]"
+      />
       <ProgressiveBlur side="bottom" fade class="h-24" />
     </div>
   </Elevated>
