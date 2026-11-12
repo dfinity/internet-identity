@@ -5,8 +5,8 @@
     BellOffIcon,
     CheckCheckIcon,
     CheckIcon,
+    CircleCheckIcon,
     ExternalLinkIcon,
-    LayoutGridIcon,
     LinkIcon,
     Trash2Icon,
     XIcon,
@@ -123,9 +123,11 @@
             ]),
       ],
       [
+        // Says what happens: the grid goes into selecting with this app
+        // already checked, under the very mark the icon draws.
         ...(onManage === undefined
           ? []
-          : [{ label: "Manage", icon: LayoutGridIcon, onSelect: onManage }]),
+          : [{ label: "Select", icon: CircleCheckIcon, onSelect: onManage }]),
         ...(onRemove === undefined
           ? []
           : [
