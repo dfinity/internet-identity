@@ -9,15 +9,17 @@
     ChevronDownIcon,
     CopyIcon,
     PlusIcon,
+    UserIcon,
   } from "@lucide/svelte";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { slide } from "svelte/transition";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+  import { identityInitial, identityPalette } from "$lib/utils/identityColors";
   import { getMetadataString } from "$lib/utils/openID";
   import { swapIn, swapOut } from "../motion";
-  import Elevated from "./Elevated.svelte";
+  import Elevated, { useSurface } from "./Elevated.svelte";
 
   interface Props {
     identity: LastUsedIdentity;
@@ -68,6 +70,12 @@
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => (copied = false), 1800);
   };
+
+  /** The row's avatars show the first few; the rest are a count. */
+  const PREVIEW = 3;
+  // The card is one step above what it stands on (Elevated, below), and the
+  // avatars in the preview cut themselves out of it.
+  const cardSurface = `var(--ii-surface-${Math.min(useSurface() + 1, 8)})`;
 
   const ROW =
     "ii-hover focus-visible:ring-focus-ring flex w-full items-center text-start outline-none focus-visible:ring-2 focus-visible:ring-inset";
@@ -136,8 +144,8 @@
     </li>
   {:else}
     <li>
-      <!-- Closed, the row names who there is to switch to, where the row
-           above has its value; open, the list below says it. -->
+      <!-- Closed, the row shows who there is to switch to, as overlapping
+           avatars in their own colours; open, the list below says it. -->
       <button
         type="button"
         onclick={() => (switching = !switching)}
@@ -145,17 +153,45 @@
         aria-controls={SWITCH_LIST_ID}
         class={[ROW, "gap-2 px-4 py-3"]}
       >
-        <span class="text-text-primary shrink-0 text-sm font-medium">
+        <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
           Switch identity
         </span>
         <span
           aria-hidden="true"
           class={[
-            "text-text-tertiary min-w-0 flex-1 truncate text-end text-sm transition-opacity duration-150 ease-out motion-reduce:transition-none",
+            "flex shrink-0 items-center transition-opacity duration-150 ease-out motion-reduce:transition-none",
             switching && "opacity-0",
           ]}
+          style:--ii-stack-cut={cardSurface}
         >
-          {others.map(nameOf).join(", ")}
+          {#each others.slice(0, PREVIEW) as other, index (other.identityNumber)}
+            {@const palette = identityPalette(other.identityNumber)}
+            {@const initial = identityInitial(other.name)}
+            <!-- Later avatars tuck under earlier ones, each cut out of the
+                 card by a ring, so the first reads as the front. -->
+            <span
+              class={[
+                "relative grid size-6 place-items-center rounded-full text-[11px] leading-none font-semibold ring-2 ring-(color:--ii-stack-cut) outline-1 -outline-offset-1 outline-black/8 dark:outline-white/12",
+                index > 0 && "-ms-1.5",
+              ]}
+              style:background-color={palette.background}
+              style:color={palette.foreground}
+              style:z-index={PREVIEW - index}
+            >
+              {#if initial !== undefined}
+                {initial}
+              {:else}
+                <UserIcon class="size-3.5" />
+              {/if}
+            </span>
+          {/each}
+          {#if others.length > PREVIEW}
+            <span
+              class="bg-bg-secondary text-text-tertiary relative -ms-1.5 grid h-6 min-w-6 place-items-center rounded-full px-1 text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-stack-cut)"
+            >
+              +{others.length - PREVIEW}
+            </span>
+          {/if}
         </span>
         <ChevronDownIcon
           aria-hidden="true"
