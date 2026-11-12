@@ -189,6 +189,24 @@
     --ii-tile-backdrop: var(--ii-shelf);
   }
 
+  /* Rows of one group, parted the way Apple's lists part theirs: a hairline
+     that starts where the row's text does and stops short of the far edge.
+     The card's own edge stays whole, so its rows read as one sheet with air
+     around the lines, not as a stack of boxes. `--ii-rows-inset` is where
+     the text starts: 1rem in a plain row, 4rem past a 36px icon. */
+  .ii-rows > :not(:first-child) {
+    position: relative;
+  }
+  .ii-rows > :not(:first-child)::before {
+    content: "";
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: var(--ii-rows-inset, 1rem) 1rem;
+    block-size: 1px;
+    background-color: var(--color-border-tertiary);
+    pointer-events: none;
+  }
+
   /* A transparent border under the ring keeps the edge in forced-colors mode. */
   [class*="ii-elevation-"] {
     border: 1px solid transparent;

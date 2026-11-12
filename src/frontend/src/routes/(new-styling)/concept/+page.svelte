@@ -99,9 +99,21 @@
     }),
   );
   const lead = $derived(leadOf(cards));
-  /** The account's rows. Apps are managed from the grid itself (Manage, by
-   *  All apps' heading), so the account doesn't list them too. */
-  const accountCards = $derived(cards.filter(({ kind }) => kind !== "apps"));
+  /** The account's rows, in two groups: how you get in, and what is signed in
+   *  or connected with the identity. Apps are managed from the grid itself
+   *  (Manage, by All apps' heading), so the account doesn't list them too. */
+  const GROUPS: { title: string; kinds: CardKind[] }[] = [
+    { title: "Sign-in", kinds: ["access", "recovery"] },
+    { title: "Connected", kinds: ["devices", "integrations"] },
+  ];
+  const accountGroups = $derived(
+    GROUPS.map(({ title, kinds }) => ({
+      title,
+      cards: kinds
+        .map((kind) => cards.find((card) => card.kind === kind))
+        .filter((card) => card !== undefined),
+    })),
+  );
   /** What the calm island mentions: something new or waiting, never a tip. */
   const note = $derived(
     cards.find(({ tone }) =>
@@ -624,7 +636,7 @@
 {/snippet}
 
 {#snippet overview(closable: boolean, inSheet: boolean, cornered: boolean)}
-  <div class="flex flex-col gap-3">
+  <div class="flex flex-col gap-5">
     <!-- With the account in the corner, the account itself is this header. -->
     {#if !cornered}
       <!-- The header stands on the panel's edge, not on the icons inside the
@@ -674,26 +686,37 @@
     {:else}
       <IdentityCard {identity} />
     {/if}
-    <Elevated
-      offset={1}
-      as="ul"
-      class="divide-border-tertiary flex flex-col divide-y overflow-hidden rounded-2xl"
-    >
-      {#each accountCards as card (card.kind)}
-        <StatusRow
-          kind={card.kind}
-          title={TITLES[card.kind]}
-          sentence={card.sentence}
-          tone={card.tone}
-          action={isLoud(card)
-            ? leadActionOf(card, current.scenario)
-            : undefined}
-          resolved={resolvedKinds.includes(card.kind)}
-          onOpen={() => openCard(card.kind)}
-          onAction={() => runLead(card)}
-        />
-      {/each}
-    </Elevated>
+    <!-- Each group is a card under a small heading, as in Settings on iOS:
+         the heading starts where the rows' content does, 16px in. -->
+    {#each accountGroups as group (group.title)}
+      <section class="flex flex-col gap-2">
+        <h2
+          class="text-text-tertiary ps-4 text-[13px] leading-[18px] font-medium"
+        >
+          {group.title}
+        </h2>
+        <Elevated
+          offset={1}
+          as="ul"
+          class="ii-rows flex flex-col overflow-hidden rounded-2xl [--ii-rows-inset:4rem]"
+        >
+          {#each group.cards as card (card.kind)}
+            <StatusRow
+              kind={card.kind}
+              title={TITLES[card.kind]}
+              sentence={card.sentence}
+              tone={card.tone}
+              action={isLoud(card)
+                ? leadActionOf(card, current.scenario)
+                : undefined}
+              resolved={resolvedKinds.includes(card.kind)}
+              onOpen={() => openCard(card.kind)}
+              onAction={() => runLead(card)}
+            />
+          {/each}
+        </Elevated>
+      </section>
+    {/each}
   </div>
 {/snippet}
 

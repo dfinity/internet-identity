@@ -426,7 +426,7 @@
           platform={group.platform}
           count={group.browsers.length}
         />
-        <ul class="divide-border-tertiary flex flex-col divide-y">
+        <ul class="ii-rows flex flex-col [--ii-rows-inset:4rem]">
           {#each group.browsers as browser (browser.id)}
             {@render row(browserRow(browser))}
           {/each}
@@ -443,7 +443,7 @@
     <Elevated
       offset={1}
       as="ul"
-      class="divide-border-tertiary flex flex-col divide-y overflow-hidden rounded-2xl"
+      class="ii-rows flex flex-col overflow-hidden rounded-2xl [--ii-rows-inset:4rem]"
     >
       {#each rows as item (item.id)}
         {@render row(item)}
