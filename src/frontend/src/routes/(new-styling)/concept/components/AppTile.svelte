@@ -5,7 +5,7 @@
     CheckCheckIcon,
     CheckIcon,
     ExternalLinkIcon,
-    InfoIcon,
+    LayoutGridIcon,
     LinkIcon,
     Trash2Icon,
     XIcon,
@@ -38,10 +38,10 @@
     onClearAll?: () => void;
     /** Whether the identity lets the app notify it. */
     notificationsAllowed?: boolean;
-    /** From the tile's right-click menu: the app's settings, its details, or
-     *  removing it. */
+    /** From the tile's right-click menu: the app's settings, managing apps
+     *  starting from this one, or removing it. */
     onSetNotifications?: (allowed: boolean) => void;
-    onDetails?: () => void;
+    onManage?: () => void;
     onRemove?: () => void;
   }
 
@@ -59,7 +59,7 @@
     onClearAll,
     notificationsAllowed = false,
     onSetNotifications,
-    onDetails,
+    onManage,
     onRemove,
   }: Props = $props();
 
@@ -77,45 +77,68 @@
   };
 
   // What a browser's menu would offer for the link, then everything the app's
-  // details panel offers, so none of it takes a trip to the panel.
-  const menuItems: ContextMenuEntry[] = $derived([
-    {
-      label: "Open in new tab",
-      icon: ExternalLinkIcon,
-      href: url,
-      onSelect: onOpen,
-    },
-    { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
-    { kind: "separator" },
-    ...(hasUnread
-      ? [
-          {
-            label: "Mark all as read",
-            icon: CheckCheckIcon,
-            onSelect: onClearAll,
-          },
-        ]
-      : []),
-    notificationsAllowed
-      ? {
-          label: "Turn off notifications",
-          icon: BellOffIcon,
-          onSelect: () => onSetNotifications?.(false),
-        }
-      : {
-          label: "Turn on notifications",
-          icon: BellIcon,
-          onSelect: () => onSetNotifications?.(true),
+  // details panel offers, so none of it takes a trip to the panel. A group
+  // shows only what the tile was given a handler for: a featured app the
+  // identity hasn't used has nothing to read, set, manage or remove.
+  const menuItems: ContextMenuEntry[] = $derived.by(() => {
+    const groups: ContextMenuEntry[][] = [
+      [
+        {
+          label: "Open in new tab",
+          icon: ExternalLinkIcon,
+          href: url,
+          onSelect: onOpen,
         },
-    { kind: "separator" },
-    { label: "App details", icon: InfoIcon, onSelect: onDetails },
-    {
-      label: "Remove app",
-      icon: Trash2Icon,
-      tone: "destructive",
-      onSelect: onRemove,
-    },
-  ]);
+        { label: "Copy link", icon: LinkIcon, onSelect: copyLink },
+      ],
+      [
+        ...(hasUnread && onClearAll !== undefined
+          ? [
+              {
+                label: "Mark all as read",
+                icon: CheckCheckIcon,
+                onSelect: onClearAll,
+              },
+            ]
+          : []),
+        ...(onSetNotifications === undefined
+          ? []
+          : [
+              notificationsAllowed
+                ? {
+                    label: "Turn off notifications",
+                    icon: BellOffIcon,
+                    onSelect: () => onSetNotifications(false),
+                  }
+                : {
+                    label: "Turn on notifications",
+                    icon: BellIcon,
+                    onSelect: () => onSetNotifications(true),
+                  },
+            ]),
+      ],
+      [
+        ...(onManage === undefined
+          ? []
+          : [{ label: "Manage", icon: LayoutGridIcon, onSelect: onManage }]),
+        ...(onRemove === undefined
+          ? []
+          : [
+              {
+                label: "Remove app",
+                icon: Trash2Icon,
+                tone: "destructive" as const,
+                onSelect: onRemove,
+              },
+            ]),
+      ],
+    ];
+    return groups
+      .filter((group) => group.length > 0)
+      .flatMap((group, index) =>
+        index === 0 ? group : [{ kind: "separator" as const }, ...group],
+      );
+  });
 
   // Shared by both faces: a 0.97 press, 160ms ease-out, off under reduced motion.
   const PRESS =
@@ -133,7 +156,17 @@
 />
 
 {#snippet face()}
-  <span class="relative">
+  <!-- While managing, the logo rocks the way icons do in a home screen's edit
+       mode, each on its own beat, so the grid reads as one you can rearrange. -->
+  <span
+    class={["relative", mode === "select" && "jiggle"]}
+    style:animation-delay={mode === "select"
+      ? `-${(index * 97) % 260}ms`
+      : undefined}
+    style:animation-direction={mode === "select" && index % 2 === 1
+      ? "reverse"
+      : undefined}
+  >
     <AppLogo {logo} size="tile" />
     {#if mode === "select"}
       <span
@@ -311,6 +344,36 @@
 {/if}
 
 <style>
+  .jiggle {
+    animation: jiggle 260ms ease-in-out infinite;
+  }
+
+  @keyframes jiggle {
+    0%,
+    100% {
+      rotate: -1.5deg;
+    }
+    50% {
+      rotate: 1.5deg;
+    }
+  }
+
+  /* The tile being dragged holds still, lifted off the page, and loses the
+     plate its press would draw, which would read as picked. */
+  :global([data-dragging]) .jiggle {
+    animation: none;
+    filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.18));
+  }
+  :global([data-dragging]) .ii-hover {
+    background-image: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .jiggle {
+      animation: none;
+    }
+  }
+
   @media (hover: hover) {
     .dismiss {
       opacity: 0;

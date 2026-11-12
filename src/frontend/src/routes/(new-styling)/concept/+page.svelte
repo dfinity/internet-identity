@@ -11,9 +11,10 @@
     XIcon,
   } from "@lucide/svelte";
   import type { Component } from "svelte";
+  import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
-  import { fade } from "svelte/transition";
   import { MediaQuery } from "svelte/reactivity";
+  import { slide } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
@@ -28,9 +29,10 @@
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
+  import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StatusRow from "./components/StatusRow.svelte";
-  import TopAccount from "./components/TopAccount.svelte";
+  import CornerAccount from "./components/CornerAccount.svelte";
   import {
     browsersFor,
     featuredApps,
@@ -109,10 +111,11 @@
     ),
   );
 
-  // Four columns at every width, centered, so Recent and All apps line up
-  // tile for tile; only the tiles grow with the canvas.
+  // Columns follow the canvas the way Apple's home screens do: four on a
+  // phone, five on a tablet, seven on a desktop (the Mac's Applications
+  // grid). Recent and All apps share them, so they line up tile for tile.
   const GRID =
-    "grid grid-cols-[repeat(4,5.25rem)] gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2";
+    "grid grid-cols-[repeat(4,5.25rem)] gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2 @2xl:grid-cols-[repeat(5,7rem)] @4xl:grid-cols-[repeat(7,7rem)]";
   // A heading starts at the edge of the first logo, like a shelf title on
   // iOS. The 4rem logo sits centered in its column, so the inset is half of
   // what the column leaves: (5.25rem − 4rem) / 2, then (7rem − 4rem) / 2.
@@ -121,35 +124,38 @@
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
+  // The account on top is the concept's main layout; the other two stay in
+  // the concept menu to compare against.
   const LAYOUTS: { value: Layout; label: string; icon: Component }[] = [
-    { value: "island", label: "Island at the bottom", icon: PanelBottomIcon },
-    { value: "panel", label: "Panel on the side", icon: PanelRightIcon },
     {
       value: "top",
       label: "Account on top, widgets below",
       icon: PanelTopIcon,
     },
+    { value: "island", label: "Island at the bottom", icon: PanelBottomIcon },
+    { value: "panel", label: "Panel on the side", icon: PanelRightIcon },
   ];
-  const LAYOUT_KEY = "ii-concept-layout";
-  // `?layout=top` in the address picks a layout too, so a link can show one.
+  // A new key, so a layout picked before the account moved up doesn't stand
+  // in for the main one.
+  const LAYOUT_KEY = "ii-concept-layout-v2";
+  // `?layout=island` in the address picks a layout too, so a link can show one.
   const readLayout = (): Layout => {
     const asked =
       new URLSearchParams(location.search).get("layout") ??
       localStorage.getItem(LAYOUT_KEY);
-    return LAYOUTS.find(({ value }) => value === asked)?.value ?? "island";
+    return LAYOUTS.find(({ value }) => value === asked)?.value ?? "top";
   };
   let layout = $state<Layout>(readLayout());
   const isDesktop = new MediaQuery("min-width: 768px");
-  /** The island's panel on desktop, the sheet on a phone, and the account
-   *  opened from the top. */
+  /** The panel the island or the account opens on desktop, and the sheet on
+   *  a phone. */
   let panelOpen = $state(false);
   const panelVisible = $derived(
-    isDesktop.current && layout !== "top"
-      ? layout === "panel" || panelOpen
-      : panelOpen,
+    isDesktop.current ? layout === "panel" || panelOpen : panelOpen,
   );
-  /** Whether the panel lies beside the canvas, rather than over it. */
-  const besideCanvas = $derived(layout !== "top" && panelVisible);
+  /** The account's pill in the top layout, for the room the header keeps. */
+  let accountWidth = $state(0);
+  let accountHeight = $state(0);
 
   const setLayout = (next: Layout) => {
     layout = next;
@@ -217,25 +223,24 @@
     section = undefined;
     selected = [];
     managing = true;
-    // On a phone the sheet steps aside, so the grid is there to pick from, and
-    // so does the account opened over the page.
-    if (!isDesktop.current || layout === "top") {
+    // On a phone the sheet steps aside, so the grid is there to pick from.
+    if (!isDesktop.current) {
       panelOpen = false;
     }
   };
 
-  /** Straight to one app's details, from its tile's menu. */
-  const showDetails = (app: ConceptApp) => {
+  /** Managing from a tile's menu, like a home screen's edit mode: the grid
+   *  starts to rock with that app already picked. */
+  const manageFrom = (app: ConceptApp) => {
     startManaging();
     selected = [app.origin];
-    panelOpen = true;
   };
 
   const stopManaging = () => {
     navDirection = -1;
     managing = false;
     selected = [];
-    if (!isDesktop.current || layout === "top") {
+    if (!isDesktop.current) {
       panelOpen = false;
     }
   };
@@ -439,6 +444,14 @@
     });
   };
 
+  /** Dragging a tile while managing rearranges the grid. */
+  const moveApp = (from: number, to: number) => {
+    const apps = [...current.apps];
+    const [moved] = apps.splice(from, 1);
+    apps.splice(to, 0, moved);
+    current.apps = apps;
+  };
+
   const remove = (apps: ConceptApp[]) => {
     const state = current;
     const before = [...state.apps];
@@ -472,7 +485,8 @@
     if (
       event.key === "Escape" &&
       !event.defaultPrevented &&
-      ((layout === "island" && isDesktop.current) || layout === "top") &&
+      (layout === "island" || layout === "top") &&
+      isDesktop.current &&
       panelOpen &&
       !isSwitcherOpen &&
       // An open popover takes Escape first.
@@ -485,26 +499,24 @@
 
 <svelte:window onkeydown={onWindowKeydown} />
 
-{#snippet tile(app: ConceptApp, index: number)}
-  <li>
-    <AppTile
-      name={app.name}
-      logo={app.logo}
-      url={app.url}
-      unread={app.unread}
-      mode={managing ? "select" : "open"}
-      selected={selected.includes(app.origin)}
-      {index}
-      onToggle={() => toggleSelected(app.origin)}
-      onOpen={() => readAll(app)}
-      onRead={(id) => read(app, id)}
-      onClearAll={() => readAll(app)}
-      notificationsAllowed={app.notificationsAllowed}
-      onSetNotifications={(allowed) => setNotificationsFromMenu(app, allowed)}
-      onDetails={() => showDetails(app)}
-      onRemove={() => remove([app])}
-    />
-  </li>
+{#snippet appTile(app: ConceptApp, index: number)}
+  <AppTile
+    name={app.name}
+    logo={app.logo}
+    url={app.url}
+    unread={app.unread}
+    mode={managing ? "select" : "open"}
+    selected={selected.includes(app.origin)}
+    {index}
+    onToggle={() => toggleSelected(app.origin)}
+    onOpen={() => readAll(app)}
+    onRead={(id) => read(app, id)}
+    onClearAll={() => readAll(app)}
+    notificationsAllowed={app.notificationsAllowed}
+    onSetNotifications={(allowed) => setNotificationsFromMenu(app, allowed)}
+    onManage={() => manageFrom(app)}
+    onRemove={() => remove([app])}
+  />
 {/snippet}
 
 {#snippet conceptControls(compact: boolean)}
@@ -524,52 +536,55 @@
   </button>
 {/snippet}
 
-{#snippet overview(closable: boolean, inSheet: boolean)}
+{#snippet overview(closable: boolean, inSheet: boolean, cornered: boolean)}
   <div class="flex flex-col gap-3">
-    <!-- The header stands on the panel's edge, not on the icons inside the
+    <!-- With the account in the corner, the account itself is this header. -->
+    {#if !cornered}
+      <!-- The header stands on the panel's edge, not on the icons inside the
          rows: the avatar lines up with the list below. With no inset there is
          no room for a hover fill, so the switch control lights up instead. -->
-    <div class={["flex items-center gap-1", inSheet && "pe-10"]}>
-      <button
-        bind:this={switcherAnchor}
-        type="button"
-        onclick={() => (isSwitcherOpen = true)}
-        aria-label={`${identityName}, identity ${identity.identityNumber}. Switch identity`}
-        class="group/identity focus-visible:outline-focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-2 text-start focus-visible:outline-2 focus-visible:outline-offset-4"
-      >
-        <IdentityAvatar {identity} size="sm" />
-        <!-- The panel speaks in two sizes and two weights: a 14px medium
+      <div class={["flex items-center gap-1", inSheet && "pe-10"]}>
+        <button
+          bind:this={switcherAnchor}
+          type="button"
+          onclick={() => (isSwitcherOpen = true)}
+          aria-label={`${identityName}, identity ${identity.identityNumber}. Switch identity`}
+          class="group/identity focus-visible:outline-focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-2 text-start focus-visible:outline-2 focus-visible:outline-offset-4"
+        >
+          <IdentityAvatar {identity} size="sm" />
+          <!-- The panel speaks in two sizes and two weights: a 14px medium
              label over a 13px regular line, the same as every row below. -->
-        <span class="flex min-w-0 flex-1 flex-col">
-          <span class="text-text-primary truncate text-sm font-medium">
-            {identityName}
+          <span class="flex min-w-0 flex-1 flex-col">
+            <span class="text-text-primary truncate text-sm font-medium">
+              {identityName}
+            </span>
+            <span
+              class="text-text-tertiary text-[13px] leading-[18px] tabular-nums"
+            >
+              Identity {identity.identityNumber}
+            </span>
           </span>
           <span
-            class="text-text-tertiary text-[13px] leading-[18px] tabular-nums"
+            aria-hidden="true"
+            class="text-fg-tertiary grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 group-hover/identity:bg-(--ii-hover) group-active/identity:bg-(--ii-selected)"
           >
-            Identity {identity.identityNumber}
+            <ChevronsUpDownIcon class="size-4" />
           </span>
-        </span>
-        <span
-          aria-hidden="true"
-          class="text-fg-tertiary grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 group-hover/identity:bg-(--ii-hover) group-active/identity:bg-(--ii-selected)"
-        >
-          <ChevronsUpDownIcon class="size-4" />
-        </span>
-      </button>
-      {#if closable}
-        <!-- Drawn like the switch control beside it: same circle, same 16px
-             glyph, same muted tone, so neither outweighs the other. -->
-        <button
-          type="button"
-          onclick={() => (panelOpen = false)}
-          class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
-        >
-          <XIcon class="size-4" aria-hidden="true" />
-          <span class="sr-only">Close</span>
         </button>
-      {/if}
-    </div>
+        {#if closable}
+          <!-- Drawn like the switch control beside it: same circle, same 16px
+             glyph, same muted tone, so neither outweighs the other. -->
+          <button
+            type="button"
+            onclick={() => (panelOpen = false)}
+            class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
+          >
+            <XIcon class="size-4" aria-hidden="true" />
+            <span class="sr-only">Close</span>
+          </button>
+        {/if}
+      </div>
+    {/if}
     <Elevated
       offset={1}
       as="ul"
@@ -593,7 +608,7 @@
   </div>
 {/snippet}
 
-{#snippet panelBody(closable: boolean, inSheet: boolean)}
+{#snippet panelBody(closable: boolean, inSheet: boolean, cornered: boolean)}
   {#if managing}
     {#if selectedApps.length === 1}
       {@const app = selectedApps[0]}
@@ -631,11 +646,19 @@
       onUnavailable={unavailable}
     />
   {:else}
-    {@render overview(closable, inSheet)}
+    {@render overview(closable, inSheet, cornered)}
   {/if}
 {/snippet}
 
-{#snippet panel(closable: boolean, inSheet: boolean)}
+{#snippet panel(closable: boolean, inSheet: boolean, cornered: boolean)}
+  {#if cornered}
+    <!-- The account's row, kept free for it as it arrives from the canvas,
+         and kept clear when the panel scrolls under it. -->
+    <div
+      aria-hidden="true"
+      class="ii-surface-1 sticky top-0 z-10 -mt-1 mb-1 h-15 shrink-0"
+    ></div>
+  {/if}
   <!-- Views stack in one cell, so the old one fades while the new one arrives. -->
   <div class="grid">
     {#key viewKey}
@@ -644,7 +667,7 @@
         in:viewIn={{ direction: navDirection * readingDirection(), reduced }}
         out:viewOut={{ reduced }}
       >
-        {@render panelBody(closable, inSheet)}
+        {@render panelBody(closable, inSheet, cornered)}
       </div>
     {/key}
   </div>
@@ -661,17 +684,6 @@
   >
     <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
     <h1 class="sr-only">Apps</h1>
-
-    {#if layout === "top" && panelOpen}
-      <!-- The page dims and softens behind the open account; a click on it
-           closes the account, as Escape does. -->
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div
-        transition:fade={{ duration: reduced ? 0 : 200 }}
-        onclick={() => (panelOpen = false)}
-        class="fixed inset-0 z-[25] bg-black/[0.06] backdrop-blur-[2px] dark:bg-black/40"
-      ></div>
-    {/if}
 
     <!-- On desktop one row: the logo, the pages centered on the canvas, and an
          empty column that keeps them centered. A phone has no room for the
@@ -718,29 +730,29 @@
           layout !== "top" && "md:hidden",
         ]}
       >
-        {@render conceptControls(true)}
+        <!-- Phone only: on desktop it keeps to the bottom-left corner. -->
+        <div class="flex md:hidden">
+          {@render conceptControls(true)}
+        </div>
         {#if layout === "top"}
-          <!-- The account, moved up from the island: it opens in place and
-               grows over the page, the way the island grew. -->
-          <div class="ms-2">
-            <TopAccount
-              open={panelOpen}
-              {identity}
-              status={accountStatus}
-              compact={!isDesktop.current}
-              onOpen={openAccount}
-            >
-              {@render panel(true, false)}
-            </TopAccount>
-          </div>
+          <!-- Desktop: room for the account, which floats over this corner
+               (CornerAccount). It folds away while the account sits on the
+               panel, and opens again for it to come back. -->
+          <div
+            aria-hidden="true"
+            class="shrink-0 transition-[width,margin] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none max-md:hidden"
+            style:width={`${panelVisible ? 0 : accountWidth}px`}
+            style:height={`${accountHeight}px`}
+            style:margin-inline-start={panelVisible ? "0px" : "0.5rem"}
+          ></div>
         {/if}
-        {#if layout === "panel"}
+        {#if layout === "panel" || layout === "top"}
           <!-- Phone: the panel opens from here; the dot says it has something for you. -->
           <button
             type="button"
             onclick={() => (panelOpen = true)}
             aria-label={`Open ${identityName}${needsAttention(cards) ? ", needs your attention" : ""}`}
-            class="relative -me-2 flex size-11 items-center justify-center rounded-full"
+            class="relative -me-2 flex size-11 items-center justify-center rounded-full md:hidden"
           >
             <IdentityAvatar {identity} size="sm" />
             {#if needsAttention(cards)}
@@ -772,15 +784,23 @@
           class="w-full shrink-0 snap-start snap-always px-2 pt-6 pb-32 sm:px-6"
         >
           {#if current.apps.length > 0}
-            <div class="mx-auto flex w-fit flex-col gap-8">
-              {#if showRecent}
-                <section class="flex flex-col gap-2">
+            <div class="mx-auto flex w-fit flex-col">
+              <!-- Recent is ordered by use, not by hand, so it steps aside while
+                   apps are managed and All apps is the one grid to arrange. -->
+              {#if showRecent && !managing}
+                <section
+                  transition:slide={{
+                    duration: reduced ? 0 : 260,
+                    easing: quintOut,
+                  }}
+                  class="flex flex-col gap-2 pb-8"
+                >
                   <h2 class={["text-text-tertiary text-sm font-medium", INSET]}>
                     Recent
                   </h2>
                   <ul class={GRID}>
                     {#each recentApps as app, index (app.origin)}
-                      {@render tile(app, index)}
+                      <li>{@render appTile(app, index)}</li>
                     {/each}
                   </ul>
                 </section>
@@ -789,11 +809,20 @@
                 <h2 class={["text-text-tertiary text-sm font-medium", INSET]}>
                   All apps
                 </h2>
-                <ul class={GRID}>
-                  {#each current.apps as app, index (app.origin)}
-                    {@render tile(app, index + (showRecent ? 4 : 0))}
-                  {/each}
-                </ul>
+                <ReorderGrid
+                  items={current.apps}
+                  key={(app) => app.origin}
+                  editing={managing}
+                  onMove={moveApp}
+                  class={GRID}
+                >
+                  {#snippet tile(app, index)}
+                    {@render appTile(
+                      app,
+                      index + (showRecent && !managing ? 4 : 0),
+                    )}
+                  {/snippet}
+                </ReorderGrid>
               </section>
             </div>
           {:else}
@@ -862,14 +891,15 @@
       <!-- Tiles blur deeper the nearer they get to either edge while a page
            slides. Each side takes all the room up to the first logo, so tiles
            at rest stay sharp: half of what GRID leaves (21.75rem wide, 29.5rem
-           from @lg) plus the logo's inset in its column, less a hair. -->
+           from @lg, 37rem from @2xl, 52rem from @4xl) plus the logo's inset
+           in its column, less a hair. -->
       <ProgressiveBlur
         side="left"
-        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)]"
+        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)] @2xl:w-[calc((100%_-_37rem)/2_+_1.25rem)] @4xl:w-[calc((100%_-_52rem)/2_+_1.25rem)]"
       />
       <ProgressiveBlur
         side="right"
-        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)]"
+        class="w-[calc((100%_-_21.75rem)/2_+_0.5rem)] @lg:w-[calc((100%_-_29.5rem)/2_+_1.25rem)] @2xl:w-[calc((100%_-_37rem)/2_+_1.25rem)] @4xl:w-[calc((100%_-_52rem)/2_+_1.25rem)]"
       />
     </div>
   </Elevated>
@@ -878,29 +908,46 @@
        opens and closes; the canvas gives it the room. -->
   <div
     class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none max-md:hidden"
-    style:width={besideCanvas ? "25rem" : "0rem"}
+    style:width={panelVisible ? "25rem" : "0rem"}
   >
     <aside
       aria-label="Identity"
-      inert={!besideCanvas}
+      inert={!panelVisible}
       class={[
         // 24px of air on both sides: from the canvas frame (8px gap + 16px)
         // and from the window edge (8px page padding + 16px).
         "h-full w-[25rem] overflow-y-auto overscroll-contain ps-6 pe-4 pt-1 pb-4",
         "transition-[opacity,translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
-        !besideCanvas && "translate-x-4 opacity-0 rtl:-translate-x-4",
+        !panelVisible && "translate-x-4 opacity-0 rtl:-translate-x-4",
       ]}
     >
-      {#if isDesktop.current && layout !== "top"}
-        {@render panel(layout === "island", false)}
+      {#if isDesktop.current}
+        {@render panel(layout === "island", false, layout === "top")}
       {/if}
     </aside>
   </div>
 
+  {#if layout === "top" && isDesktop.current}
+    <!-- The account in the top-right corner, over the canvas or on the panel. -->
+    <CornerAccount
+      open={panelOpen}
+      {identity}
+      status={accountStatus}
+      bind:width={accountWidth}
+      bind:height={accountHeight}
+      onOpen={openAccount}
+      onClose={() => (panelOpen = false)}
+      onSwitch={(anchor) => {
+        switcherAnchor = anchor;
+        isSwitcherOpen = true;
+      }}
+    />
+  {/if}
+
   <!-- Phone: the panel is a sheet from the bottom, as dialogs are elsewhere. -->
-  {#if panelOpen && !isDesktop.current && layout !== "top"}
+  {#if panelOpen && !isDesktop.current}
     <Dialog onClose={() => (panelOpen = false)}>
-      {@render panel(false, true)}
+      {@render panel(false, true, false)}
     </Dialog>
   {/if}
 
@@ -927,7 +974,7 @@
     />
   {/if}
 
-  {#if layout === "top" && !panelOpen && !managing && dockItems.length > 0}
+  {#if layout === "top" && !panelVisible && !managing && dockItems.length > 0}
     <ActionDock
       items={dockItems}
       onOpen={openFromDock}
@@ -936,13 +983,11 @@
   {/if}
 
   <!-- Concept only: walk the panel through its states, and switch layouts.
-       With the account on top it sits in the header, leaving the bottom to
-       the widgets. -->
-  {#if layout !== "top"}
-    <div class="fixed start-3 bottom-3 z-10 max-md:hidden">
-      {@render conceptControls(false)}
-    </div>
-  {/if}
+       On desktop it stays in the bottom-left corner in every layout; on a
+       phone it sits in the header, leaving the bottom to the island. -->
+  <div class="fixed start-4 bottom-4 z-10 max-md:hidden">
+    {@render conceptControls(false)}
+  </div>
 
   {#if conceptMenu !== undefined}
     {@const close = () => (conceptMenu = undefined)}
