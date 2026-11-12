@@ -15,8 +15,8 @@
   import {
     BotIcon,
     BriefcaseMedicalIcon,
+    Grid2x2CheckIcon,
     KeyRoundIcon,
-    LayoutGridIcon,
     MonitorSmartphoneIcon,
   } from "@lucide/svelte";
   import { flip } from "svelte/animate";
@@ -38,7 +38,7 @@
     access: KeyRoundIcon,
     devices: MonitorSmartphoneIcon,
     recovery: BriefcaseMedicalIcon,
-    apps: LayoutGridIcon,
+    apps: Grid2x2CheckIcon,
     integrations: BotIcon,
   };
 

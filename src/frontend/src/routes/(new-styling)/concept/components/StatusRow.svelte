@@ -4,8 +4,8 @@
     BriefcaseMedicalIcon,
     CheckIcon,
     ChevronRightIcon,
+    Grid2x2CheckIcon,
     KeyRoundIcon,
-    LayoutGridIcon,
     MonitorSmartphoneIcon,
   } from "@lucide/svelte";
   import { slide } from "svelte/transition";
@@ -38,13 +38,15 @@
     onAction,
   }: Props = $props();
 
-  // Same glyphs as the current sidebar, so each section keeps its icon.
+  // Same glyphs as the current sidebar, so each section keeps its icon, but
+  // for apps: a bare grid said nothing of managing, so it carries the check
+  // an app gets when picked, as the tile's "Select" does.
   const Icon = $derived(
     {
       access: KeyRoundIcon,
       devices: MonitorSmartphoneIcon,
       recovery: BriefcaseMedicalIcon,
-      apps: LayoutGridIcon,
+      apps: Grid2x2CheckIcon,
       integrations: BotIcon,
     }[kind],
   );
