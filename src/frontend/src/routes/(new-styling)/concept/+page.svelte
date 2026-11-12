@@ -1260,11 +1260,14 @@
   {/if}
 
   {#if isSwitcherOpen}
+    <!-- It opens from its anchor's start, which suits the panel's header: that
+         one spans the panel. The account in the corner ends at the window's
+         edge, so from there it opens from the end, back over the panel. -->
     <Popover
       anchor={switcherAnchor}
       onClose={() => (isSwitcherOpen = false)}
       direction="down"
-      align="start"
+      align={layout === "top" && isDesktop.current ? "end" : "start"}
       distance="0.5rem"
       class="!bg-bg-primary"
     >
