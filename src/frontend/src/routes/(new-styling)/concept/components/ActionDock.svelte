@@ -103,28 +103,27 @@
   });
 
   // A step to take asks for the user now and then, as a Dock icon does: the
-  // stack hops soon after it appears, then less and less often while it's left
-  // waiting. Not while the user is on it, not in a hidden tab,
+  // stack hops soon after it appears, then again on a steady beat for as long
+  // as it's left waiting. Not while the user is on it, not in a hidden tab,
   // and not under reduced motion. Something only on its way never asks.
   /** The first hop, once the widgets have risen in and had a moment. */
   const NUDGE_FIRST = 1500;
-  /** The wait after that, doubling with each hop up to the cap. */
+  /** The beat after that. */
   const NUDGE_EVERY = 8000;
-  const NUDGE_CAP = 32000;
   const asking = $derived(items[0]?.primary === true);
   const front = $derived(items[0]?.kind);
-  /** Hops so far for the front step; a new step at the front asks afresh. */
-  let nudges = 0;
+  /** Whether the front step has hopped yet; a new step asks afresh. */
+  let nudged = false;
   let nudgedFor: CardKind | undefined;
   $effect(() => {
     const node = stack;
     if (front !== nudgedFor) {
       nudgedFor = front;
-      nudges = 0;
+      nudged = false;
     }
     if (engaged) {
-      // The user has seen it: the next hop waits a full round.
-      nudges = Math.max(nudges, 1);
+      // The user has seen it: the next hop waits a full beat.
+      nudged = true;
       return;
     }
     if (reduced || !asking || node === undefined) {
@@ -132,17 +131,16 @@
     }
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
-      const wait =
-        nudges === 0
-          ? NUDGE_FIRST
-          : Math.min(NUDGE_EVERY * 2 ** (nudges - 1), NUDGE_CAP);
-      timer = setTimeout(() => {
-        if (!document.hidden) {
-          hop(node);
-          nudges += 1;
-        }
-        schedule();
-      }, wait);
+      timer = setTimeout(
+        () => {
+          if (!document.hidden) {
+            hop(node);
+            nudged = true;
+          }
+          schedule();
+        },
+        nudged ? NUDGE_EVERY : NUDGE_FIRST,
+      );
     };
     schedule();
     return () => clearTimeout(timer);
