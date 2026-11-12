@@ -37,7 +37,7 @@ PR titles follow conventional commits with a scope naming the product surface th
 
 - Write the title and description from the user's perspective: "Fix multiple accounts toggle staying on after switching identity", not "Reset continue screen state when switching identity".
 - Follow the template: Motivation (no heading, just the text), `# Changes`, `# Tests`. Include Tests only for new or updated tests, and state what was actually tested ("manually exercised" when nothing automated covers it).
-- Explain why, not only what: the reason for a design choice or a new dependency goes here, not in a code comment.
+- Explain why, not only what: the reason for a design choice or for any added, removed or changed dependency goes here, not in a code comment.
 - Attach screenshots or a video for every UI change.
 - Keep the description in sync with the code. After every push that changes scope or approach, update it with `gh pr edit` without being asked, and re-read it for claims that are no longer true.
 - Call out any breaking change and any behaviour change outside the PR's stated purpose.

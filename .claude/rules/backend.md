@@ -56,7 +56,7 @@ Exceptions, each to be kept as narrow as it is:
 - Don't widen visibility (`pub`, `pub(crate)`) or add test-only accessors and `#![allow(dead_code)]` to keep code alive. Delete unused code. Don't add thin `pub` re-export wrappers.
 - Don't add `#[allow(clippy::...)]`; restructure instead (a type alias, a smaller function).
 - Keep function bodies short enough to read on one screen.
-- New canister dependencies: check maintenance, advisories, wasm/`no_std` fit and the wasm size budget, and use `default-features = false`. Dev-dependencies use `.workspace = true`.
+- New canister dependencies: check maintenance, advisories, wasm/`no_std` fit and the wasm size budget, and use `default-features = false`. Dev-dependencies use `.workspace = true`. List every added, removed or changed dependency in the PR description with its reason (see `scripts-and-ci.md`).
 
 ## Clippy
 

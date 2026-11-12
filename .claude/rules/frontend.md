@@ -5,7 +5,7 @@ paths:
 
 # Frontend
 
-The frontend ships inside the II frontend canister wasm, which has a hard size cap. Don't add large libraries, and check the cost of any new dependency.
+The frontend ships inside the II frontend canister wasm, which has a hard size cap. Don't add large libraries, and check the cost of any new dependency. List every added, removed or changed dependency in the PR description with its reason (see `scripts-and-ci.md`).
 
 ## Design system and styling
 

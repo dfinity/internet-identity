@@ -32,7 +32,7 @@ paths:
 - Dependency updates come from Dependabot or the team's workspace-wide update (`scripts/update-deps`). Lockfile-only and transitive Dependabot bumps are closed and picked up by the next workspace update. Don't add dependency bumps to feature PRs.
 - A bot dependency PR that needs code changes is closed and redone as a manual PR.
 - Commit `Cargo.lock` in sync with `Cargo.toml` (CI checks `--locked`).
-- Put the reason for a dependency in the PR, not as a comment in `Cargo.toml` or `package.json`.
+- List every added, removed or changed dependency in the PR description with a clear reason: what it is for, why this one, its size and maintenance, and what it replaces. Never put the reason in a comment in `Cargo.toml` or `package.json`.
 
 ## Feature flags and releases
 
