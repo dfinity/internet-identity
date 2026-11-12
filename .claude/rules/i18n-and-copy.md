@@ -12,7 +12,7 @@ paths:
 ## Translations
 
 - Never edit `src/frontend/src/lib/locales/*.po` files. They are generated from the source strings, so change the text in the `.svelte` or `.ts` file instead. A bot extracts and translates them in separate `chore(fe): update translations` PRs; revert any `.po` diff before staging.
-- Add a `context` (msgctxt) when one English string carries two meanings.
+- Add a `context` (msgctxt) when one English string carries two meanings, or when a string should be adapted rather than translated literally (a headline, a marketing line, wording constrained by the layout). Say what it is for and the intent or tone to keep (see "Additional context" in `LOCALIZING.md`).
 - Translate every visible word, including "now", units and fallbacks.
 - Format dates and durations with the `locale.store` helpers (`$formatRelative`, `$formatDuration`). Pass timestamps (or `Date`) into components as data and format them there.
 - Translated arrays and option lists are `$derived`, so they follow locale changes.
