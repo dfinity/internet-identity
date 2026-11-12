@@ -6,10 +6,12 @@
  * Eight levels, each a background paired with a shadow. In light mode shadow
  * alone carries elevation (surfaces flatten to white from level 3); in dark
  * mode every step up is lighter, so a raised surface never reads as sunken.
- * Scoped to `.concept` so nothing outside this route picks it up.
+ * Scoped to `.concept`, and to the root while it shows one, so nothing
+ * outside this route picks it up.
  */
 
-.concept {
+.concept,
+:root:has(.concept) {
   --ii-surface-1: #fafafa;
   --ii-surface-2: #fcfcfc;
   --ii-surface-3: #ffffff;
@@ -66,7 +68,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .concept {
+  .concept,
+  :root:has(.concept) {
     --ii-surface-1: #171717;
     --ii-surface-2: #1e1e1e;
     --ii-surface-3: #252525;
@@ -122,6 +125,21 @@
 
     --ii-hover: rgb(255 255 255 / 0.06);
     --ii-selected: rgb(255 255 255 / 0.1);
+  }
+}
+
+/*
+ * Past the page's edges, where an overscroll bounces, the browser paints the
+ * root's background, so it is whatever the page shows at that edge: on a
+ * phone the canvas itself (level 3, full bleed), from `md` the page around
+ * the canvas's frame.
+ */
+:root:has(.concept) {
+  background-color: var(--ii-surface-3);
+}
+@media (width >= 48rem) {
+  :root:has(.concept) {
+    background-color: var(--ii-surface-1);
   }
 }
 
