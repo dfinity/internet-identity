@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+  import { identityInitials, identityPalette } from "$lib/utils/identityColors";
   import { openIdLogo } from "$lib/utils/openID";
   import { UserIcon } from "@lucide/svelte";
   import Avatar from "./Avatar.svelte";
@@ -13,6 +14,11 @@
   };
 
   let { identity, size }: Props = $props();
+
+  // The identity's initials on colours of its own, so that the identities on
+  // a device tell apart; the person icon only for a name without letters.
+  const palette = $derived(identityPalette(identity.identityNumber));
+  const initials = $derived(identityInitials(identity.name));
 
   // SSO entries get their own badge — never the underlying IdP's logo —
   // so the row UX matches what the user picked.
@@ -40,8 +46,25 @@
 </script>
 
 <div class="relative">
-  <Avatar {size}>
-    <UserIcon class={size === "lg" ? "size-6" : "size-5"} />
+  <!-- Decorative: the identity's name is always written beside it. The fill
+       reaches the edge under a clear border; a hairline drawn inside keeps a
+       pale ground from melting into a pale page, and a dark one into a dark
+       page. On the small avatar the badge would cover the foot of the second
+       letter, so the letters sit a little up and away from it. -->
+  <Avatar
+    {size}
+    aria-hidden="true"
+    class={[
+      "outline-1 -outline-offset-1 outline-black/8 dark:outline-white/12",
+      size === "sm" && "pe-0.5 pb-1",
+    ]}
+    style="background-color: {palette.background}; color: {palette.foreground}; border-color: transparent;"
+  >
+    {#if initials !== undefined}
+      {initials}
+    {:else}
+      <UserIcon class={size === "lg" ? "size-6" : "size-5"} />
+    {/if}
   </Avatar>
   <AuthMethodBadge {variant} {size} />
 </div>
