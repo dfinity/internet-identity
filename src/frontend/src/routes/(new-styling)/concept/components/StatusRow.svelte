@@ -8,9 +8,9 @@
     KeyRoundIcon,
     MonitorSmartphoneIcon,
   } from "@lucide/svelte";
-  import { slide } from "svelte/transition";
-  import { quintOut } from "svelte/easing";
+  import { cubicIn, quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
+  import { fade } from "svelte/transition";
   import type { CardKind, LeadAction, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
 
@@ -51,12 +51,17 @@
     }[kind],
   );
 
-  const loud = $derived(tone === "risk" || tone === "action");
+  /** The step this row offers: only a loud row does. */
+  const offered = $derived(
+    tone === "risk" || tone === "action" ? action : undefined,
+  );
 </script>
 
 <!-- The row itself stays plain: the tinted icon carries the tone and the
-     button carries the ask, so the card reads as one list, not two halves. -->
-<li class="flex flex-col">
+     button carries the ask, so the card reads as one list, not two halves.
+     The ask stands at the row's end, where a quiet row has its chevron, so
+     every row keeps one height and the step is the last thing on its line. -->
+<li class="relative flex">
   <button
     type="button"
     onclick={onOpen}
@@ -118,27 +123,35 @@
         <span class="min-w-0">{sentence}</span>
       </span>
     </span>
-    <ChevronRightIcon
-      aria-hidden="true"
-      class="text-fg-quaternary size-4 shrink-0 rtl:-scale-x-100"
-    />
+    {#if offered !== undefined}
+      <!-- Keeps the step's room in the row: the step is a button of its own,
+           and a button can't sit inside this one, so it lies over this. -->
+      <span
+        aria-hidden="true"
+        class="btn btn-sm invisible shrink-0 font-medium"
+      >
+        {offered.label}
+      </span>
+    {:else}
+      <ChevronRightIcon
+        aria-hidden="true"
+        class="text-fg-quaternary size-4 shrink-0 rtl:-scale-x-100"
+      />
+    {/if}
   </button>
-  {#if loud && action !== undefined}
-    <div
-      transition:slide={{
-        duration: prefersReducedMotion.current ? 0 : 240,
-        easing: quintOut,
+  {#if offered !== undefined}
+    <button
+      type="button"
+      onclick={onAction}
+      aria-label={`${title}: ${offered.label}`}
+      in:fade={{ duration: 200, easing: quintOut }}
+      out:fade={{
+        duration: prefersReducedMotion.current ? 0 : 100,
+        easing: cubicIn,
       }}
+      class="btn btn-primary btn-sm absolute end-4 top-1/2 -translate-y-1/2 rounded-full font-medium transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100"
     >
-      <div class="ps-16 pe-4 pb-4">
-        <button
-          type="button"
-          onclick={onAction}
-          class="btn btn-primary btn-sm rounded-full font-medium transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100"
-        >
-          {action.label}
-        </button>
-      </div>
-    </div>
+      {offered.label}
+    </button>
   {/if}
 </li>

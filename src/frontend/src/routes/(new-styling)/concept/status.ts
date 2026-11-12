@@ -266,6 +266,8 @@ export const leadOf = (cards: CardStatus[]): CardStatus | undefined => {
 /** What the loud card offers. With `resolve`, the step finishes right there, as
  *  the concept fakes it; without, the button opens the card's section. */
 export interface LeadAction {
+  /** A verb alone: the button stands at the end of its card's row, beside
+   *  the card's title and sentence, which say what it acts on. */
   label: string;
   resolve?: { patch: Partial<Scenario>; message: string };
   /** The product's own flow runs first, and the step resolves once it's done. */
@@ -281,7 +283,7 @@ export const leadActionOf = (
   }
   if (kind === "recovery" && scenario.recovery === "unverified") {
     return {
-      label: "Verify phrase",
+      label: "Verify",
       resolve: {
         patch: { recovery: "calm" },
         message: "Recovery phrase verified",
@@ -291,7 +293,7 @@ export const leadActionOf = (
   }
   if (kind === "recovery" && scenario.recovery === "none") {
     return {
-      label: "Set up recovery",
+      label: "Set up",
       resolve: {
         patch: { recovery: "calm" },
         message: "Recovery phrase set up",
@@ -299,10 +301,7 @@ export const leadActionOf = (
     };
   }
   if (kind === "access") {
-    return {
-      label:
-        scenario.recovery === "usedPhrase" ? "Add a passkey" : "Add a way in",
-    };
+    return { label: "Add" };
   }
   return { label: "Review" };
 };
