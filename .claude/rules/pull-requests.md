@@ -2,10 +2,10 @@
 
 ## Local checks
 
-Run the checks CI runs yourself; hooks aren't installed in fresh clones, containers or CI. Don't hold a push back for the slow ones: push, run them locally while CI runs, and push a fix for anything either one catches.
+Run the checks CI runs yourself; hooks aren't installed in fresh clones, containers or CI. Run the fast ones before committing. Don't hold a push back for the test suites: push, run them locally while CI runs, and push a fix for anything either one catches.
 
-- Before committing, since they are fast and a miss is a guaranteed red run: `cargo fmt` and `npm run format`; `npm run generate` after a `.did` change (see `candid-api.md`); revert any `src/frontend/src/lib/locales/*.po` diff (see `i18n-and-copy.md`).
-- After pushing, in parallel with CI: `cargo clippy` with the flags in `backend.md`; `npm run lint:eslint -- --fix`, `npm run lint`, `npm run check`. CI stops at the first failure, so fix all three.
+- Before committing: `cargo fmt`, then `cargo clippy` with the flags in `backend.md`; `npm run format`, `npm run lint:eslint -- --fix`, `npm run lint`, `npm run check` (CI stops at the first failure, so fix all of them); `npm run generate` after a `.did` change (see `candid-api.md`); revert any `src/frontend/src/lib/locales/*.po` diff (see `i18n-and-copy.md`).
+- After pushing, in parallel with CI: the test suites the change touches, such as the PocketIC integration tests (see `backend.md`), the unit tests (`cargo test`, `npm run test`) and the Playwright e2e tests (see `e2e-testing.md`).
 
 Never add "Generated with Claude" or similar attribution footers to commits, PR descriptions, review replies or code.
 
