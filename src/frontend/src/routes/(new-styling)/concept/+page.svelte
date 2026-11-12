@@ -26,6 +26,8 @@
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
   import Elevated from "./components/Elevated.svelte";
+  import ExploreBanner from "./components/ExploreBanner.svelte";
+  import ExploreShelf from "./components/ExploreShelf.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
@@ -35,6 +37,7 @@
   import CornerAccount from "./components/CornerAccount.svelte";
   import {
     browsersFor,
+    exploreFeed,
     featuredApps,
     identities,
     scenarioPresets,
@@ -859,28 +862,19 @@
           aria-labelledby="tab-explore"
           class={PAGE}
         >
-          <div class="mx-auto flex w-fit flex-col gap-2 md:my-auto">
-            <h2 class={["text-text-tertiary text-sm font-medium", INSET]}>
-              Featured on Internet Identity
-            </h2>
-            {#if featured.length > 0}
-              <ul class={GRID}>
-                {#each featured as app (app.origin)}
-                  <li>
-                    <AppTile
-                      name={app.name}
-                      logo={app.logo}
-                      url={app.url}
-                      mode={managing ? "inert" : "open"}
-                    />
-                  </li>
-                {/each}
-              </ul>
-            {:else}
-              <p class={["text-text-tertiary text-sm", INSET]}>
-                You already use every featured app.
-              </p>
-            {/if}
+          <!-- Explore reads like the App Store: a banner, a shelf, another
+               banner, more shelves. The featured shelf keeps to apps this
+               identity doesn't use yet, and steps aside when there are none. -->
+          <div class="mx-auto flex w-full max-w-5xl flex-col gap-10 px-2">
+            {#each exploreFeed as item, index (index)}
+              {#if item.kind === "banner"}
+                <ExploreBanner {item} />
+              {:else if item.kind === "shelf"}
+                <ExploreShelf title={item.title} apps={item.apps} />
+              {:else if featured.length > 0}
+                <ExploreShelf title={item.title} apps={featured} />
+              {/if}
+            {/each}
           </div>
         </div>
 

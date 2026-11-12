@@ -73,14 +73,15 @@ const app = (
   };
 };
 
-const featured = (name: string): FeaturedApp => {
+/** `oneLiner` stands in where the curated list has none. */
+const featured = (name: string, oneLiner?: string): FeaturedApp => {
   const known = dapp(name);
   return {
     origin: new URL(known.website).origin,
     name: known.name,
     logo: known.logoSrc,
     url: known.website,
-    oneLiner: known.oneLiner,
+    oneLiner: known.oneLiner ?? oneLiner,
   };
 };
 
@@ -220,6 +221,90 @@ export const featuredApps: FeaturedApp[] = [
   featured("DecideAI"),
   featured("Yuku"),
   featured("Catalyze"),
+];
+
+export interface ExploreBannerItem {
+  kind: "banner";
+  app: FeaturedApp;
+  eyebrow: string;
+  title: string;
+  /** The card's background, as CSS. */
+  art: string;
+  /** Light text on a dark card. */
+  dark: boolean;
+}
+
+export interface ExploreShelfItem {
+  kind: "shelf";
+  title: string;
+  apps: FeaturedApp[];
+}
+
+/** Where the featured apps the identity doesn't use yet go in the feed. */
+export interface ExploreFeaturedItem {
+  kind: "featured";
+  title: string;
+}
+
+/** Not in Internet Identity today: Explore laid out the way the App Store
+ *  lays out its Today and Apps tabs, a banner, a shelf, another banner, more
+ *  shelves. Apps and their one-liners come from the curated dapps list. */
+export const exploreFeed: (
+  ExploreBannerItem | ExploreShelfItem | ExploreFeaturedItem
+)[] = [
+  {
+    kind: "banner",
+    app: featured("Caffeine"),
+    eyebrow: "Build with AI",
+    title: "Describe an app. Caffeine builds it.",
+    art: "radial-gradient(90% 130% at 80% 45%, #6b3416 0%, #2a130a 45%, #0c0b0b 100%)",
+    dark: true,
+  },
+  { kind: "featured", title: "Featured on Internet Identity" },
+  {
+    kind: "banner",
+    app: featured("Open Cloud"),
+    eyebrow: "Sovereign cloud",
+    title: "A cloud of your own, on the Internet Computer.",
+    art: "radial-gradient(90% 130% at 80% 40%, #ffffff 0%, #dbe7ff 40%, #b3c9f7 100%)",
+    dark: false,
+  },
+  {
+    kind: "shelf",
+    title: "Trade and earn",
+    apps: [
+      featured(
+        "ICPSwap",
+        "Swap and provide liquidity on the Internet Computer",
+      ),
+      featured("Sonic DEX"),
+      featured("ICPEx"),
+      featured("Water Neuron"),
+      featured("NeuronPool"),
+      featured("BIT10"),
+    ],
+  },
+  {
+    kind: "shelf",
+    title: "Talk and share",
+    apps: [
+      featured("distrikt"),
+      featured("Hobbi"),
+      featured("MORA"),
+      featured("Dmail Network"),
+      featured("Signals"),
+      featured("RuBaRu"),
+    ],
+  },
+  {
+    kind: "shelf",
+    title: "Play",
+    apps: [
+      featured("dragginz"),
+      featured("Cosmicrafts"),
+      featured("AutoRoyale"),
+    ],
+  },
 ];
 
 export interface MockIdentity {
