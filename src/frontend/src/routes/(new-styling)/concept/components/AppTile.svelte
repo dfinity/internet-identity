@@ -178,14 +178,17 @@
           easing: quintOut,
         }}
         class={[
-          "absolute -start-2 -top-2 flex size-6 items-center justify-center rounded-full border-2 transition-colors duration-150",
+          // The unread count's size and place, mirrored to the start corner:
+          // 18px, 5px over the logo's edges. The 1.5px ring matches the
+          // check's own stroke (3 on lucide's 24-unit grid, drawn at 12px).
+          "absolute -start-[5px] -top-[5px] flex size-4.5 items-center justify-center rounded-full border-[1.5px] transition-colors duration-150",
           selected
             ? "border-bg-brand-solid bg-bg-brand-solid text-text-primary-inversed"
             : "border-border-primary bg-bg-primary",
         ]}
       >
         {#if selected}
-          <CheckIcon class="size-3.5" strokeWidth={3} />
+          <CheckIcon class="size-3" strokeWidth={3} />
         {/if}
       </span>
     {/if}
