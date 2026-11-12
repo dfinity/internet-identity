@@ -2,9 +2,9 @@
   /**
    * An editorial banner, after the App Store's: a line on what it's for, a
    * headline, the app's own icon large as the art, and the app's lockup with
-   * Open. One flat color and nothing behind the icon, so a banner stays as
-   * quiet as the shelves around it while the pages are swiped. The whole
-   * card opens the app.
+   * Open. One flat color, or a sky barely deeper at the top, and nothing
+   * behind the icon, so a banner stays as quiet as the shelves around it
+   * while the pages are swiped. The whole card opens the app.
    */
   import AppLogo from "../../manage/(authenticated)/applications/components/AppLogo.svelte";
   import type { ExploreBannerItem } from "../mockData";
@@ -20,7 +20,7 @@
   href={item.app.url}
   target="_blank"
   rel="noopener noreferrer"
-  style:background-color={item.color}
+  style:background={item.background}
   class={[
     "group focus-visible:outline-focus-ring relative isolate grid min-h-[30rem] gap-6 overflow-hidden rounded-[1.75rem] p-6 focus-visible:outline-2 focus-visible:outline-offset-2",
     "grid-rows-[auto_1fr_auto] [grid-template-areas:'text'_'art'_'lockup']",

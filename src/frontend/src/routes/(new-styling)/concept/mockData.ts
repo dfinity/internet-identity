@@ -242,8 +242,8 @@ export interface ExploreBannerItem {
   app: FeaturedApp;
   eyebrow: string;
   title: string;
-  /** The card's one flat color. */
-  color: string;
+  /** The card's background, as CSS: one flat color, or a quiet sky. */
+  background: string;
   /** Light text on a dark card. */
   dark: boolean;
 }
@@ -271,8 +271,9 @@ export const exploreFeed: (
     app: featured("Caffeine"),
     eyebrow: "Build with AI",
     title: "Describe an app. Caffeine builds it.",
-    color: "#0c0b0b",
-    dark: true,
+    // A pale sky, a shade deeper at the top than the bottom.
+    background: "linear-gradient(180deg, #b2ceea 0%, #bdd3eb 100%)",
+    dark: false,
   },
   { kind: "featured", title: "Featured on Internet Identity" },
   {
@@ -280,7 +281,7 @@ export const exploreFeed: (
     app: featured("Open Cloud"),
     eyebrow: "Sovereign cloud",
     title: "A cloud of your own, on the Internet Computer.",
-    color: "#dbe7ff",
+    background: "#dbe7ff",
     dark: false,
   },
   {

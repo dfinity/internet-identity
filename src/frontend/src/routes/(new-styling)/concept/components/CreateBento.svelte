@@ -146,7 +146,7 @@
     copiedTimer = setTimeout(() => (copied = undefined), 1600);
   };
 
-  /** Caffeine's tile, in the flat color of its Explore banner. */
+  /** Caffeine's tile, in Caffeine's near-black. */
   const CAFFEINE_COLOR = "#0c0b0b";
 
   const TILE = "rounded-[1.75rem] p-6 @2xl:p-7";
