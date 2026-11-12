@@ -2,6 +2,7 @@
   import { tick, untrack } from "svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+  import { SWITCH_LIST_ID } from "./IdentityCard.svelte";
 
   interface Props {
     /** Whether the panel beside the canvas is open. */
@@ -10,9 +11,11 @@
     /** The account's size, so the canvas header keeps it room. */
     width?: number;
     height?: number;
+    /** Whether the open panel lists the identities to switch to. */
+    switching: boolean;
     onOpen: () => void;
-    /** The open account switches identity, as the panel's header did. */
-    onSwitch: (anchor: HTMLElement) => void;
+    /** The open account lists the identities to switch to, in the panel. */
+    onSwitch: () => void;
   }
 
   let {
@@ -20,6 +23,7 @@
     identity,
     width = $bindable(0),
     height = $bindable(0),
+    switching,
     onOpen,
     onSwitch,
   }: Props = $props();
@@ -71,11 +75,10 @@
     bind:offsetWidth={width}
     bind:offsetHeight={height}
     type="button"
-    onclick={() => (open ? button !== undefined && onSwitch(button) : onOpen())}
-    aria-label={open
-      ? `${name}, identity ${identity.identityNumber}. Switch identity`
-      : `${name}. Open identity`}
-    aria-expanded={open}
+    onclick={() => (open ? onSwitch() : onOpen())}
+    aria-label={open ? `${name}. Switch identity` : `${name}. Open identity`}
+    aria-expanded={open ? switching : false}
+    aria-controls={open && switching ? SWITCH_LIST_ID : undefined}
     class="ii-hover focus-visible:ring-focus-ring flex items-center gap-2.5 rounded-full py-1 ps-3 pe-1 outline-none focus-visible:ring-2 active:bg-(--ii-selected)"
   >
     <!-- Read toward the avatar, so the name ends at it. The identity's number

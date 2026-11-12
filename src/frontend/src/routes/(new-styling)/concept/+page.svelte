@@ -3,16 +3,16 @@
   import {
     CheckIcon,
     ChevronsRightIcon,
-    ChevronsUpDownIcon,
     FlaskConicalIcon,
     LayoutGridIcon,
+    LogOutIcon,
     PanelBottomIcon,
     PanelRightIcon,
     PanelTopIcon,
     MoonIcon,
     SunIcon,
   } from "@lucide/svelte";
-  import type { Component } from "svelte";
+  import { tick, type Component } from "svelte";
   import { flip } from "svelte/animate";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
@@ -20,7 +20,6 @@
   import { scale, slide } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
-  import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { toaster } from "$lib/components/utils/toaster";
@@ -32,7 +31,9 @@
   import Elevated from "./components/Elevated.svelte";
   import ExploreBanner from "./components/ExploreBanner.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
-  import IdentityCard from "./components/IdentityCard.svelte";
+  import IdentityCard, {
+    SWITCH_LIST_ID,
+  } from "./components/IdentityCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
@@ -224,8 +225,10 @@
   let section = $state<Section>();
   let managing = $state(false);
   let selected = $state<string[]>([]);
-  let isSwitcherOpen = $state(false);
-  let switcherAnchor = $state<HTMLElement>();
+  /** Whether the overview lists the identities to switch to. */
+  let switching = $state(false);
+  /** The desktop panel, which scrolls. */
+  let aside = $state<HTMLElement>();
 
   const selectedApps = $derived(
     selected
@@ -250,6 +253,7 @@
 
   const openCard = (kind: CardKind) => {
     navDirection = 1;
+    switching = false;
     if (kind === "apps") {
       startManaging();
     } else {
@@ -552,15 +556,46 @@
     });
   };
 
-  const switchIdentity = (identityNumber: bigint): Promise<void> => {
+  const switchIdentity = (identityNumber: bigint) => {
     identityIndex = identities.findIndex(
       (entry) => entry.identity.identityNumber === identityNumber,
     );
-    isSwitcherOpen = false;
+    switching = false;
     section = undefined;
     stopManaging();
-    return Promise.resolve();
   };
+
+  /** The account in the corner, once its panel is open, lists the identities
+   *  to switch to. They open at the top of the overview, so from a section or
+   *  from managing apps the panel goes back there first. */
+  const toggleSwitcher = () => {
+    if (managing) {
+      stopManaging();
+      switching = true;
+    } else if (section !== undefined) {
+      closeSection();
+      switching = true;
+    } else {
+      switching = !switching;
+    }
+    if (switching) {
+      aside?.scrollTo({ top: 0, behavior: reduced ? "instant" : "smooth" });
+      // The account stands after the panel, so focus goes up to the list.
+      void tick().then(() =>
+        document
+          .getElementById(SWITCH_LIST_ID)
+          ?.querySelector("button")
+          ?.focus({ preventScroll: true }),
+      );
+    }
+  };
+
+  // A panel that opens again starts with the list folded.
+  $effect(() => {
+    if (!panelVisible) {
+      switching = false;
+    }
+  });
 
   /** Light or dark, to try the concept in both; the open panel switches it. */
   const theme = new ConceptTheme();
@@ -569,20 +604,11 @@
     if (event.key !== "Escape" || event.defaultPrevented) {
       return;
     }
-    // The product's Popover hears Escape only on its backdrop, which focus
-    // never reaches, so the identity switcher is closed here: Escape takes it
-    // first, and the panel with the next press.
-    if (isSwitcherOpen) {
-      event.preventDefault();
-      isSwitcherOpen = false;
-      switcherAnchor?.focus({ preventScroll: true });
-      return;
-    }
     if (
       (layout === "island" || layout === "top") &&
       isDesktop.current &&
       panelOpen &&
-      // Any other open popover keeps the panel open.
+      // An open popover takes Escape first.
       document.querySelector(".popover:popover-open") === null
     ) {
       panelOpen = false;
@@ -639,40 +665,19 @@
     <!-- With the account in the corner, the account itself is this header. -->
     {#if !cornered}
       <!-- The header stands on the panel's edge, not on the icons inside the
-         rows: the avatar lines up with the list below. With no inset there is
-         no room for a hover fill, so the switch control lights up instead. -->
-      <div class={["flex items-center gap-1", inSheet && "pe-10"]}>
-        <button
-          bind:this={switcherAnchor}
-          type="button"
-          onclick={() => (isSwitcherOpen = true)}
-          aria-label={`${identityName}, identity ${identity.identityNumber}. Switch identity`}
-          class="group/identity focus-visible:outline-focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-2 text-start focus-visible:outline-2 focus-visible:outline-offset-4"
+         rows: the avatar lines up with the cards below. It only says whose
+         panel this is, as the account in the corner does on desktop; the
+         number and the other identities are rows of the first card. -->
+      <div class={["flex items-center gap-3 py-2", inSheet && "pe-10"]}>
+        <IdentityAvatar {identity} size="sm" />
+        <span
+          class="text-text-primary min-w-0 flex-1 truncate text-sm font-medium"
         >
-          <IdentityAvatar {identity} size="sm" />
-          <!-- The panel speaks in two sizes and two weights: a 14px medium
-             label over a 13px regular line, the same as every row below. -->
-          <span class="flex min-w-0 flex-1 flex-col">
-            <span class="text-text-primary truncate text-sm font-medium">
-              {identityName}
-            </span>
-            <span
-              class="text-text-tertiary text-[13px] leading-[18px] tabular-nums"
-            >
-              Identity {identity.identityNumber}
-            </span>
-          </span>
-          <span
-            aria-hidden="true"
-            class="text-fg-tertiary grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 group-hover/identity:bg-(--ii-hover) group-active/identity:bg-(--ii-selected)"
-          >
-            <ChevronsUpDownIcon class="size-4" />
-          </span>
-        </button>
+          {identityName}
+        </span>
         {#if closable}
-          <!-- Drawn like the switch control beside it: same circle, same 16px
-             glyph, same muted tone, so neither outweighs the other. Its
-             glyph points the way the panel leaves (see the corner's Close). -->
+          <!-- A 16px glyph in a muted tone, pointing the way the panel leaves
+             (see the corner's Close). -->
           <button
             type="button"
             onclick={() => (panelOpen = false)}
@@ -687,9 +692,16 @@
           </button>
         {/if}
       </div>
-    {:else}
-      <IdentityCard {identity} />
     {/if}
+    <IdentityCard
+      {identity}
+      others={identities
+        .map((entry) => entry.identity)
+        .filter((one) => one.identityNumber !== identity.identityNumber)}
+      bind:switching
+      onSwitch={switchIdentity}
+      onAdd={() => unavailable("Adding an identity")}
+    />
     <!-- Each group is a card under a small heading, as in Settings on iOS:
          the heading starts where the rows' content does, 16px in. -->
     {#each accountGroups as group (group.title)}
@@ -721,6 +733,22 @@
         </Elevated>
       </section>
     {/each}
+    <!-- Signing out ends the list, as it ends an account's page in Settings. -->
+    <Elevated offset={1} class="overflow-hidden rounded-2xl">
+      <button
+        type="button"
+        onclick={() => unavailable("Signing out")}
+        class="ii-hover focus-visible:ring-focus-ring flex w-full items-center gap-2 px-4 py-3 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset"
+      >
+        <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
+          Sign out
+        </span>
+        <LogOutIcon
+          class="text-fg-quaternary size-4 shrink-0 rtl:-scale-x-100"
+          aria-hidden="true"
+        />
+      </button>
+    </Elevated>
   </div>
 {/snippet}
 
@@ -850,17 +878,23 @@
       bind:clientHeight={headerHeight}
       class="pointer-events-none relative z-10 grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr] md:px-5"
     >
-      <div
+      <!-- The logo is the way home: it goes back to the first page. Its hover
+           is a layer over the pill's own colour (`ii-hover`), so the pill
+           stays solid over the pages when it is lifted. -->
+      <button
+        type="button"
         dir="ltr"
+        onclick={() => goToPage(0)}
+        aria-label={`id.ai, go to ${PAGES[0].label}`}
         class={[
           pill,
           PILL_MOTION,
-          "my-3 flex h-10 items-center gap-3 justify-self-start px-4",
+          "ii-hover focus-visible:outline-focus-ring my-3 flex h-10 items-center gap-3 justify-self-start px-4 focus-visible:outline-2 focus-visible:outline-offset-2",
         ]}
       >
         <Logo class="text-fg-primary h-4" />
         <span class="text-text-primary text-base font-semibold"> id.ai </span>
-      </div>
+      </button>
       <div
         role="tablist"
         aria-label="Apps"
@@ -1144,6 +1178,7 @@
     style:width={panelVisible ? "25rem" : "0rem"}
   >
     <aside
+      bind:this={aside}
       aria-label="Identity"
       inert={!panelVisible}
       class={[
@@ -1167,11 +1202,9 @@
       {identity}
       bind:width={accountWidth}
       bind:height={accountHeight}
+      {switching}
       onOpen={openAccount}
-      onSwitch={(anchor) => {
-        switcherAnchor = anchor;
-        isSwitcherOpen = true;
-      }}
+      onSwitch={toggleSwitcher}
     />
   {/if}
 
@@ -1289,37 +1322,6 @@
           </button>
         {/each}
       </div>
-    </Popover>
-  {/if}
-
-  {#if isSwitcherOpen}
-    <!-- It opens from its anchor's start, which suits the panel's header: that
-         one spans the panel. The account in the corner ends at the window's
-         edge, so from there it opens from the end, back over the panel. -->
-    <Popover
-      anchor={switcherAnchor}
-      onClose={() => (isSwitcherOpen = false)}
-      direction="down"
-      align={layout === "top" && isDesktop.current ? "end" : "start"}
-      distance="0.5rem"
-      class="!bg-bg-primary"
-    >
-      <IdentitySwitcher
-        selected={identity.identityNumber}
-        identities={identities.map((entry) => entry.identity)}
-        onSwitchIdentity={switchIdentity}
-        onUseAnotherIdentity={() => {
-          isSwitcherOpen = false;
-          unavailable("Adding an identity");
-        }}
-        onError={() => (isSwitcherOpen = false)}
-        onClose={() => (isSwitcherOpen = false)}
-        onSignOut={() => {
-          isSwitcherOpen = false;
-          unavailable("Signing out");
-          return Promise.resolve();
-        }}
-      />
     </Popover>
   {/if}
 </div>
