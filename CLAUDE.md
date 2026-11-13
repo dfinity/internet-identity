@@ -38,4 +38,4 @@ These rules are how a correction reaches the next agent. Update `.claude/rules/`
 - Your change makes a rule wrong: a renamed symbol, a moved path, a replaced pattern.
 - You notice a rule that contradicts the code or another rule.
 
-Make the update in the same PR when it belongs to that change. Otherwise, propose it to the user before you finish. Say which rule you added or changed. Don't keep a repo convention only in your own memory: it never reaches a teammate's agent.
+Make the update in the same PR when it belongs to that change. Otherwise, propose it to the user before you finish. List every rule you added, changed or removed in the PR description, in its own section, so reviewers see it. Don't keep a repo convention only in your own memory: it never reaches a teammate's agent.
