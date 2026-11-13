@@ -164,6 +164,11 @@
       </div>
     </div>
     <div class="flex flex-col gap-2.5 px-4 pt-8 pb-16">
+      <p
+        class="bg-bg-secondary border-border-secondary text-text-tertiary rounded-lg border px-3.5 py-3 font-mono text-xs/4 break-all select-all"
+      >
+        {viaWebApp(target)}
+      </p>
       <a class="btn btn-primary btn-xl" href={viaWebApp(target)}>
         {$t`Continue`}
       </a>
