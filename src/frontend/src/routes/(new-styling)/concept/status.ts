@@ -216,9 +216,11 @@ export const deriveStatus = (input: StatusInput): CardStatus[] => {
       ask: "Review the phrase reset",
     };
     if (scenario.access === "newPasskey") {
+      // The incident tells the whole story under that title; the row keeps
+      // to its own part of it.
       said.devices = {
         tone: "risk",
-        sentence: "Firefox changed how you sign in",
+        sentence: "New sign-in from Firefox",
         ask: "Check what Firefox changed",
       };
     }
