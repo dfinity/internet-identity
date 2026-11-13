@@ -77,7 +77,12 @@ export const holdsTheInstallPlaceholder = ({
   search: string;
 }): boolean => !inTheApp && new URLSearchParams(search).has("installing");
 
-export const insideTheBrowser = async (hash: string): Promise<Screen> => {
+/** `mintedElsewhere` is an install handed over by another browser on this device, whose
+ *  entry is the one waiting for it: this browser's own entry says nothing about it. */
+export const insideTheBrowser = async (
+  hash: string,
+  mintedElsewhere: boolean,
+): Promise<Screen> => {
   const fragment = decodeLinkToken(hash);
   switch (fragment.kind) {
     // This URL exists to carry a token to an app that was added from it. Reaching it in a
@@ -88,7 +93,9 @@ export const insideTheBrowser = async (hash: string): Promise<Screen> => {
       console.error(fragment.reason);
       return { kind: "elsewhere" };
     case "token":
-      return await settleTheTab(fragment.token);
+      return mintedElsewhere
+        ? { kind: "install" }
+        : await settleTheTab(fragment.token);
   }
 };
 

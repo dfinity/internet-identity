@@ -62,6 +62,9 @@ export const prepareInstallUrl = async ({
 /** The placeholder the new tab holds while the URL is still being minted: this page, told to wait rather than to decide. */
 export const INSTALL_PLACEHOLDER_URL = `${NOTIFICATION_APP_PATH}?installing`;
 
+/** Marks an install handed to Safari by another browser on this device, whose own entry is the one the install is for. */
+export const MINTED_ELSEWHERE_PARAM = "minted-elsewhere";
+
 /** `undefined` where this browser has nothing to send the user to; the reason is logged rather than raised.
  *  A record that still answers refuses an install, which is what keeps a second app off a device that already has one.
  *  That refusal is not worked around here: the caller that means to replace an app probes it first, and the screen says so where it is still there. */
@@ -86,9 +89,12 @@ export const openInstallTab = (
   if (isStandalone()) {
     void Promise.resolve(url).then(
       (resolved) => {
-        if (resolved !== undefined) {
-          openInSafari(new URL(resolved, window.location.origin).toString());
+        if (resolved === undefined) {
+          return;
         }
+        const handedOver = new URL(resolved, window.location.origin);
+        handedOver.searchParams.set(MINTED_ELSEWHERE_PARAM, "");
+        openInSafari(handedOver.toString());
       },
       (error: unknown) => console.error(error),
     );
