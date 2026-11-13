@@ -19,21 +19,12 @@ The `e2e-playwright` job in `.github/workflows/canister-tests.yml` is the CI ref
 
 ## Running tests
 
-```bash
-./scripts/dev-e2e-setup
-npx playwright test --project=desktop --workers=1 --grep "Authorize ready message"
-npx playwright test --project=desktop --workers=1 src/frontend/tests/e2e-playwright/routes/recovery.spec.ts
-
-# After more code changes, re-run setup:
-./scripts/dev-e2e-setup
-
-# When done:
-./scripts/dev-e2e-setup --teardown
-```
-
-Run with `--workers=1`, as CI does: specs share canister state, and parallel workers produce false failures. For broad frontend changes (auth flows, consent, sessions), run the full suite, not just the new spec.
-
-Other invocations, all with `--workers=1`: `npx playwright test <file> --workers=1 -g "<name pattern>"`, `--ui`, `--trace on`.
+- Start the stack with `./scripts/dev-e2e-setup`, then run `npx playwright test --project=desktop --workers=1`, narrowed to a spec file (`npx playwright test <path to .spec.ts> ...`) or to tests by name (`-g "<name pattern>"`).
+- Run with `--workers=1`, as CI does: specs share canister state, and parallel workers produce false failures.
+- After changing code, re-run `./scripts/dev-e2e-setup` before the next test run. The tests run against the deployed canisters, so a change takes effect only once setup rebuilds them (see Stack gotchas).
+- For broad frontend changes (auth flows, consent, sessions), run the full suite, not just the new spec.
+- Add `--trace on` to debug a failure.
+- Tear the stack down with `./scripts/dev-e2e-setup --teardown` when done.
 
 ## Environment the scripts set
 
