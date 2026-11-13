@@ -190,6 +190,9 @@
   };
   let layout = $state<Layout>(readLayout());
   const isDesktop = new MediaQuery("min-width: 768px");
+  /** Wide enough that the panel beside the canvas still leaves the apps their
+   *  room, so news may open it on arrival. Narrower, only a risk does. */
+  const roomy = new MediaQuery("min-width: 1024px");
   /** The panel the island or the account opens on desktop, and the sheet on
    *  a phone. */
   let panelOpen = $state(false);
@@ -349,6 +352,83 @@
     }
   };
 
+  // --- Arriving: whether the panel meets the user ---
+
+  // On desktop the panel opens by itself only as a visit starts, never in the
+  // middle of one, and only when it has something to say: on the first visit,
+  // when something has come up since the panel last showed, and on every visit
+  // while a risk is left unanswered. Otherwise it is as the user left it.
+  // Whatever the open panel shows counts as read, so once it is closed the
+  // same items wait in the dock and don't open it again.
+  /** Whether the panel was left open, to come back to it as it was. */
+  const PANEL_KEY = "ii-concept-panel-v1";
+  /** What the panel last showed, per identity, so only news opens it. */
+  const SEEN_KEY = "ii-concept-seen-v1";
+  const seenKeyOf = ({ kind, sentence }: CardStatus) => `${kind}:${sentence}`;
+  const readSeen = (): Record<string, string[]> => {
+    try {
+      return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "{}") as Record<
+        string,
+        string[]
+      >;
+    } catch {
+      return {};
+    }
+  };
+  const seenId = $derived(`${identity.identityNumber}`);
+
+  const opensOnArrival = (): boolean => {
+    if (!isDesktop.current || layout === "panel") {
+      return false;
+    }
+    if (cards.some(({ tone }) => tone === "risk")) {
+      return true;
+    }
+    const left = localStorage.getItem(PANEL_KEY);
+    const seen = readSeen()[seenId] ?? [];
+    const news =
+      left === null ||
+      attention.some((card) => !seen.includes(seenKeyOf(card)));
+    return (news && roomy.current) || left === "open";
+  };
+
+  /** A visit starts: as the page loads, and from the concept menu. */
+  const arrive = () => {
+    section = undefined;
+    switching = false;
+    managing = false;
+    selected = [];
+    panelOpen = opensOnArrival();
+  };
+  arrive();
+
+  // The open panel has shown what it holds now.
+  $effect(() => {
+    if (!panelVisible) {
+      return;
+    }
+    const keys = attention.map(seenKeyOf);
+    const all = readSeen();
+    if (JSON.stringify(all[seenId] ?? []) !== JSON.stringify(keys)) {
+      all[seenId] = keys;
+      localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+    }
+  });
+
+  // How the desktop panel was left. A phone's sheet is closed on every visit.
+  $effect(() => {
+    if (isDesktop.current && layout !== "panel") {
+      localStorage.setItem(PANEL_KEY, panelOpen ? "open" : "closed");
+    }
+  });
+
+  /** Concept only: the next visit is the first again. */
+  const arriveFirst = () => {
+    localStorage.removeItem(PANEL_KEY);
+    localStorage.removeItem(SEEN_KEY);
+    arrive();
+  };
+
   // --- Apps grid pages ---
 
   const PAGES = [
@@ -491,11 +571,12 @@
     panelOpen = true;
   };
 
+  /** A preset stands for the state the user arrives to, so it starts a visit. */
   const applyPreset = (index: number) => {
     current.scenario = { ...scenarioPresets[index].scenario };
     current.signedOut = [];
     navDirection = -1;
-    section = undefined;
+    arrive();
   };
 
   const signOut = (id: string) => {
@@ -1348,6 +1429,35 @@
             {preset.label}
           </button>
         {/each}
+        <hr class="border-border-secondary -mx-1.5 my-1.5" />
+        <div
+          aria-hidden="true"
+          class="text-text-tertiary px-3 pt-1.5 pb-1 text-xs"
+        >
+          Visit
+        </div>
+        <button
+          type="button"
+          role="menuitem"
+          onclick={() => {
+            close();
+            arrive();
+          }}
+          class="btn btn-tertiary justify-start !px-3 text-start"
+        >
+          New visit
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onclick={() => {
+            close();
+            arriveFirst();
+          }}
+          class="btn btn-tertiary justify-start !px-3 text-start"
+        >
+          First visit
+        </button>
       </div>
     </Popover>
   {/if}
