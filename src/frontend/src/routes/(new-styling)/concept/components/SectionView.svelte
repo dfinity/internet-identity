@@ -276,13 +276,14 @@
         },
       },
     ];
-    if (integrations === "local") {
+    // Kept on purpose, the server is still there, only no longer flagged.
+    if (integrations === "local" || integrations === "localAllowed") {
       rows.push({
         id: "local",
         icon: ServerIcon,
         title: "Local server",
         meta: "Runs on this computer · Any local program can connect",
-        flag: "error",
+        flag: integrations === "local" ? "error" : undefined,
         action: {
           label: "Remove",
           variant: "danger",

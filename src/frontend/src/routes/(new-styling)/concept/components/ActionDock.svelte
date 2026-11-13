@@ -41,14 +41,15 @@
   };
 
   // The glyph carries the tone. The dark button is inverted, so its glyph
-  // takes the other theme's shade to stay readable on it.
+  // takes the other theme's shade to stay readable on it. A risk's button is
+  // red, not dark, so it doesn't pass for one more step: its glyph is white.
   const GLYPH: Partial<Record<Tone, string>> = {
     risk: "text-fg-error-primary",
     action: "text-fg-warning-primary",
     queued: "text-fg-warning-primary",
   };
   const GLYPH_ON_PRIMARY: Partial<Record<Tone, string>> = {
-    risk: "text-error-400 dark:text-error-600",
+    risk: "text-white",
     action: "text-warning-400 dark:text-warning-600",
   };
 
@@ -232,7 +233,9 @@
             // A utility, not `ii-surface-6`: the reset for buttons outranks
             // the surface classes, and the widget must not show the page through.
             item.primary
-              ? "btn-primary"
+              ? item.tone === "risk"
+                ? "btn-primary btn-danger"
+                : "btn-primary"
               : "ii-hover text-text-primary bg-(--ii-surface-6)",
           ]}
         >

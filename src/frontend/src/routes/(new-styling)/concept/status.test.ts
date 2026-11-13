@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { deriveStatus, needsAttention, type Scenario } from "./status";
+import {
+  deriveStatus,
+  incidentOf,
+  needsAttention,
+  type Scenario,
+} from "./status";
 
 const calm: Scenario = {
   recovery: "calm",
@@ -110,5 +115,52 @@ describe("needsAttention", () => {
     expect(of({ devices: "newBrowser" })).toBe(false);
     expect(of({ recovery: "unverified" })).toBe(true);
     expect(of({ integrations: "local" })).toBe(true);
+  });
+});
+
+describe("incidentOf", () => {
+  const incident = (scenario: Partial<Scenario>, signedOut: string[] = []) =>
+    incidentOf({
+      scenario: { ...calm, ...scenario },
+      signedOut: new Set(signedOut),
+    });
+  const firefox: Partial<Scenario> = {
+    recovery: "phraseReset",
+    access: "newPasskey",
+    devices: "newBrowser",
+  };
+
+  it("tells a phrase reset from a new browser as one story", () => {
+    expect(incident(firefox)?.kinds).toEqual(["devices", "access", "recovery"]);
+    expect(incident(firefox)?.facts.map(({ kind }) => kind)).toEqual([
+      "devices",
+      "access",
+      "recovery",
+    ]);
+  });
+
+  it("ends once the new browser is signed out", () => {
+    expect(incident(firefox, ["firefox"])).toBeUndefined();
+  });
+
+  it("goes quiet whichever way it is answered", () => {
+    const answered = incident(firefox);
+    for (const answer of [answered?.secure, answered?.confirm]) {
+      const after = { ...calm, ...firefox, ...answer?.patch };
+      expect(incident(after)).toBeUndefined();
+      expect(derive(after).recovery.tone).not.toBe("risk");
+      expect(derive(after).devices.tone).not.toBe("risk");
+    }
+  });
+
+  it("asks about a local server left open, and keeps it quietly", () => {
+    const local = incident({ integrations: "local" });
+    expect(local?.kinds).toEqual(["integrations"]);
+    expect(derive({ ...local?.confirm.patch }).integrations.tone).toBe("tip");
+  });
+
+  it("is not raised by news or a to-do", () => {
+    expect(incident({ devices: "newBrowser" })).toBeUndefined();
+    expect(incident({ recovery: "unverified" })).toBeUndefined();
   });
 });

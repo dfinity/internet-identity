@@ -17,8 +17,11 @@ export type RecoveryState =
   | "noEmail"
   | "calm";
 export type AccessState = "one" | "newPasskey" | "unused" | "calm";
-export type DevicesState = "newBrowser" | "many" | "calm";
-export type IntegrationsState = "local" | "cliConfirm" | "off" | "calm";
+/** `known`: the new browser stays, once the user said it was theirs. */
+export type DevicesState = "newBrowser" | "known" | "many" | "calm";
+/** `localAllowed`: the local server stays, once the user said they set it up. */
+export type IntegrationsState =
+  "local" | "localAllowed" | "cliConfirm" | "off" | "calm";
 
 export interface Scenario {
   recovery: RecoveryState;
@@ -122,6 +125,7 @@ const INTEGRATIONS: Record<IntegrationsState, Said> = {
     sentence: "Any local program can connect",
     ask: "Review local access",
   },
+  localAllowed: { tone: "tip", sentence: "Any local program can connect" },
   cliConfirm: {
     tone: "pending",
     sentence: "ICP CLI is waiting for approval",
@@ -152,6 +156,7 @@ const devicesSaid = ({
             sentence: `Signed in on ${browserCount} browsers`,
           }
         : { tone: "calm", sentence: `Signed in on ${browserCount} browsers` };
+    case "known":
     case "calm":
       return {
         tone: "calm",
@@ -310,3 +315,119 @@ export const needsAttention = (cards: CardStatus[]): boolean =>
   cards.some(({ tone }) =>
     (["risk", "action", "queued", "pending"] as Tone[]).includes(tone),
   );
+
+/** One way to answer an incident, and what the answer changes. */
+export interface IncidentAnswer {
+  label: string;
+  patch: Partial<Scenario>;
+  message: string;
+}
+
+/**
+ * A risk told as one story: something changed the identity from elsewhere,
+ * or left it open, and only the user can tell whether that was them. Until
+ * they answer, it meets them on every visit and asks for the cards it
+ * covers, which stop asking on their own.
+ */
+export interface Incident {
+  /** The cards whose risk this tells. */
+  kinds: CardKind[];
+  title: string;
+  /** The one question the answers reply to. */
+  question: string;
+  /** What happened, oldest first, each by the card it touched. */
+  facts: { kind: CardKind; text: string; meta: string }[];
+  /** The step, as a verb, where the incident is only mentioned. */
+  ask: string;
+  /** It wasn't the user: undo what was done. */
+  secure: IncidentAnswer & {
+    /** What the answer will do, said before it is given. */
+    detail: string;
+  };
+  /** It was the user: the change stays and goes quiet. */
+  confirm: IncidentAnswer;
+}
+
+export const incidentOf = ({
+  scenario,
+  signedOut,
+}: Pick<StatusInput, "scenario" | "signedOut">): Incident | undefined => {
+  const newBrowserLive =
+    scenario.devices === "newBrowser" && !signedOut.has("firefox");
+  if (scenario.recovery === "phraseReset" && newBrowserLive) {
+    const passkey = scenario.access === "newPasskey";
+    const access: Partial<Scenario> = passkey ? { access: "calm" } : {};
+    return {
+      kinds: passkey
+        ? ["devices", "access", "recovery"]
+        : ["devices", "recovery"],
+      title: passkey
+        ? "Firefox changed how you sign in"
+        : "Firefox reset your recovery phrase",
+      question: "Was this you?",
+      facts: [
+        {
+          kind: "devices",
+          text: "Signed in from Firefox",
+          meta: "12 min ago",
+        },
+        ...(passkey
+          ? [
+              {
+                kind: "access" as const,
+                text: "Added a passkey",
+                meta: "10 min ago",
+              },
+            ]
+          : []),
+        {
+          kind: "recovery",
+          text: "Reset the recovery phrase",
+          meta: "9 min ago",
+        },
+      ],
+      ask: "Check what Firefox changed",
+      secure: {
+        label: "This wasn't me",
+        detail: passkey
+          ? "Signs Firefox out and removes its passkey. Then you set a new recovery phrase."
+          : "Signs Firefox out. Then you set a new recovery phrase.",
+        // The phrase Firefox set is void, so recovery starts over.
+        patch: { devices: "calm", recovery: "none", ...access },
+        message: "Firefox signed out",
+      },
+      confirm: {
+        label: "This was me",
+        patch: { devices: "known", recovery: "calm", ...access },
+        message: "Firefox stays signed in",
+      },
+    };
+  }
+  if (scenario.integrations === "local") {
+    return {
+      kinds: ["integrations"],
+      title: "Any local program can connect",
+      question: "Did you set this up?",
+      facts: [
+        {
+          kind: "integrations",
+          text: "Local server on this computer",
+          meta: "No approval to connect",
+        },
+      ],
+      ask: "Review local access",
+      secure: {
+        label: "Remove it",
+        detail: "Removes the server. AI and CLI tools ask before they connect.",
+        patch: { integrations: "calm" },
+        message: "Local server removed",
+      },
+      confirm: {
+        label: "Keep it",
+        patch: { integrations: "localAllowed" },
+        message: "Local server kept",
+      },
+    };
+  }
+  return undefined;
+};

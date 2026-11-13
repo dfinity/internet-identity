@@ -33,6 +33,7 @@
   import ExploreBanner from "./components/ExploreBanner.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
   import IdentityCard from "./components/IdentityCard.svelte";
+  import IncidentCard from "./components/IncidentCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
@@ -52,12 +53,14 @@
   import { ConceptTheme } from "./theme.svelte";
   import {
     deriveStatus,
+    incidentOf,
     isLoud,
     leadActionOf,
     leadOf,
     needsAttention,
     type CardKind,
     type CardStatus,
+    type IncidentAnswer,
     type Scenario,
     type Tone,
   } from "./status";
@@ -97,6 +100,15 @@
     }),
   );
   const lead = $derived(leadOf(cards));
+  /** A risk, told as one story the user answers; it speaks for its cards. */
+  const incident = $derived(
+    incidentOf({
+      scenario: current.scenario,
+      signedOut: new Set(current.signedOut),
+    }),
+  );
+  const coveredByIncident = (kind: CardKind) =>
+    incident?.kinds.includes(kind) === true;
   /** The account's rows, in two groups: how you get in, and what is signed in
    *  or connected with the identity. Apps are managed from the grid itself
    *  (Manage, by All apps' heading), so the account doesn't list them too. */
@@ -320,13 +332,29 @@
       .filter(({ tone }) => URGENCY.includes(tone))
       .sort((a, b) => URGENCY.indexOf(a.tone) - URGENCY.indexOf(b.tone)),
   );
+  /** An incident takes one widget for all its cards, in front: it opens the
+   *  panel, which leads with it. */
   const dockItems = $derived<DockItem[]>(
-    attention.slice(0, 3).map((card) => ({
-      kind: card.kind,
-      tone: card.tone,
-      label: card.ask ?? card.sentence,
-      primary: isLoud(card),
-    })),
+    [
+      ...(incident !== undefined
+        ? [
+            {
+              kind: incident.kinds[0],
+              tone: "risk" as const,
+              label: incident.ask,
+              primary: true,
+            },
+          ]
+        : []),
+      ...attention
+        .filter((card) => !coveredByIncident(card.kind))
+        .map((card) => ({
+          kind: card.kind,
+          tone: card.tone,
+          label: card.ask ?? card.sentence,
+          primary: isLoud(card),
+        })),
+    ].slice(0, 3),
   );
   /** The closed account's dot, while something needs the user (as the panel
    *  layout's avatar on a phone has it): red for a risk, amber otherwise. */
@@ -346,6 +374,10 @@
   };
 
   const actFromDock = (kind: CardKind) => {
+    if (coveredByIncident(kind)) {
+      openAccount();
+      return;
+    }
     const card = cards.find((one) => one.kind === kind);
     if (card !== undefined) {
       runLead(card);
@@ -381,7 +413,7 @@
     if (!isDesktop.current || layout === "panel") {
       return false;
     }
-    if (cards.some(({ tone }) => tone === "risk")) {
+    if (incident !== undefined) {
       return true;
     }
     const left = localStorage.getItem(PANEL_KEY);
@@ -552,6 +584,12 @@
     if (verifying === undefined) return;
     const { patch, message } = verifying;
     verifying = undefined;
+    resolve(patch, message);
+  };
+
+  /** Either answer settles the incident; "it wasn't me" leaves the next step
+   *  (a new recovery phrase) to the cards. */
+  const answerIncident = ({ patch, message }: IncidentAnswer) => {
     resolve(patch, message);
   };
 
@@ -773,6 +811,14 @@
         Identity
       </h2>
     {/if}
+    {#if incident !== undefined}
+      <div
+        out:slide={{ duration: reduced ? 0 : 260, easing: quintOut }}
+        class="flex flex-col"
+      >
+        <IncidentCard {incident} onAnswer={answerIncident} />
+      </div>
+    {/if}
     <IdentityCard
       {identity}
       others={identities
@@ -802,7 +848,7 @@
               title={TITLES[card.kind]}
               sentence={card.sentence}
               tone={card.tone}
-              action={isLoud(card)
+              action={isLoud(card) && !coveredByIncident(card.kind)
                 ? leadActionOf(card, current.scenario)
                 : undefined}
               resolved={resolvedKinds.includes(card.kind)}

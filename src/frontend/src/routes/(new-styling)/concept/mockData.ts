@@ -502,7 +502,8 @@ export const browsersFor = (devices: Scenario["devices"]): MockBrowser[] => {
       now - DAY,
     ),
   ];
-  if (devices === "newBrowser") {
+  // Once the user says the new browser was theirs, it stays, no longer new.
+  if (devices === "newBrowser" || devices === "known") {
     list.push(
       browser(
         "firefox",
@@ -510,7 +511,7 @@ export const browsersFor = (devices: Scenario["devices"]): MockBrowser[] => {
         { Windows: null },
         { Desktop: null },
         now - 10 * MINUTE,
-        { isNew: true },
+        { isNew: devices === "newBrowser" },
       ),
     );
   }
