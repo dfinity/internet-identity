@@ -260,19 +260,27 @@ export interface ExploreFeaturedItem {
   title: string;
 }
 
+/** Not in Internet Identity today: the one place Explore says you can make
+ *  an app of your own, led by the app that needs nothing but words. */
+export interface ExploreBuildItem {
+  kind: "build";
+  app: FeaturedApp;
+}
+
 /** Not in Internet Identity today: Explore laid out the way the App Store
  *  lays out its Today and Apps tabs, a banner, a shelf, another banner, more
  *  shelves. Apps and their one-liners come from the curated dapps list. */
 export const exploreFeed: (
-  ExploreBannerItem | ExploreShelfItem | ExploreFeaturedItem
+  ExploreBannerItem | ExploreShelfItem | ExploreFeaturedItem | ExploreBuildItem
 )[] = [
   {
     kind: "banner",
-    app: featured("Caffeine"),
-    eyebrow: "Build with AI",
-    title: "Describe an app. Caffeine builds it.",
-    // As light as Open Cloud's banner, in the hue of Caffeine's own sky.
-    background: "#d6e9fe",
+    app: featured("OpenChat"),
+    eyebrow: "Messaging",
+    title: "Chat with no company in the middle.",
+    // A pale wash of the orange in OpenChat's ring, so its blue icon stands
+    // out rather than sinking into another blue.
+    background: "#fdebd9",
     dark: false,
   },
   { kind: "featured", title: "Featured on Internet Identity" },
@@ -299,6 +307,9 @@ export const exploreFeed: (
       featured("BIT10"),
     ],
   },
+  // The third banner, after the apps: what you can make comes after what you
+  // can use.
+  { kind: "build", app: featured("Caffeine") },
   {
     kind: "shelf",
     title: "Talk and share",

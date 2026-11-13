@@ -31,6 +31,7 @@
   import CreateBento from "./components/CreateBento.svelte";
   import Elevated from "./components/Elevated.svelte";
   import ExploreBanner from "./components/ExploreBanner.svelte";
+  import ExploreBuild from "./components/ExploreBuild.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
   import IdentityCard from "./components/IdentityCard.svelte";
   import IncidentBanner from "./components/IncidentBanner.svelte";
@@ -1345,6 +1346,8 @@
                 <ExploreBanner {item} />
               {:else if item.kind === "shelf"}
                 <ExploreShelf title={item.title} apps={item.apps} />
+              {:else if item.kind === "build"}
+                <ExploreBuild app={item.app} />
               {:else if featured.length > 0}
                 <ExploreShelf title={item.title} apps={featured} />
               {/if}
