@@ -19,7 +19,7 @@ Conventions live in `.claude/rules/`, one file per topic. Most are scoped with
 | `backend.md` | canister crates, `src/canister_tests/**` | no trapping, state and `await`, layering, Rust style, clippy, PocketIC |
 | `candid-api.md` | `*.did`, interface crate, generated bindings | API evolution, shape, error design, bindings |
 | `stable-memory.md` | storage, state, upgrade tests | record formats, memory indices, migrations, upgrades |
-| `frontend.md` | `src/frontend/**` | design system, Svelte, async and errors, TypeScript, accessibility |
+| `frontend.md` | `src/frontend/**` | design system, Svelte, async and errors, TypeScript, the `/authorize` state machine, accessibility |
 | `i18n-and-copy.md` | frontend sources, locales | translations, `<Trans>`/`$t`, UI copy |
 | `testing.md` | tests, Rust sources | where coverage goes, assertions that can fail |
 | `e2e-testing.md` | `src/frontend/tests/**`, `scripts/dev-e2e*`, `playwright.config.ts` | the dev-e2e stack, writing Playwright tests |
