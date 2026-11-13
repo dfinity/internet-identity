@@ -1510,6 +1510,37 @@ export interface InternetIdentityStats {
  */
 export type Iss = string;
 export type JWT = string;
+export type JoinNotificationAppError = {
+    /**
+     * The installer key did not sign this request.
+     */
+    'InvalidInstallerSignature' : null
+  } |
+  {
+    /**
+     * No app the installer identity points at was installed with that key.
+     */
+    'NoNotificationApp' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No browser of the identity waits on an install the caller holds the key to.
+     */
+    'NoPendingLink' : null
+  };
+/**
+ * Points the browser waiting on the caller's install key at the Home Screen app another
+ * install key on the same device installed, instead of adding a second app. The caller
+ * signs as the one-shot key its browser registered; the installer key is the one the app
+ * was installed with, which only the browser that showed that install still holds.
+ */
+export interface JoinNotificationAppRequest {
+  'signature' : Uint8Array | number[],
+  'installer_anchor_number' : UserNumber,
+  'anchor_number' : UserNumber,
+  'installer_key' : PublicKey,
+}
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
@@ -3180,6 +3211,15 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  /**
+   * Called by the browser that shows an install, signed as that install's key, with
+   * proof it showed the install the app on this device came from.
+   */
+  'join_notification_app' : ActorMethod<
+    [JoinNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : JoinNotificationAppError }
+  >,
   /**
    * Called by the Home Screen app on its first open, signed with that one-shot key.
    * Creates the app's record where its key has none, and points the browser at it.

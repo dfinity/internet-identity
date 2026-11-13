@@ -10,6 +10,10 @@ import {
   type LinkToken,
 } from "$lib/utils/notifications/linkToken";
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
+import {
+  joinInstalledApp,
+  rememberInstaller,
+} from "$lib/utils/notifications/installerKey";
 import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
 import {
@@ -93,10 +97,21 @@ export const insideTheBrowser = async (
       console.error(fragment.reason);
       return { kind: "elsewhere" };
     case "token":
-      return mintedElsewhere
-        ? { kind: "install" }
-        : await settleTheTab(fragment.token);
+      return await followTheToken(fragment.token, mintedElsewhere);
   }
+};
+
+/** An app this browser installed before is joined rather than added again, and an install
+ *  that does go ahead is the one a later install joins. */
+const followTheToken = async (
+  token: LinkToken,
+  mintedElsewhere: boolean,
+): Promise<Screen> => {
+  if (await joinInstalledApp(token)) {
+    return { kind: "ready", inTheApp: false };
+  }
+  await rememberInstaller(token);
+  return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
 };
 
 /** What this browser's entry says to do about the identity a readable token named. */

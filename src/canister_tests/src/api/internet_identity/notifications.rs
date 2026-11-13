@@ -8,19 +8,19 @@ use internet_identity_interface::internet_identity::types::{
     EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
     GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetNotificationError, GetNotificationRequest,
-    GetNotificationResponse, GetWebPushSubscriptionStatusRequest, LinkNotificationAppError,
-    LinkNotificationAppRequest, LinkNotificationAppResponse, NotificationAppAnchorsRequest,
-    NotificationAppStatus, NotificationConsentGrantedRequest, NotificationDelegationError,
-    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationId,
-    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
-    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionResult,
-    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, SendNotificationArg, SendNotificationError,
-    SendNotificationResponse, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    WebPushSubscriptionStatus,
+    GetNotificationResponse, GetWebPushSubscriptionStatusRequest, JoinNotificationAppError,
+    JoinNotificationAppRequest, LinkNotificationAppError, LinkNotificationAppRequest,
+    LinkNotificationAppResponse, NotificationAppAnchorsRequest, NotificationAppStatus,
+    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
+    NotificationGrantConsentRequest, NotificationId, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
+    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, PrepareWebPushSubscriptionResponse,
+    PrepareWebPushSubscriptionResult, ProbeNotificationAppError, ProbeNotificationAppRequest,
+    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SendNotificationArg,
+    SendNotificationError, SendNotificationResponse, SetWebPushSubscriptionError,
+    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -433,6 +433,23 @@ pub fn claim_notification_app(
         RawEffectivePrincipal::None,
         sender,
         "claim_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn join_notification_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: JoinNotificationAppRequest,
+) -> Result<Result<(), JoinNotificationAppError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "join_notification_app",
         (request,),
     )
     .map(|(x,)| x)

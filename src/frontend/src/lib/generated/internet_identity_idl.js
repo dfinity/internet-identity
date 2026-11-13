@@ -869,6 +869,18 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const JoinNotificationAppRequest = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'installer_anchor_number' : UserNumber,
+    'anchor_number' : UserNumber,
+    'installer_key' : PublicKey,
+  });
+  const JoinNotificationAppError = IDL.Variant({
+    'InvalidInstallerSignature' : IDL.Null,
+    'NoNotificationApp' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NoPendingLink' : IDL.Null,
+  });
   const NotificationAppId = IDL.Nat64;
   const LinkNotificationAppRequest = IDL.Record({
     'app_principal' : IDL.Principal,
@@ -1673,6 +1685,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'join_notification_app' : IDL.Func(
+        [JoinNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : JoinNotificationAppError })],
+        [],
+      ),
     'link_notification_app' : IDL.Func(
         [LinkNotificationAppRequest],
         [

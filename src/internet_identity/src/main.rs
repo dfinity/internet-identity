@@ -816,6 +816,67 @@ fn claim_notification_app(
     Ok(())
 }
 
+/// Points the browser waiting on the caller's install key at the app this device already
+/// has, so a second install on the phone joins it rather than adding another app.
+///
+/// Authorized twice over: the caller signs as the waiting install's one-shot key, and the
+/// signature is by the key the app was installed with. Only the browser that showed that
+/// install holds it, which is what places the caller on the device the app is on. The
+/// signature binds the caller, so it is spent with the install it was made for.
+#[update]
+fn join_notification_app(
+    request: JoinNotificationAppRequest,
+) -> Result<(), JoinNotificationAppError> {
+    let JoinNotificationAppRequest {
+        anchor_number,
+        installer_anchor_number,
+        installer_key,
+        signature,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(JoinNotificationAppError::InternalCanisterError(
+            NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let now = ic_cdk::api::time();
+    let mut anchor = state::anchor(anchor_number);
+    let joining_browser = anchor
+        .browser_awaiting_link(caller(), now)
+        .ok_or(JoinNotificationAppError::NoPendingLink)?;
+    if !browser_key::verify_notification_app_join(
+        &installer_key,
+        &signature,
+        anchor_number,
+        &caller(),
+    ) {
+        return Err(JoinNotificationAppError::InvalidInstallerSignature);
+    }
+    let installer = Principal::self_authenticating(&installer_key);
+    // Found through the installer identity's own references, so only an app somebody
+    // still uses is joined.
+    let installer_anchor = if installer_anchor_number == anchor_number {
+        anchor.clone()
+    } else {
+        state::anchor(installer_anchor_number)
+    };
+    let app_id = installer_anchor
+        .browsers()
+        .iter()
+        .filter_map(|browser| browser.notification_app?.linked_app())
+        .find(|app_id| {
+            notifications::installed_app::record(*app_id)
+                .is_some_and(|app| app.installer == Some(installer))
+        })
+        .ok_or(JoinNotificationAppError::NoNotificationApp)?;
+
+    anchor.point_at_notification_app(joining_browser, app_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| JoinNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
 /// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
 /// nobody to deliver for, and those cases cannot be told apart.
 #[query]
@@ -862,7 +923,9 @@ fn link_notification_app(
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app(app_principal, app_id, now)
+        let app = storage.ensure_notification_app(app_principal, app_id, now)?;
+        storage.record_notification_app_installer(app.id, caller());
+        Ok::<_, storage::StorageError>(app)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id);
@@ -905,8 +968,12 @@ fn anchor_delivering_to(
     key: NotificationKey,
     browser_id: BrowserId,
 ) -> Option<storage::anchor::Anchor> {
-    let (anchor, delivering) = delivering_browser(anchor_number, key)?;
-    (delivering == browser_id).then_some(anchor)
+    let anchor = state::anchor(anchor_number);
+    let delivering = match key {
+        NotificationKey::Browser(signed) => signed == browser_id,
+        NotificationKey::App(app_id) => anchor.delivers_through(browser_id, app_id),
+    };
+    delivering.then_some(anchor)
 }
 
 /// Authorized by the browser key the caller signs with, or by the key of the Home Screen

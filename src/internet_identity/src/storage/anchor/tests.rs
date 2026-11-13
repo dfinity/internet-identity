@@ -1341,6 +1341,7 @@ mod browser_tests {
             id: app_id,
             principal: Principal::self_authenticating(vec![app_id as u8; 91]),
             created_at_ns: 1_000,
+            installer: None,
             last_used_ns: last_used,
             anchors: std::collections::BTreeSet::new(),
             webpush_subscription: None,
@@ -1567,7 +1568,7 @@ mod browser_tests {
     }
 
     #[test]
-    fn pointing_a_second_browser_at_one_app_takes_it_off_the_first() {
+    fn pointing_a_second_browser_at_one_app_leaves_it_on_the_first() {
         let (mut anchor, first) = anchor_with_browser();
         let (second, _) = anchor
             .resolve_browser(
@@ -1580,18 +1581,54 @@ mod browser_tests {
         anchor.point_at_notification_app(first, 7);
 
         anchor.point_at_notification_app(second, 7);
-        assert_eq!(anchor.notification_app(first), None);
-        assert_eq!(
-            anchor
-                .notification_app(second)
-                .and_then(|app| app.linked_app()),
-            Some(7)
-        );
-        assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(second));
+        for browser in [first, second] {
+            assert_eq!(
+                anchor
+                    .notification_app(browser)
+                    .and_then(|app| app.linked_app()),
+                Some(7)
+            );
+        }
+        assert_eq!(anchor.browser_pointing_at_notification_app(7), Some(first));
+    }
+
+    /// Whether the app delivers is the user's answer about the app, so switching it off
+    /// from one entry switches off every entry pointing at it, and leaves other apps be.
+    #[test]
+    fn switching_an_app_off_switches_off_every_entry_pointing_at_it() {
+        let (mut anchor, first) = anchor_with_browser();
+        let (second, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Safari on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        let (elsewhere, _) = anchor
+            .resolve_browser(
+                browser_key(3),
+                successor_key(3),
+                description("Safari on iPad"),
+                3_000,
+            )
+            .unwrap();
+        anchor.point_at_notification_app(first, 7);
+        anchor.point_at_notification_app(second, 7);
+        anchor.point_at_notification_app(elsewhere, 8);
+
+        anchor.disable_notification_app(second);
+        assert!(!anchor.delivers_through(first, 7));
+        assert!(!anchor.delivers_through(second, 7));
+        assert!(anchor.delivers_through(elsewhere, 8));
+
+        anchor.enable_notification_app(first);
+        assert!(anchor.delivers_through(first, 7));
+        assert!(anchor.delivers_through(second, 7));
     }
 
     #[test]
-    fn taking_an_app_off_an_entry_drops_what_it_had_waiting() {
+    fn pointing_a_second_entry_at_an_app_leaves_what_the_first_has_waiting() {
         let mut anchor = anchor();
         let (first, _) = anchor
             .resolve_browser(
@@ -1625,7 +1662,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(second, 7);
 
-        assert!(anchor.notifications_for_browser(first).is_empty());
+        assert_eq!(anchor.notifications_for_browser(first).len(), 1);
     }
 
     #[test]

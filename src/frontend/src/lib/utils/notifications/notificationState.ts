@@ -13,6 +13,7 @@ import type {
   NotificationAppInfo,
 } from "$lib/generated/internet_identity_types";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
+import { joinFromThisBrowser } from "$lib/utils/notifications/installerKey";
 import { deviceHasDonorIdentity } from "./deviceApp";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
@@ -219,14 +220,19 @@ export const resolveOptIn = async ({
 
 /** Which screen a device whose delivery is the Home Screen app's needs.
  *
- *  Asks only: an app another identity here already has is taken over by the press, not by
- *  this resolution, so nothing here writes. Where a donor exists the question is still
- *  allow rather than install, because the press can point this entry at the app. */
+ *  The one write is joining the app this browser installed before, which needs no answer
+ *  from the user: the app is already on this phone, and only this entry did not know it.
+ *  An app another identity here already has is taken over by the press, not by this
+ *  resolution. Where a donor exists the question is still allow rather than install,
+ *  because the press can point this entry at the app. */
 const resolveAppOptIn = async (
   identityNumber: bigint,
   consented: boolean,
 ): Promise<OptInResolution> => {
-  const status = await browserAppStatus(identityNumber);
+  let status = await browserAppStatus(identityNumber);
+  if (status.kind === "no-app" && (await joinFromThisBrowser(identityNumber))) {
+    status = await browserAppStatus(identityNumber);
+  }
 
   switch (status.kind) {
     case "unanswered": {

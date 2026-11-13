@@ -3611,6 +3611,8 @@ impl<M: Memory + Clone> Storage<M> {
             id: self.allocate_notification_app_id()?,
             principal: app_principal,
             created_at_ns: now,
+            // Recorded by the link that spends the install, which is the caller that knows it.
+            installer: None,
             last_used_ns: now,
             // The anchor pointing at it is added by the write that points it.
             anchors: BTreeSet::new(),
@@ -3622,6 +3624,23 @@ impl<M: Memory + Clone> Storage<M> {
         self.notification_app_memory
             .insert(app.id, StorableNotificationApp::from(app.clone()));
         Ok(app)
+    }
+
+    /// Records the one-shot key whose install `app_id` spent, where none is recorded yet:
+    /// the first install is the one the device's installing browser keeps the key of.
+    pub fn record_notification_app_installer(
+        &mut self,
+        app_id: NotificationAppId,
+        installer: Principal,
+    ) {
+        let Some(mut app) = self.notification_app_memory.get(&app_id) else {
+            return;
+        };
+        if app.installer.is_some() {
+            return;
+        }
+        app.installer = Some(installer.as_slice().to_vec());
+        self.notification_app_memory.insert(app_id, app);
     }
 
     /// Creates the session `prepare_account_session` mints an identity from, replacing

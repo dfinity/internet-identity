@@ -2073,6 +2073,27 @@ type ClaimNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
+// Points the browser waiting on the caller's install key at the Home Screen app another
+// install key on the same device installed, instead of adding a second app. The caller
+// signs as the one-shot key its browser registered; the installer key is the one the app
+// was installed with, which only the browser that showed that install still holds.
+type JoinNotificationAppRequest = record {
+    anchor_number : UserNumber;            // the identity whose browser waits on the caller's key
+    installer_anchor_number : UserNumber;  // the identity the installer key was handed out for
+    installer_key : PublicKey;             // the public half of the key the app was installed with
+    signature : blob;                      // the installer key over anchor_number and the caller
+};
+
+type JoinNotificationAppError = variant {
+    // No browser of the identity waits on an install the caller holds the key to.
+    NoPendingLink;
+    // The installer key did not sign this request.
+    InvalidInstallerSignature;
+    // No app the installer identity points at was installed with that key.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2823,6 +2844,10 @@ service : (opt InternetIdentityInit) -> {
     // Called by the identity being added, from its own browser on the device, with a
     // token the identity that has the app signed for it.
     claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+
+    // Called by the browser that shows an install, signed as that install's key, with
+    // proof it showed the install the app on this device came from.
+    join_notification_app : (JoinNotificationAppRequest) -> (variant { Ok; Err : JoinNotificationAppError });
 
     // Called by the browser, which may hold nothing but its key: the install page is a
     // tab of its own with no session.

@@ -1,10 +1,5 @@
-import type { ActorSubclass } from "@icp-sdk/core/agent";
-import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { throwCanisterError } from "$lib/utils/utils";
-import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
-import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
+import { startInstall } from "./startInstall";
 import { NOTIFICATION_APP_PATH } from "./appPath";
 import { isStandalone } from "./standalone";
 import { openInSafari } from "./openInSafari";
@@ -13,22 +8,7 @@ import {
   type NotificationsSource,
 } from "$lib/utils/analytics/icpAlertsFunnel";
 
-/** `undefined` where no sign-in has registered this browser; rejects where its key could not be read, which is not the same thing. */
-const registeredBrowserActor = async (
-  identityNumber: bigint,
-): Promise<ActorSubclass<_SERVICE> | undefined> => {
-  try {
-    return await browserKeyActor(identityNumber);
-  } catch (error) {
-    if (error instanceof UnregisteredBrowserError) {
-      return undefined;
-    }
-    throw error;
-  }
-};
-
-/** `undefined` where this browser is not registered; rejects where its key could not be read or the canister refused the install.
- *  The canister refuses while the app it would replace is still answering, so a caller that offers an install asks the app to prove itself first. */
+/** `undefined` where this browser is not registered; rejects as {@link startInstall} does. */
 export const prepareInstallUrl = async ({
   identityNumber,
   source,
@@ -37,22 +17,10 @@ export const prepareInstallUrl = async ({
   /** Where the install was offered, carried to the Home Screen app for analytics; `undefined` where a URL that never carried one is minted again. */
   source: NotificationsSource | undefined;
 }): Promise<string | undefined> => {
-  const actor = await registeredBrowserActor(identityNumber);
-  if (actor === undefined) {
+  const linkKey = await startInstall(identityNumber);
+  if (linkKey === undefined) {
     return undefined;
   }
-  const keyPair = await generateLinkKey();
-  const [identity, linkKey] = await Promise.all([
-    ECDSAKeyIdentity.fromKeyPair(keyPair),
-    exportLinkKey(keyPair),
-  ]);
-  // The slot is written before the key is handed out, so a URL that exists is one the canister is waiting for.
-  await actor
-    .prepare_notification_app_link({
-      anchor_number: identityNumber,
-      link_principal: identity.getPrincipal(),
-    })
-    .then(throwCanisterError);
   const token = encodeLinkToken({ identityNumber, linkKey });
   return source === undefined
     ? `${NOTIFICATION_APP_PATH}#${token}`

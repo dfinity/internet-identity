@@ -17,6 +17,10 @@ pub struct NotificationApp {
     /// its own partition. What an app-facing caller is matched against.
     pub principal: Principal,
     pub created_at_ns: Timestamp,
+    /// The one-shot key whose install this app spent first. Only the browser that showed
+    /// that install still holds it, so a signature by it shows a caller is on the device
+    /// the app is on.
+    pub installer: Option<Principal>,
     /// Stamped by the app's own update calls only, so a query leaves it where it was.
     pub last_used_ns: Timestamp,
     /// The identities whose browsers point at this app. Also the reference count: a
@@ -133,6 +137,7 @@ mod probe_tests {
             id: 1,
             principal: Principal::anonymous(),
             created_at_ns: 0,
+            installer: None,
             last_used_ns: last_used,
             anchors: BTreeSet::new(),
             webpush_subscription: None,

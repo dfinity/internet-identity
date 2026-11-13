@@ -401,6 +401,7 @@ const P256_SPKI_HEADER: [u8; 26] = [
 const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
+const NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-join";
 
 impl BrowserKey {
     pub fn new(seed: u8) -> Self {
@@ -457,6 +458,20 @@ impl BrowserKey {
         message.extend_from_slice(&offering_anchor_number.to_be_bytes());
         message.extend_from_slice(&claiming_anchor_number.to_be_bytes());
         message.extend_from_slice(&expires_at_ns.to_be_bytes());
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
+    }
+
+    /// What the key an app was installed with signs, so the install waiting on `caller`
+    /// joins that app.
+    pub fn sign_join_token(&self, anchor_number: AnchorNumber, caller: Principal) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let caller = caller.as_slice();
+        let mut message = NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(&anchor_number.to_be_bytes());
+        message.push(caller.len() as u8);
+        message.extend_from_slice(caller);
         let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
         ByteBuf::from(signature.to_bytes().to_vec())
     }
