@@ -161,8 +161,17 @@
   // --header-h). On a phone the grid starts at the top like a home screen; on
   // desktop it sits in the middle of the free space (md:my-auto inside), and
   // the room kept for the island below lifts it a little above center.
+  // Its scrollbar is thin, on a clear track, with room kept for it on both
+  // sides whether the page scrolls or not, so every page centres its content
+  // on the same line. (Overlay scrollbars take no room.) The thumb shows only
+  // while the page rests in the pager (SETTLED): mid-swipe it would ride the
+  // seam between two pages across the canvas.
   const PAGE =
-    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-[calc(var(--header-h)+3rem)] pb-32 scroll-pt-[calc(var(--header-h)+3rem)] sm:px-6";
+    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-[calc(var(--header-h)+3rem)] pb-32 scroll-pt-[calc(var(--header-h)+3rem)] [scrollbar-color:transparent_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:px-6";
+  /** A page at rest: its thumb fades in. It hides at once when a swipe
+   *  starts, as the transition is only here. */
+  const SETTLED =
+    "[scrollbar-color:var(--color-fg-quaternary)_transparent] transition-[scrollbar-color] duration-200 ease-out motion-reduce:transition-none";
   /** The header's height: the pages run up under it. */
   let headerHeight = $state(64);
 
@@ -565,6 +574,29 @@
         }
       },
       { root: pager, threshold: 0.6 },
+    );
+    for (const page of pageRefs) {
+      observer.observe(page);
+    }
+    return () => observer.disconnect();
+  });
+
+  /** How much of a page is in view once it rests: all of it, give or take
+   *  the subpixels of a fractional width. */
+  const SETTLED_AT = 0.99;
+  /** Which pages rest in the pager, so they show their scrollbar (SETTLED).
+   *  Mid-swipe neither page does. */
+  const settled = $state(PAGES.map(() => false));
+  $effect(() => {
+    if (pager === undefined) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const index = pageRefs.indexOf(entry.target as HTMLElement);
+          settled[index] = entry.intersectionRatio >= SETTLED_AT;
+        }
+      },
+      { root: pager, threshold: SETTLED_AT },
     );
     for (const page of pageRefs) {
       observer.observe(page);
@@ -1156,7 +1188,7 @@
           id="page-mine"
           role="tabpanel"
           aria-labelledby="tab-mine"
-          class={PAGE}
+          class={[PAGE, settled[0] && SETTLED]}
         >
           {#if current.apps.length > 0}
             <div class="mx-auto flex w-fit flex-col md:my-auto">
@@ -1302,7 +1334,7 @@
           id="page-explore"
           role="tabpanel"
           aria-labelledby="tab-explore"
-          class={PAGE}
+          class={[PAGE, settled[1] && SETTLED]}
         >
           <!-- Explore reads like the App Store: a banner, a shelf, another
                banner, more shelves. The featured shelf keeps to apps this
@@ -1327,7 +1359,7 @@
           id="page-create"
           role="tabpanel"
           aria-labelledby="tab-create"
-          class={PAGE}
+          class={[PAGE, settled[2] && SETTLED]}
         >
           <CreateBento />
         </div>
