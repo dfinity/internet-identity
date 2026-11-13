@@ -31,6 +31,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 - When a derived value is used only inside one snippet, use `{@const}` in the snippet rather than a script-level `$derived`, and reference the snippet's parameter.
 - Use `$store`, not `get(store)`, in `.svelte` files.
 - Keep business logic in the flow or store (`*.svelte.ts` flows, `lib/stores`); components render and forward events. Give child components presentational props (`isOpen`, `onRemove`), not the parent's state or whole service objects. Callbacks pass data, not functions.
+- Type an action callback prop that does async work as returning a `Promise` (`onSubmit: (recoveryPhrase: string[]) => Promise<void>`), and keep `() => void` for one that completes at once. The component awaits the promise to show progress and block repeat actions: set an `is*` state, `await` the callback in `try`/`finally`, and disable the control and show a spinner meanwhile. The parent doesn't pass a separate loading prop. The parent handles the error itself (message, retry, routing). The component only learns that the promise rejected, not why, and may reflect that visually where it helps, for example by resetting the button or marking the field invalid.
 - Extract non-trivial inline handlers into named `handle*` functions. Submit forms through one path: `<form onsubmit>`.
 - Use unique `{#each}` keys (compound when needed).
 - Template comments: only the non-obvious why (constraint, bug avoided, visual intent). Never paraphrase the utility classes or describe what is rendered.
