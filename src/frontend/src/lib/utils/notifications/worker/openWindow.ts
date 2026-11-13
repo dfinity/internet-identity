@@ -53,6 +53,12 @@ export const openOnClick = (
   shown: { title: string; body: string },
   inTheApp: boolean,
 ): Promise<void> => {
+  if (inTheApp && url.startsWith("https:")) {
+    return worker.clients.openWindow(url.replace(/^https:/, "webapp:")).then(
+      () => undefined,
+      (error: unknown) => console.error(error),
+    );
+  }
   const doorway = inTheApp ? doorwayFor(url, shown) : undefined;
   if (doorway === undefined) {
     return worker.clients.openWindow(url).then(
