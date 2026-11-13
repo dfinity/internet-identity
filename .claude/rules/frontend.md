@@ -27,7 +27,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 
 ## Svelte
 
-- Svelte 5 runes only (`$props`, `$state`, `$derived`, `$effect`); no `export let`. Use `SvelteMap`/`SvelteSet` for reactive collections. Assigning to a `$derived` for an optimistic update is valid.
+- Svelte 5 runes only (`$props`, `$state`, `$derived`, `$effect`); no `export let`. Use `SvelteMap`/`SvelteSet` for reactive collections.
 - When a derived value is used only inside one snippet, use `{@const}` in the snippet rather than a script-level `$derived`, and reference the snippet's parameter.
 - Use `$store`, not `get(store)`, in `.svelte` files.
 - Keep business logic in the flow or store (`*.svelte.ts` flows, `lib/stores`); components render and forward events. Give child components presentational props (`isOpen`, `onRemove`), not the parent's state or whole service objects. Callbacks pass data, not functions.
@@ -39,7 +39,12 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 ## Lifecycle and async
 
 - Clean up every timer, RAF, observer, listener, poll loop and in-flight request in the `$effect` cleanup or `onDestroy`, and on dialog close. Use `AbortController` and honour the signal in every await.
-- Reset loading and submitting flags in `finally`. Disable a control while its write runs, ignore stale async results, and reconcile optimistic updates with the authoritative state.
+- Reset loading and submitting flags in `finally`. Disable a control while its write runs, and ignore stale async results.
+- Page data comes from SvelteKit loaders, and a write is followed by `invalidate`/`invalidateAll()` to reload it. Choose per case between a progress indicator and an optimistic update:
+  - Progress indicator: typical for dialog submissions. Disable the control and show a spinner until the write settles (see the async callback rule under Svelte).
+  - Optimistic update: for something that should feel instant, like a toggle. Assign the next state to the `$derived` that reads the loader data, run the write, then invalidate. When the loader data comes back, the `$derived` recomputes from it: on success it matches, on failure it rolls back on its own. Don't write rollback code. Still show the error.
+
+  Updating the UI only after the write resolves is not an optimistic update.
 - Reset per-request store state, and don't render until async-derived state is ready.
 - Open popups and tabs synchronously inside the click handler; do the async work after.
 - Wait for async cleanup to finish before navigating away.
