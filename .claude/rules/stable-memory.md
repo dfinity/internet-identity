@@ -30,7 +30,7 @@ A decoding mistake here traps every read of the affected records and can take si
 ## Upgrades
 
 - Heap `thread_local!` state resets on every upgrade. Anything that must survive (sequence counters, queued work) lives in stable memory or is rebuilt from it.
-- Do no large or unbounded work in `pre_upgrade`: a trap there blocks every future upgrade. A `post_upgrade` trap fails only that upgrade, but it cannot make outcalls.
+- Do no large or unbounded work in `pre_upgrade`: a trap there blocks every future upgrade. A `post_upgrade` trap fails only that upgrade.
 - Migrate data in bounded batches on a timer (or lazily), not in one pass. Migrations are idempotent, count each item they actually changed, record skipped items and every error distinctly (without PII), and expose progress through a metric or query.
 - Mark migration code `TEMPORARY` with the condition for removing it, and remove it and its state once it has run in production.
 - A migration or reset of security-relevant state clears every dependent pointer, and a reverse-index insert never overwrites a principal bound to another anchor.
