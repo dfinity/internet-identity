@@ -104,4 +104,5 @@ Accessibility is a requirement, and e2e tests select through the accessibility t
 
 ## Analytics
 
+- Analytics reports the page URL with every pageview and event, so nothing sensitive may be in it (see Leaks in `security.md`).
 - Fire funnel events from the flow, and check they still fire after a refactor. Never close a funnel on failure: an interrupted funnel is the signal.

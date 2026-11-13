@@ -44,6 +44,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 
 - Don't leak whether something exists: a missing anchor gets the same answer as an unauthorized caller, and a caller-supplied id must not trigger a trapping read.
 - Keep PII and linkable data (emails, `sub`, mailbox provider, nonces) out of logs, the archive, metrics and errors. Don't tell relying parties which authentication method was used.
+- Never put secrets, tokens, keys or personal data in a URL: not in the path, the query or the fragment. URLs end up in analytics, browser history, server logs, referrers and bookmarks. Pass such values through `postMessage`, a request body or storage instead. Where a URL has to carry one (the ICP Alerts install link, because iOS keeps only the URL of a Home Screen app), put it in the fragment and make sure analytics never reports it: `reportedUrl` in `lib/utils/analytics/analytics.ts` strips the fragment, so a new path that carries one must be covered there, with a test.
 - `#[query(hidden = true)]` is not access control. Never ship debug endpoints in production candid.
 - One production wasm per canister: dev behaviour (`fetch_root_key`, dummy auth, captcha) is set through init args, never compile-time features.
 
