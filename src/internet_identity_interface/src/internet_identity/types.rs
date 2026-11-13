@@ -1338,27 +1338,27 @@ pub enum ClaimNotificationAppError {
     InternalCanisterError(String),
 }
 
-/// Points the browser waiting on the caller's install key at the Home Screen app another
-/// install key on the same device installed, instead of adding a second app.
+/// Points the browser waiting on the caller's link key at the Home Screen app already on
+/// the device, instead of adding a second app.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct JoinNotificationAppRequest {
-    /// The identity whose browser is waiting on the install key the caller signs as.
+    /// The identity whose browser is waiting on the link key the caller signs as.
     pub anchor_number: AnchorNumber,
-    /// The identity the installer key was handed out for, whose browsers point at the app.
+    /// The identity the installer link key was handed out for, whose browsers point at the app.
     pub installer_anchor_number: AnchorNumber,
-    /// The public half of the one-shot key the app was installed with.
-    pub installer_key: PublicKey,
-    /// The installer key's signature over `anchor_number` and the caller.
+    /// The public half of the link key the app linked with.
+    pub installer_link_key: PublicKey,
+    /// The installer link key's signature over `anchor_number` and the caller.
     pub signature: ByteBuf,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum JoinNotificationAppError {
-    /// No browser of the identity is waiting on an install the caller holds the key to.
+    /// No browser of the identity is waiting on the link key the caller signs as.
     NoPendingLink,
-    /// The installer key did not sign this request.
+    /// The installer link key did not sign this request.
     InvalidInstallerSignature,
-    /// No app the installer identity points at was installed with that key.
+    /// No app the installer identity points at linked with that link key.
     NoNotificationApp,
     InternalCanisterError(String),
 }

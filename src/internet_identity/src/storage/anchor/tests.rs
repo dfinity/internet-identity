@@ -1341,7 +1341,7 @@ mod browser_tests {
             id: app_id,
             principal: Principal::self_authenticating(vec![app_id as u8; 91]),
             created_at_ns: 1_000,
-            installer: None,
+            linked_with: None,
             last_used_ns: last_used,
             anchors: std::collections::BTreeSet::new(),
             webpush_subscription: None,

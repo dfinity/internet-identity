@@ -12,8 +12,8 @@ import {
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import {
   joinInstalledApp,
-  rememberInstaller,
-} from "$lib/utils/notifications/installerKey";
+  rememberInstallerLinkKey,
+} from "$lib/utils/notifications/installerLinkKey";
 import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
 import {
@@ -110,7 +110,7 @@ const followTheToken = async (
   if (await joinInstalledApp(token)) {
     return { kind: "ready", inTheApp: false };
   }
-  await rememberInstaller(token);
+  await rememberInstallerLinkKey(token);
   return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
 };
 

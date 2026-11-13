@@ -872,8 +872,8 @@ export const idlFactory = ({ IDL }) => {
   const JoinNotificationAppRequest = IDL.Record({
     'signature' : IDL.Vec(IDL.Nat8),
     'installer_anchor_number' : UserNumber,
+    'installer_link_key' : PublicKey,
     'anchor_number' : UserNumber,
-    'installer_key' : PublicKey,
   });
   const JoinNotificationAppError = IDL.Variant({
     'InvalidInstallerSignature' : IDL.Null,

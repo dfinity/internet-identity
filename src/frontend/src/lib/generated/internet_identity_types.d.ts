@@ -1512,34 +1512,34 @@ export type Iss = string;
 export type JWT = string;
 export type JoinNotificationAppError = {
     /**
-     * The installer key did not sign this request.
+     * The installer link key did not sign this request.
      */
     'InvalidInstallerSignature' : null
   } |
   {
     /**
-     * No app the installer identity points at was installed with that key.
+     * No app the installer identity points at linked with that link key.
      */
     'NoNotificationApp' : null
   } |
   { 'InternalCanisterError' : string } |
   {
     /**
-     * No browser of the identity waits on an install the caller holds the key to.
+     * No browser of the identity waits on the link key the caller signs as.
      */
     'NoPendingLink' : null
   };
 /**
- * Points the browser waiting on the caller's install key at the Home Screen app another
- * install key on the same device installed, instead of adding a second app. The caller
- * signs as the one-shot key its browser registered; the installer key is the one the app
- * was installed with, which only the browser that showed that install still holds.
+ * Points the browser waiting on the caller's link key at the Home Screen app already on
+ * the device, instead of adding a second app. The caller signs as the link key its browser
+ * registered; the installer link key is the one the app linked with, which only the
+ * browser that showed that install still holds.
  */
 export interface JoinNotificationAppRequest {
   'signature' : Uint8Array | number[],
   'installer_anchor_number' : UserNumber,
+  'installer_link_key' : PublicKey,
   'anchor_number' : UserNumber,
-  'installer_key' : PublicKey,
 }
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |

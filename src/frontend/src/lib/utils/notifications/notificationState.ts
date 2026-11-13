@@ -13,7 +13,7 @@ import type {
   NotificationAppInfo,
 } from "$lib/generated/internet_identity_types";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
-import { joinFromThisBrowser } from "$lib/utils/notifications/installerKey";
+import { joinFromThisBrowser } from "$lib/utils/notifications/installerLinkKey";
 import { deviceHasDonorIdentity } from "./deviceApp";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";

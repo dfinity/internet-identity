@@ -816,11 +816,11 @@ fn claim_notification_app(
     Ok(())
 }
 
-/// Points the browser waiting on the caller's install key at the app this device already
-/// has, so a second install on the phone joins it rather than adding another app.
+/// Points the browser waiting on the caller's link key at the app this device already has,
+/// so a second install on the phone joins it rather than adding another app.
 ///
-/// Authorized twice over: the caller signs as the waiting install's one-shot key, and the
-/// signature is by the key the app was installed with. Only the browser that showed that
+/// Authorized twice over: the caller signs as the waiting install's link key, and the
+/// signature is by the link key the app linked with. Only the browser that showed that
 /// install holds it, which is what places the caller on the device the app is on. The
 /// signature binds the caller, so it is spent with the install it was made for.
 #[update]
@@ -830,7 +830,7 @@ fn join_notification_app(
     let JoinNotificationAppRequest {
         anchor_number,
         installer_anchor_number,
-        installer_key,
+        installer_link_key,
         signature,
     } = request;
     if !notifications::notifications_enabled() {
@@ -844,14 +844,14 @@ fn join_notification_app(
         .browser_awaiting_link(caller(), now)
         .ok_or(JoinNotificationAppError::NoPendingLink)?;
     if !browser_key::verify_notification_app_join(
-        &installer_key,
+        &installer_link_key,
         &signature,
         anchor_number,
         &caller(),
     ) {
         return Err(JoinNotificationAppError::InvalidInstallerSignature);
     }
-    let installer = Principal::self_authenticating(&installer_key);
+    let installer_link_principal = Principal::self_authenticating(&installer_link_key);
     // Found through the installer identity's own references, so only an app somebody
     // still uses is joined.
     let installer_anchor = if installer_anchor_number == anchor_number {
@@ -865,7 +865,7 @@ fn join_notification_app(
         .filter_map(|browser| browser.notification_app?.linked_app())
         .find(|app_id| {
             notifications::installed_app::record(*app_id)
-                .is_some_and(|app| app.installer == Some(installer))
+                .is_some_and(|app| app.linked_with == Some(installer_link_principal))
         })
         .ok_or(JoinNotificationAppError::NoNotificationApp)?;
 
@@ -924,7 +924,7 @@ fn link_notification_app(
 
     let app = state::storage_borrow_mut(|storage| {
         let app = storage.ensure_notification_app(app_principal, app_id, now)?;
-        storage.record_notification_app_installer(app.id, caller());
+        storage.record_notification_app_link_key(app.id, caller());
         Ok::<_, storage::StorageError>(app)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;

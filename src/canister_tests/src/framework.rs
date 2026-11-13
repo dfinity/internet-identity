@@ -462,7 +462,7 @@ impl BrowserKey {
         ByteBuf::from(signature.to_bytes().to_vec())
     }
 
-    /// What the key an app was installed with signs, so the install waiting on `caller`
+    /// What the link key an app linked with signs, so the install waiting on `caller`
     /// joins that app.
     pub fn sign_join_token(&self, anchor_number: AnchorNumber, caller: Principal) -> ByteBuf {
         use p256::ecdsa::signature::Signer;

@@ -32,9 +32,9 @@ pub struct StorableNotificationApp {
     /// What this app registered for Web Push, if anything.
     #[n(7)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
-    /// The principal of the one-shot key whose install this app spent first.
+    /// The principal of the link key this app first linked with.
     #[cbor(n(8), with = "minicbor::bytes")]
-    pub installer: Option<Vec<u8>>,
+    pub linked_with: Option<Vec<u8>>,
     // #[n(5)] RETIRED, never reuse: the Web Push registration before a push carried a payload.
 }
 
@@ -54,9 +54,9 @@ impl From<NotificationApp> for StorableNotificationApp {
             id: value.id,
             principal: value.principal.as_slice().to_vec(),
             created_at_ns: value.created_at_ns,
-            installer: value
-                .installer
-                .map(|installer| installer.as_slice().to_vec()),
+            linked_with: value
+                .linked_with
+                .map(|link_principal| link_principal.as_slice().to_vec()),
             last_used_ns: value.last_used_ns,
             anchors: value.anchors,
             webpush_subscription: value
@@ -76,10 +76,10 @@ impl From<StorableNotificationApp> for NotificationApp {
             id: value.id,
             principal: Principal::from_slice(&value.principal),
             created_at_ns: value.created_at_ns,
-            installer: value
-                .installer
+            linked_with: value
+                .linked_with
                 .as_deref()
-                .and_then(|installer| Principal::try_from_slice(installer).ok()),
+                .and_then(|link_principal| Principal::try_from_slice(link_principal).ok()),
             last_used_ns: value.last_used_ns,
             anchors: value.anchors,
             // A registration that will not read back reads as none, which is a state this

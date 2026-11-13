@@ -2496,7 +2496,7 @@ mod joins {
     use pretty_assertions::assert_eq;
 
     /// The Home Screen app every test here installs, and the one-shot key `link_app`
-    /// hands it, which is the installer key.
+    /// hands it, which is the installer link key.
     const APP_SEED: u8 = 100;
     const INSTALLER_SEED: u8 = APP_SEED + 1;
     /// The one-shot key the second install hands out.
@@ -2544,7 +2544,7 @@ mod joins {
             JoinNotificationAppRequest {
                 anchor_number: anchor,
                 installer_anchor_number: installer_anchor,
-                installer_key: BrowserKey::new(INSTALLER_SEED).public_key(),
+                installer_link_key: BrowserKey::new(INSTALLER_SEED).public_key(),
                 signature: signer.sign_join_token(anchor, joining),
             },
         )
@@ -2633,7 +2633,7 @@ mod joins {
     }
 
     #[test]
-    fn should_refuse_a_join_the_installer_key_did_not_sign() -> Result<(), RejectResponse> {
+    fn should_refuse_a_join_the_installer_link_key_did_not_sign() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
         link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
@@ -2667,7 +2667,7 @@ mod joins {
                 JoinNotificationAppRequest {
                     anchor_number: anchor,
                     installer_anchor_number: anchor,
-                    installer_key: stranger.public_key(),
+                    installer_link_key: stranger.public_key(),
                     signature: stranger.sign_join_token(anchor, joining),
                 },
             )?,

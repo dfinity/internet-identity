@@ -1,5 +1,5 @@
 /** The key of the last ICP Alerts install this browser showed the steps for.
- *  The app added from those steps records that key as its installer, and only this browser kept a copy, so a signature by it places this browser on the phone the app is on.
+ *  The app added from those steps records it as the link key it linked with, and only this browser kept a copy, so a signature by it places this browser on the phone the app is on.
  *  Every install on an iPhone shows its steps in Safari, so a later one, from Safari itself or handed over from another Home Screen app, joins the app already there instead of adding a second icon. */
 import { createStore, get as idbGet, set as idbSet } from "idb-keyval";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -11,36 +11,50 @@ import type { LinkToken } from "./linkToken";
 import { linkKeyActorWith } from "./notificationAppActor";
 import { startInstall } from "./startInstall";
 
-const INSTALLER_STORE = createStore("ii-notification-installer", "installer");
-const INSTALLER_ENTRY = "installer";
+const INSTALLER_LINK_KEY_STORE = createStore(
+  "ii-notification-installer-link-key",
+  "installer-link-key",
+);
+const INSTALLER_LINK_KEY_ENTRY = "installer-link-key";
 
 /** Must match `NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN` in `browser_key.rs`. */
 const JOIN_SIGNATURE_DOMAIN = new TextEncoder().encode(
   "ii-notification-app-join",
 );
 
-interface Installer {
+interface InstallerLinkKey {
   /** The identity the install was handed out for, whose browsers point at the app. */
   identityNumber: bigint;
   keyPair: CryptoKeyPair;
 }
 
 /** Never throws: a browser that cannot keep it adds a second app next time, as it would without it. */
-export const rememberInstaller = async (token: LinkToken): Promise<void> => {
+export const rememberInstallerLinkKey = async (
+  token: LinkToken,
+): Promise<void> => {
   try {
-    const installer: Installer = {
+    const installerLinkKey: InstallerLinkKey = {
       identityNumber: token.identityNumber,
       keyPair: await importLinkKey(token.linkKey),
     };
-    await idbSet(INSTALLER_ENTRY, installer, INSTALLER_STORE);
+    await idbSet(
+      INSTALLER_LINK_KEY_ENTRY,
+      installerLinkKey,
+      INSTALLER_LINK_KEY_STORE,
+    );
   } catch (error) {
     console.error(error);
   }
 };
 
-const readInstaller = async (): Promise<Installer | undefined> => {
+const readInstallerLinkKey = async (): Promise<
+  InstallerLinkKey | undefined
+> => {
   try {
-    return await idbGet<Installer>(INSTALLER_ENTRY, INSTALLER_STORE);
+    return await idbGet<InstallerLinkKey>(
+      INSTALLER_LINK_KEY_ENTRY,
+      INSTALLER_LINK_KEY_STORE,
+    );
   } catch (error) {
     console.error(error);
     return undefined;
@@ -48,8 +62,8 @@ const readInstaller = async (): Promise<Installer | undefined> => {
 };
 
 /** Whether this browser showed an install it could join a later one to. */
-export const keepsAnInstaller = async (): Promise<boolean> =>
-  (await readInstaller()) !== undefined;
+export const keepsAnInstallerLinkKey = async (): Promise<boolean> =>
+  (await readInstallerLinkKey()) !== undefined;
 
 /** Must match `join_token_message` in `browser_key.rs`. */
 const joinMessage = (
@@ -81,7 +95,7 @@ const describe = (error: unknown): string =>
  * before, answering whether it did.
  *
  * `false` covers every way it can fail, which all leave the install to go ahead: no
- * installer kept here, an app since deleted, or a canister that would not answer.
+ * link key kept here, an app since deleted, or a canister that would not answer.
  */
 export const joinInstalledApp = async ({
   identityNumber,
@@ -90,8 +104,8 @@ export const joinInstalledApp = async ({
   identityNumber: bigint;
   linkKey: Uint8Array;
 }): Promise<boolean> => {
-  const installer = await readInstaller();
-  if (installer === undefined) {
+  const installerLinkKey = await readInstallerLinkKey();
+  if (installerLinkKey === undefined) {
     return false;
   }
   try {
@@ -100,19 +114,19 @@ export const joinInstalledApp = async ({
     );
     const signature = await crypto.subtle.sign(
       { name: "ECDSA", hash: "SHA-256" },
-      installer.keyPair.privateKey,
+      installerLinkKey.keyPair.privateKey,
       joinMessage(identityNumber, waiting.getPrincipal().toUint8Array()),
     );
-    const installerKey = await crypto.subtle.exportKey(
+    const installerPublicKey = await crypto.subtle.exportKey(
       "spki",
-      installer.keyPair.publicKey,
+      installerLinkKey.keyPair.publicKey,
     );
     const actor = await linkKeyActorWith(linkKey, { agentOptions, canisterId });
     await actor
       .join_notification_app({
         anchor_number: identityNumber,
-        installer_anchor_number: installer.identityNumber,
-        installer_key: new Uint8Array(installerKey),
+        installer_anchor_number: installerLinkKey.identityNumber,
+        installer_link_key: new Uint8Array(installerPublicKey),
         signature: new Uint8Array(signature),
       })
       .then(throwCanisterError);
@@ -128,7 +142,7 @@ export const joinInstalledApp = async ({
 export const joinFromThisBrowser = async (
   identityNumber: bigint,
 ): Promise<boolean> => {
-  if (!(await keepsAnInstaller())) {
+  if (!(await keepsAnInstallerLinkKey())) {
     return false;
   }
   try {

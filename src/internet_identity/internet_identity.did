@@ -2073,23 +2073,23 @@ type ClaimNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
-// Points the browser waiting on the caller's install key at the Home Screen app another
-// install key on the same device installed, instead of adding a second app. The caller
-// signs as the one-shot key its browser registered; the installer key is the one the app
-// was installed with, which only the browser that showed that install still holds.
+// Points the browser waiting on the caller's link key at the Home Screen app already on
+// the device, instead of adding a second app. The caller signs as the link key its browser
+// registered; the installer link key is the one the app linked with, which only the
+// browser that showed that install still holds.
 type JoinNotificationAppRequest = record {
-    anchor_number : UserNumber;            // the identity whose browser waits on the caller's key
-    installer_anchor_number : UserNumber;  // the identity the installer key was handed out for
-    installer_key : PublicKey;             // the public half of the key the app was installed with
-    signature : blob;                      // the installer key over anchor_number and the caller
+    anchor_number : UserNumber;            // the identity whose browser waits on the caller's link key
+    installer_anchor_number : UserNumber;  // the identity the installer link key was handed out for
+    installer_link_key : PublicKey;        // the public half of the link key the app linked with
+    signature : blob;                      // the installer link key over anchor_number and the caller
 };
 
 type JoinNotificationAppError = variant {
-    // No browser of the identity waits on an install the caller holds the key to.
+    // No browser of the identity waits on the link key the caller signs as.
     NoPendingLink;
-    // The installer key did not sign this request.
+    // The installer link key did not sign this request.
     InvalidInstallerSignature;
-    // No app the installer identity points at was installed with that key.
+    // No app the installer identity points at linked with that link key.
     NoNotificationApp;
     InternalCanisterError : text;
 };

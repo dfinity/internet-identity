@@ -20,8 +20,8 @@ const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 /// Prefix for the token a browser signs to let another identity point at its Home Screen app.
 const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
 
-/// Prefix for what an installer key signs to let another install on the device join the
-/// app it installed.
+/// Prefix for what an installer link key signs to let another install on the device join
+/// the app that linked with it.
 const NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-join";
 
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
@@ -112,13 +112,13 @@ pub fn verify_notification_app_claim(
 /// The signature binds the caller, which is the waiting install's one-shot key, so it
 /// cannot be spent on any other install.
 pub fn verify_notification_app_join(
-    installer_key: &PublicKey,
+    installer_link_key: &PublicKey,
     signature: &[u8],
     anchor_number: u64,
     caller: &Principal,
 ) -> bool {
     verify(
-        installer_key,
+        installer_link_key,
         signature,
         &join_token_message(anchor_number, caller),
     )
