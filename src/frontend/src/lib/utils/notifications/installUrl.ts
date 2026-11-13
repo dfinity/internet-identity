@@ -6,6 +6,8 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
 import { NOTIFICATION_APP_PATH } from "./appPath";
+import { isStandalone } from "./standalone";
+import { openInSafari } from "./openInSafari";
 import {
   installSourceParam,
   type NotificationsSource,
@@ -76,10 +78,22 @@ export const installUrlOrNone = async (
 };
 
 /** Must be called straight from the click, which is the only time a browser allows it; the tab is opened on the placeholder and pointed once the URL resolves.
- *  A blocked tab is not an error: the screen shows the link instead. */
+ *  A blocked tab is not an error: the screen shows the link instead.
+ *  Inside a Home Screen web app, II runs in an in-app view that has no tabs and reports itself standalone, which the install page would take for the installed app, so the steps are handed to Safari instead. */
 export const openInstallTab = (
   url: string | Promise<string | undefined>,
 ): boolean => {
+  if (isStandalone()) {
+    void Promise.resolve(url).then(
+      (resolved) => {
+        if (resolved !== undefined) {
+          openInSafari(new URL(resolved, window.location.origin).toString());
+        }
+      },
+      (error: unknown) => console.error(error),
+    );
+    return true;
+  }
   const opened = window.open(INSTALL_PLACEHOLDER_URL, "_blank");
   if (opened === null) {
     // The caller handed its only failure path to this promise, so a tab the browser

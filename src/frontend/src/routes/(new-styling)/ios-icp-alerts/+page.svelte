@@ -10,7 +10,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import { isStandalone } from "./standalone";
+  import { isStandalone } from "$lib/utils/notifications/standalone";
   import {
     decodeLinkToken,
     type FragmentLinkToken,
@@ -31,7 +31,7 @@
     settleFromSettings,
     settleWithTheApp,
   } from "./screen";
-  import { openInSafari } from "./openInSafari";
+  import { openInSafari } from "$lib/utils/notifications/openInSafari";
   import { watchForInstall } from "./watchInstall";
   import { watchProbe } from "$lib/utils/notifications/watchProbe";
   import { NOTIFICATION_APP_NAME } from "./appName";
