@@ -120,7 +120,11 @@ pub fn verify_notification_app_join(
     verify(
         installer_link_key,
         signature,
-        &join_token_message(anchor_number, caller),
+        &installer_message(
+            NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN,
+            anchor_number,
+            caller,
+        ),
     )
 }
 
@@ -173,9 +177,9 @@ pub mod test_keys {
     }
 }
 
-fn join_token_message(anchor_number: u64, caller: &Principal) -> Vec<u8> {
+fn installer_message(domain: &[u8], anchor_number: u64, caller: &Principal) -> Vec<u8> {
     let caller = caller.as_slice();
-    let mut message = NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN.to_vec();
+    let mut message = domain.to_vec();
     message.extend_from_slice(&anchor_number.to_be_bytes());
     message.push(caller.len() as u8);
     message.extend_from_slice(caller);

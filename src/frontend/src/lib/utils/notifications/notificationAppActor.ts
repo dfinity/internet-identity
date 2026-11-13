@@ -18,7 +18,7 @@ interface AgentTarget {
   canisterId: Principal;
 }
 
-const actorAs = (
+export const actorAs = (
   identity: SignIdentity,
   { agentOptions, canisterId }: AgentTarget,
 ): ActorSubclass<_SERVICE> =>

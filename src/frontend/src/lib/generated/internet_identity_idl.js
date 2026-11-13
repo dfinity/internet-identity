@@ -869,6 +869,9 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const InstalledNotificationAppRequest = IDL.Record({
+    'installer_anchor_number' : UserNumber,
+  });
   const JoinNotificationAppRequest = IDL.Record({
     'signature' : IDL.Vec(IDL.Nat8),
     'installer_anchor_number' : UserNumber,
@@ -1104,14 +1107,14 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
-  const ProbeNotificationAppRequest = IDL.Record({
-    'anchor_number' : UserNumber,
-  });
   const ProbeNotificationAppError = IDL.Variant({
     'NoNotificationApp' : IDL.Null,
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NotReachable' : IDL.Null,
+  });
+  const ProbeNotificationAppRequest = IDL.Record({
+    'anchor_number' : UserNumber,
   });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
@@ -1130,6 +1133,11 @@ export const idlFactory = ({ IDL }) => {
   const RemoveWebPushSubscriptionError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+  });
+  const RetireNotificationAppError = IDL.Variant({
+    'NoNotificationApp' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'AppStillAnswering' : IDL.Null,
   });
   const RevokeBrowserSessionsRequest = IDL.Record({
     'browser_id' : IDL.Nat32,
@@ -1685,6 +1693,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'installed_notification_app_last_seen' : IDL.Func(
+        [InstalledNotificationAppRequest],
+        [IDL.Opt(Timestamp)],
+        ['query'],
+      ),
     'join_notification_app' : IDL.Func(
         [JoinNotificationAppRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : JoinNotificationAppError })],
@@ -1969,6 +1982,16 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'probe_installed_notification_app' : IDL.Func(
+        [InstalledNotificationAppRequest],
+        [
+          IDL.Variant({
+            'Ok' : NotificationId,
+            'Err' : ProbeNotificationAppError,
+          }),
+        ],
+        [],
+      ),
     'probe_notification_app' : IDL.Func(
         [ProbeNotificationAppRequest],
         [
@@ -1996,6 +2019,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
+    'retire_notification_app' : IDL.Func(
+        [InstalledNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : RetireNotificationAppError })],
+        [],
+      ),
     'revoke_browser_sessions' : IDL.Func(
         [RevokeBrowserSessionsRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SessionRevokeError })],

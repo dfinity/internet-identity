@@ -1360,6 +1360,13 @@ export type IdentityPropertiesReplaceError = {
  */
 export type InboxNotificationId = bigint;
 /**
+ * Names the app the caller's link key linked, which the caller signs as: the identity that
+ * link key was handed out for, whose browsers point at the app.
+ */
+export interface InstalledNotificationAppRequest {
+  'installer_anchor_number' : UserNumber,
+}
+/**
  * Init arguments of II which can be supplied on install and upgrade.
  * 
  * Each field is wrapped is `opt` to indicate whether the field should
@@ -1525,15 +1532,16 @@ export type JoinNotificationAppError = {
   { 'InternalCanisterError' : string } |
   {
     /**
-     * No browser of the identity waits on the link key the caller signs as.
+     * The caller is neither a link key a browser of the identity waits on nor a browser of it.
      */
     'NoPendingLink' : null
   };
 /**
- * Points the browser waiting on the caller's link key at the Home Screen app already on
- * the device, instead of adding a second app. The caller signs as the link key its browser
- * registered; the installer link key is the one the app linked with, which only the
- * browser that showed that install still holds.
+ * Points the browser waiting on the caller's link key, or the browser the caller is, at the
+ * Home Screen app already on the device, instead of adding a second app. The caller signs
+ * as the link key its browser registered or as the browser itself; the installer link key
+ * is the one the app linked with, which only the browser that showed that install still
+ * holds.
  */
 export interface JoinNotificationAppRequest {
   'signature' : Uint8Array | number[],
@@ -2343,6 +2351,19 @@ export interface RemoveWebPushSubscriptionRequest {
   'browser_id' : number,
   'anchor_number' : UserNumber,
 }
+export type RetireNotificationAppError = {
+    /**
+     * No app the installer identity points at linked with the caller's link key.
+     */
+    'NoNotificationApp' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The app has not been asked to prove itself, or answered, or still has time to.
+     */
+    'AppStillAnswering' : null
+  };
 export interface RevokeBrowserSessionsRequest {
   'browser_id' : number,
   'identity_number' : UserNumber,
@@ -3212,6 +3233,15 @@ export interface _SERVICE {
    */
   'init_salt' : ActorMethod<[], undefined>,
   /**
+   * Signed as the link key the app linked with, which only the browser that showed that
+   * install holds: when the app last called, a probe for it, and forgetting it for every
+   * identity once that probe went unanswered.
+   */
+  'installed_notification_app_last_seen' : ActorMethod<
+    [InstalledNotificationAppRequest],
+    [] | [Timestamp]
+  >,
+  /**
    * Called by the browser that shows an install, signed as that install's key, with
    * proof it showed the install the app on this device came from.
    */
@@ -3540,6 +3570,11 @@ export interface _SERVICE {
       { 'Err' : PrepareWebPushSubscriptionError } |
       { 'Pending' : null }
   >,
+  'probe_installed_notification_app' : ActorMethod<
+    [InstalledNotificationAppRequest],
+    { 'Ok' : NotificationId } |
+      { 'Err' : ProbeNotificationAppError }
+  >,
   /**
    * Called by the browser, which watches for the answer leaving its own queue: that
    * is what says the app this browser points at is still installed.
@@ -3566,6 +3601,11 @@ export interface _SERVICE {
    * Atomically replace device matching the device key with the new device data
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
+  'retire_notification_app' : ActorMethod<
+    [InstalledNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : RetireNotificationAppError }
+  >,
   'revoke_browser_sessions' : ActorMethod<
     [RevokeBrowserSessionsRequest],
     { 'Ok' : null } |

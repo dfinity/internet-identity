@@ -465,10 +465,23 @@ impl BrowserKey {
     /// What the link key an app linked with signs, so the install waiting on `caller`
     /// joins that app.
     pub fn sign_join_token(&self, anchor_number: AnchorNumber, caller: Principal) -> ByteBuf {
+        self.sign_installer_message(
+            NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN,
+            anchor_number,
+            caller,
+        )
+    }
+
+    fn sign_installer_message(
+        &self,
+        domain: &[u8],
+        anchor_number: AnchorNumber,
+        caller: Principal,
+    ) -> ByteBuf {
         use p256::ecdsa::signature::Signer;
 
         let caller = caller.as_slice();
-        let mut message = NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN.to_vec();
+        let mut message = domain.to_vec();
         message.extend_from_slice(&anchor_number.to_be_bytes());
         message.push(caller.len() as u8);
         message.extend_from_slice(caller);

@@ -1354,12 +1354,28 @@ pub struct JoinNotificationAppRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum JoinNotificationAppError {
-    /// No browser of the identity is waiting on the link key the caller signs as.
+    /// The caller is neither a link key a browser of the identity waits on nor a browser of it.
     NoPendingLink,
     /// The installer link key did not sign this request.
     InvalidInstallerSignature,
     /// No app the installer identity points at linked with that link key.
     NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+/// Names the app the caller's link key linked, which the caller signs as: the identity
+/// that link key was handed out for, whose browsers point at the app.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct InstalledNotificationAppRequest {
+    pub installer_anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RetireNotificationAppError {
+    /// No app the installer identity points at linked with the caller's link key.
+    NoNotificationApp,
+    /// The app has not been asked to prove itself, or answered, or still has time to.
+    AppStillAnswering,
     InternalCanisterError(String),
 }
 

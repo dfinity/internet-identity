@@ -8,17 +8,18 @@ use internet_identity_interface::internet_identity::types::{
     EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
     GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetNotificationError, GetNotificationRequest,
-    GetNotificationResponse, GetWebPushSubscriptionStatusRequest, JoinNotificationAppError,
-    JoinNotificationAppRequest, LinkNotificationAppError, LinkNotificationAppRequest,
-    LinkNotificationAppResponse, NotificationAppAnchorsRequest, NotificationAppStatus,
-    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationId, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, PrepareNotificationAppLinkError,
-    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
-    PrepareNotificationDelegationResponse, PrepareWebPushSubscriptionResponse,
-    PrepareWebPushSubscriptionResult, ProbeNotificationAppError, ProbeNotificationAppRequest,
-    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
-    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SendNotificationArg,
+    GetNotificationResponse, GetWebPushSubscriptionStatusRequest, InstalledNotificationAppRequest,
+    JoinNotificationAppError, JoinNotificationAppRequest, LinkNotificationAppError,
+    LinkNotificationAppRequest, LinkNotificationAppResponse, NotificationAppAnchorsRequest,
+    NotificationAppStatus, NotificationConsentGrantedRequest, NotificationDelegationError,
+    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationId,
+    NotificationRevokeConsentError, NotificationRevokeConsentRequest,
+    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
+    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
+    PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionResult,
+    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
+    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
+    RemoveWebPushSubscriptionRequest, RetireNotificationAppError, SendNotificationArg,
     SendNotificationError, SendNotificationResponse, SetWebPushSubscriptionError,
     SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
@@ -450,6 +451,57 @@ pub fn join_notification_app(
         RawEffectivePrincipal::None,
         sender,
         "join_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn retire_notification_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: InstalledNotificationAppRequest,
+) -> Result<Result<(), RetireNotificationAppError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "retire_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn probe_installed_notification_app(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: InstalledNotificationAppRequest,
+) -> Result<Result<NotificationId, ProbeNotificationAppError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "probe_installed_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn installed_notification_app_last_seen(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: InstalledNotificationAppRequest,
+) -> Result<Option<internet_identity_interface::internet_identity::types::Timestamp>, RejectResponse>
+{
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "installed_notification_app_last_seen",
         (request,),
     )
     .map(|(x,)| x)

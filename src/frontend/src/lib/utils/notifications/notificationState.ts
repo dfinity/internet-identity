@@ -221,7 +221,7 @@ export const resolveOptIn = async ({
 /** Which screen a device whose delivery is the Home Screen app's needs.
  *
  *  The one write is joining the app this browser installed before, which needs no answer
- *  from the user: the app is already on this phone, and only this entry did not know it.
+ *  from the user: the app is already on this phone, and this entry may not point at it.
  *  An app another identity here already has is taken over by the press, not by this
  *  resolution. Where a donor exists the question is still allow rather than install,
  *  because the press can point this entry at the app. */
@@ -229,10 +229,10 @@ const resolveAppOptIn = async (
   identityNumber: bigint,
   consented: boolean,
 ): Promise<OptInResolution> => {
-  let status = await browserAppStatus(identityNumber);
-  if (status.kind === "no-app" && (await joinFromThisBrowser(identityNumber))) {
-    status = await browserAppStatus(identityNumber);
-  }
+  // Joined whatever the entry reads: one still pointing at an app deleted from the Home
+  // Screen reads as having one, and only the join moves it to the app that is there.
+  await joinFromThisBrowser(identityNumber);
+  const status = await browserAppStatus(identityNumber);
 
   switch (status.kind) {
     case "unanswered": {

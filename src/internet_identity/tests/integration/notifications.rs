@@ -2484,14 +2484,17 @@ mod claims {
 /// A second install on a phone joining the app the first one added, on the authority of
 /// the key that first install was handed out with.
 mod joins {
+    use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        get_notification_app_status, join_notification_app, notification_app_anchors,
-        prepare_notification_app_link,
+        get_notification_app_status, installed_notification_app_last_seen, join_notification_app,
+        notification_app_anchors, prepare_notification_app_link, probe_installed_notification_app,
+        retire_notification_app, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
-        GetNotificationAppStatusRequest, JoinNotificationAppError, JoinNotificationAppRequest,
-        NotificationAppAnchorsRequest, NotificationAppStatus, PrepareNotificationAppLinkRequest,
+        GetNotificationAppStatusRequest, InstalledNotificationAppRequest, JoinNotificationAppError,
+        JoinNotificationAppRequest, NotificationAppAnchorsRequest, NotificationAppStatus,
+        PrepareNotificationAppLinkRequest, RetireNotificationAppError,
     };
     use pretty_assertions::assert_eq;
 
@@ -2672,6 +2675,154 @@ mod joins {
                 },
             )?,
             Err(JoinNotificationAppError::NoNotificationApp)
+        );
+        Ok(())
+    }
+
+    /// A browser still pointing at an app since deleted signs as itself and moves to the
+    /// app its kept link key linked, which leaves the deleted one's record behind.
+    #[test]
+    fn should_move_a_browser_off_another_app_onto_the_joined_one() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, app_id) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        let (old_app, old_app_id) =
+            link_app(&env, canister_id, anchor, THIRD_BROWSER_SEED, APP_SEED + 50);
+        let joining = browser(THIRD_BROWSER_SEED);
+
+        join_notification_app(
+            &env,
+            canister_id,
+            joining,
+            JoinNotificationAppRequest {
+                anchor_number: anchor,
+                installer_anchor_number: anchor,
+                installer_link_key: BrowserKey::new(INSTALLER_SEED).public_key(),
+                signature: BrowserKey::new(INSTALLER_SEED).sign_join_token(anchor, joining),
+            },
+        )?
+        .expect("join_notification_app returned Err");
+
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                app,
+                NotificationAppAnchorsRequest { app_id }
+            )?,
+            vec![anchor]
+        );
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                old_app,
+                NotificationAppAnchorsRequest { app_id: old_app_id }
+            )?,
+            Vec::<AnchorNumber>::new(),
+            "nothing points at the app the browser left"
+        );
+        Ok(())
+    }
+
+    fn installer() -> Principal {
+        BrowserKey::new(INSTALLER_SEED).principal()
+    }
+
+    fn installed(anchor: AnchorNumber) -> InstalledNotificationAppRequest {
+        InstalledNotificationAppRequest {
+            installer_anchor_number: anchor,
+        }
+    }
+
+    /// An app asked to prove itself that stays silent through its window is gone, and
+    /// forgetting it takes it off every entry, so each is asked to install again rather
+    /// than reading as delivering to nothing.
+    #[test]
+    fn should_retire_an_app_that_left_its_probe_unanswered() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, app_id) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        start_install(&env, canister_id, anchor, THIRD_BROWSER_SEED);
+        join(
+            &env,
+            canister_id,
+            anchor,
+            anchor,
+            &BrowserKey::new(INSTALLER_SEED),
+        )?
+        .expect("join_notification_app returned Err");
+        let last_seen = installed_notification_app_last_seen(
+            &env,
+            canister_id,
+            installer(),
+            installed(anchor),
+        )?;
+        assert!(last_seen.is_some());
+
+        probe_installed_notification_app(&env, canister_id, installer(), installed(anchor))?
+            .expect("probe_installed_notification_app returned Err");
+        env.advance_time(std::time::Duration::from_secs(11));
+        retire_notification_app(&env, canister_id, installer(), installed(anchor))?
+            .expect("retire_notification_app returned Err");
+
+        assert!(!linked_app(&env, canister_id, anchor, FIRST_BROWSER_SEED)?);
+        assert!(!linked_app(&env, canister_id, anchor, THIRD_BROWSER_SEED)?);
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                app,
+                NotificationAppAnchorsRequest { app_id }
+            )?,
+            Vec::<AnchorNumber>::new()
+        );
+        assert_eq!(
+            installed_notification_app_last_seen(
+                &env,
+                canister_id,
+                installer(),
+                installed(anchor)
+            )?,
+            None
+        );
+        Ok(())
+    }
+
+    /// Only an unanswered probe says an app is gone, so one never asked is kept.
+    #[test]
+    fn should_keep_an_app_that_was_never_probed() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+
+        assert_eq!(
+            retire_notification_app(&env, canister_id, installer(), installed(anchor))?,
+            Err(RetireNotificationAppError::AppStillAnswering)
+        );
+        assert!(linked_app(&env, canister_id, anchor, FIRST_BROWSER_SEED)?);
+        Ok(())
+    }
+
+    /// Any other key places the caller nowhere.
+    #[test]
+    fn should_answer_nothing_to_a_key_no_app_linked_with() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        let stranger = BrowserKey::new(77).principal();
+
+        assert_eq!(
+            installed_notification_app_last_seen(&env, canister_id, stranger, installed(anchor))?,
+            None
+        );
+        assert_eq!(
+            retire_notification_app(&env, canister_id, stranger, installed(anchor))?,
+            Err(RetireNotificationAppError::NoNotificationApp)
         );
         Ok(())
     }

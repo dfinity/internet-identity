@@ -12,6 +12,8 @@ import {
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import {
   joinInstalledApp,
+  keepsAnInstallerLinkKey,
+  probeInstalledApp,
   rememberInstallerLinkKey,
 } from "$lib/utils/notifications/installerLinkKey";
 import { appKeyActor } from "./appKeyActor";
@@ -101,15 +103,28 @@ export const insideTheBrowser = async (
   }
 };
 
-/** An app this browser installed before is joined rather than added again, and an install
- *  that does go ahead is the one a later install joins. */
+/** An app this browser installed before is joined rather than added again, once it has
+ *  answered a probe: nothing reports a deleted Home Screen app, and joining one would
+ *  leave the user with nothing installed and no steps to add it. */
 const followTheToken = async (
   token: LinkToken,
   mintedElsewhere: boolean,
 ): Promise<Screen> => {
-  if (await joinInstalledApp(token)) {
+  if (
+    (await keepsAnInstallerLinkKey()) &&
+    (await probeInstalledApp()) !== "gone" &&
+    (await joinInstalledApp(token))
+  ) {
     return { kind: "ready", inTheApp: false };
   }
+  return await installFrom(token, mintedElsewhere);
+};
+
+/** The steps for `token`, which a later install joins. */
+const installFrom = async (
+  token: LinkToken,
+  mintedElsewhere: boolean,
+): Promise<Screen> => {
   await rememberInstallerLinkKey(token);
   return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
 };
