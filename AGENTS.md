@@ -9,8 +9,9 @@ as the source of truth for user flows.
 
 Conventions live in `.claude/rules/`, one file per topic. Most are scoped with
 `paths:` frontmatter: Claude Code loads them only when the files they govern are
-in play. Other agents: before changing files, read every rule file whose
-"Applies to" column below matches them.
+in play. Other agents: before changing files, read every file in `.claude/rules/` whose
+`paths:` frontmatter matches them; a file without `paths:` applies everywhere.
+The table below is a summary, and the frontmatter is the scope definition.
 
 | File | Applies to | Covers |
 | --- | --- | --- |
