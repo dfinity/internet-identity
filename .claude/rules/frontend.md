@@ -91,7 +91,7 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 - Stores hold the requests and the user's decisions, and are the only thing handlers and views share.
 - Views (`routes/(new-styling)/authorize/views/*`) read stores and write the user's decisions back to them. They never touch the channel.
 - `+page.svelte` picks the view with one `{#if}` chain over the stores, in precedence order: the first state that matches is what the user sees. Pending attribute consent comes before pending notification consent, both before the redirect animation, and then the sign-in screens. Add a step as a store state, a view and a handler, and place its condition in that chain. A request that needs time before it knows its screen holds the current one with `claimScreen()`, so the flow doesn't flash the redirect animation.
-- Avoid navigating away from the page: open a dialog or a popup instead, so the channel to the app stays open. The 1-click OpenID resume and SSO redirect flows are the exceptions.
+- Avoid navigating away from the page: open a dialog or a popup instead (for example `redirectInPopup` in `lib/utils/openID.ts` for OpenID), so the channel to the app stays open. The 1-click OpenID resume and SSO redirect flows are the exceptions.
 
 ## Accessibility
 
