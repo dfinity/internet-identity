@@ -1,4 +1,5 @@
 import type { ClientInit } from "@sveltejs/kit";
+import { base } from "$app/paths";
 import featureFlags from "$lib/state/featureFlags";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { mintSession } from "$lib/stores/session-delegation.store";
@@ -53,9 +54,11 @@ const overrideFeatureFlags = () => {
 export const init: ClientInit = async () => {
   // The UI concept (`npm run dev:concept`) runs on mock data with no replica:
   // there is no canister config to read, so only the locale is set up.
+  // `base` is the path the site is served under, so a static build of the
+  // concept also works on a subpath (e.g. a GitHub Pages project site).
   if (
     import.meta.env.II_CONCEPT === "1" &&
-    window.location.pathname.startsWith("/concept")
+    window.location.pathname.startsWith(`${base}/concept`)
   ) {
     await localeStore.init();
     return;
