@@ -920,7 +920,7 @@ test.describe("notifications on a Home Screen app", () => {
     await page.goto(`${II_URL}/ios-icp-alerts/open#${carried.toString()}`);
 
     // Shown while the hand-over has not taken the page away, which it cannot here:
-    // `webapp:` and `x-safari-https:` are iOS schemes and nothing answers them in a test browser.
+    // `x-safari-https:` is an iOS scheme and nothing answers it in a test browser.
     await expect(
       page.getByRole("heading", { name: "Almost there" }),
     ).toBeVisible({ timeout: 30_000 });

@@ -167,9 +167,6 @@ export const launchWillWrite = async (hash: string): Promise<boolean> => {
   }
 };
 
-/** What the last launch inside the app saw, shown where it ends unconnected. The fragment is described, never shown: it carries a key. */
-export const launchTrace: string[] = [];
-
 /** `onTokenSpent` runs for a token the canister took, so the page can drop it from the URL. */
 export const insideTheApp = async (
   hash: string,
@@ -177,12 +174,6 @@ export const insideTheApp = async (
   onTokenSpent: () => void,
 ): Promise<Screen> => {
   const record = await ensureAppKey();
-  launchTrace.length = 0;
-  launchTrace.push(
-    `url: ${window.location.pathname}${window.location.search}`,
-    `fragment: ${hash === "" ? "none" : `${hash.length} chars, ${decodeLinkToken(hash).kind}`}`,
-    `stored app: ${record.appId === undefined ? "none" : record.appId.toString()}`,
-  );
   // Only this page knows it is the installed app and what it is running on. The worker
   // cannot ask: an iPad in desktop mode is a Mac to anything reading the user agent
   // alone, and `maxTouchPoints`, which tells them apart, is not on a worker's navigator.
@@ -197,9 +188,6 @@ export const insideTheApp = async (
   const outcome = replayed
     ? null
     : await spendTheFragment(decodeLinkToken(hash), record);
-  launchTrace.push(
-    `link: ${replayed ? "replayed" : outcome === null ? "not attempted" : outcome.status === "linked" ? `linked as app ${outcome.appId.toString()}` : `${outcome.status} (${outcome.reason})`}`,
-  );
   if (outcome?.status === "failed") {
     // Recorded below and not here: a link that failed for a reason that may pass spent
     // nothing, and an app that already has an `appId` would read the fragment as a
@@ -222,7 +210,6 @@ export const insideTheApp = async (
   const appId = outcome?.status === "linked" ? outcome.appId : record.appId;
   // No record means nothing has ever linked this app, which reads as no anchors.
   const anchors = appId === undefined ? [] : await appAnchors(actor, appId);
-  launchTrace.push(`identities: ${anchors.length}`);
   if (anchors.length === 0 && outcome?.status === "token-refused") {
     return { kind: "stale-link" };
   }
