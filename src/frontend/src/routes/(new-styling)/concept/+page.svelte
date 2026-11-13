@@ -224,6 +224,9 @@
   /** The concept's one menu (layout and scenario), and where it was opened:
    *  the corner on desktop opens it upwards, the header downwards. */
   let conceptMenu = $state<{ anchor: HTMLElement; compact: boolean }>();
+  /** A phone's header controls. The menu hangs from this pill's end, at the
+   *  screen's edge: from the flask, mid-pill, it would run off the start. */
+  let controlsPill = $state<HTMLElement>();
 
   // --- Panel ---
 
@@ -808,7 +811,12 @@
     aria-haspopup="menu"
     aria-expanded={conceptMenu !== undefined}
     onclick={(event) =>
-      (conceptMenu = { anchor: event.currentTarget, compact })}
+      (conceptMenu = {
+        anchor: compact
+          ? (controlsPill ?? event.currentTarget)
+          : event.currentTarget,
+        compact,
+      })}
     class="text-fg-quaternary hover:text-fg-tertiary focus-visible:outline-focus-ring grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
   >
     <FlaskConicalIcon class="size-4" aria-hidden="true" />
@@ -1038,6 +1046,7 @@
         {/each}
       </div>
       <div
+        bind:this={controlsPill}
         class={[
           "col-start-2 row-start-1 flex items-center gap-1 justify-self-end md:col-start-3",
           layout === "panel" && "md:hidden",
@@ -1464,9 +1473,14 @@
       align={conceptMenu.compact ? "end" : "start"}
       distance="0.5rem"
       responsive={false}
-      class="!w-max p-1.5 !shadow-lg"
+      class="!w-max !shadow-lg"
     >
-      <div class="flex flex-col" role="menu" aria-label="Concept settings">
+      <!-- On a short phone it scrolls within the room the popover leaves it. -->
+      <div
+        class="flex max-h-(--max-panel-height) flex-col overflow-y-auto overscroll-contain p-1.5 *:shrink-0"
+        role="menu"
+        aria-label="Concept settings"
+      >
         <div
           aria-hidden="true"
           class="text-text-tertiary px-3 pt-1.5 pb-1 text-xs"
