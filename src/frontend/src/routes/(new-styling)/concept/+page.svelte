@@ -33,6 +33,7 @@
   import ExploreBanner from "./components/ExploreBanner.svelte";
   import ExploreShelf from "./components/ExploreShelf.svelte";
   import IdentityCard from "./components/IdentityCard.svelte";
+  import IncidentBanner from "./components/IncidentBanner.svelte";
   import IncidentCard from "./components/IncidentCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
@@ -109,6 +110,9 @@
   );
   const coveredByIncident = (kind: CardKind) =>
     incident?.kinds.includes(kind) === true;
+  /** A phone's incident sheet was put away unanswered on this visit; the next
+   *  visit brings it back. */
+  let incidentDismissed = $state(false);
   /** The account's rows, in two groups: how you get in, and what is signed in
    *  or connected with the identity. Apps are managed from the grid itself
    *  (Manage, by All apps' heading), so the account doesn't list them too. */
@@ -333,10 +337,11 @@
       .sort((a, b) => URGENCY.indexOf(a.tone) - URGENCY.indexOf(b.tone)),
   );
   /** An incident takes one widget for all its cards, in front: it opens the
-   *  panel, which leads with it. */
+   *  panel, which leads with it. On a phone its card at the top of the apps
+   *  stands in for the widget. */
   const dockItems = $derived<DockItem[]>(
     [
-      ...(incident !== undefined
+      ...(incident !== undefined && isDesktop.current
         ? [
             {
               kind: incident.kinds[0],
@@ -426,6 +431,7 @@
 
   /** A visit starts: as the page loads, and from the concept menu. */
   const arrive = () => {
+    incidentDismissed = false;
     section = undefined;
     switching = false;
     managing = false;
@@ -1136,6 +1142,24 @@
         >
           {#if current.apps.length > 0}
             <div class="mx-auto flex w-fit flex-col md:my-auto">
+              <!-- Phone: an incident put away unanswered heads the apps. It
+                   takes the column's width without widening it, and lines up
+                   with Recent's shelf, which bleeds out by its padding. -->
+              {#if !isDesktop.current && incident !== undefined && !managing}
+                <div
+                  transition:slide={{
+                    duration: reduced ? 0 : 260,
+                    easing: quintOut,
+                  }}
+                  class="-mx-1.5 w-0 min-w-[calc(100%+0.75rem)] pb-8"
+                >
+                  <IncidentBanner
+                    {incident}
+                    class="w-full"
+                    onOpen={() => (incidentDismissed = false)}
+                  />
+                </div>
+              {/if}
               <!-- Recent is ordered by use, not by hand, so it steps aside while
                    apps are managed and All apps is the one grid to arrange. -->
               {#if showRecent && !managing}
@@ -1361,6 +1385,14 @@
       {/if}
     </aside>
   </div>
+
+  <!-- Phone: an unanswered incident meets the user over the apps on every
+       visit, until they answer it. Put away, it waits at the top of the apps. -->
+  {#if !isDesktop.current && incident !== undefined && !incidentDismissed && !panelOpen && verifying === undefined}
+    <Dialog onClose={() => (incidentDismissed = true)}>
+      <IncidentCard {incident} variant="sheet" onAnswer={answerIncident} />
+    </Dialog>
+  {/if}
 
   <!-- Phone: the panel is a sheet from the bottom, as dialogs are elsewhere. -->
   {#if panelOpen && !isDesktop.current}
