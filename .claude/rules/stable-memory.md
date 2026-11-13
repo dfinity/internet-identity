@@ -16,8 +16,8 @@ A decoding mistake here traps every read of the affected records and can take si
 
 ## Record formats
 
-- Stored records are minicbor with numeric keys (`#[n(k)]`). Pick the encoding that fits the shape (see the minicbor docs): `#[cbor(map)]` for records that may grow, `#[cbor(array)]` for a small fixed tuple, `#[cbor(transparent)]` for a newtype over a single field. In an array the key is the position, so only a trailing `Option` or `#[cbor(default)]` field can be added later. Rust field names can be renamed freely; the keys cannot.
-- A new field on a stored type must be `Option` or `#[cbor(default)]`. Existing records don't have the key, and a required field traps every read of them. This took staging down once (#4481).
+- Stored records are minicbor with numeric keys (`#[n(k)]`). Pick the encoding that fits the shape (see the minicbor docs): `#[cbor(map)]` for records that may grow, `#[cbor(array)]` for a small fixed tuple, `#[cbor(transparent)]` for a newtype over a single field. In an array the key is the position, so a new field can only be added at the end. Rust field names can be renamed freely; the keys cannot.
+- A new field on a stored type must be an `Option`. Existing records don't have the key, and a required field traps every read of them. `#[cbor(default)]` alone is not enough: use it only after checking the minicbor docs and adding everything it needs. This took staging down once (#4481).
 - Retire a key with a `// #[n(k)] RETIRED, never reuse` comment. Never reuse a retired key for a new shape.
 - When a key or record format changes, keep a decode fallback for the old format, and prove that derived values (seeds, so principals) stay byte-identical.
 
