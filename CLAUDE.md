@@ -28,3 +28,14 @@ Conventions live in `.claude/rules/`, one file per topic. Most are scoped with
 The rules are distilled from review discussions on this repository's pull
 requests. Add a new convention to the file for its topic, or as a new file with
 `paths:` frontmatter, rather than expanding this one.
+
+## Keep the rules current
+
+These rules are how a correction reaches the next agent. Update `.claude/rules/` when:
+
+- The user or a reviewer corrects how something should be done, and it's a convention rather than a one-off.
+- A review comment states a general expectation ("we always…", "don't…", "ditto elsewhere") rather than fixing one line, so it would apply to the next PR too.
+- Your change makes a rule wrong: a renamed symbol, a moved path, a replaced pattern.
+- You notice a rule that contradicts the code or another rule.
+
+Make the update in the same PR when it belongs to that change. Otherwise, propose it to the user before you finish. Say which rule you added or changed. Don't keep a repo convention only in your own memory: it never reaches a teammate's agent.
