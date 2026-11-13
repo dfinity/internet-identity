@@ -10,7 +10,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import { isStandalone } from "./standalone";
+  import { isStandalone } from "$lib/utils/notifications/standalone";
   import {
     decodeLinkToken,
     type FragmentLinkToken,
@@ -19,7 +19,10 @@
     browserAppStatus,
     probeApp,
   } from "$lib/utils/notifications/appStatus";
-  import { prepareInstallUrl } from "$lib/utils/notifications/installUrl";
+  import {
+    MINTED_ELSEWHERE_PARAM,
+    prepareInstallUrl,
+  } from "$lib/utils/notifications/installUrl";
   import {
     afterAlreadyAdded,
     failed,
@@ -31,7 +34,7 @@
     settleFromSettings,
     settleWithTheApp,
   } from "./screen";
-  import { openInSafari } from "./openInSafari";
+  import { openInSafari } from "$lib/utils/notifications/openInSafari";
   import { watchForInstall } from "./watchInstall";
   import { watchProbe } from "$lib/utils/notifications/watchProbe";
   import { NOTIFICATION_APP_NAME } from "./appName";
@@ -51,6 +54,8 @@
   let screen = $state<Screen>({ kind: "working" });
   /** Where the install was offered, read before a spent token is dropped from the URL. */
   let source: NotificationsSource | undefined;
+  /** An install another browser on this device minted: only its entry is waiting for it. */
+  let mintedElsewhere = false;
   const track = (
     event: (typeof IcpAlertsEvents)[keyof typeof IcpAlertsEvents],
     properties?: Record<string, string>,
@@ -121,7 +126,10 @@
   /** The whole of what a launch does, which is also the whole of what retrying it is. */
   const launch = async (): Promise<Screen> => {
     if (!isStandalone()) {
-      return await insideTheBrowser(window.location.hash).catch(failed);
+      return await insideTheBrowser(
+        window.location.hash,
+        mintedElsewhere,
+      ).catch(failed);
     }
     const landed = await insideTheApp(
       window.location.hash,
@@ -152,6 +160,9 @@
         installSourceOf(window.location.hash) ??
         installSourceOf(window.location.search);
       host = window.location.host;
+      mintedElsewhere = new URLSearchParams(window.location.search).has(
+        MINTED_ELSEWHERE_PARAM,
+      );
       beginWaiting();
       const standalone = isStandalone();
       inTheApp = standalone;
@@ -264,6 +275,10 @@
   // left. Nothing else tells this tab that the app started delivering, so without it the
   // user is left on a stale screen until they reload.
   $effect(() => {
+    // This browser's entry is not the one waiting, so nothing it can be asked settles it.
+    if (mintedElsewhere) {
+      return;
+    }
     if (
       screen.kind !== "install" &&
       screen.kind !== "open-to-finish" &&

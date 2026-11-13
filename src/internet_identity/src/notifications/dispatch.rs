@@ -27,6 +27,7 @@ use internet_identity_interface::internet_identity::types::{
     Urgency,
 };
 use std::cell::{Cell, RefCell};
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(1);
@@ -438,6 +439,7 @@ fn fan_out_to_destinations(
             event: Some(pending.event.clone()),
         };
         let mut planned = Vec::new();
+        let mut addressed = BTreeSet::new();
         for browser_id in destinations {
             let Some(browser) = anchor
                 .browsers()
@@ -452,6 +454,10 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
+            // Entries sharing one app share its address, and one post is one banner.
+            if !addressed.insert(subscription.endpoint.as_str().to_string()) {
+                continue;
+            }
             planned.push((
                 relay_origin,
                 browser_id,
@@ -590,6 +596,7 @@ fn fan_out_to_browsers(
             .collect();
         // The sealing keys travel with each wake-up: the deposit that names its entry
         // happens below, after this borrow of the browsers has ended.
+        let mut addressed = BTreeSet::new();
         let woken: Vec<(String, Delivery)> = anchor
             .browsers()
             .iter()
@@ -597,6 +604,11 @@ fn fan_out_to_browsers(
             .filter_map(|(browser, app)| {
                 let (subscription, relay_origin, target) =
                     wake_up_address(browser, app.as_ref(), now_ns)?;
+                // Entries sharing one app share its address, and one post is one banner:
+                // the first entry's inbox holds it and the others are left out.
+                if !addressed.insert(subscription.endpoint.as_str().to_string()) {
+                    return None;
+                }
                 Some((
                     relay_origin,
                     Delivery {
@@ -1349,11 +1361,12 @@ mod tests {
         storage_borrow(|storage| storage.notification_app(app_id)).map(|app| app.id)
     }
 
-    /// An identity with `count` browsers, every one registered with the relay.
+    /// An identity with `count` browsers, every one registered with the relay. Each at an
+    /// address of its own, as a push service hands out: one address is one post.
     fn subscribed_recipient(count: u8) -> (AnchorNumber, Vec<BrowserId>) {
         let (recipient, browsers) = anchor_with_browsers(count);
         for browser in &browsers {
-            subscribe(recipient, *browser, RELAY, 0);
+            subscribe(recipient, *browser, &format!("{RELAY}/{browser}"), 0);
         }
         (recipient, browsers)
     }
@@ -1473,7 +1486,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             browsers
         );
-        assert!(deliveries.iter().all(|one| one.endpoint == RELAY));
+        assert!(deliveries.iter().all(|one| one.endpoint.starts_with(RELAY)));
         for browser in &browsers {
             assert_eq!(queued(recipient, *browser), vec![7]);
         }
@@ -2032,6 +2045,30 @@ mod tests {
         );
         assert_eq!(queued(recipient, browsers[0]), vec![7]);
         assert_eq!(queued(recipient, browsers[1]), vec![7]);
+    }
+
+    /// Every browser on a phone signs in as an entry of its own and they share the phone's
+    /// one app, so one notification for the identity is one post to that app, queued in
+    /// the inbox of the first entry that reaches it.
+    #[test]
+    fn entries_sharing_one_app_are_woken_once() {
+        setup();
+        let (recipient, browsers) = anchor_with_browsers(2);
+        let app = route_through_an_app(recipient, browsers[0], 9, Some(APP_RELAY));
+        assert_eq!(route_through_an_app(recipient, browsers[1], 9, None), app);
+        submit(recipient, 7, 10 * SECOND_NS);
+
+        let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+
+        assert_eq!(
+            deliveries
+                .iter()
+                .map(|one| (one.browser_id, one.target))
+                .collect::<Vec<_>>(),
+            vec![(browsers[0], DeliveryTarget::App(app))]
+        );
+        assert_eq!(queued(recipient, browsers[0]), vec![7]);
+        assert!(queued(recipient, browsers[1]).is_empty());
     }
 
     /// Two identities' browsers can point at one Home Screen app, and they share its

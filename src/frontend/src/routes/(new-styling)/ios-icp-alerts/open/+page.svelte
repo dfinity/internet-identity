@@ -7,7 +7,7 @@
   import { Trans } from "$lib/components/locale";
   import { NOTIFICATION_APP_NAME } from "../appName";
   import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
-  import { isStandalone } from "../standalone";
+  import { isStandalone } from "$lib/utils/notifications/standalone";
   import NotificationMock from "../NotificationMock.svelte";
 
   let target = $state<string | undefined>(undefined);

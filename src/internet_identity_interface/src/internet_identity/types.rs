@@ -1338,6 +1338,47 @@ pub enum ClaimNotificationAppError {
     InternalCanisterError(String),
 }
 
+/// Points the browser waiting on the caller's link key at the Home Screen app already on
+/// the device, instead of adding a second app.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct JoinNotificationAppRequest {
+    /// The identity whose browser is waiting on the link key the caller signs as.
+    pub anchor_number: AnchorNumber,
+    /// The identity the installer link key was handed out for, whose browsers point at the app.
+    pub installer_anchor_number: AnchorNumber,
+    /// The public half of the link key the app linked with.
+    pub installer_link_key: PublicKey,
+    /// The installer link key's signature over `anchor_number` and the caller.
+    pub signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum JoinNotificationAppError {
+    /// The caller is neither a link key a browser of the identity waits on nor a browser of it.
+    NoPendingLink,
+    /// The installer link key did not sign this request.
+    InvalidInstallerSignature,
+    /// No app the installer identity points at linked with that link key.
+    NoNotificationApp,
+    InternalCanisterError(String),
+}
+
+/// Names the app the caller's link key linked, which the caller signs as: the identity
+/// that link key was handed out for, whose browsers point at the app.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct InstalledNotificationAppRequest {
+    pub installer_anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RetireNotificationAppError {
+    /// No app the installer identity points at linked with the caller's link key.
+    NoNotificationApp,
+    /// The app has not been asked to prove itself, or answered, or still has time to.
+    AppStillAnswering,
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,

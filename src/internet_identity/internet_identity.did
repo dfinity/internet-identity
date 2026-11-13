@@ -2073,6 +2073,42 @@ type ClaimNotificationAppError = variant {
     InternalCanisterError : text;
 };
 
+// Points the browser waiting on the caller's link key, or the browser the caller is, at the
+// Home Screen app already on the device, instead of adding a second app. The caller signs
+// as the link key its browser registered or as the browser itself; the installer link key
+// is the one the app linked with, which only the browser that showed that install still
+// holds.
+type JoinNotificationAppRequest = record {
+    anchor_number : UserNumber;            // the identity whose browser waits on the caller's link key
+    installer_anchor_number : UserNumber;  // the identity the installer link key was handed out for
+    installer_link_key : PublicKey;        // the public half of the link key the app linked with
+    signature : blob;                      // the installer link key over anchor_number and the caller
+};
+
+type JoinNotificationAppError = variant {
+    // The caller is neither a link key a browser of the identity waits on nor a browser of it.
+    NoPendingLink;
+    // The installer link key did not sign this request.
+    InvalidInstallerSignature;
+    // No app the installer identity points at linked with that link key.
+    NoNotificationApp;
+    InternalCanisterError : text;
+};
+
+// Names the app the caller's link key linked, which the caller signs as: the identity that
+// link key was handed out for, whose browsers point at the app.
+type InstalledNotificationAppRequest = record {
+    installer_anchor_number : UserNumber;
+};
+
+type RetireNotificationAppError = variant {
+    // No app the installer identity points at linked with the caller's link key.
+    NoNotificationApp;
+    // The app has not been asked to prove itself, or answered, or still has time to.
+    AppStillAnswering;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2823,6 +2859,17 @@ service : (opt InternetIdentityInit) -> {
     // Called by the identity being added, from its own browser on the device, with a
     // token the identity that has the app signed for it.
     claim_notification_app : (ClaimNotificationAppRequest) -> (variant { Ok; Err : ClaimNotificationAppError });
+
+    // Called by the browser that shows an install, signed as that install's key, with
+    // proof it showed the install the app on this device came from.
+    join_notification_app : (JoinNotificationAppRequest) -> (variant { Ok; Err : JoinNotificationAppError });
+
+    // Signed as the link key the app linked with, which only the browser that showed that
+    // install holds: when the app last called, a probe for it, and forgetting it for every
+    // identity once that probe went unanswered.
+    installed_notification_app_last_seen : (InstalledNotificationAppRequest) -> (opt Timestamp) query;
+    probe_installed_notification_app : (InstalledNotificationAppRequest) -> (variant { Ok : NotificationId; Err : ProbeNotificationAppError });
+    retire_notification_app : (InstalledNotificationAppRequest) -> (variant { Ok; Err : RetireNotificationAppError });
 
     // Called by the browser, which may hold nothing but its key: the install page is a
     // tab of its own with no session.

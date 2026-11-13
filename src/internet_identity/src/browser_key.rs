@@ -3,6 +3,7 @@
 //! Knows nothing of sessions or storage, so both layers may depend on it: the endpoint
 //! verifies, and storage requires the [`VerifiedBrowserKeys`] that verifying produces.
 
+use candid::Principal;
 use internet_identity_interface::internet_identity::types::{PublicKey, SessionKey};
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature, VerifyingKey};
@@ -18,6 +19,10 @@ const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 
 /// Prefix for the token a browser signs to let another identity point at its Home Screen app.
 const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
+
+/// Prefix for what an installer link key signs to let another install on the device join
+/// the app that linked with it.
+const NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-join";
 
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
 const BROWSER_KEY_SIGNATURE_BYTES: usize = 64;
@@ -104,6 +109,25 @@ pub fn verify_notification_app_claim(
     )
 }
 
+/// The signature binds the caller, which is the waiting install's one-shot key, so it
+/// cannot be spent on any other install.
+pub fn verify_notification_app_join(
+    installer_link_key: &PublicKey,
+    signature: &[u8],
+    anchor_number: u64,
+    caller: &Principal,
+) -> bool {
+    verify(
+        installer_link_key,
+        signature,
+        &installer_message(
+            NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN,
+            anchor_number,
+            caller,
+        ),
+    )
+}
+
 /// What a browser presents and what it signs, for tests of the callers that verify one.
 #[cfg(test)]
 pub mod test_keys {
@@ -151,6 +175,15 @@ pub mod test_keys {
         ));
         signature.to_bytes().to_vec()
     }
+}
+
+fn installer_message(domain: &[u8], anchor_number: u64, caller: &Principal) -> Vec<u8> {
+    let caller = caller.as_slice();
+    let mut message = domain.to_vec();
+    message.extend_from_slice(&anchor_number.to_be_bytes());
+    message.push(caller.len() as u8);
+    message.extend_from_slice(caller);
+    message
 }
 
 fn claim_token_message(

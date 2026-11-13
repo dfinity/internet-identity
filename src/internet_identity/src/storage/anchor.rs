@@ -134,6 +134,11 @@ impl Browser {
         };
         reference.linked_app() == Some(app_id) && !reference.is_delivering()
     }
+
+    /// Whether this entry points at `app_id` with delivery switched on.
+    pub fn delivers_through(&self, app_id: NotificationAppId) -> bool {
+        self.is_pointing_at(app_id) && !self.is_delivery_disabled_for(app_id)
+    }
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -1036,8 +1041,7 @@ impl Anchor {
         })
     }
 
-    /// The browser of this identity that points at `app_id`, where one does. At most one:
-    /// [`Anchor::point_at_notification_app`] takes the reference off every other entry.
+    /// The first browser of this identity that points at `app_id`, where one does.
     pub fn browser_pointing_at_notification_app(
         &self,
         app_id: NotificationAppId,
@@ -1091,12 +1095,9 @@ impl Anchor {
     }
 
     /// Points `browser_id` at `app_id`, which also spends the pending install that
-    /// authorized it, and takes that record off every other entry of this identity.
-    ///
-    /// One entry per record, because the app resolves its calls through the one entry it
-    /// finds: a browser that lost its key is a second entry here while the app keeps the
-    /// key it generated, so without this the app would answer for an entry nothing is
-    /// queued on any more.
+    /// authorized it. Other entries of this identity pointing at the same record keep it:
+    /// every browser on a phone signs in as an entry of its own, and they share the phone's
+    /// one app. Dispatch posts once per address, so they do not make it deliver twice.
     ///
     /// Pointing at the record this browser already points at changes nothing, switch
     /// included: a claim token may be spent twice, and a replay is not the user asking
@@ -1128,22 +1129,6 @@ impl Anchor {
                 _ => None,
             })
             .unwrap_or(true);
-        for browser in &mut self.browsers {
-            // Every OTHER entry lets go, never this one: the entry being pointed is what
-            // the check above reads, and stripping it here would make re-pointing at the
-            // app this entry already has look like a fresh one and silently switch
-            // delivery back on.
-            if browser.id != browser_id
-                && browser
-                    .notification_app
-                    .is_some_and(|reference| reference.linked_app() == Some(app_id))
-            {
-                browser.notification_app = None;
-                // The record's address belongs to the entry being pointed now, and this
-                // one has no address of its own to have been posted at.
-                browser.notifications.clear();
-            }
-        }
         let Some(browser) = self
             .browsers
             .iter_mut()
@@ -1173,30 +1158,38 @@ impl Anchor {
         self.set_notification_app_delivery(browser_id, false);
     }
 
+    /// Switches every entry of this identity that points at the same record as
+    /// `browser_id`: whether the app delivers is the user's answer about the app, and an
+    /// entry left on would go on delivering through it.
     fn set_notification_app_delivery(&mut self, browser_id: BrowserId, enabled: bool) {
-        let Some(browser) = self
-            .browsers
-            .iter_mut()
-            .find(|browser| browser.id == browser_id)
-        else {
-            return;
-        };
         // An install that has not completed has no delivery to switch.
-        let Some(NotificationAppRef::Linked {
-            enabled: current, ..
-        }) = browser.notification_app.as_mut()
+        let Some(app_id) = self
+            .notification_app(browser_id)
+            .and_then(|reference| reference.linked_app())
         else {
             return;
         };
-        *current = enabled;
-        if enabled {
-            return;
+        for browser in &mut self.browsers {
+            let Some(NotificationAppRef::Linked {
+                app_id: held,
+                enabled: current,
+            }) = browser.notification_app.as_mut()
+            else {
+                continue;
+            };
+            if *held != app_id {
+                continue;
+            }
+            *current = enabled;
+            if enabled {
+                continue;
+            }
+            // What is queued was posted to an address this entry has just stopped being
+            // delivered at. Nothing drains it while delivery is off and nothing joins it,
+            // so leaving it would only mean the first wake-up after switching back on
+            // shows something from before the switch-off instead of what caused it.
+            browser.notifications.clear();
         }
-        // What is queued was posted to an address this entry has just stopped being
-        // delivered at. Nothing drains it while delivery is off and nothing joins it, so
-        // leaving it would only mean the first wake-up after switching back on shows
-        // something from before the switch-off instead of what caused it.
-        browser.notifications.clear();
     }
 
     /// Forgets `app_id` on every entry of this identity that points at it, and what the
@@ -1217,19 +1210,24 @@ impl Anchor {
         }
     }
 
-    /// The entry of this identity whose calls an app signing as `app_id` acts on: one
+    /// An entry of this identity whose calls an app signing as `app_id` acts on: one
     /// pointing at it with delivery on. Switching delivery off is this identity saying
     /// the app does not act for it, so there is no entry to find.
     ///
-    /// At most one: pointing an entry at a record takes that record off every other entry
-    /// of the identity, which is what lets an app resolve its calls to a single entry.
+    /// The first of them where several point at the record. What the app asks for this
+    /// way, a delegation, is the identity's and the same through any of them.
     pub fn browser_delivering_through(&self, app_id: NotificationAppId) -> Option<BrowserId> {
         self.browsers
             .iter()
-            .find(|browser| {
-                browser.is_pointing_at(app_id) && !browser.is_delivery_disabled_for(app_id)
-            })
+            .find(|browser| browser.delivers_through(app_id))
             .map(|browser| browser.id)
+    }
+
+    /// Whether `browser_id` points at `app_id` with delivery on, which is what lets the
+    /// app act on that entry's inbox.
+    pub fn delivers_through(&self, browser_id: BrowserId, app_id: NotificationAppId) -> bool {
+        self.browser(browser_id)
+            .is_some_and(|browser| browser.delivers_through(app_id))
     }
 
     /// Clears everything this browser has waiting, which is all of it: a browser pointing

@@ -2481,6 +2481,374 @@ mod claims {
     }
 }
 
+/// A second install on a phone joining the app the first one added, on the authority of
+/// the key that first install was handed out with.
+mod joins {
+    use super::subscriptions::{request, ENDPOINT};
+    use super::*;
+    use canister_tests::api::internet_identity::notifications::{
+        get_notification_app_status, installed_notification_app_last_seen, join_notification_app,
+        notification_app_anchors, prepare_notification_app_link, probe_installed_notification_app,
+        retire_notification_app, subscribe_webpush,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        GetNotificationAppStatusRequest, InstalledNotificationAppRequest, JoinNotificationAppError,
+        JoinNotificationAppRequest, NotificationAppAnchorsRequest, NotificationAppStatus,
+        PrepareNotificationAppLinkRequest, RetireNotificationAppError,
+    };
+    use pretty_assertions::assert_eq;
+
+    /// The Home Screen app every test here installs, and the one-shot key `link_app`
+    /// hands it, which is the installer link key.
+    const APP_SEED: u8 = 100;
+    const INSTALLER_SEED: u8 = APP_SEED + 1;
+    /// The one-shot key the second install hands out.
+    const JOINING_SEED: u8 = 50;
+    /// A browser of the first identity besides the one that installed the app.
+    const THIRD_BROWSER_SEED: u8 = 3;
+
+    fn browser(browser_seed: u8) -> Principal {
+        BrowserKey::new(browser_seed).successor().principal()
+    }
+
+    /// The browser `browser_seed` names starts an install, handing out the key `JOINING_SEED` names.
+    fn start_install(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_seed: u8,
+    ) {
+        prepare_notification_app_link(
+            env,
+            canister_id,
+            browser(browser_seed),
+            PrepareNotificationAppLinkRequest {
+                anchor_number: anchor,
+                link_principal: BrowserKey::new(JOINING_SEED).principal(),
+            },
+        )
+        .expect("prepare_notification_app_link rejected")
+        .expect("prepare_notification_app_link returned Err");
+    }
+
+    /// Joins the install `JOINING_SEED` names, with a signature `signer` made.
+    fn join(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        installer_anchor: AnchorNumber,
+        signer: &BrowserKey,
+    ) -> Result<Result<(), JoinNotificationAppError>, RejectResponse> {
+        let joining = BrowserKey::new(JOINING_SEED).principal();
+        join_notification_app(
+            env,
+            canister_id,
+            joining,
+            JoinNotificationAppRequest {
+                anchor_number: anchor,
+                installer_anchor_number: installer_anchor,
+                installer_link_key: BrowserKey::new(INSTALLER_SEED).public_key(),
+                signature: signer.sign_join_token(anchor, joining),
+            },
+        )
+    }
+
+    fn linked_app(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_seed: u8,
+    ) -> Result<bool, RejectResponse> {
+        Ok(matches!(
+            get_notification_app_status(
+                env,
+                canister_id,
+                browser(browser_seed),
+                GetNotificationAppStatusRequest {
+                    anchor_number: anchor
+                },
+            )?,
+            NotificationAppStatus::Linked(_)
+        ))
+    }
+
+    #[test]
+    fn should_join_a_second_browser_of_the_identity_to_the_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, app_id) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        start_install(&env, canister_id, anchor, THIRD_BROWSER_SEED);
+
+        join(
+            &env,
+            canister_id,
+            anchor,
+            anchor,
+            &BrowserKey::new(INSTALLER_SEED),
+        )?
+        .expect("join_notification_app returned Err");
+
+        assert!(linked_app(&env, canister_id, anchor, THIRD_BROWSER_SEED)?);
+        assert!(
+            linked_app(&env, canister_id, anchor, FIRST_BROWSER_SEED)?,
+            "the browser that installed the app kept it"
+        );
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                app,
+                NotificationAppAnchorsRequest { app_id }
+            )?,
+            vec![anchor]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_join_another_identity_to_the_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let (app, app_id) = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, APP_SEED);
+        start_install(&env, canister_id, second, SECOND_BROWSER_SEED);
+
+        join(
+            &env,
+            canister_id,
+            second,
+            first,
+            &BrowserKey::new(INSTALLER_SEED),
+        )?
+        .expect("join_notification_app returned Err");
+
+        assert!(linked_app(&env, canister_id, second, SECOND_BROWSER_SEED)?);
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                app,
+                NotificationAppAnchorsRequest { app_id }
+            )?,
+            vec![first, second]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_join_the_installer_link_key_did_not_sign() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        start_install(&env, canister_id, anchor, THIRD_BROWSER_SEED);
+
+        assert_eq!(
+            join(&env, canister_id, anchor, anchor, &BrowserKey::new(77))?,
+            Err(JoinNotificationAppError::InvalidInstallerSignature)
+        );
+        assert!(!linked_app(&env, canister_id, anchor, THIRD_BROWSER_SEED)?);
+        Ok(())
+    }
+
+    /// A signature by a key that never installed anything places the caller nowhere.
+    #[test]
+    fn should_refuse_a_join_by_a_key_no_app_was_installed_with() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        start_install(&env, canister_id, anchor, THIRD_BROWSER_SEED);
+        let stranger = BrowserKey::new(77);
+        let joining = BrowserKey::new(JOINING_SEED).principal();
+
+        assert_eq!(
+            join_notification_app(
+                &env,
+                canister_id,
+                joining,
+                JoinNotificationAppRequest {
+                    anchor_number: anchor,
+                    installer_anchor_number: anchor,
+                    installer_link_key: stranger.public_key(),
+                    signature: stranger.sign_join_token(anchor, joining),
+                },
+            )?,
+            Err(JoinNotificationAppError::NoNotificationApp)
+        );
+        Ok(())
+    }
+
+    /// A browser still pointing at an app since deleted signs as itself and moves to the
+    /// app its kept link key linked, which leaves the deleted one's record behind.
+    #[test]
+    fn should_move_a_browser_off_another_app_onto_the_joined_one() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, app_id) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        let (old_app, old_app_id) =
+            link_app(&env, canister_id, anchor, THIRD_BROWSER_SEED, APP_SEED + 50);
+        let joining = browser(THIRD_BROWSER_SEED);
+
+        join_notification_app(
+            &env,
+            canister_id,
+            joining,
+            JoinNotificationAppRequest {
+                anchor_number: anchor,
+                installer_anchor_number: anchor,
+                installer_link_key: BrowserKey::new(INSTALLER_SEED).public_key(),
+                signature: BrowserKey::new(INSTALLER_SEED).sign_join_token(anchor, joining),
+            },
+        )?
+        .expect("join_notification_app returned Err");
+
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                app,
+                NotificationAppAnchorsRequest { app_id }
+            )?,
+            vec![anchor]
+        );
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                old_app,
+                NotificationAppAnchorsRequest { app_id: old_app_id }
+            )?,
+            Vec::<AnchorNumber>::new(),
+            "nothing points at the app the browser left"
+        );
+        Ok(())
+    }
+
+    fn installer() -> Principal {
+        BrowserKey::new(INSTALLER_SEED).principal()
+    }
+
+    fn installed(anchor: AnchorNumber) -> InstalledNotificationAppRequest {
+        InstalledNotificationAppRequest {
+            installer_anchor_number: anchor,
+        }
+    }
+
+    /// An app asked to prove itself that stays silent through its window is gone, and
+    /// forgetting it takes it off every entry, so each is asked to install again rather
+    /// than reading as delivering to nothing.
+    #[test]
+    fn should_retire_an_app_that_left_its_probe_unanswered() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, app_id) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        start_install(&env, canister_id, anchor, THIRD_BROWSER_SEED);
+        join(
+            &env,
+            canister_id,
+            anchor,
+            anchor,
+            &BrowserKey::new(INSTALLER_SEED),
+        )?
+        .expect("join_notification_app returned Err");
+        let last_seen = installed_notification_app_last_seen(
+            &env,
+            canister_id,
+            installer(),
+            installed(anchor),
+        )?;
+        assert!(last_seen.is_some());
+
+        probe_installed_notification_app(&env, canister_id, installer(), installed(anchor))?
+            .expect("probe_installed_notification_app returned Err");
+        env.advance_time(std::time::Duration::from_secs(11));
+        retire_notification_app(&env, canister_id, installer(), installed(anchor))?
+            .expect("retire_notification_app returned Err");
+
+        assert!(!linked_app(&env, canister_id, anchor, FIRST_BROWSER_SEED)?);
+        assert!(!linked_app(&env, canister_id, anchor, THIRD_BROWSER_SEED)?);
+        assert_eq!(
+            notification_app_anchors(
+                &env,
+                canister_id,
+                app,
+                NotificationAppAnchorsRequest { app_id }
+            )?,
+            Vec::<AnchorNumber>::new()
+        );
+        assert_eq!(
+            installed_notification_app_last_seen(
+                &env,
+                canister_id,
+                installer(),
+                installed(anchor)
+            )?,
+            None
+        );
+        Ok(())
+    }
+
+    /// Only an unanswered probe says an app is gone, so one never asked is kept.
+    #[test]
+    fn should_keep_an_app_that_was_never_probed() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+
+        assert_eq!(
+            retire_notification_app(&env, canister_id, installer(), installed(anchor))?,
+            Err(RetireNotificationAppError::AppStillAnswering)
+        );
+        assert!(linked_app(&env, canister_id, anchor, FIRST_BROWSER_SEED)?);
+        Ok(())
+    }
+
+    /// Any other key places the caller nowhere.
+    #[test]
+    fn should_answer_nothing_to_a_key_no_app_linked_with() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        let stranger = BrowserKey::new(77).principal();
+
+        assert_eq!(
+            installed_notification_app_last_seen(&env, canister_id, stranger, installed(anchor))?,
+            None
+        );
+        assert_eq!(
+            retire_notification_app(&env, canister_id, stranger, installed(anchor))?,
+            Err(RetireNotificationAppError::NoNotificationApp)
+        );
+        Ok(())
+    }
+
+    /// The signature names the install it was made for, so nobody else can spend it.
+    #[test]
+    fn should_refuse_a_caller_no_install_is_waiting_on() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+
+        assert_eq!(
+            join(
+                &env,
+                canister_id,
+                anchor,
+                anchor,
+                &BrowserKey::new(INSTALLER_SEED)
+            )?,
+            Err(JoinNotificationAppError::NoPendingLink)
+        );
+        Ok(())
+    }
+}
+
 /// Runs the dispatcher's next pass, answering every relay probe it puts on the wire,
 /// which is what lets the pass deposit an entry and name it.
 fn run_dispatch_pass(env: &PocketIc) {

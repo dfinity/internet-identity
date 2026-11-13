@@ -816,6 +816,156 @@ fn claim_notification_app(
     Ok(())
 }
 
+/// Points the browser waiting on the caller's link key, or the browser the caller is, at
+/// the app this device already has, so a second install on the phone joins it rather than
+/// adding another app, and a browser still pointing at an app since deleted moves to it.
+///
+/// Authorized twice over: the caller signs as the waiting install's link key or as a
+/// browser of the identity, and the signature is by the link key the app linked with. Only
+/// the browser that showed that install holds it, which is what places the caller on the
+/// device the app is on. The signature binds the caller, so it cannot be spent by another.
+#[update]
+fn join_notification_app(
+    request: JoinNotificationAppRequest,
+) -> Result<(), JoinNotificationAppError> {
+    let JoinNotificationAppRequest {
+        anchor_number,
+        installer_anchor_number,
+        installer_link_key,
+        signature,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(JoinNotificationAppError::InternalCanisterError(
+            NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let mut anchor = state::anchor(anchor_number);
+    // An install waiting on the caller's link key, or a browser of the identity signing as
+    // itself, which re-points whatever it pointed at before.
+    let joining_browser = calling_browser(&anchor, ic_cdk::api::time())
+        .ok_or(JoinNotificationAppError::NoPendingLink)?;
+    if !browser_key::verify_notification_app_join(
+        &installer_link_key,
+        &signature,
+        anchor_number,
+        &caller(),
+    ) {
+        return Err(JoinNotificationAppError::InvalidInstallerSignature);
+    }
+    let app_id = app_linked_with(
+        installer_anchor_number,
+        Principal::self_authenticating(&installer_link_key),
+    )
+    .ok_or(JoinNotificationAppError::NoNotificationApp)?;
+
+    anchor.point_at_notification_app(joining_browser, app_id);
+    state::storage_borrow_mut(|storage| {
+        storage
+            .write(anchor)
+            .map_err(|err| JoinNotificationAppError::InternalCanisterError(format!("{err:?}")))
+    })
+}
+
+/// The browser of `anchor` a call acts for: the one whose install waits on the caller's
+/// link key, or the one the caller is.
+fn calling_browser(anchor: &storage::anchor::Anchor, now: Timestamp) -> Option<BrowserId> {
+    anchor
+        .browser_awaiting_link(caller(), now)
+        .or_else(|| anchor.browser_by_principal(caller()))
+}
+
+/// The app that linked with `installer_link_principal`, found through the installer
+/// identity's own references, so only an app somebody still points at is found.
+fn app_linked_with(
+    installer_anchor_number: AnchorNumber,
+    installer_link_principal: Principal,
+) -> Option<NotificationAppId> {
+    state::anchor(installer_anchor_number)
+        .browsers()
+        .iter()
+        .filter_map(|browser| browser.notification_app?.linked_app())
+        .find(|app_id| {
+            notifications::installed_app::record(*app_id)
+                .is_some_and(|app| app.linked_with == Some(installer_link_principal))
+        })
+}
+
+/// When the app the caller's link key linked last called, which is what an app answers a
+/// probe with. `None` where no app linked with it is still pointed at.
+///
+/// Signed as the installer link key: only the browser that showed that install holds it.
+#[query]
+fn installed_notification_app_last_seen(
+    request: InstalledNotificationAppRequest,
+) -> Option<Timestamp> {
+    if !notifications::notifications_enabled() {
+        return None;
+    }
+    let app_id = app_linked_with(request.installer_anchor_number, caller())?;
+    notifications::installed_app::record(app_id).map(|app| app.last_used_ns)
+}
+
+/// Asks the app the caller's link key linked to prove it is still installed, through an
+/// entry of the installer identity it delivers for. A probe still inside its window is
+/// handed back instead of sending another.
+#[update]
+fn probe_installed_notification_app(
+    request: InstalledNotificationAppRequest,
+) -> Result<NotificationId, ProbeNotificationAppError> {
+    let InstalledNotificationAppRequest {
+        installer_anchor_number,
+    } = request;
+    if !notifications::notifications_enabled() {
+        return Err(ProbeNotificationAppError::InternalCanisterError(
+            NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let app_id = app_linked_with(installer_anchor_number, caller())
+        .ok_or(ProbeNotificationAppError::NoNotificationApp)?;
+    let anchor = state::anchor(installer_anchor_number);
+    let browser_id = anchor
+        .browser_delivering_through(app_id)
+        .ok_or(ProbeNotificationAppError::NotReachable)?;
+    let now_ns = ic_cdk::api::time();
+    if let Some(outstanding) = outstanding_probe_of(&anchor, browser_id, now_ns) {
+        return Ok(outstanding);
+    }
+    notifications::dispatch::notify_identity(
+        installer_anchor_number,
+        browser_id,
+        NotificationEvent::NotificationsOn(identity_for_notification(&anchor)),
+        now_ns,
+    )
+    .ok_or(ProbeNotificationAppError::NotReachable)
+}
+
+/// Forgets the app the caller's link key linked, for every identity pointing at it, once
+/// a probe it was sent went unanswered. Nothing reports a deleted Home Screen app, and an
+/// entry left pointing at one reads as delivering, so it would never be asked to install
+/// again.
+///
+/// Signed as the installer link key: only the browser that showed that install holds it.
+#[update]
+fn retire_notification_app(
+    request: InstalledNotificationAppRequest,
+) -> Result<(), RetireNotificationAppError> {
+    if !notifications::notifications_enabled() {
+        return Err(RetireNotificationAppError::InternalCanisterError(
+            NOT_ENABLED_MESSAGE.to_string(),
+        ));
+    }
+    let app_id = app_linked_with(request.installer_anchor_number, caller())
+        .ok_or(RetireNotificationAppError::NoNotificationApp)?;
+    // The only evidence an app is gone: asked to prove itself, given its window, silent.
+    let gone = notifications::installed_app::record(app_id)
+        .is_some_and(|app| app.probe_went_unanswered(ic_cdk::api::time()));
+    if !gone {
+        return Err(RetireNotificationAppError::AppStillAnswering);
+    }
+    state::storage_borrow_mut(|storage| storage.forget_notification_app(app_id))
+        .map_err(|err| RetireNotificationAppError::InternalCanisterError(format!("{err:?}")))
+}
+
 /// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
 /// nobody to deliver for, and those cases cannot be told apart.
 #[query]
@@ -862,7 +1012,9 @@ fn link_notification_app(
     }
 
     let app = state::storage_borrow_mut(|storage| {
-        storage.ensure_notification_app(app_principal, app_id, now)
+        let app = storage.ensure_notification_app(app_principal, app_id, now)?;
+        storage.record_notification_app_link_key(app.id, caller());
+        Ok::<_, storage::StorageError>(app)
     })
     .map_err(|err| LinkNotificationAppError::InternalCanisterError(format!("{err:?}")))?;
     anchor.point_at_notification_app(installing_browser, app.id);
@@ -905,8 +1057,12 @@ fn anchor_delivering_to(
     key: NotificationKey,
     browser_id: BrowserId,
 ) -> Option<storage::anchor::Anchor> {
-    let (anchor, delivering) = delivering_browser(anchor_number, key)?;
-    (delivering == browser_id).then_some(anchor)
+    let anchor = state::anchor(anchor_number);
+    let delivering = match key {
+        NotificationKey::Browser(signed) => signed == browser_id,
+        NotificationKey::App(app_id) => anchor.delivers_through(browser_id, app_id),
+    };
+    delivering.then_some(anchor)
 }
 
 /// Authorized by the browser key the caller signs with, or by the key of the Home Screen

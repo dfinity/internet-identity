@@ -10,6 +10,12 @@ import {
   type LinkToken,
 } from "$lib/utils/notifications/linkToken";
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
+import {
+  joinInstalledApp,
+  keepsAnInstallerLinkKey,
+  probeInstalledApp,
+  rememberInstallerLinkKey,
+} from "$lib/utils/notifications/installerLinkKey";
 import { appKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
 import {
@@ -77,7 +83,12 @@ export const holdsTheInstallPlaceholder = ({
   search: string;
 }): boolean => !inTheApp && new URLSearchParams(search).has("installing");
 
-export const insideTheBrowser = async (hash: string): Promise<Screen> => {
+/** `mintedElsewhere` is an install handed over by another browser on this device, whose
+ *  entry is the one waiting for it: this browser's own entry says nothing about it. */
+export const insideTheBrowser = async (
+  hash: string,
+  mintedElsewhere: boolean,
+): Promise<Screen> => {
   const fragment = decodeLinkToken(hash);
   switch (fragment.kind) {
     // This URL exists to carry a token to an app that was added from it. Reaching it in a
@@ -88,8 +99,34 @@ export const insideTheBrowser = async (hash: string): Promise<Screen> => {
       console.error(fragment.reason);
       return { kind: "elsewhere" };
     case "token":
-      return await settleTheTab(fragment.token);
+      return await followTheToken(fragment.token, mintedElsewhere);
   }
+};
+
+/** An app this browser installed before is joined rather than added again, once it has
+ *  answered a probe: nothing reports a deleted Home Screen app, and joining one would
+ *  leave the user with nothing installed and no steps to add it. */
+const followTheToken = async (
+  token: LinkToken,
+  mintedElsewhere: boolean,
+): Promise<Screen> => {
+  if (
+    (await keepsAnInstallerLinkKey()) &&
+    (await probeInstalledApp()) !== "gone" &&
+    (await joinInstalledApp(token))
+  ) {
+    return { kind: "ready", inTheApp: false };
+  }
+  return await installFrom(token, mintedElsewhere);
+};
+
+/** The steps for `token`, which a later install joins. */
+const installFrom = async (
+  token: LinkToken,
+  mintedElsewhere: boolean,
+): Promise<Screen> => {
+  await rememberInstallerLinkKey(token);
+  return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
 };
 
 /** What this browser's entry says to do about the identity a readable token named. */
