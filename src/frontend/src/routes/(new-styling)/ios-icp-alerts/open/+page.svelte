@@ -1,6 +1,7 @@
 <script lang="ts">
-  /** iOS gives a standalone web app an in-app browser view, with storage of its own, for any window opened on another origin, so `webapp:` hands the link to the destination's own Home Screen app.
-   *  It is honoured for a navigation a page makes and not for a window a service worker opens, and nothing about it is documented, so it is attempted and then offered. */
+  /** iOS gives a standalone web app an in-app browser view, with storage of its own, for any window opened on another origin, and refuses `webapp:` from inside one.
+   *  So the app hands this page to Safari with `x-safari-https:` and a `bounce` marker, and the Safari tab hands the link on to the destination's own Home Screen app with `webapp:`.
+   *  Both are attempted and then offered, since nothing about either is documented. */
   import { onMount } from "svelte";
   import LockIcon from "@lucide/svelte/icons/lock";
   import { t } from "$lib/stores/locale.store";
@@ -13,9 +14,23 @@
   let target = $state<string | undefined>(undefined);
   let shown = $state<{ title: string; body: string } | undefined>(undefined);
   let stillHere = $state(false);
+  /** Where this page sends `target`: Safari from inside the app, the destination's app from Safari. */
+  let outgoing = $state<string | undefined>(undefined);
+
+  const BOUNCE_PARAM = "bounce";
 
   /** `webapp:` needs a path after the host, which a parsed `https:` URL always has. */
   const viaWebApp = (url: string): string => url.replace(/^https:/, "webapp:");
+
+  /** This page in Safari, carrying the same fragment, told to bounce. */
+  const viaSafariBounce = (carrying: {
+    url: string;
+    title: string;
+    body: string;
+  }): string => {
+    const fragment = new URLSearchParams(carrying);
+    return `x-safari-https://${window.location.host}${NOTIFICATION_APP_PATH}/open?${BOUNCE_PARAM}#${fragment.toString()}`;
+  };
 
   /** Only `https`, and only what parses: this page follows what it is handed. */
   const carried = (
@@ -67,7 +82,11 @@
       // else arrived on one somebody else wrote. Following it would send a visitor off
       // this origin on a link they did not choose, so nothing here is acted on and the
       // page shows that it has nothing to open.
-      if (!isStandalone()) {
+      const inTheApp = isStandalone();
+      const bouncing =
+        !inTheApp &&
+        new URLSearchParams(window.location.search).has(BOUNCE_PARAM);
+      if (!inTheApp && !bouncing) {
         return;
       }
       target = carrying?.url;
@@ -75,10 +94,11 @@
         carrying !== undefined && carrying.title !== ""
           ? { title: carrying.title, body: carrying.body }
           : undefined;
-      if (target === undefined) {
+      if (carrying === undefined) {
         return;
       }
-      window.location.href = viaWebApp(target);
+      outgoing = inTheApp ? viaSafariBounce(carrying) : viaWebApp(carrying.url);
+      window.location.href = outgoing;
       // Long enough that a handover which worked has already taken the page away.
       waited = setTimeout(() => (stillHere = true), 1_200);
     };
@@ -100,6 +120,7 @@
       stillHere = false;
       target = undefined;
       shown = undefined;
+      outgoing = undefined;
     };
 
     const onVisible = () => {
@@ -118,8 +139,17 @@
       window.location.replace(NOTIFICATION_APP_PATH);
     };
 
-    const onVisibilityChange = () =>
-      document.visibilityState === "hidden" ? onHidden() : onVisible();
+    // A Safari tab has no Home Screen icon to come back to, so only the app is put back.
+    const onVisibilityChange = () => {
+      if (!isStandalone()) {
+        return;
+      }
+      if (document.visibilityState === "hidden") {
+        onHidden();
+      } else {
+        onVisible();
+      }
+    };
 
     handOver();
     window.addEventListener("hashchange", handOver);
@@ -136,7 +166,7 @@
   <title>{NOTIFICATION_APP_NAME}</title>
 </svelte:head>
 
-{#if target === undefined}
+{#if target === undefined || outgoing === undefined}
   <main class="flex min-h-dvh flex-col items-center justify-center p-6">
     <p class="text-text-tertiary text-center text-sm">
       <Trans>There is nothing here to open.</Trans>
@@ -167,9 +197,9 @@
       <p
         class="bg-bg-secondary border-border-secondary text-text-tertiary rounded-lg border px-3.5 py-3 font-mono text-xs/4 break-all select-all"
       >
-        {viaWebApp(target)}
+        {outgoing}
       </p>
-      <a class="btn btn-primary btn-xl" href={viaWebApp(target)}>
+      <a class="btn btn-primary btn-xl" href={outgoing}>
         {$t`Continue`}
       </a>
       <p
