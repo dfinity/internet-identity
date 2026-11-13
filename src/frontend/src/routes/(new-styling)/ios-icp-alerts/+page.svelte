@@ -33,6 +33,7 @@
     type Screen,
     settleFromSettings,
     settleWithTheApp,
+    launchTrace,
   } from "./screen";
   import { openInSafari } from "$lib/utils/notifications/openInSafari";
   import { watchForInstall } from "./watchInstall";
@@ -900,6 +901,11 @@
             </Trans>
           </p>
           <ReinstallSteps {host} />
+          <p
+            class="bg-bg-secondary border-border-secondary text-text-tertiary mt-5 rounded-lg border px-3.5 py-3 font-mono text-xs/4 break-words whitespace-pre-line"
+          >
+            {launchTrace.join("\n")}
+          </p>
           <div class={buttonGroup}>
             <button class="btn btn-primary btn-xl" onclick={openTheHost}>
               <Trans>Open {host}</Trans>
