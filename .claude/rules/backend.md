@@ -29,7 +29,7 @@ Exceptions, each to be kept as narrow as it is:
 ## State changes, errors and `await`
 
 - On the IC, returning `Err` doesn't undo state changes. Every mutation made before it is committed: stable-memory writes (`Storage::write`, map inserts and removes, counter bumps) and changes to heap state (`state` module, `thread_local!`). Reads, locals and building the response don't count. Only a trap rolls back. Run every check that can fail before the first mutation, and never use `?` after one. Each `await` commits the same way (next rule).
-- Every `await` is a commit point and lets other messages run. Re-read and re-check (authorization, existence, generation) anything captured before it; never write back a value loaded before it. A lock or "in progress" flag written before an `await` needs a recovery path.
+- Every `await` is a commit point and lets other messages run. Re-read and re-check (authorization, existence, generation) anything captured before it; never write back a value loaded before it. Re-derive the value from its source and compare it with the one captured before (`if <the same lookup> != Some(anchor_number) { return Err(...) }`), in one check. A lock or "in progress" flag written before an `await` needs a recovery path.
 - Don't check, await, then write (lazy salts, get-or-create with `raw_rand`). Initialize at install, or refuse.
 - Never drop a result: no `let _ =` on a `Result`, check what `.remove()`/`.insert()` return, and use `#[must_use]` where a value must be consumed. A map insert must not silently overwrite an existing binding: detect the collision and return an error.
 - Call `time()` once at the endpoint and pass `now: Timestamp` (nanoseconds) down.
@@ -37,10 +37,12 @@ Exceptions, each to be kept as narrow as it is:
 
 ## Layering
 
-- `main.rs` is a thin entry point: authorize first (through `authz_utils`: `check_authz_and_record_activity`, `anchor_operation_with_authz_check`), validate, then call the module that owns the feature. Feature logic lives in its module, not in `main.rs`.
+- `main.rs` is a thin entry point, and every endpoint follows the same order: authorize (through `authz_utils`: `check_authz_and_record_activity`, `anchor_operation_with_authz_check`), validate shape, destructure, narrow, make one call to the module that owns the feature, map its result. Feature logic lives in its module, not in `main.rs`, including multi-phase flows and the re-checks between their `await`s.
 - Anchor-mutating updates go through `anchor_operation_with_authz_check` / `post_operation_bookkeeping` so they are archived and counted.
 - Endpoints validate shape. Convert raw candid input once, through `TryFrom`, into a `Validated*` request whose fields are shared newtypes (`ApplicationOrigin`), collecting all errors. Destructure it completely at the top of the endpoint, without `..`, so the API carries no field the endpoint doesn't use and a new field is a compile error until it is handled. A field that is deliberately left unused needs a code comment saying why.
 - Business logic never assumes a raw `String`, number or byte vector was validated upstream. Choose per case how it gets valid input: a type owned by the business module that only the module's own checks can construct, or validation at the function's entry. A type fits when the value crosses several functions or modules, is persisted or authorized on, or carries an invariant beyond shape (the email belongs to a known anchor, the timestamp is in the future). Validating at the entry fits when the input is used in one place, or when a type would only wrap a single check. Either way the module's types are independent of the API's, so the two evolve separately.
+- Narrow before calling: pass each function only the values it uses, not the whole request, anchor or state.
+- Map errors in one place. Business logic returns `Result<T, ModuleError>` and propagates with `?`; the endpoint converts that error to the method's candid error type once, not by building an error response at each failure.
 - Storage is abstract: it takes and returns domain types, keeps `Storable*` types, internal numbers (`ApplicationNumber`) and index sync to itself (inside `Storage::write`), and contains no feature logic. Enforce an invariant in the lowest layer that must hold it.
 - Keep maps that must agree behind one struct that owns every mutation, or model multi-step state as one enum, so inconsistent combinations can't be represented.
 - Keep mutable state in the `state` module and don't nest `STATE.with` borrows. A helper doesn't read global state behind the caller's back: pass what it needs.
@@ -50,6 +52,8 @@ Exceptions, each to be kept as narrow as it is:
 - Import types and functions at the top of the module, merged per path; no inline fully-qualified paths.
 - New modules use `foo.rs` + `foo/bar.rs`, not `foo/mod.rs`. Test fixtures go in `foo/fixtures.rs` or a `#[cfg(test)]` module.
 - No bare `bool` parameters or returns from functions that aren't predicates: use an enum, a `Result`, or two functions (`enable_x` / `disable_x`).
+- Unwrap an `Option` or `Result` where it is produced (`let Some(anchor_number) = ... else { return Err(...) };` or `?`). Don't carry `*_maybe` bindings to a later check.
+- Shadow a raw value with its validated form (`let request = ValidatedRequest::try_from(request)?;`), so the raw value can't be used afterwards.
 - Prefer a full `match` over `if let` on enums, keep distinct cases in distinct arms (no catch-all `_` merging them), at most one `?` per line, and no state-changing calls inside `if` conditions.
 - Use `BTreeSet`/`BTreeMap` (deterministic order) and `Option` for absence, never sentinels like `""` or `0`. Derive enumerations from the type (`AttributeName::all()`) rather than a hand-kept list.
 - Use dependency injection rather than `#[cfg(test)]` / `#[cfg(not(test))]` branches or test-only thread-locals in production code, so the production branch is the one tested.
