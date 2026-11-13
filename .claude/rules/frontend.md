@@ -83,6 +83,16 @@ The frontend ships inside the II frontend canister wasm, which has a hard size c
 - Persist per-identity preferences with a `writableStored` store keyed by anchor, never raw global `localStorage`.
 - Before using a new browser API, check its support in older browsers. Core flows must work there: feature-detect and fall back. Elsewhere, degraded styling or polish is acceptable as long as the page stays usable and navigable. Don't hold back the UX in current browsers to match older ones.
 
+## The `/authorize` route
+
+`/authorize` is a state machine driven by app messages, not a set of URL routes. Three layers, decoupled through stores:
+
+- Channel handlers (`lib/stores/channelHandlers/*`) receive app requests: validate the params (zod, `OriginSchema`), write the request into its store (`attributeConsentStore`, `notificationConsentStore`), wait for the user's answer from a store (`waitForStore`) and reply on the channel. They never import components or touch the DOM. Requests that drive authorization state run one at a time through `serializeAuthorizationRequest`.
+- Stores hold the requests and the user's decisions, and are the only thing handlers and views share.
+- Views (`routes/(new-styling)/authorize/views/*`) read stores and write the user's decisions back to them. They never touch the channel.
+- `+page.svelte` picks the view with one `{#if}` chain over the stores, in precedence order: the first state that matches is what the user sees. Pending attribute consent comes before pending notification consent, both before the redirect animation, and then the sign-in screens. Add a step as a store state, a view and a handler, and place its condition in that chain. A request that needs time before it knows its screen holds the current one with `claimScreen()`, so the flow doesn't flash the redirect animation.
+- Avoid navigating away from the page: open a dialog or a popup instead, so the channel to the app stays open. The 1-click OpenID resume and SSO redirect flows are the exceptions.
+
 ## Accessibility
 
 Accessibility is a requirement, and e2e tests select through the accessibility tree.
