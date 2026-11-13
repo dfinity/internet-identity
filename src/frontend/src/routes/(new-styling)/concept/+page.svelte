@@ -1160,7 +1160,7 @@
                     duration: reduced ? 0 : 260,
                     easing: quintOut,
                   }}
-                  class="-mx-1.5 w-0 min-w-[calc(100%+0.75rem)] pb-8"
+                  class="-mx-1.5 w-0 min-w-[calc(100%+0.75rem)] pb-8 @lg:-mx-2 @lg:min-w-[calc(100%+1rem)]"
                 >
                   <IncidentBanner
                     {incident}
