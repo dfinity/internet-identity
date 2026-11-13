@@ -28,7 +28,7 @@ Canisters must not trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`,
 
 - On the IC, returning `Err` doesn't undo state changes. Every mutation made before it is committed: stable-memory writes (`Storage::write`, map inserts and removes, counter bumps) and changes to heap state (`state` module, `thread_local!`). Reads, locals and building the response don't count. Only a trap rolls back. Run every check that can fail before the first mutation, and never use `?` after one. Each `await` commits the same way (next rule).
 - Every `await` is a commit point and lets other messages run. Re-read and re-check (authorization, existence, generation) anything captured before it; never write back a value loaded before it. Re-derive the value from its source and compare it with the one captured before (`if <the same lookup> != Some(anchor_number) { return Err(...) }`), in one check. A lock or "in progress" flag written before an `await` needs a recovery path.
-- Don't check, await, then write (lazy salts, get-or-create with `raw_rand`). Initialize at install, or refuse.
+- Don't check, await, then write (get-or-create with `raw_rand`). An install hook can't await, so initialize from a zero-delay timer scheduled at install that re-checks after its await (`set_salt_if_unset`), and refuse dependent calls until it has run.
 - Never drop a result: no `let _ =` on a `Result`, check what `.remove()`/`.insert()` return, and use `#[must_use]` where a value must be consumed. A map insert must not silently overwrite an existing binding: detect the collision and return an error.
 - Call `time()` once at the endpoint and pass `now: Timestamp` (nanoseconds) down.
 - Log internal-invariant violations with `ic_cdk::println!("ERROR: ...")`.

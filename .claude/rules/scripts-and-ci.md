@@ -3,7 +3,7 @@ paths:
   - "scripts/**"
   - ".github/**"
   - "Dockerfile"
-  - "package.json"
+  - "**/package.json"
   - "Cargo.toml"
   - "**/Cargo.toml"
 ---
@@ -14,7 +14,7 @@ paths:
 
 - Fail loudly: `set -euo pipefail`, quote every expansion, propagate failures (`|| return 1`), validate inputs up front. Never swallow errors with `2>/dev/null` or `|| true`.
 - Run on macOS (bash 3.2, BSD tools: no `nproc`, no GNU-only flags) and on Linux CI (no `sed -i ''`, no `tee /dev/tty`). Tell an empty variable apart from an unset one (`${VAR+set}`) under `set -u`.
-- Don't mutate the working tree; use `mktemp -d`. Write multi-file updates atomically.
+- Put intermediate files in `mktemp -d`, not the working tree. A script whose job is to update tracked files (`scripts/update-deps/update-didc`, `scripts/update-translations`) writes only those, atomically across files.
 - Hoist hardcoded values (canister ids, ports, URLs) into named variables at the top.
 - Paginate `gh api` calls. Derive release and proposal facts from on-chain state (the running wasm hash), not from GitHub releases.
 - Pin and checksum-verify every tool binary a script downloads.
@@ -29,7 +29,7 @@ paths:
 
 ## Dependencies
 
-- Dependency updates come from Dependabot or the team's workspace-wide update (`scripts/update-deps`). Lockfile-only and transitive Dependabot bumps are closed and picked up by the next workspace update. Don't add dependency bumps to feature PRs.
+- Dependency updates come from Dependabot. Toolchain pins (Rust, Node, didc, icp-cli) come from `scripts/update-deps` through the `update-deps` workflow, which doesn't touch lockfiles. Don't add dependency bumps to feature PRs.
 - A bot dependency PR that needs code changes is closed and redone as a manual PR.
 - Commit `Cargo.lock` in sync with `Cargo.toml` (CI checks `--locked`).
 - List every added, removed or changed dependency in the PR description with a clear reason: what it is for, why this one, its size and maintenance, and what it replaces. Never put the reason in a comment in `Cargo.toml` or `package.json`.

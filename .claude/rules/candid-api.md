@@ -14,7 +14,7 @@ The backend `.did` is a public API with outside callers (wallets, other identity
 ## Evolving the interface
 
 - Never change a shipped signature incompatibly: no new non-`opt` record fields, no changed `Ok` types, no renamed or removed fields, methods or variants without an explicit decision. Types still inside an unmerged PR or stack are not shipped and may change freely.
-- Add new record fields and new trailing arguments as `opt`, so callers built against the old `.did` still encode and decode. Stored records are minicbor, not candid: see `stable-memory.md` for new fields there. A new optional argument defaults to the old behaviour; changing an existing default is a breaking change.
+- Add new record fields and new trailing arguments as `opt`, so callers built against the old `.did` still encode and decode. Stored records are mostly minicbor, where field names don't matter: see `stable-memory.md`. A new optional argument defaults to the old behaviour; changing an existing default is a breaking change.
 - Mark superseded methods `// Deprecated:` in the `.did`. Extend an existing method rather than adding a sibling that does nearly the same thing; add a narrow new method only when widening an existing one would expose data to callers that don't need it.
 - Leave room to grow: return a `record` (`record { is_granted : bool }`), not a bare `bool`.
 - Install and upgrade args: `opt T` means "leave the stored value unchanged". Use `opt opt T` when a field must also be clearable (`null` keeps, `opt null` clears, `opt opt v` sets).

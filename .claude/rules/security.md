@@ -27,7 +27,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 
 - Parse URLs with `new URL()` / the `url` crate and compare exact origins (`new URL(x).origin === x`). Never concatenate URL parts or use substring checks.
 - Match a hostname against an allowlist exactly or on a dot boundary (`host === domain || host.endsWith("." + domain)`), never a bare `endsWith(domain)`.
-- Every origin used as an outcall target or derivation input goes through the canonicalizing validator and requires `https`. Plain `http` is allowed only for loopback hosts behind an explicit dev flag.
+- Every origin used as an outcall target or derivation input goes through the canonicalizing validator. Outcall targets require `https`, with plain `http` allowed only for loopback hosts behind an explicit dev flag. Derivation origins are validated per transport: `OriginSchema` also accepts `chrome-extension://`.
 - Validate the derivation origin in every channel/RPC handler before using it, with `OriginSchema` rather than `z.url()`.
 - Sanitize navigation targets (`next`, redirects) to same-origin relative paths as early as possible (in `load`). No open redirects.
 - Match an OpenID provider on `(iss, aud)`, never `iss` alone, and include `aud` in seed derivation.
@@ -35,8 +35,8 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 ## Delegations and keys
 
 - Length-prefix every variable-length field when hashing a seed.
-- Keep delegation seeds minimal and justify every input. Set delegation `targets` where the canister signs, and keep them when rebuilding a chain.
-- Delegation lifetimes that cross the IC are at least 5 minutes, because of replica clock drift.
+- Keep delegation seeds minimal and justify every input. Set `targets` on delegations whose contract names them (the session delegation is scoped to II), and keep them when rebuilding a chain. App delegations have none, because apps call arbitrary canisters.
+- Allow for replica clock drift in delegation lifetimes, but never beyond the caller's `maxTimeToLive` or another cap such as the MCP session grant.
 - Browser keys are generated with `extractable: false`. Use the browser's built-in crypto functions, never hand-rolled crypto.
 - Every frontend agent, including ones created in service workers, carries the deployment's `shouldFetchRootKey`.
 
