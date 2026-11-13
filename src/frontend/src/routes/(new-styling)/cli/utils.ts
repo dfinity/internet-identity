@@ -88,7 +88,7 @@ export const cliAuthorize = async ({
     )
     .then(throwCanisterError);
 
-  const canisterChain = await retryFor(5, () =>
+  const canisterChain = await retryFor(8, () =>
     actor
       .get_account_delegation(
         identityNumber,

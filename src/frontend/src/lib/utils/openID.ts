@@ -12,7 +12,7 @@ const REDIRECT_CALLBACK_PATH = "/callback";
 const POPUP_CLOSED_POLL_INTERVAL_MS = 250;
 // How long `redirectInPopup` keeps waiting for the callback payload after the
 // popup first reads as closed, before treating the flow as cancelled.
-const POPUP_CLOSED_GRACE_MS = 1000;
+const POPUP_CLOSED_GRACE_MS = 5000;
 
 export class CallbackPopupClosedError extends Error {}
 
