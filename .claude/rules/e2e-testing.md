@@ -60,9 +60,7 @@ The ports are declared at the top of `scripts/dev-e2e-setup`. Read them from the
 - After clicking an optimistic toggle, wait for `toBeEnabled` before asserting its state.
 - Model another device with a new browser context, not a new page. Close every context you create in `finally`, and attach the virtual authenticator to the page where WebAuthn runs.
 - Use the shared `II_URL` constant; never hardcode origins, ports or URLs without a named constant.
-- Fixtures that bind a fixed port offset it by `TEST_PARALLEL_INDEX`. Assertions on canister-wide counters use `>=`.
 - Fixtures and the test app must not swallow failures, and fakes must not hide missing behaviour. Never change product behaviour to make a test pass.
-- Cover each new flow with an e2e test, including the authorize path from an app. Gate any randomness in II behind an init-arg flag rather than patching `Math.random`.
 
 ## Bisecting a regression
 

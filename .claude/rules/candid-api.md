@@ -5,7 +5,6 @@ paths:
   - "src/internet_identity/src/main.rs"
   - "src/internet_identity_frontend/src/main.rs"
   - "src/frontend/src/lib/generated/**"
-  - "docs/ii-spec.mdx"
 ---
 
 # Candid API
@@ -18,7 +17,7 @@ The backend `.did` is a public API with outside callers (wallets, other identity
 - Add new record fields and new trailing arguments as `opt`, so callers built against the old `.did` still encode and decode. Stored records are minicbor, not candid: see `stable-memory.md` for new fields there. A new optional argument defaults to the old behaviour; changing an existing default is a breaking change.
 - Mark superseded methods `// Deprecated:` in the `.did`. Extend an existing method rather than adding a sibling that does nearly the same thing; add a narrow new method only when widening an existing one would expose data to callers that don't need it.
 - Leave room to grow: return a `record` (`record { is_granted : bool }`), not a bare `bool`.
-- Install and upgrade args: `opt T` means "leave the stored value unchanged". Use `opt opt T` when a field must also be clearable (`null` keeps, `opt null` clears, `opt opt v` sets). Configuration that changes at runtime belongs behind an update call, not an install arg.
+- Install and upgrade args: `opt T` means "leave the stored value unchanged". Use `opt opt T` when a field must also be clearable (`null` keeps, `opt null` clears, `opt opt v` sets).
 - Don't add fields to the backend-to-frontend config (`/.config.did.bin`) or to frontend stores unless the frontend uses them.
 
 ## Shape
@@ -44,4 +43,3 @@ The backend `.did` is a public API with outside callers (wallets, other identity
 
 - After any `.did` change, run `npm run generate` (with the `didc` version CI pins) and commit the result in the same PR. Never hand-edit files under `src/frontend/src/lib/generated/`. Keep `query` annotations and Rust signatures in step with the `.did`; the `service_equal` test checks this.
 - `.did` comments say only what a caller needs: behaviour, units, authorization. No implementation detail or design reasoning.
-- `docs/ii-spec.mdx` describes what clients observe and each method's authorization, and is amended in the same stack as the change.

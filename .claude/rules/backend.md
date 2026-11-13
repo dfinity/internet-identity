@@ -20,8 +20,6 @@ Canisters must not trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`,
 - Use `checked_*` arithmetic and `try_from` conversions; no `as` casts between integer types. Prefer `checked_*` plus an error over `saturating_*` when the clamped value would be acted on or an id handed out twice. Truncate strings only at a char boundary.
 - Never `unwrap_or_default()` a value that is then persisted or authorized on. A missing record is an error, not an empty default.
 - Push back on reviewer suggestions (Copilot and others) to add `.expect(...)` or `debug_assert!` "to document the invariant".
-
-Exceptions, each to be kept as narrow as it is:
 - `Storable::from_bytes` cannot return an error, so it may `expect` with an actionable message. Make decoding unable to fail instead: see `stable-memory.md`, and use the bounded helpers (`slice_to_bounded_32`) rather than `copy_from_slice`.
 - HTTP outcall transform functions cannot return or log errors, so they may trap on a response that is unusable as a whole. Skip a single malformed element (a key without a `kid`) rather than rejecting the response.
 - `#[cfg(test)]` code may `unwrap`/`expect`; prefer `expect("context")`.
