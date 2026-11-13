@@ -3,6 +3,7 @@ import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { ensureAppKey } from "$lib/utils/notifications/notificationAppKey";
 import { registerForAnyAnchor } from "$lib/utils/notifications/subscribeDevice";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
+import { turnOnAndProve } from "$lib/utils/notifications/turnOnAndProve";
 import { appAnchors } from "$lib/utils/notifications/appAnchors";
 import {
   decodeLinkToken,
@@ -108,14 +109,20 @@ const settleTheTab = async (token: LinkToken): Promise<Screen> => {
     case "no-app":
       return { kind: "install", staleKey: true };
     case "app":
-      // This tab exists to walk the install, so what it answers is about the app being
-      // there. Whether this identity wants it to deliver was recorded where the user
-      // said so, and nothing here reads or writes it.
       // The record exists because the app was opened and linked, so it is on the Home
       // Screen and the permission is what is left.
-      return status.app.subscribed
+      if (!status.app.subscribed) {
+        return { kind: "open-app", guessed: false };
+      }
+      if (status.app.enabled) {
+        return { kind: "ready", inTheApp: false };
+      }
+      // Every install link comes from a press that turns notifications on, which a
+      // switched-off record has not had done to it yet. One that does not answer is an
+      // app that has gone, and the steps go on a URL minted for this browser.
+      return (await turnOnAndProve(token.identityNumber))
         ? { kind: "ready", inTheApp: false }
-        : { kind: "open-app", guessed: false };
+        : { kind: "install", staleKey: true };
   }
 };
 
