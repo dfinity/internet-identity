@@ -353,6 +353,12 @@
         : []),
       ...attention
         .filter((card) => !coveredByIncident(card.kind))
+        // News leaves once the panel has shown it; a step stays until done.
+        .filter(
+          (card) =>
+            card.tone !== "recent" ||
+            !(seen[seenId] ?? []).includes(seenKeyOf(card)),
+        )
         .map((card) => ({
           kind: card.kind,
           tone: card.tone,
@@ -395,11 +401,12 @@
   // middle of one, and only when it has something to say: on the first visit,
   // when something has come up since the panel last showed, and on every visit
   // while a risk is left unanswered. Otherwise it is as the user left it.
-  // Whatever the open panel shows counts as read, so once it is closed the
-  // same items wait in the dock and don't open it again.
+  // Whatever the open panel shows counts as read: once it is closed, the
+  // same steps wait in the dock and don't open it again, and news is done.
   /** Whether the panel was left open, to come back to it as it was. */
   const PANEL_KEY = "ii-concept-panel-v1";
-  /** What the panel last showed, per identity, so only news opens it. */
+  /** What the panel last showed, per identity: only news opens it, and news
+   *  it has shown leaves the dock. */
   const SEEN_KEY = "ii-concept-seen-v1";
   const seenKeyOf = ({ kind, sentence }: CardStatus) => `${kind}:${sentence}`;
   const readSeen = (): Record<string, string[]> => {
@@ -412,6 +419,7 @@
       return {};
     }
   };
+  let seen = $state(readSeen());
   const seenId = $derived(`${identity.identityNumber}`);
 
   const opensOnArrival = (): boolean => {
@@ -422,10 +430,10 @@
       return true;
     }
     const left = localStorage.getItem(PANEL_KEY);
-    const seen = readSeen()[seenId] ?? [];
+    const shown = seen[seenId] ?? [];
     const news =
       left === null ||
-      attention.some((card) => !seen.includes(seenKeyOf(card)));
+      attention.some((card) => !shown.includes(seenKeyOf(card)));
     return (news && roomy.current) || left === "open";
   };
 
@@ -446,10 +454,10 @@
       return;
     }
     const keys = attention.map(seenKeyOf);
-    const all = readSeen();
-    if (JSON.stringify(all[seenId] ?? []) !== JSON.stringify(keys)) {
-      all[seenId] = keys;
-      localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+    const shown = untrack(() => seen[seenId]) ?? [];
+    if (JSON.stringify(shown) !== JSON.stringify(keys)) {
+      seen[seenId] = keys;
+      localStorage.setItem(SEEN_KEY, JSON.stringify(untrack(() => seen)));
     }
   });
 
@@ -464,6 +472,7 @@
   const arriveFirst = () => {
     localStorage.removeItem(PANEL_KEY);
     localStorage.removeItem(SEEN_KEY);
+    seen = {};
     arrive();
   };
 
