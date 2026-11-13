@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  aiAccessOn,
+  cliAccessOn,
   deriveStatus,
   incidentOf,
   needsAttention,
+  withAiAccess,
+  withCliAccess,
   type Scenario,
 } from "./status";
 
@@ -162,5 +166,42 @@ describe("incidentOf", () => {
   it("is not raised by news or a to-do", () => {
     expect(incident({ devices: "newBrowser" })).toBeUndefined();
     expect(incident({ recovery: "unverified" })).toBeUndefined();
+  });
+});
+
+describe("switching AI and CLI access", () => {
+  it("switches each on its own", () => {
+    expect(withAiAccess("calm", false)).toBe("cliOnly");
+    expect(withCliAccess("calm", false)).toBe("aiOnly");
+    expect(withAiAccess("off", true)).toBe("aiOnly");
+    expect(withCliAccess("aiOnly", true)).toBe("calm");
+    expect(withCliAccess("cliOnly", false)).toBe("off");
+  });
+
+  it("forgets a local server along with AI access", () => {
+    expect(withAiAccess("local", false)).toBe("cliOnly");
+  });
+
+  it("approves a waiting CLI on, and declines it off", () => {
+    expect(cliAccessOn("cliConfirm")).toBe(false);
+    expect(withCliAccess("cliConfirm", true)).toBe("calm");
+    expect(withCliAccess("cliConfirm", false)).toBe("aiOnly");
+  });
+
+  it("has no state for AI off while the CLI waits, or CLI off beside a local server", () => {
+    expect(withAiAccess("cliConfirm", false)).toBeUndefined();
+    expect(withCliAccess("local", false)).toBeUndefined();
+    expect(withCliAccess("localAllowed", false)).toBeUndefined();
+  });
+
+  it("lands on a state that says what it switched", () => {
+    for (const state of ["calm", "aiOnly", "cliOnly", "off"] as const) {
+      for (const on of [true, false]) {
+        const ai = withAiAccess(state, on);
+        const cli = withCliAccess(state, on);
+        expect(ai !== undefined && aiAccessOn(ai)).toBe(on);
+        expect(cli !== undefined && cliAccessOn(cli)).toBe(on);
+      }
+    }
   });
 });

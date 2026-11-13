@@ -19,9 +19,68 @@ export type RecoveryState =
 export type AccessState = "one" | "newPasskey" | "unused" | "calm";
 /** `known`: the new browser stays, once the user said it was theirs. */
 export type DevicesState = "newBrowser" | "known" | "many" | "calm";
-/** `localAllowed`: the local server stays, once the user said they set it up. */
+/** `calm`: AI and CLI access both on. `aiOnly` and `cliOnly`: one of them.
+ *  `local`: AI access trusts a local server too. `localAllowed`: it stays,
+ *  once the user said they set it up. `cliConfirm`: AI access on, and the
+ *  ICP CLI waits for approval to sign in. */
 export type IntegrationsState =
-  "local" | "localAllowed" | "cliConfirm" | "off" | "calm";
+  | "local"
+  | "localAllowed"
+  | "cliConfirm"
+  | "aiOnly"
+  | "cliOnly"
+  | "off"
+  | "calm";
+
+export const aiAccessOn = (state: IntegrationsState): boolean =>
+  state !== "off" && state !== "cliOnly";
+
+/** A CLI that waits for approval isn't on yet. */
+export const cliAccessOn = (state: IntegrationsState): boolean =>
+  state !== "off" && state !== "aiOnly" && state !== "cliConfirm";
+
+/** The state once AI access is switched, or `undefined` where the concept has
+ *  no state for the result. Switching it off forgets a local server too, as
+ *  the product does. */
+export function withAiAccess(
+  state: IntegrationsState,
+  on: true,
+): IntegrationsState;
+export function withAiAccess(
+  state: IntegrationsState,
+  on: boolean,
+): IntegrationsState | undefined;
+export function withAiAccess(
+  state: IntegrationsState,
+  on: boolean,
+): IntegrationsState | undefined {
+  if (aiAccessOn(state) === on) return state;
+  if (on) return cliAccessOn(state) ? "calm" : "aiOnly";
+  if (state === "cliConfirm") return undefined;
+  return cliAccessOn(state) ? "cliOnly" : "off";
+}
+
+/** The state once CLI access is switched, or `undefined` where the concept has
+ *  no state for the result. On approves a CLI that waits; off declines it. */
+export function withCliAccess(
+  state: IntegrationsState,
+  on: true,
+): IntegrationsState;
+export function withCliAccess(
+  state: IntegrationsState,
+  on: boolean,
+): IntegrationsState | undefined;
+export function withCliAccess(
+  state: IntegrationsState,
+  on: boolean,
+): IntegrationsState | undefined {
+  if (on) {
+    if (cliAccessOn(state)) return state;
+    return aiAccessOn(state) ? "calm" : "cliOnly";
+  }
+  if (state === "local" || state === "localAllowed") return undefined;
+  return aiAccessOn(state) ? "aiOnly" : "off";
+}
 
 export interface Scenario {
   recovery: RecoveryState;
@@ -131,6 +190,8 @@ const INTEGRATIONS: Record<IntegrationsState, Said> = {
     sentence: "ICP CLI is waiting for approval",
     ask: "Review the ICP CLI request",
   },
+  aiOnly: { tone: "calm", sentence: "AI access on" },
+  cliOnly: { tone: "calm", sentence: "CLI access on" },
   off: { tone: "tip", sentence: "AI and CLI aren't connected" },
   calm: { tone: "calm", sentence: "AI and CLI access on" },
 };

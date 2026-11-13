@@ -28,7 +28,7 @@
   import AttentionDot from "./components/AttentionDot.svelte";
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
-  import CreateBento from "./components/CreateBento.svelte";
+  import ConnectPage from "./components/ConnectPage.svelte";
   import Elevated from "./components/Elevated.svelte";
   import ExploreBanner from "./components/ExploreBanner.svelte";
   import ExploreBuild from "./components/ExploreBuild.svelte";
@@ -494,7 +494,7 @@
   const PAGES = [
     { id: "mine", label: "My apps" },
     { id: "explore", label: "Explore" },
-    { id: "create", label: "Create" },
+    { id: "connect", label: "Connect" },
   ] as const;
   let activePage = $state(0);
   let pager = $state<HTMLElement>();
@@ -1355,16 +1355,21 @@
           </div>
         </div>
 
-        <!-- Create: every way to build an app of your own on the Internet
-             Computer, as a bento grid. -->
+        <!-- Connect: AI and command-line access to this identity's apps,
+             with their state, as the identity's own page. -->
         <div
           bind:this={pageRefs[2]}
-          id="page-create"
+          id="page-connect"
           role="tabpanel"
-          aria-labelledby="tab-create"
+          aria-labelledby="tab-connect"
           class={[PAGE, settled[2] && SETTLED]}
         >
-          <CreateBento />
+          <ConnectPage
+            integrations={current.scenario.integrations}
+            apps={current.apps}
+            onResolve={resolve}
+            onUnavailable={unavailable}
+          />
         </div>
       </div>
       <!-- Content comes up from under the island through a blur that deepens

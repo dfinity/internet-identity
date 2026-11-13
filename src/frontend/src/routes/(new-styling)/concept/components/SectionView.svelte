@@ -27,7 +27,13 @@
     platformWordOf,
   } from "../../manage/(authenticated)/devices/browsers";
   import type { MockBrowser, MockIdentity } from "../mockData";
-  import type { Scenario } from "../status";
+  import {
+    aiAccessOn,
+    cliAccessOn,
+    withAiAccess,
+    withCliAccess,
+    type Scenario,
+  } from "../status";
   import Elevated from "./Elevated.svelte";
   import PanelHeader from "./PanelHeader.svelte";
 
@@ -238,34 +244,10 @@
 
   const integrationRows = $derived.by<Row[]>(() => {
     const { integrations } = scenario;
-    if (integrations === "off") {
-      return [
-        {
-          id: "ai",
-          icon: McpIcon,
-          title: "AI access",
-          meta: "Chat with AI to act across your apps",
-          empty: true,
-          action: {
-            label: "Set up",
-            onclick: () => onResolve({ integrations: "calm" }, "AI access on"),
-          },
-        },
-        {
-          id: "cli",
-          icon: SquareTerminalIcon,
-          title: "CLI access",
-          meta: "Sign in from the ICP CLI on a device you trust",
-          empty: true,
-          action: {
-            label: "Turn on",
-            onclick: () => onResolve({ integrations: "calm" }, "CLI access on"),
-          },
-        },
-      ];
-    }
-    const rows: Row[] = [
-      {
+    const ai = aiAccessOn(integrations);
+    const rows: Row[] = [];
+    if (ai) {
+      rows.push({
         id: "mcp",
         icon: McpIcon,
         title: "Internet Computer MCP",
@@ -274,8 +256,24 @@
           label: "Customize",
           onclick: () => onUnavailable("Customizing the connector"),
         },
-      },
-    ];
+      });
+    } else {
+      rows.push({
+        id: "ai",
+        icon: McpIcon,
+        title: "AI access",
+        meta: "Chat with AI to act across your apps",
+        empty: true,
+        action: {
+          label: "Set up",
+          onclick: () =>
+            onResolve(
+              { integrations: withAiAccess(integrations, true) },
+              "AI access on",
+            ),
+        },
+      });
+    }
     // Kept on purpose, the server is still there, only no longer flagged.
     if (integrations === "local" || integrations === "localAllowed") {
       rows.push({
@@ -307,13 +305,29 @@
                 onResolve({ integrations: "calm" }, "ICP CLI approved"),
             },
           }
-        : {
-            id: "cli",
-            icon: SquareTerminalIcon,
-            title: "CLI access",
-            meta: "On for this device",
-            badge: { label: "On", color: "success" },
-          },
+        : cliAccessOn(integrations)
+          ? {
+              id: "cli",
+              icon: SquareTerminalIcon,
+              title: "CLI access",
+              meta: "On for this device",
+              badge: { label: "On", color: "success" },
+            }
+          : {
+              id: "cli",
+              icon: SquareTerminalIcon,
+              title: "CLI access",
+              meta: "Sign in from the ICP CLI on a device you trust",
+              empty: true,
+              action: {
+                label: "Turn on",
+                onclick: () =>
+                  onResolve(
+                    { integrations: withCliAccess(integrations, true) },
+                    "CLI access on",
+                  ),
+              },
+            },
     );
     return rows;
   });
