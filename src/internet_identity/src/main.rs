@@ -20,7 +20,7 @@ use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk::call;
 use ic_cdk::spawn;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::set_timer;
+use ic_cdk_timers::{set_timer, TimerId};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -50,6 +50,7 @@ use notifications::{
     admit_batch, delivery_metrics, enabled_or, fetchable_origin, TooManyNotifications,
 };
 use serde_bytes::ByteBuf;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
@@ -1797,6 +1798,12 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // Apply arguments
     apply_install_arg(maybe_arg);
 
+    // TEMPORARY: a one-time sweep recording the passkey pubkeys several anchors already
+    // shared before their other holders were indexed. Remove once every deployment has
+    // upgraded through a build that carries it: its progress is heap state, so an upgrade
+    // starts it over, which costs time but changes nothing it already wrote.
+    init_secondary_passkey_pubkey_holders_backfill_timer();
+
     // Get config that possibly has been updated above
     let config = config();
 
@@ -1816,6 +1823,97 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
             notifications::webpush::vapid_key::ensure_public_key,
         );
     }
+}
+
+const SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BACKOFF: Duration = Duration::from_secs(1);
+
+const SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BATCH_SIZE: u64 = 2_000;
+
+thread_local! {
+    /// The anchor the next batch starts from, or `None` once every anchor has been examined
+    /// and what is left is settling the entries kept while the sweep ran.
+    static SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR: RefCell<Option<AnchorNumber>> = const { RefCell::new(Some(0)) };
+    static SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_DONE: RefCell<bool> = const { RefCell::new(false) };
+    static SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Returns `(shared_passkey_pubkeys, is_done)` so monitoring can track the sweep: the number
+/// of passkey pubkeys with other holders recorded so far, and whether every stored anchor
+/// has been examined.
+#[query(hidden = true)]
+fn secondary_passkey_pubkey_holders_backfill_status() -> (u64, bool) {
+    (
+        state::storage_borrow(|storage| {
+            storage
+                .lookup_secondary_anchors_with_passkey_pubkey_memory
+                .len()
+        }),
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_DONE.with_borrow(|done| *done),
+    )
+}
+
+fn run_secondary_passkey_pubkey_holders_backfill_batch() {
+    if SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_DONE.with_borrow(|done| *done) {
+        // A timer that fired after the sweep finished: stop it rather than let it fire
+        // every second doing nothing.
+        clear_secondary_passkey_pubkey_holders_backfill_timer();
+        return;
+    }
+    if let Some(start) =
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR.with_borrow(|cursor| *cursor)
+    {
+        let next_anchor_number = state::storage_borrow_mut(|storage| {
+            storage.backfill_secondary_passkey_pubkey_holders_batch(
+                start,
+                SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BATCH_SIZE,
+            )
+        });
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_CURSOR.replace(next_anchor_number);
+        return;
+    }
+    let done = state::storage_borrow_mut(|storage| {
+        storage.reconcile_passkey_pubkeys_awaiting_backfill_batch(
+            SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BATCH_SIZE,
+        )
+    });
+    if done {
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_DONE.replace(true);
+        clear_secondary_passkey_pubkey_holders_backfill_timer();
+        let (shared, _) = secondary_passkey_pubkey_holders_backfill_status();
+        ic_cdk::println!(
+            "Secondary passkey pubkey holders backfill COMPLETED ({shared} shared pubkeys)."
+        );
+    }
+}
+
+/// Stops the sweep's timer and forgets its id. Does nothing where there is no id.
+fn clear_secondary_passkey_pubkey_holders_backfill_timer() {
+    SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(timer_id) = id_slot.take() {
+            ic_cdk_timers::clear_timer(timer_id);
+        }
+    });
+}
+
+/// Safe to call from both `init` and `post_upgrade`: with no anchors the first batch
+/// reports completion right away.
+fn init_secondary_passkey_pubkey_holders_backfill_timer() {
+    // Anchors stored before this point may share pubkeys the sweep has yet to record. Any
+    // anchor created later went through the index, so a canister without anchors has none.
+    state::storage_borrow_mut(|storage| {
+        if storage.anchor_count() > 0 {
+            storage.start_secondary_passkey_pubkey_holders_backfill();
+        }
+    });
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_BACKOFF,
+        run_secondary_passkey_pubkey_holders_backfill_batch,
+    );
+    SECONDARY_PASSKEY_PUBKEY_HOLDERS_BACKFILL_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
