@@ -1964,7 +1964,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     pub fn lookup_anchor_with_device_credential(&self, key: &CredentialId) -> Option<AnchorNumber> {
         self.lookup_anchor_with_passkey_credential_memory
             .get(&key.clone().into())
