@@ -1,0 +1,26 @@
+{
+  "fixture": "synth-rsa-relaxed-relaxed.eml",
+  "route": "Dnssec",
+  "now_unix": 1777972889,
+  "prepare_delegation": "Ok",
+  "smtp_request_nonce_subject": {
+    "response": "Ok",
+    "polled": {
+      "status": "NeedDkimLeaf",
+      "diagnostics": {
+        "message_id": "synth-rsa-relaxed-relaxed.eml",
+        "reason_code": "NeedDkimLeaf",
+        "verification_path": "Dnssec"
+      }
+    }
+  },
+  "submit_dkim_leaf": "Ok",
+  "polled_after_submit": {
+    "status": "Failed(EmailVerificationFailed: signature did not validate against public key)",
+    "diagnostics": {
+      "message_id": "synth-rsa-relaxed-relaxed.eml",
+      "reason_code": "Failed:EmailVerificationFailed",
+      "verification_path": "Dnssec"
+    }
+  }
+}

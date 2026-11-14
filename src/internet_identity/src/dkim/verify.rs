@@ -48,6 +48,8 @@ use super::types::{
     DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
     VerificationFailReason,
 };
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::smtp::{SmtpHeader, SmtpRequest};
 
 const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
@@ -55,6 +57,8 @@ const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
 /// Verify an `SmtpRequest` against an already-trusted DKIM TXT record.
 ///
 /// `now_secs` is Unix seconds — passed in so unit tests can pin time.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyResult {
     let message = match email.message.as_ref() {
         Some(m) => m,
@@ -115,6 +119,8 @@ fn Unverified(reason: VerificationFailReason, checks: Vec<DkimCheck>) -> DkimVer
 
 /// Try to verify one specific DKIM-Signature header. Returns the `d=`
 /// domain on success, or a `(reason, partial-checks)` pair on failure.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 fn try_verify_signature(
     _email: &SmtpRequest,
     message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
@@ -359,6 +365,8 @@ fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -
 /// `dkim_header_value` is the original (gateway-supplied) value of the
 /// DKIM-Signature header itself; we blank its `b=` content as the spec
 /// requires before canonicalising.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 pub(crate) fn build_header_hash_input(
     all_headers: &[SmtpHeader],
     sig: &DkimSignature,
@@ -558,6 +566,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn no_signature_returns_no_signature() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpMessage,
@@ -595,6 +605,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn rejects_simple_header_canon() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpMessage,
@@ -646,6 +658,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn rejects_expired_signature() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpMessage,
@@ -692,6 +706,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn rejects_misaligned_auid() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpMessage,
@@ -739,6 +755,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn rejects_future_dated_signature() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpMessage,
@@ -788,6 +806,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn accepts_slightly_future_t_within_skew() {
         // A `t=` value inside the CLOCK_SKEW_SECS window must NOT be
         // rejected as future-dated — that would create a spurious
@@ -852,6 +872,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn rejects_signature_without_subject_in_h() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpMessage,

@@ -36,6 +36,8 @@
 //! `dnssec/mod.rs`, so no inner gate is needed here.
 
 use super::types::{DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset};
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::DnssecRootAnchor;
 use serde::Deserialize;
 use serde_bytes::ByteBuf;
@@ -160,6 +162,8 @@ struct WireAnchorFile {
     anchors: Vec<WireAnchor>,
 }
 
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 pub fn load_anchors(json: &str) -> Vec<DnssecRootAnchor> {
     let wire: WireAnchorFile = serde_json::from_str(json).expect("invalid anchors JSON");
     wire.anchors

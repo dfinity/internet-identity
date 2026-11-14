@@ -1,0 +1,9 @@
+{
+  "fixture": "mailbox.org-2026-06.json",
+  "route": "Dnssec",
+  "now_unix": 1781039000,
+  "domain": "mailbox.org",
+  "leaf_name": "mbo0001._domainkey.mailbox.org",
+  "prepare_add_as_captured": "Err(EmailVerificationFailed: DNSSEC chain: BadSignature)",
+  "prepare_add_skeleton": "Err(EmailVerificationFailed: DNSSEC chain: BadSignature)"
+}

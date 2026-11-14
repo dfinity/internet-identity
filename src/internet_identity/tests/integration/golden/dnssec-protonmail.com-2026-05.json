@@ -1,0 +1,17 @@
+{
+  "fixture": "protonmail.com-2026-05.json",
+  "route": "Dnssec",
+  "now_unix": 1778508966,
+  "domain": "protonmail.com",
+  "leaf_name": "protonmail.com",
+  "prepare_add_as_captured": "Err(EmailVerificationFailed: skeleton bundle leaf name \"protonmail.com.\" is not the expected DMARC name \"_dmarc.protonmail.com.\" — DKIM leaves belong in submit_dkim_leaf)",
+  "prepare_add_skeleton": "Ok",
+  "polled": {
+    "status": "Pending",
+    "diagnostics": {
+      "message_id": null,
+      "reason_code": "Pending",
+      "verification_path": "Dnssec"
+    }
+  }
+}

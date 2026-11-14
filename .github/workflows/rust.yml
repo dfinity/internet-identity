@@ -58,6 +58,17 @@ jobs:
           cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
           cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
 
+  # Every `allow(clippy::disallowed_types)` must name the PR that retires it
+  # (or be declared permanent); see src/internet_identity/clippy.toml.
+  disallowed-types-tags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check disallowed-types allow tags
+        run: |
+          ./scripts/check-disallowed-types-tags.test.sh
+          ./scripts/check-disallowed-types-tags.sh
+
   check-lockfile:
     runs-on: ubuntu-latest
     steps:
