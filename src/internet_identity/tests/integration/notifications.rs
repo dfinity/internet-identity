@@ -2491,18 +2491,20 @@ mod claims {
 mod joins {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
+    use canister_tests::api::internet_identity::api_v2::revoke_browser_sessions;
     use canister_tests::api::internet_identity::notifications::{
-        disable_notification_app, get_notification_app_status,
+        disable_notification_app, enable_notification_app, get_notification_app_status,
         installed_notification_app_last_seen, join_notification_app, notification_app_anchors,
         notification_app_link_pending, prepare_notification_app_link,
         probe_installed_notification_app, retire_notification_app, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
-        DisableNotificationAppRequest, GetNotificationAppStatusRequest,
-        InstalledNotificationAppRequest, JoinNotificationAppError, JoinNotificationAppRequest,
-        NotificationAppAnchorsRequest, NotificationAppInfo, NotificationAppStatus,
-        PendingNotificationAppLinkRequest, PrepareNotificationAppLinkRequest,
-        RetireNotificationAppError,
+        DisableNotificationAppRequest, EnableNotificationAppRequest,
+        GetNotificationAppStatusRequest, InstalledNotificationAppRequest, JoinNotificationAppError,
+        JoinNotificationAppRequest, NotificationAppAnchorsRequest, NotificationAppInfo,
+        NotificationAppStatus, PendingNotificationAppLinkRequest,
+        PrepareNotificationAppLinkRequest, RetireNotificationAppError,
+        RevokeBrowserSessionsRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -2821,6 +2823,58 @@ mod joins {
         InstalledNotificationAppRequest {
             installer_anchor_number: anchor,
         }
+    }
+
+    /// The switch is shared by every entry of the identity on the app, so a browser with
+    /// no sessions of its own turns it on through one that can be woken.
+    #[test]
+    fn should_turn_on_through_another_entry_on_the_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        sign_in_at(&env, canister_id, anchor, ORIGIN, THIRD_BROWSER_SEED);
+        start_install(&env, canister_id, anchor, THIRD_BROWSER_SEED);
+        join(
+            &env,
+            canister_id,
+            anchor,
+            anchor,
+            &BrowserKey::new(INSTALLER_SEED),
+        )?
+        .expect("join_notification_app returned Err");
+        disable_notification_app(
+            &env,
+            canister_id,
+            browser(THIRD_BROWSER_SEED),
+            DisableNotificationAppRequest {
+                anchor_number: anchor,
+            },
+        )?
+        .expect("disable_notification_app returned Err");
+        revoke_browser_sessions(
+            &env,
+            canister_id,
+            principal_1(),
+            RevokeBrowserSessionsRequest {
+                identity_number: anchor,
+                browser_id: 1,
+            },
+        )?
+        .expect("revoke_browser_sessions rejected");
+
+        enable_notification_app(
+            &env,
+            canister_id,
+            browser(THIRD_BROWSER_SEED),
+            EnableNotificationAppRequest {
+                anchor_number: anchor,
+            },
+        )?
+        .expect("enable_notification_app returned Err");
+        assert!(linked_app(&env, canister_id, anchor, FIRST_BROWSER_SEED)?);
+        Ok(())
     }
 
     /// A probe still waiting in the backlog has not reached the phone, so its silence is

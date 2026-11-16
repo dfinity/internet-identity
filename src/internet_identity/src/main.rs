@@ -585,13 +585,12 @@ fn enable_notification_app(
         .map_err(|_| EnableNotificationAppError::InvalidBrowserKey)?;
     // An install nobody has opened is not an app to switch on: the flag lives on the
     // reference the app writes, so flipping it here would answer Ok and change nothing.
-    if anchor
+    let Some(app_id) = anchor
         .notification_app(browser_id)
         .and_then(|reference| reference.linked_app())
-        .is_none()
-    {
+    else {
         return Err(EnableNotificationAppError::NoNotificationApp);
-    }
+    };
 
     let now_ns = ic_cdk::api::time();
     // One already on its way is asking what this call asks, and a second would reach the
@@ -600,6 +599,17 @@ fn enable_notification_app(
     let outstanding = outstanding_probe_of(&anchor, browser_id, now_ns);
     anchor.enable_notification_app(browser_id);
     let identity = identity_for_notification(&anchor);
+    // The switch is shared by every entry of this identity on the app, so any of them
+    // that can be woken asks the same app: the caller may be a browser with no sessions.
+    let probed_browser = state::storage_borrow(|storage| {
+        anchor
+            .browsers()
+            .iter()
+            .filter(|browser| browser.delivers_through(app_id))
+            .find(|browser| notifications::dispatch::can_wake(storage, browser, now_ns))
+            .map(|browser| browser.id)
+    })
+    .unwrap_or(browser_id);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
@@ -611,7 +621,7 @@ fn enable_notification_app(
 
     match notifications::dispatch::notify_identity(
         anchor_number,
-        browser_id,
+        probed_browser,
         NotificationEvent::NotificationsOn(identity),
         now_ns,
     ) {
