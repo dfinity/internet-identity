@@ -313,6 +313,8 @@
     accessLevel = accessLevelStore.getPreference("continue", identityNumber);
     defaultAccountNumber = null;
     selectedAccountNumber = null;
+    // Those of the identity selected before, when there was one.
+    accounts = undefined;
     isSignInNeededForOptions = false;
     sessionActor = undefined;
     void lookUpSessionActor(identityNumber).then((isSelected) => {
@@ -423,8 +425,10 @@
   const loadAccountsWithoutSignIn = async (
     readActor: ActorSubclass<_SERVICE>,
   ): Promise<boolean> => {
+    // Another identity may be selected by the time the canister has answered.
+    const identityNumber = selectedIdentityNumber;
     try {
-      await loadAccountsViaActor(readActor, selectedIdentityNumber);
+      await loadAccountsViaActor(readActor, identityNumber);
       return true;
     } catch (err) {
       // Not read with again, whatever went wrong: the next press signs in
@@ -436,12 +440,12 @@
         isCanisterError<SessionDelegationError>(err) &&
         err.type === "Unauthorized"
       ) {
-        void purgeSession(selectedIdentityNumber);
+        void purgeSession(identityNumber);
         return false;
       }
       // The lookup drops a session that expired while this screen was open,
       // and finds again one the request just did not reach.
-      void lookUpSessionActor(selectedIdentityNumber);
+      void lookUpSessionActor(identityNumber);
       throw err;
     }
   };
