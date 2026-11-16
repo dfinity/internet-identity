@@ -1360,8 +1360,8 @@ export type IdentityPropertiesReplaceError = {
  */
 export type InboxNotificationId = bigint;
 /**
- * Names the app the caller's link key linked, which the caller signs as: the identity that
- * link key was handed out for, whose browsers point at the app.
+ * Names the app that named the caller as its installer: the identity the installer last
+ * showed an install for, whose browsers point at the app.
  */
 export interface InstalledNotificationAppRequest {
   'installer_anchor_number' : UserNumber,
@@ -1519,13 +1519,14 @@ export type Iss = string;
 export type JWT = string;
 export type JoinNotificationAppError = {
     /**
-     * The installer link key did not sign this request.
+     * The installer key did not sign this request.
      */
     'InvalidInstallerSignature' : null
   } |
   {
     /**
-     * No app the installer identity points at linked with that link key.
+     * No app the installer identity points at named that installer key, or the one that
+     * did went silent when asked to prove itself.
      */
     'NoNotificationApp' : null
   } |
@@ -1539,15 +1540,15 @@ export type JoinNotificationAppError = {
 /**
  * Points the browser waiting on the caller's link key, or the browser the caller is, at the
  * Home Screen app already on the device, instead of adding a second app. The caller signs
- * as the link key its browser registered or as the browser itself; the installer link key
- * is the one the app linked with, which only the browser that showed that install still
+ * as the link key its browser registered or as the browser itself; the installer key is
+ * the one the app named when it linked, which only the browser that showed that install
  * holds.
  */
 export interface JoinNotificationAppRequest {
   'signature' : Uint8Array | number[],
   'installer_anchor_number' : UserNumber,
-  'installer_link_key' : PublicKey,
   'anchor_number' : UserNumber,
+  'installer_key' : PublicKey,
 }
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
@@ -1557,7 +1558,7 @@ export type KeyType = { 'platform' : null } |
 export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
   {
     /**
-     * A browser of this identity already signs as that principal.
+     * A browser of this identity already signs as the caller.
      */
     'PrincipalAlreadyInUse' : null
   } |
@@ -1570,22 +1571,35 @@ export type LinkNotificationAppError = { 'InternalCanisterError' : string } |
   } |
   {
     /**
-     * The record is keyed by this principal, and the anonymous one is held by everyone,
-     * so any caller at all would resolve to that record.
+     * The link key did not sign this request.
+     */
+    'InvalidLinkSignature' : null
+  } |
+  {
+    /**
+     * The caller is the anonymous principal, which no app key signs as.
      */
     'AppPrincipalIsAnonymous' : null
   };
 export interface LinkNotificationAppRequest {
   /**
-   * The principal the app signs as, over the key it generated in its own partition.
+   * The public half of the one-shot key the install URL carried.
    */
-  'app_principal' : Principal,
+  'link_key' : PublicKey,
+  /**
+   * The link key over anchor_number, the calling app and installer_principal.
+   */
+  'link_signature' : Uint8Array | number[],
   /**
    * The record this app already has, where it is linking a second identity to the app
    * it is running as. Null is a first install and takes a record of its own.
    */
   'app_id' : [] | [NotificationAppId],
   'anchor_number' : UserNumber,
+  /**
+   * The installer key the install URL named: the browser that showed the install.
+   */
+  'installer_principal' : [] | [Principal],
 }
 export interface LinkNotificationAppResponse {
   /**
@@ -1943,6 +1957,12 @@ export type OperatingSystem = { 'Ios' : null } |
   { 'Windows' : null } |
   { 'Other' : string } |
   { 'Ipados' : null };
+/**
+ * Asked as the one-shot key of an install URL.
+ */
+export interface PendingNotificationAppLinkRequest {
+  'anchor_number' : UserNumber,
+}
 /**
  * The delegation permissions a caller requests, mirroring the ICP protocol's
  * request-delegation `permissions` values. `queries` yields a queries-only
@@ -2353,7 +2373,7 @@ export interface RemoveWebPushSubscriptionRequest {
 }
 export type RetireNotificationAppError = {
     /**
-     * No app the installer identity points at linked with the caller's link key.
+     * No app the installer identity points at named the caller as its installer.
      */
     'NoNotificationApp' : null
   } |
@@ -3233,7 +3253,7 @@ export interface _SERVICE {
    */
   'init_salt' : ActorMethod<[], undefined>,
   /**
-   * Signed as the link key the app linked with, which only the browser that showed that
+   * Signed as the installer key the app named, which only the browser that showed its
    * install holds: when the app last called, a probe for it, and forgetting it for every
    * identity once that probe went unanswered.
    */
@@ -3242,8 +3262,8 @@ export interface _SERVICE {
     [] | [Timestamp]
   >,
   /**
-   * Called by the browser that shows an install, signed as that install's key, with
-   * proof it showed the install the app on this device came from.
+   * Called by the browser that shows an install, signed as that install's key or as
+   * itself, with the installer key's proof it is on the device the app is on.
    */
   'join_notification_app' : ActorMethod<
     [JoinNotificationAppRequest],
@@ -3251,8 +3271,9 @@ export interface _SERVICE {
       { 'Err' : JoinNotificationAppError }
   >,
   /**
-   * Called by the Home Screen app on its first open, signed with that one-shot key.
-   * Creates the app's record where its key has none, and points the browser at it.
+   * Called by the Home Screen app on its first open, as itself, carrying that one-shot
+   * key's signature. Creates the app's record where its key has none, records the
+   * installer it names, and points the browser at it.
    */
   'link_notification_app' : ActorMethod<
     [LinkNotificationAppRequest],
@@ -3396,6 +3417,13 @@ export interface _SERVICE {
   'notification_app_anchors' : ActorMethod<
     [NotificationAppAnchorsRequest],
     BigUint64Array | bigint[]
+  >,
+  /**
+   * Signed as that one-shot key: whether the install it was handed can still complete.
+   */
+  'notification_app_link_pending' : ActorMethod<
+    [PendingNotificationAppLinkRequest],
+    boolean
   >,
   'notification_consent_granted' : ActorMethod<
     [NotificationConsentGrantedRequest],

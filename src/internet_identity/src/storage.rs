@@ -3611,8 +3611,8 @@ impl<M: Memory + Clone> Storage<M> {
             id: self.allocate_notification_app_id()?,
             principal: app_principal,
             created_at_ns: now,
-            // Recorded by the link that spends the install, which is the caller that knows it.
-            linked_with: None,
+            // Named by the app in the link that spends the install.
+            installer_principal: None,
             last_used_ns: now,
             // The anchor pointing at it is added by the write that points it.
             anchors: BTreeSet::new(),
@@ -3626,20 +3626,18 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(app)
     }
 
-    /// Records the principal of the link key `app_id` linked with, where none is recorded
-    /// yet: the first link key is the one the browser that showed that install keeps.
-    pub fn record_notification_app_link_key(
+    /// Records the installer key the app named. Only the app's own link reaches here, so
+    /// the app is the one vouching for it, and a later install it is opened from names the
+    /// browser that showed that one.
+    pub fn record_notification_app_installer(
         &mut self,
         app_id: NotificationAppId,
-        link_principal: Principal,
+        installer_principal: Principal,
     ) {
         let Some(mut app) = self.notification_app_memory.get(&app_id) else {
             return;
         };
-        if app.linked_with.is_some() {
-            return;
-        }
-        app.linked_with = Some(link_principal.as_slice().to_vec());
+        app.installer_principal = Some(installer_principal.as_slice().to_vec());
         self.notification_app_memory.insert(app_id, app);
     }
 

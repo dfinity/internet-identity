@@ -454,9 +454,12 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
-            // Entries sharing one app share its address, and one post is one banner.
-            if !addressed.insert(subscription.endpoint.as_str().to_string()) {
-                continue;
+            // Entries sharing one app share its address, and one post is one banner. An
+            // entry's own registration is its own, so it is always woken.
+            if let DeliveryTarget::App(app_id) = target {
+                if !addressed.insert(app_id) {
+                    continue;
+                }
             }
             planned.push((
                 relay_origin,
@@ -605,9 +608,12 @@ fn fan_out_to_browsers(
                 let (subscription, relay_origin, target) =
                     wake_up_address(browser, app.as_ref(), now_ns)?;
                 // Entries sharing one app share its address, and one post is one banner:
-                // the first entry's inbox holds it and the others are left out.
-                if !addressed.insert(subscription.endpoint.as_str().to_string()) {
-                    return None;
+                // the first entry's inbox holds it and the others are left out. An entry's
+                // own registration is its own, so it is always woken.
+                if let DeliveryTarget::App(app_id) = target {
+                    if !addressed.insert(app_id) {
+                        return None;
+                    }
                 }
                 Some((
                     relay_origin,

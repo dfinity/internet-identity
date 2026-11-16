@@ -1489,8 +1489,8 @@ fn install_with_two_anchors(env: &PocketIc) -> (CanisterId, AnchorNumber, Anchor
 }
 
 /// Installs the Home Screen app `app_seed` names on `anchor`: the browser `browser_seed`
-/// names registers the one-shot key, and the app links as it. Answers the principal the
-/// app signs as.
+/// names registers the one-shot key `app_seed + 1` names, and the app links with it,
+/// naming the installer key `app_seed + 2` names. Answers the principal the app signs as.
 fn link_app(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -1500,6 +1500,7 @@ fn link_app(
 ) -> (Principal, NotificationAppId) {
     let app = BrowserKey::new(app_seed);
     let link = BrowserKey::new(app_seed.wrapping_add(1));
+    let installer = BrowserKey::new(app_seed.wrapping_add(2)).principal();
     prepare_notification_app_link(
         env,
         canister_id,
@@ -1515,10 +1516,12 @@ fn link_app(
     let linked = link_notification_app(
         env,
         canister_id,
-        link.principal(),
+        app.principal(),
         LinkNotificationAppRequest {
             anchor_number: anchor,
-            app_principal: app.principal(),
+            link_key: link.public_key(),
+            link_signature: link.sign_link_token(anchor, app.principal(), Some(installer)),
+            installer_principal: Some(installer),
             app_id: None,
         },
     )
@@ -1690,10 +1693,12 @@ mod app_anchors {
         let linked = link_notification_app(
             env,
             canister_id,
-            link.principal(),
+            app.principal(),
             LinkNotificationAppRequest {
                 anchor_number: anchor,
-                app_principal: app.principal(),
+                link_key: link.public_key(),
+                link_signature: link.sign_link_token(anchor, app.principal(), None),
+                installer_principal: None,
                 app_id: known,
             },
         )
@@ -2482,26 +2487,28 @@ mod claims {
 }
 
 /// A second install on a phone joining the app the first one added, on the authority of
-/// the key that first install was handed out with.
+/// the installer key the app named.
 mod joins {
     use super::subscriptions::{request, ENDPOINT};
     use super::*;
     use canister_tests::api::internet_identity::notifications::{
-        get_notification_app_status, installed_notification_app_last_seen, join_notification_app,
-        notification_app_anchors, prepare_notification_app_link, probe_installed_notification_app,
-        retire_notification_app, subscribe_webpush,
+        disable_notification_app, get_notification_app_status,
+        installed_notification_app_last_seen, join_notification_app, notification_app_anchors,
+        notification_app_link_pending, prepare_notification_app_link,
+        probe_installed_notification_app, retire_notification_app, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
-        GetNotificationAppStatusRequest, InstalledNotificationAppRequest, JoinNotificationAppError,
-        JoinNotificationAppRequest, NotificationAppAnchorsRequest, NotificationAppStatus,
-        PrepareNotificationAppLinkRequest, RetireNotificationAppError,
+        DisableNotificationAppRequest, GetNotificationAppStatusRequest,
+        InstalledNotificationAppRequest, JoinNotificationAppError, JoinNotificationAppRequest,
+        NotificationAppAnchorsRequest, NotificationAppInfo, NotificationAppStatus,
+        PendingNotificationAppLinkRequest, PrepareNotificationAppLinkRequest,
+        RetireNotificationAppError,
     };
     use pretty_assertions::assert_eq;
 
-    /// The Home Screen app every test here installs, and the one-shot key `link_app`
-    /// hands it, which is the installer link key.
+    /// The Home Screen app every test here installs, and the installer key it names.
     const APP_SEED: u8 = 100;
-    const INSTALLER_SEED: u8 = APP_SEED + 1;
+    const INSTALLER_SEED: u8 = APP_SEED + 2;
     /// The one-shot key the second install hands out.
     const JOINING_SEED: u8 = 50;
     /// A browser of the first identity besides the one that installed the app.
@@ -2547,7 +2554,7 @@ mod joins {
             JoinNotificationAppRequest {
                 anchor_number: anchor,
                 installer_anchor_number: installer_anchor,
-                installer_link_key: BrowserKey::new(INSTALLER_SEED).public_key(),
+                installer_key: BrowserKey::new(INSTALLER_SEED).public_key(),
                 signature: signer.sign_join_token(anchor, joining),
             },
         )
@@ -2636,7 +2643,7 @@ mod joins {
     }
 
     #[test]
-    fn should_refuse_a_join_the_installer_link_key_did_not_sign() -> Result<(), RejectResponse> {
+    fn should_refuse_a_join_the_installer_key_did_not_sign() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
         link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
@@ -2670,7 +2677,7 @@ mod joins {
                 JoinNotificationAppRequest {
                     anchor_number: anchor,
                     installer_anchor_number: anchor,
-                    installer_link_key: stranger.public_key(),
+                    installer_key: stranger.public_key(),
                     signature: stranger.sign_join_token(anchor, joining),
                 },
             )?,
@@ -2680,7 +2687,7 @@ mod joins {
     }
 
     /// A browser still pointing at an app since deleted signs as itself and moves to the
-    /// app its kept link key linked, which leaves the deleted one's record behind.
+    /// app that named its installer key, which leaves the deleted one's record behind.
     #[test]
     fn should_move_a_browser_off_another_app_onto_the_joined_one() -> Result<(), RejectResponse> {
         let env = env();
@@ -2698,7 +2705,7 @@ mod joins {
             JoinNotificationAppRequest {
                 anchor_number: anchor,
                 installer_anchor_number: anchor,
-                installer_link_key: BrowserKey::new(INSTALLER_SEED).public_key(),
+                installer_key: BrowserKey::new(INSTALLER_SEED).public_key(),
                 signature: BrowserKey::new(INSTALLER_SEED).sign_join_token(anchor, joining),
             },
         )?
@@ -2723,6 +2730,84 @@ mod joins {
             Vec::<AnchorNumber>::new(),
             "nothing points at the app the browser left"
         );
+        Ok(())
+    }
+
+    /// A join moves the entry to the app on the phone, which is not the user switching
+    /// delivery back on: an entry switched off stays off.
+    #[test]
+    fn should_keep_a_switched_off_entry_off_when_it_moves() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        link_app(&env, canister_id, first, FIRST_BROWSER_SEED, APP_SEED);
+        link_app(
+            &env,
+            canister_id,
+            second,
+            SECOND_BROWSER_SEED,
+            APP_SEED + 50,
+        );
+        disable_notification_app(
+            &env,
+            canister_id,
+            browser(SECOND_BROWSER_SEED),
+            DisableNotificationAppRequest {
+                anchor_number: second,
+            },
+        )?
+        .expect("disable_notification_app returned Err");
+        let joining = browser(SECOND_BROWSER_SEED);
+
+        join_notification_app(
+            &env,
+            canister_id,
+            joining,
+            JoinNotificationAppRequest {
+                anchor_number: second,
+                installer_anchor_number: first,
+                installer_key: BrowserKey::new(INSTALLER_SEED).public_key(),
+                signature: BrowserKey::new(INSTALLER_SEED).sign_join_token(second, joining),
+            },
+        )?
+        .expect("join_notification_app returned Err");
+
+        assert!(matches!(
+            get_notification_app_status(
+                &env,
+                canister_id,
+                joining,
+                GetNotificationAppStatusRequest {
+                    anchor_number: second
+                },
+            )?,
+            NotificationAppStatus::Linked(NotificationAppInfo { enabled: false, .. })
+        ));
+        Ok(())
+    }
+
+    /// A tab holding an install URL asks as its one-shot key whether the install can still
+    /// complete, so it never shows steps for an app that could not link.
+    #[test]
+    fn should_answer_whether_an_install_is_still_waiting() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let pending = || {
+            notification_app_link_pending(
+                &env,
+                canister_id,
+                BrowserKey::new(JOINING_SEED).principal(),
+                PendingNotificationAppLinkRequest {
+                    anchor_number: anchor,
+                },
+            )
+        };
+        assert!(!pending()?);
+
+        start_install(&env, canister_id, anchor, FIRST_BROWSER_SEED);
+        assert!(pending()?);
+
+        env.advance_time(std::time::Duration::from_secs(31 * 60));
+        assert!(!pending()?, "an expired install cannot complete");
         Ok(())
     }
 
@@ -2810,7 +2895,7 @@ mod joins {
 
     /// Any other key places the caller nowhere.
     #[test]
-    fn should_answer_nothing_to_a_key_no_app_linked_with() -> Result<(), RejectResponse> {
+    fn should_answer_nothing_to_a_key_no_app_named() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor) = install_with_anchor(&env);
         link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
@@ -2949,20 +3034,23 @@ mod app_link {
         )
     }
 
+    /// The app `app_principal` spends the install `link_key` was handed, signed by it.
     fn link(
         env: &PocketIc,
         canister_id: CanisterId,
-        sender: Principal,
+        link_key: &BrowserKey,
         anchor: AnchorNumber,
         app_principal: Principal,
     ) -> Result<Result<LinkNotificationAppResponse, LinkNotificationAppError>, RejectResponse> {
         link_notification_app(
             env,
             canister_id,
-            sender,
+            app_principal,
             LinkNotificationAppRequest {
                 anchor_number: anchor,
-                app_principal,
+                link_key: link_key.public_key(),
+                link_signature: link_key.sign_link_token(anchor, app_principal, None),
+                installer_principal: None,
                 app_id: None,
             },
         )
@@ -2986,8 +3074,47 @@ mod app_link {
             Ok(())
         );
         assert_eq!(
-            link(&env, canister_id, key.principal(), anchor, app.principal())?,
+            link(&env, canister_id, &key, anchor, app.principal())?,
             Ok(LinkNotificationAppResponse { app_id: 0 })
+        );
+        Ok(())
+    }
+
+    /// The signature names the app it was made for, so one read off the wire cannot be
+    /// spent by another app.
+    #[test]
+    fn should_refuse_a_signature_made_for_another_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_browser(&env);
+        let key = BrowserKey::new(100);
+        prepare(
+            &env,
+            canister_id,
+            browser(BROWSER_SEED),
+            anchor,
+            key.principal(),
+        )?
+        .expect("prepare_notification_app_link returned Err");
+        let thief = BrowserKey::new(102).principal();
+
+        assert_eq!(
+            link_notification_app(
+                &env,
+                canister_id,
+                thief,
+                LinkNotificationAppRequest {
+                    anchor_number: anchor,
+                    link_key: key.public_key(),
+                    link_signature: key.sign_link_token(
+                        anchor,
+                        BrowserKey::new(101).principal(),
+                        None
+                    ),
+                    installer_principal: None,
+                    app_id: None,
+                },
+            )?,
+            Err(LinkNotificationAppError::InvalidLinkSignature)
         );
         Ok(())
     }
@@ -3014,7 +3141,7 @@ mod app_link {
             link(
                 &env,
                 canister_id,
-                BrowserKey::new(102).principal(),
+                &BrowserKey::new(102),
                 anchor,
                 app.principal()
             )?,
@@ -3059,7 +3186,7 @@ mod app_link {
         link(
             &env,
             canister_id,
-            link_key.principal(),
+            &link_key,
             anchor,
             BrowserKey::new(101).principal(),
         )?
@@ -3096,7 +3223,7 @@ mod app_link {
         link(
             &env,
             canister_id,
-            key.principal(),
+            &key,
             anchor,
             BrowserKey::new(101).principal(),
         )?
@@ -3106,7 +3233,7 @@ mod app_link {
             link(
                 &env,
                 canister_id,
-                key.principal(),
+                &key,
                 anchor,
                 BrowserKey::new(103).principal()
             )?,
@@ -3132,12 +3259,12 @@ mod app_link {
             )?,
             Err(PrepareNotificationAppLinkError::LinkPrincipalIsAnonymous)
         );
-        // And nothing was written: the app the anonymous caller would have been is refused.
+        // And nothing was written: no key the anonymous principal could be has a slot.
         assert_eq!(
             link(
                 &env,
                 canister_id,
-                Principal::anonymous(),
+                &BrowserKey::new(100),
                 anchor,
                 BrowserKey::new(101).principal()
             )?,
@@ -3163,13 +3290,7 @@ mod app_link {
         )?
         .expect("prepare_notification_app_link returned Err");
         assert_eq!(
-            link(
-                &env,
-                canister_id,
-                key.principal(),
-                anchor,
-                Principal::anonymous()
-            )?,
+            link(&env, canister_id, &key, anchor, Principal::anonymous())?,
             Err(LinkNotificationAppError::AppPrincipalIsAnonymous)
         );
 
@@ -3178,7 +3299,7 @@ mod app_link {
             link(
                 &env,
                 canister_id,
-                key.principal(),
+                &key,
                 anchor,
                 BrowserKey::new(101).principal()
             )?
@@ -3210,7 +3331,7 @@ mod app_link {
             )?
             .expect("prepare_notification_app_link returned Err");
             assert_eq!(
-                link(&env, canister_id, key.principal(), anchor, held)?,
+                link(&env, canister_id, &key, anchor, held)?,
                 Err(LinkNotificationAppError::PrincipalAlreadyInUse)
             );
         }
@@ -3220,7 +3341,7 @@ mod app_link {
             link(
                 &env,
                 canister_id,
-                key.principal(),
+                &key,
                 anchor,
                 BrowserKey::new(101).principal()
             )?
@@ -3276,7 +3397,7 @@ mod app_link {
             link(
                 &env,
                 canister_id,
-                BrowserKey::new(100).principal(),
+                &BrowserKey::new(100),
                 anchor,
                 BrowserKey::new(101).principal()
             )?,

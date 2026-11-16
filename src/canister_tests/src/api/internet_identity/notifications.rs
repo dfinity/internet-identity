@@ -14,14 +14,14 @@ use internet_identity_interface::internet_identity::types::{
     NotificationAppStatus, NotificationConsentGrantedRequest, NotificationDelegationError,
     NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationId,
     NotificationRevokeConsentError, NotificationRevokeConsentRequest,
-    PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
-    PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionResult,
-    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, RetireNotificationAppError, SendNotificationArg,
-    SendNotificationError, SendNotificationResponse, SetWebPushSubscriptionError,
-    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    PendingNotificationAppLinkRequest, PrepareNotificationAppLinkError,
+    PrepareNotificationAppLinkRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, PrepareWebPushSubscriptionResponse,
+    PrepareWebPushSubscriptionResult, ProbeNotificationAppError, ProbeNotificationAppRequest,
+    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, RetireNotificationAppError,
+    SendNotificationArg, SendNotificationError, SendNotificationResponse,
+    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -485,6 +485,22 @@ pub fn probe_installed_notification_app(
         RawEffectivePrincipal::None,
         sender,
         "probe_installed_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn notification_app_link_pending(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: PendingNotificationAppLinkRequest,
+) -> Result<bool, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "notification_app_link_pending",
         (request,),
     )
     .map(|(x,)| x)

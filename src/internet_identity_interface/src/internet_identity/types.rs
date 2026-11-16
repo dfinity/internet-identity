@@ -1207,9 +1207,15 @@ pub type NotificationAppId = u64;
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct LinkNotificationAppRequest {
     pub anchor_number: AnchorNumber,
-    /// The principal the app signs as, self-authenticating over the key it generated in
-    /// its own partition.
-    pub app_principal: Principal,
+    /// The public half of the one-shot key the install URL carried, which the browser
+    /// that started the install registered.
+    pub link_key: PublicKey,
+    /// The link key's signature over `anchor_number`, the caller and
+    /// `installer_principal`, so the install it spends is bound to this app and to the
+    /// installer it names.
+    pub link_signature: ByteBuf,
+    /// The installer key the install URL named: the browser that showed the install.
+    pub installer_principal: Option<Principal>,
     /// The record this app already has, where it is linking a second identity to the app
     /// it is running as. Absent is a first install and takes a record of its own.
     pub app_id: Option<NotificationAppId>,
@@ -1224,14 +1230,16 @@ pub struct LinkNotificationAppResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum LinkNotificationAppError {
-    /// The principal offered is not one a key can sign as, so no app could ever present
-    /// it. Refused before the pending link is read, so the install is unspent and the app
-    /// may call again until that link expires.
+    /// The caller is the anonymous principal, which no app key signs as. Refused before
+    /// the pending link is read, so the install is unspent and the app may call again
+    /// until that link expires.
     AppPrincipalIsAnonymous,
+    /// The link key did not sign this request.
+    InvalidLinkSignature,
     /// No browser of this identity is waiting for this caller, or the install it started
     /// has expired.
     NoPendingLink,
-    /// A browser of this identity already signs as that principal.
+    /// A browser of this identity already signs as the caller.
     PrincipalAlreadyInUse,
     InternalCanisterError(String),
 }
@@ -1338,17 +1346,19 @@ pub enum ClaimNotificationAppError {
     InternalCanisterError(String),
 }
 
-/// Points the browser waiting on the caller's link key at the Home Screen app already on
-/// the device, instead of adding a second app.
+/// Points a browser of `anchor_number` at the Home Screen app already on the device,
+/// instead of adding a second app.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct JoinNotificationAppRequest {
-    /// The identity whose browser is waiting on the link key the caller signs as.
+    /// The identity whose browser is waiting on the link key the caller signs as, or
+    /// whose browser the caller is.
     pub anchor_number: AnchorNumber,
-    /// The identity the installer link key was handed out for, whose browsers point at the app.
+    /// The identity the installer last showed an install for, whose browsers point at
+    /// the app.
     pub installer_anchor_number: AnchorNumber,
-    /// The public half of the link key the app linked with.
-    pub installer_link_key: PublicKey,
-    /// The installer link key's signature over `anchor_number` and the caller.
+    /// The public half of the installer key the app named.
+    pub installer_key: PublicKey,
+    /// The installer key's signature over `anchor_number` and the caller.
     pub signature: ByteBuf,
 }
 
@@ -1356,15 +1366,23 @@ pub struct JoinNotificationAppRequest {
 pub enum JoinNotificationAppError {
     /// The caller is neither a link key a browser of the identity waits on nor a browser of it.
     NoPendingLink,
-    /// The installer link key did not sign this request.
+    /// The installer key did not sign this request.
     InvalidInstallerSignature,
-    /// No app the installer identity points at linked with that link key.
+    /// No app the installer identity points at named that installer key, or the one that
+    /// did went silent when asked to prove itself.
     NoNotificationApp,
     InternalCanisterError(String),
 }
 
-/// Names the app the caller's link key linked, which the caller signs as: the identity
-/// that link key was handed out for, whose browsers point at the app.
+/// Asked as the one-shot key of an install URL, so a tab holding that URL can tell
+/// whether the install it shows can still complete.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PendingNotificationAppLinkRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// Names the app that named the caller as its installer: the identity the installer last
+/// showed an install for, whose browsers point at the app.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct InstalledNotificationAppRequest {
     pub installer_anchor_number: AnchorNumber,
@@ -1372,7 +1390,7 @@ pub struct InstalledNotificationAppRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum RetireNotificationAppError {
-    /// No app the installer identity points at linked with the caller's link key.
+    /// No app the installer identity points at named the caller as its installer.
     NoNotificationApp,
     /// The app has not been asked to prove itself, or answered, or still has time to.
     AppStillAnswering,

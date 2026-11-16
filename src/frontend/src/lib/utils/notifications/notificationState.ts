@@ -13,7 +13,7 @@ import type {
   NotificationAppInfo,
 } from "$lib/generated/internet_identity_types";
 import { browserAppStatus } from "$lib/utils/notifications/appStatus";
-import { joinFromThisBrowser } from "$lib/utils/notifications/installerLinkKey";
+import { joinFromThisBrowser } from "$lib/utils/notifications/installerKey";
 import { deviceHasDonorIdentity } from "./deviceApp";
 import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
@@ -218,21 +218,32 @@ export const resolveOptIn = async ({
     : { screen, state, consented, installFirst: false };
 };
 
+/** What this entry reads after moving it onto the app this browser installed, where it
+ *  pointed at an app already. One still pointing at a deleted app reads as having one,
+ *  and only the join moves it to the app that is there. */
+const repairedAppStatus = async (identityNumber: bigint) => {
+  const status = await browserAppStatus(identityNumber);
+  if (status.kind !== "app" || !(await joinFromThisBrowser(identityNumber))) {
+    return status;
+  }
+  return await browserAppStatus(identityNumber);
+};
+
 /** Which screen a device whose delivery is the Home Screen app's needs.
  *
- *  The one write is joining the app this browser installed before, which needs no answer
- *  from the user: the app is already on this phone, and this entry may not point at it.
- *  An app another identity here already has is taken over by the press, not by this
- *  resolution. Where a donor exists the question is still allow rather than install,
- *  because the press can point this entry at the app. */
+ *  The one write is moving an entry that already points at an app onto the app this
+ *  browser installed: the user said yes for this identity already, the entry may still
+ *  point at an app deleted from the Home Screen, and its switch moves with it. An entry
+ *  with no app is not joined here, because that would start delivery before the user
+ *  answers: pressing Allow runs the install, which joins it. An app another identity here
+ *  already has is taken over by the press, not by this resolution. Where a donor exists
+ *  the question is still allow rather than install, because the press can point this
+ *  entry at the app. */
 const resolveAppOptIn = async (
   identityNumber: bigint,
   consented: boolean,
 ): Promise<OptInResolution> => {
-  // Joined whatever the entry reads: one still pointing at an app deleted from the Home
-  // Screen reads as having one, and only the join moves it to the app that is there.
-  await joinFromThisBrowser(identityNumber);
-  const status = await browserAppStatus(identityNumber);
+  const status = await repairedAppStatus(identityNumber);
 
   switch (status.kind) {
     case "unanswered": {

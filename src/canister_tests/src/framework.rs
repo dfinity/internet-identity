@@ -402,6 +402,7 @@ const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
 const NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-join";
+const NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-link";
 
 impl BrowserKey {
     pub fn new(seed: u8) -> Self {
@@ -462,8 +463,32 @@ impl BrowserKey {
         ByteBuf::from(signature.to_bytes().to_vec())
     }
 
-    /// What the link key an app linked with signs, so the install waiting on `caller`
-    /// joins that app.
+    /// What an install URL's one-shot key signs, so the app `app_principal` spends the
+    /// install and names `installer_principal` as the browser that showed it.
+    pub fn sign_link_token(
+        &self,
+        anchor_number: AnchorNumber,
+        app_principal: Principal,
+        installer_principal: Option<Principal>,
+    ) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let app = app_principal.as_slice();
+        let installer = installer_principal
+            .as_ref()
+            .map_or(&[][..], Principal::as_slice);
+        let mut message = NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(&anchor_number.to_be_bytes());
+        message.push(app.len() as u8);
+        message.extend_from_slice(app);
+        message.push(installer.len() as u8);
+        message.extend_from_slice(installer);
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
+    }
+
+    /// What an installer key signs, so the install waiting on `caller`, or the browser
+    /// `caller` is, joins the app that named it.
     pub fn sign_join_token(&self, anchor_number: AnchorNumber, caller: Principal) -> ByteBuf {
         self.sign_installer_message(
             NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN,

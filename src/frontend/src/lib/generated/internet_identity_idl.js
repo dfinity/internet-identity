@@ -875,8 +875,8 @@ export const idlFactory = ({ IDL }) => {
   const JoinNotificationAppRequest = IDL.Record({
     'signature' : IDL.Vec(IDL.Nat8),
     'installer_anchor_number' : UserNumber,
-    'installer_link_key' : PublicKey,
     'anchor_number' : UserNumber,
+    'installer_key' : PublicKey,
   });
   const JoinNotificationAppError = IDL.Variant({
     'InvalidInstallerSignature' : IDL.Null,
@@ -886,9 +886,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const NotificationAppId = IDL.Nat64;
   const LinkNotificationAppRequest = IDL.Record({
-    'app_principal' : IDL.Principal,
+    'link_key' : PublicKey,
+    'link_signature' : IDL.Vec(IDL.Nat8),
     'app_id' : IDL.Opt(NotificationAppId),
     'anchor_number' : UserNumber,
+    'installer_principal' : IDL.Opt(IDL.Principal),
   });
   const LinkNotificationAppResponse = IDL.Record({
     'app_id' : NotificationAppId,
@@ -897,6 +899,7 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'PrincipalAlreadyInUse' : IDL.Null,
     'NoPendingLink' : IDL.Null,
+    'InvalidLinkSignature' : IDL.Null,
     'AppPrincipalIsAnonymous' : IDL.Null,
   });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
@@ -936,6 +939,9 @@ export const idlFactory = ({ IDL }) => {
   });
   const NotificationAppAnchorsRequest = IDL.Record({
     'app_id' : NotificationAppId,
+  });
+  const PendingNotificationAppLinkRequest = IDL.Record({
+    'anchor_number' : UserNumber,
   });
   const NotificationConsentGrantedRequest = IDL.Record({
     'origin' : IDL.Text,
@@ -1798,6 +1804,11 @@ export const idlFactory = ({ IDL }) => {
     'notification_app_anchors' : IDL.Func(
         [NotificationAppAnchorsRequest],
         [IDL.Vec(UserNumber)],
+        ['query'],
+      ),
+    'notification_app_link_pending' : IDL.Func(
+        [PendingNotificationAppLinkRequest],
+        [IDL.Bool],
         ['query'],
       ),
     'notification_consent_granted' : IDL.Func(

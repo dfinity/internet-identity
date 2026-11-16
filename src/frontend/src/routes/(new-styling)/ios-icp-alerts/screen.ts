@@ -12,11 +12,9 @@ import {
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import {
   joinInstalledApp,
-  keepsAnInstallerLinkKey,
   probeInstalledApp,
-  rememberInstallerLinkKey,
-} from "$lib/utils/notifications/installerLinkKey";
-import { appKeyActor } from "./appKeyActor";
+} from "$lib/utils/notifications/installerKey";
+import { appKeyActor, linkKeyActor } from "./appKeyActor";
 import { linkWithToken, type LinkOutcome } from "./link";
 import {
   readAppKey,
@@ -55,6 +53,8 @@ export type Screen =
   | { kind: "open-to-finish" }
   /** A browser tab whose install nothing can finish any more: the key it handed out has expired, and the URL the Home Screen holds is frozen. */
   | { kind: "link-expired" }
+  /** A browser tab handed an install by another app on this device, which only that app can renew. */
+  | { kind: "handover-expired" }
   /** The app, whose own key the canister will not link; a key is minted once per storage partition, so the way on is a fresh app. */
   | { kind: "unusable-key" }
   | { kind: "failed"; reason: string };
@@ -103,30 +103,44 @@ export const insideTheBrowser = async (
   }
 };
 
-/** An app this browser installed before is joined rather than added again, once it has
- *  answered a probe: nothing reports a deleted Home Screen app, and joining one would
- *  leave the user with nothing installed and no steps to add it. */
+/** An app this browser installed is joined rather than added again, unless a probe found
+ *  it gone: nothing reports a deleted Home Screen app, and joining one would leave the user
+ *  with nothing installed and no steps to add it. */
 const followTheToken = async (
   token: LinkToken,
   mintedElsewhere: boolean,
 ): Promise<Screen> => {
-  if (
-    (await keepsAnInstallerLinkKey()) &&
-    (await probeInstalledApp()) !== "gone" &&
-    (await joinInstalledApp(token))
-  ) {
-    return { kind: "ready", inTheApp: false };
+  // Only the app that handed it over can renew it, so steps on a link that can no longer
+  // complete would add an app that never links.
+  if (mintedElsewhere && !(await stillWaiting(token))) {
+    return { kind: "handover-expired" };
   }
-  return await installFrom(token, mintedElsewhere);
+  const installed = await probeInstalledApp();
+  if (installed !== "gone" && (await joinInstalledApp(token))) {
+    // An app that answered was woken by a push, so it can deliver. One that could not be
+    // asked may still need opening for the permission.
+    return installed === "answered"
+      ? { kind: "ready", inTheApp: false }
+      : { kind: "open-app", guessed: false };
+  }
+  return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
 };
 
-/** The steps for `token`, which a later install joins. */
-const installFrom = async (
-  token: LinkToken,
-  mintedElsewhere: boolean,
-): Promise<Screen> => {
-  await rememberInstallerLinkKey(token);
-  return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
+/** Whether the install `token` was handed can still complete. A canister that would not
+ *  answer is no reason to withhold the steps. */
+const stillWaiting = async ({
+  identityNumber,
+  linkKey,
+}: LinkToken): Promise<boolean> => {
+  try {
+    const actor = await linkKeyActor(linkKey);
+    return await actor.notification_app_link_pending({
+      anchor_number: identityNumber,
+    });
+  } catch (error) {
+    console.error(error);
+    return true;
+  }
 };
 
 /** What this browser's entry says to do about the identity a readable token named. */

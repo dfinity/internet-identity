@@ -20,9 +20,13 @@ const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 /// Prefix for the token a browser signs to let another identity point at its Home Screen app.
 const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
 
-/// Prefix for what an installer link key signs to let another install on the device join
-/// the app that linked with it.
+/// Prefix for what an installer key signs to let another install on the device join the
+/// app that named it.
 const NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-join";
+
+/// Prefix for what an install URL's one-shot key signs to let the app that calls with it
+/// spend the install.
+const NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-link";
 
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
 const BROWSER_KEY_SIGNATURE_BYTES: usize = 64;
@@ -109,16 +113,32 @@ pub fn verify_notification_app_claim(
     )
 }
 
-/// The signature binds the caller, which is the waiting install's one-shot key, so it
-/// cannot be spent on any other install.
+/// The signature binds the app calling and the installer it names, so a signature read
+/// off the wire cannot spend the install for another app or name another installer.
+pub fn verify_notification_app_link(
+    link_key: &PublicKey,
+    signature: &[u8],
+    anchor_number: u64,
+    app_principal: &Principal,
+    installer_principal: Option<&Principal>,
+) -> bool {
+    verify(
+        link_key,
+        signature,
+        &link_message(anchor_number, app_principal, installer_principal),
+    )
+}
+
+/// The signature binds the caller, which is the waiting install's one-shot key or a
+/// browser of the identity, so it cannot be spent by anyone else.
 pub fn verify_notification_app_join(
-    installer_link_key: &PublicKey,
+    installer_key: &PublicKey,
     signature: &[u8],
     anchor_number: u64,
     caller: &Principal,
 ) -> bool {
     verify(
-        installer_link_key,
+        installer_key,
         signature,
         &installer_message(
             NOTIFICATION_APP_JOIN_SIGNATURE_DOMAIN,
@@ -175,6 +195,24 @@ pub mod test_keys {
         ));
         signature.to_bytes().to_vec()
     }
+}
+
+/// Every principal goes in behind its length, and an absent installer as length zero,
+/// so no two different requests produce the same message.
+fn link_message(
+    anchor_number: u64,
+    app_principal: &Principal,
+    installer_principal: Option<&Principal>,
+) -> Vec<u8> {
+    let mut message = installer_message(
+        NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN,
+        anchor_number,
+        app_principal,
+    );
+    let installer = installer_principal.map_or(&[][..], Principal::as_slice);
+    message.push(installer.len() as u8);
+    message.extend_from_slice(installer);
+    message
 }
 
 fn installer_message(domain: &[u8], anchor_number: u64, caller: &Principal) -> Vec<u8> {

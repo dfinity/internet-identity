@@ -94,7 +94,11 @@ export const openInstallTab = (
         }
         const handedOver = new URL(resolved, window.location.origin);
         handedOver.searchParams.set(MINTED_ELSEWHERE_PARAM, "");
-        openInSafari(handedOver.toString());
+        try {
+          openInSafari(handedOver.toString());
+        } catch (error) {
+          console.error(error);
+        }
       },
       (error: unknown) => console.error(error),
     );

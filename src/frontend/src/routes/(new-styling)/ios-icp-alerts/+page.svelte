@@ -14,7 +14,9 @@
   import {
     decodeLinkToken,
     type FragmentLinkToken,
+    withInstallerKey,
   } from "$lib/utils/notifications/linkToken";
+  import { installerKeyForSteps } from "$lib/utils/notifications/installerKey";
   import {
     browserAppStatus,
     probeApp,
@@ -302,6 +304,33 @@
     );
   });
 
+  /** iOS bookmarks whatever the address bar holds when the page is added, so the URL the
+   *  steps are on names this browser as the installer before anyone follows them. Every
+   *  path to the steps passes here, a URL minted in this tab as well as one handed over. */
+  $effect(() => {
+    if (screen.kind !== "install" || inTheApp !== false) {
+      return;
+    }
+    const fragment = decodeLinkToken(window.location.hash);
+    if (fragment.kind !== "token") {
+      return;
+    }
+    void installerKeyForSteps(fragment.token.identityNumber).then(
+      (installerKey) => {
+        const named = withInstallerKey(window.location.hash, installerKey);
+        if (named === window.location.hash) {
+          return;
+        }
+        history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}${named}`,
+        );
+      },
+      (error: unknown) => console.error(error),
+    );
+  });
+
   /** Set by the user saying the guess was wrong, which is the end of guessing: without
    *  it the next glance at another app would throw them forward again. */
   let theyAreStillOnTheSteps = $state(false);
@@ -375,6 +404,11 @@
 
   /** A record that disappears means the push service said the endpoint is gone. */
   $effect(() => {
+    // This browser's entry is not the one the install is for, so its record says nothing
+    // about it, and a fresh install minted here would be Safari's and not that app's.
+    if (mintedElsewhere) {
+      return;
+    }
     const watchingForTheApp =
       screen.kind === "open-app" ||
       (screen.kind === "ready" && !screen.inTheApp);
@@ -431,6 +465,12 @@
 
   const alreadyAdded = async () => {
     track(IcpAlertsEvents.SaidAlreadyAdded);
+    // The entry waiting for this install is the other app's, which nothing here can read:
+    // opening the app is what finishes it.
+    if (mintedElsewhere) {
+      screen = { kind: "open-to-finish" };
+      return;
+    }
     screen = await afterAlreadyAdded(window.location.hash).catch(failed);
   };
 
@@ -849,6 +889,20 @@
               {$t`Add it again`}
             </button>
           </div>
+        </div>
+      {:else if screen.kind === "handover-expired"}
+        <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
+          <FeaturedIcon size="lg" class="mb-4 self-start">
+            <CircleAlertIcon class="size-6" aria-hidden="true" />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            {$t`This link has expired`}
+          </h1>
+          <p class="text-text-tertiary text-base">
+            <Trans>
+              Go back to the app you came from and allow notifications again.
+            </Trans>
+          </p>
         </div>
       {:else if screen.kind === "unusable-key"}
         <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">

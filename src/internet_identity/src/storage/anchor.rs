@@ -1113,6 +1113,12 @@ impl Anchor {
         if browser.is_pointing_at(app_id) {
             return;
         }
+        // An entry moving off another app keeps its own answer: a join moves it to the app
+        // that is on the phone, and that is not the user switching delivery back on.
+        let own_answer = match browser.notification_app {
+            Some(NotificationAppRef::Linked { enabled, .. }) => Some(enabled),
+            _ => None,
+        };
         // Whether this identity wants the app to deliver is the user's answer about the
         // app, not about whichever entry happens to hold the reference, so a rotation
         // that moves it between this identity's browsers carries their answer along. A
@@ -1128,6 +1134,7 @@ impl Anchor {
                 }) if held == app_id => Some(enabled),
                 _ => None,
             })
+            .or(own_answer)
             .unwrap_or(true);
         let Some(browser) = self
             .browsers
@@ -1214,13 +1221,21 @@ impl Anchor {
     /// pointing at it with delivery on. Switching delivery off is this identity saying
     /// the app does not act for it, so there is no entry to find.
     ///
-    /// The first of them where several point at the record. What the app asks for this
-    /// way, a delegation, is the identity's and the same through any of them.
+    /// One that is signed in where several point at the record, since dispatch routes
+    /// only through those, and the first of them. What the app asks for this way, a
+    /// delegation, is the identity's and the same through any of them.
     pub fn browser_delivering_through(&self, app_id: NotificationAppId) -> Option<BrowserId> {
-        self.browsers
+        let mut pointing = self
+            .browsers
             .iter()
-            .find(|browser| browser.delivers_through(app_id))
-            .map(|browser| browser.id)
+            .filter(|browser| browser.delivers_through(app_id));
+        let first = pointing.clone().next()?;
+        Some(
+            pointing
+                .find(|browser| browser.session_count > 0)
+                .unwrap_or(first)
+                .id,
+        )
     }
 
     /// Whether `browser_id` points at `app_id` with delivery on, which is what lets the
