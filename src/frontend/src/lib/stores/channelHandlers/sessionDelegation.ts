@@ -424,7 +424,7 @@ const createSession = async (
     (prepared) => prepared.browser_id,
   );
 
-  const fetched = await retryFor(5, () =>
+  const fetched = await retryFor(8, () =>
     actor
       .get_account_session({
         identity_number: identityNumber,

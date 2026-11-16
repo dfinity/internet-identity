@@ -156,7 +156,7 @@ export const handleDelegationRequest =
           )
           .then(throwCanisterError);
 
-        const delegationChain = await retryFor(5, () =>
+        const delegationChain = await retryFor(8, () =>
           actor
             .get_account_delegation(
               identityNumber,
