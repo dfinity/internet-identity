@@ -1714,7 +1714,32 @@ impl<M: Memory + Clone> Storage<M> {
         app.pending_probe = Some(PendingProbe {
             notification_id,
             asked_at_ns: now,
+            posted_at_ns: None,
         });
+        self.notification_app_memory
+            .insert(app_id, StorableNotificationApp::from(app));
+    }
+
+    /// Starts the app's window to answer the probe `notification_id`, now that the push
+    /// service has taken it. A wake-up for anything else leaves the probe as it was.
+    // Called from the outcall, which tests stub out.
+    #[cfg_attr(test, allow(dead_code))]
+    pub fn record_notification_app_probe_posted(
+        &mut self,
+        app_id: NotificationAppId,
+        notification_id: NotificationId,
+        now: Timestamp,
+    ) {
+        let Some(mut app) = self.notification_app(app_id) else {
+            return;
+        };
+        let Some(probe) = app.pending_probe.as_mut() else {
+            return;
+        };
+        if probe.notification_id != notification_id || probe.posted_at_ns.is_some() {
+            return;
+        }
+        probe.posted_at_ns = Some(now);
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
     }

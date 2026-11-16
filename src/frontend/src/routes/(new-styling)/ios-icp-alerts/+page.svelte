@@ -32,6 +32,7 @@
     insideTheApp,
     launchWillWrite,
     insideTheBrowser,
+    joinTheApp,
     type Screen,
     settleFromSettings,
     settleWithTheApp,
@@ -307,27 +308,33 @@
   /** iOS bookmarks whatever the address bar holds when the page is added, so the URL the
    *  steps are on names this browser as the installer before anyone follows them. Every
    *  path to the steps passes here, a URL minted in this tab as well as one handed over. */
+  let installerKeyed = $state(false);
   $effect(() => {
     if (screen.kind !== "install" || inTheApp !== false) {
       return;
     }
+    installerKeyed = false;
     const fragment = decodeLinkToken(window.location.hash);
     if (fragment.kind !== "token") {
+      installerKeyed = true;
       return;
     }
     void installerKeyForSteps(fragment.token.identityNumber).then(
       (installerKey) => {
         const named = withInstallerKey(window.location.hash, installerKey);
-        if (named === window.location.hash) {
-          return;
+        if (named !== window.location.hash) {
+          history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${window.location.search}${named}`,
+          );
         }
-        history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${window.location.search}${named}`,
-        );
+        installerKeyed = true;
       },
-      (error: unknown) => console.error(error),
+      (error: unknown) => {
+        // Steps without the key add an app no later install can find.
+        screen = failed(error);
+      },
     );
   });
 
@@ -543,6 +550,20 @@
     }
   };
 
+  /** The user asking for this identity's notifications in the app already here. */
+  const join = async (answered: boolean) => {
+    screen = { kind: "working" };
+    beginWaiting();
+    screen = await joinTheApp(
+      window.location.hash,
+      answered,
+      mintedElsewhere,
+    ).catch(failed);
+    if (screen.kind === "install" && screen.staleKey === true) {
+      void offerAFreshInstall();
+    }
+  };
+
   /** `window.close()` closes only a tab a script opened, so the screen says what the close could not. */
   const dismiss = () => {
     window.close();
@@ -628,6 +649,8 @@
             </div>
           </div>
         {/if}
+      {:else if screen.kind === "install" && !installerKeyed}
+        <div class="flex-1"></div>
       {:else if screen.kind === "install"}
         <!-- No icon above the heading: the steps are the screen, and every row of
              chrome above them pushes one further below the fold. -->
@@ -706,6 +729,31 @@
           {:else}
             <div class="h-[98px]"></div>
           {/if}
+        </div>
+      {:else if screen.kind === "join"}
+        {@const answered = screen.answered}
+        <div class="flex min-w-0 flex-1 flex-col items-stretch">
+          <div class={centredBlock}>
+            <AppsGridMock />
+            <div class={centredText}>
+              <h1 class={centredHeading}>
+                <Trans>{NOTIFICATION_APP_NAME} is already on this phone</Trans>
+              </h1>
+              <p class={centredBody}>
+                <Trans>
+                  Notifications for this identity will show up there too.
+                </Trans>
+              </p>
+            </div>
+          </div>
+          <div class={actionBlock}>
+            <button
+              class="btn btn-primary btn-xl"
+              onclick={() => void join(answered)}
+            >
+              {$t`Turn on notifications`}
+            </button>
+          </div>
         </div>
       {:else if screen.kind === "ask"}
         <div class="flex min-w-0 flex-1 flex-col items-stretch">

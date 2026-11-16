@@ -11,6 +11,7 @@ import {
 } from "$lib/utils/notifications/linkToken";
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import {
+  installedAppIsKnown,
   joinInstalledApp,
   probeInstalledApp,
 } from "$lib/utils/notifications/installerKey";
@@ -55,6 +56,11 @@ export type Screen =
   | { kind: "link-expired" }
   /** A browser tab handed an install by another app on this device, which only that app can renew. */
   | { kind: "handover-expired" }
+  /** A browser tab whose link names an identity, on a phone that already has the app.
+   *  The identity joins it only on a tap: anyone can send a link, so opening one is not
+   *  the user asking for that identity's notifications. `answered` is whether the app
+   *  just proved it is there. */
+  | { kind: "join"; answered: boolean }
   /** The app, whose own key the canister will not link; a key is minted once per storage partition, so the way on is a fresh app. */
   | { kind: "unusable-key" }
   | { kind: "failed"; reason: string };
@@ -103,27 +109,61 @@ export const insideTheBrowser = async (
   }
 };
 
-/** An app this browser installed is joined rather than added again, unless a probe found
- *  it gone: nothing reports a deleted Home Screen app, and joining one would leave the user
- *  with nothing installed and no steps to add it. */
+/** An app this browser installed is offered to join rather than added again, unless a
+ *  probe found it gone: nothing reports a deleted Home Screen app, and joining one would
+ *  leave the user with nothing installed and no steps to add it. A link nothing waits for
+ *  any more is answered without asking the app, whose answer is a notification. */
 const followTheToken = async (
   token: LinkToken,
   mintedElsewhere: boolean,
 ): Promise<Screen> => {
-  // Only the app that handed it over can renew it, so steps on a link that can no longer
-  // complete would add an app that never links.
-  if (mintedElsewhere && !(await stillWaiting(token))) {
-    return { kind: "handover-expired" };
+  if (!(await stillWaiting(token))) {
+    if (!mintedElsewhere) {
+      return await settleTheTab(token);
+    }
+    // Only the app that handed it over can renew it, so steps on a link that can no
+    // longer complete would add an app that never links. A link spent by joining or
+    // linking the app this browser installed is a finished install, not an expired one.
+    return (await installedAppIsKnown())
+      ? { kind: "open-app", guessed: false }
+      : { kind: "handover-expired" };
   }
   const installed = await probeInstalledApp();
-  if (installed !== "gone" && (await joinInstalledApp(token))) {
-    // An app that answered was woken by a push, so it can deliver. One that could not be
-    // asked may still need opening for the permission.
-    return installed === "answered"
-      ? { kind: "ready", inTheApp: false }
-      : { kind: "open-app", guessed: false };
+  if (installed !== "gone") {
+    return { kind: "join", answered: installed === "answered" };
   }
   return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
+};
+
+/** The tap on `join`. An app that could not be asked before is asked again once this
+ *  identity reaches it, and one silent then is gone, so the steps are what is left. */
+export const joinTheApp = async (
+  hash: string,
+  answered: boolean,
+  mintedElsewhere: boolean,
+): Promise<Screen> => {
+  const fragment = decodeLinkToken(hash);
+  if (fragment.kind !== "token") {
+    return { kind: "elsewhere" };
+  }
+  if (!(await joinInstalledApp(fragment.token))) {
+    // The app is there, so the steps would add a second one.
+    return { kind: "failed", reason: "join" };
+  }
+  if (answered) {
+    return { kind: "ready", inTheApp: false };
+  }
+  switch (await probeInstalledApp()) {
+    case "answered":
+      return { kind: "ready", inTheApp: false };
+    case "unknown":
+      return { kind: "open-app", guessed: false };
+    case "gone":
+      // The join spent the link on the app that turned out to be gone.
+      return mintedElsewhere
+        ? { kind: "handover-expired" }
+        : { kind: "install", staleKey: true };
+  }
 };
 
 /** Whether the install `token` was handed can still complete. A canister that would not

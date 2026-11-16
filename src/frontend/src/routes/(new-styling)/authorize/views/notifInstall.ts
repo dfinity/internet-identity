@@ -39,7 +39,11 @@ export const startAppInstall = ({
   void granted.catch(() => undefined);
 
   const url = installUrlOrNone(identityNumber, "authorize");
-  void url.then(tab.point);
+  // Inside a Home Screen app the tab is Safari, which takes over the screen and can
+  // suspend this page, so the consent is written before it is pointed there.
+  void Promise.all([url, granted.catch(() => undefined)]).then(([resolved]) =>
+    tab.point(resolved),
+  );
 
   return { granted, url, tabOpened: tab.opened };
 };

@@ -33,37 +33,55 @@ const JOIN_SIGNATURE_DOMAIN = new TextEncoder().encode(
 interface InstallerKey {
   /** The private half cannot be exported, so it never leaves this browser's storage. */
   keyPair: CryptoKeyPair;
-  /** The identity this browser last showed the steps for, whose browsers point at the
-   *  app those steps added. Absent until it has shown one. */
-  identityNumber?: bigint;
+  /** Every identity this browser showed the steps for or joined, newest first. The
+   *  canister finds the app through an identity pointing at it, and any one of these may
+   *  have stopped while another still does. */
+  identityNumbers?: bigint[];
 }
 
-const readInstallerKey = async (): Promise<InstallerKey | undefined> => {
-  try {
-    return await idbGet<InstallerKey>(INSTALLER_KEY_ENTRY, INSTALLER_KEY_STORE);
-  } catch (error) {
-    console.error(error);
-    return undefined;
+/** Serialises every write: two tabs making the key at once would leave the app naming
+ *  one this browser no longer holds. */
+const exclusively = async <T>(run: () => Promise<T>): Promise<T> => {
+  const locks = navigator.locks;
+  if (locks === undefined) {
+    return run();
   }
+  return await locks.request("ii-notification-installer-key", run);
 };
+
+/** Rejects where the store cannot be read: an unreadable key is not an absent one, and
+ *  making a new one would orphan the app that names the old. */
+const readInstallerKey = (): Promise<InstallerKey | undefined> =>
+  idbGet<InstallerKey>(INSTALLER_KEY_ENTRY, INSTALLER_KEY_STORE);
 
 const writeInstallerKey = (installerKey: InstallerKey): Promise<void> =>
   idbSet(INSTALLER_KEY_ENTRY, installerKey, INSTALLER_KEY_STORE);
 
-const ensureInstallerKey = async (): Promise<InstallerKey> => {
-  const kept = await readInstallerKey();
-  if (kept !== undefined) {
-    return kept;
-  }
-  const keyPair = (await crypto.subtle.generateKey(
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign", "verify"],
-  )) as CryptoKeyPair;
-  const installerKey: InstallerKey = { keyPair };
-  await writeInstallerKey(installerKey);
-  return installerKey;
-};
+/** Puts `identityNumber` first among the identities the key is looked up through,
+ *  making the key where this browser has none. */
+const rememberIdentity = (identityNumber: bigint): Promise<InstallerKey> =>
+  exclusively(async () => {
+    const kept = await readInstallerKey();
+    const keyPair =
+      kept?.keyPair ??
+      ((await crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" },
+        false,
+        ["sign", "verify"],
+      )) as CryptoKeyPair);
+    const others = (kept?.identityNumbers ?? []).filter(
+      (known) => known !== identityNumber,
+    );
+    if (kept !== undefined && kept.identityNumbers?.[0] === identityNumber) {
+      return kept;
+    }
+    const installerKey = {
+      keyPair,
+      identityNumbers: [identityNumber, ...others],
+    };
+    await writeInstallerKey(installerKey);
+    return installerKey;
+  });
 
 const publicKeyOf = async (installerKey: InstallerKey): Promise<Uint8Array> =>
   new Uint8Array(
@@ -71,27 +89,57 @@ const publicKeyOf = async (installerKey: InstallerKey): Promise<Uint8Array> =>
   );
 
 /** The public half to name in the URL whose steps this browser is about to show, made on
- *  first use. Records `identityNumber` as the identity those steps are for. */
+ *  first use. Rejects where the key cannot be read or kept, since steps without it add
+ *  an app no later install can find. */
 export const installerKeyForSteps = async (
   identityNumber: bigint,
-): Promise<Uint8Array> => {
-  const installerKey = await ensureInstallerKey();
-  if (installerKey.identityNumber !== identityNumber) {
-    await writeInstallerKey({ ...installerKey, identityNumber });
-  }
-  return await publicKeyOf(installerKey);
-};
+): Promise<Uint8Array> =>
+  await publicKeyOf(await rememberIdentity(identityNumber));
 
-/** The installer key, where this browser has shown the steps for an app it could join a
- *  later install to. */
-const installerOfAnApp = async (): Promise<
-  Required<InstallerKey> | undefined
-> => {
+interface Installer {
+  keyPair: CryptoKeyPair;
+  /** An identity pointing at the app, which is what the canister finds it through. */
+  identityNumber: bigint;
+  /** When the app last called. */
+  lastSeen: bigint;
+}
+
+/** The installer key and an identity the canister finds its app through, where this
+ *  browser installed an app somebody still points at. */
+const installerOfAnApp = async (): Promise<Installer | undefined> => {
   const installerKey = await readInstallerKey();
-  if (installerKey?.identityNumber === undefined) {
+  if (installerKey === undefined) {
     return undefined;
   }
-  return { ...installerKey, identityNumber: installerKey.identityNumber };
+  const actor = actorAs(
+    await ECDSAKeyIdentity.fromKeyPair(installerKey.keyPair),
+    {
+      agentOptions,
+      canisterId,
+    },
+  );
+  for (const identityNumber of installerKey.identityNumbers ?? []) {
+    const lastSeen = (
+      await actor.installed_notification_app_last_seen({
+        installer_anchor_number: identityNumber,
+      })
+    )[0];
+    if (lastSeen !== undefined) {
+      return { keyPair: installerKey.keyPair, identityNumber, lastSeen };
+    }
+  }
+  return undefined;
+};
+
+/** Whether this browser installed an app somebody still points at. `false` where that
+ *  cannot be read. */
+export const installedAppIsKnown = async (): Promise<boolean> => {
+  try {
+    return (await installerOfAnApp()) !== undefined;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 };
 
 /** Must match `installer_message` in `browser_key.rs`. */
@@ -127,7 +175,7 @@ const joinAs = async ({
   caller,
   actor,
 }: {
-  installer: Required<InstallerKey>;
+  installer: Installer;
   identityNumber: bigint;
   caller: SignIdentity;
   actor: ActorSubclass<_SERVICE>;
@@ -146,6 +194,7 @@ const joinAs = async ({
         signature: new Uint8Array(signature),
       })
       .then(throwCanisterError);
+    await rememberIdentity(identityNumber);
     return true;
   } catch (error) {
     console.error(`the join was refused: ${describe(error)}`);
@@ -165,11 +214,11 @@ export const joinInstalledApp = async ({
   identityNumber,
   linkKey,
 }: LinkToken): Promise<boolean> => {
-  const installer = await installerOfAnApp();
-  if (installer === undefined) {
-    return false;
-  }
   try {
+    const installer = await installerOfAnApp();
+    if (installer === undefined) {
+      return false;
+    }
     const [caller, actor] = await Promise.all([
       importLinkKey(linkKey).then((keyPair) =>
         ECDSAKeyIdentity.fromKeyPair(keyPair),
@@ -191,11 +240,11 @@ export const joinInstalledApp = async ({
 export const joinFromThisBrowser = async (
   identityNumber: bigint,
 ): Promise<boolean> => {
-  const installer = await installerOfAnApp();
-  if (installer === undefined) {
-    return false;
-  }
   try {
+    const installer = await installerOfAnApp();
+    if (installer === undefined) {
+      return false;
+    }
     const caller = await browserKeyIdentity(identityNumber);
     if (caller === undefined) {
       return false;
@@ -225,22 +274,17 @@ export type InstalledApp = "answered" | "gone" | "unknown";
  *  notification and calls; one that is gone is forgotten for every entry pointing at it,
  *  so each is asked to install again rather than reading as delivering to nothing. */
 export const probeInstalledApp = async (): Promise<InstalledApp> => {
-  const installer = await installerOfAnApp();
-  if (installer === undefined) {
-    return "gone";
-  }
-  const request = { installer_anchor_number: installer.identityNumber };
   try {
+    const installer = await installerOfAnApp();
+    if (installer === undefined) {
+      return "gone";
+    }
+    const request = { installer_anchor_number: installer.identityNumber };
     const actor = actorAs(
       await ECDSAKeyIdentity.fromKeyPair(installer.keyPair),
       { agentOptions, canisterId },
     );
-    const before = (
-      await actor.installed_notification_app_last_seen(request)
-    )[0];
-    if (before === undefined) {
-      return "gone";
-    }
+    const before = installer.lastSeen;
     const probe = await actor.probe_installed_notification_app(request);
     if ("Err" in probe) {
       return "NoNotificationApp" in probe.Err ? "gone" : "unknown";

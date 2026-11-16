@@ -46,6 +46,8 @@ pub struct StorablePendingProbe {
     pub notification_id: u64,
     #[n(1)]
     pub asked_at_ns: Timestamp,
+    #[n(2)]
+    pub posted_at_ns: Option<Timestamp>,
 }
 
 impl From<NotificationApp> for StorableNotificationApp {
@@ -65,6 +67,7 @@ impl From<NotificationApp> for StorableNotificationApp {
             pending_probe: value.pending_probe.map(|probe| StorablePendingProbe {
                 notification_id: probe.notification_id,
                 asked_at_ns: probe.asked_at_ns,
+                posted_at_ns: probe.posted_at_ns,
             }),
         }
     }
@@ -99,6 +102,7 @@ impl From<StorableNotificationApp> for NotificationApp {
             pending_probe: value.pending_probe.map(|probe| PendingProbe {
                 notification_id: probe.notification_id,
                 asked_at_ns: probe.asked_at_ns,
+                posted_at_ns: probe.posted_at_ns,
             }),
         }
     }

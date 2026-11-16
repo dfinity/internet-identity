@@ -1187,6 +1187,17 @@ mod outcalls {
         ic_cdk::spawn(async move {
             let _permit = permit;
             let outcome = post_wake_up(&delivery).await;
+            if let (PostOutcome::Sent, DeliveryTarget::App(app_id), Some(notification)) =
+                (outcome, delivery.target, delivery.notification.as_ref())
+            {
+                storage_borrow_mut(|storage| {
+                    storage.record_notification_app_probe_posted(
+                        app_id,
+                        notification.notification_id,
+                        ic_cdk::api::time(),
+                    )
+                });
+            }
             settle(&delivery, outcome);
         });
     }

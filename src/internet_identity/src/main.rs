@@ -844,6 +844,7 @@ fn join_notification_app(
     let mut anchor = state::anchor(anchor_number);
     // An install waiting on the caller's link key, or a browser of the identity signing as
     // itself, which re-points whatever it pointed at before.
+    let pending_install = anchor.browser_awaiting_link(caller(), now);
     let joining_browser =
         calling_browser(&anchor, now).ok_or(JoinNotificationAppError::NoPendingLink)?;
     if !browser_key::verify_notification_app_join(
@@ -863,6 +864,11 @@ fn join_notification_app(
     .id;
 
     anchor.move_to_notification_app(joining_browser, app_id);
+    // A pending install is the user tapping Allow for this identity, so it delivers
+    // whatever another entry of the identity says about the app.
+    if pending_install.is_some() {
+        anchor.enable_notification_app(joining_browser);
+    }
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
@@ -939,16 +945,16 @@ fn probe_installed_notification_app(
         .anchors
         .iter()
         .map(|anchor_number| state::anchor(*anchor_number))
-        .filter_map(|anchor| {
-            let browser_id = anchor.browser_delivering_through(app.id)?;
+        .find_map(|anchor| {
+            let browser_id = state::storage_borrow(|storage| {
+                anchor
+                    .browsers()
+                    .iter()
+                    .filter(|browser| browser.delivers_through(app.id))
+                    .find(|browser| notifications::dispatch::can_wake(storage, browser, now_ns))
+                    .map(|browser| browser.id)
+            })?;
             Some((anchor, browser_id))
-        })
-        .find(|(anchor, browser_id)| {
-            state::storage_borrow(|storage| {
-                anchor.browser(*browser_id).is_some_and(|browser| {
-                    notifications::dispatch::can_wake(storage, browser, now_ns)
-                })
-            })
         });
     let Some((anchor, browser_id)) = reachable else {
         return Err(ProbeNotificationAppError::NotReachable);

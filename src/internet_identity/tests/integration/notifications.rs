@@ -2823,6 +2823,28 @@ mod joins {
         }
     }
 
+    /// A probe still waiting in the backlog has not reached the phone, so its silence is
+    /// no evidence the app is gone.
+    #[test]
+    fn should_keep_an_app_whose_probe_never_left() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, APP_SEED);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+
+        probe_installed_notification_app(&env, canister_id, installer(), installed(anchor))?
+            .expect("probe_installed_notification_app returned Err");
+        env.advance_time(std::time::Duration::from_secs(11));
+
+        assert_eq!(
+            retire_notification_app(&env, canister_id, installer(), installed(anchor))?,
+            Err(RetireNotificationAppError::AppStillAnswering)
+        );
+        assert!(linked_app(&env, canister_id, anchor, FIRST_BROWSER_SEED)?);
+        Ok(())
+    }
+
     /// An app asked to prove itself that stays silent through its window is gone, and
     /// forgetting it takes it off every entry, so each is asked to install again rather
     /// than reading as delivering to nothing.
@@ -2853,6 +2875,13 @@ mod joins {
 
         probe_installed_notification_app(&env, canister_id, installer(), installed(anchor))?
             .expect("probe_installed_notification_app returned Err");
+        // The first pass probes the relay; a later one posts the wake-up.
+        for _ in 0..10 {
+            run_dispatch_pass(&env);
+        }
+        // The relay's answer lands a round after it is given.
+        env.tick();
+        env.tick();
         env.advance_time(std::time::Duration::from_secs(11));
         retire_notification_app(&env, canister_id, installer(), installed(anchor))?
             .expect("retire_notification_app returned Err");

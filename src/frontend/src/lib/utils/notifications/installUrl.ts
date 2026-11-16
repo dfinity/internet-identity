@@ -7,6 +7,7 @@ import { exportLinkKey, generateLinkKey } from "./linkKey";
 import { encodeLinkToken } from "./linkToken";
 import { NOTIFICATION_APP_PATH } from "./appPath";
 import { isStandalone } from "./standalone";
+import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { openInSafari } from "./openInSafari";
 import {
   installSourceParam,
@@ -80,13 +81,19 @@ export const installUrlOrNone = async (
   }
 };
 
+const isAnotherIosBrowser = (): boolean => {
+  const { brand, os } = browserAndSystem();
+  return ("Ios" in os || "Ipados" in os) && !("Safari" in brand);
+};
+
 /** Must be called straight from the click, which is the only time a browser allows it; the tab is opened on the placeholder and pointed once the URL resolves.
  *  A blocked tab is not an error: the screen shows the link instead.
- *  Inside a Home Screen web app, II runs in an in-app view that has no tabs and reports itself standalone, which the install page would take for the installed app, so the steps are handed to Safari instead. */
+ *  Inside a Home Screen web app, II runs in an in-app view that has no tabs and reports itself standalone, which the install page would take for the installed app, so the steps are handed to Safari instead.
+ *  Another browser on an iPhone is handed over too: the installer key lives in the browser that shows the steps, and Safari is where every other install on the phone looks for it. */
 export const openInstallTab = (
   url: string | Promise<string | undefined>,
 ): boolean => {
-  if (isStandalone()) {
+  if (isStandalone() || isAnotherIosBrowser()) {
     void Promise.resolve(url).then(
       (resolved) => {
         if (resolved === undefined) {

@@ -48,6 +48,9 @@ pub const PROBE_ANSWER_WINDOW_NS: u64 = 10 * 1_000_000_000;
 pub struct PendingProbe {
     pub notification_id: NotificationId,
     pub asked_at_ns: Timestamp,
+    /// When the push service took the wake-up. The app's window runs from here: a probe
+    /// still in the backlog has not reached the phone, so its silence says nothing.
+    pub posted_at_ns: Option<Timestamp>,
 }
 
 impl NotificationApp {
@@ -64,8 +67,10 @@ impl NotificationApp {
     /// tells the canister nothing, and the push service goes on accepting for it.
     pub fn probe_went_unanswered(&self, now_ns: Timestamp) -> bool {
         self.pending_probe.is_some_and(|probe| {
-            now_ns.saturating_sub(probe.asked_at_ns) >= PROBE_ANSWER_WINDOW_NS
-                && self.last_used_ns < probe.asked_at_ns
+            probe.posted_at_ns.is_some_and(|posted_at_ns| {
+                now_ns.saturating_sub(posted_at_ns) >= PROBE_ANSWER_WINDOW_NS
+                    && self.last_used_ns < probe.asked_at_ns
+            })
         })
     }
 
@@ -144,6 +149,7 @@ mod probe_tests {
             pending_probe: Some(PendingProbe {
                 notification_id: 7,
                 asked_at_ns,
+                posted_at_ns: Some(asked_at_ns),
             }),
         }
     }
