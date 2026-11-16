@@ -536,7 +536,20 @@
   const PILL_MOTION =
     "transition-[background-color,box-shadow] duration-200 ease-out motion-reduce:transition-none";
 
+  /** The page a tab sent the pager to, while it's on its way. A page it only
+   *  passes (Explore, from My apps to Connect) doesn't take the tab for a
+   *  moment, or the thumb would run there and back. */
+  let headingTo: number | undefined;
+  /** The page the pager shows, or is nearest to mid-swipe. */
+  const pageInView = () =>
+    pager === undefined
+      ? activePage
+      : Math.round(Math.abs(pager.scrollLeft) / pager.clientWidth);
+
   const goToPage = (index: number) => {
+    if (index !== pageInView()) {
+      headingTo = index;
+    }
     activePage = index;
     pageRefs[index]?.scrollIntoView({
       behavior: reduced ? "instant" : "smooth",
@@ -569,9 +582,12 @@
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            activePage = pageRefs.indexOf(entry.target as HTMLElement);
-          }
+          if (!entry.isIntersecting) continue;
+          const index = pageRefs.indexOf(entry.target as HTMLElement);
+          if (headingTo !== undefined && index !== headingTo) continue;
+          // Where scrollend isn't fired, arriving is what ends the trip.
+          headingTo = undefined;
+          activePage = index;
         }
       },
       { root: pager, threshold: 0.6 },
@@ -581,6 +597,14 @@
     }
     return () => observer.disconnect();
   });
+
+  /** The pager stopped: if a swipe cut the trip short, the tab is the page
+   *  it stopped on. */
+  const onPagerScrollEnd = () => {
+    if (headingTo === undefined) return;
+    headingTo = undefined;
+    activePage = pageInView();
+  };
 
   /** How much of a page is in view once it rests: all of it, give or take
    *  the subpixels of a fractional width. */
@@ -1182,6 +1206,7 @@
       <div
         bind:this={pager}
         onscrollcapture={onPageScroll}
+        onscrollend={onPagerScrollEnd}
         class="flex min-h-0 flex-1 snap-x snap-mandatory [scrollbar-width:none] overflow-x-auto overscroll-x-contain [&::-webkit-scrollbar]:hidden"
       >
         <div
