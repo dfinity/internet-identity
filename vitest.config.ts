@@ -6,6 +6,9 @@ import { sveltekit } from "@sveltejs/kit/vite";
 export default defineConfig(({ mode }: UserConfig): UserConfig => ({
   resolve: {
     alias: aliasConfig,
+    // Svelte's client build, so that component tests can mount: without it
+    // Vitest picks the server build, which has no `mount`.
+    conditions: ["browser"],
   },
   plugins: [sveltekit()],
   test: {
