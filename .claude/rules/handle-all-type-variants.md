@@ -1,6 +1,6 @@
 # Handle every variant a type can carry — never assume the backend won't use one
 
-When code consumes a value of a union/variant type (a candid `variant`, a TS
+`variants/handle-every-variant` When code consumes a value of a union/variant type (a candid `variant`, a TS
 discriminated union, a Rust `enum`), handle **every** case the type permits.
 Never narrow the handling to "the cases the producer happens to return today."
 

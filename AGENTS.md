@@ -32,6 +32,17 @@ The rules are distilled from review discussions on this repository's pull
 requests. Add a new convention to the file for its topic, or as a new file with
 `paths:` frontmatter, rather than expanding this one.
 
+## Rule IDs
+
+Every rule starts with a stable ID, `<area>/<slug>` (`be/no-trap`,
+`sec/no-secrets-in-urls`), so reviews and PR descriptions can cite it. The
+area matches the file: `be`, `fe`, `candid`, `mem`, `sec`, `e2e`, `test`,
+`style`, `i18n`, `ci`, `pr`, `variants`.
+
+- One ID per rule. A bullet that grows a second requirement is split, and the new rule gets its own ID.
+- A slug is kebab-case and names what the rule requires. IDs are not numbered, so adding a rule never shifts another.
+- Never reuse a removed ID. A renamed rule keeps its old ID next to the new one: `` `be/new-slug` (was `be/old-slug`) ``.
+
 ## Keep the rules current
 
 These rules are how a correction reaches the next agent. Update `.claude/rules/` when:
@@ -41,4 +52,4 @@ These rules are how a correction reaches the next agent. Update `.claude/rules/`
 - Your change makes a rule wrong: a renamed symbol, a moved path, a replaced pattern.
 - You notice a rule that contradicts the code or another rule.
 
-Make the update in the same PR when it belongs to that change. Otherwise, propose it to the user before you finish. List every rule you added, changed or removed in the PR description, in its own section, so reviewers see it. Don't keep a repo convention only in your own memory: it never reaches a teammate's agent.
+Make the update in the same PR when it belongs to that change. Otherwise, propose it to the user before you finish. List every rule you added, changed or removed in the PR description by its ID, in its own section, so reviewers see it. Don't keep a repo convention only in your own memory: it never reaches a teammate's agent.
