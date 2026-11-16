@@ -1103,6 +1103,31 @@ impl Anchor {
     /// included: a claim token may be spent twice, and a replay is not the user asking
     /// for delivery back on.
     pub fn point_at_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
+        self.point_entry_at_app(browser_id, app_id, None);
+    }
+
+    /// Moves `browser_id` onto `app_id` because the app it pointed at is not the one on the
+    /// phone, which is not the user switching delivery back on: an entry switched off stays
+    /// off, unless this identity already answered for `app_id` through another entry.
+    pub fn move_to_notification_app(&mut self, browser_id: BrowserId, app_id: NotificationAppId) {
+        let own_answer = match self
+            .browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .and_then(|browser| browser.notification_app)
+        {
+            Some(NotificationAppRef::Linked { enabled, .. }) => Some(enabled),
+            _ => None,
+        };
+        self.point_entry_at_app(browser_id, app_id, own_answer);
+    }
+
+    fn point_entry_at_app(
+        &mut self,
+        browser_id: BrowserId,
+        app_id: NotificationAppId,
+        own_answer: Option<bool>,
+    ) {
         let Some(browser) = self
             .browsers
             .iter()
@@ -1113,12 +1138,6 @@ impl Anchor {
         if browser.is_pointing_at(app_id) {
             return;
         }
-        // An entry moving off another app keeps its own answer: a join moves it to the app
-        // that is on the phone, and that is not the user switching delivery back on.
-        let own_answer = match browser.notification_app {
-            Some(NotificationAppRef::Linked { enabled, .. }) => Some(enabled),
-            _ => None,
-        };
         // Whether this identity wants the app to deliver is the user's answer about the
         // app, not about whichever entry happens to hold the reference, so a rotation
         // that moves it between this identity's browsers carries their answer along. A

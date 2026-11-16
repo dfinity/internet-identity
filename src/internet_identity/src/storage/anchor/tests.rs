@@ -1522,6 +1522,24 @@ mod browser_tests {
         );
     }
 
+    /// A join moves the entry to the app on the phone, which is not the user asking for
+    /// delivery back on.
+    #[test]
+    fn moving_to_the_app_on_the_phone_keeps_it_switched_off() {
+        let (mut anchor, id) = anchor_with_browser();
+        anchor.point_at_notification_app(id, 7);
+        anchor.disable_notification_app(id);
+
+        anchor.move_to_notification_app(id, 8);
+        assert_eq!(
+            anchor.notification_app(id),
+            Some(NotificationAppRef::Linked {
+                app_id: 8,
+                enabled: false,
+            })
+        );
+    }
+
     /// A browser key rotates on every sign-in, so the reference moves between this
     /// identity's entries without the user deciding anything. Their answer about the app
     /// moves with it, or signing in again would turn delivery back on unasked.

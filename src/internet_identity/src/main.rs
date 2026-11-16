@@ -862,7 +862,7 @@ fn join_notification_app(
     .ok_or(JoinNotificationAppError::NoNotificationApp)?
     .id;
 
-    anchor.point_at_notification_app(joining_browser, app_id);
+    anchor.move_to_notification_app(joining_browser, app_id);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
