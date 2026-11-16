@@ -49,10 +49,17 @@ const handleErrorMock = vi.hoisted(() => vi.fn());
 vi.mock("$lib/stores/last-used-identities.store", () => ({
   lastUsedIdentitiesStore: lastUsedIdentitiesStoreValue,
 }));
-// Nobody is signed in, and every sign-in below is left pending.
+// Nobody is signed in unless a test says so, and every sign-in below is left
+// pending.
+const authenticationStoreValue = vi.hoisted(() =>
+  createSubscribableStore<unknown>(undefined),
+);
+const isAuthenticatedStoreValue = vi.hoisted(() =>
+  createSubscribableStore(false),
+);
 vi.mock("$lib/stores/authentication.store", () => ({
-  authenticationStore: createSubscribableStore(undefined),
-  isAuthenticatedStore: createSubscribableStore(false),
+  authenticationStore: authenticationStoreValue,
+  isAuthenticatedStore: isAuthenticatedStoreValue,
 }));
 vi.mock("$lib/stores/session.store", () => ({
   sessionStore: createSubscribableStore({
@@ -192,6 +199,7 @@ const deferred = <T>() => {
 describe("ContinueView starts a sign-in inside the click that asks for it", () => {
   let component: ReturnType<typeof mount> | undefined;
   let open: ReturnType<typeof vi.spyOn>;
+  let onAuthorize: ReturnType<typeof vi.fn<(...args: unknown[]) => void>>;
 
   const select = (selected: LastUsedIdentity) => {
     lastUsedIdentitiesStoreValue.set({
@@ -208,7 +216,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       props: {
         effectiveOrigin: "https://app.example",
         displayOrigin: "https://app.example",
-        onAuthorize: vi.fn(),
+        onAuthorize,
         header: createRawSnippet(() => ({ render: () => "<span></span>" })),
       },
     });
@@ -253,6 +261,9 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
   beforeEach(() => {
     localStorage.clear();
+    onAuthorize = vi.fn<(...args: unknown[]) => void>();
+    authenticationStoreValue.set(undefined);
+    isAuthenticatedStoreValue.set(false);
     // jsdom has no Popover API, which the tooltips drive, no modal dialogs,
     // no visual viewport for them to follow and no form submission for their
     // buttons, no Web Animations API, which transitions run on, and no
@@ -476,6 +487,111 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
       expect(signInsStarted()).toBe(1);
       expect(actor.get_accounts).not.toHaveBeenCalled();
+    });
+
+    it("starts no sign-in when the screen comes up with all options on and no session", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+
+      // Nothing was pressed, so nothing may open, and nothing has failed.
+      expect(signInsStarted()).toBe(0);
+      expect(handleErrorMock).not.toHaveBeenCalled();
+      expect(showAllOptions().checked).toBe(true);
+      expect(localStorage.getItem(TOGGLE_KEY)).toBe("1");
+
+      // The options take a sign-in, which a press of Continue starts.
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+    });
+
+    it("starts no sign-in when the screen comes up with a stored session the canister refuses", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      actor.get_accounts.mockResolvedValue({
+        Err: { Unauthorized: "session" },
+      });
+      actorForIdentityMock.mockResolvedValue(actor);
+      render(identities[kind]);
+      await settle();
+
+      expect(purgeSessionMock).toHaveBeenCalledWith(IDENTITY_NUMBER);
+      expect(signInsStarted()).toBe(0);
+      expect(handleErrorMock).not.toHaveBeenCalled();
+      expect(showAllOptions().checked).toBe(true);
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+    });
+
+    it("lets Continue be pressed again when the sign-in for the options fails", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(undefined);
+      open.mockReturnValue(null);
+      render(identities[kind]);
+      await settle();
+
+      button("Continue").click();
+      await settle();
+
+      expect(handleErrorMock).toHaveBeenCalledTimes(1);
+      expect(handleErrorMock.mock.calls[0][0]).toBeInstanceOf(
+        PopupBlockedError,
+      );
+      // The choice to see all options is kept, and so is the way to them.
+      expect(showAllOptions().checked).toBe(true);
+      expect(localStorage.getItem(TOGGLE_KEY)).toBe("1");
+      expect(button("Continue").disabled).toBe(false);
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(2);
+    });
+
+    it("shows the options with the press of Continue they waited for, without continuing", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+      // Signed in since, so that this press has no sign-in left to wait for.
+      authenticationStoreValue.set({
+        identityNumber: IDENTITY_NUMBER,
+        actor: sessionActor(),
+      });
+      isAuthenticatedStoreValue.set(true);
+      flushSync();
+
+      button("Continue").click();
+      await settle();
+
+      expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+      expect(onAuthorize).not.toHaveBeenCalled();
+
+      // With the options on the screen, the next press continues.
+      button("Continue").click();
+      await settle();
+
+      expect(onAuthorize).toHaveBeenCalledTimes(1);
+    });
+
+    it("signs in once when the options were switched off and on again before Continue", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+      showAllOptions().click();
+      flushSync();
+      showAllOptions().click();
+      flushSync();
+      expect(signInsStarted()).toBe(1);
+
+      // The accounts are on their way with the sign-in the switch started.
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
     });
 
     it("leaves all options off when they were switched off before the stored session was found", async () => {
