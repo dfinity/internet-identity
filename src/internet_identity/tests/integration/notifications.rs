@@ -2807,6 +2807,8 @@ mod joins {
         assert!(pending()?);
 
         env.advance_time(std::time::Duration::from_secs(31 * 60));
+        // A query reads the state of the last round, so one has to run at the new time.
+        env.tick();
         assert!(!pending()?, "an expired install cannot complete");
         Ok(())
     }
