@@ -1,6 +1,11 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize, addVirtualAuthenticator, II_URL } from "../../utils";
+import {
+  authorize,
+  addVirtualAuthenticator,
+  blockPopUpsOutsideOfPresses,
+  II_URL,
+} from "../../utils";
 import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 
 const DEFAULT_USER_NAME = "John Doe";
@@ -232,6 +237,10 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
     await page.waitForURL(II_URL + "/manage");
     await managePage.signOut((c) => c.keepIdentity());
     await page.context().clearCookies();
+    // From here on II's windows open a popup the way Safari does, only inside
+    // the press that asks for it: Continue below has to open the OIDC popup
+    // before it awaits anything, or no popup ever arrives.
+    await blockPopUpsOutsideOfPresses(page.context(), II_URL);
 
     // Sign in via /authorize — known (iss, sub) goes straight to ContinueView.
     // keepIdentity() left the last-used entry in localStorage, so the picker

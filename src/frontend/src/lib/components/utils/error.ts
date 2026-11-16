@@ -28,7 +28,7 @@ export const handleError = (error: unknown) => {
   if (error instanceof PopupBlockedError) {
     toaster.warning({
       title: t`Pop-up blocked`,
-      description: t`Your browser blocked the sign-in window. Please try again, and allow pop-ups for this site if it keeps happening.`,
+      description: t`Your browser blocked the sign-in window. Please try again. If it keeps happening, check your browser's pop-up settings.`,
     });
     return;
   }

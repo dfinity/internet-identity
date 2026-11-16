@@ -7,7 +7,9 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => ({
   resolve: {
     alias: aliasConfig,
     // Svelte's client build, so that component tests can mount: without it
-    // Vitest picks the server build, which has no `mount`.
+    // Vitest picks the server build, which has no `mount`. The condition is
+    // not Svelte's alone: `browser` from `$app/environment` is `true` in unit
+    // tests with it, and lit-html resolves to its browser build.
     conditions: ["browser"],
   },
   plugins: [sveltekit()],

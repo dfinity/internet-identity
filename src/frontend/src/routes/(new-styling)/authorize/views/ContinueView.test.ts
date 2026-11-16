@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRawSnippet, flushSync, mount, unmount } from "svelte";
 import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+import { PopupBlockedError } from "$lib/utils/openID";
 
 // The pop-up an OpenID or SSO identity signs in with has to open while the
 // click is being handled: Safari blocks a pop-up that opens after anything was
@@ -132,6 +133,7 @@ vi.mock("$lib/stores/locale.store", () => {
 import ContinueView from "./ContinueView.svelte";
 
 const IDENTITY_NUMBER = BigInt(10000);
+const OTHER_IDENTITY_NUMBER = BigInt(10001);
 const TOGGLE_KEY = `ii:multi-accounts:${IDENTITY_NUMBER}`;
 
 const identity = (
@@ -166,24 +168,41 @@ const workAccount = {
 
 /**
  * A stored session, which the canister lets read the accounts and nothing
- * else: there is no method here to change one with.
+ * else: it refuses to change one.
  */
 const sessionActor = () => ({
   get_accounts: vi
     .fn()
     .mockResolvedValue({ Ok: [primaryAccount, workAccount] }),
   get_default_account: vi.fn().mockResolvedValue({ Ok: primaryAccount }),
+  set_default_account: vi
+    .fn()
+    .mockResolvedValue({ Err: { Unauthorized: "session" } }),
 });
+
+/** A promise for a test to settle when it gets to that point. */
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+};
 
 describe("ContinueView starts a sign-in inside the click that asks for it", () => {
   let component: ReturnType<typeof mount> | undefined;
   let open: ReturnType<typeof vi.spyOn>;
 
-  const render = (selected: LastUsedIdentity) => {
+  const select = (selected: LastUsedIdentity) => {
     lastUsedIdentitiesStoreValue.set({
       identities: { [`${selected.identityNumber}`]: selected },
       selected,
     });
+    flushSync();
+  };
+
+  const render = (selected: LastUsedIdentity) => {
+    select(selected);
     component = mount(ContinueView, {
       target: document.body,
       props: {
@@ -215,6 +234,21 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
   const settle = async () => {
     await new Promise((resolve) => setTimeout(resolve));
     flushSync();
+  };
+
+  /**
+   * Presses the switch the way a browser delivers a press: the box is checked,
+   * the click is handled and what it started settles, and only then does the
+   * box report its change. `click()` reports the change before anything
+   * settles, which hides a failure that is handled in between.
+   */
+  const pressShowAllOptions = async () => {
+    const toggle = showAllOptions();
+    toggle.checked = !toggle.checked;
+    toggle.dispatchEvent(new Event("click", { bubbles: true }));
+    await settle();
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await settle();
   };
 
   beforeEach(() => {
@@ -324,7 +358,8 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
     it("signs in when the default account is changed, and keeps the stored session", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
-      actorForIdentityMock.mockResolvedValue(sessionActor());
+      const actor = sessionActor();
+      actorForIdentityMock.mockResolvedValue(actor);
       render(identities[kind]);
       await settle();
       document.body
@@ -339,9 +374,126 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       button("Save changes").click();
 
       expect(signInsStarted()).toBe(1);
-      // Changing the default takes a sign-in. The stored session can't do it,
-      // and is not thrown away for not being able to.
+      // Changing the default takes a sign-in. The stored session is not asked
+      // to do it, and so not thrown away for being refused.
+      await settle();
+      expect(actor.set_default_account).not.toHaveBeenCalled();
       expect(purgeSessionMock).not.toHaveBeenCalled();
+    });
+
+    it("reports a pop-up the browser refused, and lets Continue be pressed again", async () => {
+      open.mockReturnValue(null);
+      render(identities[kind]);
+
+      button("Continue").click();
+      await settle();
+
+      expect(handleErrorMock).toHaveBeenCalledTimes(1);
+      expect(handleErrorMock.mock.calls[0][0]).toBeInstanceOf(
+        PopupBlockedError,
+      );
+      expect(button("Continue").disabled).toBe(false);
+    });
+
+    it("switches all options back off when the sign-in fails within the press", async () => {
+      open.mockReturnValue(null);
+      render(identities[kind]);
+
+      await pressShowAllOptions();
+
+      expect(handleErrorMock).toHaveBeenCalledTimes(1);
+      expect(showAllOptions().checked).toBe(false);
+      expect(localStorage.getItem(TOGGLE_KEY)).toBeNull();
+    });
+
+    it("signs in on the next press once the canister refused the stored session", async () => {
+      const actor = sessionActor();
+      actor.get_accounts.mockResolvedValue({
+        Err: { Unauthorized: "session" },
+      });
+      actorForIdentityMock.mockResolvedValue(actor);
+      // The sign-in the refusal falls back to fails too, so that the option
+      // can be pressed a second time.
+      open.mockReturnValue(null);
+      render(identities[kind]);
+      await settle();
+
+      await pressShowAllOptions();
+      expect(purgeSessionMock).toHaveBeenCalledWith(IDENTITY_NUMBER);
+      expect(signInsStarted()).toBe(1);
+
+      showAllOptions().click();
+
+      expect(signInsStarted()).toBe(2);
+      expect(actor.get_accounts).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not read with a session that failed to read, and looks it up again", async () => {
+      const actor = sessionActor();
+      actor.get_accounts.mockRejectedValue(new Error("Invalid delegation"));
+      actorForIdentityMock.mockResolvedValueOnce(actor);
+      // Looked up again, the session turns out to have expired.
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+
+      await pressShowAllOptions();
+      expect(handleErrorMock).toHaveBeenCalledTimes(1);
+      expect(showAllOptions().checked).toBe(false);
+      expect(actorForIdentityMock).toHaveBeenCalledTimes(2);
+
+      showAllOptions().click();
+
+      expect(signInsStarted()).toBe(1);
+      expect(actor.get_accounts).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not read with the stored session of the identity selected before", async () => {
+      const actor = sessionActor();
+      actorForIdentityMock.mockResolvedValueOnce(actor);
+      render(identities[kind]);
+      await settle();
+      // The lookup for the identity switched to has not answered yet.
+      actorForIdentityMock.mockReturnValue(new Promise(() => {}));
+      select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+
+      showAllOptions().click();
+
+      expect(signInsStarted()).toBe(1);
+      expect(actor.get_accounts).not.toHaveBeenCalled();
+    });
+
+    it("ignores a lookup that answers after another identity was selected", async () => {
+      const actor = sessionActor();
+      const lookup = deferred<typeof actor>();
+      actorForIdentityMock.mockReturnValueOnce(lookup.promise);
+      render(identities[kind]);
+      select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+      lookup.resolve(actor);
+      await settle();
+
+      showAllOptions().click();
+
+      expect(signInsStarted()).toBe(1);
+      expect(actor.get_accounts).not.toHaveBeenCalled();
+    });
+
+    it("leaves all options off when they were switched off before the stored session was found", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const lookup = deferred<typeof actor>();
+      actorForIdentityMock.mockReturnValue(lookup.promise);
+      render(identities[kind]);
+      expect(showAllOptions().checked).toBe(true);
+
+      showAllOptions().click();
+      flushSync();
+      lookup.resolve(actor);
+      await settle();
+
+      expect(showAllOptions().checked).toBe(false);
+      expect(actor.get_accounts).not.toHaveBeenCalled();
+      expect(signInsStarted()).toBe(0);
     });
   });
 

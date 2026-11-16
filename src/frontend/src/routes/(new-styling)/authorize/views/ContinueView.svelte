@@ -278,6 +278,20 @@
   // an OpenID or SSO identity. `undefined` while the lookup is in flight too,
   // which the handlers treat like having no session: they sign in.
   let sessionActor: ActorSubclass<_SERVICE> | undefined;
+  // Resolves to whether the identity is still the selected one, in which case
+  // `sessionActor` now holds what the lookup found.
+  const lookUpSessionActor = (identityNumber: bigint): Promise<boolean> =>
+    actorForIdentity(identityNumber).then((actor) => {
+      // The identity may have been switched while IndexedDB was read.
+      if (selectedIdentityNumber !== identityNumber) {
+        return false;
+      }
+      // While signed in as this identity the lookup answers with the actor of
+      // that sign-in. The handlers read that one from the store; kept here it
+      // would outlive the sign-in it belongs to.
+      sessionActor = actor === $authenticationStore?.actor ? undefined : actor;
+      return true;
+    });
   // Re-initialize the flow and re-hydrate per-identity state when the
   // identity changes. Read the persisted values into locals so the
   // effect's only reactive dependency is `selectedIdentityNumber` -- if
@@ -293,13 +307,8 @@
     defaultAccountNumber = null;
     selectedAccountNumber = null;
     sessionActor = undefined;
-    void actorForIdentity(identityNumber).then((actor) => {
-      // The identity may have been switched while IndexedDB was read.
-      if (selectedIdentityNumber !== identityNumber) {
-        return;
-      }
-      sessionActor = actor;
-      if (hydrated && isMultipleAccountsEnabled) {
+    void lookUpSessionActor(identityNumber).then((isSelected) => {
+      if (isSelected && hydrated && isMultipleAccountsEnabled) {
         void handleEnableMultipleAccounts();
       }
     });
@@ -393,6 +402,11 @@
   };
 
   const handleEnableMultipleAccounts = async () => {
+    // On already, as far as this component goes. The switch only reports its
+    // change once the click has been handled, and a sign-in that fails within
+    // the click (a refused pop-up) is handled before that: switching the
+    // option back off below would then be undone by the report.
+    isMultipleAccountsEnabled = true;
     selectedTtlSeconds = rememberedTtlSeconds();
     try {
       // What `actorForIdentity` resolves to, read rather than awaited, so that
@@ -408,14 +422,20 @@
           await loadAccountsViaActor(readActor, selectedIdentityNumber);
           return;
         } catch (err) {
+          // Not read with again, whatever went wrong: the next press signs in
+          // right away, unless a session is found to read with once more.
+          if (readActor === sessionActor) {
+            sessionActor = undefined;
+          }
           if (
             isCanisterError<SessionDelegationError>(err) &&
             err.type === "Unauthorized"
           ) {
-            // Forgotten here too, so that the next press signs in right away.
-            sessionActor = undefined;
             void purgeSession(selectedIdentityNumber);
           } else {
+            // The lookup drops a session that expired while this screen was
+            // open, and finds again one the request just did not reach.
+            void lookUpSessionActor(selectedIdentityNumber);
             throw err;
           }
         }
