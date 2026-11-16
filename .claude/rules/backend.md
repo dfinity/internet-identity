@@ -27,7 +27,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 
 ## State changes, errors and `await`
 
-- `be/err-does-not-roll-back` On the IC, returning `Err` doesn't undo state changes. Every mutation made before it is committed: stable-memory writes (`Storage::write`, map inserts and removes, counter bumps) and changes to heap state (`state` module, `thread_local!`). Reads, locals and building the response don't count. Only a trap rolls back. Run every check that can fail before the first mutation, and never use `?` after one. Each `await` commits the same way (next rule).
+- `be/err-does-not-roll-back` On the IC, returning `Err` doesn't undo state changes. Every mutation made before it is committed: stable-memory writes (`Storage::write`, map inserts and removes, counter bumps) and changes to heap state (`state` module, `thread_local!`). Reads, locals and building the response don't count. Only a trap rolls back. Run every check that can fail before the first mutation, and never use `?` after one. Each `await` commits the same way (next rule). The activity bookkeeping done by `check_authz_and_record_activity` is the exception: it records that the caller acted and is meant to commit even when the call then fails validation.
 - `be/recheck-after-await` Every `await` is a commit point and lets other messages run. Re-read and re-check (authorization, existence, generation) anything captured before it; never write back a value loaded before it. Re-derive the value from its source and compare it with the one captured before (`if <the same lookup> != Some(anchor_number) { return Err(...) }`), in one check.
 - `be/lock-needs-recovery` A lock or "in progress" flag written before an `await` needs a recovery path.
 - `be/no-check-await-write` Don't check, await, then write (get-or-create with `raw_rand`). An install hook can't await, so initialize from a zero-delay timer scheduled at install that re-checks after its await (`set_salt_if_unset`), and refuse dependent calls until it has run.
@@ -83,9 +83,10 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 
 ## Clippy
 
-`be/run-clippy` Run `cargo fmt` and `cargo clippy` after Rust changes, before committing. CI (`.github/workflows/rust.yml`) runs two passes, and both must be clean:
+`be/run-clippy` Run `cargo fmt` and `cargo clippy` after Rust changes, before committing. CI (`.github/workflows/rust.yml`) runs two passes, and both must be clean. In a fresh checkout, create `dist/` first: the frontend canister embeds it with `include_dir!`, and CI creates an empty one the same way.
 
 ```bash
+mkdir -p dist
 cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
 cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
 ```

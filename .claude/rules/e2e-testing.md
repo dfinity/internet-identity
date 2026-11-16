@@ -19,10 +19,10 @@ The `e2e-playwright` job in `.github/workflows/canister-tests.yml` is the CI ref
 
 ## Running tests
 
-- `e2e/run-narrowed` Start the stack with `./scripts/dev-e2e-setup`, then run `npx playwright test --project=desktop --workers=1`, narrowed to a spec file (`npx playwright test <path to .spec.ts> ...`) or to tests by name (`-g "<name pattern>"`).
+- `e2e/run-narrowed` Start the stack with `./scripts/dev-e2e-setup`, then run `npx playwright test --project=desktop --workers=1`, narrowed to a spec file (`npx playwright test <path to .spec.ts> ...`) or to tests by name (`-g "<name pattern>"`). The projects in `playwright.config.ts` are `desktop`, `mobile` and `chrome-extension`; specs under `e2e-playwright-chrome-extension` only run in `chrome-extension`, which has its own `testDir`.
 - `e2e/one-worker` Run with `--workers=1`, as CI does: specs share canister state, and parallel workers produce false failures.
 - `e2e/rerun-setup` After changing code, re-run `./scripts/dev-e2e-setup` before the next test run. The tests run against the deployed canisters, so a change takes effect only once setup rebuilds them (see Stack gotchas).
-- `e2e/full-suite-for-broad-changes` For broad frontend changes (auth flows, consent, sessions), run the full suite, not just the new spec.
+- `e2e/full-suite-for-broad-changes` For broad frontend changes (auth flows, consent, sessions), run the full suite in all three projects, as CI does, not just the new spec.
 - `e2e/trace-failures` Add `--trace on` to debug a failure.
 - `e2e/teardown-when-done` Tear the stack down with `./scripts/dev-e2e-setup --teardown` when done.
 

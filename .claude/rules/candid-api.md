@@ -19,7 +19,7 @@ paths:
 - `candid/mark-deprecated` Mark superseded methods `// Deprecated:` in the `.did`.
 - `candid/extend-before-adding` Extend an existing method rather than adding a sibling that does nearly the same thing; add a narrow new method only when widening an existing one would expose data to callers that don't need it.
 - `candid/record-not-bare-bool` Leave room to grow: return a `record` (`record { is_granted : bool }`), not a bare `bool`.
-- `candid/install-args-opt` Install and upgrade args: `opt T` means "leave the stored value unchanged". Use `opt opt T` when a field must also be clearable (`null` keeps, `opt null` clears, `opt opt v` sets).
+- `candid/install-args-opt` Install and upgrade args: `opt T` means "leave the stored value unchanged". Use `opt opt T` when a field must also be clearable (`null` keeps, `opt null` clears, `opt opt v` sets). This is the backend canister, which keeps its stored config. The frontend canister rebuilds its config from the args on every install and upgrade, so a missing field there resets it (`related_origins`): pass its full configuration every time.
 - `candid/no-unused-config-fields` Don't add fields to the backend-to-frontend config (`/.config.did.bin`) or to frontend stores unless the frontend uses them.
 
 ## Shape
@@ -27,7 +27,7 @@ paths:
 - `candid/request-record` One `*Request` record argument per method once it takes more than a trivial input.
 - `candid/alias-opaque-types` Give opaque `text`/`blob` arguments a named alias (`type RegistrationId = text`).
 - `candid/method-names` Method names start with a verb. Methods apps call are prefixed `app_`. A boolean query is named for its answer.
-- `candid/result-variant` Updates and authenticated calls return `variant { Ok : T; Err : XError }`. A public, unauthenticated lookup may return `opt T`. Never return `Ok : false` as a failure.
+- `candid/result-variant` Updates and authenticated calls return `variant { Ok : T; Err : XError }`, except reads with several states, which return a status variant (`candid/return-shape`). A public, unauthenticated lookup may return `opt T`. Never return `Ok : false` as a failure.
 - `candid/match-existing-names` Match field names to existing response shapes (`signed_delegation`). Use the same type name on both sides of the frontend/backend boundary.
 - `candid/no-redundant-caller-args` Don't make the caller send what `caller()` already proves.
 
