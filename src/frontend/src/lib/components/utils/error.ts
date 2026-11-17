@@ -24,11 +24,10 @@ import {
 import { t } from "$lib/stores/locale.store";
 
 export const handleError = (error: unknown) => {
-  // The pop-up never opened, which is not the user canceling anything.
   if (error instanceof PopupBlockedError) {
     toaster.warning({
       title: t`Pop-up blocked`,
-      description: t`Your browser blocked the sign-in window. Please try again. If it keeps happening, check your browser's pop-up settings.`,
+      description: t`Your browser blocked the sign-in window. Try again. If it keeps happening, check your browser's pop-up settings.`,
     });
     return;
   }

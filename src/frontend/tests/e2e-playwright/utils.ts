@@ -79,10 +79,10 @@ export const authorize = (
  * opens only while the press that asked for it is being handled, and `null`
  * comes back afterwards.
  *
- * Chromium, which these tests run in, is far more lenient: it opens a pop-up
- * for seconds after a press, whatever was awaited in between. A sign-in that
- * awaits something before its pop-up therefore passes here and fails for every
- * Safari user, which is what this is for.
+ * Chromium as these tests launch it blocks no pop-up at all, and a regular
+ * Chrome opens one for seconds after a press, whatever was awaited in
+ * between. A sign-in that awaits something before its pop-up therefore passes
+ * here and fails for every Safari user, which is what this is for.
  *
  * "Being handled" is the task of the click and its microtasks. Whatever comes
  * back in a task of its own (IndexedDB, the network, a timer) is too late.
@@ -97,7 +97,7 @@ export const authorize = (
  * @param context The browser context II's windows open in.
  * @param origin The origin to block late pop-ups on.
  */
-export const blockPopUpsOutsideOfPresses = async (
+export const blockPopupsOutsideOfPresses = async (
   context: BrowserContext,
   origin: string,
 ): Promise<void> => {
@@ -105,28 +105,28 @@ export const blockPopUpsOutsideOfPresses = async (
     if (window.location.origin !== blockedOrigin) {
       return;
     }
-    let pressing = false;
-    const endOfPress = () => {
-      pressing = false;
+    let isPressBeingHandled = false;
+    const endPress = () => {
+      isPressBeingHandled = false;
     };
     const channel = new MessageChannel();
-    channel.port1.onmessage = endOfPress;
+    channel.port1.onmessage = endPress;
     window.addEventListener(
       "click",
       (event) => {
         if (!event.isTrusted) {
           return;
         }
-        pressing = true;
+        isPressBeingHandled = true;
         // Both run as tasks of their own, queued ahead of anything the click
         // goes on to start; whichever comes first ends the press.
-        setTimeout(endOfPress);
+        setTimeout(endPress);
         channel.port2.postMessage(undefined);
       },
       true,
     );
     const open = window.open.bind(window);
-    window.open = (...args) => (pressing ? open(...args) : null);
+    window.open = (...args) => (isPressBeingHandled ? open(...args) : null);
   }, origin);
 };
 

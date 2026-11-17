@@ -663,7 +663,7 @@ describe("requestWithPopup", () => {
 
     const error: unknown = await requestWithPopup(config, {
       nonce: "nonce",
-    }).catch((e: unknown) => e);
+    }).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(PopupBlockedError);
     expect(error).not.toBeInstanceOf(CallbackPopupClosedError);
@@ -676,7 +676,7 @@ describe("requestWithPopup", () => {
 
     const error: unknown = await requestWithPopup(Promise.resolve(config), {
       nonce: "nonce",
-    }).catch((e: unknown) => e);
+    }).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(PopupBlockedError);
   });
@@ -690,7 +690,7 @@ describe("requestWithPopup", () => {
     const error: unknown = await requestWithPopup(
       { ...config, authURL: "https://appleid.apple.com/auth/authorize" },
       { nonce: "nonce" },
-    ).catch((e: unknown) => e);
+    ).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(PopupBlockedError);
   });

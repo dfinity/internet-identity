@@ -25,9 +25,7 @@ export class CallbackPopupClosedError extends Error {}
  * the site may open them, so this is either a sign-in that started too late
  * after the click (a bug on our side) or pop-ups being blocked for this site.
  *
- * `handleError` has a message for it. The wizards, which answer a cancel in
- * place, answer this the same way for now, see their `PopupBlockedError`
- * checks.
+ * `handleError` has a message for it.
  */
 export class PopupBlockedError extends Error {
   constructor() {

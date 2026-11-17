@@ -14,20 +14,20 @@ import { PopupBlockedError } from "$lib/utils/openID";
 vi.mock("$app/environment", () => ({ browser: true, building: false }));
 vi.mock("$app/navigation", () => ({ goto: vi.fn(), onNavigate: vi.fn() }));
 
-function createSubscribableStore<T>(initial: T) {
-  let value = initial;
-  const subs = new Set<(v: T) => void>();
+function createSubscribableStore<T>(initialValue: T) {
+  let value = initialValue;
+  const subscribers = new Set<(value: T) => void>();
   return {
-    subscribe: (fn: (v: T) => void) => {
-      subs.add(fn);
-      fn(value);
+    subscribe: (subscriber: (value: T) => void) => {
+      subscribers.add(subscriber);
+      subscriber(value);
       return () => {
-        subs.delete(fn);
+        subscribers.delete(subscriber);
       };
     },
-    set: (v: T) => {
-      value = v;
-      subs.forEach((fn) => fn(value));
+    set: (newValue: T) => {
+      value = newValue;
+      subscribers.forEach((subscriber) => subscriber(value));
     },
   };
 }
@@ -119,8 +119,8 @@ vi.mock("$lib/stores/locale.store", () => {
   // Not preprocessed in unit tests, so templates arrive as written.
   const asStore = <T extends object>(value: T): T =>
     Object.assign(value, {
-      subscribe: (fn: (v: T) => void) => {
-        fn(value);
+      subscribe: (subscriber: (value: T) => void) => {
+        subscriber(value);
         return () => {};
       },
     });
@@ -139,9 +139,22 @@ vi.mock("$lib/stores/locale.store", () => {
 
 import ContinueView from "./ContinueView.svelte";
 
+/** The number of the identity the Continue screen comes up with. */
 const IDENTITY_NUMBER = BigInt(10000);
+/** The number of a second identity, for the tests that select another one. */
 const OTHER_IDENTITY_NUMBER = BigInt(10001);
+/**
+ * The `localStorage` key under which `ContinueView.svelte` keeps whether "Show
+ * all options" is on for the identity numbered `IDENTITY_NUMBER`: its
+ * `TOGGLE_STORAGE_PREFIX` followed by the identity number. The value is `"1"`
+ * while the options are on, and the key is absent while they are off.
+ */
 const TOGGLE_KEY = `ii:multi-accounts:${IDENTITY_NUMBER}`;
+/**
+ * The `localStorage` key under which `ContinueView.svelte` keeps whether "Show
+ * all options" is on for the identity numbered `OTHER_IDENTITY_NUMBER`, in the
+ * same form as `TOGGLE_KEY`.
+ */
 const OTHER_TOGGLE_KEY = `ii:multi-accounts:${OTHER_IDENTITY_NUMBER}`;
 
 const identity = (
@@ -192,9 +205,9 @@ const sessionActor = () => ({
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
   });
   return { promise, resolve, reject };
 };
@@ -204,16 +217,16 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
   let open: ReturnType<typeof vi.spyOn>;
   let onAuthorize: ReturnType<typeof vi.fn<(...args: unknown[]) => void>>;
 
-  const select = (selected: LastUsedIdentity) => {
+  const select = (selectedIdentity: LastUsedIdentity) => {
     lastUsedIdentitiesStoreValue.set({
-      identities: { [`${selected.identityNumber}`]: selected },
-      selected,
+      identities: { [`${selectedIdentity.identityNumber}`]: selectedIdentity },
+      selected: selectedIdentity,
     });
     flushSync();
   };
 
-  const render = (selected: LastUsedIdentity) => {
-    select(selected);
+  const render = (selectedIdentity: LastUsedIdentity) => {
+    select(selectedIdentity);
     component = mount(ContinueView, {
       target: document.body,
       props: {
@@ -227,19 +240,54 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
   };
 
   const button = (name: string): HTMLButtonElement => {
-    const found = Array.from(document.body.querySelectorAll("button")).find(
-      (candidate) => candidate.textContent?.trim() === name,
-    );
-    if (found === undefined) {
+    const matchingButton = Array.from(
+      document.body.querySelectorAll("button"),
+    ).find((candidate) => candidate.textContent?.trim() === name);
+    if (matchingButton === undefined) {
       throw new Error(`No button named ${name}`);
     }
-    return found;
+    return matchingButton;
+  };
+
+  const element = <T extends Element>(
+    selector: string,
+    type: new () => T,
+  ): T => {
+    const matchingElement = document.body.querySelector(selector);
+    if (!(matchingElement instanceof type)) {
+      throw new Error(`No ${type.name} matches ${selector}`);
+    }
+    return matchingElement;
   };
 
   const showAllOptions = (): HTMLInputElement =>
-    document.body.querySelector<HTMLInputElement>('input[role="switch"]')!;
+    element('input[role="switch"]', HTMLInputElement);
 
   const signInsStarted = (): number => open.mock.calls.length;
+
+  /** Puts back what `stubProperty` replaced, most recent first. */
+  let restoreStubbedProperties: (() => void)[] = [];
+
+  /**
+   * Defines `property` on `target` as `value` until `afterEach`, which puts
+   * back the descriptor `property` had on `target`, or removes `property` when
+   * it had none.
+   */
+  const stubProperty = (target: object, property: string, value: unknown) => {
+    const original = Object.getOwnPropertyDescriptor(target, property);
+    Object.defineProperty(target, property, {
+      configurable: true,
+      writable: true,
+      value,
+    });
+    restoreStubbedProperties.unshift(() => {
+      if (original === undefined) {
+        Reflect.deleteProperty(target, property);
+      } else {
+        Object.defineProperty(target, property, original);
+      }
+    });
+  };
 
   /** Lets everything that can settle without the network do so. */
   const settle = async () => {
@@ -271,22 +319,21 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     // no visual viewport for them to follow and no form submission for their
     // buttons, no Web Animations API, which transitions run on, and no
     // ResizeObserver, which the spinner of the button uses.
-    HTMLElement.prototype.showPopover = () => {};
-    HTMLElement.prototype.hidePopover = () => {};
-    HTMLDialogElement.prototype.showModal = () => {};
-    HTMLDialogElement.prototype.close = () => {};
+    stubProperty(HTMLElement.prototype, "showPopover", () => {});
+    stubProperty(HTMLElement.prototype, "hidePopover", () => {});
+    stubProperty(HTMLDialogElement.prototype, "showModal", () => {});
+    stubProperty(HTMLDialogElement.prototype, "close", () => {});
     vi.stubGlobal("visualViewport", null);
-    HTMLFormElement.prototype.requestSubmit = () => {};
+    stubProperty(HTMLFormElement.prototype, "requestSubmit", () => {});
     // An animation that is over at once, so that what a transition takes off
     // the screen is gone from the document as well.
-    Element.prototype.animate = () =>
-      ({
-        cancel: () => {},
-        finished: Promise.resolve(),
-        set onfinish(finish: () => void) {
-          queueMicrotask(finish);
-        },
-      }) as unknown as Animation;
+    stubProperty(Element.prototype, "animate", () => ({
+      cancel: () => {},
+      finished: Promise.resolve(),
+      set onfinish(finish: () => void) {
+        queueMicrotask(finish);
+      },
+    }));
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -324,6 +371,8 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       component = undefined;
     }
     document.body.innerHTML = "";
+    restoreStubbedProperties.forEach((restore) => restore());
+    restoreStubbedProperties = [];
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     vi.clearAllMocks();
@@ -332,6 +381,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
   describe.each(Object.keys(identities))("with a %s identity", (kind) => {
     it("signs in when Continue is pressed", () => {
       render(identities[kind]);
+      expect(signInsStarted()).toBe(0);
 
       button("Continue").click();
 
@@ -360,6 +410,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
     it("signs in when all options are switched on with no session at hand", () => {
       render(identities[kind]);
+      expect(signInsStarted()).toBe(0);
 
       showAllOptions().click();
 
@@ -386,12 +437,14 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       await settle();
       button("Add another account").click();
       flushSync();
-      const name = document.body.querySelector<HTMLInputElement>(
+      const name = element(
         'input[aria-label="Account name"]',
-      )!;
+        HTMLInputElement,
+      );
       name.value = "Demo";
       name.dispatchEvent(new Event("input", { bubbles: true }));
       flushSync();
+      expect(signInsStarted()).toBe(0);
 
       button("Create account").click();
 
@@ -404,14 +457,11 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       actorForIdentityMock.mockResolvedValue(actor);
       render(identities[kind]);
       await settle();
-      document.body
-        .querySelector<HTMLButtonElement>('button[aria-label="Edit Work"]')!
-        .click();
+      element('button[aria-label="Edit Work"]', HTMLButtonElement).click();
       flushSync();
-      document.body
-        .querySelector<HTMLInputElement>('dialog input[type="checkbox"]')!
-        .click();
+      element('dialog input[type="checkbox"]', HTMLInputElement).click();
       flushSync();
+      expect(signInsStarted()).toBe(0);
 
       button("Save changes").click();
 
@@ -425,40 +475,36 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
     it("makes an account the default with the sign-in at hand, not with the stored session", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
-      const stored = sessionActor();
-      actorForIdentityMock.mockResolvedValue(stored);
+      const storedSessionActor = sessionActor();
+      actorForIdentityMock.mockResolvedValue(storedSessionActor);
       render(identities[kind]);
       await settle();
       // Signed in since, so that this press has no sign-in left to wait for.
-      const signedIn = {
+      const signedInActor = {
         ...sessionActor(),
         set_default_account: vi.fn().mockResolvedValue({ Ok: workAccount }),
       };
       authenticationStoreValue.set({
         identityNumber: IDENTITY_NUMBER,
-        actor: signedIn,
+        actor: signedInActor,
       });
       isAuthenticatedStoreValue.set(true);
       flushSync();
-      document.body
-        .querySelector<HTMLButtonElement>('button[aria-label="Edit Work"]')!
-        .click();
+      element('button[aria-label="Edit Work"]', HTMLButtonElement).click();
       flushSync();
-      document.body
-        .querySelector<HTMLInputElement>('dialog input[type="checkbox"]')!
-        .click();
+      element('dialog input[type="checkbox"]', HTMLInputElement).click();
       flushSync();
 
       button("Save changes").click();
       await settle();
 
       expect(signInsStarted()).toBe(0);
-      expect(signedIn.set_default_account).toHaveBeenCalledWith(
+      expect(signedInActor.set_default_account).toHaveBeenCalledWith(
         IDENTITY_NUMBER,
         "https://app.example",
         [BigInt(1)],
       );
-      expect(stored.set_default_account).not.toHaveBeenCalled();
+      expect(storedSessionActor.set_default_account).not.toHaveBeenCalled();
       expect(handleErrorMock).not.toHaveBeenCalled();
     });
 
@@ -551,6 +597,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(handleErrorMock).toHaveBeenCalledTimes(1);
       expect(showAllOptions().checked).toBe(false);
       expect(actorForIdentityMock).toHaveBeenCalledTimes(2);
+      expect(signInsStarted()).toBe(0);
 
       showAllOptions().click();
 
@@ -566,6 +613,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       // The lookup for the identity switched to has not answered yet.
       actorForIdentityMock.mockReturnValue(new Promise(() => {}));
       select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+      expect(signInsStarted()).toBe(0);
 
       showAllOptions().click();
 
@@ -581,6 +629,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
       lookup.resolve(actor);
       await settle();
+      expect(signInsStarted()).toBe(0);
 
       showAllOptions().click();
 
@@ -670,7 +719,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
       expect(onAuthorize).not.toHaveBeenCalled();
 
-      // With the options on the screen, the next press continues.
       button("Continue").click();
       await settle();
 
@@ -725,7 +773,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
       expect(document.body.querySelector('input[type="radio"]')).toBeNull();
       expect(showAllOptions().checked).toBe(true);
-      // Nor are they remembered as accounts of the identity switched to.
       expect(
         lastUsedIdentitiesStoreValue.syncLastUsedAccounts,
       ).not.toHaveBeenCalledWith(
@@ -773,7 +820,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
       answer.resolve({ Err: { Unauthorized: "session" } });
       await settle();
-      // The session thrown away is the one that was refused.
       expect(purgeSessionMock).toHaveBeenCalledWith(IDENTITY_NUMBER);
       expect(purgeSessionMock).not.toHaveBeenCalledWith(OTHER_IDENTITY_NUMBER);
 
@@ -825,6 +871,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(
         lastUsedIdentitiesStoreValue.syncLastUsedAccounts,
       ).not.toHaveBeenCalled();
+      expect(signInsStarted()).toBe(0);
       // The identity switched to still waits for its own.
       button("Continue").click();
       expect(signInsStarted()).toBe(1);
@@ -867,6 +914,27 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
       expect(handleErrorMock).not.toHaveBeenCalled();
       expect(showAllOptions().checked).toBe(false);
+    });
+
+    it("reports nothing when the accounts fail to load after the screen was taken down", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const answer = deferred<never>();
+      actor.get_accounts.mockReturnValue(answer.promise);
+      actorForIdentityMock.mockResolvedValue(actor);
+      render(identities[kind]);
+      await settle();
+      expect(actor.get_accounts).toHaveBeenCalledTimes(1);
+      if (component === undefined) {
+        throw new Error("The screen is not up");
+      }
+      await unmount(component);
+      component = undefined;
+
+      answer.reject(new Error("Failed to fetch"));
+      await settle();
+
+      expect(handleErrorMock).not.toHaveBeenCalled();
     });
 
     it("reports it and switches all options off when the accounts fail to load as the screen comes up", async () => {
@@ -971,11 +1039,11 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
     it("continues with one press when a press of the switch is refused after the accounts arrived", async () => {
       const actor = sessionActor();
-      const first = deferred<{ Ok: unknown[] }>();
-      const second = deferred<{ Err: { Unauthorized: string } }>();
+      const accountsAnswer = deferred<{ Ok: unknown[] }>();
+      const refusalAnswer = deferred<{ Err: { Unauthorized: string } }>();
       actor.get_accounts
-        .mockReturnValueOnce(first.promise)
-        .mockReturnValueOnce(second.promise);
+        .mockReturnValueOnce(accountsAnswer.promise)
+        .mockReturnValueOnce(refusalAnswer.promise);
       actorForIdentityMock.mockResolvedValue(actor);
       render(identities[kind]);
       await settle();
@@ -989,10 +1057,9 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(actor.get_accounts).toHaveBeenCalledTimes(2);
       expect(signInsStarted()).toBe(0);
 
-      // The first answer brings the accounts, the second is a refusal.
-      first.resolve({ Ok: [primaryAccount, workAccount] });
+      accountsAnswer.resolve({ Ok: [primaryAccount, workAccount] });
       await settle();
-      second.resolve({ Err: { Unauthorized: "session" } });
+      refusalAnswer.resolve({ Err: { Unauthorized: "session" } });
       await settle();
       expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
       expect(showAllOptions().checked).toBe(true);
@@ -1292,7 +1359,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
     expect(signInsStarted()).toBe(0);
 
-    // With the accounts on the screen, one press of Continue continues.
     authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
     isAuthenticatedStoreValue.set(true);
     flushSync();
@@ -1331,6 +1397,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     authenticationStoreValue.set(undefined);
     isAuthenticatedStoreValue.set(false);
     flushSync();
+    expect(signInsStarted()).toBe(0);
 
     showAllOptions().click();
 

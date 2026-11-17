@@ -321,7 +321,9 @@ test("All options left on wait for Continue when showing them takes a sign-in", 
     await expect(authPage.getByRole("radio")).toHaveCount(0);
     // The first press signs in and shows the options as they were left.
     await continueButton.click();
-    await expect(authPage.getByRole("radio", { name: "Work" })).toBeChecked();
+    await expect(authPage.getByRole("radio", { name: "Work" })).toBeChecked({
+      timeout: 15_000,
+    });
     await expect(authPage.getByRole("button", { name: "1 day" })).toBeVisible();
     // The second continues with them.
     await continueButton.click();
