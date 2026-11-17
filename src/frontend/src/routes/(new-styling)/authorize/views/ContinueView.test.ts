@@ -274,17 +274,20 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
    * it had none.
    */
   const stubProperty = (target: object, property: string, value: unknown) => {
-    const original = Object.getOwnPropertyDescriptor(target, property);
+    const originalDescriptor = Object.getOwnPropertyDescriptor(
+      target,
+      property,
+    );
     Object.defineProperty(target, property, {
       configurable: true,
       writable: true,
       value,
     });
     restoreStubbedProperties.unshift(() => {
-      if (original === undefined) {
+      if (originalDescriptor === undefined) {
         Reflect.deleteProperty(target, property);
       } else {
-        Object.defineProperty(target, property, original);
+        Object.defineProperty(target, property, originalDescriptor);
       }
     });
   };
@@ -934,6 +937,28 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       answer.reject(new Error("Failed to fetch"));
       await settle();
 
+      expect(handleErrorMock).not.toHaveBeenCalled();
+    });
+
+    it("asks the canister for nothing when the stored session is found after the screen was taken down", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const lookup = deferred<typeof actor>();
+      actorForIdentityMock.mockReturnValue(lookup.promise);
+      render(identities[kind]);
+      await settle();
+      expect(showAllOptions().checked).toBe(true);
+      if (component === undefined) {
+        throw new Error("The screen is not up");
+      }
+      await unmount(component);
+      component = undefined;
+
+      lookup.resolve(actor);
+      await settle();
+
+      expect(actor.get_accounts).not.toHaveBeenCalled();
+      expect(actor.get_default_account).not.toHaveBeenCalled();
       expect(handleErrorMock).not.toHaveBeenCalled();
     });
 

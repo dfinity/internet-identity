@@ -19,11 +19,11 @@ export class CallbackPopupClosedError extends Error {}
 /**
  * The browser refused to open the pop-up: `window.open` returned `null`.
  *
- * Not a cancel, and not reported as one: nothing was shown to the user, so
- * telling them the interaction was canceled blames them for what they never
- * saw. A browser opens a pop-up only while it handles a click, and only where
- * the site may open them, so this is either a sign-in that started too late
- * after the click (a bug on our side) or pop-ups being blocked for this site.
+ * Not a cancel: nothing was shown to the user, so telling them the
+ * interaction was canceled blames them for what they never saw. A browser
+ * opens a pop-up only while it handles a click, and only where the site may
+ * open them, so this is either a sign-in that started too late after the
+ * click (a bug on our side) or pop-ups being blocked for this site.
  *
  * `handleError` has a message for it.
  */

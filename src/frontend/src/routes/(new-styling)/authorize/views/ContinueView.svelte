@@ -330,8 +330,9 @@
     sessionActor = undefined;
     const epoch = ++optionsEpoch;
     void lookUpSessionActor(identityNumber).then(() => {
-      // Still this identity, with the options as they were found: neither
-      // switched off, nor switched back on by a press that loads them itself.
+      // Still this screen and this identity, with the options as they were
+      // found: neither switched off, nor switched back on by a press that
+      // loads them itself.
       if (hydrated && epoch === optionsEpoch) {
         void restoreMultipleAccounts(epoch);
       }
