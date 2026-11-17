@@ -52,9 +52,6 @@
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
-  import RecentlyUsed, {
-    type RecentEntry,
-  } from "./components/RecentlyUsed.svelte";
   import RecoveryFlow, {
     type RecoveryMethod,
   } from "./components/RecoveryFlow.svelte";
@@ -202,33 +199,7 @@
   // --- Apps ---
 
   // One grid, in the order apps were added (or arranged): a newly used app
-  // goes to the end, so nothing moves by itself. What was used lately is
-  // history, in a quiet row under the grid.
-  const recentEntries = $derived<RecentEntry[]>(
-    [
-      // A preset app the identity never signed in to isn't history yet.
-      ...current.apps
-        .filter((app) => app.lastUsedMillis > 0)
-        .map((app) => ({
-          origin: app.origin,
-          name: app.name,
-          logo: app.logo,
-          url: app.url,
-          usedMillis: app.lastUsedMillis,
-          added: true,
-        })),
-      ...current.recentOnly.map(({ app, usedMillis }) => ({
-        origin: app.origin,
-        name: app.name,
-        logo: app.logo,
-        url: app.url,
-        usedMillis,
-        added: false,
-      })),
-    ]
-      .sort((a, b) => b.usedMillis - a.usedMillis)
-      .slice(0, 10),
-  );
+  // goes to the end, so nothing moves by itself.
   /** The tile after the last app, which adds one. */
   const ADD_TILE = { origin: "add-app" } as const;
   type GridItem = ConceptApp | typeof ADD_TILE;
@@ -908,7 +879,7 @@
     removing = apps;
   };
 
-  /** From Explore, the add popover, or history: the app joins the end of the
+  /** From Explore or the add popover: the app joins the end of the
    *  grid, as a newly installed app does on a phone. */
   const addApp = (app: FeaturedApp, usedMillis?: number) => {
     if (current.apps.some(({ origin }) => origin === app.origin)) return;
@@ -941,12 +912,6 @@
       logo: "",
       url: `https://${host}`,
     });
-  const addFromHistory = (origin: string) => {
-    const entry = current.recentOnly.find((one) => one.app.origin === origin);
-    if (entry !== undefined) {
-      addApp(entry.app, entry.usedMillis);
-    }
-  };
 
   const switchIdentity = (identityNumber: bigint) => {
     identityIndex = identities.findIndex(
@@ -1656,7 +1621,7 @@
                         class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
                       >
                         {current.keepHistory
-                          ? "An app shows up here once you sign in to it, and Recently used keeps your history."
+                          ? "An app shows up here once you sign in to it."
                           : "No record of where you sign in. Only apps you add yourself show up here, and signing in still works everywhere."}
                       </span>
                     </span>
@@ -1683,18 +1648,6 @@
                   {/snippet}
                 </ReorderGrid>
               </section>
-              {#if !managing && current.keepHistory}
-                <RecentlyUsed
-                  entries={recentEntries}
-                  onAdd={addFromHistory}
-                  onOpen={(origin) => {
-                    const app = current.apps.find(
-                      (one) => one.origin === origin,
-                    );
-                    if (app !== undefined) markUsed(app);
-                  }}
-                />
-              {/if}
             {:else}
               {@render firstApps()}
             {/if}
