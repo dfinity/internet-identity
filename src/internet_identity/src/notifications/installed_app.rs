@@ -55,10 +55,12 @@ pub struct PendingProbe {
 
 impl NotificationApp {
     /// The probe still inside its window, which a second ask is handed back instead of
-    /// sending another to the same address.
+    /// sending another to the same address. The window runs from the post, or from the ask
+    /// while the probe has not been posted.
     pub fn outstanding_probe(&self, now_ns: Timestamp) -> Option<NotificationId> {
         let probe = self.pending_probe?;
-        (now_ns.saturating_sub(probe.asked_at_ns) < PROBE_ANSWER_WINDOW_NS)
+        let opened_at_ns = probe.posted_at_ns.unwrap_or(probe.asked_at_ns);
+        (now_ns.saturating_sub(opened_at_ns) < PROBE_ANSWER_WINDOW_NS)
             .then_some(probe.notification_id)
     }
 
@@ -175,6 +177,30 @@ mod probe_tests {
             Some(7)
         );
         assert_eq!(app.outstanding_probe(1_000 + PROBE_ANSWER_WINDOW_NS), None);
+    }
+
+    /// An ask posted late still has its whole window from the post, so a second ask in
+    /// it is handed this one back rather than showing the app another notification.
+    #[test]
+    fn an_ask_posted_late_stays_outstanding_for_the_window_after_its_post() {
+        let posted_at = 1_000 + PROBE_ANSWER_WINDOW_NS;
+        let app = NotificationApp {
+            pending_probe: Some(PendingProbe {
+                notification_id: 7,
+                asked_at_ns: 1_000,
+                posted_at_ns: Some(posted_at),
+            }),
+            ..asked_at(1_000, 0)
+        };
+
+        assert_eq!(
+            app.outstanding_probe(posted_at + PROBE_ANSWER_WINDOW_NS - 1),
+            Some(7)
+        );
+        assert_eq!(
+            app.outstanding_probe(posted_at + PROBE_ANSWER_WINDOW_NS),
+            None
+        );
     }
 
     /// The window is what makes an ask a question with an end to it; inside it the app

@@ -13,7 +13,7 @@ import type { ActorSubclass, SignIdentity } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { agentOptions, canisterId } from "$lib/globals";
 import { browserKeyIdentity } from "$lib/stores/browser-key.store";
-import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+import { isCanisterError } from "$lib/utils/utils";
 import { browserKeyActor } from "./browserActor";
 import { importLinkKey } from "./linkKey";
 import type { LinkToken } from "./linkToken";
@@ -131,11 +131,24 @@ const installerOfAnApp = async (): Promise<Installer | undefined> => {
   return undefined;
 };
 
-/** Whether this browser installed an app somebody still points at. `false` where that
+/** Whether `identityNumber` points at the app this browser installed. `false` where that
  *  cannot be read. */
-export const installedAppIsKnown = async (): Promise<boolean> => {
+export const installedAppServes = async (
+  identityNumber: bigint,
+): Promise<boolean> => {
   try {
-    return (await installerOfAnApp()) !== undefined;
+    const installerKey = await readInstallerKey();
+    if (installerKey === undefined) {
+      return false;
+    }
+    const actor = actorAs(
+      await ECDSAKeyIdentity.fromKeyPair(installerKey.keyPair),
+      { agentOptions, canisterId },
+    );
+    const lastSeen = await actor.installed_notification_app_last_seen({
+      installer_anchor_number: identityNumber,
+    });
+    return lastSeen[0] !== undefined;
   } catch (error) {
     console.error(error);
     return false;
@@ -167,8 +180,15 @@ const describe = (error: unknown): string =>
       ? error.message
       : String(error);
 
-/** Signs the join for `caller` with the installer key and makes it as `actor`, answering
- *  whether the canister took it. */
+/** What a join came to. `gone` is no app for it to join, `expired` a link nothing waits
+ *  on any more. */
+export type JoinOutcome =
+  | { kind: "joined" }
+  | { kind: "gone" }
+  | { kind: "expired" }
+  | { kind: "failed"; reason: string };
+
+/** Signs the join for `caller` with the installer key and makes it as `actor`. */
 const joinAs = async ({
   installer,
   identityNumber,
@@ -179,45 +199,53 @@ const joinAs = async ({
   identityNumber: bigint;
   caller: SignIdentity;
   actor: ActorSubclass<_SERVICE>;
-}): Promise<boolean> => {
+}): Promise<JoinOutcome> => {
   try {
     const signature = await crypto.subtle.sign(
       { name: "ECDSA", hash: "SHA-256" },
       installer.keyPair.privateKey,
       joinMessage(identityNumber, caller.getPrincipal().toUint8Array()),
     );
-    await actor
-      .join_notification_app({
-        anchor_number: identityNumber,
-        installer_anchor_number: installer.identityNumber,
-        installer_key: await publicKeyOf(installer),
-        signature: new Uint8Array(signature),
-      })
-      .then(throwCanisterError);
-    await rememberIdentity(identityNumber);
-    return true;
+    const joined = await actor.join_notification_app({
+      anchor_number: identityNumber,
+      installer_anchor_number: installer.identityNumber,
+      installer_key: await publicKeyOf(installer),
+      signature: new Uint8Array(signature),
+    });
+    if ("Err" in joined) {
+      const error = joined.Err;
+      if ("NoNotificationApp" in error) {
+        return { kind: "gone" };
+      }
+      if ("NoPendingLink" in error) {
+        return { kind: "expired" };
+      }
+      if ("InvalidInstallerSignature" in error) {
+        return { kind: "failed", reason: "InvalidInstallerSignature" };
+      }
+      return { kind: "failed", reason: error.InternalCanisterError };
+    }
   } catch (error) {
-    console.error(`the join was refused: ${describe(error)}`);
-    return false;
+    console.error(error);
+    return { kind: "failed", reason: describe(error) };
   }
+  // The canister has joined it whatever happens here: this list only orders the lookup.
+  await rememberIdentity(identityNumber).catch((error: unknown) => {
+    console.error(error);
+  });
+  return { kind: "joined" };
 };
 
-/**
- * Points the install `token` was handed out for at the app this browser installed
- * before, answering whether it did.
- *
- * `false` covers every way it can fail, which all leave the install to go ahead: no app
- * installed from here, an app the canister no longer has, or a canister that would not
- * answer.
- */
+/** Points the identity the install `token` was handed out for at the app this browser
+ *  installed before. */
 export const joinInstalledApp = async ({
   identityNumber,
   linkKey,
-}: LinkToken): Promise<boolean> => {
+}: LinkToken): Promise<JoinOutcome> => {
   try {
     const installer = await installerOfAnApp();
     if (installer === undefined) {
-      return false;
+      return { kind: "gone" };
     }
     const [caller, actor] = await Promise.all([
       importLinkKey(linkKey).then((keyPair) =>
@@ -228,7 +256,7 @@ export const joinInstalledApp = async ({
     return await joinAs({ installer, identityNumber, caller, actor });
   } catch (error) {
     console.error(error);
-    return false;
+    return { kind: "failed", reason: describe(error) };
   }
 };
 
@@ -249,12 +277,13 @@ export const joinFromThisBrowser = async (
     if (caller === undefined) {
       return false;
     }
-    return await joinAs({
+    const joined = await joinAs({
       installer,
       identityNumber,
       caller,
       actor: await browserKeyActor(identityNumber),
     });
+    return joined.kind === "joined";
   } catch (error) {
     console.error(error);
     return false;
@@ -263,6 +292,9 @@ export const joinFromThisBrowser = async (
 
 /** Longer than the canister's window for an answer, so an app it would call gone has had all of it. */
 const PROBE_ANSWER_WAIT_MS = 12_000;
+/** The canister's window opens when the push is posted, which can be a while after it is
+ *  asked, so retiring is retried until this long after the ask. */
+const PROBE_GIVE_UP_MS = 45_000;
 const PROBE_POLL_MS = 1_000;
 
 /** Whether the app this browser installed is still on the phone, which only the app
@@ -289,8 +321,8 @@ export const probeInstalledApp = async (): Promise<InstalledApp> => {
     if ("Err" in probe) {
       return "NoNotificationApp" in probe.Err ? "gone" : "unknown";
     }
-    const deadline = Date.now() + PROBE_ANSWER_WAIT_MS;
-    while (Date.now() < deadline) {
+    const askedAt = Date.now();
+    while (Date.now() < askedAt + PROBE_GIVE_UP_MS) {
       await new Promise((resolve) => setTimeout(resolve, PROBE_POLL_MS));
       const seen = (
         await actor.installed_notification_app_last_seen(request)
@@ -301,11 +333,18 @@ export const probeInstalledApp = async (): Promise<InstalledApp> => {
       if (seen > before) {
         return "answered";
       }
+      if (Date.now() < askedAt + PROBE_ANSWER_WAIT_MS) {
+        continue;
+      }
+      const retired = await actor.retire_notification_app(request);
+      if ("Ok" in retired || "NoNotificationApp" in retired.Err) {
+        return "gone";
+      }
+      if (!("AppStillAnswering" in retired.Err)) {
+        return "unknown";
+      }
     }
-    const retired = await actor.retire_notification_app(request);
-    return "Ok" in retired || "NoNotificationApp" in retired.Err
-      ? "gone"
-      : "unknown";
+    return "unknown";
   } catch (error) {
     console.error(error);
     return "unknown";

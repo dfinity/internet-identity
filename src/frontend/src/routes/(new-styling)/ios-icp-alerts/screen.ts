@@ -11,7 +11,7 @@ import {
 } from "$lib/utils/notifications/linkToken";
 import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
 import {
-  installedAppIsKnown,
+  installedAppServes,
   joinInstalledApp,
   probeInstalledApp,
 } from "$lib/utils/notifications/installerKey";
@@ -38,14 +38,16 @@ export type Screen =
   | { kind: "closed" }
   /** A browser tab where this browser already points at an app; iOS has no link capturing,
    *  so nothing here can open it. `guessed` is the tab that was left and came back, where
-   *  nothing proves the app was added at all. */
-  | { kind: "open-app"; guessed: boolean }
+   *  nothing proves the app was added at all. `probed` is a tab whose join already had
+   *  the app show a notification. */
+  | { kind: "open-app"; guessed: boolean; probed?: boolean }
   /** The app, permission still to ask for; iOS raises the prompt only from a gesture. */
   | { kind: "ask" }
   /** The app, with the permission refused. Only iOS Settings can lift it. */
   | { kind: "blocked" }
-  /** Delivering; `inTheApp` is which document this is. */
-  | { kind: "ready"; inTheApp: boolean }
+  /** Delivering; `inTheApp` is which document this is. `probed` is a tab whose join
+   *  already had the app show a notification. */
+  | { kind: "ready"; inTheApp: boolean; probed?: boolean }
   /** The app, with no identity pointing at it. */
   | { kind: "orphaned" }
   /** The app, carrying a link it could not spend: a refused token, or an unreadable fragment. */
@@ -118,8 +120,8 @@ const followTheToken = async (
     }
     // Only the app that handed it over can renew it, so steps on a link that can no
     // longer complete would add an app that never links. A link spent by joining or
-    // linking the app this browser installed is a finished install, not an expired one.
-    return (await installedAppIsKnown())
+    // linking the app this browser installed leaves its identity on that app.
+    return (await installedAppServes(token.identityNumber))
       ? { kind: "open-app", guessed: false }
       : { kind: "handover-expired" };
   }
@@ -137,18 +139,27 @@ const joinTheApp = async (
   answered: boolean,
   mintedElsewhere: boolean,
 ): Promise<Screen> => {
-  if (!(await joinInstalledApp(token))) {
-    // The app is there, so the steps would add a second one.
-    return { kind: "failed", reason: "join" };
+  const joined = await joinInstalledApp(token);
+  switch (joined.kind) {
+    case "joined":
+      break;
+    case "gone":
+      return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
+    case "expired":
+      return mintedElsewhere
+        ? { kind: "handover-expired" }
+        : await settleTheTab(token);
+    case "failed":
+      return { kind: "failed", reason: joined.reason };
   }
   if (answered) {
-    return { kind: "ready", inTheApp: false };
+    return { kind: "ready", inTheApp: false, probed: true };
   }
   switch (await probeInstalledApp()) {
     case "answered":
-      return { kind: "ready", inTheApp: false };
+      return { kind: "ready", inTheApp: false, probed: true };
     case "unknown":
-      return { kind: "open-app", guessed: false };
+      return { kind: "open-app", guessed: false, probed: true };
     case "gone":
       // The join spent the link on the app that turned out to be gone.
       return mintedElsewhere

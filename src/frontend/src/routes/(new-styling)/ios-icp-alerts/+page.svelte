@@ -416,8 +416,9 @@
       return;
     }
     const watchingForTheApp =
-      screen.kind === "open-app" ||
-      (screen.kind === "ready" && !screen.inTheApp);
+      (screen.kind === "open-app" ||
+        (screen.kind === "ready" && !screen.inTheApp)) &&
+      screen.probed !== true;
     if (!watchingForTheApp || probedAlready) {
       return;
     }

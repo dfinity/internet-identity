@@ -1187,16 +1187,20 @@ mod outcalls {
         ic_cdk::spawn(async move {
             let _permit = permit;
             let outcome = post_wake_up(&delivery).await;
+            // An app's own notification ids are its own to choose, so only one of Internet
+            // Identity's own is the probe a matching id names.
             if let (PostOutcome::Sent, DeliveryTarget::App(app_id), Some(notification)) =
                 (outcome, delivery.target, delivery.notification.as_ref())
             {
-                storage_borrow_mut(|storage| {
-                    storage.record_notification_app_probe_posted(
-                        app_id,
-                        notification.notification_id,
-                        ic_cdk::api::time(),
-                    )
-                });
+                if notification.sender == crate::storage::canister_id() {
+                    storage_borrow_mut(|storage| {
+                        storage.record_notification_app_probe_posted(
+                            app_id,
+                            notification.notification_id,
+                            ic_cdk::api::time(),
+                        )
+                    });
+                }
             }
             settle(&delivery, outcome);
         });
