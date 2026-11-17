@@ -1808,7 +1808,9 @@
   {/if}
 
   {#if addAnchor !== undefined}
+    <!-- Rendered here, outside the canvas, but it opens over the canvas. -->
     <Popup
+      over={3}
       anchor={addAnchor}
       onClose={() => (addAnchor = undefined)}
       direction="down"

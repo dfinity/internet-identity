@@ -14,12 +14,17 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { provideSurface, useSurface } from "./Elevated.svelte";
 
-  type Props = ComponentProps<typeof Popover>;
+  type Props = ComponentProps<typeof Popover> & {
+    /** The level it opens over, for a popup rendered outside that surface,
+     *  e.g. at the page's root but over the canvas. */
+    over?: number;
+  };
 
-  const { class: className, style, children, ...rest }: Props = $props();
+  const { over, class: className, style, children, ...rest }: Props = $props();
 
   // The level is fixed for the popup's life, like where it opens.
-  const level = Math.min(useSurface() + 2, 8);
+  // svelte-ignore state_referenced_locally
+  const level = Math.min((over ?? useSurface()) + 2, 8);
   provideSurface(level);
 </script>
 
