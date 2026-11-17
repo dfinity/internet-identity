@@ -9,8 +9,8 @@ use canister_tests::api::internet_identity::api_v2::{
 };
 use canister_tests::api::internet_identity::notifications::{
     app_get_pwa_notification, app_prepare_pwa_webpush_subscription, app_remove_pwa_notification,
-    app_send_notification, app_set_pwa_webpush_subscription, subscribe_pwa_webpush,
-    subscribe_webpush, TEST_AUTH_SECRET,
+    app_send_notification, app_set_pwa_webpush_subscription, prepare_notification_delegation,
+    subscribe_pwa_webpush, subscribe_webpush, TEST_AUTH_SECRET,
 };
 use canister_tests::framework::{get_metrics, II_WASM_PREVIOUS};
 use internet_identity_interface::internet_identity::types::{
@@ -18,7 +18,8 @@ use internet_identity_interface::internet_identity::types::{
     AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionResult,
     AppRemovePwaNotificationError, AppRemovePwaNotificationRequest,
     AppSetPwaWebPushSubscriptionError, AppSetPwaWebPushSubscriptionRequest, NotAcceptedReason,
-    Notification, PrepareAccountSessionResponse, PwaNotification, RevokeBrowserSessionsRequest,
+    Notification, NotificationDelegationError, PrepareAccountSessionResponse,
+    PrepareNotificationDelegationRequest, PwaNotification, RevokeBrowserSessionsRequest,
     SendNotificationArg, SetWebPushSubscriptionRequest,
 };
 use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
@@ -1396,7 +1397,7 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
     );
     both_held(&read);
 
-    // The identity signs the browser out.
+    // The identity signs the browser out, and it signs in again.
     revoke_browser_sessions(
         &env,
         canister_id,
@@ -1407,7 +1408,31 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
         },
     )?
     .expect("sign-out refused");
-    both_held(&read);
+    let browser = browser.successor();
+    sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, APP, &browser),
+    );
+    let browser_key = browser.successor().principal();
+    let read_again = |inbox_notification_id| {
+        browser_get_notification(
+            &env,
+            canister_id,
+            browser_key,
+            GetNotificationRequest {
+                anchor_number: anchor,
+                browser_id: first.browser_id,
+                inbox_notification_id,
+            },
+        )
+        .expect("read rejected")
+        .expect("read refused")
+        .notification
+        .map(|notification| notification.id)
+    };
+    both_held(&read_again);
     Ok(())
 }
 
@@ -1570,5 +1595,106 @@ fn should_drop_only_the_entry_a_gone_wake_up_announced() -> Result<(), RejectRes
     assert_eq!(read(0), Some(1));
     assert_eq!(read(1), Some(2));
     assert_eq!(read(2), None);
+    Ok(())
+}
+
+#[test]
+fn should_refuse_a_signed_out_browser_its_inbox_until_it_signs_in_again(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, signed_in) = install_signed_in(&env, None, None);
+    assert_eq!(
+        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        vec![BROWSER_ENDPOINT.to_string()]
+    );
+    let read = |browser_key| {
+        browser_get_notification(
+            &env,
+            canister_id,
+            browser_key,
+            GetNotificationRequest {
+                anchor_number: anchor,
+                browser_id: signed_in.browser_id,
+                inbox_notification_id: FIRST_ENTRY,
+            },
+        )
+        .expect("read rejected")
+        .map(|response| response.notification.map(|notification| notification.id))
+    };
+    let prepare = |browser_key| {
+        prepare_notification_delegation(
+            &env,
+            canister_id,
+            browser_key,
+            PrepareNotificationDelegationRequest {
+                anchor_number: anchor,
+                origin: APP.to_string(),
+                account_number: None,
+                session_key: ByteBuf::from(vec![2; 32]),
+            },
+        )
+        .expect("prepare rejected")
+        .map(|_| ())
+    };
+    let browser = BrowserKey::new(1).successor();
+    assert_eq!(read(browser.principal()), Ok(Some(1)));
+
+    revoke_browser_sessions(
+        &env,
+        canister_id,
+        principal_1(),
+        RevokeBrowserSessionsRequest {
+            identity_number: anchor,
+            browser_id: signed_in.browser_id,
+        },
+    )?
+    .expect("sign-out refused");
+
+    assert_eq!(
+        read(browser.principal()),
+        Err(GetNotificationError::InvalidBrowserKey)
+    );
+    assert_eq!(
+        prepare(browser.principal()),
+        Err(NotificationDelegationError::NoNotificationAccess)
+    );
+
+    // Signing in again on the same browser, whose key moves on as it does.
+    sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, APP, &browser),
+    );
+    assert_eq!(read(browser.successor().principal()), Ok(Some(1)));
+    assert_eq!(prepare(browser.successor().principal()), Ok(()));
+    Ok(())
+}
+
+#[test]
+fn should_refuse_a_home_screen_app_once_its_browser_is_signed_out() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor) = install_with_anchor(&env);
+    let (app, _) = link_app(&env, canister_id, anchor, 1, 50);
+    assert_eq!(
+        browser_get_notification(&env, canister_id, app, get_request(anchor))?,
+        Ok(GetNotificationResponse { notification: None })
+    );
+
+    revoke_browser_sessions(
+        &env,
+        canister_id,
+        principal_1(),
+        RevokeBrowserSessionsRequest {
+            identity_number: anchor,
+            browser_id: FIRST_BROWSER,
+        },
+    )?
+    .expect("sign-out refused");
+
+    assert_eq!(
+        browser_get_notification(&env, canister_id, app, get_request(anchor))?,
+        Err(GetNotificationError::InvalidBrowserKey)
+    );
     Ok(())
 }

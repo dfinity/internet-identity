@@ -881,7 +881,9 @@ fn link_notification_app(
 }
 
 /// The browser this key is delivered through: the one that signed the call, or the one
-/// whose wake-ups route through the app that did, delivery switched on.
+/// whose wake-ups route through the app that did, delivery switched on. `None` where the
+/// identity signed that browser out: it stays signed out, whoever asks, until it signs in
+/// again, and what its inbox holds is readable again then.
 ///
 /// Read here rather than carried out of the authorization, so what a call acts on is what
 /// is stored when it acts rather than what was stored when it was let in.
@@ -894,6 +896,9 @@ fn delivering_browser(
         NotificationKey::Browser(browser_id) => Some(browser_id),
         NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
     }?;
+    anchor
+        .browser(browser_id)
+        .filter(|browser| browser.session_count > 0)?;
     Some((anchor, browser_id))
 }
 
