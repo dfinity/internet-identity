@@ -11,6 +11,7 @@ use canister_tests::api::internet_identity::notifications::{
     app_send_notification, app_set_pwa_webpush_subscription, subscribe_pwa_webpush,
     subscribe_webpush, TEST_AUTH_SECRET,
 };
+use canister_tests::framework::II_WASM_PREVIOUS;
 use internet_identity_interface::internet_identity::types::{
     AppGetPwaNotificationError, AppGetPwaNotificationRequest,
     AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionResult,
@@ -838,4 +839,35 @@ fn should_drop_the_entry_a_failed_wake_up_announced() {
         deliver(&env, canister_id, first.account_principal, 2, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
+}
+
+#[test]
+fn should_refuse_an_endpoint_taken_over_from_a_slot_a_rollback_emptied(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+    // The previous release decodes the config without its installed app subscriptions and
+    // writes it back without them, which leaves the endpoint indexed for an empty slot.
+    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+    revoke_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("revoke refused");
+    grant_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("grant refused");
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    // Nothing holds the endpoint any more, so another identity takes it.
+    let second = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(is_endpoint_free(&env, canister_id, second));
+
+    // It is that identity's now, which keys other than its own cannot take.
+    assert_eq!(
+        subscribe_pwa_webpush(
+            &env,
+            canister_id,
+            session_of(&first),
+            PWA_ENDPOINT,
+            p256dh(9),
+            &TEST_AUTH_SECRET
+        )?,
+        Err(AppSetPwaWebPushSubscriptionError::EndpointInUse)
+    );
+    Ok(())
 }

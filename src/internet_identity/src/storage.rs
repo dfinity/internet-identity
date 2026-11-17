@@ -3394,17 +3394,42 @@ impl<M: Memory + Clone> Storage<M> {
                 .lookup_pwa_webpush_subscription_with_endpoint_memory
                 .get(endpoint_hash)
             {
-                if indexed != *holder {
+                if indexed == *holder {
+                    continue;
+                }
+                // An entry whose slot no longer holds the endpoint, which a config written
+                // by a release that does not know the slots leaves behind, is replaced.
+                if self.holds_pwa_endpoint(indexed, endpoint_hash) {
                     ic_cdk::println!(
                         "ERROR: an installed app endpoint is held by two subscriptions; the \
                          lookup keeps {indexed:?} rather than {holder:?}"
                     );
+                    continue;
                 }
-                continue;
             }
             self.lookup_pwa_webpush_subscription_with_endpoint_memory
                 .insert(*endpoint_hash, *holder);
         }
+    }
+
+    /// Whether `holder`'s slot holds a subscribed endpoint hashing to `endpoint_hash`.
+    fn holds_pwa_endpoint(
+        &self,
+        holder: StorablePwaSubscriptionHolder,
+        endpoint_hash: &[u8; 32],
+    ) -> bool {
+        let slot = PwaSubscriptionSlot {
+            browser_id: holder.browser_id,
+            account_number: holder.account_number,
+        };
+        self.anchor_application_config(holder.anchor_number, holder.application_number)
+            .and_then(|config| config.pwa_webpush_subscriptions?.remove(&slot))
+            .is_some_and(|subscription| match subscription {
+                StorableWebPushSubscription::Ready { endpoint, .. } => {
+                    endpoint_sha256(&endpoint) == *endpoint_hash
+                }
+                StorableWebPushSubscription::Pending { .. } => false,
+            })
     }
 
     /// The installed app subscription holding `endpoint`, if any.
