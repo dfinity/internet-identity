@@ -29,9 +29,11 @@ const askOnce = async (
 ): Promise<SubscriptionKeys> => {
   const response = await actor.prepare_webpush_subscription(identityNumber);
   if ("Pending" in response) {
-    // Thrown so the ask is re-issued: the draw is in flight by now, and the wait before
-    // the next one is what it needs to land.
-    throw new Error("the randomness these keys come from is still being drawn");
+    // Thrown so the ask is re-issued: the VAPID key fetch or the randomness draw is in
+    // flight by now, and the wait before the next one is what it needs to land.
+    throw new Error(
+      "Internet Identity is not ready to hand out these keys yet",
+    );
   }
   const keys = await throwCanisterError(response);
   return {
@@ -43,10 +45,10 @@ const askOnce = async (
 /**
  * Asks `actor` for the keys `identityNumber`'s next subscribe needs.
  *
- * The canister derives both from randomness it keeps pooled, and a pool nobody has
- * subscribed through for a while has none to serve. The first ask puts the draw in
- * flight and is told to come back; the reply to it lands a round or two later, which is
- * what the wait between asks is for.
+ * The canister answers Pending while it has no VAPID key yet (right after a deploy) or
+ * no pooled randomness for the transport key (a pool nobody has subscribed through for
+ * a while). The first ask puts the fetch or draw in flight and is told to come back; it
+ * lands a round or two later, which is what the wait between asks is for.
  */
 export const prepareSubscription = (
   identityNumber: bigint,
