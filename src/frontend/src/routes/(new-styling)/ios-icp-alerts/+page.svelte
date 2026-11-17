@@ -32,7 +32,6 @@
     insideTheApp,
     launchWillWrite,
     insideTheBrowser,
-    joinTheApp,
     type Screen,
     settleFromSettings,
     settleWithTheApp,
@@ -550,20 +549,6 @@
     }
   };
 
-  /** The user asking for this identity's notifications in the app already here. */
-  const join = async (answered: boolean) => {
-    screen = { kind: "working" };
-    beginWaiting();
-    screen = await joinTheApp(
-      window.location.hash,
-      answered,
-      mintedElsewhere,
-    ).catch(failed);
-    if (screen.kind === "install" && screen.staleKey === true) {
-      void offerAFreshInstall();
-    }
-  };
-
   /** `window.close()` closes only a tab a script opened, so the screen says what the close could not. */
   const dismiss = () => {
     window.close();
@@ -729,31 +714,6 @@
           {:else}
             <div class="h-[98px]"></div>
           {/if}
-        </div>
-      {:else if screen.kind === "join"}
-        {@const answered = screen.answered}
-        <div class="flex min-w-0 flex-1 flex-col items-stretch">
-          <div class={centredBlock}>
-            <AppsGridMock />
-            <div class={centredText}>
-              <h1 class={centredHeading}>
-                <Trans>{NOTIFICATION_APP_NAME} is already on this phone</Trans>
-              </h1>
-              <p class={centredBody}>
-                <Trans>
-                  Notifications for this identity will show up there too.
-                </Trans>
-              </p>
-            </div>
-          </div>
-          <div class={actionBlock}>
-            <button
-              class="btn btn-primary btn-xl"
-              onclick={() => void join(answered)}
-            >
-              {$t`Turn on notifications`}
-            </button>
-          </div>
         </div>
       {:else if screen.kind === "ask"}
         <div class="flex min-w-0 flex-1 flex-col items-stretch">

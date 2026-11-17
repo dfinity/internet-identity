@@ -873,17 +873,34 @@ fn join_notification_app(
     .ok_or(JoinNotificationAppError::NoNotificationApp)?
     .id;
 
+    let delivered_before = anchor
+        .browsers()
+        .iter()
+        .any(|browser| browser.delivers_through(app_id));
     anchor.move_to_notification_app(joining_browser, app_id);
     // A pending install is the user tapping Allow for this identity, so it delivers
     // whatever another entry of the identity says about the app.
     if pending_install.is_some() {
         anchor.enable_notification_app(joining_browser);
     }
+    // Anyone can hand a phone a link to join, so the app names an identity it starts
+    // delivering for, and the person holding it sees who was added.
+    let newly_delivered = !delivered_before && anchor.delivers_through(joining_browser, app_id);
+    let identity = identity_for_notification(&anchor);
     state::storage_borrow_mut(|storage| {
         storage
             .write(anchor)
             .map_err(|err| JoinNotificationAppError::InternalCanisterError(format!("{err:?}")))
-    })
+    })?;
+    if newly_delivered {
+        notifications::dispatch::notify_identity(
+            anchor_number,
+            joining_browser,
+            NotificationEvent::NotificationsOn(identity),
+            now,
+        );
+    }
+    Ok(())
 }
 
 /// The browser of `anchor` a call acts for: the one whose install waits on the caller's

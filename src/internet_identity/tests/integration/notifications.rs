@@ -2500,11 +2500,11 @@ mod joins {
     };
     use internet_identity_interface::internet_identity::types::{
         DisableNotificationAppRequest, EnableNotificationAppRequest,
-        GetNotificationAppStatusRequest, InstalledNotificationAppRequest, JoinNotificationAppError,
-        JoinNotificationAppRequest, NotificationAppAnchorsRequest, NotificationAppInfo,
-        NotificationAppStatus, PendingNotificationAppLinkRequest,
-        PrepareNotificationAppLinkRequest, RetireNotificationAppError,
-        RevokeBrowserSessionsRequest,
+        GetNotificationAppStatusRequest, IdentityForNotification, InstalledNotificationAppRequest,
+        JoinNotificationAppError, JoinNotificationAppRequest, NotificationAppAnchorsRequest,
+        NotificationAppInfo, NotificationAppStatus, NotificationEvent,
+        PendingNotificationAppLinkRequest, PrepareNotificationAppLinkRequest,
+        RetireNotificationAppError, RevokeBrowserSessionsRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -2640,6 +2640,58 @@ mod joins {
                 NotificationAppAnchorsRequest { app_id }
             )?,
             vec![first, second]
+        );
+        Ok(())
+    }
+
+    /// Anyone can hand a phone a link to join, so the app shows the identity it starts
+    /// delivering for.
+    #[test]
+    fn should_name_the_identity_a_join_adds_to_the_app() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, first, second) = install_with_two_anchors(&env);
+        let (app, _) = link_app(&env, canister_id, first, FIRST_BROWSER_SEED, APP_SEED);
+        subscribe_webpush(&env, canister_id, app, request(first, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        enable_notification_app(
+            &env,
+            canister_id,
+            browser(FIRST_BROWSER_SEED),
+            EnableNotificationAppRequest {
+                anchor_number: first,
+            },
+        )?
+        .expect("enable_notification_app returned Err");
+        start_install(&env, canister_id, second, SECOND_BROWSER_SEED);
+
+        join(
+            &env,
+            canister_id,
+            second,
+            first,
+            &BrowserKey::new(INSTALLER_SEED),
+        )?
+        .expect("join_notification_app returned Err");
+
+        let mut shown = None;
+        for _ in 0..10 {
+            run_dispatch_pass(&env);
+            shown = browser_get_notification(&env, canister_id, app, get_request(second))?
+                .expect("the read returned Err")
+                .notification;
+            if shown.is_some() {
+                break;
+            }
+        }
+        let shown = shown.expect("no pass deposited an entry for the joined identity");
+        assert_eq!(
+            shown.event,
+            Some(NotificationEvent::NotificationsOn(
+                IdentityForNotification {
+                    anchor_number: second,
+                    name: None,
+                }
+            ))
         );
         Ok(())
     }

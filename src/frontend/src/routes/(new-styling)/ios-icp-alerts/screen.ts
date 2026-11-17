@@ -56,11 +56,6 @@ export type Screen =
   | { kind: "link-expired" }
   /** A browser tab handed an install by another app on this device, which only that app can renew. */
   | { kind: "handover-expired" }
-  /** A browser tab whose link names an identity, on a phone that already has the app.
-   *  The identity joins it only on a tap: anyone can send a link, so opening one is not
-   *  the user asking for that identity's notifications. `answered` is whether the app
-   *  just proved it is there. */
-  | { kind: "join"; answered: boolean }
   /** The app, whose own key the canister will not link; a key is minted once per storage partition, so the way on is a fresh app. */
   | { kind: "unusable-key" }
   | { kind: "failed"; reason: string };
@@ -109,8 +104,8 @@ export const insideTheBrowser = async (
   }
 };
 
-/** An app this browser installed is offered to join rather than added again, unless a
- *  probe found it gone: nothing reports a deleted Home Screen app, and joining one would
+/** An app this browser installed is joined rather than added again, unless a probe found
+ *  it gone: nothing reports a deleted Home Screen app, and joining one would
  *  leave the user with nothing installed and no steps to add it. A link nothing waits for
  *  any more is answered without asking the app, whose answer is a notification. */
 const followTheToken = async (
@@ -130,23 +125,19 @@ const followTheToken = async (
   }
   const installed = await probeInstalledApp();
   if (installed !== "gone") {
-    return { kind: "join", answered: installed === "answered" };
+    return await joinTheApp(token, installed === "answered", mintedElsewhere);
   }
   return mintedElsewhere ? { kind: "install" } : await settleTheTab(token);
 };
 
-/** The tap on `join`. An app that could not be asked before is asked again once this
- *  identity reaches it, and one silent then is gone, so the steps are what is left. */
-export const joinTheApp = async (
-  hash: string,
+/** An app that could not be asked before is asked again once this identity reaches it,
+ *  and one silent then is gone, so the steps are what is left. */
+const joinTheApp = async (
+  token: LinkToken,
   answered: boolean,
   mintedElsewhere: boolean,
 ): Promise<Screen> => {
-  const fragment = decodeLinkToken(hash);
-  if (fragment.kind !== "token") {
-    return { kind: "elsewhere" };
-  }
-  if (!(await joinInstalledApp(fragment.token))) {
+  if (!(await joinInstalledApp(token))) {
     // The app is there, so the steps would add a second one.
     return { kind: "failed", reason: "join" };
   }
