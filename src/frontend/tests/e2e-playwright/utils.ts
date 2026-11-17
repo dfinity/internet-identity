@@ -92,7 +92,8 @@ export const authorize = (
  * within the click's microtasks, so a pop-up opened after awaiting a digest
  * or a signature passes here, where WebKit refuses it.
  *
- * Applies to the pages the context opens after the call.
+ * Takes effect in the documents the context loads after the call: a page that
+ * is open already is covered from its next navigation on.
  * @param context The browser context II's windows open in.
  * @param origin The origin to block late pop-ups on.
  */

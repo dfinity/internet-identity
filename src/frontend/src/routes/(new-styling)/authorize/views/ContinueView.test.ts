@@ -423,6 +423,45 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(purgeSessionMock).not.toHaveBeenCalled();
     });
 
+    it("makes an account the default with the sign-in at hand, not with the stored session", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const stored = sessionActor();
+      actorForIdentityMock.mockResolvedValue(stored);
+      render(identities[kind]);
+      await settle();
+      // Signed in since, so that this press has no sign-in left to wait for.
+      const signedIn = {
+        ...sessionActor(),
+        set_default_account: vi.fn().mockResolvedValue({ Ok: workAccount }),
+      };
+      authenticationStoreValue.set({
+        identityNumber: IDENTITY_NUMBER,
+        actor: signedIn,
+      });
+      isAuthenticatedStoreValue.set(true);
+      flushSync();
+      document.body
+        .querySelector<HTMLButtonElement>('button[aria-label="Edit Work"]')!
+        .click();
+      flushSync();
+      document.body
+        .querySelector<HTMLInputElement>('dialog input[type="checkbox"]')!
+        .click();
+      flushSync();
+
+      button("Save changes").click();
+      await settle();
+
+      expect(signInsStarted()).toBe(0);
+      expect(signedIn.set_default_account).toHaveBeenCalledWith(
+        IDENTITY_NUMBER,
+        "https://app.example",
+        [BigInt(1)],
+      );
+      expect(stored.set_default_account).not.toHaveBeenCalled();
+      expect(handleErrorMock).not.toHaveBeenCalled();
+    });
+
     it("reports a pop-up the browser refused, and lets Continue be pressed again", async () => {
       open.mockReturnValue(null);
       render(identities[kind]);
@@ -743,7 +782,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(signInsStarted()).toBe(0);
     });
 
-    it("signs in once when a refusal arrives after the options were switched off and on again", async () => {
+    it("signs in once when the options are switched on again after a refusal that arrived while they were off", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
       const actor = sessionActor();
       const answer = deferred<{ Err: { Unauthorized: string } }>();
@@ -930,6 +969,63 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(actor.get_accounts).toHaveBeenCalledTimes(1);
     });
 
+    it("continues with one press when a press of the switch is refused after the accounts arrived", async () => {
+      const actor = sessionActor();
+      const first = deferred<{ Ok: unknown[] }>();
+      const second = deferred<{ Err: { Unauthorized: string } }>();
+      actor.get_accounts
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise);
+      actorForIdentityMock.mockResolvedValue(actor);
+      render(identities[kind]);
+      await settle();
+      // On, which asks the canister, off, and on again, which asks once more.
+      showAllOptions().click();
+      flushSync();
+      showAllOptions().click();
+      flushSync();
+      showAllOptions().click();
+      flushSync();
+      expect(actor.get_accounts).toHaveBeenCalledTimes(2);
+      expect(signInsStarted()).toBe(0);
+
+      // The first answer brings the accounts, the second is a refusal.
+      first.resolve({ Ok: [primaryAccount, workAccount] });
+      await settle();
+      second.resolve({ Err: { Unauthorized: "session" } });
+      await settle();
+      expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+      expect(showAllOptions().checked).toBe(true);
+      authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+      isAuthenticatedStoreValue.set(true);
+      flushSync();
+      button("Continue").click();
+      await settle();
+
+      expect(onAuthorize).toHaveBeenCalledTimes(1);
+      expect(actor.get_accounts).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not read with a stored session found after the options were switched off and on again", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const lookup = deferred<typeof actor>();
+      actorForIdentityMock.mockReturnValue(lookup.promise);
+      render(identities[kind]);
+      showAllOptions().click();
+      flushSync();
+      showAllOptions().click();
+      flushSync();
+      // No session known at the press: it signs in for the options.
+      expect(signInsStarted()).toBe(1);
+
+      lookup.resolve(actor);
+      await settle();
+
+      expect(actor.get_accounts).not.toHaveBeenCalled();
+      expect(document.body.querySelector('input[type="radio"]')).toBeNull();
+    });
+
     it("signs in once when the stored session is looked up after the options were switched off and on again", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
       const lookup = deferred<undefined>();
@@ -1067,6 +1163,36 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     await settle();
 
     expect(onAuthorize).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves Continue inert for an identity whose accounts load, selected before the sign-in for another's options failed", async () => {
+    localStorage.setItem(TOGGLE_KEY, "1");
+    localStorage.setItem(OTHER_TOGGLE_KEY, "1");
+    const discovery = deferred<never>();
+    discoverSsoConfigMock.mockReturnValue(discovery.promise);
+    actorForIdentityMock.mockResolvedValueOnce(undefined);
+    render(identities.SSO);
+    await settle();
+    button("Continue").click();
+    expect(signInsStarted()).toBe(1);
+    // The identity switched to has a stored session; its accounts are on
+    // their way.
+    const actor = sessionActor();
+    actor.get_accounts.mockReturnValue(new Promise(() => {}));
+    actorForIdentityMock.mockResolvedValue(actor);
+    select({ ...identities.SSO, identityNumber: OTHER_IDENTITY_NUMBER });
+    await settle();
+    expect(actor.get_accounts).toHaveBeenCalledTimes(1);
+
+    discovery.reject(new Error("SSO discovery failed"));
+    await settle();
+
+    // The failed sign-in was for the options of the identity before: those
+    // of this one do not wait for a sign-in because of it.
+    expect(handleErrorMock).toHaveBeenCalledTimes(1);
+    expect(button("Continue").getAttribute("aria-disabled")).toBe("true");
+    button("Continue").click();
+    expect(signInsStarted()).toBe(1);
   });
 
   it("continues with one press when the sign-in for the options fails after the accounts arrived", async () => {
