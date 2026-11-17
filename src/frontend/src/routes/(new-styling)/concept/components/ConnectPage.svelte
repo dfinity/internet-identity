@@ -1,11 +1,15 @@
 <script lang="ts">
   /**
-   * Connect: what can use your apps as you outside the browser. An AI
-   * assistant, through the Internet Computer MCP, and command-line tools on
-   * this device. Each leads with its state and the switch the product's
-   * settings have, so the page is the identity's own, not an ad for building;
-   * around them, how to add the connector, what AI may do and which apps it
-   * used. The copy follows DFINITY's ICP MCP page, told for the identity.
+   * Connect: using your apps from AI, which is for everyone. AI access leads
+   * with its state and the switch the product's settings have, so the page is
+   * the identity's own, not an ad for building; around it, how to add the
+   * connector, what AI may do and which apps it used. The copy follows
+   * DFINITY's ICP MCP page, told for the identity.
+   *
+   * The terminal is a developer's, so it waits at the bottom: one quiet line
+   * until the ICP CLI first asks to sign in. Once allowed, the line becomes
+   * Developer access, with its switch and each place the terminal is signed
+   * in; signing the last one out folds it back into the line.
    */
   import type { Component } from "svelte";
   import {
@@ -49,9 +53,11 @@
   const { integrations, apps, onResolve, onUnavailable }: Props = $props();
   const aiTitleId = $props.id();
   const cliTitleId = `${aiTitleId}-cli`;
+  const developerTitleId = `${aiTitleId}-developer`;
 
   const aiOn = $derived(aiAccessOn(integrations));
   const cliOn = $derived(cliAccessOn(integrations));
+  const cliAsks = $derived(integrations === "cliConfirm");
   const localServer = $derived(
     integrations === "local" || integrations === "localAllowed",
   );
@@ -60,6 +66,83 @@
    *  switch is drawn again from the state and springs back. */
   let resets = $state(0);
 
+  const MINUTE = 60 * 1000;
+  const HOUR = 60 * MINUTE;
+  const DAY = 24 * HOUR;
+  const opened = Date.now();
+
+  /** A place the terminal may sign in as you. */
+  interface Terminal {
+    id: string;
+    tool: string;
+    place: string;
+    allowedAt: number;
+    expiresAt: number;
+  }
+
+  /** Where an identity with CLI access on is signed in from the terminal. */
+  const TERMINALS: Terminal[] = [
+    {
+      id: "macbook",
+      tool: "icp-cli",
+      place: "MacBook Pro",
+      allowedAt: opened - 2 * HOUR,
+      expiresAt: opened + 28 * DAY,
+    },
+    {
+      id: "build-server",
+      tool: "icp-cli",
+      place: "build-server",
+      allowedAt: opened - 5 * DAY,
+      expiresAt: opened + 23 * DAY,
+    },
+  ];
+
+  /** What happened on this page that the scenario has no state for: places
+   *  signed out, a request just allowed, the switch turned off with places
+   *  still listed. It holds while the scenario stays where the page left it;
+   *  a preset or another identity starts from the scenario alone. */
+  interface Local {
+    at: IntegrationsState;
+    signedOut: string[];
+    /** When the ICP CLI's request was allowed here, so this device is the
+     *  one place listed. */
+    allowedAt?: number;
+    switchedOff?: boolean;
+  }
+  let local = $state<Local>();
+  const here = $derived(local?.at === integrations ? local : undefined);
+
+  const terminals = $derived(
+    (here?.allowedAt === undefined
+      ? TERMINALS
+      : [
+          {
+            ...TERMINALS[0],
+            allowedAt: here.allowedAt,
+            expiresAt: here.allowedAt + 30 * DAY,
+          },
+        ]
+    ).filter(({ id }) => here?.signedOut.includes(id) !== true),
+  );
+
+  /** Developer access shows once the terminal has asked: while it waits,
+   *  while it's allowed somewhere, and while switched off with places kept.
+   *  Before that, and after the last place signs out, one quiet line. */
+  const developer = $derived(
+    cliAsks || (cliOn && terminals.length > 0) || here?.switchedOff === true,
+  );
+
+  /** Moves the scenario on and carries what this page holds with it. */
+  const move = (
+    next: IntegrationsState,
+    message: string,
+    change: Partial<Omit<Local, "at">> = {},
+  ) => {
+    local = { signedOut: [], ...here, ...change, at: next };
+    onResolve(next === integrations ? {} : { integrations: next }, message);
+  };
+
   const switchAi = (on: boolean) => {
     const next = withAiAccess(integrations, on);
     if (next === undefined) {
@@ -67,18 +150,47 @@
       onUnavailable("Turning AI access off while the ICP CLI waits");
       return;
     }
-    onResolve({ integrations: next }, on ? "AI access on" : "AI access off");
+    move(next, on ? "AI access on" : "AI access off");
   };
 
   const switchCli = (on: boolean) => {
     const next = withCliAccess(integrations, on);
     if (next === undefined) {
       resets += 1;
-      onUnavailable("Turning CLI access off beside a local server");
+      onUnavailable("Turning terminal sign-in off beside a local server");
       return;
     }
-    onResolve({ integrations: next }, on ? "CLI access on" : "CLI access off");
+    move(next, on ? "Terminal sign-in on" : "Terminal sign-in off", {
+      switchedOff: !on,
+    });
   };
+
+  const answerCli = (allow: boolean) =>
+    move(
+      withCliAccess(integrations, allow) ?? integrations,
+      allow ? "ICP CLI allowed" : "ICP CLI declined",
+      allow ? { signedOut: [], allowedAt: Date.now() } : {},
+    );
+
+  /** Signs one place out. The last one takes CLI access with it, where the
+   *  concept has a state for that, so the section folds into the line. */
+  const signOut = ({ id, tool, place }: Terminal) => {
+    const last = terminals.length === 1;
+    move(
+      last
+        ? (withCliAccess(integrations, false) ?? integrations)
+        : integrations,
+      `${tool} signed out on ${place}`,
+      { signedOut: [...(here?.signedOut ?? []), id] },
+    );
+  };
+
+  const allowedFor = ({ allowedAt, expiresAt }: Terminal) =>
+    `Allowed ${
+      Date.now() - allowedAt < MINUTE
+        ? "just now"
+        : $formatRelative(new Date(allowedAt), { style: "long" })
+    } · expires ${$formatRelative(new Date(expiresAt), { style: "long" })}`;
 
   const switched = (event: Event) =>
     event.currentTarget instanceof HTMLInputElement &&
@@ -97,6 +209,8 @@
   /** A URL in pieces that end at a slash or a dot, where it may wrap. */
   const urlParts = (url: string) => url.split(/(?<=[/.])(?!\/)/);
   const CLI_INSTALL = "npm install -g @icp-sdk/icp-cli";
+  /** The ICP CLI's official source, as the product's CLI dialog links it. */
+  const CLI_DOCS = "https://github.com/dfinity/icp-cli";
 
   const STEPS: { title: string; body: string }[] = [
     {
@@ -208,6 +322,19 @@
   </div>
 {/snippet}
 
+<!-- The ICP CLI's docs, from the developer's line and from its section. -->
+{#snippet docsLink()}
+  <a
+    href={CLI_DOCS}
+    target="_blank"
+    rel="noopener noreferrer"
+    class={["shrink-0", TEXT_LINK]}
+  >
+    Docs<span class="sr-only">&nbsp;for the ICP CLI</span>
+    <ArrowUpRightIcon class="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+  </a>
+{/snippet}
+
 <!-- An access's head: its icon, its name and state, and its switch. -->
 {#snippet accessHead(
   titleId: string,
@@ -299,13 +426,13 @@
     <h2
       class="text-text-primary text-2xl leading-8 font-semibold tracking-tight"
     >
-      Use your apps from AI and the terminal
+      Use your apps from AI
     </h2>
     <p
       class="text-text-tertiary max-w-[60ch] text-[15px] leading-6 text-pretty"
     >
-      Internet Identity signs them in to your apps as you, with only the access
-      you allow, for as long as you allow it.
+      Internet Identity signs your assistant in to your apps as you, with only
+      the access you allow, for as long as you allow it.
     </p>
   </header>
 
@@ -360,8 +487,7 @@
                 {
                   label: "Remove",
                   danger: true,
-                  onclick: () =>
-                    onResolve({ integrations: "calm" }, "Local server removed"),
+                  onclick: () => move("calm", "Local server removed"),
                 },
               )}
             {/if}
@@ -446,9 +572,10 @@
       </a>
     </section>
 
-    <!-- What AI may do once signed in, and where it stops. -->
+    <!-- What AI may do once signed in, and where it stops: the whole row,
+         now that AI's two tiles above have it to themselves. -->
     <section
-      class={["flex flex-col gap-5 @2xl:col-span-2 @4xl:col-span-3", TILE]}
+      class={["flex flex-col gap-5 @2xl:col-span-2 @4xl:col-span-6", TILE]}
     >
       <div class="flex flex-col gap-1">
         <h3 class={TILE_TITLE}>What AI can do as you</h3>
@@ -457,7 +584,7 @@
           once.
         </p>
       </div>
-      <ul class="grid gap-x-4 gap-y-5 @2xl:grid-cols-2">
+      <ul class="grid gap-x-4 gap-y-5 @2xl:grid-cols-2 @4xl:grid-cols-4">
         {#each CAN as item (item.title)}
           {@const Icon = item.icon}
           <li class="flex flex-col gap-0.5">
@@ -479,73 +606,140 @@
         {/each}
       </ul>
     </section>
+  </div>
 
-    <!-- CLI access: per device, with a CLI that waits for approval. -->
-    <section
-      aria-labelledby={cliTitleId}
-      class={["flex flex-col gap-4 @2xl:col-span-2 @4xl:col-span-3", TILE]}
-    >
-      {@render accessHead(
-        cliTitleId,
-        SquareTerminalIcon,
-        "CLI access",
-        cliOn ? "Enabled on this device" : undefined,
-        cliOn,
-        switchCli,
-      )}
-      <p class={TILE_BODY}>
-        {cliOn
-          ? "Command-line tools on this device can ask to sign you in to apps."
-          : "Let command-line tools on this device sign in to apps using your identity."}
-      </p>
-      {#if integrations === "cliConfirm"}
-        <div
-          class={[
-            "flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3",
-            PLATE,
-          ]}
+  {#if developer}
+    <!-- Developer access: the terminal, once it has asked. A section of its
+         own under AI, so the developer's tool never reads as everyone's. -->
+    <section aria-labelledby={developerTitleId} class="flex flex-col gap-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2
+          id={developerTitleId}
+          class="text-text-primary text-xl font-semibold tracking-tight"
         >
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-primary text-sm font-semibold">
-              The ICP CLI asks to sign in as you
+          Developer access
+        </h2>
+        {@render docsLink()}
+      </div>
+      <div class={["flex flex-col gap-4", TILE]}>
+        {#if cliAsks}
+          <!-- The ICP CLI asked from this device: the request is the whole
+               card until it's answered, with no switch to turn on yet. -->
+          <div
+            class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-3 @2xl:grid-cols-[auto_1fr_auto]"
+          >
+            <span aria-hidden="true" class={ICON_CHIP}>
+              <SquareTerminalIcon class="size-5" />
             </span>
-            <span
-              class="text-warning-700 dark:text-text-warning-primary text-[13px] leading-[18px]"
-            >
-              On this device · Waiting for you
+            <span class="flex min-w-0 flex-col gap-0.5">
+              <h3 id={cliTitleId} class={TILE_TITLE}>
+                The ICP CLI asks to sign in as you
+              </h3>
+              <span
+                class="text-warning-700 dark:text-text-warning-primary text-[13px] leading-[18px]"
+              >
+                On this device · Waiting for you
+              </span>
             </span>
-          </span>
-          <span class="flex shrink-0 gap-2">
-            <button
-              type="button"
-              onclick={() =>
-                onResolve({ integrations: "aiOnly" }, "ICP CLI declined")}
-              class="btn btn-secondary btn-sm font-medium"
+            <span class="col-start-2 flex shrink-0 gap-2 @2xl:col-start-auto">
+              <button
+                type="button"
+                onclick={() => answerCli(false)}
+                class="btn btn-secondary btn-sm font-medium"
+              >
+                Decline
+              </button>
+              <button
+                type="button"
+                onclick={() => answerCli(true)}
+                class="btn btn-primary btn-sm font-medium"
+              >
+                Allow
+              </button>
+            </span>
+          </div>
+          <div class="flex flex-col gap-2">
+            <p class={FIELD_LABEL}>Only allow the official ICP CLI</p>
+            {@render copyField(
+              "cli-install",
+              CLI_INSTALL,
+              "the install command",
+              true,
+            )}
+          </div>
+        {:else}
+          {@render accessHead(
+            cliTitleId,
+            SquareTerminalIcon,
+            "Sign in from the terminal",
+            undefined,
+            cliOn,
+            switchCli,
+          )}
+          <p class={TILE_BODY}>
+            Tools you run can sign in to your apps as you.
+          </p>
+          {#if cliOn}
+            <div class="flex flex-col gap-2">
+              <p class={FIELD_LABEL}>Allowed to sign in</p>
+              <ul class={["ii-rows flex flex-col overflow-hidden", PLATE]}>
+                {#each terminals as terminal (terminal.id)}
+                  <li
+                    class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3"
+                  >
+                    <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span
+                        class="text-text-primary truncate text-sm font-semibold"
+                      >
+                        {terminal.tool} · {terminal.place}
+                      </span>
+                      <span
+                        class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
+                      >
+                        {allowedFor(terminal)}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onclick={() => signOut(terminal)}
+                      class="btn btn-secondary btn-sm shrink-0 font-medium"
+                    >
+                      Sign out
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {:else}
+            <p
+              class="border-border-secondary text-text-tertiary rounded-2xl border border-dashed px-4 py-3.5 text-[13px] leading-[18px] text-pretty"
             >
-              Decline
-            </button>
-            <button
-              type="button"
-              onclick={() =>
-                onResolve({ integrations: "calm" }, "ICP CLI approved")}
-              class="btn btn-primary btn-sm font-medium"
-            >
-              Approve
-            </button>
-          </span>
-        </div>
-      {/if}
-      <div class="mt-auto flex flex-col gap-2">
-        <p class={FIELD_LABEL}>Only for the official ICP CLI</p>
-        {@render copyField(
-          "cli-install",
-          CLI_INSTALL,
-          "the install command",
-          true,
-        )}
+              Off. Tools you run can't sign in as you until you switch it back
+              on.
+            </p>
+          {/if}
+        {/if}
       </div>
     </section>
-  </div>
+  {:else}
+    <!-- Before the terminal ever asked, one quiet line for whoever builds:
+         nothing to switch on until the CLI asks here first. -->
+    <p
+      class="text-text-tertiary flex items-start gap-2.5 text-[13px] leading-5"
+    >
+      <SquareTerminalIcon
+        class="text-fg-quaternary mt-0.5 size-4 shrink-0"
+        aria-hidden="true"
+      />
+      <span class="min-w-0 text-pretty">
+        Building on ICP? Run <code
+          class="text-text-primary rounded-md bg-(--ii-selected) px-1.5 py-0.5 font-mono text-xs whitespace-nowrap"
+          >icp identity login</code
+        > in your terminal. We'll ask for your OK here first.
+      </span>
+      {@render docsLink()}
+    </p>
+  {/if}
 
   <!-- Copying says so on the button; this says it to a screen reader. -->
   <span class="sr-only" aria-live="polite">
