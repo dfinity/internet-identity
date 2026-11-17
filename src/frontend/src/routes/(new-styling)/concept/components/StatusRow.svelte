@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import {
     BotIcon,
     BriefcaseMedicalIcon,
@@ -25,6 +26,9 @@
     resolved?: boolean;
     onOpen: () => void;
     onAction?: () => void;
+    /** A glimpse of what's inside (the methods, the browsers), so the row
+     *  says more than its group's name. */
+    preview?: Snippet;
   }
 
   const {
@@ -36,6 +40,7 @@
     resolved = false,
     onOpen,
     onAction,
+    preview,
   }: Props = $props();
 
   // Same glyphs as the current sidebar, so each section keeps its icon, but
@@ -133,6 +138,11 @@
         {offered.label}
       </span>
     {:else}
+      {#if preview !== undefined}
+        <span aria-hidden="true" class="flex shrink-0 items-center">
+          {@render preview()}
+        </span>
+      {/if}
       <ChevronRightIcon
         aria-hidden="true"
         class="text-fg-quaternary size-4 shrink-0 rtl:-scale-x-100"

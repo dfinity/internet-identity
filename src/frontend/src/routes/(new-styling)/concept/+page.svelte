@@ -2,15 +2,18 @@
   import "./surfaces.css";
   import {
     ArrowRightToLineIcon,
+    AtSignIcon,
     BellOffIcon,
     CheckIcon,
     ChevronRightIcon,
     CompassIcon,
     FlaskConicalIcon,
+    KeyRoundIcon,
     LogOutIcon,
     PanelBottomIcon,
     PanelRightIcon,
     PanelTopIcon,
+    MonitorSmartphoneIcon,
     MoonIcon,
     PlusIcon,
     SunIcon,
@@ -24,7 +27,9 @@
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
+  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import { toaster } from "$lib/components/utils/toaster";
+  import { brandIconOf } from "../manage/(authenticated)/devices/browsers";
   import {
     IDENTITY_PALETTES,
     identityPaletteIndex,
@@ -170,7 +175,7 @@
    *  (Manage, by All apps' heading), so the account doesn't list them too. */
   const GROUPS: { title: string; kinds: CardKind[] }[] = [
     { title: "Sign-in", kinds: ["access", "recovery"] },
-    { title: "Connected", kinds: ["devices", "integrations"] },
+    { title: "Signed in on", kinds: ["devices"] },
   ];
   const accountGroups = $derived(
     GROUPS.map(({ title, kinds }) => ({
@@ -1018,6 +1023,48 @@
   />
 {/snippet}
 
+{#snippet accessPreview()}
+  <!-- Up to three of the ways in, as overlapping circles. -->
+  <span class="flex items-center">
+    {#each current.scenario.access === "one" ? [PasskeyIcon] : [PasskeyIcon, KeyRoundIcon, AtSignIcon] as Glyph, index (index)}
+      <span
+        class={[
+          "bg-bg-primary text-fg-tertiary grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-surface-2)",
+          index > 0 && "-ms-2",
+        ]}
+      >
+        <Glyph class="size-3.5" />
+      </span>
+    {/each}
+  </span>
+{/snippet}
+
+{#snippet devicesPreview()}
+  <!-- The browsers signed in, newest marked, as overlapping logos. -->
+  <span class="flex items-center">
+    {#each browsers.slice(0, 3) as browser, index (browser.id)}
+      {@const src = brandIconOf(browser.description)}
+      <span
+        class={[
+          "bg-bg-primary relative grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-surface-2)",
+          index > 0 && "-ms-2",
+        ]}
+      >
+        {#if src !== undefined}
+          <img {src} alt="" class="size-4" />
+        {:else}
+          <MonitorSmartphoneIcon class="text-fg-tertiary size-3.5" />
+        {/if}
+        {#if browser.isNew === true}
+          <span
+            class="bg-fg-error-primary absolute -end-0.5 -top-0.5 size-2 rounded-full ring-2 ring-(color:--ii-surface-2)"
+          ></span>
+        {/if}
+      </span>
+    {/each}
+  </span>
+{/snippet}
+
 {#snippet addTile()}
   <!-- After the last app, the way to add one by hand: a search over the
        curated apps that also takes a link. -->
@@ -1178,6 +1225,11 @@
               resolved={resolvedKinds.includes(card.kind)}
               onOpen={() => openCard(card.kind)}
               onAction={() => runLead(card)}
+              preview={card.kind === "access"
+                ? accessPreview
+                : card.kind === "devices"
+                  ? devicesPreview
+                  : undefined}
             />
           {/each}
         </Elevated>
