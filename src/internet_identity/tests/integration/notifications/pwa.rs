@@ -1448,3 +1448,89 @@ fn pushes(metrics: &str, stage: &str) -> f64 {
         .filter_map(|line| line.split_whitespace().nth(1)?.parse::<f64>().ok())
         .sum()
 }
+
+/// A canister that has just switched notifications on, so it is fetching its VAPID key and
+/// does not hold it yet, with an identity signed in at [`APP`]: its anchor, its browser
+/// key and its session there.
+fn install_fetching_the_vapid_key(
+    env: &PocketIc,
+) -> (CanisterId, AnchorNumber, Principal, Principal) {
+    // Notifications off, so nothing fetches the key yet.
+    let canister_id =
+        install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_captcha_disabled());
+    let anchor = flows::register_anchor(env, canister_id);
+    let browser = BrowserKey::new(1);
+    let session = session_of(&sign_in(
+        env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, APP, &browser),
+    ));
+    // Upgraded without the helper's follow-up calls, whose rounds would let the key fetch
+    // the upgrade starts come back before the test asks.
+    env.upgrade_canister(
+        canister_id,
+        II_WASM.clone(),
+        candid::encode_one(arg_with_notifications_enabled()).expect("encoding the arg"),
+        None,
+    )
+    .expect("upgrading");
+    (
+        canister_id,
+        anchor,
+        browser.successor().principal(),
+        session,
+    )
+}
+
+#[test]
+fn should_answer_pending_to_a_browser_until_the_vapid_key_is_held() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, browser_key, _) = install_fetching_the_vapid_key(&env);
+
+    assert_eq!(
+        prepare_webpush_subscription(&env, canister_id, browser_key, anchor)?,
+        PrepareWebPushSubscriptionResult::Pending
+    );
+
+    let mut is_ready = false;
+    for _ in 0..OUTCALL_ROUNDS {
+        env.tick();
+        if matches!(
+            prepare_webpush_subscription(&env, canister_id, browser_key, anchor)?,
+            PrepareWebPushSubscriptionResult::Ok(_)
+        ) {
+            is_ready = true;
+            break;
+        }
+    }
+    assert!(is_ready, "the keys are answered once the VAPID key is held");
+    Ok(())
+}
+
+#[test]
+fn should_answer_pending_to_an_installed_app_until_the_vapid_key_is_held(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, _, session) = install_fetching_the_vapid_key(&env);
+
+    assert_eq!(
+        app_prepare_pwa_webpush_subscription(&env, canister_id, session)?,
+        AppPreparePwaWebPushSubscriptionResult::Pending
+    );
+
+    grant_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("grant refused");
+    let mut is_ready = false;
+    for _ in 0..OUTCALL_ROUNDS {
+        env.tick();
+        if matches!(
+            app_prepare_pwa_webpush_subscription(&env, canister_id, session)?,
+            AppPreparePwaWebPushSubscriptionResult::Ok(_)
+        ) {
+            is_ready = true;
+            break;
+        }
+    }
+    assert!(is_ready, "the keys are answered once the VAPID key is held");
+    Ok(())
+}

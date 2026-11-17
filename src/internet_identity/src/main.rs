@@ -347,10 +347,12 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 /// An update call, because a query reply is signed by one replica. One that answered with
 /// a VAPID key of its own choosing would bind the subscription to it permanently, and the
 /// browser has nothing to check the answer against.
+///
+/// `Pending` where the VAPID key is not held yet or the seeds the transport key is derived
+/// from are not pooled yet. Asking puts the missing one in flight, so a caller coming back
+/// finds it.
 #[update]
-async fn prepare_webpush_subscription(
-    anchor_number: AnchorNumber,
-) -> PrepareWebPushSubscriptionResult {
+fn prepare_webpush_subscription(anchor_number: AnchorNumber) -> PrepareWebPushSubscriptionResult {
     if let Err(err) = enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError) {
         return PrepareWebPushSubscriptionResult::Err(err);
     }
@@ -360,13 +362,9 @@ async fn prepare_webpush_subscription(
         );
     };
 
-    let vapid_public_key = match notifications::webpush::vapid_key::held_public_key().await {
-        Ok(key) => key,
-        Err(err) => {
-            return PrepareWebPushSubscriptionResult::Err(
-                PrepareWebPushSubscriptionError::InternalCanisterError(err),
-            )
-        }
+    let Some(vapid_public_key) = notifications::webpush::vapid_key::public_key() else {
+        notifications::webpush::vapid_key::ensure_public_key();
+        return PrepareWebPushSubscriptionResult::Pending;
     };
 
     let now_ns = ic_cdk::api::time();
@@ -1134,28 +1132,23 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
 
 // ---- Notifications: called by an app's installed web app ----
 
-/// The keys an installed web app subscribes with, for the slot of the calling session's
-/// identity, app, browser entry and account. An update call for the reason
-/// `prepare_webpush_subscription` is one.
+/// The keys an installed web app subscribes with, for the calling session's identity, app
+/// and browser entry. An update call for the reason `prepare_webpush_subscription` is one,
+/// and `Pending` on the same grounds.
 #[update]
-async fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionResult {
+fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionResult {
     use AppPreparePwaWebPushSubscriptionError::*;
 
-    if check_app_authorization(time()).is_err() {
-        return AppPreparePwaWebPushSubscriptionResult::Err(NoSuchSession);
-    }
-    if let Err(err) = enabled_or(InternalCanisterError) {
-        return AppPreparePwaWebPushSubscriptionResult::Err(err);
-    }
-    let vapid_public_key = match notifications::webpush::vapid_key::held_public_key().await {
-        Ok(key) => key,
-        Err(err) => return AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(err)),
-    };
-
-    // Authorized again: the session may have ended while the key was fetched.
     let now = time();
     let Ok(session) = check_app_authorization(now) else {
         return AppPreparePwaWebPushSubscriptionResult::Err(NoSuchSession);
+    };
+    if let Err(err) = enabled_or(InternalCanisterError) {
+        return AppPreparePwaWebPushSubscriptionResult::Err(err);
+    }
+    let Some(vapid_public_key) = notifications::webpush::vapid_key::public_key() else {
+        notifications::webpush::vapid_key::ensure_public_key();
+        return AppPreparePwaWebPushSubscriptionResult::Pending;
     };
     pwa_subscription::prepare_pwa_subscription(&session, vapid_public_key, now)
 }

@@ -217,20 +217,6 @@ const JWT_RETRY_MULTIPLIER: u64 = 2;
 /// carrying it is gone.
 const JWT_ABANDON_FILL_AFTER_SECS: u64 = 60;
 
-/// The key, fetching and keeping it where this deployment has not got one yet.
-///
-/// Awaits the fetch, which only an update call can do: a query uses
-/// [`ensure_public_key`]. Derived from public inputs and the same forever, so the first
-/// caller to need it pays for every later one.
-pub(crate) async fn held_public_key() -> Result<Vec<u8>, String> {
-    if let Some(held) = public_key() {
-        return Ok(held);
-    }
-    let fetched = fetch_public_key().await?;
-    crate::state::persistent_state_mut(|p| p.vapid_public_key = Some(fetched.clone()));
-    Ok(fetched)
-}
-
 /// Our public key, where it has been asked for. A browser cannot subscribe before this
 /// lands, and a push cannot name a key we do not hold.
 pub(crate) fn public_key() -> Option<Vec<u8>> {
@@ -256,8 +242,8 @@ pub(crate) fn ensure_public_key() {
             Ok(key) => crate::state::persistent_state_mut(|p| p.vapid_public_key = Some(key)),
             // Not retried: the key is derived from public inputs, so the one documented
             // failure is the subnet not holding `key_1` over secp256r1, which no amount
-            // of asking changes. Until it does, no browser can subscribe and
-            // `prepare_webpush_subscription` answers the error this reports.
+            // of asking changes. Until it does, no browser can subscribe: the prepare
+            // methods answer `Pending`, and this is asked again on the next one.
             Err(err) => ic_cdk::println!(
                 "ERROR: no VAPID key, so notifications cannot be delivered from this \
                  subnet: {err}"

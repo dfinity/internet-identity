@@ -2813,7 +2813,8 @@ export interface _SERVICE {
    * to that key and sends it with app_set_pwa_webpush_subscription within 5 minutes.
    * It replaces this browser's existing subscription, if any, so the installed web app
    * gets no pushes until app_set_pwa_webpush_subscription succeeds.
-   * Pending: II has no fresh randomness to make the key yet. Call again shortly.
+   * Pending: II does not hold its VAPID key yet, or has no fresh randomness to make the
+   * transport key. Call again shortly.
    */
   'app_prepare_pwa_webpush_subscription' : ActorMethod<
     [],
@@ -3637,8 +3638,8 @@ export interface _SERVICE {
    * An update call, because a query reply is signed by one replica. One that answered
    * with a VAPID key of its own choosing would bind the subscription to it permanently,
    * and the browser has nothing to check the answer against.
-   * A cold randomness pool yields the `Pending` result arm — a retry signal, not an
-   * error: asking put the draw in flight, so the caller re-calls the method.
+   * Pending: II does not hold its VAPID key yet, or has no fresh randomness to make the
+   * transport key. Asking puts what is missing in flight, so call again shortly.
    */
   'prepare_webpush_subscription' : ActorMethod<
     [UserNumber],

@@ -1154,9 +1154,10 @@ pub struct PrepareWebPushSubscriptionResponse {
 
 /// What `prepare_webpush_subscription` answers.
 ///
-/// `Pending` is a retry signal rather than an error: the keys are derived from randomness
-/// the canister keeps pooled, a pool nobody has subscribed through for a while has none
-/// to serve, and asking is what puts the draw in flight. The caller re-calls the method.
+/// `Pending` is a retry signal rather than an error: the canister does not hold its VAPID
+/// key yet, or the transport key is derived from randomness it keeps pooled and a pool
+/// nobody has subscribed through for a while has none to serve. Asking is what puts the
+/// missing one in flight. The caller re-calls the method.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum PrepareWebPushSubscriptionResult {
     Ok(PrepareWebPushSubscriptionResponse),
