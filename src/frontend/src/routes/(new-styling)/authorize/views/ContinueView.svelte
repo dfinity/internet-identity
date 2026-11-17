@@ -173,9 +173,9 @@
   let isMultipleAccountsEnabled = $state(
     readToggle($lastUsedIdentitiesStore.selected!.identityNumber),
   );
-  // All options were on from an earlier visit, and showing them takes a
-  // sign-in: there is no session to load the accounts with. A sign-in only
-  // ever starts with a press, so they wait for the next press of Continue.
+  // All options are on, and showing them takes a sign-in: there is no session
+  // to load the accounts with, or none the canister accepts. A sign-in only
+  // ever starts inside a press, so they wait for the next press of Continue.
   let isSignInNeededForOptions = $state(false);
   // Counted up when another identity is selected and when the options are
   // switched off. What was started for the options before that has no say on
@@ -460,7 +460,8 @@
       throw err;
     }
   };
-  // Only ever called from a press: this is what may start a sign-in.
+  // Only ever called from a press, before anything is awaited: this is what
+  // may start a sign-in.
   const signInAndLoadAccounts = async () => {
     if (!$isAuthenticatedStore) {
       await authLastUsedFlow.authenticate(
@@ -508,11 +509,17 @@
     selectedTtlSeconds = rememberedTtlSeconds();
     try {
       const readActor = actorToReadWith();
-      if (
-        readActor === undefined ||
-        !(await loadAccountsWithoutSignIn(readActor))
-      ) {
+      if (readActor === undefined) {
         await signInAndLoadAccounts();
+      } else if (
+        !(await loadAccountsWithoutSignIn(readActor)) &&
+        epoch === optionsEpoch
+      ) {
+        // The canister refuses the stored session, and the press was spent
+        // on asking it: a sign-in started now would not be part of it. The
+        // options wait for a press of Continue instead, as they do when the
+        // screen comes up without a session.
+        isSignInNeededForOptions = true;
       }
     } catch (error) {
       // The option that goes back off is the one that was pressed, not that

@@ -428,26 +428,55 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(localStorage.getItem(TOGGLE_KEY)).toBeNull();
     });
 
-    it("signs in on the next press once the canister refused the stored session", async () => {
+    it("waits for Continue when the canister refuses the stored session on a press of the switch", async () => {
       const actor = sessionActor();
       actor.get_accounts.mockResolvedValue({
         Err: { Unauthorized: "session" },
       });
       actorForIdentityMock.mockResolvedValue(actor);
-      // The sign-in the refusal falls back to fails too, so that the option
-      // can be pressed a second time.
-      open.mockReturnValue(null);
       render(identities[kind]);
       await settle();
 
       await pressShowAllOptions();
+
+      // The press went into asking the canister: no sign-in is started after
+      // it, and nothing has failed for the user.
       expect(purgeSessionMock).toHaveBeenCalledWith(IDENTITY_NUMBER);
+      expect(signInsStarted()).toBe(0);
+      expect(handleErrorMock).not.toHaveBeenCalled();
+      expect(showAllOptions().checked).toBe(true);
+
+      button("Continue").click();
+
       expect(signInsStarted()).toBe(1);
-
-      showAllOptions().click();
-
-      expect(signInsStarted()).toBe(2);
       expect(actor.get_accounts).toHaveBeenCalledTimes(1);
+    });
+
+    it("starts no sign-in when the stored session is refused after the options were switched off again", async () => {
+      const actor = sessionActor();
+      const answer = deferred<{ Err: { Unauthorized: string } }>();
+      actor.get_accounts.mockReturnValue(answer.promise);
+      actorForIdentityMock.mockResolvedValue(actor);
+      render(identities[kind]);
+      await settle();
+      showAllOptions().click();
+      flushSync();
+      showAllOptions().click();
+      flushSync();
+
+      answer.resolve({ Err: { Unauthorized: "session" } });
+      await settle();
+
+      expect(signInsStarted()).toBe(0);
+      expect(handleErrorMock).not.toHaveBeenCalled();
+      expect(showAllOptions().checked).toBe(false);
+      // Nor do the options wait for Continue once they are switched on
+      // again: that press signs in for them, and Continue leaves it at that.
+      showAllOptions().click();
+      flushSync();
+      expect(signInsStarted()).toBe(1);
+      button("Continue").click();
+      expect(signInsStarted()).toBe(1);
     });
 
     it("does not read with a session that failed to read, and looks it up again", async () => {
