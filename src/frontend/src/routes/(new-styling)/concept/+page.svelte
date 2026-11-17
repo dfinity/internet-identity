@@ -206,14 +206,17 @@
   // history, in a quiet row under the grid.
   const recentEntries = $derived<RecentEntry[]>(
     [
-      ...current.apps.map((app) => ({
-        origin: app.origin,
-        name: app.name,
-        logo: app.logo,
-        url: app.url,
-        usedMillis: app.lastUsedMillis,
-        added: true,
-      })),
+      // A preset app the identity never signed in to isn't history yet.
+      ...current.apps
+        .filter((app) => app.lastUsedMillis > 0)
+        .map((app) => ({
+          origin: app.origin,
+          name: app.name,
+          logo: app.logo,
+          url: app.url,
+          usedMillis: app.lastUsedMillis,
+          added: true,
+        })),
       ...current.recentOnly.map(({ app, usedMillis }) => ({
         origin: app.origin,
         name: app.name,

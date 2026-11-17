@@ -183,9 +183,12 @@
             Last signed in
           </span>
           <span class="text-text-tertiary text-[13px] leading-[18px]">
-            {app.lastBrowser} · {$formatRelative(new Date(app.lastUsedMillis), {
-              style: "long",
-            })}
+            {app.lastUsedMillis > 0
+              ? `${app.lastBrowser} · ${$formatRelative(
+                  new Date(app.lastUsedMillis),
+                  { style: "long" },
+                )}`
+              : "Not yet"}
           </span>
         </span>
       </li>

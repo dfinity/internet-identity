@@ -38,7 +38,8 @@ export interface ConceptApp {
   name: string;
   logo: string;
   url: string;
-  /** From `list_applications`: the latest sign-in to the app. */
+  /** From `list_applications`: the latest sign-in to the app. 0 where there
+   *  was none yet: an app a new identity starts with (see `presetApps`). */
   lastUsedMillis: number;
   /** From `list_applications`: whether the identity allows the app to notify it. */
   notificationsAllowed: boolean;
@@ -240,6 +241,20 @@ export const featuredApps: FeaturedApp[] = [
   featured("Catalyze"),
 ];
 
+/** Not in Internet Identity today: what a new identity's My apps starts with,
+ *  so its home page is never empty and there's no empty state to design
+ *  around. The team picks the set; here, the first three featured apps. */
+export const presetApps: FeaturedApp[] = featuredApps.slice(0, 3);
+
+/** A preset app in My apps: there from the start, never signed in to. */
+const fromPreset = (one: FeaturedApp): ConceptApp => ({
+  ...one,
+  lastUsedMillis: 0,
+  notificationsAllowed: false,
+  lastBrowser: "",
+  unread: [],
+});
+
 export interface ExploreBannerItem {
   kind: "banner";
   app: FeaturedApp;
@@ -412,7 +427,7 @@ export const identities: MockIdentity[] = [
       meta: "Synced across your Android devices",
       kind: "passkey",
     },
-    apps: [],
+    apps: presetApps.map(fromPreset),
     recentOnly: [],
     scenario: {
       recovery: "none",
