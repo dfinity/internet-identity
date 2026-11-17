@@ -15,16 +15,20 @@ use crate::notifications::webpush::{
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
+use crate::storage::account::Session;
 use crate::storage::anchor::{Browser, InboxNotification, ReadySubscription, WebPushSubscription};
+use crate::storage::storable::anchor_application_config::{
+    AnchorApplicationConfig, PwaSubscriptionSlot,
+};
 use crate::storage::storable::application::StorableOriginSha256;
-use crate::storage::Storage;
-use crate::{DAY_NS, HOUR_NS, SECOND_NS};
+use crate::storage::{PwaSubscriptionHolder, Storage};
+use crate::{DAY_NS, HOUR_NS, MINUTE_NS, SECOND_NS};
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, InboxNotificationId, NotificationEvent, NotificationId, Timestamp,
-    Urgency,
+    AccountNumber, AnchorNumber, ApplicationNumber, BrowserId, InboxNotificationId,
+    NotificationEvent, NotificationId, Timestamp, Urgency,
 };
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
@@ -206,7 +210,42 @@ pub(crate) enum DeliveryTarget {
     Browser,
     /// The app record the entry routes through, shared with every identity pointing at it.
     App(NotificationAppId),
+    /// The app's own installed web app on this entry, subscribed for this account.
+    Pwa {
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    },
 }
+
+impl DeliveryTarget {
+    /// The installed web app slot a wake-up to `browser_id` of `anchor_number` was posted
+    /// to, where this target is one.
+    pub(crate) fn pwa_holder(
+        self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> Option<PwaSubscriptionHolder> {
+        match self {
+            DeliveryTarget::Pwa {
+                application_number,
+                account_number,
+            } => Some(PwaSubscriptionHolder {
+                anchor_number,
+                application_number,
+                slot: PwaSubscriptionSlot {
+                    browser_id,
+                    account_number,
+                },
+            }),
+            DeliveryTarget::Browser | DeliveryTarget::App(_) => None,
+        }
+    }
+}
+
+/// How long past now a session on a browser entry must stay live for the entry's
+/// installed web app to be woken rather than the entry itself: the push's latency and the
+/// two calls its service worker signs with that session.
+const PWA_SESSION_MARGIN_NS: u64 = MINUTE_NS;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Delivery {
@@ -588,6 +627,12 @@ fn fan_out_to_browsers(
             .iter()
             .map(|browser| routed_app(storage, browser))
             .collect();
+        let pwa_route = PwaRoute::read(
+            storage,
+            pending.anchor_number,
+            pending.application_number,
+            pending.account_number,
+        );
         // The sealing keys travel with each wake-up: the deposit that names its entry
         // happens below, after this borrow of the browsers has ended.
         let woken: Vec<(String, Delivery)> = anchor
@@ -596,7 +641,14 @@ fn fan_out_to_browsers(
             .zip(apps.iter())
             .filter_map(|(browser, app)| {
                 let (subscription, relay_origin, target) =
-                    wake_up_address(browser, app.as_ref(), now_ns)?;
+                    match pwa_wake_up_address(browser, &pwa_route, now_ns) {
+                        Some(installed_app) => installed_app,
+                        None => {
+                            let (subscription, relay_origin, target) =
+                                wake_up_address(browser, app.as_ref(), now_ns)?;
+                            (subscription.clone(), relay_origin, target)
+                        }
+                    };
                 Some((
                     relay_origin,
                     Delivery {
@@ -607,7 +659,7 @@ fn fan_out_to_browsers(
                         notification: None,
                         endpoint: subscription.endpoint.as_str().to_string(),
                         body: None,
-                        sealing: rotation::SealingKeys::from(subscription),
+                        sealing: rotation::SealingKeys::from(&subscription),
                         // Filled in below, once every relay this reaches has one.
                         jwt: String::new(),
                         urgency: pending.urgency.clone(),
@@ -881,6 +933,80 @@ fn wake_up_address<'a>(
     Some((subscription, jwt, target))
 }
 
+/// What decides whether an app's notification wakes an entry's installed web app: the
+/// identity's config for the app, which holds the subscriptions, and the sessions of the
+/// recipient account there.
+pub(crate) struct PwaRoute {
+    config: Option<AnchorApplicationConfig>,
+    sessions: Vec<Session>,
+    application_number: ApplicationNumber,
+    account_number: Option<AccountNumber>,
+}
+
+impl PwaRoute {
+    /// What `anchor_number` holds for `account_number` of `application_number`.
+    pub(crate) fn read<M: Memory + Clone>(
+        storage: &Storage<M>,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    ) -> Self {
+        Self {
+            config: storage
+                .read_anchor_application_config_with_number(anchor_number, application_number),
+            sessions: storage.read_account_sessions(
+                anchor_number,
+                application_number,
+                account_number,
+            ),
+            application_number,
+            account_number,
+        }
+    }
+}
+
+/// Whether the entry's installed web app could be woken for `route` right now.
+pub(crate) fn can_wake_installed_app(
+    browser: &Browser,
+    route: &PwaRoute,
+    now_ns: Timestamp,
+) -> bool {
+    pwa_wake_up_address(browser, route, now_ns).is_some()
+}
+
+/// The entry's installed web app for this app and account, where it subscribed and a
+/// session of that account on this entry stays live past [`PWA_SESSION_MARGIN_NS`].
+fn pwa_wake_up_address(
+    browser: &Browser,
+    route: &PwaRoute,
+    now_ns: Timestamp,
+) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    let live_until_ns = now_ns.checked_add(PWA_SESSION_MARGIN_NS)?;
+    let has_live_session = route.sessions.iter().any(|session| {
+        session.browser_id == browser.id && !session.is_expired_or_idle(live_until_ns)
+    });
+    if !has_live_session {
+        return None;
+    }
+    let subscription = route
+        .config
+        .as_ref()?
+        .pwa_webpush_subscription(PwaSubscriptionSlot {
+            browser_id: browser.id,
+            account_number: route.account_number,
+        })?
+        .into_ready()?;
+    let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
+    Some((
+        subscription,
+        relay_origin,
+        DeliveryTarget::Pwa {
+            application_number: route.application_number,
+            account_number: route.account_number,
+        },
+    ))
+}
+
 /// Liveness is the entry's, whichever address this is: the app has none of its own.
 fn authorized_wake_up<'a>(
     browser: &Browser,
@@ -993,21 +1119,33 @@ struct WakeUpPayload {
     inbox_notification_id: InboxNotificationId,
 }
 
+/// What an installed web app's service worker is handed: the name the inbox gave the
+/// entry. Its session says which identity and inbox, so no identity number travels.
+#[derive(serde::Serialize)]
+struct PwaWakeUpPayload {
+    inbox_notification_id: InboxNotificationId,
+}
+
 /// Seals what names `deposited`. `None` where it could not be sealed, which leaves a
 /// wake-up carrying nothing rather than one carrying something the browser will not open.
 fn sealed_for(
     payload_ikm: &PayloadIkm,
     payload_keyid: &PayloadKeyId,
-    anchor_number: AnchorNumber,
-    browser_id: BrowserId,
+    destination: rotation::Destination,
     deposited: &InboxNotification,
     salt: u128,
 ) -> Option<Vec<u8>> {
-    let named = serde_json::to_vec(&WakeUpPayload {
-        anchor_number,
-        browser_id,
-        inbox_notification_id: deposited.inbox_notification_id,
-    })
+    let inbox_notification_id = deposited.inbox_notification_id;
+    let named = match destination.target {
+        DeliveryTarget::Browser | DeliveryTarget::App(_) => serde_json::to_vec(&WakeUpPayload {
+            anchor_number: destination.anchor_number,
+            browser_id: destination.browser_id,
+            inbox_notification_id,
+        }),
+        DeliveryTarget::Pwa { .. } => serde_json::to_vec(&PwaWakeUpPayload {
+            inbox_notification_id,
+        }),
+    }
     .inspect_err(|err| ic_cdk::println!("ERROR: could not write a wake-up's payload: {err}"))
     .ok()?;
     payload::seal(payload_ikm, payload_keyid, salt, &named)
@@ -1061,8 +1199,7 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
         delivery.body = sealed_for(
             &sealing.payload_ikm,
             &sealing.payload_keyid,
-            delivery.anchor_number,
-            delivery.browser_id,
+            destination_of(delivery),
             &deposited,
             payload::salt_at(pass_bytes, index),
         );

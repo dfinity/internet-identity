@@ -366,6 +366,8 @@ pub fn app_prepare_delegation(
         session_id,
         valid_till_ns,
         read_only,
+        // The delegation is the session's wherever it signed in from.
+        browser_id: _,
     } = session;
     let locator = SessionLocator {
         anchor_number,

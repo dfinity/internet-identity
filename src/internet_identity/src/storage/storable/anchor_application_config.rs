@@ -1,9 +1,24 @@
+use crate::storage::anchor::WebPushSubscription;
 use crate::storage::storable::account_number::StorableAccountNumber;
+use crate::storage::storable::browser_id::StorableBrowserId;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Which of an app's installed web app subscriptions on one identity: the browser entry
+/// the subscribing session signed in from, and the account that session is at.
+#[derive(Encode, Decode, Clone, Copy, Ord, Eq, Hash, PartialEq, PartialOrd, Debug)]
+#[cbor(array)]
+pub struct PwaSubscriptionSlot {
+    #[n(0)]
+    pub browser_id: StorableBrowserId,
+    #[n(1)]
+    pub account_number: Option<StorableAccountNumber>, // None is the unreserved synthetic account
+}
 
 /// What the identity holds for one app. Key 1 is retired and never reused: rows that
 /// carry it decode with it skipped.
@@ -16,6 +31,11 @@ pub struct AnchorApplicationConfig {
     pub last_notified_at_ns: Option<Timestamp>, // None if the app never reached a browser
     #[n(3)]
     pub notifications: Option<PermissionDecision>, // None if the identity never decided
+    /// The app's own installed web app subscriptions, one per browser entry and account.
+    /// None if the app never subscribed one, or every one it did was removed.
+    #[n(4)]
+    pub pwa_webpush_subscriptions:
+        Option<BTreeMap<PwaSubscriptionSlot, StorableWebPushSubscription>>,
 }
 
 /// The identity's answer to an app asking for a permission. Switching the permission keeps
@@ -41,6 +61,7 @@ impl AnchorApplicationConfig {
             default_account_number: _,
             last_notified_at_ns: _,
             notifications,
+            pwa_webpush_subscriptions: _,
         } = self;
         notifications.is_some()
     }
@@ -51,12 +72,64 @@ impl AnchorApplicationConfig {
             default_account_number,
             last_notified_at_ns: _,
             notifications: _,
+            pwa_webpush_subscriptions: _,
         } = self;
         Self {
             default_account_number,
             last_notified_at_ns: None,
             notifications: None,
+            pwa_webpush_subscriptions: None,
         }
+    }
+
+    /// The installed app subscription in `slot`. An entry that does not read back reads as
+    /// none, which the app recovers from by subscribing again.
+    pub fn pwa_webpush_subscription(
+        &self,
+        slot: PwaSubscriptionSlot,
+    ) -> Option<WebPushSubscription> {
+        let stored = self.pwa_webpush_subscriptions.as_ref()?.get(&slot)?.clone();
+        WebPushSubscription::try_from(stored)
+            .inspect_err(|reason| {
+                ic_cdk::println!(
+                    "ERROR: dropped the installed app subscription of browser {} as unreadable: {reason}",
+                    slot.browser_id
+                );
+            })
+            .ok()
+    }
+
+    /// Puts `subscription` in `slot`, or with `None` empties the slot.
+    pub fn set_pwa_webpush_subscription(
+        &mut self,
+        slot: PwaSubscriptionSlot,
+        subscription: Option<WebPushSubscription>,
+    ) {
+        let mut subscriptions = self.pwa_webpush_subscriptions.take().unwrap_or_default();
+        match subscription {
+            Some(subscription) => {
+                subscriptions.insert(slot, StorableWebPushSubscription::from(subscription));
+            }
+            None => {
+                subscriptions.remove(&slot);
+            }
+        }
+        self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
+    }
+
+    /// Empties every slot of a browser entry in `browser_ids`, answering whether any was held.
+    pub fn remove_pwa_webpush_subscriptions_of_browsers(
+        &mut self,
+        browser_ids: &BTreeSet<StorableBrowserId>,
+    ) -> bool {
+        let Some(mut subscriptions) = self.pwa_webpush_subscriptions.take() else {
+            return false;
+        };
+        let held_count = subscriptions.len();
+        subscriptions.retain(|slot, _| !browser_ids.contains(&slot.browser_id));
+        let has_removed = subscriptions.len() != held_count;
+        self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
+        has_removed
     }
 }
 
@@ -87,6 +160,17 @@ mod tests {
                 allowed: false,
                 changed_at_ns: 3,
             }),
+            pwa_webpush_subscriptions: Some(BTreeMap::from([(
+                PwaSubscriptionSlot {
+                    browser_id: 4,
+                    account_number: Some(5),
+                },
+                StorableWebPushSubscription::Pending {
+                    secret_key: vec![1; 32],
+                    sender_seed: vec![2; 32],
+                    minted_at_ns: 6,
+                },
+            )])),
         };
         assert_eq!(
             AnchorApplicationConfig::from_bytes(config.to_bytes()),
@@ -118,6 +202,17 @@ mod tests {
                 allowed: true,
                 changed_at_ns: 3,
             }),
+            pwa_webpush_subscriptions: Some(BTreeMap::from([(
+                PwaSubscriptionSlot {
+                    browser_id: 4,
+                    account_number: None,
+                },
+                StorableWebPushSubscription::Pending {
+                    secret_key: vec![1; 32],
+                    sender_seed: vec![2; 32],
+                    minted_at_ns: 6,
+                },
+            )])),
         };
         assert_eq!(
             config.forgotten(),
@@ -125,6 +220,7 @@ mod tests {
                 default_account_number: Some(5),
                 last_notified_at_ns: None,
                 notifications: None,
+                pwa_webpush_subscriptions: None,
             }
         );
     }

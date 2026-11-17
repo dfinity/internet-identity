@@ -1,6 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
+use super::pwa_subscription::clear_gone_pwa_subscription;
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
 use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
@@ -13,7 +14,8 @@ use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{
     Anchor, InboxNotification, PendingTransport, ReadySubscription, WebPushSubscription,
 };
-use crate::storage::Storage;
+use crate::storage::storable::anchor_application_config::PwaSubscriptionSlot;
+use crate::storage::{PwaSubscriptionHolder, Storage};
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, PrepareWebPushSubscriptionError, RemoveWebPushSubscriptionError,
@@ -127,7 +129,7 @@ pub fn set_subscription(
 ///
 /// The age and the queue follow the address: a browser re-registering where it already
 /// was keeps both, which is why the fetch kept what it was replacing.
-fn spend_pending(
+pub(super) fn spend_pending(
     pending: &PendingTransport,
     browser_transport_key: &SubscriberKey,
     sealed_auth: &SealedAuth,
@@ -221,6 +223,20 @@ pub(crate) fn clear_gone_subscription(
             }
             write_subscription(anchor, browser_id, None)
         }
+        DeliveryTarget::Pwa {
+            application_number,
+            account_number,
+        } => clear_gone_pwa_subscription(
+            PwaSubscriptionHolder {
+                anchor_number,
+                application_number,
+                slot: PwaSubscriptionSlot {
+                    browser_id,
+                    account_number,
+                },
+            },
+            endpoint,
+        ),
         DeliveryTarget::App(app_id) => {
             let gone = storage_borrow(|storage| {
                 storage.notification_app(app_id).is_some_and(|app| {

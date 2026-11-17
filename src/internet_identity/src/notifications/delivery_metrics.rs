@@ -388,8 +388,10 @@ impl Path {
     ];
 
     pub(crate) fn of(target: DeliveryTarget, endpoint: &str) -> Self {
-        if let DeliveryTarget::App(_) = target {
-            return Path::App;
+        match target {
+            DeliveryTarget::App(_) => return Path::App,
+            // An installed web app's endpoint is the browser's push service, read as one.
+            DeliveryTarget::Browser | DeliveryTarget::Pwa { .. } => {}
         }
         let Some(origin) = vapid_key::relay_origin_of(endpoint) else {
             return Path::Other;

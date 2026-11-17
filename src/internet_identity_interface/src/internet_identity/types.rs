@@ -1588,3 +1588,99 @@ pub enum RemoveNotificationError {
     InvalidBrowserKey,
     InternalCanisterError(String),
 }
+
+/// What `app_prepare_pwa_webpush_subscription` answers. `Pending` is the retry signal of
+/// [`PrepareWebPushSubscriptionResult`]: the caller re-calls the method.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppPreparePwaWebPushSubscriptionResult {
+    Ok(PrepareWebPushSubscriptionResponse),
+    Pending,
+    Err(AppPreparePwaWebPushSubscriptionError),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppPreparePwaWebPushSubscriptionError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    /// The identity has not allowed this app to notify it.
+    NotificationsNotAllowed,
+    InternalCanisterError(String),
+}
+
+/// What an installed web app's page registers, or `None` to remove the subscription its
+/// session's browser entry and account hold.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppSetPwaWebPushSubscriptionRequest {
+    pub subscription: Option<PwaWebPushSubscription>,
+}
+
+/// An installed web app's Web Push subscription, with the fields of
+/// [`SetWebPushSubscriptionRequest`] and the same encodings.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PwaWebPushSubscription {
+    pub endpoint: String,
+    /// The subscription's own public key, uncompressed SEC1 P-256.
+    pub p256dh: ByteBuf,
+    /// The public half of the pair the app minted to encrypt `auth` with, uncompressed
+    /// SEC1 P-256.
+    pub transport_key: ByteBuf,
+    /// The subscription's 16-byte `auth` secret under AES-128-GCM, 32 bytes with its tag,
+    /// encrypted to the transport key `app_prepare_pwa_webpush_subscription` answered.
+    pub sealed_auth: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppSetPwaWebPushSubscriptionError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    /// The identity has not allowed this app to notify it.
+    NotificationsNotAllowed,
+    /// Nothing here can open `sealed_auth`: the transport key it was encrypted to has
+    /// expired, or a later prepare replaced it. Prepare again and re-send.
+    TransportKeyExpired,
+    /// Another subscription holds this endpoint with other keys or for another app.
+    /// Subscribe again for a fresh endpoint and re-send.
+    EndpointInUse,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppGetPwaNotificationRequest {
+    /// As the wake-up that announced it named it.
+    pub inbox_notification_id: InboxNotificationId,
+}
+
+/// `None` where the named entry is gone, or is not this app's for this session.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppGetPwaNotificationResponse {
+    pub notification: Option<PwaNotification>,
+}
+
+/// Which notification an installed web app fetches the content of, and from which canister.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PwaNotification {
+    pub canister_id: Principal,
+    pub id: NotificationId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppGetPwaNotificationError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppRemovePwaNotificationRequest {
+    /// As the wake-up that announced it named it.
+    pub inbox_notification_id: InboxNotificationId,
+    /// Why the worker could not show it. Absent where it did.
+    pub not_shown: Option<NotShownReason>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppRemovePwaNotificationError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}

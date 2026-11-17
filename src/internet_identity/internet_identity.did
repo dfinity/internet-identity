@@ -2276,6 +2276,80 @@ type RemoveNotificationError = variant {
     InternalCanisterError : text;
 };
 
+// ===== Notifications to an app's own installed web app =====
+
+type AppPreparePwaWebPushSubscriptionError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    // The identity has not allowed this app to notify it.
+    NotificationsNotAllowed;
+    InternalCanisterError : text;
+};
+
+// What an installed web app's page registers. Null removes the subscription held for the
+// calling session's browser and account.
+type AppSetPwaWebPushSubscriptionRequest = record {
+    subscription : opt PwaWebPushSubscription;
+};
+
+// The fields and encodings of SetWebPushSubscriptionRequest, with sealed_auth encrypted
+// to the transport key app_prepare_pwa_webpush_subscription answered.
+type PwaWebPushSubscription = record {
+    endpoint : text;
+    p256dh : blob;                     // 65 bytes
+    transport_key : blob;              // 65 bytes
+    sealed_auth : blob;                // 32 bytes
+};
+
+type AppSetPwaWebPushSubscriptionError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    // The identity has not allowed this app to notify it.
+    NotificationsNotAllowed;
+    // Nothing here can open sealed_auth: the transport key it was encrypted to has
+    // expired, or a later prepare replaced it. Prepare again and re-send.
+    TransportKeyExpired;
+    // Another subscription holds this endpoint with other keys or for another app.
+    // Subscribe again for a fresh endpoint and re-send.
+    EndpointInUse;
+    InternalCanisterError : text;
+};
+
+type AppGetPwaNotificationRequest = record {
+    // As the wake-up that announced it named it.
+    inbox_notification_id : InboxNotificationId;
+};
+
+// Null where the named entry is gone, or is not this app's for this session.
+type AppGetPwaNotificationResponse = record {
+    notification : opt PwaNotification;
+};
+
+// Which notification to fetch the content of, and from which canister.
+type PwaNotification = record {
+    canister_id : principal;
+    id : NotificationId;
+};
+
+type AppGetPwaNotificationError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
+type AppRemovePwaNotificationRequest = record {
+    // As the wake-up that announced it named it.
+    inbox_notification_id : InboxNotificationId;
+    // Why the worker could not show it. Absent where it did.
+    not_shown : opt NotShownReason;
+};
+
+type AppRemovePwaNotificationError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2840,4 +2914,16 @@ service : (opt InternetIdentityInit) -> {
     // Called by an app's frontend, as its session.
     app_notification_consent_status : () -> (variant { Ok : AppNotificationConsentStatusResponse; Err : AppNotificationConsentStatusError }) query;
     app_revoke_notification_consent : () -> (variant { Ok; Err : AppRevokeNotificationConsentError });
+
+    // Called by an app's installed web app, signed by its session. The identity, browser
+    // and account are the session's.
+    // The keys an installed web app subscribes with. Pending: call again shortly.
+    app_prepare_pwa_webpush_subscription : () -> (variant { Ok : PrepareWebPushSubscriptionResponse; Pending; Err : AppPreparePwaWebPushSubscriptionError });
+    // Sets or, with null, removes the subscription of the session's browser and account.
+    app_set_pwa_webpush_subscription : (AppSetPwaWebPushSubscriptionRequest) -> (variant { Ok; Err : AppSetPwaWebPushSubscriptionError });
+    // The notification a wake-up named, where it is this app's for the session's browser
+    // and account.
+    app_get_pwa_notification : (AppGetPwaNotificationRequest) -> (variant { Ok : AppGetPwaNotificationResponse; Err : AppGetPwaNotificationError }) query;
+    // Removes the notification a wake-up named once the worker has handled it.
+    app_remove_pwa_notification : (AppRemovePwaNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : AppRemovePwaNotificationError });
 };

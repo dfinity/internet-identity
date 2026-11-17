@@ -2,7 +2,8 @@ use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::{Decode, Encode};
 
 /// Where a push goes, and what its payload is sealed against. Held by a browser entry,
-/// and by a Home Screen app's record, which has one per identity.
+/// by a Home Screen app's record, which has one per identity, and by an identity's config
+/// for an app, one per installed web app of that app.
 ///
 /// Two states because a subscribe takes two calls: the first mints the key the browser
 /// encrypts `auth` to, the second spends it. A re-subscribe passes back through

@@ -10,11 +10,14 @@
 use crate::notifications::delivery_metrics::{self, Path, Reason};
 use crate::notifications::dispatch;
 use crate::notifications::dispatch::DeliveryTarget;
+use crate::notifications::webpush::pwa_subscription;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, InboxNotification, WebPushSubscription};
+use crate::storage::PwaSubscriptionHolder;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, InboxNotificationId, NotShownReason, NotificationToShow, Timestamp,
+    AnchorNumber, BrowserId, InboxNotificationId, NotShownReason, NotificationToShow,
+    PwaNotification, Timestamp,
 };
 
 /// Most entries one inbox holds. A new one past it replaces the oldest.
@@ -59,6 +62,11 @@ pub(crate) fn remove_after_failed_wake_up(
                 .webpush_subscription(browser_id)
                 .and_then(WebPushSubscription::ready)
                 .map(|registered| registered.endpoint.as_str().to_string()),
+            DeliveryTarget::Pwa { .. } => target
+                .pwa_holder(anchor_number, browser_id)
+                .and_then(pwa_subscription::read)
+                .and_then(WebPushSubscription::into_ready)
+                .map(|registered| registered.endpoint.into_string()),
             DeliveryTarget::App(app_id) => {
                 // The app's address stands for this entry only while the entry still
                 // points at it. A switch to another record, or an install started, makes
@@ -229,6 +237,67 @@ pub(crate) fn remove_collected(
         }
         Ok(())
     })
+}
+
+/// [`notification_named`] for an installed web app: only an entry of `holder`'s app and
+/// account in its browser entry's inbox, and only what the app fetches the content with.
+pub(crate) fn pwa_notification_named(
+    holder: PwaSubscriptionHolder,
+    inbox_notification_id: InboxNotificationId,
+    now_ns: Timestamp,
+) -> Option<PwaNotification> {
+    let anchor = storage_borrow(|storage| storage.read(holder.anchor_number)).ok()?;
+    if !holds_pwa_entry(&anchor, holder, inbox_notification_id) {
+        return None;
+    }
+    let NotificationToShow {
+        canister_id, id, ..
+    } = notification_named(
+        &anchor,
+        holder.slot.browser_id,
+        inbox_notification_id,
+        now_ns,
+    )?;
+    Some(PwaNotification { canister_id, id })
+}
+
+/// [`remove_collected`] for an installed web app: only an entry of `holder`'s app and
+/// account in its browser entry's inbox. Any other is no error, as one already gone.
+pub(crate) fn remove_pwa_collected(
+    holder: PwaSubscriptionHolder,
+    inbox_notification_id: InboxNotificationId,
+    not_shown: Option<NotShownReason>,
+    now_ns: Timestamp,
+) -> Result<(), String> {
+    let anchor = storage_borrow(|storage| storage.read(holder.anchor_number))
+        .map_err(|err| format!("{err}"))?;
+    if !holds_pwa_entry(&anchor, holder, inbox_notification_id) {
+        return Ok(());
+    }
+    remove_collected(
+        anchor,
+        holder.slot.browser_id,
+        inbox_notification_id,
+        not_shown,
+        now_ns,
+    )
+}
+
+/// Whether the entry `inbox_notification_id` names in the inbox of `holder`'s browser entry
+/// is a notification of `holder`'s app to `holder`'s account.
+fn holds_pwa_entry(
+    anchor: &Anchor,
+    holder: PwaSubscriptionHolder,
+    inbox_notification_id: InboxNotificationId,
+) -> bool {
+    anchor
+        .notifications_for_browser(holder.slot.browser_id)
+        .iter()
+        .find(|entry| entry.inbox_notification_id == inbox_notification_id)
+        .is_some_and(|entry| {
+            entry.application_number == Some(holder.application_number)
+                && entry.account_number == holder.slot.account_number
+        })
 }
 
 #[cfg(test)]

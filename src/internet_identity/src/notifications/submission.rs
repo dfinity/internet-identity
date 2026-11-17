@@ -186,7 +186,8 @@ struct Resolved {
 
 /// What a principal names at `origin`. No such recipient when it names none
 /// there, or when none of its browsers was used within [`BROWSER_GONE_AFTER_NS`]. No
-/// channel when it has not allowed the app, or no browser can be woken now.
+/// channel when it has not allowed the app, or no browser or installed web app of the
+/// app can be woken now.
 fn resolve_recipient(
     recipient: Principal,
     origin: &ApplicationOrigin,
@@ -214,12 +215,17 @@ fn resolve_recipient(
         let consented = storage
             .read_anchor_application_config(account.anchor_number, origin)
             .is_some_and(|config| config.notifications_allowed());
-        if !consented
-            || !anchor
-                .browsers()
-                .iter()
-                .any(|browser| dispatch::can_wake(storage, browser, now_ns))
-        {
+        let pwa_route = dispatch::PwaRoute::read(
+            storage,
+            account.anchor_number,
+            application_number,
+            account.account_number,
+        );
+        let can_wake_any = anchor.browsers().iter().any(|browser| {
+            dispatch::can_wake(storage, browser, now_ns)
+                || dispatch::can_wake_installed_app(browser, &pwa_route, now_ns)
+        });
+        if !consented || !can_wake_any {
             return Err(Refusal::NoChannel);
         }
         Ok(Resolved {

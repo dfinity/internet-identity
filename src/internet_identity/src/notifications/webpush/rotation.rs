@@ -12,11 +12,14 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 use super::payload;
+use super::pwa_subscription;
 use super::validation::{PayloadIkm, PayloadKeyId};
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::installed_app::NotificationAppId;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{ReadySubscription, WebPushSubscription};
+use crate::storage::storable::anchor_application_config::PwaSubscriptionSlot;
+use crate::storage::PwaSubscriptionHolder;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, BrowserId, Timestamp};
 
 /// How many subscriptions one pass refreshes. A pass that refreshes anything spends
@@ -50,6 +53,7 @@ pub(crate) enum RegistrationId {
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     },
+    Pwa(PwaSubscriptionHolder),
 }
 
 impl Destination {
@@ -60,6 +64,17 @@ impl Destination {
                 anchor_number: self.anchor_number,
                 browser_id: self.browser_id,
             },
+            DeliveryTarget::Pwa {
+                application_number,
+                account_number,
+            } => RegistrationId::Pwa(PwaSubscriptionHolder {
+                anchor_number: self.anchor_number,
+                application_number,
+                slot: PwaSubscriptionSlot {
+                    browser_id: self.browser_id,
+                    account_number,
+                },
+            }),
         }
     }
 }
@@ -128,36 +143,46 @@ pub(crate) fn refresh(
 /// deliver through now. A browser that holds its own and also points at an app would
 /// otherwise be read from one and written to the other.
 fn read(destination: Destination) -> Option<ReadySubscription> {
-    match destination.target {
-        DeliveryTarget::App(app_id) => storage_borrow(|storage| storage.notification_app(app_id))?
+    match destination.registration() {
+        RegistrationId::App(app_id) => storage_borrow(|storage| storage.notification_app(app_id))?
             .webpush_subscription
             .and_then(WebPushSubscription::into_ready),
-        DeliveryTarget::Browser => state::anchor(destination.anchor_number)
-            .webpush_subscription(destination.browser_id)
+        RegistrationId::Browser {
+            anchor_number,
+            browser_id,
+        } => state::anchor(anchor_number)
+            .webpush_subscription(browser_id)
             .and_then(WebPushSubscription::ready)
             .cloned(),
+        RegistrationId::Pwa(holder) => {
+            pwa_subscription::read(holder).and_then(WebPushSubscription::into_ready)
+        }
     }
 }
 
 fn write(destination: Destination, registered: ReadySubscription) -> Result<(), String> {
-    match destination.target {
+    match destination.registration() {
         // Without stamping the record as used: a refresh is this canister's work, and an
         // app that has not called is how a deleted one is told apart from a live one.
-        DeliveryTarget::App(app_id) => storage_borrow_mut(|storage| {
+        RegistrationId::App(app_id) => storage_borrow_mut(|storage| {
             storage.refresh_notification_app_subscription(
                 app_id,
                 Some(WebPushSubscription::Ready(registered)),
             )
         })
         .map_err(|err| format!("{err}")),
-        DeliveryTarget::Browser => {
-            let mut anchor = storage_borrow(|storage| storage.read(destination.anchor_number))
+        RegistrationId::Browser {
+            anchor_number,
+            browser_id,
+        } => {
+            let mut anchor = storage_borrow(|storage| storage.read(anchor_number))
                 .map_err(|err| format!("{err}"))?;
-            anchor.set_webpush_subscription(
-                destination.browser_id,
-                Some(WebPushSubscription::Ready(registered)),
-            );
+            anchor
+                .set_webpush_subscription(browser_id, Some(WebPushSubscription::Ready(registered)));
             storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
+        }
+        RegistrationId::Pwa(holder) => {
+            pwa_subscription::write(holder, Some(WebPushSubscription::Ready(registered)), None)
         }
     }
 }

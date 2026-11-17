@@ -162,6 +162,22 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
+  const InboxNotificationId = IDL.Nat64;
+  const AppGetPwaNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+  });
+  const NotificationId = IDL.Nat64;
+  const PwaNotification = IDL.Record({
+    'id' : NotificationId,
+    'canister_id' : IDL.Principal,
+  });
+  const AppGetPwaNotificationResponse = IDL.Record({
+    'notification' : IDL.Opt(PwaNotification),
+  });
+  const AppGetPwaNotificationError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
   const AppNotificationConsentStatusResponse = IDL.Record({
     'is_granted' : IDL.Bool,
   });
@@ -176,11 +192,32 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : PublicKey,
     'expiration' : Timestamp,
   });
+  const PrepareWebPushSubscriptionResponse = IDL.Record({
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'transport_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const AppPreparePwaWebPushSubscriptionError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+    'NotificationsNotAllowed' : IDL.Null,
+  });
+  const NotShownReason = IDL.Variant({
+    'PayloadUnreachable' : IDL.Null,
+    'PayloadRejected' : IDL.Null,
+  });
+  const AppRemovePwaNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+    'not_shown' : IDL.Opt(NotShownReason),
+  });
+  const RemoveNotificationResponse = IDL.Record({});
+  const AppRemovePwaNotificationError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
   const AppRevokeNotificationConsentError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
-  const NotificationId = IDL.Nat64;
   const Urgency = IDL.Variant({
     'Low' : IDL.Null,
     'High' : IDL.Null,
@@ -215,6 +252,22 @@ export const idlFactory = ({ IDL }) => {
     'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
     'InternalCanisterError' : IDL.Text,
     'NoSuchSender' : IDL.Null,
+  });
+  const PwaWebPushSubscription = IDL.Record({
+    'sealed_auth' : IDL.Vec(IDL.Nat8),
+    'endpoint' : IDL.Text,
+    'p256dh' : IDL.Vec(IDL.Nat8),
+    'transport_key' : IDL.Vec(IDL.Nat8),
+  });
+  const AppSetPwaWebPushSubscriptionRequest = IDL.Record({
+    'subscription' : IDL.Opt(PwaWebPushSubscription),
+  });
+  const AppSetPwaWebPushSubscriptionError = IDL.Variant({
+    'EndpointInUse' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'TransportKeyExpired' : IDL.Null,
+    'NoSuchSession' : IDL.Null,
+    'NotificationsNotAllowed' : IDL.Null,
   });
   const AppSsoDomainStatus = IDL.Variant({
     'Available' : IDL.Record({ 'name' : IDL.Opt(IDL.Text) }),
@@ -314,7 +367,6 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
-  const InboxNotificationId = IDL.Nat64;
   const GetNotificationRequest = IDL.Record({
     'inbox_notification_id' : InboxNotificationId,
     'browser_id' : IDL.Nat32,
@@ -342,17 +394,12 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
-  const NotShownReason = IDL.Variant({
-    'PayloadUnreachable' : IDL.Null,
-    'PayloadRejected' : IDL.Null,
-  });
   const RemoveNotificationRequest = IDL.Record({
     'inbox_notification_id' : InboxNotificationId,
     'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
     'not_shown' : IDL.Opt(NotShownReason),
   });
-  const RemoveNotificationResponse = IDL.Record({});
   const RemoveNotificationError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -1084,10 +1131,6 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'expiration' : Timestamp,
   });
-  const PrepareWebPushSubscriptionResponse = IDL.Record({
-    'vapid_public_key' : IDL.Vec(IDL.Nat8),
-    'transport_public_key' : IDL.Vec(IDL.Nat8),
-  });
   const PrepareWebPushSubscriptionError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -1239,6 +1282,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
         ['query'],
       ),
+    'app_get_pwa_notification' : IDL.Func(
+        [AppGetPwaNotificationRequest],
+        [
+          IDL.Variant({
+            'Ok' : AppGetPwaNotificationResponse,
+            'Err' : AppGetPwaNotificationError,
+          }),
+        ],
+        ['query'],
+      ),
     'app_notification_consent_status' : IDL.Func(
         [],
         [
@@ -1255,6 +1308,27 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : AppPrepareDelegationResponse,
             'Err' : AppSessionError,
+          }),
+        ],
+        [],
+      ),
+    'app_prepare_pwa_webpush_subscription' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : PrepareWebPushSubscriptionResponse,
+            'Err' : AppPreparePwaWebPushSubscriptionError,
+            'Pending' : IDL.Null,
+          }),
+        ],
+        [],
+      ),
+    'app_remove_pwa_notification' : IDL.Func(
+        [AppRemovePwaNotificationRequest],
+        [
+          IDL.Variant({
+            'Ok' : RemoveNotificationResponse,
+            'Err' : AppRemovePwaNotificationError,
           }),
         ],
         [],
@@ -1280,6 +1354,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : SendNotificationResponse,
             'Err' : SendNotificationError,
+          }),
+        ],
+        [],
+      ),
+    'app_set_pwa_webpush_subscription' : IDL.Func(
+        [AppSetPwaWebPushSubscriptionRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AppSetPwaWebPushSubscriptionError,
           }),
         ],
         [],

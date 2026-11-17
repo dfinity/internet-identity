@@ -63,9 +63,9 @@ pub fn grant_consent(
         .map_err(|err| NotificationGrantConsentError::InternalCanisterError(format!("{err}")))
 }
 
-/// Withdraws `origin`'s consent to notify `anchor_number`, and what it still has queued for
-/// the identity's browsers. Device subscriptions stay: they are shared across every
-/// consented app. Consent that was never given is already withdrawn, so that is `Ok`.
+/// Withdraws `origin`'s consent to notify `anchor_number`, what it still has queued for
+/// the identity's browsers, and the subscriptions of its installed app. Device
+/// subscriptions stay: they are shared across every consented app. Consent that was never given is already withdrawn, so that is `Ok`.
 pub fn revoke_consent(
     anchor_number: AnchorNumber,
     origin: &ApplicationOrigin,
@@ -122,6 +122,10 @@ fn write_notifications_decision(
             allowed,
             changed_at_ns: now_ns,
         });
+        // An installed app delivers only what the identity allows.
+        if !allowed {
+            config.pwa_webpush_subscriptions = None;
+        }
         storage.write_anchor_application_config(anchor_number, origin, config, now_ns)
     })
 }

@@ -96,6 +96,25 @@ export interface AppGetDelegationRequest {
    */
   'expiration' : Timestamp,
 }
+export type AppGetPwaNotificationError = { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+export interface AppGetPwaNotificationRequest {
+  /**
+   * As the wake-up that announced it named it.
+   */
+  'inbox_notification_id' : InboxNotificationId,
+}
+/**
+ * Null where the named entry is gone, or is not this app's for this session.
+ */
+export interface AppGetPwaNotificationResponse {
+  'notification' : [] | [PwaNotification],
+}
 export type AppNotificationConsentStatusError = {
     'InternalCanisterError' : string
   } |
@@ -120,6 +139,40 @@ export interface AppPrepareDelegationRequest {
 export interface AppPrepareDelegationResponse {
   'user_key' : PublicKey,
   'expiration' : Timestamp,
+}
+export type AppPreparePwaWebPushSubscriptionError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  } |
+  {
+    /**
+     * The identity has not allowed this app to notify it.
+     */
+    'NotificationsNotAllowed' : null
+  };
+export type AppRemovePwaNotificationError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+export interface AppRemovePwaNotificationRequest {
+  /**
+   * As the wake-up that announced it named it.
+   */
+  'inbox_notification_id' : InboxNotificationId,
+  /**
+   * Why the worker could not show it. Absent where it did.
+   */
+  'not_shown' : [] | [NotShownReason],
 }
 export type AppRevokeNotificationConsentError = {
     'InternalCanisterError' : string
@@ -147,6 +200,40 @@ export type AppSessionError = {
      */
     'NoSuchSession' : null
   };
+export type AppSetPwaWebPushSubscriptionError = {
+    /**
+     * Another subscription holds this endpoint with other keys or for another app.
+     * Subscribe again for a fresh endpoint and re-send.
+     */
+    'EndpointInUse' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing here can open sealed_auth: the transport key it was encrypted to has
+     * expired, or a later prepare replaced it. Prepare again and re-send.
+     */
+    'TransportKeyExpired' : null
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  } |
+  {
+    /**
+     * The identity has not allowed this app to notify it.
+     */
+    'NotificationsNotAllowed' : null
+  };
+/**
+ * What an installed web app's page registers. Null removes the subscription held for the
+ * calling session's browser and account.
+ */
+export interface AppSetPwaWebPushSubscriptionRequest {
+  'subscription' : [] | [PwaWebPushSubscription],
+}
 /**
  * Whether an organization domain can be used for SSO sign-in, read by
  * `app_sso_domain_status`. `name` is the organization's display name;
@@ -2228,6 +2315,23 @@ export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
 /**
+ * Which notification to fetch the content of, and from which canister.
+ */
+export interface PwaNotification {
+  'id' : NotificationId,
+  'canister_id' : Principal,
+}
+/**
+ * The fields and encodings of SetWebPushSubscriptionRequest, with sealed_auth encrypted
+ * to the transport key app_prepare_pwa_webpush_subscription answered.
+ */
+export interface PwaWebPushSubscription {
+  'sealed_auth' : Uint8Array | number[],
+  'endpoint' : string,
+  'p256dh' : Uint8Array | number[],
+  'transport_key' : Uint8Array | number[],
+}
+/**
  * Rate limit configuration.
  * Currently only used for `register`.
  */
@@ -2674,6 +2778,15 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
+   * The notification a wake-up named, where it is this app's for the session's browser
+   * and account.
+   */
+  'app_get_pwa_notification' : ActorMethod<
+    [AppGetPwaNotificationRequest],
+    { 'Ok' : AppGetPwaNotificationResponse } |
+      { 'Err' : AppGetPwaNotificationError }
+  >,
+  /**
    * Called by an app's frontend, as its session.
    */
   'app_notification_consent_status' : ActorMethod<
@@ -2690,6 +2803,25 @@ export interface _SERVICE {
     [AppPrepareDelegationRequest],
     { 'Ok' : AppPrepareDelegationResponse } |
       { 'Err' : AppSessionError }
+  >,
+  /**
+   * Called by an app's installed web app, signed by its session. The identity, browser
+   * and account are the session's.
+   * The keys an installed web app subscribes with. Pending: call again shortly.
+   */
+  'app_prepare_pwa_webpush_subscription' : ActorMethod<
+    [],
+    { 'Ok' : PrepareWebPushSubscriptionResponse } |
+      { 'Err' : AppPreparePwaWebPushSubscriptionError } |
+      { 'Pending' : null }
+  >,
+  /**
+   * Removes the notification a wake-up named once the worker has handled it.
+   */
+  'app_remove_pwa_notification' : ActorMethod<
+    [AppRemovePwaNotificationRequest],
+    { 'Ok' : RemoveNotificationResponse } |
+      { 'Err' : AppRemovePwaNotificationError }
   >,
   'app_revoke_notification_consent' : ActorMethod<
     [],
@@ -2713,6 +2845,14 @@ export interface _SERVICE {
     [SendNotificationArg],
     { 'Ok' : SendNotificationResponse } |
       { 'Err' : SendNotificationError }
+  >,
+  /**
+   * Sets or, with null, removes the subscription of the session's browser and account.
+   */
+  'app_set_pwa_webpush_subscription' : ActorMethod<
+    [AppSetPwaWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : AppSetPwaWebPushSubscriptionError }
   >,
   /**
    * Whether an organization domain can be used for SSO sign-in, for apps that

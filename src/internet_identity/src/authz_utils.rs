@@ -247,6 +247,8 @@ pub struct AuthorizedSession {
     pub session_id: SessionId,
     pub valid_till_ns: Timestamp,
     pub read_only: bool,
+    /// The browser entry the session signed in from.
+    pub browser_id: BrowserId,
 }
 
 /// The app session behind this call, if the caller still has a usable one.
@@ -279,6 +281,7 @@ pub fn check_app_authorization(now: Timestamp) -> Result<AuthorizedSession, Auth
     let Session {
         valid_till_ns,
         read_only,
+        browser_id,
         ..
     } = session;
 
@@ -289,6 +292,7 @@ pub fn check_app_authorization(now: Timestamp) -> Result<AuthorizedSession, Auth
         session_id,
         valid_till_ns,
         read_only,
+        browser_id,
     })
 }
 

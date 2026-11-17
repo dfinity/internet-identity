@@ -19,6 +19,7 @@ use crate::authz_utils::NotificationKey;
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
+use crate::storage::PwaSubscriptionHolder;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
 /// How long a drawn value is served before a redraw is due.
@@ -90,8 +91,20 @@ pub(crate) fn seeds_for(
     key: NotificationKey,
     now_ns: Timestamp,
 ) -> Option<SubscribeSeeds> {
+    seeds_for_caller(&caller_bytes(anchor_number, key), now_ns)
+}
+
+/// [`seeds_for`] for an installed web app subscribing `holder`'s slot.
+pub(crate) fn seeds_for_pwa(
+    holder: PwaSubscriptionHolder,
+    now_ns: Timestamp,
+) -> Option<SubscribeSeeds> {
+    seeds_for_caller(&pwa_caller_bytes(holder), now_ns)
+}
+
+fn seeds_for_caller(caller_bytes: &[u8], now_ns: Timestamp) -> Option<SubscribeSeeds> {
     match single_flight_cache::get(&POOL, ()) {
-        Cached::Ready(pool) => Some(derive(&pool, &caller_bytes(anchor_number, key), now_ns)),
+        Cached::Ready(pool) => Some(derive(&pool, caller_bytes, now_ns)),
         Cached::Pending => None,
     }
 }
@@ -111,6 +124,33 @@ pub(crate) async fn raw_rand() -> Result<[u8; 32], String> {
         .try_into()
         .map_err(|_| format!("raw_rand answered {} bytes, not 32", drawn.len()))
 }
+
+/// An installed web app's slot, as bytes the derivation can mix in. Tagged apart from
+/// [`caller_bytes`], and carrying every part of the slot, so no two slots share seeds.
+fn pwa_caller_bytes(holder: PwaSubscriptionHolder) -> Vec<u8> {
+    let PwaSubscriptionHolder {
+        anchor_number,
+        application_number,
+        slot,
+    } = holder;
+    let (account_tag, account_number) = match slot.account_number {
+        Some(account_number) => (1u8, account_number),
+        None => (0u8, 0),
+    };
+    [
+        &[PWA_CALLER_TAG][..],
+        &anchor_number.to_be_bytes()[..],
+        &application_number.to_be_bytes()[..],
+        &slot.browser_id.to_be_bytes()[..],
+        &[account_tag][..],
+        &account_number.to_be_bytes()[..],
+    ]
+    .concat()
+}
+
+/// The tag [`pwa_caller_bytes`] starts with. [`caller_bytes`] uses 0 for a browser and 1
+/// for a Home Screen app.
+const PWA_CALLER_TAG: u8 = 2;
 
 /// Who is subscribing, as bytes the derivation can mix in. Tagged and carrying the
 /// identity, because a browser id is handed out per identity, so two of them reach 1.
