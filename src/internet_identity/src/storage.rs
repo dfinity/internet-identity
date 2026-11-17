@@ -125,7 +125,7 @@ use crate::storage::storable::account_key::StorableAccountKey;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::{
-    AnchorApplicationConfig, PwaSubscriptionSlot,
+    AnchorApplicationConfig, PwaSubscription, StorablePwaSubscription,
 };
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
@@ -2656,32 +2656,6 @@ impl<M: Memory + Clone> Storage<M> {
             None => None,
         };
 
-        // The number the tracked default was given, where this write names it.
-        let renamed_default = match minted.as_slice() {
-            [account_number]
-                if previous_holds_tracked_default
-                    && !references
-                        .iter()
-                        .any(|reference| reference.account_number.is_none()) =>
-            {
-                Some(*account_number)
-            }
-            _ => None,
-        };
-
-        // The tracked default's installed app subscriptions follow it to the number it was
-        // given, as its sessions do, so naming it does not take its installed app off.
-        let config = match renamed_default {
-            Some(account_number) => {
-                let mut renamed = config.clone().unwrap_or_else(|| stored_config.clone());
-                match renamed.move_pwa_webpush_subscriptions(None, Some(account_number)) {
-                    true => Some(renamed),
-                    false => config,
-                }
-            }
-            None => config,
-        };
-
         // A config names this identity's default here, so it can only name an account
         // reference this write leaves behind. Repaired rather than refused: an account
         // reference that goes takes the default with it, and the default moves to the
@@ -2781,7 +2755,6 @@ impl<M: Memory + Clone> Storage<M> {
                 session_delta: 0,
                 previous_references: Vec::new(),
                 current_references: Vec::new(),
-                renamed_default: None,
             });
         }
 
@@ -2900,7 +2873,6 @@ impl<M: Memory + Clone> Storage<M> {
                 - Self::sessions_in(&previous_references) as i64,
             previous_references,
             current_references: references,
-            renamed_default,
         })
     }
 
@@ -2973,7 +2945,6 @@ impl<M: Memory + Clone> Storage<M> {
             session_delta: 0,
             previous_references: Vec::new(),
             current_references: Vec::new(),
-            renamed_default: None,
         };
 
         let Some(application_number) = stored_number else {
@@ -3033,7 +3004,6 @@ impl<M: Memory + Clone> Storage<M> {
             session_delta: -(Self::sessions_in(&previous) as i64),
             previous_references: previous,
             current_references: Vec::new(),
-            renamed_default: None,
         })
     }
 
@@ -3086,7 +3056,6 @@ impl<M: Memory + Clone> Storage<M> {
                 sessions_changed,
                 previous_references,
                 current_references,
-                renamed_default,
                 written: result,
                 ..
             } = one;
@@ -3167,14 +3136,6 @@ impl<M: Memory + Clone> Storage<M> {
                 self.store_anchor_application_config(key, Some(config));
             }
 
-            if let Some(account_number) = renamed_default {
-                Self::move_inbox_entries_to_account(
-                    &mut anchor,
-                    application_number,
-                    account_number,
-                );
-            }
-
             written.insert(origin, result);
         }
 
@@ -3196,33 +3157,6 @@ impl<M: Memory + Clone> Storage<M> {
             .expect("the identity record this write was handed cannot be written back");
 
         written
-    }
-
-    /// Moves what `application_number` queued for the tracked default in the identity's
-    /// inboxes to `account_number`, which the tracked default was given, so the sessions
-    /// that moved there with it can still collect it. Entries of the app's other accounts
-    /// stay where they are.
-    fn move_inbox_entries_to_account(
-        anchor: &mut Anchor,
-        application_number: ApplicationNumber,
-        account_number: AccountNumber,
-    ) {
-        let anchor_number = anchor.anchor_number();
-        let browser_ids: Vec<BrowserId> =
-            anchor.browsers().iter().map(|browser| browser.id).collect();
-        for browser_id in browser_ids {
-            let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
-                continue;
-            };
-            for entry in inbox.iter_mut().filter(|entry| {
-                entry.application_number == Some(application_number)
-                    && entry.account_number.is_none()
-            }) {
-                let previous = entry.clone();
-                entry.account_number = Some(account_number);
-                delivery_metrics::move_entry(anchor_number, &previous, entry);
-            }
-        }
     }
 
     /// The number the next application would be given, without giving it out.
@@ -3438,8 +3372,8 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        previous: Option<&BTreeMap<PwaSubscriptionSlot, StorableWebPushSubscription>>,
-        current: Option<&BTreeMap<PwaSubscriptionSlot, StorableWebPushSubscription>>,
+        previous: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+        current: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
     ) {
         let previous_holders =
             pwa_subscription_holders(anchor_number, application_number, previous);
@@ -3483,19 +3417,16 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// Whether `holder`'s slot holds a subscribed endpoint hashing to `endpoint_hash`.
+    /// Whether `holder`'s browser entry holds a subscribed endpoint hashing to
+    /// `endpoint_hash`.
     fn holds_pwa_endpoint(
         &self,
         holder: StorablePwaSubscriptionHolder,
         endpoint_hash: &[u8; 32],
     ) -> bool {
-        let slot = PwaSubscriptionSlot {
-            browser_id: holder.browser_id,
-            account_number: holder.account_number,
-        };
         self.anchor_application_config(holder.anchor_number, holder.application_number)
-            .and_then(|config| config.pwa_webpush_subscriptions?.remove(&slot))
-            .is_some_and(|subscription| match subscription {
+            .and_then(|config| config.pwa_webpush_subscriptions?.remove(&holder.browser_id))
+            .is_some_and(|held| match held.subscription {
                 StorableWebPushSubscription::Ready { endpoint, .. } => {
                     endpoint_sha256(&endpoint) == *endpoint_hash
                 }
@@ -3530,7 +3461,7 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn write_pwa_webpush_subscription(
         &mut self,
         holder: PwaSubscriptionHolder,
-        subscription: Option<WebPushSubscription>,
+        subscription: Option<PwaSubscription>,
         displaced: Option<PwaSubscriptionHolder>,
     ) -> Result<(), StorageError> {
         let displaced_config = match displaced {
@@ -3540,7 +3471,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.pwa_subscription_config(holder)?;
 
         if let Some((displaced, mut config)) = displaced_config {
-            config.set_pwa_webpush_subscription(displaced.slot, None);
+            config.set_pwa_webpush_subscription(displaced.browser_id, None);
             self.store_anchor_application_config(
                 (displaced.anchor_number, displaced.application_number),
                 Some(config),
@@ -3548,7 +3479,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
         // Read after the displaced slot is emptied: both slots may be on one config.
         let mut config = self.pwa_subscription_config(holder)?;
-        config.set_pwa_webpush_subscription(holder.slot, subscription);
+        config.set_pwa_webpush_subscription(holder.browser_id, subscription);
         self.store_anchor_application_config(
             (holder.anchor_number, holder.application_number),
             Some(config),
@@ -3556,17 +3487,24 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Writes the keying material a dispatch pass refreshed for `holder`'s slot, leaving
-    /// the transport key of a subscribe waiting for the slot to that subscribe.
+    /// Writes the keying material a dispatch pass refreshed for `holder`'s browser entry,
+    /// for the account it delivers for, leaving the transport key of a subscribe waiting
+    /// there to that subscribe. A browser entry that holds nothing any more is left empty.
     pub fn refresh_pwa_webpush_subscription(
         &mut self,
         holder: PwaSubscriptionHolder,
         subscription: ReadySubscription,
     ) -> Result<(), StorageError> {
         let mut config = self.pwa_subscription_config(holder)?;
+        let Some(held) = config.pwa_webpush_subscription(holder.browser_id) else {
+            return Ok(());
+        };
         config.refresh_pwa_webpush_subscription(
-            holder.slot,
-            Some(WebPushSubscription::Ready(subscription)),
+            holder.browser_id,
+            Some(PwaSubscription {
+                subscription: WebPushSubscription::Ready(subscription),
+                account_principal: held.account_principal,
+            }),
         );
         self.store_anchor_application_config(
             (holder.anchor_number, holder.application_number),
@@ -3583,7 +3521,7 @@ impl<M: Memory + Clone> Storage<M> {
         pending: PendingTransport,
     ) -> Result<(), StorageError> {
         let mut config = self.pwa_subscription_config(holder)?;
-        config.set_pwa_pending_transport(holder.slot, pending);
+        config.set_pwa_pending_transport(holder.browser_id, pending);
         self.store_anchor_application_config(
             (holder.anchor_number, holder.application_number),
             Some(config),
@@ -4334,6 +4272,13 @@ impl<M: Memory + Clone> Storage<M> {
             account_number: account.account_number,
             session_id: handle.session_id,
         })
+    }
+
+    /// The principal of the account the session `principal` signs as is at.
+    pub fn lookup_session_account_principal(&self, principal: Principal) -> Option<Principal> {
+        self.lookup_session_with_principal_memory
+            .get(&principal)
+            .map(|handle| handle.account_principal())
     }
 
     /// The account a principal a dapp sees was derived for, as an address.
@@ -5283,9 +5228,6 @@ struct ValidatedAccountReferenceListWrite {
     session_delta: i64,
     previous_references: Vec<AccountReference>,
     current_references: Vec<AccountReference>,
-    /// The number the tracked default was given, where this write named it. What is
-    /// queued for it in the identity's inboxes follows it there in apply.
-    renamed_default: Option<AccountNumber>,
     /// What this origin holds afterwards, handed back to the caller.
     written: AccountReferenceListWrite,
 }
@@ -5883,13 +5825,13 @@ mod allocate_anchor_safe_tests {
     }
 }
 
-/// The installed app subscription holding a push endpoint: the identity, the application
-/// whose config holds it, and its slot there.
+/// Where an installed app subscription is held: the identity, the application whose config
+/// holds it, and the browser entry it is on there.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct PwaSubscriptionHolder {
     pub anchor_number: AnchorNumber,
     pub application_number: ApplicationNumber,
-    pub slot: PwaSubscriptionSlot,
+    pub browser_id: BrowserId,
 }
 
 impl From<StorablePwaSubscriptionHolder> for PwaSubscriptionHolder {
@@ -5897,10 +5839,7 @@ impl From<StorablePwaSubscriptionHolder> for PwaSubscriptionHolder {
         Self {
             anchor_number: value.anchor_number,
             application_number: value.application_number,
-            slot: PwaSubscriptionSlot {
-                browser_id: value.browser_id,
-                account_number: value.account_number,
-            },
+            browser_id: value.browser_id,
         }
     }
 }
@@ -5915,11 +5854,11 @@ fn endpoint_sha256(endpoint: &str) -> [u8; 32] {
 fn pwa_subscription_holders(
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
-    subscriptions: Option<&BTreeMap<PwaSubscriptionSlot, StorableWebPushSubscription>>,
+    subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
 ) -> BTreeSet<([u8; 32], StorablePwaSubscriptionHolder)> {
     let mut holders = BTreeSet::new();
-    for (slot, subscription) in subscriptions.into_iter().flatten() {
-        let endpoint = match subscription {
+    for (browser_id, held) in subscriptions.into_iter().flatten() {
+        let endpoint = match &held.subscription {
             StorableWebPushSubscription::Ready { endpoint, .. } => endpoint,
             StorableWebPushSubscription::Pending { .. } => continue,
         };
@@ -5928,8 +5867,7 @@ fn pwa_subscription_holders(
             StorablePwaSubscriptionHolder {
                 anchor_number,
                 application_number,
-                browser_id: slot.browser_id,
-                account_number: slot.account_number,
+                browser_id: *browser_id,
             },
         ));
     }

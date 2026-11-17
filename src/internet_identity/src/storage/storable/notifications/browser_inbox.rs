@@ -1,6 +1,5 @@
 //! A notification a browser's service worker has yet to take, stored on the browser's entry.
 
-use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::anchor_number::StorableAnchorNumber;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::notifications::notification_id::StorableNotificationId;
@@ -27,12 +26,15 @@ pub struct StorableInboxNotification {
     pub notification_id: StorableNotificationId,
     #[n(3)]
     pub expires_at_ns: StorableTimestamp,
-    /// `None` is the unreserved default account.
-    #[n(4)]
-    pub account_number: Option<StorableAccountNumber>,
+    // #[n(4)] RETIRED, never reuse: the account number the entry was for.
     /// Set where Internet Identity sent this itself.
     #[n(5)]
     pub event: Option<StorableNotificationEvent>,
+    /// The principal of the account at the app the entry is for. `None` where Internet
+    /// Identity sent this itself, and on an app's entry written before it was recorded,
+    /// which is not read back.
+    #[cbor(n(7), with = "minicbor::bytes")]
+    pub account_principal: Option<Vec<u8>>,
 }
 
 /// Something Internet Identity has to tell the user about their own identity.
@@ -79,13 +81,13 @@ mod tests {
             sender: vec![0xff; Principal::MAX_LENGTH_IN_BYTES],
             notification_id: u64::MAX,
             expires_at_ns: u64::MAX,
-            account_number: Some(u64::MAX),
             event: None,
+            account_principal: Some(vec![0xff; Principal::MAX_LENGTH_IN_BYTES]),
         };
         let mut bytes = Vec::new();
         minicbor::encode(&queued, &mut bytes).expect("encoding a queued notification");
 
-        assert_eq!(bytes.len(), 1 + (1 + 9) + (1 + 2 + 29) + 4 * (1 + 9));
+        assert_eq!(bytes.len(), 1 + (1 + 9) + 2 * (1 + 2 + 29) + 3 * (1 + 9));
         assert_eq!(
             minicbor::decode::<StorableInboxNotification>(&bytes).expect("decoding it"),
             queued

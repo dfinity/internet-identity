@@ -18,7 +18,6 @@ use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::installed_app::NotificationAppId;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{ReadySubscription, WebPushSubscription};
-use crate::storage::storable::anchor_application_config::PwaSubscriptionSlot;
 use crate::storage::PwaSubscriptionHolder;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, BrowserId, Timestamp};
 
@@ -64,17 +63,13 @@ impl Destination {
                 anchor_number: self.anchor_number,
                 browser_id: self.browser_id,
             },
-            DeliveryTarget::Pwa {
-                application_number,
-                account_number,
-            } => RegistrationId::Pwa(PwaSubscriptionHolder {
-                anchor_number: self.anchor_number,
-                application_number,
-                slot: PwaSubscriptionSlot {
+            DeliveryTarget::Pwa { application_number } => {
+                RegistrationId::Pwa(PwaSubscriptionHolder {
+                    anchor_number: self.anchor_number,
+                    application_number,
                     browser_id: self.browser_id,
-                    account_number,
-                },
-            }),
+                })
+            }
         }
     }
 }
@@ -155,7 +150,7 @@ fn read(destination: Destination) -> Option<ReadySubscription> {
             .and_then(WebPushSubscription::ready)
             .cloned(),
         RegistrationId::Pwa(holder) => {
-            pwa_subscription::read(holder).and_then(WebPushSubscription::into_ready)
+            pwa_subscription::read(holder).and_then(|held| held.subscription.into_ready())
         }
     }
 }

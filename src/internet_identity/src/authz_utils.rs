@@ -249,6 +249,9 @@ pub struct AuthorizedSession {
     pub read_only: bool,
     /// The browser entry the session signed in from.
     pub browser_id: BrowserId,
+    /// The principal of the account the session is at, which the account keeps when it
+    /// is given a number.
+    pub account_principal: Principal,
 }
 
 /// The app session behind this call, if the caller still has a usable one.
@@ -259,10 +262,11 @@ pub struct AuthorizedSession {
 pub fn check_app_authorization(now: Timestamp) -> Result<AuthorizedSession, AuthorizationError> {
     let caller = caller();
 
-    let (locator, session) = state::storage_borrow(|storage| {
+    let (locator, session, account_principal) = state::storage_borrow(|storage| {
         let locator = storage.lookup_session_with_principal(caller)?;
         let session = storage.read_session(&locator)?;
-        Some((locator, session))
+        let account_principal = storage.lookup_session_account_principal(caller)?;
+        Some((locator, session, account_principal))
     })
     .ok_or(AuthorizationError::from(caller))?;
 
@@ -293,6 +297,7 @@ pub fn check_app_authorization(now: Timestamp) -> Result<AuthorizedSession, Auth
         valid_till_ns,
         read_only,
         browser_id,
+        account_principal,
     })
 }
 

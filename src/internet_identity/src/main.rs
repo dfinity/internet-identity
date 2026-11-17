@@ -1178,7 +1178,7 @@ fn app_set_pwa_webpush_subscription(
         .map_err(InternalCanisterError)?;
     let holder = pwa_subscription::holder_of(&session).ok_or(NoSuchSession)?;
 
-    pwa_subscription::set_pwa_subscription(holder, subscription, now)
+    pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
 }
 
 /// Every field at once rather than the first to fail, as `set_webpush_subscription` does.
@@ -1240,6 +1240,7 @@ fn app_get_pwa_notification(
     Ok(AppGetPwaNotificationResponse {
         notification: notifications::browser_inbox::pwa_notification_named(
             holder,
+            session.account_principal,
             inbox_notification_id,
             now,
         ),
@@ -1265,6 +1266,7 @@ fn app_remove_pwa_notification(
 
     notifications::browser_inbox::remove_pwa_collected(
         holder,
+        session.account_principal,
         inbox_notification_id,
         not_shown,
         now,

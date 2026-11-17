@@ -1,10 +1,11 @@
 //! What an app's own installed web app registered for Web Push, held on the identity's
-//! config for that app, in the slot of the browser entry and account its session is at.
+//! config for that app, one per browser entry, with the account it delivers for.
 //!
 //! A push endpoint names one installed app on one device, and only one identity and
-//! account deliver through it at a time. A subscribe for an endpoint another slot holds
-//! takes it over only when the keys it arrives with match that slot's, which only the
-//! device that subscribed knows: knowing an endpoint is not enough to silence the device.
+//! account deliver through it at a time: the one whose session subscribed last. A
+//! subscribe for an endpoint another browser entry holds takes it over only when the keys
+//! it arrives with match that entry's, which only the device that subscribed knows:
+//! knowing an endpoint is not enough to silence the device.
 
 use super::subscription::spend_pending;
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
@@ -12,8 +13,9 @@ use super::{seed_pool, transport};
 use crate::authz_utils::AuthorizedSession;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{PendingTransport, ReadySubscription, WebPushSubscription};
-use crate::storage::storable::anchor_application_config::PwaSubscriptionSlot;
+use crate::storage::storable::anchor_application_config::PwaSubscription;
 use crate::storage::PwaSubscriptionHolder;
+use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionResult,
     AppSetPwaWebPushSubscriptionError, PrepareWebPushSubscriptionResponse,
@@ -30,23 +32,20 @@ pub struct PwaSubscriptionRequest {
     pub sealed_auth: SealedAuth,
 }
 
-/// The slot `session` registers in: its identity, its app, the browser entry it signed in
-/// from and its account. `None` where the app has no application number, which an app
-/// with a session always has.
+/// Where `session` registers: its identity, its app and the browser entry it signed in
+/// from. `None` where the app has no application number, which an app with a session
+/// always has.
 pub fn holder_of(session: &AuthorizedSession) -> Option<PwaSubscriptionHolder> {
     let application_number =
         storage_borrow(|storage| storage.lookup_application_number_with_origin(&session.origin))?;
     Some(PwaSubscriptionHolder {
         anchor_number: session.anchor_number,
         application_number,
-        slot: PwaSubscriptionSlot {
-            browser_id: session.browser_id,
-            account_number: session.account_number,
-        },
+        browser_id: session.browser_id,
     })
 }
 
-/// Records the key a fetch just minted for `holder`'s slot. What the slot holds keeps
+/// Records the key a fetch just minted for `holder`'s browser entry. What the slot holds keeps
 /// delivering, and keeps its endpoint, until the subscribe that spends the key lands.
 fn start_pwa_subscription(
     holder: PwaSubscriptionHolder,
@@ -67,18 +66,21 @@ fn start_pwa_subscription(
     )
 }
 
-/// Registers `holder`'s slot for Web Push, or with `None` empties it.
+/// Registers `holder`'s browser entry for Web Push for the account `account_principal`
+/// names, replacing what it delivered for, or with `None` empties it where it delivers for
+/// that account.
 ///
-/// Where another slot holds the endpoint, that slot is emptied first, and only when it is
-/// the same app's and holds the same `p256dh` and `auth`: a device switching identity or
-/// account in its installed app subscribes with the keys it already has.
+/// Where another browser entry holds the endpoint, that entry is emptied first, and only
+/// when it is the same app's and holds the same `p256dh` and `auth`: a device switching
+/// identity in its installed app subscribes with the keys it already has.
 pub fn set_pwa_subscription(
     holder: PwaSubscriptionHolder,
+    account_principal: Principal,
     request: Option<PwaSubscriptionRequest>,
     now_ns: Timestamp,
 ) -> Result<(), AppSetPwaWebPushSubscriptionError> {
     let Some(request) = request else {
-        return remove_pwa_subscription(holder);
+        return remove_pwa_subscription(holder, account_principal);
     };
     if !is_allowed(holder) {
         return Err(AppSetPwaWebPushSubscriptionError::NotificationsNotAllowed);
@@ -103,16 +105,25 @@ pub fn set_pwa_subscription(
     .map_err(set_error)?;
     let displaced = displaced_holder(holder, &ready)?;
 
-    write(holder, Some(WebPushSubscription::Ready(ready)), displaced)
+    let subscription = PwaSubscription {
+        subscription: WebPushSubscription::Ready(ready),
+        account_principal,
+    };
+    write(holder, Some(subscription), displaced)
         .map_err(AppSetPwaWebPushSubscriptionError::InternalCanisterError)
 }
 
-/// Empties `holder`'s slot. A slot or config that holds nothing is already empty.
+/// Empties `holder`'s browser entry where it delivers for `account_principal`'s account.
+/// One that holds nothing, or delivers for another account, is left as it is.
 fn remove_pwa_subscription(
     holder: PwaSubscriptionHolder,
+    account_principal: Principal,
 ) -> Result<(), AppSetPwaWebPushSubscriptionError> {
-    if read(holder).is_none() && read_pending(holder).is_none() {
-        return Ok(());
+    match read(holder) {
+        Some(held) if held.account_principal != account_principal => return Ok(()),
+        Some(_) => {}
+        None if read_pending(holder).is_none() => return Ok(()),
+        None => {}
     }
     write(holder, None, None).map_err(AppSetPwaWebPushSubscriptionError::InternalCanisterError)
 }
@@ -134,7 +145,7 @@ fn displaced_holder(
     // The lookup is derived from the configs, so a slot that no longer holds the endpoint
     // holds nothing to protect.
     let Some(held) = read(indexed)
-        .and_then(WebPushSubscription::into_ready)
+        .and_then(|held| held.subscription.into_ready())
         .filter(|held| held.endpoint == ready.endpoint)
     else {
         return Ok(None);
@@ -152,14 +163,14 @@ fn displaced_holder(
     Ok(Some(indexed))
 }
 
-/// The subscription a relay answered gone for, dropped where `holder`'s slot still holds
-/// that endpoint.
+/// The subscription a relay answered gone for, dropped where `holder`'s browser entry
+/// still holds that endpoint.
 pub(crate) fn clear_gone_pwa_subscription(
     holder: PwaSubscriptionHolder,
     endpoint: &str,
 ) -> Result<(), String> {
     let is_registered = read(holder)
-        .and_then(WebPushSubscription::into_ready)
+        .and_then(|held| held.subscription.into_ready())
         .is_some_and(|registered| registered.endpoint.as_str() == endpoint);
     if !is_registered {
         return Ok(());
@@ -167,18 +178,19 @@ pub(crate) fn clear_gone_pwa_subscription(
     write(holder, None, None)
 }
 
-/// What `holder`'s slot holds.
-pub(crate) fn read(holder: PwaSubscriptionHolder) -> Option<WebPushSubscription> {
+/// What `holder`'s browser entry holds, and the account it delivers for.
+pub(crate) fn read(holder: PwaSubscriptionHolder) -> Option<PwaSubscription> {
     storage_borrow(|storage| {
         storage.read_anchor_application_config_with_number(
             holder.anchor_number,
             holder.application_number,
         )
     })?
-    .pwa_webpush_subscription(holder.slot)
+    .pwa_webpush_subscription(holder.browser_id)
 }
 
-/// The transport key fetched for a subscribe of `holder`'s slot that has yet to land.
+/// The transport key fetched for a subscribe on `holder`'s browser entry that has yet to
+/// land.
 fn read_pending(holder: PwaSubscriptionHolder) -> Option<PendingTransport> {
     storage_borrow(|storage| {
         storage.read_anchor_application_config_with_number(
@@ -186,14 +198,14 @@ fn read_pending(holder: PwaSubscriptionHolder) -> Option<PendingTransport> {
             holder.application_number,
         )
     })?
-    .pwa_pending_transport(holder.slot)
+    .pwa_pending_transport(holder.browser_id)
 }
 
-/// Puts `subscription` in `holder`'s slot, or with `None` empties it, after emptying
-/// `displaced`'s slot where one is given.
+/// Puts `subscription` on `holder`'s browser entry, or with `None` empties it, after
+/// emptying `displaced`'s where one is given.
 pub(crate) fn write(
     holder: PwaSubscriptionHolder,
-    subscription: Option<WebPushSubscription>,
+    subscription: Option<PwaSubscription>,
     displaced: Option<PwaSubscriptionHolder>,
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
@@ -227,7 +239,7 @@ fn set_error(err: SetWebPushSubscriptionError) -> AppSetPwaWebPushSubscriptionEr
     }
 }
 
-/// The keys an installed web app subscribes `session`'s slot with, after the VAPID key
+/// The keys an installed web app subscribes `session`'s browser entry with, after the VAPID key
 /// was fetched. `Pending` where the seed pool is cold.
 pub fn prepare_pwa_subscription(
     session: &AuthorizedSession,

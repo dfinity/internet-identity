@@ -17,18 +17,17 @@ use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
 use crate::storage::account::Session;
 use crate::storage::anchor::{Browser, InboxNotification, ReadySubscription, WebPushSubscription};
-use crate::storage::storable::anchor_application_config::{
-    AnchorApplicationConfig, PwaSubscriptionSlot,
-};
+use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::{PwaSubscriptionHolder, Storage};
 use crate::{DAY_NS, HOUR_NS, MINUTE_NS, SECOND_NS};
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
+use candid::Principal;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, ApplicationNumber, BrowserId, InboxNotificationId,
-    NotificationEvent, NotificationId, Timestamp, Urgency,
+    AnchorNumber, ApplicationNumber, BrowserId, InboxNotificationId, NotificationEvent,
+    NotificationId, Timestamp, Urgency,
 };
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
@@ -210,10 +209,9 @@ pub(crate) enum DeliveryTarget {
     Browser,
     /// The app record the entry routes through, shared with every identity pointing at it.
     App(NotificationAppId),
-    /// The app's own installed web app on this entry, subscribed for this account.
+    /// The app's own installed web app on this entry.
     Pwa {
         application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
     },
 }
 
@@ -226,16 +224,10 @@ impl DeliveryTarget {
         browser_id: BrowserId,
     ) -> Option<PwaSubscriptionHolder> {
         match self {
-            DeliveryTarget::Pwa {
-                application_number,
-                account_number,
-            } => Some(PwaSubscriptionHolder {
+            DeliveryTarget::Pwa { application_number } => Some(PwaSubscriptionHolder {
                 anchor_number,
                 application_number,
-                slot: PwaSubscriptionSlot {
-                    browser_id,
-                    account_number,
-                },
+                browser_id,
             }),
             DeliveryTarget::Browser | DeliveryTarget::App(_) => None,
         }
@@ -473,7 +465,7 @@ fn fan_out_to_destinations(
             sender: crate::storage::canister_id(),
             notification_id: pending.notification_id,
             expires_at_ns,
-            account_number: None,
+            account_principal: None,
             event: Some(pending.event.clone()),
         };
         let mut planned = Vec::new();
@@ -613,7 +605,7 @@ fn fan_out_to_browsers(
         sender: pending.sender,
         notification_id: pending.notification_id,
         expires_at_ns: app_expiry_ns(pending.expires_at_ns, taken.entry.received_at_ns),
-        account_number: pending.account_number,
+        account_principal: Some(pending.recipient),
     };
     let ttl_seconds = queued_entry.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
     let labels = Labels::app_number(pending.application_number, &pending.urgency);
@@ -627,21 +619,11 @@ fn fan_out_to_browsers(
             .iter()
             .map(|browser| routed_app(storage, browser))
             .collect();
-        // The account the recipient is at now: naming the unreserved default account
-        // gives it a number, under the same principal, while this waits in the backlog.
-        let account_number = storage
-            .lookup_account_with_principal(pending.recipient)
-            .filter(|account| account.anchor_number == pending.anchor_number)
-            .map_or(pending.account_number, |account| account.account_number);
-        let queued_entry = InboxNotification {
-            account_number,
-            ..queued_entry
-        };
         let pwa_route = PwaRoute::read(
             storage,
             pending.anchor_number,
             pending.application_number,
-            account_number,
+            pending.recipient,
         );
         // The sealing keys travel with each wake-up: the deposit that names its entry
         // happens below, after this borrow of the browsers has ended.
@@ -957,27 +939,35 @@ pub(crate) struct PwaRoute {
     config: Option<AnchorApplicationConfig>,
     sessions: Vec<Session>,
     application_number: ApplicationNumber,
-    account_number: Option<AccountNumber>,
+    account_principal: Principal,
 }
 
 impl PwaRoute {
-    /// What `anchor_number` holds for `account_number` of `application_number`.
+    /// What `anchor_number` holds for the account `account_principal` names at
+    /// `application_number`. No sessions where it names no account of the identity.
     pub(crate) fn read<M: Memory + Clone>(
         storage: &Storage<M>,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
+        account_principal: Principal,
     ) -> Self {
+        let sessions = storage
+            .lookup_account_with_principal(account_principal)
+            .filter(|account| account.anchor_number == anchor_number)
+            .map(|account| {
+                storage.read_account_sessions(
+                    anchor_number,
+                    application_number,
+                    account.account_number,
+                )
+            })
+            .unwrap_or_default();
         Self {
             config: storage
                 .read_anchor_application_config_with_number(anchor_number, application_number),
-            sessions: storage.read_account_sessions(
-                anchor_number,
-                application_number,
-                account_number,
-            ),
+            sessions,
             application_number,
-            account_number,
+            account_principal,
         }
     }
 }
@@ -991,8 +981,9 @@ pub(crate) fn can_wake_installed_app(
     pwa_wake_up_address(browser, route, now_ns).is_some()
 }
 
-/// The entry's installed web app for this app and account, where it subscribed and a
-/// session of that account on this entry stays live past [`PWA_SESSION_MARGIN_NS`].
+/// The entry's installed web app for this app, where it subscribed for the recipient
+/// account and a session of that account on this entry stays live past
+/// [`PWA_SESSION_MARGIN_NS`].
 fn pwa_wake_up_address(
     browser: &Browser,
     route: &PwaRoute,
@@ -1008,10 +999,9 @@ fn pwa_wake_up_address(
     let subscription = route
         .config
         .as_ref()?
-        .pwa_webpush_subscription(PwaSubscriptionSlot {
-            browser_id: browser.id,
-            account_number: route.account_number,
-        })?
+        .pwa_webpush_subscription(browser.id)
+        .filter(|held| held.account_principal == route.account_principal)?
+        .subscription
         .into_ready()?;
     let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
     Some((
@@ -1019,7 +1009,6 @@ fn pwa_wake_up_address(
         relay_origin,
         DeliveryTarget::Pwa {
             application_number: route.application_number,
-            account_number: route.account_number,
         },
     ))
 }
@@ -1410,7 +1399,6 @@ mod tests {
                     recipient: Principal::from_slice(&anchor_number.to_be_bytes()),
                     anchor_number,
                     application_number,
-                    account_number: Some(2),
                     sender: sender(),
                     notification_id,
                     urgency: Urgency::Normal,
@@ -1848,7 +1836,7 @@ mod tests {
                     sender: sender(),
                     notification_id,
                     expires_at_ns: 10 * SECOND_NS,
-                    account_number: Some(2),
+                    account_principal: Some(Principal::from_slice(&recipient.to_be_bytes())),
                     event: None,
                 }
             }))
@@ -1975,7 +1963,7 @@ mod tests {
                 sender: sender(),
                 notification_id: 7,
                 expires_at_ns: 10 * SECOND_NS,
-                account_number: Some(2),
+                account_principal: Some(Principal::from_slice(&recipient.to_be_bytes())),
                 event: None,
             })
         );

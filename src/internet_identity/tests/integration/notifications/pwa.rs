@@ -21,7 +21,7 @@ use internet_identity_interface::internet_identity::types::{
     Notification, PrepareAccountSessionResponse, PwaNotification, PwaWebPushSubscription,
     RevokeBrowserSessionsRequest, SendNotificationArg, SetWebPushSubscriptionRequest,
 };
-use pocket_ic::common::rest::CanisterHttpMethod;
+use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
 use std::time::Duration;
 
 /// An app whose sender list names [`app_sender`].
@@ -1166,5 +1166,117 @@ fn should_count_each_copy_under_the_path_it_was_posted_by() -> Result<(), Reject
     assert_eq!(delivered_pushes(&metrics, "chrome"), 1.0);
     assert_eq!(delivered_pushes(&metrics, "firefox"), 1.0);
     assert_eq!(delivered_pushes(&metrics, "other"), 0.0);
+    Ok(())
+}
+
+/// Answers every outcall but the wake-ups, as [`answer_outcalls`] does, until one is
+/// posted, and answers that one wake-up's request left unanswered.
+fn hold_wake_up(env: &PocketIc) -> CanisterHttpRequest {
+    for _ in 0..OUTCALL_ROUNDS {
+        env.advance_time(Duration::from_millis(ROUND_MILLIS));
+        env.tick();
+        for request in env.get_canister_http() {
+            if request.http_method == CanisterHttpMethod::POST {
+                return request;
+            }
+            let body = match request.url.starts_with("https://listed") {
+                true => format!(r#"{{"senders":["{}"]}}"#, app_sender().to_text()).into_bytes(),
+                false => vec![],
+            };
+            reply(env, &request, 200, body);
+        }
+    }
+    panic!("no wake-up was posted");
+}
+
+fn reply(env: &PocketIc, request: &CanisterHttpRequest, status: u16, body: Vec<u8>) {
+    env.mock_canister_http_response(MockCanisterHttpResponse {
+        subnet_id: request.subnet_id,
+        request_id: request.request_id,
+        response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+            status,
+            headers: vec![],
+            body,
+        }),
+        additional_responses: vec![],
+    });
+}
+
+#[test]
+fn should_drop_the_subscription_a_wake_up_in_flight_while_its_account_was_named_finds_gone(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+    let second = session_of(&second_identity_at(&env, canister_id, APP));
+    // Reads the sender list and probes the relay, so the next wake-up is posted at once.
+    deliver(&env, canister_id, first.account_principal, 1, 200);
+    send_accepted(&env, canister_id, first.account_principal, 2, 200);
+    let wake_up = hold_wake_up(&env);
+    assert_eq!(wake_up.url, PWA_ENDPOINT);
+
+    name_default_account(&env, canister_id, anchor)?;
+    reply(&env, &wake_up, 404, vec![]);
+    answer_outcalls(&env, 200);
+
+    assert!(is_endpoint_free(&env, canister_id, second));
+    Ok(())
+}
+
+#[test]
+fn should_deliver_for_the_account_that_subscribed_the_installed_app_last(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+    let other_account = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        APP.into(),
+        "Other".to_string(),
+    )?
+    .expect("creating the account refused")
+    .account_number;
+    // The same installed app on the same browser, signed in to the other account.
+    let other = sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        PrepareAccountSessionRequest {
+            account_number: other_account,
+            ..session_request(anchor, APP, &BrowserKey::new(1).successor())
+        },
+    );
+    subscribe_pwa_webpush(
+        &env,
+        canister_id,
+        session_of(&other),
+        PWA_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )?
+    .expect("subscribe refused");
+
+    assert_eq!(
+        deliver(&env, canister_id, other.account_principal, 1, 200),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+    assert_eq!(
+        deliver(&env, canister_id, first.account_principal, 2, 200),
+        vec![BROWSER_ENDPOINT.to_string()]
+    );
+    // One subscription on the browser, the other account's: removing from the first
+    // account's session leaves it.
+    app_set_pwa_webpush_subscription(
+        &env,
+        canister_id,
+        session_of(&first),
+        AppSetPwaWebPushSubscriptionRequest { subscription: None },
+    )?
+    .expect("remove refused");
+    assert_eq!(
+        deliver(&env, canister_id, other.account_principal, 3, 200),
+        vec![PWA_ENDPOINT.to_string()]
+    );
     Ok(())
 }

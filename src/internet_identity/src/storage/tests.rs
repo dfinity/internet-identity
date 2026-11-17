@@ -7502,7 +7502,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: 100 * notification_id,
-        account_number: Some(notification_id),
+        account_principal: Some(Principal::from_slice(&notification_id.to_be_bytes())),
         event: None,
     };
     for browser_id in [queued_on, left_empty] {
@@ -7968,7 +7968,7 @@ fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNot
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: u64::MAX,
-        account_number: None,
+        account_principal: Some(Principal::from_slice(&[9; 10])),
         event: None,
     }
 }
@@ -8155,7 +8155,7 @@ fn an_identity_notification_is_queued_without_an_application() {
             sender: Principal::from_slice(&[7; 10]),
             notification_id: 1,
             expires_at_ns: 2_000,
-            account_number: None,
+            account_principal: None,
             event: Some(NotificationEvent::NotificationsOn(
                 IdentityForNotification {
                     anchor_number: 10_000,

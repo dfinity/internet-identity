@@ -125,25 +125,20 @@ pub(crate) async fn raw_rand() -> Result<[u8; 32], String> {
         .map_err(|_| format!("raw_rand answered {} bytes, not 32", drawn.len()))
 }
 
-/// An installed web app's slot, as bytes the derivation can mix in. Tagged apart from
-/// [`caller_bytes`], and carrying every part of the slot, so no two slots share seeds.
+/// Where an installed web app subscribes, as bytes the derivation can mix in. Tagged apart
+/// from [`caller_bytes`], and carrying the identity, the app and the browser entry, so no
+/// two of them share seeds.
 fn pwa_caller_bytes(holder: PwaSubscriptionHolder) -> Vec<u8> {
     let PwaSubscriptionHolder {
         anchor_number,
         application_number,
-        slot,
+        browser_id,
     } = holder;
-    let (account_tag, account_number) = match slot.account_number {
-        Some(account_number) => (1u8, account_number),
-        None => (0u8, 0),
-    };
     [
         &[PWA_CALLER_TAG][..],
         &anchor_number.to_be_bytes()[..],
         &application_number.to_be_bytes()[..],
-        &slot.browser_id.to_be_bytes()[..],
-        &[account_tag][..],
-        &account_number.to_be_bytes()[..],
+        &browser_id.to_be_bytes()[..],
     ]
     .concat()
 }

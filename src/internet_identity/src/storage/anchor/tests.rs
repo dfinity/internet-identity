@@ -1619,13 +1619,63 @@ mod browser_tests {
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
+                account_principal: Some(Principal::from_slice(&[9; 10])),
                 event: None,
             });
 
         anchor.point_at_notification_app(second, 7);
 
         assert!(anchor.notifications_for_browser(first).is_empty());
+    }
+
+    /// An app's entry written before the account principal was recorded names no account
+    /// anything can be checked against, so it is not read back. Internet Identity's own
+    /// entries name none and are.
+    #[test]
+    fn an_apps_entry_stored_without_its_account_principal_is_dropped_on_read() {
+        use crate::storage::anchor::Browser;
+        use crate::storage::storable::browser::StorableBrowser;
+        use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
+
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome on a Mac"),
+                1_000,
+            )
+            .unwrap();
+        let browser = anchor.browser(id).expect("a listed browser").clone();
+        let stored_entry = |notification_id: u64,
+                            application_number: Option<u64>,
+                            account_principal: Option<Vec<u8>>| {
+            StorableInboxNotification {
+                application_number,
+                inbox_notification_id: notification_id,
+                sender: vec![7; 10],
+                notification_id,
+                expires_at_ns: u64::MAX,
+                event: None,
+                account_principal,
+            }
+        };
+        let stored = StorableBrowser {
+            notifications: Some(vec![
+                stored_entry(1, Some(1), None),
+                stored_entry(2, Some(1), Some(vec![9; 10])),
+                stored_entry(3, None, None),
+            ]),
+            ..StorableBrowser::from(browser)
+        };
+
+        let read: Vec<u64> = Browser::from(stored)
+            .notifications
+            .iter()
+            .map(|entry| entry.notification_id)
+            .collect();
+
+        assert_eq!(read, vec![2, 3]);
     }
 
     #[test]
@@ -1649,7 +1699,7 @@ mod browser_tests {
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
+                account_principal: Some(Principal::from_slice(&[9; 10])),
                 event: None,
             });
 
@@ -2360,7 +2410,7 @@ mod browser_tests {
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
+                account_principal: Some(Principal::from_slice(&[9; 10])),
                 event: None,
             });
 
@@ -2403,7 +2453,7 @@ mod browser_tests {
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
+                account_principal: Some(Principal::from_slice(&[9; 10])),
                 event: None,
             });
 
@@ -2427,7 +2477,7 @@ mod browser_tests {
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
+                account_principal: Some(Principal::from_slice(&[9; 10])),
                 event: None,
             });
         anchor.start_notification_app_link(id, link_principal(1), u64::MAX);

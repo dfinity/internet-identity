@@ -449,7 +449,7 @@ fn live_key(anchor_number: AnchorNumber, entry: &InboxNotification) -> LiveKey {
     let mut hasher = DefaultHasher::new();
     anchor_number.hash(&mut hasher);
     entry.application_number.hash(&mut hasher);
-    entry.account_number.hash(&mut hasher);
+    entry.account_principal.hash(&mut hasher);
     entry.sender.hash(&mut hasher);
     entry.notification_id.hash(&mut hasher);
     (entry.expires_at_ns, hasher.finish())
@@ -1121,27 +1121,6 @@ pub(crate) fn count_collected(
     });
 }
 
-/// Follows an entry whose account was renumbered from `previous` to `current`, so its
-/// copies are still found when they are collected or removed. Every browser's copy of a
-/// notification shares one record, so only the first of them finds anything to move.
-pub(crate) fn move_entry(
-    anchor_number: AnchorNumber,
-    previous: &InboxNotification,
-    current: &InboxNotification,
-) {
-    with(|counters| {
-        let previous_key = live_key(anchor_number, previous);
-        let Some(live) = counters.live.remove(&previous_key) else {
-            return;
-        };
-        let current_key = live_key(anchor_number, current);
-        counters.live.insert(current_key, live);
-        for (browser_id, path) in counters.forget_copy_paths(previous_key) {
-            counters.copy_paths.insert((current_key, browser_id), path);
-        }
-    });
-}
-
 /// Entries taken out of `browser_id`'s inbox, for `reason`, before a device collected
 /// them. Each is counted on the path its copy was pushed by.
 pub(crate) fn count_removed_entries<'a>(
@@ -1315,7 +1294,7 @@ mod tests {
             sender: Principal::anonymous(),
             notification_id,
             expires_at_ns,
-            account_number: None,
+            account_principal: Some(Principal::from_slice(&[9; 10])),
         }
     }
 

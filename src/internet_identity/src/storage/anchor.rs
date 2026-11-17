@@ -147,8 +147,9 @@ pub struct InboxNotification {
     pub sender: Principal,
     pub notification_id: NotificationId,
     pub expires_at_ns: Timestamp,
-    /// `None` is the unreserved default account, and always `None` for our own.
-    pub account_number: Option<AccountNumber>,
+    /// The principal of the account at the app the entry is for, which the account keeps
+    /// when it is given a number. `None` for our own.
+    pub account_principal: Option<Principal>,
     /// Set where Internet Identity sent this itself, and what it has to say.
     pub event: Option<NotificationEvent>,
 }
@@ -162,7 +163,9 @@ impl From<InboxNotification> for StorableInboxNotification {
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
             expires_at_ns: value.expires_at_ns,
-            account_number: value.account_number,
+            account_principal: value
+                .account_principal
+                .map(|principal| principal.as_slice().to_vec()),
         }
     }
 }
@@ -326,6 +329,17 @@ impl From<StorableBrowser> for Browser {
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|queued| {
+                    let account_principal =
+                        match (queued.application_number, queued.account_principal) {
+                            (Some(_), Some(principal)) => {
+                                Some(Principal::try_from_slice(&principal).ok()?)
+                            }
+                            // An app's entry written before its account principal was
+                            // recorded names no account, so it is dropped, and the next write
+                            // of this inbox leaves it out.
+                            (Some(_), None) => return None,
+                            (None, _) => None,
+                        };
                     Some(InboxNotification {
                         inbox_notification_id: queued.inbox_notification_id,
                         application_number: queued.application_number,
@@ -333,7 +347,7 @@ impl From<StorableBrowser> for Browser {
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
                         notification_id: queued.notification_id,
                         expires_at_ns: queued.expires_at_ns,
-                        account_number: queued.account_number,
+                        account_principal,
                     })
                 })
                 .collect(),

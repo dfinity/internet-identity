@@ -13,6 +13,7 @@ use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, InboxNotification, WebPushSubscription};
 use crate::storage::PwaSubscriptionHolder;
+use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, InboxNotificationId, NotShownReason, NotificationToShow,
     PwaNotification, Timestamp,
@@ -69,9 +70,9 @@ pub(crate) fn remove_after_failed_wake_up(
                             holder.anchor_number,
                             holder.application_number,
                         )?
-                        .pwa_webpush_subscription(holder.slot)
+                        .pwa_webpush_subscription(holder.browser_id)
                 })
-                .and_then(WebPushSubscription::into_ready)
+                .and_then(|held| held.subscription.into_ready())
                 .map(|registered| registered.endpoint.into_string()),
             DeliveryTarget::App(app_id) => {
                 // The app's address stands for this entry only while the entry still
@@ -180,12 +181,17 @@ pub(crate) fn notification_named(
     }
     storage_borrow(|storage| {
         let origin = storage.lookup_origin_with_application_number(entry.application_number?)?;
+        // The account as it is numbered now, which naming the default account changes.
+        // One the identity no longer holds at this app has nothing left to show.
+        let account = storage
+            .lookup_account_with_principal(entry.account_principal?)
+            .filter(|account| account.anchor_number == anchor_number && account.origin == origin)?;
         storage
             .read_anchor_application_config(anchor_number, &origin)
             .filter(|config| config.notifications_allowed())
             .map(|_| NotificationToShow {
                 origin: Some(origin.clone()),
-                account_number: entry.account_number,
+                account_number: account.account_number,
                 canister_id: entry.sender,
                 id: entry.notification_id,
                 event: None,
@@ -239,44 +245,43 @@ pub(crate) fn remove_collected(
     })
 }
 
-/// [`notification_named`] for an installed web app: only an entry of `holder`'s app and
-/// account in its browser entry's inbox, and only what the app fetches the content with.
+/// [`notification_named`] for an installed web app: only an entry of `holder`'s app for
+/// the account `account_principal` names, in its browser entry's inbox, and only what the
+/// app fetches the content with.
 pub(crate) fn pwa_notification_named(
     holder: PwaSubscriptionHolder,
+    account_principal: Principal,
     inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
 ) -> Option<PwaNotification> {
     let anchor = storage_borrow(|storage| storage.read(holder.anchor_number)).ok()?;
-    if !holds_pwa_entry(&anchor, holder, inbox_notification_id) {
+    if !holds_pwa_entry(&anchor, holder, account_principal, inbox_notification_id) {
         return None;
     }
     let NotificationToShow {
         canister_id, id, ..
-    } = notification_named(
-        &anchor,
-        holder.slot.browser_id,
-        inbox_notification_id,
-        now_ns,
-    )?;
+    } = notification_named(&anchor, holder.browser_id, inbox_notification_id, now_ns)?;
     Some(PwaNotification { canister_id, id })
 }
 
-/// [`remove_collected`] for an installed web app: only an entry of `holder`'s app and
-/// account in its browser entry's inbox. Any other is no error, as one already gone.
+/// [`remove_collected`] for an installed web app: only an entry of `holder`'s app for the
+/// account `account_principal` names, in its browser entry's inbox. Any other is no error,
+/// as one already gone.
 pub(crate) fn remove_pwa_collected(
     holder: PwaSubscriptionHolder,
+    account_principal: Principal,
     inbox_notification_id: InboxNotificationId,
     not_shown: Option<NotShownReason>,
     now_ns: Timestamp,
 ) -> Result<(), String> {
     let anchor = storage_borrow(|storage| storage.read(holder.anchor_number))
         .map_err(|err| format!("{err}"))?;
-    if !holds_pwa_entry(&anchor, holder, inbox_notification_id) {
+    if !holds_pwa_entry(&anchor, holder, account_principal, inbox_notification_id) {
         return Ok(());
     }
     remove_collected(
         anchor,
-        holder.slot.browser_id,
+        holder.browser_id,
         inbox_notification_id,
         not_shown,
         now_ns,
@@ -284,19 +289,20 @@ pub(crate) fn remove_pwa_collected(
 }
 
 /// Whether the entry `inbox_notification_id` names in the inbox of `holder`'s browser entry
-/// is a notification of `holder`'s app to `holder`'s account.
+/// is a notification of `holder`'s app to the account `account_principal` names.
 fn holds_pwa_entry(
     anchor: &Anchor,
     holder: PwaSubscriptionHolder,
+    account_principal: Principal,
     inbox_notification_id: InboxNotificationId,
 ) -> bool {
     anchor
-        .notifications_for_browser(holder.slot.browser_id)
+        .notifications_for_browser(holder.browser_id)
         .iter()
         .find(|entry| entry.inbox_notification_id == inbox_notification_id)
         .is_some_and(|entry| {
             entry.application_number == Some(holder.application_number)
-                && entry.account_number == holder.slot.account_number
+                && entry.account_principal == Some(account_principal)
         })
 }
 
@@ -316,7 +322,7 @@ mod tests {
     }
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{
-        IdentityForNotification, NotificationEvent,
+        AccountNumber, IdentityForNotification, NotificationEvent,
     };
     use pretty_assertions::assert_eq;
 
@@ -329,7 +335,7 @@ mod tests {
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
             expires_at_ns,
-            account_number: None,
+            account_principal: Some(Principal::from_slice(&[9; 10])),
             event: None,
         }
     }
@@ -497,11 +503,33 @@ mod tests {
         .expect("signing in stores the application")
     }
 
-    fn from_app(notification_id: u64, expires_at_ns: Timestamp) -> InboxNotification {
+    /// An entry of the app at `ORIGIN` for `anchor_number`'s unreserved default account.
+    fn from_app(
+        anchor_number: AnchorNumber,
+        notification_id: u64,
+        expires_at_ns: Timestamp,
+    ) -> InboxNotification {
+        let account_principal = storage_borrow(|storage| {
+            storage.default_account_principal_for_testing(anchor_number, &ORIGIN.to_string())
+        });
         InboxNotification {
             application_number: Some(app()),
+            account_principal: Some(account_principal),
             ..entry(notification_id, expires_at_ns)
         }
+    }
+
+    /// A named account of `anchor_number` at `ORIGIN`: its number and its principal.
+    fn named_account(anchor_number: AnchorNumber) -> (Option<AccountNumber>, Principal) {
+        storage_borrow_mut(|storage| {
+            let account = storage
+                .create_account(anchor_number, ORIGIN.to_string(), "Work".to_string(), 0)
+                .expect("creating an account");
+            (
+                account.account_number,
+                storage.account_principal_for_testing(&account),
+            )
+        })
     }
 
     fn put(
@@ -599,13 +627,17 @@ mod tests {
     #[test]
     fn a_failed_app_routed_wake_up_drops_its_entry() {
         let (anchor_number, browser_id, app_id) = routed_through_an_app();
-        put(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 7, 60 * SECOND_NS)],
+        );
 
         remove_after_failed_wake_up(
             anchor_number,
             browser_id,
             DeliveryTarget::App(app_id),
-            &from_app(7, 60 * SECOND_NS),
+            &from_app(anchor_number, 7, 60 * SECOND_NS),
             APP_RELAY,
         );
 
@@ -615,7 +647,11 @@ mod tests {
     #[test]
     fn a_failed_app_routed_wake_up_drops_its_entry_though_delivery_was_switched_off() {
         let (anchor_number, browser_id, app_id) = routed_through_an_app();
-        put(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 7, 60 * SECOND_NS)],
+        );
         let mut stored = anchor(anchor_number);
         stored.disable_notification_app(browser_id);
         storage_borrow_mut(|storage| storage.write(stored)).expect("switching delivery off");
@@ -624,7 +660,7 @@ mod tests {
             anchor_number,
             browser_id,
             DeliveryTarget::App(app_id),
-            &from_app(7, 60 * SECOND_NS),
+            &from_app(anchor_number, 7, 60 * SECOND_NS),
             APP_RELAY,
         );
 
@@ -678,13 +714,17 @@ mod tests {
             Some(APP_RELAY.to_string()),
             "the app this entry left should keep its address"
         );
-        put(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 7, 60 * SECOND_NS)],
+        );
 
         remove_after_failed_wake_up(
             anchor_number,
             browser_id,
             DeliveryTarget::App(left_behind),
-            &from_app(9, 60 * SECOND_NS),
+            &from_app(anchor_number, 9, 60 * SECOND_NS),
             APP_RELAY,
         );
 
@@ -694,13 +734,17 @@ mod tests {
     #[test]
     fn a_failed_app_routed_wake_up_for_an_old_endpoint_removes_nothing() {
         let (anchor_number, browser_id, app_id) = routed_through_an_app();
-        put(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 7, 60 * SECOND_NS)],
+        );
 
         remove_after_failed_wake_up(
             anchor_number,
             browser_id,
             DeliveryTarget::App(app_id),
-            &from_app(7, 60 * SECOND_NS),
+            &from_app(anchor_number, 7, 60 * SECOND_NS),
             "https://web.push.apple.com/b",
         );
 
@@ -715,7 +759,7 @@ mod tests {
             browser_id,
             [
                 identity_event(1, 60 * SECOND_NS),
-                from_app(1, 60 * SECOND_NS),
+                from_app(anchor_number, 1, 60 * SECOND_NS),
             ],
         );
         let shown = first_collectable(anchor_number, browser_id, 2 * SECOND_NS)
@@ -731,7 +775,7 @@ mod tests {
 
         assert_eq!(
             anchor(anchor_number).notifications_for_browser(browser_id),
-            [from_app(1, 60 * SECOND_NS)]
+            [from_app(anchor_number, 1, 60 * SECOND_NS)]
         );
     }
 
@@ -756,7 +800,7 @@ mod tests {
             browser_id,
             [
                 identity_event(1, 60 * SECOND_NS),
-                from_app(2, 60 * SECOND_NS),
+                from_app(anchor_number, 2, 60 * SECOND_NS),
             ],
         );
 
@@ -778,21 +822,23 @@ mod tests {
     #[test]
     fn the_first_collectable_is_the_oldest_and_nothing_is_removed() {
         let (anchor_number, browser_id) = signed_in();
+        let (account_number, account_principal) = named_account(anchor_number);
         let for_account = InboxNotification {
-            account_number: Some(3),
-            ..from_app(7, 60 * SECOND_NS)
+            account_principal: Some(account_principal),
+            ..from_app(anchor_number, 7, 60 * SECOND_NS)
         };
         put(
             anchor_number,
             browser_id,
-            [for_account, from_app(8, 60 * SECOND_NS)],
+            [for_account, from_app(anchor_number, 8, 60 * SECOND_NS)],
         );
 
+        assert!(account_number.is_some());
         assert_eq!(
             first_collectable(anchor_number, browser_id, 2 * SECOND_NS),
             Some(NotificationToShow {
                 origin: Some(ORIGIN.to_string()),
-                account_number: Some(3),
+                account_number,
                 canister_id: Principal::from_slice(&[7; 10]),
                 id: 7,
                 event: None,
@@ -817,7 +863,10 @@ mod tests {
         put(
             anchor_number,
             browser_id,
-            [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
+            [
+                from_app(anchor_number, 7, 60 * SECOND_NS),
+                from_app(anchor_number, 8, 60 * SECOND_NS),
+            ],
         );
         let collected =
             first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("one to collect");
@@ -836,7 +885,10 @@ mod tests {
         put(
             anchor_number,
             browser_id,
-            [from_app(1, 2 * SECOND_NS), from_app(2, 60 * SECOND_NS)],
+            [
+                from_app(anchor_number, 1, 2 * SECOND_NS),
+                from_app(anchor_number, 2, 60 * SECOND_NS),
+            ],
         );
 
         assert_eq!(
@@ -855,7 +907,7 @@ mod tests {
         put(
             anchor_number,
             browser_id,
-            [unknown, from_app(2, 60 * SECOND_NS)],
+            [unknown, from_app(anchor_number, 2, 60 * SECOND_NS)],
         );
 
         assert_eq!(
@@ -867,7 +919,11 @@ mod tests {
     #[test]
     fn an_app_that_lost_consent_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
-        put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 1, 60 * SECOND_NS)],
+        );
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), false, SECOND_NS)
             .expect("revoking consent");
 
@@ -880,7 +936,11 @@ mod tests {
     #[test]
     fn consent_granted_again_brings_back_nothing_deposited_before_it_was_revoked() {
         let (anchor_number, browser_id) = signed_in();
-        put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 1, 60 * SECOND_NS)],
+        );
         crate::notifications::revoke_consent(anchor_number, &app_origin(ORIGIN), SECOND_NS)
             .expect("revoking consent");
         write_notifications_decision(anchor_number, &app_origin(ORIGIN), true, SECOND_NS)
@@ -896,7 +956,11 @@ mod tests {
     #[test]
     fn a_signed_out_browser_has_nothing_collectable() {
         let (anchor_number, browser_id) = signed_in();
-        put(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 1, 60 * SECOND_NS)],
+        );
         storage_borrow_mut(|storage| {
             storage.revoke_browser_sessions(anchor_number, browser_id, SECOND_NS)
         })
@@ -915,7 +979,10 @@ mod tests {
         put(
             anchor_number,
             browser_id,
-            [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
+            [
+                from_app(anchor_number, 7, 60 * SECOND_NS),
+                from_app(anchor_number, 8, 60 * SECOND_NS),
+            ],
         );
         let seven =
             first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
@@ -928,14 +995,15 @@ mod tests {
     #[test]
     fn removing_tells_accounts_apart() {
         let (anchor_number, browser_id) = signed_in();
+        let (_, account_principal) = named_account(anchor_number);
         let for_account = InboxNotification {
-            account_number: Some(3),
-            ..from_app(7, 60 * SECOND_NS)
+            account_principal: Some(account_principal),
+            ..from_app(anchor_number, 7, 60 * SECOND_NS)
         };
         put(
             anchor_number,
             browser_id,
-            [from_app(7, 60 * SECOND_NS), for_account],
+            [from_app(anchor_number, 7, 60 * SECOND_NS), for_account],
         );
         let without_account =
             first_collectable(anchor_number, browser_id, 2 * SECOND_NS).expect("a first one");
@@ -945,8 +1013,8 @@ mod tests {
         assert_eq!(
             anchor(anchor_number).notifications_for_browser(browser_id),
             [InboxNotification {
-                account_number: Some(3),
-                ..from_app(7, 60 * SECOND_NS)
+                account_principal: Some(account_principal),
+                ..from_app(anchor_number, 7, 60 * SECOND_NS)
             }]
         );
     }
@@ -954,7 +1022,11 @@ mod tests {
     #[test]
     fn removing_what_is_no_longer_held_changes_nothing() {
         let (anchor_number, browser_id) = signed_in();
-        put(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        put(
+            anchor_number,
+            browser_id,
+            [from_app(anchor_number, 7, 60 * SECOND_NS)],
+        );
         let gone = NotificationToShow {
             origin: Some(ORIGIN.to_string()),
             account_number: None,

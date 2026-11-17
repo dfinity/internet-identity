@@ -14,7 +14,6 @@ use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{
     Anchor, InboxNotification, PendingTransport, ReadySubscription, WebPushSubscription,
 };
-use crate::storage::storable::anchor_application_config::PwaSubscriptionSlot;
 use crate::storage::{PwaSubscriptionHolder, Storage};
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
@@ -217,17 +216,11 @@ pub(crate) fn clear_gone_subscription(
             }
             write_subscription(anchor, browser_id, None)
         }
-        DeliveryTarget::Pwa {
-            application_number,
-            account_number,
-        } => clear_gone_pwa_subscription(
+        DeliveryTarget::Pwa { application_number } => clear_gone_pwa_subscription(
             PwaSubscriptionHolder {
                 anchor_number,
                 application_number,
-                slot: PwaSubscriptionSlot {
-                    browser_id,
-                    account_number,
-                },
+                browser_id,
             },
             endpoint,
         ),
@@ -510,7 +503,7 @@ mod tests {
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
+                account_principal: Some(candid::Principal::from_slice(&[9; 10])),
                 event: None,
             });
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
