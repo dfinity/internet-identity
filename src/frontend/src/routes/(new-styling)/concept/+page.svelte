@@ -27,6 +27,7 @@
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
+  import Toggle from "$lib/components/ui/Toggle.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { brandIconOf } from "../manage/(authenticated)/devices/browsers";
@@ -302,6 +303,9 @@
   /** The concept's one menu (layout and scenario), and where it was opened:
    *  the corner on desktop opens it upwards, the header downwards. */
   let conceptMenu = $state<{ anchor: HTMLElement; compact: boolean }>();
+  /** Whether signing in to an app adds it to My apps. Off, the list is the
+   *  user's alone: apps still work, they're added by hand. */
+  let autoAdd = $state(true);
   /** Where the add-an-app search hangs from, while it's open. */
   let addAnchor = $state<HTMLElement>();
   /** A phone's header controls. The menu hangs from this pill's end, at the
@@ -1579,6 +1583,33 @@
                     {managing ? "Done" : "Edit"}
                   </button>
                 </div>
+                {#if managing}
+                  <label
+                    transition:slide={{
+                      duration: reduced ? 0 : 220,
+                      easing: quintOut,
+                    }}
+                    class="bg-bg-primary border-border-tertiary mx-1.5 mb-3 flex items-center gap-4 rounded-2xl border px-4 py-3 @lg:mx-2"
+                  >
+                    <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span class="text-text-primary text-sm font-medium">
+                        Add apps when I sign in to them
+                      </span>
+                      <span
+                        class="text-text-tertiary text-[13px] leading-[18px]"
+                      >
+                        {autoAdd
+                          ? "An app shows up here after you sign in to it."
+                          : "Only apps you add yourself show up here. Signing in still works everywhere."}
+                      </span>
+                    </span>
+                    <Toggle
+                      checked={autoAdd}
+                      onchange={(event) =>
+                        (autoAdd = event.currentTarget.checked)}
+                    />
+                  </label>
+                {/if}
                 <ReorderGrid
                   items={gridItems}
                   key={(item) => item.origin}
