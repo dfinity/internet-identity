@@ -1080,12 +1080,29 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
             delivery.anchor_number,
             delivery.browser_id,
             notification,
+            Path::of(delivery.target, &delivery.endpoint),
             outcome.loss(),
         );
     }
     match outcome {
         PostOutcome::Sent => {}
         PostOutcome::Gone => {
+            // An installed app's entries share the browser's inbox, so only the one this
+            // wake-up announced goes with its subscription, and while the subscription still
+            // names the endpoint that answered.
+            match (delivery.target, delivery.notification.as_ref()) {
+                (DeliveryTarget::Pwa { .. }, Some(notification)) => {
+                    browser_inbox::remove_after_failed_wake_up(
+                        delivery.anchor_number,
+                        delivery.browser_id,
+                        delivery.target,
+                        notification,
+                        &delivery.endpoint,
+                    );
+                }
+                (DeliveryTarget::Pwa { .. }, None)
+                | (DeliveryTarget::Browser | DeliveryTarget::App(_), _) => {}
+            }
             if let Err(err) = clear_gone_subscription(
                 delivery.anchor_number,
                 delivery.browser_id,

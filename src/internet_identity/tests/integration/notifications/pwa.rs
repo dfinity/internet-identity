@@ -784,6 +784,8 @@ fn should_drop_the_subscription_its_push_service_calls_gone() {
         vec![PWA_ENDPOINT.to_string()]
     );
 
+    // No wake-up reached the app, so the entry it announced goes too.
+    assert_eq!(get_entry(&env, canister_id, session_of(&first)), None);
     assert!(is_endpoint_free(&env, canister_id, second));
 }
 
@@ -1301,4 +1303,78 @@ fn should_drop_only_the_revoked_apps_entries() -> Result<(), RejectResponse> {
     assert_eq!(read(0), None);
     assert_eq!(read(1), Some(2));
     Ok(())
+}
+
+#[test]
+fn should_keep_the_installed_apps_entry_when_the_browser_subscribes_again(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+    assert_eq!(
+        deliver(&env, canister_id, first.account_principal, 1, 200),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+
+    // The browser's own subscription moves, which empties what was posted to it, but not
+    // what was posted to the installed app on the same browser.
+    subscribe_webpush(
+        &env,
+        canister_id,
+        BrowserKey::new(1).successor().principal(),
+        SetWebPushSubscriptionRequest {
+            anchor_number: anchor,
+            endpoint: format!("{BROWSER_ENDPOINT}/moved"),
+            p256dh: p256dh(7),
+            transport_key: p256dh(7),
+            sealed_auth: ByteBuf::from(vec![0u8; 32]),
+        },
+    )?
+    .expect("subscribe refused");
+
+    assert_eq!(
+        get_entry(&env, canister_id, session_of(&first)),
+        Some(PwaNotification {
+            canister_id: app_sender(),
+            id: 1,
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn should_count_a_push_whose_entry_was_collected_before_its_answer() {
+    let env = env();
+    let (canister_id, _, first) = install_subscribed(&env);
+    // Reads the sender list and probes the relay, so the next wake-up is posted at once.
+    deliver(&env, canister_id, first.account_principal, 1, 200);
+    send_accepted(&env, canister_id, first.account_principal, 2, 200);
+    let wake_up = hold_wake_up(&env);
+
+    // The app collects the entry before the push service has answered the post.
+    app_remove_pwa_notification(
+        &env,
+        canister_id,
+        session_of(&first),
+        AppRemovePwaNotificationRequest {
+            inbox_notification_id: 1,
+            not_shown: None,
+        },
+    )
+    .expect("remove rejected")
+    .expect("remove refused");
+    reply(&env, &wake_up, 200, vec![]);
+    answer_outcalls(&env, 200);
+
+    assert_eq!(pushes(&get_metrics(&env, canister_id), "pushed"), 2.0);
+}
+
+/// The pushes counted at `stage`, over every other label.
+fn pushes(metrics: &str, stage: &str) -> f64 {
+    let stage_label = format!(r#"stage="{stage}""#);
+    metrics
+        .lines()
+        .filter(|line| line.starts_with("internet_identity_notification_pushes{"))
+        .filter(|line| line.contains(&stage_label))
+        .filter_map(|line| line.split_whitespace().nth(1)?.parse::<f64>().ok())
+        .sum()
 }

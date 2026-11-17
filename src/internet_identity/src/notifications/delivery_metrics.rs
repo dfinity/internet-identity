@@ -1061,22 +1061,20 @@ pub(crate) fn track_fan_out(
     });
 }
 
-/// The answer to the post announcing `entry` to `browser_id`: `Ok` where a push service
-/// took it.
+/// The answer to the post on `path` announcing `entry` to `browser_id`: `Ok` where a push
+/// service took it. A taken push is counted on `path` even where the device collected the
+/// entry before the answer came; a lost one closes that browser's copy.
 pub(crate) fn count_push_outcome(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     entry: &InboxNotification,
+    path: Path,
     outcome: Result<(), Reason>,
 ) {
     with(|counters| {
         let reason = match outcome {
             Ok(()) => {
-                let key = live_key(anchor_number, entry);
-                let Some(path) = counters.copy_paths.get(&(key, browser_id)).copied() else {
-                    return;
-                };
-                let Some(live) = counters.live.get_mut(&key) else {
+                let Some(live) = counters.live.get_mut(&live_key(anchor_number, entry)) else {
                     return;
                 };
                 let is_first_push = !std::mem::replace(&mut live.is_pushed, true);
@@ -1348,8 +1346,8 @@ mod tests {
     #[test]
     fn two_collected_copies_deliver_the_notification_once() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, 0, &entry, Ok(()));
-        count_push_outcome(1, 1, &entry, Ok(()));
+        count_push_outcome(1, 0, &entry, Path::Chrome, Ok(()));
+        count_push_outcome(1, 1, &entry, Path::Chrome, Ok(()));
         count_collected(1, 0, &entry, NOW);
         count_collected(1, 1, &entry, NOW);
 
@@ -1373,7 +1371,7 @@ mod tests {
     #[test]
     fn a_failed_post_is_a_push_loss_at_once() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
+        count_push_outcome(1, 0, &entry, Path::Chrome, Err(Reason::RelayGone));
 
         assert_eq!(push_loss_count_for_testing("relay_gone"), 1);
         assert_eq!(loss_count_for_testing("relay_gone"), 0);
@@ -1382,7 +1380,7 @@ mod tests {
     #[test]
     fn a_notification_whose_every_copy_was_lost_takes_the_last_reason() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
+        count_push_outcome(1, 0, &entry, Path::Chrome, Err(Reason::RelayGone));
         count_removed_entries(1, 1, [&entry], Reason::InboxFull);
         after_every_key_went();
 
@@ -1393,7 +1391,7 @@ mod tests {
     #[test]
     fn an_undelivered_notification_with_a_copy_still_open_was_never_fetched() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
+        count_push_outcome(1, 0, &entry, Path::Chrome, Err(Reason::RelayGone));
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("never_fetched"), 1);
@@ -1403,7 +1401,7 @@ mod tests {
     fn a_delivered_notification_is_not_lost() {
         let entry = fan_out_to_two_browsers();
         count_collected(1, 0, &entry, NOW);
-        count_push_outcome(1, 1, &entry, Err(Reason::RelayGone));
+        count_push_outcome(1, 1, &entry, Path::Chrome, Err(Reason::RelayGone));
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("relay_gone"), 0);
@@ -1468,7 +1466,7 @@ mod tests {
     #[test]
     fn a_copy_is_counted_once_however_often_it_is_removed() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
+        count_push_outcome(1, 0, &entry, Path::Chrome, Err(Reason::RelayGone));
         count_removed_entries(1, 1, [&entry], Reason::SubscriptionReplaced);
         count_removed_entries(1, 1, [&entry], Reason::SubscriptionReplaced);
         count_collected(1, 1, &entry, LATER);

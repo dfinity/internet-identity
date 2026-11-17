@@ -185,12 +185,20 @@ fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Res
     Ok(())
 }
 
-/// Empties the browser's inbox, answering what it held.
+/// Empties the browser's inbox of what was posted to its own registration, answering it.
+/// What was posted to an installed app on the browser stays: its address is the app's.
 fn take_inbox(anchor: &mut Anchor, browser_id: BrowserId) -> Vec<InboxNotification> {
-    anchor
-        .notifications_for_browser_mut(browser_id)
-        .map(std::mem::take)
-        .unwrap_or_default()
+    let anchor_number = anchor.anchor_number();
+    let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
+        return Vec::new();
+    };
+    let (installed_app_copies, taken): (Vec<_>, Vec<_>) = storage_borrow(|storage| {
+        std::mem::take(inbox)
+            .into_iter()
+            .partition(|entry| storage.is_installed_app_copy(anchor_number, browser_id, entry))
+    });
+    *inbox = installed_app_copies;
+    taken
 }
 
 /// `target` says who held the posted endpoint, rather than whoever the entry points at by

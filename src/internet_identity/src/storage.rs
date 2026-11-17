@@ -1668,12 +1668,23 @@ impl<M: Memory + Clone> Storage<M> {
                 .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| browser.id)
                 .collect();
+            // What was posted to an installed app on one of them stays: its address is
+            // the app's.
             let mut cleared_notifications: Vec<(BrowserId, Vec<InboxNotification>)> = Vec::new();
             for browser_id in pointing {
+                let held = anchor.notifications_for_browser(browser_id).to_vec();
+                if held.is_empty() {
+                    continue;
+                }
+                let (installed_app_copies, cleared): (Vec<_>, Vec<_>) =
+                    held.into_iter().partition(|entry| {
+                        self.is_installed_app_copy(anchor_number, browser_id, entry)
+                    });
                 if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                    if !inbox.is_empty() {
-                        cleared_notifications.push((browser_id, std::mem::take(inbox)));
-                    }
+                    *inbox = installed_app_copies;
+                }
+                if !cleared.is_empty() {
+                    cleared_notifications.push((browser_id, cleared));
                 }
             }
             if cleared_notifications.is_empty() {
@@ -1694,6 +1705,28 @@ impl<M: Memory + Clone> Storage<M> {
                 );
             }
         }
+    }
+
+    /// Whether `entry` in `browser_id`'s inbox was posted to an installed app there rather
+    /// than to the browser's own route: an app's entry for an account the app's installed
+    /// app on that browser delivers for.
+    pub(crate) fn is_installed_app_copy(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        entry: &InboxNotification,
+    ) -> bool {
+        let InboxNotificationKind::App { account_principal } = entry.kind else {
+            return false;
+        };
+        self.lookup_account_with_principal(account_principal)
+            .filter(|account| account.anchor_number == anchor_number)
+            .and_then(|account| self.lookup_application_number_with_origin(&account.origin))
+            .and_then(|application_number| {
+                self.anchor_application_config(anchor_number, application_number)
+            })
+            .and_then(|config| config.pwa_webpush_subscription(browser_id))
+            .is_some_and(|held| held.account_principal == account_principal)
     }
 
     /// Stamps that the app `app_id` names has just called, which is the only evidence
