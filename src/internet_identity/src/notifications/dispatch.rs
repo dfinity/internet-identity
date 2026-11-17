@@ -1085,9 +1085,8 @@ pub(crate) fn can_wake<M: Memory + Clone>(
 }
 
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
-/// way: a relay that lost the subscription takes the registration with it, and an
-/// installed app's entry with its own, and any other failure removes an entry, since no
-/// wake-up is coming for it.
+/// way: a failed post removes the entry it announced, since no wake-up is coming for it,
+/// and a relay that lost the subscription also takes the registration with it.
 pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     record_post_outcome(outcome);
     if let Some(notification) = delivery.notification.as_ref() {
@@ -1103,21 +1102,17 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
         // Nothing was posted, and the entry stays for whatever wakes this browser next.
         PostOutcome::Sent | PostOutcome::Superseded => {}
         PostOutcome::Gone => {
-            // An installed app's entries share the browser's inbox, so only the one this
-            // wake-up announced goes with its subscription, and while the subscription still
-            // names the endpoint that answered.
-            match (delivery.target, delivery.notification.as_ref()) {
-                (DeliveryTarget::Pwa { .. }, Some(notification)) => {
-                    browser_inbox::remove_after_failed_wake_up(
-                        delivery.anchor_number,
-                        delivery.browser_id,
-                        delivery.target,
-                        notification,
-                        &delivery.endpoint,
-                    );
-                }
-                (DeliveryTarget::Pwa { .. }, None)
-                | (DeliveryTarget::Browser | DeliveryTarget::App(_), _) => {}
+            // The entry this wake-up announced goes, and only that one, while the
+            // registration still names the endpoint that answered: the read below is what
+            // tells the two apart, so it runs before the registration is cleared.
+            if let Some(notification) = delivery.notification.as_ref() {
+                browser_inbox::remove_after_failed_wake_up(
+                    delivery.anchor_number,
+                    delivery.browser_id,
+                    delivery.target,
+                    notification,
+                    &delivery.endpoint,
+                );
             }
             if let Err(err) = clear_gone_subscription(
                 delivery.anchor_number,
@@ -2150,7 +2145,7 @@ mod tests {
     }
 
     #[test]
-    fn a_relay_that_lost_the_subscription_takes_the_registration_and_leaves_the_queue() {
+    fn a_relay_that_lost_the_subscription_takes_the_registration_and_the_entry_it_announced() {
         setup();
         let (recipient, browsers) = subscribed_recipient(2);
         submit(recipient, 7, 10 * SECOND_NS);
@@ -2159,7 +2154,7 @@ mod tests {
         settle(&deliveries[0], PostOutcome::Gone);
 
         assert!(stored_subscription(recipient, browsers[0]).is_none());
-        assert_eq!(queued(recipient, browsers[0]), vec![7]);
+        assert!(queued(recipient, browsers[0]).is_empty());
         assert!(stored_subscription(recipient, browsers[1]).is_some());
         assert_eq!(queued(recipient, browsers[1]), vec![7]);
     }

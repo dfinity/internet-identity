@@ -1534,3 +1534,41 @@ fn should_answer_pending_to_an_installed_app_until_the_vapid_key_is_held(
     assert!(is_ready, "the keys are answered once the VAPID key is held");
     Ok(())
 }
+
+#[test]
+fn should_drop_only_the_entry_a_gone_wake_up_announced() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, signed_in) = install_signed_in(&env, None, None);
+    for id in 1..=2 {
+        assert_eq!(
+            deliver(&env, canister_id, signed_in.account_principal, id, 200),
+            vec![BROWSER_ENDPOINT.to_string()]
+        );
+    }
+
+    assert_eq!(
+        deliver(&env, canister_id, signed_in.account_principal, 3, 404),
+        vec![BROWSER_ENDPOINT.to_string()]
+    );
+
+    let read = |inbox_notification_id| {
+        browser_get_notification(
+            &env,
+            canister_id,
+            BrowserKey::new(1).successor().principal(),
+            GetNotificationRequest {
+                anchor_number: anchor,
+                browser_id: signed_in.browser_id,
+                inbox_notification_id,
+            },
+        )
+        .expect("read rejected")
+        .expect("read refused")
+        .notification
+        .map(|notification| notification.id)
+    };
+    assert_eq!(read(0), Some(1));
+    assert_eq!(read(1), Some(2));
+    assert_eq!(read(2), None);
+    Ok(())
+}
