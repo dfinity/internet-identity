@@ -16,7 +16,9 @@ use crate::notifications::webpush::{
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
 use crate::storage::account::Session;
-use crate::storage::anchor::{Browser, InboxNotification, ReadySubscription, WebPushSubscription};
+use crate::storage::anchor::{
+    Browser, InboxNotification, InboxNotificationKind, ReadySubscription, WebPushSubscription,
+};
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::{PwaSubscriptionHolder, Storage};
@@ -460,13 +462,13 @@ fn fan_out_to_destinations(
         let queued_entry = InboxNotification {
             // Named by `deposit`, which is what draws from the inbox's own run of ids.
             inbox_notification_id: 0,
-            application_number: None,
             // Ours, so the worker signs to us for it rather than fetching it from an app.
             sender: crate::storage::canister_id(),
             notification_id: pending.notification_id,
             expires_at_ns,
-            account_principal: None,
-            event: Some(pending.event.clone()),
+            kind: InboxNotificationKind::Identity {
+                event: pending.event.clone(),
+            },
         };
         let mut planned = Vec::new();
         for browser_id in destinations {
@@ -543,7 +545,7 @@ fn fan_out_to_destinations(
         // service worker can ask nothing for.
         match storage.write(anchor) {
             Ok(()) => {
-                deposits.count(pending.anchor_number, &queued_entry, labels, now_ns);
+                deposits.count(pending.anchor_number, &queued_entry, None, labels, now_ns);
                 deliveries.extend(to_post)
             }
             Err(err) => {
@@ -600,12 +602,12 @@ fn fan_out_to_browsers(
     let queued_entry = InboxNotification {
         // Named by `deposit`, once per browser this is deposited for.
         inbox_notification_id: 0,
-        application_number: Some(pending.application_number),
-        event: None,
         sender: pending.sender,
         notification_id: pending.notification_id,
         expires_at_ns: app_expiry_ns(pending.expires_at_ns, taken.entry.received_at_ns),
-        account_principal: Some(pending.recipient),
+        kind: InboxNotificationKind::App {
+            account_principal: pending.recipient,
+        },
     };
     let ttl_seconds = queued_entry.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
     let labels = Labels::app_number(pending.application_number, &pending.urgency);
@@ -695,7 +697,13 @@ fn fan_out_to_browsers(
         }
         match storage.write(anchor) {
             Ok(()) => {
-                deposits.count(pending.anchor_number, &queued_entry, labels, now_ns);
+                deposits.count(
+                    pending.anchor_number,
+                    &queued_entry,
+                    Some(pending.application_number),
+                    labels,
+                    now_ns,
+                );
                 out.extend(to_post);
                 if queued_anywhere {
                     storage.record_notified(
@@ -750,6 +758,7 @@ impl Deposits {
         self,
         anchor_number: AnchorNumber,
         entry: &InboxNotification,
+        application_number: Option<ApplicationNumber>,
         labels: Labels,
         now_ns: Timestamp,
     ) {
@@ -761,7 +770,14 @@ impl Deposits {
                 Reason::InboxFull,
             );
         }
-        delivery_metrics::track_fan_out(anchor_number, entry, labels, self.pushes, now_ns);
+        delivery_metrics::track_fan_out(
+            anchor_number,
+            entry,
+            application_number,
+            labels,
+            self.pushes,
+            now_ns,
+        );
     }
 }
 
@@ -1832,12 +1848,12 @@ mod tests {
             queue.extend((0..browser_inbox::CAPACITY as u64).map(|notification_id| {
                 InboxNotification {
                     inbox_notification_id: notification_id,
-                    application_number: Some(1),
+                    kind: InboxNotificationKind::App {
+                        account_principal: Principal::from_slice(&recipient.to_be_bytes()),
+                    },
                     sender: sender(),
                     notification_id,
                     expires_at_ns: 10 * SECOND_NS,
-                    account_principal: Some(Principal::from_slice(&recipient.to_be_bytes())),
-                    event: None,
                 }
             }))
         });
@@ -1959,12 +1975,12 @@ mod tests {
             delivery.notification,
             Some(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&recipient.to_be_bytes())
+                },
                 sender: sender(),
                 notification_id: 7,
                 expires_at_ns: 10 * SECOND_NS,
-                account_principal: Some(Principal::from_slice(&recipient.to_be_bytes())),
-                event: None,
             })
         );
     }

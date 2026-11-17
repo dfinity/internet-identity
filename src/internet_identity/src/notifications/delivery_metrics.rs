@@ -448,8 +448,7 @@ struct Live {
 fn live_key(anchor_number: AnchorNumber, entry: &InboxNotification) -> LiveKey {
     let mut hasher = DefaultHasher::new();
     anchor_number.hash(&mut hasher);
-    entry.application_number.hash(&mut hasher);
-    entry.account_principal.hash(&mut hasher);
+    entry.account_principal().hash(&mut hasher);
     entry.sender.hash(&mut hasher);
     entry.notification_id.hash(&mut hasher);
     (entry.expires_at_ns, hasher.finish())
@@ -1013,6 +1012,7 @@ pub(crate) fn number_application(application_number: ApplicationNumber, origin: 
 pub(crate) fn track_fan_out(
     anchor_number: AnchorNumber,
     entry: &InboxNotification,
+    application_number: Option<ApplicationNumber>,
     labels: Labels,
     pushes: Vec<PlannedPush>,
     now_ns: Timestamp,
@@ -1049,7 +1049,7 @@ pub(crate) fn track_fan_out(
         counters.live.insert(
             key,
             Live {
-                application_number: entry.application_number,
+                application_number,
                 urgency,
                 is_pushed: false,
                 is_delivered: false,
@@ -1281,6 +1281,7 @@ pub(crate) fn push_loss_count_for_testing(reason: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::anchor::InboxNotificationKind;
     use internet_identity_interface::internet_identity::types::NotificationId;
 
     const NOW: Timestamp = 1_000;
@@ -1289,12 +1290,13 @@ mod tests {
     fn entry(notification_id: NotificationId, expires_at_ns: Timestamp) -> InboxNotification {
         InboxNotification {
             inbox_notification_id: 0,
-            application_number: Some(1),
-            event: None,
+            kind: InboxNotificationKind::App {
+                account_principal: Principal::from_slice(&[9; 10]),
+            },
+
             sender: Principal::anonymous(),
             notification_id,
             expires_at_ns,
-            account_principal: Some(Principal::from_slice(&[9; 10])),
         }
     }
 
@@ -1313,7 +1315,14 @@ mod tests {
     fn fan_out_to_two_browsers() -> InboxNotification {
         reset_for_testing();
         let entry = entry(7, EXPIRES);
-        track_fan_out(1, &entry, labels(), vec![deposited(0), deposited(1)], NOW);
+        track_fan_out(
+            1,
+            &entry,
+            Some(1),
+            labels(),
+            vec![deposited(0), deposited(1)],
+            NOW,
+        );
         entry
     }
 
@@ -1329,6 +1338,7 @@ mod tests {
         track_fan_out(
             1,
             &entry(99, LATER * 2),
+            Some(1),
             labels(),
             vec![deposited(0)],
             LATER,
@@ -1354,7 +1364,7 @@ mod tests {
         let first_entry = fan_out_to_two_browsers();
         count_collected(1, 0, &first_entry, NOW);
         let resent_entry = entry(7, EXPIRES + 1);
-        track_fan_out(1, &resent_entry, labels(), vec![deposited(0)], NOW);
+        track_fan_out(1, &resent_entry, Some(1), labels(), vec![deposited(0)], NOW);
         count_collected(1, 0, &resent_entry, NOW);
 
         assert_eq!(notification_count_for_testing("delivered"), 2);
@@ -1407,6 +1417,7 @@ mod tests {
         track_fan_out(
             1,
             &entry,
+            Some(1),
             Labels::app("https://app.example", Some(&Urgency::High)),
             vec![deposited(0)],
             NOW,
@@ -1422,7 +1433,7 @@ mod tests {
     #[test]
     fn a_fan_out_that_reached_no_browser_is_lost_for_no_device() {
         reset_for_testing();
-        track_fan_out(1, &entry(7, EXPIRES), labels(), vec![], NOW);
+        track_fan_out(1, &entry(7, EXPIRES), Some(1), labels(), vec![], NOW);
 
         assert_eq!(loss_count_for_testing("no_device"), 1);
     }
@@ -1436,6 +1447,7 @@ mod tests {
         track_fan_out(
             1,
             &self::entry(8, LATER * 2),
+            Some(1),
             labels(),
             vec![deposited(0)],
             LATER,
@@ -1473,6 +1485,7 @@ mod tests {
         track_fan_out(
             1,
             &self::entry(8, LATER * 2),
+            Some(1),
             labels(),
             vec![deposited(0)],
             LATER,
@@ -1490,6 +1503,7 @@ mod tests {
             track_fan_out(
                 2,
                 &entry(id, EXPIRES + id),
+                Some(1),
                 labels(),
                 vec![deposited(0)],
                 NOW,
@@ -1605,7 +1619,7 @@ mod tests {
         let labels = Labels::listed_app(&app(0), None, NOW);
         number_application(1, &app(0));
         let entry = entry(7, EXPIRES);
-        track_fan_out(1, &entry, labels, vec![deposited(0)], NOW);
+        track_fan_out(1, &entry, Some(1), labels, vec![deposited(0)], NOW);
         with(|counters| {
             counters.apps.remove(&app(0));
             counters.drop_app(&app(0));

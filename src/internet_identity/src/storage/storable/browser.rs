@@ -36,13 +36,15 @@ pub struct StorableBrowser {
     /// What this browser registered for Web Push, if anything.
     #[n(10)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
-    /// What this identity's service worker has yet to show on this device, oldest first.
-    #[n(11)]
-    pub notifications: Option<Vec<StorableInboxNotification>>,
     /// What the next entry deposited in that inbox is named. `None` on an entry written
     /// before entries were named, whose inbox is empty anyway.
     #[n(12)]
     pub next_inbox_notification_id: Option<u64>,
+    /// What this identity's service worker has yet to show on this device, oldest first.
+    #[n(13)]
+    pub inbox: Option<Vec<StorableInboxNotification>>,
     // #[n(7)] RETIRED, never reuse: the Web Push registration before a push carried a payload.
     // #[n(9)] RETIRED, never reuse: the inbox before its entries were named.
+    // #[n(11)] RETIRED, never reuse: the inbox before its entries named an app's account by
+    // principal.
 }

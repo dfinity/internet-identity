@@ -8,7 +8,9 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::account::AccountReference;
 use crate::storage::account::{Account, AccountKey};
-use crate::storage::anchor::{Anchor, Device, WebPushSubscription, MAX_BROWSERS};
+use crate::storage::anchor::{
+    Anchor, Device, InboxNotificationKind, WebPushSubscription, MAX_BROWSERS,
+};
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::{AccountReferenceListWrite, AccountReferenceWrite};
@@ -7498,12 +7500,12 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
     // can produce, and a wake-up naming one of them could not tell them apart.
     let queued = |notification_id: u64| InboxNotification {
         inbox_notification_id: notification_id,
-        application_number: Some(4),
+        kind: InboxNotificationKind::App {
+            account_principal: Principal::from_slice(&notification_id.to_be_bytes()),
+        },
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: 100 * notification_id,
-        account_principal: Some(Principal::from_slice(&notification_id.to_be_bytes())),
-        event: None,
     };
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
@@ -7964,12 +7966,12 @@ fn forgetting_an_app_leaves_alone_a_browser_that_left_it_for_an_address_of_its_o
 fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNotification {
     crate::storage::anchor::InboxNotification {
         inbox_notification_id: 0,
-        application_number: Some(1),
+        kind: InboxNotificationKind::App {
+            account_principal: Principal::from_slice(&[9; 10]),
+        },
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: u64::MAX,
-        account_principal: Some(Principal::from_slice(&[9; 10])),
-        event: None,
     }
 }
 
@@ -8151,17 +8153,15 @@ fn an_identity_notification_is_queued_without_an_application() {
         .expect("a registered browser")
         .push(InboxNotification {
             inbox_notification_id: 0,
-            application_number: None,
+            kind: InboxNotificationKind::Identity {
+                event: NotificationEvent::NotificationsOn(IdentityForNotification {
+                    anchor_number: 10_000,
+                    name: Some("Work".to_string()),
+                }),
+            },
             sender: Principal::from_slice(&[7; 10]),
             notification_id: 1,
             expires_at_ns: 2_000,
-            account_principal: None,
-            event: Some(NotificationEvent::NotificationsOn(
-                IdentityForNotification {
-                    anchor_number: 10_000,
-                    name: Some("Work".to_string()),
-                },
-            )),
         });
     storage.write(anchor).expect("writing the anchor");
 
@@ -8173,7 +8173,10 @@ fn an_identity_notification_is_queued_without_an_application() {
         reloaded
             .notifications_for_browser(0)
             .first()
-            .and_then(|one| one.event.clone()),
+            .and_then(|one| match &one.kind {
+                InboxNotificationKind::Identity { event } => Some(event.clone()),
+                InboxNotificationKind::App { .. } => None,
+            }),
         Some(NotificationEvent::NotificationsOn(
             IdentityForNotification {
                 anchor_number: 10_000,

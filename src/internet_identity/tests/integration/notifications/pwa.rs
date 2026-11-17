@@ -242,13 +242,25 @@ fn send_accepted(
     id: u64,
     push_status: u16,
 ) {
+    send_accepted_from(env, canister_id, APP, recipient, id, push_status);
+}
+
+/// [`send_accepted`] for the app at `origin`.
+fn send_accepted_from(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    origin: &str,
+    recipient: Principal,
+    id: u64,
+    push_status: u16,
+) {
     let send = || {
         app_send_notification(
             env,
             canister_id,
             app_sender(),
             SendNotificationArg {
-                origin: APP.to_string(),
+                origin: origin.to_string(),
                 notifications: vec![Notification {
                     id,
                     recipient,
@@ -1236,5 +1248,57 @@ fn should_deliver_for_the_account_that_subscribed_the_installed_app_last(
         deliver(&env, canister_id, other.account_principal, 3, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
+    Ok(())
+}
+
+#[test]
+fn should_drop_only_the_revoked_apps_entries() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, at_app) = install_signed_in(&env, None, None);
+    // The same browser, signed in at the other app too, which it allows.
+    let browser = BrowserKey::new(1).successor();
+    let at_other_app = sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, OTHER_APP, &browser),
+    );
+    grant_consent(&env, canister_id, principal_1(), anchor, OTHER_APP.into())?
+        .expect("grant refused");
+    send_accepted_from(&env, canister_id, APP, at_app.account_principal, 1, 200);
+    answer_outcalls(&env, 200);
+    send_accepted_from(
+        &env,
+        canister_id,
+        OTHER_APP,
+        at_other_app.account_principal,
+        2,
+        200,
+    );
+    answer_outcalls(&env, 200);
+
+    // Allowed again, so consent is not what keeps an entry from being read.
+    revoke_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("revoke refused");
+    grant_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("grant refused");
+
+    let browser_key = browser.successor().principal();
+    let read = |inbox_notification_id| {
+        browser_get_notification(
+            &env,
+            canister_id,
+            browser_key,
+            GetNotificationRequest {
+                anchor_number: anchor,
+                browser_id: at_app.browser_id,
+                inbox_notification_id,
+            },
+        )
+        .expect("read rejected")
+        .expect("read refused")
+        .notification
+        .map(|notification| notification.id)
+    };
+    assert_eq!(read(0), None);
+    assert_eq!(read(1), Some(2));
     Ok(())
 }

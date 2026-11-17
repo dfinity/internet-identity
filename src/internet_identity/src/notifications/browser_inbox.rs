@@ -11,7 +11,9 @@ use crate::notifications::delivery_metrics::{self, Reason};
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{Anchor, InboxNotification, WebPushSubscription};
+use crate::storage::anchor::{
+    Anchor, InboxNotification, InboxNotificationKind, WebPushSubscription,
+};
 use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -115,20 +117,25 @@ pub(crate) fn remove_after_failed_wake_up(
 pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &ApplicationOrigin) {
     let origin = &origin.as_str().to_string();
     storage_borrow_mut(|storage| {
-        let Some(application_number) = storage.lookup_application_number_with_origin(origin) else {
-            return;
-        };
         let Ok(mut anchor) = storage.read(anchor_number) else {
             return;
+        };
+        // The app's entries, and those whose account no longer resolves, which are gone.
+        let is_removed = |entry: &InboxNotification| match entry.kind {
+            InboxNotificationKind::App { account_principal } => storage
+                .lookup_account_with_principal(account_principal)
+                .is_none_or(|account| {
+                    account.anchor_number != anchor_number || account.origin == *origin
+                }),
+            InboxNotificationKind::Identity { .. } => false,
         };
         let browser_ids: Vec<BrowserId> =
             anchor.browsers().iter().map(|browser| browser.id).collect();
         let mut removed_entries = Vec::new();
         for browser_id in browser_ids {
             if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                let (theirs, others): (Vec<_>, Vec<_>) = std::mem::take(inbox)
-                    .into_iter()
-                    .partition(|entry| entry.application_number == Some(application_number));
+                let (theirs, others): (Vec<_>, Vec<_>) =
+                    std::mem::take(inbox).into_iter().partition(is_removed);
                 *inbox = others;
                 if !theirs.is_empty() {
                     removed_entries.push((browser_id, theirs));
@@ -168,29 +175,31 @@ pub(crate) fn notification_named(
         .find(|entry| {
             entry.inbox_notification_id == inbox_notification_id && entry.expires_at_ns > now_ns
         })?;
-    // Ours carries the event and names no app, so there is no origin to resolve and no
-    // consent to read: the words for it are written in the service worker.
-    if let Some(event) = entry.event.clone() {
-        return Some(NotificationToShow {
-            origin: None,
-            account_number: None,
-            canister_id: entry.sender,
-            id: entry.notification_id,
-            event: Some(event),
-        });
-    }
+    let account_principal = match &entry.kind {
+        InboxNotificationKind::App { account_principal } => *account_principal,
+        // Ours names no app, so there is no origin to resolve and no consent to read: the
+        // words for it are written in the service worker.
+        InboxNotificationKind::Identity { event } => {
+            return Some(NotificationToShow {
+                origin: None,
+                account_number: None,
+                canister_id: entry.sender,
+                id: entry.notification_id,
+                event: Some(event.clone()),
+            });
+        }
+    };
     storage_borrow(|storage| {
-        let origin = storage.lookup_origin_with_application_number(entry.application_number?)?;
-        // The account as it is numbered now, which naming the default account changes.
-        // One the identity no longer holds at this app has nothing left to show.
+        // The app and the account as it is numbered now, which naming the default account
+        // changes. An account the identity no longer holds has nothing left to show.
         let account = storage
-            .lookup_account_with_principal(entry.account_principal?)
-            .filter(|account| account.anchor_number == anchor_number && account.origin == origin)?;
+            .lookup_account_with_principal(account_principal)
+            .filter(|account| account.anchor_number == anchor_number)?;
         storage
-            .read_anchor_application_config(anchor_number, &origin)
+            .read_anchor_application_config(anchor_number, &account.origin)
             .filter(|config| config.notifications_allowed())
             .map(|_| NotificationToShow {
-                origin: Some(origin.clone()),
+                origin: Some(account.origin.clone()),
                 account_number: account.account_number,
                 canister_id: entry.sender,
                 id: entry.notification_id,
@@ -289,7 +298,8 @@ pub(crate) fn remove_pwa_collected(
 }
 
 /// Whether the entry `inbox_notification_id` names in the inbox of `holder`'s browser entry
-/// is a notification of `holder`'s app to the account `account_principal` names.
+/// is a notification to the account `account_principal` names, which is an account at
+/// `holder`'s app.
 fn holds_pwa_entry(
     anchor: &Anchor,
     holder: PwaSubscriptionHolder,
@@ -300,10 +310,7 @@ fn holds_pwa_entry(
         .notifications_for_browser(holder.browser_id)
         .iter()
         .find(|entry| entry.inbox_notification_id == inbox_notification_id)
-        .is_some_and(|entry| {
-            entry.application_number == Some(holder.application_number)
-                && entry.account_principal == Some(account_principal)
-        })
+        .is_some_and(|entry| entry.account_principal() == Some(account_principal))
 }
 
 #[cfg(test)]
@@ -331,12 +338,12 @@ mod tests {
             // `deposit` names it; a fixture placed in an inbox by hand keeps the id it
             // was built with.
             inbox_notification_id: notification_id,
-            application_number: Some(1),
+            kind: InboxNotificationKind::App {
+                account_principal: Principal::from_slice(&[9; 10]),
+            },
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
             expires_at_ns,
-            account_principal: Some(Principal::from_slice(&[9; 10])),
-            event: None,
         }
     }
 
@@ -496,13 +503,6 @@ mod tests {
         (anchor_number, browser_id)
     }
 
-    fn app() -> u64 {
-        crate::state::storage_borrow(|storage| {
-            storage.lookup_application_number_with_origin(&ORIGIN.to_string())
-        })
-        .expect("signing in stores the application")
-    }
-
     /// An entry of the app at `ORIGIN` for `anchor_number`'s unreserved default account.
     fn from_app(
         anchor_number: AnchorNumber,
@@ -513,8 +513,8 @@ mod tests {
             storage.default_account_principal_for_testing(anchor_number, &ORIGIN.to_string())
         });
         InboxNotification {
-            application_number: Some(app()),
-            account_principal: Some(account_principal),
+            kind: InboxNotificationKind::App { account_principal },
+
             ..entry(notification_id, expires_at_ns)
         }
     }
@@ -781,13 +781,13 @@ mod tests {
 
     fn identity_event(notification_id: u64, expires_at_ns: Timestamp) -> InboxNotification {
         InboxNotification {
-            application_number: None,
-            event: Some(NotificationEvent::NotificationsOn(
-                IdentityForNotification {
+            kind: InboxNotificationKind::Identity {
+                event: NotificationEvent::NotificationsOn(IdentityForNotification {
                     anchor_number: 10_000,
                     name: None,
-                },
-            )),
+                }),
+            },
+
             ..entry(notification_id, expires_at_ns)
         }
     }
@@ -824,7 +824,7 @@ mod tests {
         let (anchor_number, browser_id) = signed_in();
         let (account_number, account_principal) = named_account(anchor_number);
         let for_account = InboxNotification {
-            account_principal: Some(account_principal),
+            kind: InboxNotificationKind::App { account_principal },
             ..from_app(anchor_number, 7, 60 * SECOND_NS)
         };
         put(
@@ -845,6 +845,28 @@ mod tests {
             })
         );
         assert_eq!(left_for(anchor_number, browser_id), vec![7, 8]);
+    }
+
+    /// An app's entry whose account principal no longer resolves names no app and no
+    /// account, so nothing shows it, and the next sweep of the inbox drops it.
+    #[test]
+    fn an_entry_whose_account_no_longer_resolves_is_gone() {
+        let (anchor_number, browser_id) = signed_in();
+        put(
+            anchor_number,
+            browser_id,
+            [
+                entry(7, 60 * SECOND_NS),
+                from_app(anchor_number, 8, 60 * SECOND_NS),
+            ],
+        );
+
+        assert_eq!(
+            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
+            Some(8)
+        );
+        remove_app_entries(anchor_number, &app_origin("https://another.example"));
+        assert_eq!(left_for(anchor_number, browser_id), vec![8]);
     }
 
     #[test]
@@ -901,7 +923,6 @@ mod tests {
     fn an_app_ii_no_longer_holds_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         let unknown = InboxNotification {
-            application_number: Some(u64::MAX),
             ..entry(1, 60 * SECOND_NS)
         };
         put(
@@ -997,7 +1018,7 @@ mod tests {
         let (anchor_number, browser_id) = signed_in();
         let (_, account_principal) = named_account(anchor_number);
         let for_account = InboxNotification {
-            account_principal: Some(account_principal),
+            kind: InboxNotificationKind::App { account_principal },
             ..from_app(anchor_number, 7, 60 * SECOND_NS)
         };
         put(
@@ -1013,7 +1034,7 @@ mod tests {
         assert_eq!(
             anchor(anchor_number).notifications_for_browser(browser_id),
             [InboxNotification {
-                account_principal: Some(account_principal),
+                kind: InboxNotificationKind::App { account_principal },
                 ..from_app(anchor_number, 7, 60 * SECOND_NS)
             }]
         );

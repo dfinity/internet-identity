@@ -1277,7 +1277,9 @@ mod browser_tests {
     use crate::notifications::installed_app::{
         NotificationApp, NotificationAppId, NotificationAppRef,
     };
-    use crate::storage::anchor::{BrowserError, InboxNotification, MAX_BROWSERS};
+    use crate::storage::anchor::{
+        BrowserError, InboxNotification, InboxNotificationKind, MAX_BROWSERS,
+    };
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, BrowserId, FormFactor, NotificationAppInfo,
         NotificationAppStatus, OperatingSystem, PublicKey,
@@ -1615,12 +1617,12 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_principal: Some(Principal::from_slice(&[9; 10])),
-                event: None,
             });
 
         anchor.point_at_notification_app(second, 7);
@@ -1628,14 +1630,12 @@ mod browser_tests {
         assert!(anchor.notifications_for_browser(first).is_empty());
     }
 
-    /// An app's entry written before the account principal was recorded names no account
-    /// anything can be checked against, so it is not read back. Internet Identity's own
-    /// entries name none and are.
+    /// A browser entry still carrying the retired inbox, key 11, reads with that inbox
+    /// skipped, so as an empty one, and is written back without it.
     #[test]
-    fn an_apps_entry_stored_without_its_account_principal_is_dropped_on_read() {
+    fn a_browser_stored_with_the_retired_inbox_reads_as_empty_and_is_rewritten_without_it() {
         use crate::storage::anchor::Browser;
         use crate::storage::storable::browser::StorableBrowser;
-        use crate::storage::storable::notifications::browser_inbox::StorableInboxNotification;
 
         let mut anchor = anchor();
         let (id, _) = anchor
@@ -1647,35 +1647,35 @@ mod browser_tests {
             )
             .unwrap();
         let browser = anchor.browser(id).expect("a listed browser").clone();
-        let stored_entry = |notification_id: u64,
-                            application_number: Option<u64>,
-                            account_principal: Option<Vec<u8>>| {
-            StorableInboxNotification {
-                application_number,
-                inbox_notification_id: notification_id,
-                sender: vec![7; 10],
-                notification_id,
-                expires_at_ns: u64::MAX,
-                event: None,
-                account_principal,
-            }
-        };
-        let stored = StorableBrowser {
-            notifications: Some(vec![
-                stored_entry(1, Some(1), None),
-                stored_entry(2, Some(1), Some(vec![9; 10])),
-                stored_entry(3, None, None),
-            ]),
-            ..StorableBrowser::from(browser)
-        };
+        let mut current = Vec::new();
+        minicbor::encode(StorableBrowser::from(browser), &mut current).expect("encoding it");
 
-        let read: Vec<u64> = Browser::from(stored)
-            .notifications
-            .iter()
-            .map(|entry| entry.notification_id)
-            .collect();
+        // The same map with one entry more: key 11, holding one entry in the shape it had,
+        // an app's notification for an account by number.
+        let header = *current.first().expect("a map header");
+        assert!(
+            (0xa0..0xb7).contains(&header),
+            "a map of fewer than 23 keys"
+        );
+        let mut retired = vec![header + 1];
+        retired.extend_from_slice(current.get(1..).expect("the map's entries"));
+        let mut encoder = minicbor::Encoder::new(&mut retired);
+        encoder.u8(11).unwrap().array(1).unwrap().map(6).unwrap();
+        encoder.u8(0).unwrap().u64(1).unwrap();
+        encoder.u8(6).unwrap().u64(0).unwrap();
+        encoder.u8(1).unwrap().bytes(&[7; 10]).unwrap();
+        encoder.u8(2).unwrap().u64(1).unwrap();
+        encoder.u8(3).unwrap().u64(u64::MAX).unwrap();
+        encoder.u8(4).unwrap().u64(3).unwrap();
 
-        assert_eq!(read, vec![2, 3]);
+        let read = Browser::from(
+            minicbor::decode::<StorableBrowser>(&retired).expect("decoding the retired shape"),
+        );
+        assert!(read.notifications.is_empty());
+
+        let mut rewritten = Vec::new();
+        minicbor::encode(StorableBrowser::from(read), &mut rewritten).expect("encoding it");
+        assert_eq!(rewritten, current);
     }
 
     #[test]
@@ -1695,12 +1695,12 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_principal: Some(Principal::from_slice(&[9; 10])),
-                event: None,
             });
 
         anchor.point_at_notification_app(id, 7);
@@ -2406,12 +2406,12 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_principal: Some(Principal::from_slice(&[9; 10])),
-                event: None,
             });
 
         anchor.point_at_notification_app(id, 7);
@@ -2449,12 +2449,12 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_principal: Some(Principal::from_slice(&[9; 10])),
-                event: None,
             });
 
         anchor.disable_notification_app(id);
@@ -2473,12 +2473,12 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_principal: Some(Principal::from_slice(&[9; 10])),
-                event: None,
             });
         anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
 

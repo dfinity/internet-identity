@@ -12,7 +12,7 @@ use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCr
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_inbox::{
-    StorableInboxNotification, StorableNotificationEvent,
+    StorableInboxNotification, StorableInboxNotificationKind, StorableNotificationEvent,
 };
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -141,32 +141,84 @@ impl Browser {
 pub struct InboxNotification {
     /// Assigned at deposit, unique within its inbox, and what a wake-up names.
     pub inbox_notification_id: InboxNotificationId,
-    /// `None` where Internet Identity sent this itself.
-    pub application_number: Option<ApplicationNumber>,
-    /// The canister that sent it, which the service worker fetches the text from.
+    /// The canister that sent it, which the service worker fetches the text from: the
+    /// app's, or Internet Identity's own.
     pub sender: Principal,
     pub notification_id: NotificationId,
     pub expires_at_ns: Timestamp,
-    /// The principal of the account at the app the entry is for, which the account keeps
-    /// when it is given a number. `None` for our own.
-    pub account_principal: Option<Principal>,
-    /// Set where Internet Identity sent this itself, and what it has to say.
-    pub event: Option<NotificationEvent>,
+    pub kind: InboxNotificationKind,
+}
+
+/// Who an inbox entry is for.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InboxNotificationKind {
+    /// An app's notification to the account with this principal. The principal names the
+    /// app and the account, and stays the account's when it is given a number.
+    App { account_principal: Principal },
+    /// Internet Identity's own, and what it has to say.
+    Identity { event: NotificationEvent },
+}
+
+impl InboxNotification {
+    /// The account principal of an app's notification. `None` for our own.
+    pub fn account_principal(&self) -> Option<Principal> {
+        match &self.kind {
+            InboxNotificationKind::App { account_principal } => Some(*account_principal),
+            InboxNotificationKind::Identity { .. } => None,
+        }
+    }
 }
 
 impl From<InboxNotification> for StorableInboxNotification {
     fn from(value: InboxNotification) -> Self {
         StorableInboxNotification {
             inbox_notification_id: value.inbox_notification_id,
-            application_number: value.application_number,
-            event: value.event.map(StorableNotificationEvent::from),
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
             expires_at_ns: value.expires_at_ns,
-            account_principal: value
-                .account_principal
-                .map(|principal| principal.as_slice().to_vec()),
+            kind: match value.kind {
+                InboxNotificationKind::App { account_principal } => {
+                    StorableInboxNotificationKind::App {
+                        account_principal: account_principal.as_slice().to_vec(),
+                    }
+                }
+                InboxNotificationKind::Identity { event } => {
+                    StorableInboxNotificationKind::Identity {
+                        event: StorableNotificationEvent::from(event),
+                    }
+                }
+            },
         }
+    }
+}
+
+impl TryFrom<StorableInboxNotification> for InboxNotification {
+    type Error = String;
+
+    /// An entry this canister wrote, read back: a principal that does not read back means
+    /// the entry is not what it claims to be.
+    fn try_from(value: StorableInboxNotification) -> Result<Self, Self::Error> {
+        let principal = |bytes: &[u8]| {
+            Principal::try_from_slice(bytes).map_err(|err| format!("not a principal: {err}"))
+        };
+        Ok(InboxNotification {
+            inbox_notification_id: value.inbox_notification_id,
+            sender: principal(&value.sender)?,
+            notification_id: value.notification_id,
+            expires_at_ns: value.expires_at_ns,
+            kind: match value.kind {
+                StorableInboxNotificationKind::App { account_principal } => {
+                    InboxNotificationKind::App {
+                        account_principal: principal(&account_principal)?,
+                    }
+                }
+                StorableInboxNotificationKind::Identity { event } => {
+                    InboxNotificationKind::Identity {
+                        event: NotificationEvent::from(event),
+                    }
+                }
+            },
+        })
     }
 }
 
@@ -324,31 +376,20 @@ impl From<StorableBrowser> for Browser {
                     })
                     .ok()
             }),
+            // An entry that does not read back is dropped, as a registration is above.
             notifications: value
-                .notifications
+                .inbox
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|queued| {
-                    let account_principal =
-                        match (queued.application_number, queued.account_principal) {
-                            (Some(_), Some(principal)) => {
-                                Some(Principal::try_from_slice(&principal).ok()?)
-                            }
-                            // An app's entry written before its account principal was
-                            // recorded names no account, so it is dropped, and the next write
-                            // of this inbox leaves it out.
-                            (Some(_), None) => return None,
-                            (None, _) => None,
-                        };
-                    Some(InboxNotification {
-                        inbox_notification_id: queued.inbox_notification_id,
-                        application_number: queued.application_number,
-                        event: queued.event.map(NotificationEvent::from),
-                        sender: Principal::try_from_slice(&queued.sender).ok()?,
-                        notification_id: queued.notification_id,
-                        expires_at_ns: queued.expires_at_ns,
-                        account_principal,
-                    })
+                    InboxNotification::try_from(queued)
+                        .inspect_err(|reason| {
+                            ic_cdk::println!(
+                                "ERROR: dropped an inbox entry of browser {} as unreadable: {reason}",
+                                value.id
+                            );
+                        })
+                        .ok()
                 })
                 .collect(),
             next_inbox_notification_id: value.next_inbox_notification_id.unwrap_or_default(),
@@ -372,7 +413,7 @@ impl From<Browser> for StorableBrowser {
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
             next_inbox_notification_id: Some(value.next_inbox_notification_id),
-            notifications: (!value.notifications.is_empty()).then(|| {
+            inbox: (!value.notifications.is_empty()).then(|| {
                 value
                     .notifications
                     .into_iter()

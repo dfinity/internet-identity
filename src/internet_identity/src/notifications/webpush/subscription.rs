@@ -499,12 +499,12 @@ mod tests {
             .expect("a registered browser")
             .push(crate::storage::anchor::InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: crate::storage::anchor::InboxNotificationKind::App {
+                    account_principal: candid::Principal::from_slice(&[9; 10]),
+                },
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_principal: Some(candid::Principal::from_slice(&[9; 10])),
-                event: None,
             });
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }

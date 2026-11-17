@@ -115,7 +115,8 @@ use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
 use crate::storage::anchor::{
-    Anchor, BrowserError, InboxNotification, ReadySubscription, WebPushSubscription, MAX_BROWSERS,
+    Anchor, BrowserError, InboxNotification, InboxNotificationKind, ReadySubscription,
+    WebPushSubscription, MAX_BROWSERS,
 };
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -1996,16 +1997,6 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key.clone().into())
     }
 
-    /// The origin of an app II still holds.
-    pub fn lookup_origin_with_application_number(
-        &self,
-        application_number: ApplicationNumber,
-    ) -> Option<FrontendHostname> {
-        self.stable_application_memory
-            .get(&application_number)
-            .map(|application| application.origin)
-    }
-
     pub fn lookup_application_number_with_origin(
         &self,
         origin: &FrontendHostname,
@@ -3290,7 +3281,7 @@ impl<M: Memory + Clone> Storage<M> {
                 .anchor_application_config(anchor_number, application_number)
                 .map(AnchorApplicationConfig::forgotten);
             writes.insert(origin.clone(), Some((account_references, config)));
-            forgotten.insert(application_number);
+            forgotten.insert(origin.clone());
         }
         if writes.is_empty() {
             return Ok(());
@@ -3300,10 +3291,15 @@ impl<M: Memory + Clone> Storage<M> {
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
-                queue.retain(|queued| {
-                    queued
-                        .application_number
-                        .is_none_or(|number| !forgotten.contains(&number))
+                // An app's entry whose account no longer resolves is gone too.
+                queue.retain(|queued| match queued.kind {
+                    InboxNotificationKind::App { account_principal } => self
+                        .lookup_account_with_principal(account_principal)
+                        .is_some_and(|account| {
+                            account.anchor_number == anchor_number
+                                && !forgotten.contains(&account.origin)
+                        }),
+                    InboxNotificationKind::Identity { .. } => true,
                 });
             }
         }
