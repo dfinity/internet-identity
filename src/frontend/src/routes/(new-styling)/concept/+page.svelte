@@ -174,8 +174,8 @@
   /** A phone's incident sheet was put away unanswered on this visit; the next
    *  visit brings it back. */
   let incidentDismissed = $state(false);
-  /** The account's rows, in one untitled group: how you get in, then where
-   *  the identity is signed in. Apps are managed from the grid itself
+  /** The account's rows, each its own card: how you get in, then where the
+   *  identity is signed in. Apps are managed from the grid itself
    *  (Manage, by All apps' heading), so the account doesn't list them too. */
   const ACCOUNT_KINDS: CardKind[] = ["access", "recovery", "devices"];
   const accountCards = $derived(
@@ -1178,34 +1178,30 @@
         {/if}
       {/snippet}
     </IdentityCard>
-    <!-- One card of rows, as a group in Settings on iOS, with no heading:
-         the rows' titles say what each is. -->
-    <Elevated
-      offset={1}
-      as="ul"
-      aria-label="Account"
-      class="ii-rows flex flex-col overflow-hidden rounded-2xl [--ii-rows-inset:4rem]"
-    >
+    <!-- A card per row, no headings: the rows' titles say what each is. -->
+    <div class="flex flex-col gap-2">
       {#each accountCards as card (card.kind)}
-        <StatusRow
-          kind={card.kind}
-          title={TITLES[card.kind]}
-          sentence={card.sentence}
-          tone={card.tone}
-          action={isLoud(card) && !coveredByIncident(card.kind)
-            ? leadActionOf(card, current.scenario)
-            : undefined}
-          resolved={resolvedKinds.includes(card.kind)}
-          onOpen={() => openCard(card.kind)}
-          onAction={() => runLead(card)}
-          preview={card.kind === "access"
-            ? accessPreview
-            : card.kind === "devices"
-              ? devicesPreview
+        <Elevated offset={1} as="ul" class="overflow-hidden rounded-2xl">
+          <StatusRow
+            kind={card.kind}
+            title={TITLES[card.kind]}
+            sentence={card.sentence}
+            tone={card.tone}
+            action={isLoud(card) && !coveredByIncident(card.kind)
+              ? leadActionOf(card, current.scenario)
               : undefined}
-        />
+            resolved={resolvedKinds.includes(card.kind)}
+            onOpen={() => openCard(card.kind)}
+            onAction={() => runLead(card)}
+            preview={card.kind === "access"
+              ? accessPreview
+              : card.kind === "devices"
+                ? devicesPreview
+                : undefined}
+          />
+        </Elevated>
       {/each}
-    </Elevated>
+    </div>
   </div>
 {/snippet}
 
