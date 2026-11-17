@@ -174,20 +174,14 @@
   /** A phone's incident sheet was put away unanswered on this visit; the next
    *  visit brings it back. */
   let incidentDismissed = $state(false);
-  /** The account's rows, in two groups: how you get in, and what is signed in
-   *  or connected with the identity. Apps are managed from the grid itself
+  /** The account's rows, in one untitled group: how you get in, then where
+   *  the identity is signed in. Apps are managed from the grid itself
    *  (Manage, by All apps' heading), so the account doesn't list them too. */
-  const GROUPS: { title: string; kinds: CardKind[] }[] = [
-    { title: "Sign-in", kinds: ["access", "recovery"] },
-    { title: "Signed in on", kinds: ["devices"] },
-  ];
-  const accountGroups = $derived(
-    GROUPS.map(({ title, kinds }) => ({
-      title,
-      cards: kinds
-        .map((kind) => cards.find((card) => card.kind === kind))
-        .filter((card) => card !== undefined),
-    })),
+  const ACCOUNT_KINDS: CardKind[] = ["access", "recovery", "devices"];
+  const accountCards = $derived(
+    ACCOUNT_KINDS.map((kind) =>
+      cards.find((card) => card.kind === kind),
+    ).filter((card) => card !== undefined),
   );
   /** What the calm island mentions: something new or waiting, never a tip. */
   const note = $derived(
@@ -1184,42 +1178,34 @@
         {/if}
       {/snippet}
     </IdentityCard>
-    <!-- Each group is a card under a small heading, as in Settings on iOS:
-         the heading starts where the rows' content does, 16px in. -->
-    {#each accountGroups as group (group.title)}
-      <section class="flex flex-col gap-2">
-        <h2
-          class="text-text-tertiary ps-4 text-[13px] leading-[18px] font-medium"
-        >
-          {group.title}
-        </h2>
-        <Elevated
-          offset={1}
-          as="ul"
-          class="ii-rows flex flex-col overflow-hidden rounded-2xl [--ii-rows-inset:4rem]"
-        >
-          {#each group.cards as card (card.kind)}
-            <StatusRow
-              kind={card.kind}
-              title={TITLES[card.kind]}
-              sentence={card.sentence}
-              tone={card.tone}
-              action={isLoud(card) && !coveredByIncident(card.kind)
-                ? leadActionOf(card, current.scenario)
-                : undefined}
-              resolved={resolvedKinds.includes(card.kind)}
-              onOpen={() => openCard(card.kind)}
-              onAction={() => runLead(card)}
-              preview={card.kind === "access"
-                ? accessPreview
-                : card.kind === "devices"
-                  ? devicesPreview
-                  : undefined}
-            />
-          {/each}
-        </Elevated>
-      </section>
-    {/each}
+    <!-- One card of rows, as a group in Settings on iOS, with no heading:
+         the rows' titles say what each is. -->
+    <Elevated
+      offset={1}
+      as="ul"
+      aria-label="Account"
+      class="ii-rows flex flex-col overflow-hidden rounded-2xl [--ii-rows-inset:4rem]"
+    >
+      {#each accountCards as card (card.kind)}
+        <StatusRow
+          kind={card.kind}
+          title={TITLES[card.kind]}
+          sentence={card.sentence}
+          tone={card.tone}
+          action={isLoud(card) && !coveredByIncident(card.kind)
+            ? leadActionOf(card, current.scenario)
+            : undefined}
+          resolved={resolvedKinds.includes(card.kind)}
+          onOpen={() => openCard(card.kind)}
+          onAction={() => runLead(card)}
+          preview={card.kind === "access"
+            ? accessPreview
+            : card.kind === "devices"
+              ? devicesPreview
+              : undefined}
+        />
+      {/each}
+    </Elevated>
   </div>
 {/snippet}
 
