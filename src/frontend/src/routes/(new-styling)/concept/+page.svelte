@@ -1528,7 +1528,13 @@
             <!-- The page says whose it is before anything else: the identity's
                  own avatar and name, said the way a person would. -->
             {#if !managing}
-              <div class={["mb-8 flex items-center gap-3.5", INSET]}>
+              <div
+                class={[
+                  "mb-8 flex items-center gap-3.5 lg:mb-10",
+                  INSET,
+                  "lg:@lg:ps-5",
+                ]}
+              >
                 <IdentityAvatar
                   {identity}
                   palette={identityPaletteOverride}
