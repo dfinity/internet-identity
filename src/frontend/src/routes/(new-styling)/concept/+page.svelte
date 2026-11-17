@@ -94,6 +94,12 @@
       recentOnly: [...recentOnly],
       scenario: { ...scenario },
       signedOut: [] as string[],
+      /** Not in Internet Identity today: whether the identity keeps a record
+       *  of the apps it signs in to. On, a signed-in app joins My apps and
+       *  history is kept; off, there's no record of where it signs in, so My
+       *  apps holds only what the user added (or the preset it started
+       *  with). One per identity, as it would be saved with it. */
+      keepHistory: true,
     })),
   );
   let identityIndex = $state(0);
@@ -303,9 +309,6 @@
   /** The concept's one menu (layout and scenario), and where it was opened:
    *  the corner on desktop opens it upwards, the header downwards. */
   let conceptMenu = $state<{ anchor: HTMLElement; compact: boolean }>();
-  /** Whether signing in to an app adds it to My apps. Off, the list is the
-   *  user's alone: apps still work, they're added by hand. */
-  let autoAdd = $state(true);
   /** Where the add-an-app search hangs from, while it's open. */
   let addAnchor = $state<HTMLElement>();
   /** A phone's header controls. The menu hangs from this pill's end, at the
@@ -823,6 +826,8 @@
    *  tab opened in the background (⌘-click) never hides this one, so the row
    *  moves right away. */
   const markUsed = (app: ConceptApp) => {
+    // With history off, nothing records where the identity signs in.
+    if (!current.keepHistory) return;
     const bump = () => {
       app.lastUsedMillis = Date.now();
     };
@@ -1248,6 +1253,7 @@
       {@const app = selectedApps[0]}
       <AppView
         {app}
+        history={current.keepHistory}
         backLabel="Done"
         onExit={stopManaging}
         onToggleNotifications={(allowed) => setNotifications([app], allowed)}
@@ -1273,6 +1279,7 @@
     {@const app = openedApp}
     <AppView
       {app}
+      history={current.keepHistory}
       backLabel={identityName}
       onExit={closeAppDetails}
       onToggleNotifications={(allowed) => setNotifications([app], allowed)}
@@ -1597,22 +1604,25 @@
                     }}
                     class="bg-bg-primary border-border-tertiary mx-1.5 mb-3 flex items-center gap-4 rounded-2xl border px-4 py-3 @lg:mx-2"
                   >
+                    <!-- A privacy setting, not a list setting: it decides
+                         whether there is any record of where this identity
+                         signs in. -->
                     <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span class="text-text-primary text-sm font-medium">
-                        Add apps when I sign in to them
+                        Remember apps I sign in to
                       </span>
                       <span
-                        class="text-text-tertiary text-[13px] leading-[18px]"
+                        class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
                       >
-                        {autoAdd
-                          ? "An app shows up here after you sign in to it."
-                          : "Only apps you add yourself show up here. Signing in still works everywhere."}
+                        {current.keepHistory
+                          ? "An app shows up here once you sign in to it, and Recently used keeps your history."
+                          : "No record of where you sign in. Only apps you add yourself show up here, and signing in still works everywhere."}
                       </span>
                     </span>
                     <Toggle
-                      checked={autoAdd}
+                      checked={current.keepHistory}
                       onchange={(event) =>
-                        (autoAdd = event.currentTarget.checked)}
+                        (current.keepHistory = event.currentTarget.checked)}
                     />
                   </label>
                 {/if}
@@ -1632,7 +1642,7 @@
                   {/snippet}
                 </ReorderGrid>
               </section>
-              {#if !managing}
+              {#if !managing && current.keepHistory}
                 <RecentlyUsed
                   entries={recentEntries}
                   onAdd={addFromHistory}

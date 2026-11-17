@@ -26,6 +26,9 @@
     onOpen?: () => void;
     onRead?: (id: string) => void;
     onReadAll?: () => void;
+    /** Off when the identity keeps no record of where it signs in, so there's
+     *  no last sign-in to tell. */
+    history?: boolean;
   }
 
   const {
@@ -37,6 +40,7 @@
     onOpen,
     onRead,
     onReadAll,
+    history = true,
   }: Props = $props();
 
   const host = $derived(new URL(app.url).host);
@@ -169,21 +173,23 @@
         aria-labelledby={switchId}
       />
     </li>
-    <li class={ROW}>
-      <span aria-hidden="true" class={ICON}>
-        <MonitorSmartphoneIcon class="size-4.5" />
-      </span>
-      <span class="flex min-w-0 flex-col gap-0.5">
-        <span class="text-text-primary text-sm font-medium">
-          Last signed in
+    {#if history}
+      <li class={ROW}>
+        <span aria-hidden="true" class={ICON}>
+          <MonitorSmartphoneIcon class="size-4.5" />
         </span>
-        <span class="text-text-tertiary text-[13px] leading-[18px]">
-          {app.lastBrowser} · {$formatRelative(new Date(app.lastUsedMillis), {
-            style: "long",
-          })}
+        <span class="flex min-w-0 flex-col gap-0.5">
+          <span class="text-text-primary text-sm font-medium">
+            Last signed in
+          </span>
+          <span class="text-text-tertiary text-[13px] leading-[18px]">
+            {app.lastBrowser} · {$formatRelative(new Date(app.lastUsedMillis), {
+              style: "long",
+            })}
+          </span>
         </span>
-      </span>
-    </li>
+      </li>
+    {/if}
     {#if app.aiUsedMillis !== undefined}
       <li class={ROW}>
         <span aria-hidden="true" class={ICON}>
