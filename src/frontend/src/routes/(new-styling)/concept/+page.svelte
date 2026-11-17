@@ -26,7 +26,6 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
-  import Popover from "$lib/components/ui/Popover.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import { toaster } from "$lib/components/utils/toaster";
@@ -43,6 +42,7 @@
   import ConnectPage from "./components/ConnectPage.svelte";
   import CustomizeIdentityDialog from "./components/CustomizeIdentityDialog.svelte";
   import Elevated from "./components/Elevated.svelte";
+  import Popup from "./components/Popup.svelte";
   import AppRow from "./components/AppRow.svelte";
   import AppSearch from "./components/AppSearch.svelte";
   import ExplorePage from "./components/ExplorePage.svelte";
@@ -1847,13 +1847,13 @@
   {/if}
 
   {#if addAnchor !== undefined}
-    <Popover
+    <Popup
       anchor={addAnchor}
       onClose={() => (addAnchor = undefined)}
       direction="down"
       align="center"
       distance="0.5rem"
-      class="!w-[min(26rem,calc(100vw-2rem))] !shadow-lg"
+      class="!w-[min(26rem,calc(100vw-2rem))]"
     >
       <div class="flex max-h-[min(32rem,70dvh)] flex-col overflow-y-auto p-3">
         <AppSearch
@@ -1869,13 +1869,13 @@
             addAnchor = undefined;
             goToPage(1);
           }}
-          class="btn btn-tertiary mt-2 justify-start gap-2.5 !px-3"
+          class="ii-hover text-text-primary focus-visible:ring-focus-ring mt-2 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset"
         >
           <CompassIcon class="text-fg-quaternary size-4" aria-hidden="true" />
           Browse Explore
         </button>
       </div>
-    </Popover>
+    </Popup>
   {/if}
 
   {#if recoveryMode !== undefined}
@@ -1982,14 +1982,14 @@
 
   {#if conceptMenu !== undefined}
     {@const close = () => (conceptMenu = undefined)}
-    <Popover
+    <Popup
       anchor={conceptMenu.anchor}
       onClose={close}
       direction={conceptMenu.compact ? "down" : "up"}
       align={conceptMenu.compact ? "end" : "start"}
       distance="0.5rem"
       responsive={false}
-      class="!w-max !shadow-lg"
+      class="!w-max"
     >
       <!-- On a short phone it scrolls within the room the popover leaves it. -->
       <div
@@ -2076,6 +2076,6 @@
           First visit
         </button>
       </div>
-    </Popover>
+    </Popup>
   {/if}
 </div>

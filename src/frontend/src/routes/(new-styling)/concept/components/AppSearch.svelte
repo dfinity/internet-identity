@@ -88,6 +88,8 @@
 {/snippet}
 
 <div class="@container/search flex flex-col gap-4">
+  <!-- A pill with a hairline, as Fluid Functionalism draws a field: focus
+       darkens the hairline instead of adding a ring, and hovering fills it. -->
   <div class="relative">
     <SearchIcon
       class="text-fg-tertiary pointer-events-none absolute start-3.5 top-1/2 size-4.5 -translate-y-1/2"
@@ -103,7 +105,7 @@
       autocapitalize="off"
       spellcheck="false"
       enterkeyhint="search"
-      class="text-text-primary placeholder:text-text-placeholder focus-visible:outline-focus-ring h-11 w-full appearance-none rounded-xl bg-(--ii-hover) ps-10 pe-10 text-base outline-none focus-visible:outline-2 [&::-webkit-search-cancel-button]:appearance-none"
+      class="text-text-primary placeholder:text-text-placeholder border-border-tertiary focus:border-fg-quaternary h-11 w-full appearance-none rounded-full border bg-transparent ps-10 pe-10 text-base transition-[background-color,border-color] duration-100 ease-out outline-none hover:bg-(--ii-hover) focus:ring-0 focus:hover:bg-transparent motion-reduce:transition-none [&::-webkit-search-cancel-button]:appearance-none"
     />
     {#if query !== ""}
       <button

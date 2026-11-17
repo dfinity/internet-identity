@@ -18,7 +18,6 @@
   import { prefersReducedMotion } from "svelte/motion";
   import { slide } from "svelte/transition";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
-  import Popover from "$lib/components/ui/Popover.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import {
     identityInitial,
@@ -27,6 +26,7 @@
   } from "$lib/utils/identityColors";
   import { getMetadataString } from "$lib/utils/openID";
   import Elevated, { useSurface } from "./Elevated.svelte";
+  import Popup from "./Popup.svelte";
 
   interface Props {
     identity: LastUsedIdentity;
@@ -91,6 +91,9 @@
 
   const ROW =
     "ii-hover focus-visible:ring-focus-ring flex w-full items-center text-start outline-none focus-visible:ring-2 focus-visible:ring-inset";
+  /** A menu's row: in a menu the lit row is the focus, so no ring. */
+  const MENU_ROW =
+    "ii-hover text-text-primary flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-sm outline-none";
 </script>
 
 <!-- Whose panel this is, as an account switcher heads its menu (Google's
@@ -132,6 +135,62 @@
     >
       <EllipsisIcon class="size-4.5" aria-hidden="true" />
     </button>
+    {#if menuAnchor !== undefined}
+      <!-- Inside the card, so the menu stands two steps above the card it
+           opens over, not above the panel. -->
+      <Popup
+        anchor={menuAnchor}
+        onClose={closeMenu}
+        direction="down"
+        align="end"
+        distance="0.375rem"
+        responsive={false}
+        class="!w-max"
+      >
+        <div class="flex flex-col p-1" role="menu" aria-label="Identity">
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => {
+              closeMenu();
+              onCustomize();
+            }}
+            class={MENU_ROW}
+          >
+            <PaletteIcon class="text-fg-quaternary size-4" aria-hidden="true" />
+            Customize name and colour
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => {
+              closeMenu();
+              onStartPage();
+            }}
+            class={MENU_ROW}
+          >
+            <HouseIcon class="text-fg-quaternary size-4" aria-hidden="true" />
+            Make id.ai your start page
+          </button>
+          <hr class="border-border-tertiary -mx-1 my-1" />
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => {
+              closeMenu();
+              onSignOut();
+            }}
+            class={MENU_ROW}
+          >
+            <LogOutIcon
+              class="text-fg-quaternary size-4 rtl:-scale-x-100"
+              aria-hidden="true"
+            />
+            Sign out
+          </button>
+        </div>
+      </Popup>
+    {/if}
   </li>
   {#if alert !== undefined}
     <li class="px-2 pb-2">
@@ -266,58 +325,3 @@
     {/if}
   {/if}
 </Elevated>
-
-{#if menuAnchor !== undefined}
-  <Popover
-    anchor={menuAnchor}
-    onClose={closeMenu}
-    direction="down"
-    align="end"
-    distance="0.375rem"
-    responsive={false}
-    class="!w-max !shadow-lg"
-  >
-    <div class="flex flex-col p-1.5" role="menu" aria-label="Identity">
-      <button
-        type="button"
-        role="menuitem"
-        onclick={() => {
-          closeMenu();
-          onCustomize();
-        }}
-        class="btn btn-tertiary justify-start gap-2.5 !px-3 text-start"
-      >
-        <PaletteIcon class="text-fg-quaternary size-4" aria-hidden="true" />
-        Customize name and colour
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onclick={() => {
-          closeMenu();
-          onStartPage();
-        }}
-        class="btn btn-tertiary justify-start gap-2.5 !px-3 text-start"
-      >
-        <HouseIcon class="text-fg-quaternary size-4" aria-hidden="true" />
-        Make id.ai your start page
-      </button>
-      <hr class="border-border-secondary -mx-1.5 my-1.5" />
-      <button
-        type="button"
-        role="menuitem"
-        onclick={() => {
-          closeMenu();
-          onSignOut();
-        }}
-        class="btn btn-tertiary justify-start gap-2.5 !px-3 text-start"
-      >
-        <LogOutIcon
-          class="text-fg-quaternary size-4 rtl:-scale-x-100"
-          aria-hidden="true"
-        />
-        Sign out
-      </button>
-    </div>
-  </Popover>
-{/if}

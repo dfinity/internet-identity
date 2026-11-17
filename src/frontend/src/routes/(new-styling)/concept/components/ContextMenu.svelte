@@ -75,6 +75,7 @@
   import type { Snippet } from "svelte";
   import { prefersReducedMotion } from "svelte/motion";
   import { menuIn, menuOut } from "../motion";
+  import { useSurface } from "./Elevated.svelte";
 
   interface Props {
     items: ContextMenuEntry[];
@@ -115,6 +116,9 @@
   const TYPEAHEAD_RESET = 500;
 
   const menuId = $props.id();
+  /** Two steps above what it opens over, on the surface ladder, as a
+   *  dropdown is in Fluid Functionalism; its shadow's ring is its edge. */
+  const surface = `var(--ii-surface-${Math.min(useSurface() + 2, 8)})`;
   const reduced = $derived(prefersReducedMotion.current);
 
   let open = $state(false);
@@ -468,7 +472,8 @@
       out:menuOut|global={{ reduced }}
       onkeydown={onMenuKeydown}
       oncontextmenu={(event) => event.preventDefault()}
-      class="border-border-secondary bg-bg-primary_alt fixed inset-auto m-0 flex max-w-72 min-w-56 flex-col overflow-hidden rounded-xl border p-1.5 shadow-lg outline-none"
+      style:background-color={surface}
+      class="fixed inset-auto m-0 flex max-w-72 min-w-56 flex-col overflow-hidden rounded-xl border border-transparent p-1.5 shadow-(--ii-shadow-3) outline-none"
     >
       <!-- One highlight for the whole menu, so it can glide from row to row. -->
       <span
@@ -498,7 +503,7 @@
 
       {#each items as entry, index (index)}
         {#if entry.kind === "separator"}
-          <hr class="border-border-secondary -mx-1.5 my-1" />
+          <hr class="border-border-tertiary -mx-1.5 my-1" />
         {:else if entry.href !== undefined}
           <a
             bind:this={itemRefs[index]}
