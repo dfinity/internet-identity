@@ -53,7 +53,7 @@ paths:
 
 ## Errors
 
-- `fe/throw-canister-error` Unwrap canister results with `.then(throwCanisterError)` and check with `isCanisterError`; never `"Err" in result` and never fabricate a canister error. Methods whose error is `text` (the MCP methods, such as `get_mcp_registration_delegation`) unwrap with `throwTextCanisterError` instead, which throws a plain `Error` that `isCanisterError` doesn't match.
+- `fe/throw-canister-error` Unwrap canister results with `.then(throwCanisterError)` and check with `isCanisterError`; never `"Err" in result` and never fabricate a canister error. Legacy exception: the MCP methods (`get_mcp_registration_delegation` and the other `mcp_*` methods) return `Err : text`, which `throwCanisterError` can't wrap, so they unwrap with `throwTextCanisterError`. New methods return variant errors (`candid/result-variant`), so they never need it.
 - `fe/route-async-errors` Route every async failure to the user-visible path (`handleError` / the flow's `onError`), the way the delegation handler does. `console.error` alone is not handling.
 - `fe/no-silent-catch` `void promise.catch(...)` that drops an error needs a comment saying why; otherwise let it propagate. When the error is unused, write bare `catch { ... }`.
 - `fe/retry-transient-only` Retry only transient failures (network, 408, 429, 5xx).
