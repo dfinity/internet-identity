@@ -518,6 +518,7 @@ mod tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
                 event: None,
+                delivery_path: None,
             });
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }

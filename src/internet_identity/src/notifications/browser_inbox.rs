@@ -338,6 +338,7 @@ mod tests {
             expires_at_ns,
             account_number: None,
             event: None,
+            delivery_path: None,
         }
     }
 

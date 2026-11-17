@@ -33,6 +33,26 @@ pub struct StorableInboxNotification {
     /// Set where Internet Identity sent this itself.
     #[n(5)]
     pub event: Option<StorableNotificationEvent>,
+    /// The way its wake-up was posted. `None` on an entry deposited before it was recorded.
+    #[n(7)]
+    pub delivery_path: Option<StorableDeliveryPath>,
+}
+
+/// The way an entry's wake-up was posted, as the delivery funnel labels it.
+#[derive(Encode, Decode, Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum StorableDeliveryPath {
+    #[n(0)]
+    Chrome,
+    #[n(1)]
+    Safari,
+    #[n(2)]
+    Firefox,
+    #[n(3)]
+    Edge,
+    #[n(4)]
+    App,
+    #[n(5)]
+    Other,
 }
 
 /// Something Internet Identity has to tell the user about their own identity.
@@ -81,11 +101,16 @@ mod tests {
             expires_at_ns: u64::MAX,
             account_number: Some(u64::MAX),
             event: None,
+            delivery_path: Some(StorableDeliveryPath::Other),
         };
         let mut bytes = Vec::new();
         minicbor::encode(&queued, &mut bytes).expect("encoding a queued notification");
 
-        assert_eq!(bytes.len(), 1 + (1 + 9) + (1 + 2 + 29) + 4 * (1 + 9));
+        // The last term is the delivery path: its key, and the variant as a one-item array.
+        assert_eq!(
+            bytes.len(),
+            1 + (1 + 9) + (1 + 2 + 29) + 4 * (1 + 9) + (1 + 3)
+        );
         assert_eq!(
             minicbor::decode::<StorableInboxNotification>(&bytes).expect("decoding it"),
             queued

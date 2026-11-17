@@ -475,6 +475,7 @@ fn fan_out_to_destinations(
             expires_at_ns,
             account_number: None,
             event: Some(pending.event.clone()),
+            delivery_path: None,
         };
         let mut planned = Vec::new();
         for browser_id in destinations {
@@ -537,6 +538,10 @@ fn fan_out_to_destinations(
             let Some((queue, next_id)) = anchor.inbox_and_next_id_for_browser_mut(browser_id)
             else {
                 continue;
+            };
+            let entry = InboxNotification {
+                delivery_path: Some(path),
+                ..entry
             };
             let (deposited_entry, overflowed_entry) =
                 browser_inbox::deposit(queue, next_id, entry, now_ns);
@@ -614,6 +619,7 @@ fn fan_out_to_browsers(
         notification_id: pending.notification_id,
         expires_at_ns: app_expiry_ns(pending.expires_at_ns, taken.entry.received_at_ns),
         account_number: pending.account_number,
+        delivery_path: None,
     };
     let ttl_seconds = queued_entry.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
     let labels = Labels::app_number(pending.application_number, &pending.urgency);
@@ -695,8 +701,12 @@ fn fan_out_to_browsers(
                 continue;
             };
             queued_anywhere = true;
+            let entry = InboxNotification {
+                delivery_path: Some(path),
+                ..queued_entry.clone()
+            };
             let (deposited_entry, overflowed_entry) =
-                browser_inbox::deposit(queue, next_id, queued_entry.clone(), now_ns);
+                browser_inbox::deposit(queue, next_id, entry, now_ns);
             deposits.count_deposit(path, overflowed_entry);
             delivery.notification = Some(deposited_entry);
             to_post.push(delivery);
@@ -1848,6 +1858,7 @@ mod tests {
                     expires_at_ns: 10 * SECOND_NS,
                     account_number: Some(2),
                     event: None,
+                    delivery_path: None,
                 }
             }))
         });
@@ -1975,6 +1986,7 @@ mod tests {
                 expires_at_ns: 10 * SECOND_NS,
                 account_number: Some(2),
                 event: None,
+                delivery_path: Some(Path::of(DeliveryTarget::Browser, &delivery.endpoint)),
             })
         );
     }

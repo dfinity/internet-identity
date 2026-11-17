@@ -1066,12 +1066,14 @@ pub(crate) fn count_push_outcome(
 }
 
 /// A device collected `entry`, which delivers its notification unless another did first.
+/// Counted under the path `entry` was posted by, and under `path` where it records none.
 pub(crate) fn count_collected(
     anchor_number: AnchorNumber,
     entry: &InboxNotification,
     path: Path,
     now_ns: Timestamp,
 ) {
+    let path = entry.delivery_path.unwrap_or(path);
     with(|counters| {
         counters.prune(now_ns);
         let Some(labels) = counters.close(anchor_number, entry, path, None) else {
@@ -1088,7 +1090,8 @@ pub(crate) fn count_collected(
     });
 }
 
-/// Entries taken out of an inbox at `path`, for `reason`, before a device collected them.
+/// Entries taken out of an inbox, for `reason`, before a device collected them. Each is
+/// counted under the path it was posted by, and under `path` where it records none.
 pub(crate) fn count_removed_entries<'a>(
     anchor_number: AnchorNumber,
     entries: impl IntoIterator<Item = &'a InboxNotification>,
@@ -1097,6 +1100,7 @@ pub(crate) fn count_removed_entries<'a>(
 ) {
     with(|counters| {
         for entry in entries {
+            let path = entry.delivery_path.unwrap_or(path);
             if let Some(labels) = counters.close(anchor_number, entry, path, Some(reason)) {
                 counters.count_push_lost(reason, path, &labels);
             }
@@ -1259,6 +1263,7 @@ mod tests {
             notification_id,
             expires_at_ns,
             account_number: None,
+            delivery_path: None,
         }
     }
 

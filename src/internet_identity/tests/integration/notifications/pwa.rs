@@ -11,7 +11,7 @@ use canister_tests::api::internet_identity::notifications::{
     app_send_notification, app_set_pwa_webpush_subscription, subscribe_pwa_webpush,
     subscribe_webpush, TEST_AUTH_SECRET,
 };
-use canister_tests::framework::II_WASM_PREVIOUS;
+use canister_tests::framework::{get_metrics, II_WASM_PREVIOUS};
 use internet_identity_interface::internet_identity::types::{
     AccountUpdate, AppGetPwaNotificationError, AppGetPwaNotificationRequest,
     AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionResult,
@@ -29,6 +29,8 @@ const APP: &str = "https://listed-app.example";
 const OTHER_APP: &str = "https://listed-other.example";
 const PWA_ENDPOINT: &str = "https://pwa.push.example/device";
 const BROWSER_ENDPOINT: &str = "https://browser.push.example/device";
+/// An endpoint on Firebase Cloud Messaging, which the delivery funnel labels `chrome`.
+const FCM_ENDPOINT: &str = "https://fcm.googleapis.com/fcm/send/device";
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
 /// The first entry of a browser's inbox, which every flow here wakes for first.
 const FIRST_ENTRY: InboxNotificationId = 0;
@@ -899,4 +901,51 @@ fn should_keep_waking_the_installed_app_once_its_account_is_named() -> Result<()
     let second = session_of(&second_identity_at(&env, canister_id, APP));
     assert!(!is_endpoint_free(&env, canister_id, second));
     Ok(())
+}
+
+#[test]
+fn should_count_an_installed_app_delivery_under_the_path_it_was_posted_by() {
+    let env = env();
+    // The browser's own subscription posts by a relay counted as `other`, and the
+    // installed app's by Firebase Cloud Messaging, counted as `chrome`.
+    let (canister_id, _, signed_in) = install_signed_in(&env, None, None);
+    let session = session_of(&signed_in);
+    subscribe_pwa_webpush(
+        &env,
+        canister_id,
+        session,
+        FCM_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+    assert_eq!(
+        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        vec![FCM_ENDPOINT.to_string()]
+    );
+
+    remove_entry(&env, canister_id, session);
+
+    assert_eq!(
+        delivered_pushes(&get_metrics(&env, canister_id), "chrome"),
+        1.0
+    );
+    assert_eq!(
+        delivered_pushes(&get_metrics(&env, canister_id), "other"),
+        0.0
+    );
+}
+
+/// The pushes counted delivered on `path`, over every other label.
+fn delivered_pushes(metrics: &str, path: &str) -> f64 {
+    let path_label = format!(r#"path="{path}""#);
+    metrics
+        .lines()
+        .filter(|line| {
+            line.starts_with(r#"internet_identity_notification_pushes{stage="delivered""#)
+        })
+        .filter(|line| line.contains(&path_label))
+        .filter_map(|line| line.split_whitespace().nth(1)?.parse::<f64>().ok())
+        .sum()
 }

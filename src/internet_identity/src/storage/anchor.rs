@@ -1,5 +1,6 @@
 use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
+use crate::notifications::delivery_metrics::Path;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::{
     AuthSecret, PayloadIkm, PayloadKeyId, PushEndpoint, SubscriberKey,
@@ -12,7 +13,7 @@ use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCr
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_inbox::{
-    StorableInboxNotification, StorableNotificationEvent,
+    StorableDeliveryPath, StorableInboxNotification, StorableNotificationEvent,
 };
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -151,6 +152,9 @@ pub struct InboxNotification {
     pub account_number: Option<AccountNumber>,
     /// Set where Internet Identity sent this itself, and what it has to say.
     pub event: Option<NotificationEvent>,
+    /// The way its wake-up was posted, which its removal is counted under. `None` on an
+    /// entry deposited before it was recorded.
+    pub(crate) delivery_path: Option<Path>,
 }
 
 impl From<InboxNotification> for StorableInboxNotification {
@@ -163,6 +167,33 @@ impl From<InboxNotification> for StorableInboxNotification {
             notification_id: value.notification_id,
             expires_at_ns: value.expires_at_ns,
             account_number: value.account_number,
+            delivery_path: value.delivery_path.map(StorableDeliveryPath::from),
+        }
+    }
+}
+
+impl From<Path> for StorableDeliveryPath {
+    fn from(value: Path) -> Self {
+        match value {
+            Path::Chrome => StorableDeliveryPath::Chrome,
+            Path::Safari => StorableDeliveryPath::Safari,
+            Path::Firefox => StorableDeliveryPath::Firefox,
+            Path::Edge => StorableDeliveryPath::Edge,
+            Path::App => StorableDeliveryPath::App,
+            Path::Other => StorableDeliveryPath::Other,
+        }
+    }
+}
+
+impl From<StorableDeliveryPath> for Path {
+    fn from(value: StorableDeliveryPath) -> Self {
+        match value {
+            StorableDeliveryPath::Chrome => Path::Chrome,
+            StorableDeliveryPath::Safari => Path::Safari,
+            StorableDeliveryPath::Firefox => Path::Firefox,
+            StorableDeliveryPath::Edge => Path::Edge,
+            StorableDeliveryPath::App => Path::App,
+            StorableDeliveryPath::Other => Path::Other,
         }
     }
 }
@@ -334,6 +365,7 @@ impl From<StorableBrowser> for Browser {
                         notification_id: queued.notification_id,
                         expires_at_ns: queued.expires_at_ns,
                         account_number: queued.account_number,
+                        delivery_path: queued.delivery_path.map(Path::from),
                     })
                 })
                 .collect(),
