@@ -61,13 +61,17 @@ const hash = (text: string): number => {
   return h >>> 0;
 };
 
+/** Where the identity's colours stand in `IDENTITY_PALETTES`. */
+export const identityPaletteIndex = (identityNumber: bigint): number =>
+  hash(identityNumber.toString()) % IDENTITY_PALETTES.length;
+
 /**
  * The identity number, not the name, picks the colours: the name can be
  * changed and the credential differs per device, while the number is the same
  * everywhere the identity is used.
  */
 export const identityPalette = (identityNumber: bigint): IdentityPalette =>
-  IDENTITY_PALETTES[hash(identityNumber.toString()) % IDENTITY_PALETTES.length];
+  IDENTITY_PALETTES[identityPaletteIndex(identityNumber)];
 
 const firstLetter = /\p{L}\p{M}*/u;
 

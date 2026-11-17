@@ -4,6 +4,7 @@
     ArrowRightToLineIcon,
     BellOffIcon,
     CheckIcon,
+    ChevronRightIcon,
     CompassIcon,
     FlaskConicalIcon,
     LogOutIcon,
@@ -24,16 +25,21 @@
   import Logo from "$lib/components/ui/Logo.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { toaster } from "$lib/components/utils/toaster";
+  import {
+    IDENTITY_PALETTES,
+    identityPaletteIndex,
+  } from "$lib/utils/identityColors";
   import ActionDock, { type DockItem } from "./components/ActionDock.svelte";
   import AppTile from "./components/AppTile.svelte";
   import AttentionDot from "./components/AttentionDot.svelte";
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
   import ConnectPage from "./components/ConnectPage.svelte";
+  import CustomizeIdentityDialog from "./components/CustomizeIdentityDialog.svelte";
   import Elevated from "./components/Elevated.svelte";
-  import ExploreBanner from "./components/ExploreBanner.svelte";
-  import ExploreBuild from "./components/ExploreBuild.svelte";
-  import ExploreShelf from "./components/ExploreShelf.svelte";
+  import AppRow from "./components/AppRow.svelte";
+  import AppSearch from "./components/AppSearch.svelte";
+  import ExplorePage from "./components/ExplorePage.svelte";
   import IdentityCard from "./components/IdentityCard.svelte";
   import IncidentBanner from "./components/IncidentBanner.svelte";
   import IncidentCard from "./components/IncidentCard.svelte";
@@ -43,13 +49,15 @@
   import RecentlyUsed, {
     type RecentEntry,
   } from "./components/RecentlyUsed.svelte";
+  import RecoveryFlow, {
+    type RecoveryFlowMode,
+  } from "./components/RecoveryFlow.svelte";
   import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StatusRow from "./components/StatusRow.svelte";
   import VerifyPhraseDialog from "./components/VerifyPhraseDialog.svelte";
   import {
     browsersFor,
-    exploreFeed,
     featuredApps,
     identities,
     scenarioPresets,
@@ -84,7 +92,22 @@
   );
   let identityIndex = $state(0);
 
-  const identity = $derived(identities[identityIndex].identity);
+  /** Names and colours picked in Customize, per identity. The name would be
+   *  saved on the canister (identity_properties_replace takes one); where a
+   *  picked colour lives is still open. */
+  const customized = $state<
+    Record<string, { name: string; paletteIndex: number }>
+  >({});
+  let customizing = $state(false);
+  const identity = $derived.by(() => {
+    const base = identities[identityIndex].identity;
+    const own = customized[`${base.identityNumber}`];
+    return own === undefined ? base : { ...base, name: own.name };
+  });
+  const identityPaletteOverride = $derived.by(() => {
+    const own = customized[`${identity.identityNumber}`];
+    return own === undefined ? undefined : IDENTITY_PALETTES[own.paletteIndex];
+  });
   const identityName = $derived(identity.name ?? `${identity.identityNumber}`);
   const signedInWith = $derived(identities[identityIndex].signedInWith);
   const current = $derived(states[identityIndex]);
@@ -321,7 +344,20 @@
     document.documentElement.dir === "rtl" ? -1 : 1;
   const reduced = $derived(prefersReducedMotion.current);
 
+  /** Recovery is one thing, on or off: setting it up, finishing it and
+   *  managing it all happen in one dialog that explains each step. */
+  let recoveryMode = $state<RecoveryFlowMode>();
+  const openRecovery = () => {
+    const state = current.scenario.recovery;
+    recoveryMode =
+      state === "none" ? "start" : state === "unverified" ? "resume" : "manage";
+  };
+
   const openCard = (kind: CardKind) => {
+    if (kind === "recovery") {
+      openRecovery();
+      return;
+    }
     navDirection = 1;
     switching = false;
     if (kind === "apps") {
@@ -739,6 +775,10 @@
   /** The loud card's button: finishes the step where the concept can, otherwise
    *  opens the card's section. */
   const runLead = (card: CardStatus) => {
+    if (card.kind === "recovery") {
+      openRecovery();
+      return;
+    }
     const action = leadActionOf(card, current.scenario);
     if (action.resolve !== undefined) {
       if (action.flow === "verifyPhrase") {
@@ -866,6 +906,16 @@
     );
     toaster.success({ title: `${app.name} added to My apps`, duration: 2500 });
   };
+  const isAdded = (origin: string) =>
+    current.apps.some((app) => app.origin === origin);
+  /** A site that isn't in the curated list, added by its address. */
+  const addLink = (host: string) =>
+    addApp({
+      origin: `https://${host}`,
+      name: host,
+      logo: "",
+      url: `https://${host}`,
+    });
   const addFromHistory = (origin: string) => {
     const entry = current.recentOnly.find((one) => one.app.origin === origin);
     if (entry !== undefined) {
@@ -1007,6 +1057,38 @@
       Add your first app
     </button>
   </div>
+  <!-- A short Explore, in rows: suggestions that are plainly not the user's
+       yet, each with Add, and the way to all of them last. -->
+  <section class="mt-10 flex w-[min(36rem,calc(100vw-2rem))] flex-col gap-2">
+    <h2 class="text-text-tertiary ps-4 text-sm font-medium">
+      Suggested for you
+    </h2>
+    <Elevated
+      offset={1}
+      as="ul"
+      class="ii-rows flex flex-col overflow-hidden rounded-2xl"
+    >
+      {#each featuredApps.slice(0, 4) as app (app.origin)}
+        <li>
+          <AppRow {app} added={isAdded(app.origin)} onAdd={() => addApp(app)} />
+        </li>
+      {/each}
+      <li>
+        <button
+          type="button"
+          onclick={() => goToPage(1)}
+          class="ii-hover focus-visible:ring-focus-ring text-text-primary flex w-full items-center gap-3 px-4 py-3.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset"
+        >
+          <CompassIcon class="text-fg-tertiary size-4.5" aria-hidden="true" />
+          <span class="flex-1">Explore all apps</span>
+          <ChevronRightIcon
+            class="text-fg-quaternary size-4 rtl:-scale-x-100"
+            aria-hidden="true"
+          />
+        </button>
+      </li>
+    </Elevated>
+  </section>
 {/snippet}
 
 {#snippet conceptControls(compact: boolean)}
@@ -1042,23 +1124,34 @@
         Identity
       </h2>
     {/if}
-    {#if incident !== undefined}
-      <div
-        out:slide={{ duration: reduced ? 0 : 260, easing: quintOut }}
-        class="flex flex-col"
-      >
-        <IncidentCard {incident} onAnswer={answerIncident} />
-      </div>
-    {/if}
     <IdentityCard
       {identity}
       others={identities
         .map((entry) => entry.identity)
         .filter((one) => one.identityNumber !== identity.identityNumber)}
       bind:switching
+      signedInWith={signedInWith.title}
+      palette={identityPaletteOverride}
       onSwitch={switchIdentity}
       onAdd={() => unavailable("Adding an identity")}
-    />
+      onCustomize={() => (customizing = true)}
+      onStartPage={() =>
+        toaster.create({
+          title: "Make id.ai your start page",
+          description:
+            "In your browser's settings, under “On startup”, open id.ai.",
+          duration: 5000,
+        })}
+      onSignOut={() => unavailable("Signing out")}
+    >
+      {#snippet alert()}
+        {#if incident !== undefined}
+          <div out:slide={{ duration: reduced ? 0 : 260, easing: quintOut }}>
+            <IncidentCard {incident} onAnswer={answerIncident} />
+          </div>
+        {/if}
+      {/snippet}
+    </IdentityCard>
     <!-- Each group is a card under a small heading, as in Settings on iOS:
          the heading starts where the rows' content does, 16px in. -->
     {#each accountGroups as group (group.title)}
@@ -1090,22 +1183,6 @@
         </Elevated>
       </section>
     {/each}
-    <!-- Signing out ends the list, as it ends an account's page in Settings. -->
-    <Elevated offset={1} class="overflow-hidden rounded-2xl">
-      <button
-        type="button"
-        onclick={() => unavailable("Signing out")}
-        class="ii-hover focus-visible:ring-focus-ring flex w-full items-center gap-2 px-4 py-3 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset"
-      >
-        <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
-          Sign out
-        </span>
-        <LogOutIcon
-          class="text-fg-quaternary size-4 shrink-0 rtl:-scale-x-100"
-          aria-hidden="true"
-        />
-      </button>
-    </Elevated>
   </div>
 {/snippet}
 
@@ -1336,7 +1413,11 @@
                 ? "var(--ii-surface-6)"
                 : "var(--ii-surface-3)"}
             >
-              <IdentityAvatar {identity} size="sm" />
+              <IdentityAvatar
+                {identity}
+                palette={identityPaletteOverride}
+                size="sm"
+              />
               {#if accountAttention !== undefined}
                 <AttentionDot tone={accountAttention} />
               {/if}
@@ -1351,7 +1432,11 @@
             aria-label={`Open ${identityName}${needsAttention(cards) ? ", needs your attention" : ""}`}
             class="relative -me-2 flex size-11 items-center justify-center rounded-full md:hidden"
           >
-            <IdentityAvatar {identity} size="sm" />
+            <IdentityAvatar
+              {identity}
+              palette={identityPaletteOverride}
+              size="sm"
+            />
             {#if needsAttention(cards)}
               <span
                 aria-hidden="true"
@@ -1388,7 +1473,11 @@
                  own avatar and name, said the way a person would. -->
             {#if !managing}
               <div class={["mb-8 flex items-center gap-3.5", INSET]}>
-                <IdentityAvatar {identity} size="lg" />
+                <IdentityAvatar
+                  {identity}
+                  palette={identityPaletteOverride}
+                  size="lg"
+                />
                 <div class="flex min-w-0 flex-col">
                   <p
                     class="text-text-primary truncate text-xl leading-7 font-semibold tracking-tight"
@@ -1482,19 +1571,12 @@
           <!-- Explore reads like the App Store: a banner, a shelf, another
                banner, more shelves. The featured shelf keeps to apps this
                identity doesn't use yet, and steps aside when there are none. -->
-          <div class="mx-auto flex w-full max-w-5xl flex-col gap-10 px-2">
-            {#each exploreFeed as item, index (index)}
-              {#if item.kind === "banner"}
-                <ExploreBanner {item} />
-              {:else if item.kind === "shelf"}
-                <ExploreShelf title={item.title} apps={item.apps} />
-              {:else if item.kind === "build"}
-                <ExploreBuild app={item.app} />
-              {:else if featured.length > 0}
-                <ExploreShelf title={item.title} apps={featured} />
-              {/if}
-            {/each}
-          </div>
+          <ExplorePage
+            {featured}
+            {isAdded}
+            onAdd={(app) => addApp(app)}
+            onAddLink={addLink}
+          />
         </div>
 
         <!-- Connect: AI and command-line access to this identity's apps,
@@ -1630,6 +1712,71 @@
 
   {#if layout === "top" && !panelVisible && !managing && dockItems.length > 0}
     <ActionDock items={dockItems} onAction={actFromDock} />
+  {/if}
+
+  {#if addAnchor !== undefined}
+    <Popover
+      anchor={addAnchor}
+      onClose={() => (addAnchor = undefined)}
+      direction="down"
+      align="center"
+      distance="0.5rem"
+      class="!w-[min(26rem,calc(100vw-2rem))] !shadow-lg"
+    >
+      <div class="flex max-h-[min(32rem,70dvh)] flex-col overflow-y-auto p-3">
+        <AppSearch
+          autofocus
+          suggestions={featured.slice(0, 4)}
+          {isAdded}
+          onAdd={(app) => addApp(app)}
+          onAddLink={addLink}
+        />
+        <button
+          type="button"
+          onclick={() => {
+            addAnchor = undefined;
+            goToPage(1);
+          }}
+          class="btn btn-tertiary mt-2 justify-start gap-2.5 !px-3"
+        >
+          <CompassIcon class="text-fg-quaternary size-4" aria-hidden="true" />
+          Browse Explore
+        </button>
+      </div>
+    </Popover>
+  {/if}
+
+  {#if recoveryMode !== undefined}
+    <RecoveryFlow
+      mode={recoveryMode}
+      {identityName}
+      onDone={(method) => {
+        recoveryMode = undefined;
+        resolve(
+          { recovery: "calm" },
+          method === "email" ? "Recovery by email is on" : "Recovery is on",
+        );
+      }}
+      onTurnOff={() => {
+        recoveryMode = undefined;
+        resolve({ recovery: "none" }, "Recovery is off");
+      }}
+      onClose={() => (recoveryMode = undefined)}
+    />
+  {/if}
+
+  {#if customizing}
+    <CustomizeIdentityDialog
+      name={identityName}
+      paletteIndex={customized[`${identity.identityNumber}`]?.paletteIndex ??
+        identityPaletteIndex(identity.identityNumber)}
+      signedInWith={signedInWith.title}
+      onSave={(value) => {
+        customized[`${identity.identityNumber}`] = value;
+        customizing = false;
+      }}
+      onClose={() => (customizing = false)}
+    />
   {/if}
 
   {#if removing !== undefined}

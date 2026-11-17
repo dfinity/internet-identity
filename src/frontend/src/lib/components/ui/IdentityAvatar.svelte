@@ -1,6 +1,10 @@
 <script lang="ts">
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-  import { identityInitial, identityPalette } from "$lib/utils/identityColors";
+  import {
+    identityInitial,
+    identityPalette,
+    type IdentityPalette,
+  } from "$lib/utils/identityColors";
   import { openIdLogo } from "$lib/utils/openID";
   import { UserIcon } from "@lucide/svelte";
   import Avatar from "./Avatar.svelte";
@@ -11,13 +15,18 @@
   type Props = {
     identity: LastUsedIdentity;
     size: "sm" | "lg";
+    /** Colours chosen for the identity, in place of the ones its number
+     *  picks. */
+    palette?: IdentityPalette;
   };
 
-  let { identity, size }: Props = $props();
+  let { identity, size, palette: chosenPalette }: Props = $props();
 
   // The identity's initial on colours of its own, so that the identities on
   // a device tell apart; the person icon only for a name without letters.
-  const palette = $derived(identityPalette(identity.identityNumber));
+  const palette = $derived(
+    chosenPalette ?? identityPalette(identity.identityNumber),
+  );
   const initial = $derived(identityInitial(identity.name));
 
   // SSO entries get their own badge — never the underlying IdP's logo —

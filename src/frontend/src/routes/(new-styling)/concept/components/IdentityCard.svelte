@@ -5,20 +5,27 @@
 
 <script lang="ts">
   import {
-    CheckIcon,
-    ChevronDownIcon,
-    CopyIcon,
+    EllipsisIcon,
+    HouseIcon,
+    LogOutIcon,
+    PaletteIcon,
     PlusIcon,
     UserIcon,
+    ChevronDownIcon,
   } from "@lucide/svelte";
+  import type { Snippet } from "svelte";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { slide } from "svelte/transition";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
+  import Popover from "$lib/components/ui/Popover.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-  import { identityInitial, identityPalette } from "$lib/utils/identityColors";
+  import {
+    identityInitial,
+    identityPalette,
+    type IdentityPalette,
+  } from "$lib/utils/identityColors";
   import { getMetadataString } from "$lib/utils/openID";
-  import { swapIn, swapOut } from "../motion";
   import Elevated, { useSurface } from "./Elevated.svelte";
 
   interface Props {
@@ -29,6 +36,17 @@
     switching?: boolean;
     onSwitch: (identityNumber: bigint) => void;
     onAdd: () => void;
+    /** What this browser signed in with, said under the name. */
+    signedInWith: string;
+    /** The colours the user picked, over the ones the number gives. */
+    palette?: IdentityPalette;
+    /** The card's menu: the name and colour, the start page, signing out. */
+    onCustomize: () => void;
+    onStartPage: () => void;
+    onSignOut: () => void;
+    /** Something wrong with this identity, told inside its own card, under
+     *  its name, so it's never unclear whose it is. */
+    alert?: Snippet;
   }
 
   let {
@@ -37,7 +55,16 @@
     switching = $bindable(false),
     onSwitch,
     onAdd,
+    signedInWith,
+    palette,
+    onCustomize,
+    onStartPage,
+    onSignOut,
+    alert,
   }: Props = $props();
+
+  let menuAnchor = $state<HTMLElement>();
+  const closeMenu = () => (menuAnchor = undefined);
 
   const nameOf = (one: LastUsedIdentity): string =>
     one.name ?? `${one.identityNumber}`;
@@ -56,21 +83,6 @@
     return "Passkey";
   };
 
-  // The clipboard refuses in some embedded or insecure contexts; then the
-  // number simply doesn't say "copied".
-  let copied = $state(false);
-  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
-  const copyNumber = async () => {
-    try {
-      await navigator.clipboard.writeText(`${identity.identityNumber}`);
-    } catch {
-      return;
-    }
-    copied = true;
-    clearTimeout(copiedTimer);
-    copiedTimer = setTimeout(() => (copied = false), 1800);
-  };
-
   /** The row's avatars show the first few; the rest are a count. */
   const PREVIEW = 3;
   // The card is one step above what it stands on (Elevated, below), and the
@@ -83,7 +95,8 @@
 
 <!-- Whose panel this is, as an account switcher heads its menu (Google's
      accounts, a workspace or an organization): the identity itself, large,
-     with its name and number, and under it the way to another one. The other
+     with its name and how it signed in (never its number, which is legacy),
+     and under it the way to another one. The other
      identities show as a row of avatars, so the row says who there is at a
      glance; they open in the card itself and push the panel down, so nothing
      floats over the panel. -->
@@ -92,55 +105,39 @@
   as="ul"
   class="ii-rows flex flex-col overflow-hidden rounded-2xl"
 >
-  <li class="flex items-center gap-3 px-4 pt-4 pb-3.5">
-    <IdentityAvatar {identity} size="lg" />
+  <li class="flex items-center gap-3 ps-4 pe-2.5 pt-4 pb-3.5">
+    <IdentityAvatar {identity} {palette} size="lg" />
     <div class="flex min-w-0 flex-1 flex-col items-start">
       <span
         class="text-text-primary w-full truncate text-base leading-6 font-semibold"
       >
         {nameOf(identity)}
       </span>
-      <!-- The number copies from where it is said, with the glyph after it
-           that says so. -->
-      <button
-        type="button"
-        onclick={copyNumber}
-        aria-label={`Identity number ${identity.identityNumber}. Copy`}
-        class="ii-hover focus-visible:ring-focus-ring text-text-tertiary hover:text-text-secondary -mx-1.5 flex items-center gap-1.5 rounded-md px-1.5 text-sm leading-6 transition-colors duration-150 outline-none focus-visible:ring-2"
-      >
-        <span>
-          Identity number <span class="tabular-nums"
-            >{identity.identityNumber}</span
-          >
-        </span>
-        <span
-          aria-hidden="true"
-          class="grid size-3.5 shrink-0 place-items-center *:col-start-1 *:row-start-1"
-        >
-          {#if copied}
-            <span
-              class="text-fg-success-primary"
-              in:swapIn={{ reduced: prefersReducedMotion.current }}
-              out:swapOut={{ reduced: prefersReducedMotion.current }}
-            >
-              <CheckIcon class="size-3.5" strokeWidth={2.5} />
-            </span>
-          {:else}
-            <span
-              class="text-fg-quaternary"
-              in:swapIn={{ reduced: prefersReducedMotion.current }}
-              out:swapOut={{ reduced: prefersReducedMotion.current }}
-            >
-              <CopyIcon class="size-3.5" />
-            </span>
-          {/if}
-        </span>
-      </button>
-      <span class="sr-only" aria-live="polite">
-        {copied ? "Identity number copied" : ""}
+      <span class="text-text-tertiary w-full truncate text-sm leading-6">
+        {signedInWith}
       </span>
     </div>
+    <!-- Everything about the identity itself that isn't security: its name
+         and colour, and signing out, out of the way behind one ghost button. -->
+    <button
+      type="button"
+      onclick={(event) => (menuAnchor = event.currentTarget)}
+      aria-label="More for this identity"
+      aria-haspopup="menu"
+      aria-expanded={menuAnchor !== undefined}
+      class={[
+        "text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-9 shrink-0 place-items-center self-start rounded-xl transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2",
+        menuAnchor !== undefined && "text-fg-secondary bg-(--ii-selected)",
+      ]}
+    >
+      <EllipsisIcon class="size-4.5" aria-hidden="true" />
+    </button>
   </li>
+  {#if alert !== undefined}
+    <li class="px-2 pb-2">
+      {@render alert()}
+    </li>
+  {/if}
   {#if others.length === 0}
     <li>
       <button type="button" onclick={onAdd} class={[ROW, "gap-2 px-4 py-3"]}>
@@ -269,3 +266,58 @@
     {/if}
   {/if}
 </Elevated>
+
+{#if menuAnchor !== undefined}
+  <Popover
+    anchor={menuAnchor}
+    onClose={closeMenu}
+    direction="down"
+    align="end"
+    distance="0.375rem"
+    responsive={false}
+    class="!w-max !shadow-lg"
+  >
+    <div class="flex flex-col p-1.5" role="menu" aria-label="Identity">
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          closeMenu();
+          onCustomize();
+        }}
+        class="btn btn-tertiary justify-start gap-2.5 !px-3 text-start"
+      >
+        <PaletteIcon class="text-fg-quaternary size-4" aria-hidden="true" />
+        Customize name and colour
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          closeMenu();
+          onStartPage();
+        }}
+        class="btn btn-tertiary justify-start gap-2.5 !px-3 text-start"
+      >
+        <HouseIcon class="text-fg-quaternary size-4" aria-hidden="true" />
+        Make id.ai your start page
+      </button>
+      <hr class="border-border-secondary -mx-1.5 my-1.5" />
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          closeMenu();
+          onSignOut();
+        }}
+        class="btn btn-tertiary justify-start gap-2.5 !px-3 text-start"
+      >
+        <LogOutIcon
+          class="text-fg-quaternary size-4 rtl:-scale-x-100"
+          aria-hidden="true"
+        />
+        Sign out
+      </button>
+    </div>
+  </Popover>
+{/if}
