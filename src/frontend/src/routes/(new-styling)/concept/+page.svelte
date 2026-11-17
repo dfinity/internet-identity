@@ -2,22 +2,23 @@
   import "./surfaces.css";
   import {
     ArrowRightToLineIcon,
+    BellOffIcon,
     CheckIcon,
+    CompassIcon,
     FlaskConicalIcon,
-    LayoutGridIcon,
     LogOutIcon,
     PanelBottomIcon,
     PanelRightIcon,
     PanelTopIcon,
     MoonIcon,
+    PlusIcon,
     SunIcon,
   } from "@lucide/svelte";
   import { tick, untrack, type Component } from "svelte";
-  import { flip } from "svelte/animate";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { MediaQuery } from "svelte/reactivity";
-  import { fade, scale, slide } from "svelte/transition";
+  import { fade, slide } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
@@ -39,6 +40,9 @@
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
+  import RecentlyUsed, {
+    type RecentEntry,
+  } from "./components/RecentlyUsed.svelte";
   import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StatusRow from "./components/StatusRow.svelte";
@@ -50,6 +54,7 @@
     identities,
     scenarioPresets,
     type ConceptApp,
+    type FeaturedApp,
   } from "./mockData";
   import { viewIn, viewOut } from "./motion";
   import { ConceptTheme } from "./theme.svelte";
@@ -70,8 +75,9 @@
   // --- Mock state, one per identity ---
 
   const states = $state(
-    identities.map(({ apps, scenario }) => ({
+    identities.map(({ apps, recentOnly, scenario }) => ({
       apps: apps.map((app) => ({ ...app, unread: [...app.unread] })),
+      recentOnly: [...recentOnly],
       scenario: { ...scenario },
       signedOut: [] as string[],
     })),
@@ -82,6 +88,28 @@
   const identityName = $derived(identity.name ?? `${identity.identityNumber}`);
   const signedInWith = $derived(identities[identityIndex].signedInWith);
   const current = $derived(states[identityIndex]);
+
+  /** The app whose details the panel shows: a tile's plain click opens them
+   *  beside the grid (in the sheet on a phone). */
+  let appOpen = $state<string>();
+  const openedApp = $derived(
+    current.apps.find((app) => app.origin === appOpen),
+  );
+  /** Whether the panel was open before the app's details took it, so closing
+   *  them leaves it as it was. */
+  let panelBeforeApp = false;
+
+  /** Said on the home page, over the apps, by the time of day. */
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    return hour < 5
+      ? "Good night"
+      : hour < 12
+        ? "Good morning"
+        : hour < 18
+          ? "Good afternoon"
+          : "Good evening";
+  })();
 
   const browsers = $derived(
     browsersFor(current.scenario.devices).filter(
@@ -138,19 +166,36 @@
 
   // --- Apps ---
 
-  // The grid keeps the order apps were added in, so a launch never moves a
-  // tile. What was used last gets its own short row above it.
-  const recentApps = $derived(
-    [...current.apps]
-      .sort((a, b) => b.lastUsedMillis - a.lastUsedMillis)
-      .slice(0, 4),
+  // One grid, in the order apps were added (or arranged): a newly used app
+  // goes to the end, so nothing moves by itself. What was used lately is
+  // history, in a quiet row under the grid.
+  const recentEntries = $derived<RecentEntry[]>(
+    [
+      ...current.apps.map((app) => ({
+        origin: app.origin,
+        name: app.name,
+        logo: app.logo,
+        url: app.url,
+        usedMillis: app.lastUsedMillis,
+        added: true,
+      })),
+      ...current.recentOnly.map(({ app, usedMillis }) => ({
+        origin: app.origin,
+        name: app.name,
+        logo: app.logo,
+        url: app.url,
+        usedMillis,
+        added: false,
+      })),
+    ]
+      .sort((a, b) => b.usedMillis - a.usedMillis)
+      .slice(0, 10),
   );
-  const showRecent = $derived(current.apps.length > 6);
-  // An app's unread count is told once, on its first tile: in Recent when the
-  // row is up, so All apps leaves it off those apps. (While apps are managed
-  // Recent steps aside, and no tile shows a count.)
-  const countedInRecent = $derived(
-    new Set(showRecent ? recentApps.map(({ origin }) => origin) : []),
+  /** The tile after the last app, which adds one. */
+  const ADD_TILE = { origin: "add-app" } as const;
+  type GridItem = ConceptApp | typeof ADD_TILE;
+  const gridItems = $derived.by<GridItem[]>(() =>
+    managing ? current.apps : [...current.apps, ADD_TILE],
   );
   const featured = $derived(
     featuredApps.filter(
@@ -185,11 +230,6 @@
   // iOS. The 4rem logo sits centered in its column, so the inset is half of
   // what the column leaves: (5.25rem − 4rem) / 2, then (7rem − 4rem) / 2.
   const INSET = "ps-2.5 @lg:ps-6";
-  // Recent always holds four, so its shelf hugs four columns instead of
-  // stretching across seven with three left empty.
-  const RECENT_GRID =
-    "grid grid-cols-[repeat(4,5.25rem)] gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2";
-
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
@@ -234,6 +274,8 @@
   /** The concept's one menu (layout and scenario), and where it was opened:
    *  the corner on desktop opens it upwards, the header downwards. */
   let conceptMenu = $state<{ anchor: HTMLElement; compact: boolean }>();
+  /** Where the add-an-app search hangs from, while it's open. */
+  let addAnchor = $state<HTMLElement>();
   /** A phone's header controls. The menu hangs from this pill's end, at the
    *  screen's edge: from the flask, mid-pill, it would run off the start. */
   let controlsPill = $state<HTMLElement>();
@@ -270,7 +312,9 @@
         : selectedApps.length > 1
           ? "bulk"
           : "manage"
-      : (section ?? "overview"),
+      : openedApp !== undefined
+        ? `details:${openedApp.origin}`
+        : (section ?? "overview"),
   );
   let navDirection = $state(1);
   const readingDirection = () =>
@@ -294,6 +338,7 @@
 
   const startManaging = () => {
     navDirection = 1;
+    appOpen = undefined;
     section = undefined;
     selected = [];
     managing = true;
@@ -325,6 +370,27 @@
       ? selected.filter((one) => one !== origin)
       : [...selected, origin];
     navDirection = selected.length > before ? 1 : -1;
+  };
+
+  /** A tile's plain click: its details take the panel, or the sheet. */
+  const openAppDetails = (app: ConceptApp) => {
+    if (managing) return;
+    if (appOpen === undefined) {
+      panelBeforeApp = panelOpen;
+    }
+    navDirection = 1;
+    section = undefined;
+    switching = false;
+    appOpen = app.origin;
+    panelOpen = true;
+  };
+
+  const closeAppDetails = () => {
+    navDirection = -1;
+    appOpen = undefined;
+    if (!panelBeforeApp || !isDesktop.current) {
+      panelOpen = false;
+    }
   };
 
   const islandView = $derived<IslandView | undefined>(
@@ -394,6 +460,7 @@
     if (!managing) {
       section = undefined;
     }
+    appOpen = undefined;
     panelOpen = true;
   };
 
@@ -454,6 +521,7 @@
   const arrive = () => {
     incidentDismissed = false;
     section = undefined;
+    appOpen = undefined;
     switching = false;
     managing = false;
     selected = [];
@@ -753,16 +821,56 @@
     state.apps = state.apps.filter(({ origin }) => !origins.includes(origin));
     navDirection = -1;
     selected = [];
+    if (appOpen !== undefined && origins.includes(appOpen)) {
+      closeAppDetails();
+    }
     toaster.create({
       title:
         apps.length === 1
-          ? `${apps[0].name} has been removed.`
-          : `${apps.length} apps have been removed.`,
-      description: "You've been signed out and they can no longer notify you.",
+          ? `${apps[0].name} removed`
+          : `${apps.length} apps removed`,
+      description: "You're signed out. You can find them again in Explore.",
       closable: true,
       duration: 5000,
       action: { label: "Undo", onClick: () => (state.apps = before) },
     });
+  };
+
+  /** Removing asks first, and says what it does: sign out, no more
+   *  notifications, and the app is still in Explore. */
+  let removing = $state<ConceptApp[]>();
+  const askRemove = (apps: ConceptApp[]) => {
+    removing = apps;
+  };
+
+  /** From Explore, the add popover, or history: the app joins the end of the
+   *  grid, as a newly installed app does on a phone. */
+  const addApp = (app: FeaturedApp, usedMillis?: number) => {
+    if (current.apps.some(({ origin }) => origin === app.origin)) return;
+    current.apps = [
+      ...current.apps,
+      {
+        origin: app.origin,
+        name: app.name,
+        logo: app.logo,
+        url: app.url,
+        oneLiner: app.oneLiner,
+        lastUsedMillis: usedMillis ?? Date.now(),
+        notificationsAllowed: false,
+        lastBrowser: "Chrome on Mac",
+        unread: [],
+      },
+    ];
+    current.recentOnly = current.recentOnly.filter(
+      (entry) => entry.app.origin !== app.origin,
+    );
+    toaster.success({ title: `${app.name} added to My apps`, duration: 2500 });
+  };
+  const addFromHistory = (origin: string) => {
+    const entry = current.recentOnly.find((one) => one.app.origin === origin);
+    if (entry !== undefined) {
+      addApp(entry.app, entry.usedMillis);
+    }
   };
 
   const switchIdentity = (identityNumber: bigint) => {
@@ -771,13 +879,15 @@
     );
     switching = false;
     section = undefined;
+    appOpen = undefined;
     stopManaging();
   };
 
-  // A panel that opens again starts with the list folded.
+  // A panel that opens again starts with the list folded, on its overview.
   $effect(() => {
     if (!panelVisible) {
       switching = false;
+      appOpen = undefined;
     }
   });
 
@@ -833,29 +943,70 @@
 
 <svelte:window onkeydown={onWindowKeydown} />
 
-{#snippet appTile(app: ConceptApp, index: number, showCount = true)}
+{#snippet appTile(app: ConceptApp, index: number)}
   <AppTile
     name={app.name}
     logo={app.logo}
     url={app.url}
     unread={app.unread}
-    {showCount}
     mode={managing ? "select" : "open"}
     selected={selected.includes(app.origin)}
+    current={appOpen === app.origin && panelVisible}
     {index}
     onToggle={() => toggleSelected(app.origin)}
+    onSelect={() => openAppDetails(app)}
     onOpen={() => {
       readAll(app);
       markUsed(app);
     }}
-    onRead={(id) => read(app, id)}
     onClearAll={() => readAll(app)}
     notificationsAllowed={app.notificationsAllowed}
     muted={!app.notificationsAllowed && app.lastNotifiedMillis !== undefined}
     onSetNotifications={(allowed) => setNotificationsAndSay([app], allowed)}
     onManage={() => manageFrom(app)}
-    onRemove={() => remove([app])}
+    onRemove={() => askRemove([app])}
   />
+{/snippet}
+
+{#snippet addTile()}
+  <!-- After the last app, the way to add one by hand: a search over the
+       curated apps that also takes a link. -->
+  <button
+    type="button"
+    onclick={(event) => (addAnchor = event.currentTarget)}
+    aria-haspopup="dialog"
+    aria-expanded={addAnchor !== undefined}
+    class="ii-hover focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 outline-none focus-visible:ring-2"
+  >
+    <span
+      class="border-border-primary text-fg-tertiary grid size-16 place-items-center rounded-2xl border-[1.5px] border-dashed"
+    >
+      <PlusIcon class="size-6" aria-hidden="true" />
+    </span>
+    <span class="text-text-tertiary text-xs leading-tight">Add app</span>
+  </button>
+{/snippet}
+
+{#snippet firstApps()}
+  <!-- No apps yet: a calm panel that says what will be here, with the one
+       action inside it. -->
+  <div
+    class="border-border-tertiary flex w-[min(36rem,calc(100vw-2rem))] flex-col items-center gap-2 rounded-3xl border bg-(--ii-hover) px-6 py-9 text-center"
+  >
+    <p class="text-text-primary text-base font-semibold">No apps yet</p>
+    <p class="text-text-tertiary max-w-xs text-sm text-pretty">
+      Apps you sign in to with Internet Identity show up here. You can also add
+      one yourself.
+    </p>
+    <button
+      type="button"
+      onclick={(event) => (addAnchor = event.currentTarget)}
+      class="btn btn-primary btn-sm mt-3 rounded-full"
+    >
+      <PlusIcon class="size-4" aria-hidden="true" />
+      Add your first app
+    </button>
+  </div>
 {/snippet}
 
 {#snippet conceptControls(compact: boolean)}
@@ -964,9 +1115,10 @@
       {@const app = selectedApps[0]}
       <AppView
         {app}
+        backLabel="Done"
         onExit={stopManaging}
         onToggleNotifications={(allowed) => setNotifications([app], allowed)}
-        onRemove={() => remove([app])}
+        onRemove={() => askRemove([app])}
       />
     {:else if selectedApps.length > 1}
       <BulkView
@@ -974,7 +1126,7 @@
         onExit={stopManaging}
         onSetNotifications={(allowed) =>
           setNotifications(selectedApps, allowed)}
-        onRemove={() => remove(selectedApps)}
+        onRemove={() => askRemove(selectedApps)}
       />
     {:else}
       <PanelHeader
@@ -984,6 +1136,21 @@
         onBack={stopManaging}
       />
     {/if}
+  {:else if openedApp !== undefined}
+    {@const app = openedApp}
+    <AppView
+      {app}
+      backLabel={identityName}
+      onExit={closeAppDetails}
+      onToggleNotifications={(allowed) => setNotifications([app], allowed)}
+      onRemove={() => askRemove([app])}
+      onOpen={() => {
+        readAll(app);
+        markUsed(app);
+      }}
+      onRead={(id) => read(app, id)}
+      onReadAll={() => readAll(app)}
+    />
   {:else if section !== undefined}
     <SectionView
       {section}
@@ -1216,89 +1383,44 @@
           aria-labelledby="tab-mine"
           class={[PAGE, settled[0] && SETTLED]}
         >
-          {#if current.apps.length > 0}
-            <div class="mx-auto flex w-fit flex-col md:my-auto">
-              <!-- Phone: an incident put away unanswered heads the apps. It
-                   takes the column's width without widening it, and lines up
-                   with Recent's shelf, which bleeds out by its padding. -->
-              {#if !isDesktop.current && incident !== undefined && !managing}
-                <div
-                  transition:slide={{
-                    duration: reduced ? 0 : 260,
-                    easing: quintOut,
-                  }}
-                  class="-mx-1.5 w-0 min-w-[calc(100%+0.75rem)] pb-8 @lg:-mx-2 @lg:min-w-[calc(100%+1rem)]"
-                >
-                  <IncidentBanner
-                    {incident}
-                    class="w-full"
-                    onOpen={() => (incidentDismissed = false)}
-                  />
+          <div class="mx-auto flex w-fit max-w-full flex-col md:my-auto">
+            <!-- The page says whose it is before anything else: the identity's
+                 own avatar and name, said the way a person would. -->
+            {#if !managing}
+              <div class={["mb-8 flex items-center gap-3.5", INSET]}>
+                <IdentityAvatar {identity} size="lg" />
+                <div class="flex min-w-0 flex-col">
+                  <p
+                    class="text-text-primary truncate text-xl leading-7 font-semibold tracking-tight"
+                  >
+                    {greeting}, {identityName}
+                  </p>
+                  <p class="text-text-tertiary text-sm">
+                    Signed in with {signedInWith.title}
+                  </p>
                 </div>
-              {/if}
-              <!-- Recent is ordered by use, not by hand, so it steps aside while
-                   apps are managed and All apps is the one grid to arrange. -->
-              {#if showRecent && !managing}
-                <!-- Recent repeats apps from the grid below, so it sits on a
-                     shelf of its own, like Suggestions in the App Library: the
-                     same apps, plainly a different list. The shelf is a raised
-                     card, like the account's groups in the panel: white, with
-                     a shadow, where a grey well read as a hole in the canvas.
-                     Its heading sits above it, on the edge of All apps'
-                     heading, so the shelf holds only logos, the same distance
-                     from every edge: 16px on a phone (the 10px a column
-                     leaves, plus 6px), 32px from `@lg` (24px, plus 8px). The
-                     section bleeds out by the shelf's padding, so the logos
-                     stay in All apps' columns and the slide, which clips the
-                     section while it opens, doesn't cut the shelf's sides. The
-                     48px under it, twice the 24px from a heading to its logos,
-                     keeps All apps' heading with its own grid. -->
-                <section
-                  transition:slide={{
-                    duration: reduced ? 0 : 260,
-                    easing: quintOut,
-                  }}
-                  class="-mx-1.5 flex flex-col gap-2 pb-12 @lg:-mx-2"
-                >
-                  <h2
-                    class={[
-                      "text-text-tertiary ms-1.5 text-sm font-medium @lg:ms-2",
-                      INSET,
-                    ]}
-                  >
-                    Recent
-                  </h2>
-                  <!-- A tile's badge cuts itself out of the card it sits on. -->
-                  <Elevated
-                    offset={1}
-                    class="w-fit rounded-[1.75rem] px-1.5 pb-1 [--ii-tile-backdrop:var(--ii-surface-4)] @lg:px-2 @lg:pt-4 @lg:pb-5"
-                  >
-                    <ul class={RECENT_GRID}>
-                      {#each recentApps as app, index (app.origin)}
-                        <!-- An app just opened slides to the front; one new to
-                             the row grows in where it lands. -->
-                        <li
-                          animate:flip={{
-                            duration: reduced ? 0 : 400,
-                            easing: quintOut,
-                          }}
-                          in:scale={{
-                            duration: reduced ? 0 : 300,
-                            start: 0.8,
-                            easing: quintOut,
-                          }}
-                        >
-                          {@render appTile(app, index)}
-                        </li>
-                      {/each}
-                    </ul>
-                  </Elevated>
-                </section>
-              {/if}
+              </div>
+            {/if}
+            <!-- Phone: an incident put away unanswered heads the apps. -->
+            {#if !isDesktop.current && incident !== undefined && !managing}
+              <div
+                transition:slide={{
+                  duration: reduced ? 0 : 260,
+                  easing: quintOut,
+                }}
+                class="-mx-1.5 w-0 min-w-[calc(100%+0.75rem)] pb-8 @lg:-mx-2 @lg:min-w-[calc(100%+1rem)]"
+              >
+                <IncidentBanner
+                  {incident}
+                  class="w-full"
+                  onOpen={() => (incidentDismissed = false)}
+                />
+              </div>
+            {/if}
+            {#if current.apps.length > 0}
               <section class="flex flex-col gap-2">
-                <!-- Manage stands at the heading's other end, like Edit over
-                     a list on iOS: a plain word, ending where the last
-                     column's logo ends, and Done while apps are managed. -->
+                <!-- Edit stands at the heading's other end, as over a list on
+                     iOS, and Done while apps are arranged. -->
                 <div
                   class={[
                     "flex items-baseline justify-between gap-4 pe-2.5 @lg:pe-6",
@@ -1306,53 +1428,48 @@
                   ]}
                 >
                   <h2 class="text-text-tertiary text-sm font-medium">
-                    All apps
+                    My apps
                   </h2>
                   <button
                     type="button"
                     onclick={managing ? stopManaging : startManaging}
                     class="text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -mx-1.5 rounded-md px-1.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2"
                   >
-                    {managing ? "Done" : "Manage"}
+                    {managing ? "Done" : "Edit"}
                   </button>
                 </div>
                 <ReorderGrid
-                  items={current.apps}
-                  key={(app) => app.origin}
+                  items={gridItems}
+                  key={(item) => item.origin}
                   editing={managing}
                   onMove={moveApp}
                   class={GRID}
                 >
-                  {#snippet tile(app, index)}
-                    {@render appTile(
-                      app,
-                      index + (showRecent && !managing ? 4 : 0),
-                      !countedInRecent.has(app.origin),
-                    )}
+                  {#snippet tile(item, index)}
+                    {#if "name" in item}
+                      {@render appTile(item, index)}
+                    {:else}
+                      {@render addTile()}
+                    {/if}
                   {/snippet}
                 </ReorderGrid>
               </section>
-            </div>
-          {:else}
-            <div
-              class="border-border-tertiary mx-auto flex max-w-md flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-6 py-10 text-center md:my-auto"
-            >
-              <LayoutGridIcon
-                class="text-fg-quaternary size-7"
-                aria-hidden="true"
-              />
-              <p class="text-text-tertiary text-sm text-pretty">
-                Apps you sign in to with this identity show up here.
-              </p>
-              <button
-                type="button"
-                onclick={() => goToPage(1)}
-                class="btn btn-secondary btn-sm mt-2 rounded-full"
-              >
-                Explore apps
-              </button>
-            </div>
-          {/if}
+              {#if !managing}
+                <RecentlyUsed
+                  entries={recentEntries}
+                  onAdd={addFromHistory}
+                  onOpen={(origin) => {
+                    const app = current.apps.find(
+                      (one) => one.origin === origin,
+                    );
+                    if (app !== undefined) markUsed(app);
+                  }}
+                />
+              {/if}
+            {:else}
+              {@render firstApps()}
+            {/if}
+          </div>
         </div>
 
         <div
@@ -1506,13 +1623,68 @@
       onDetails={() => (panelOpen = true)}
       onSetNotifications={(allowed) =>
         setNotificationsAndSay(selectedApps, allowed)}
-      onRemove={() => remove(selectedApps)}
+      onRemove={() => askRemove(selectedApps)}
       onDone={stopManaging}
     />
   {/if}
 
   {#if layout === "top" && !panelVisible && !managing && dockItems.length > 0}
     <ActionDock items={dockItems} onAction={actFromDock} />
+  {/if}
+
+  {#if removing !== undefined}
+    {@const apps = removing}
+    {@const what = apps.length === 1 ? apps[0].name : `${apps.length} apps`}
+    <Dialog onClose={() => (removing = undefined)}>
+      <div class="flex flex-col gap-5">
+        <h2 class="text-text-primary text-lg font-semibold">
+          Remove {what}?
+        </h2>
+        <ul class="text-text-secondary flex flex-col gap-3 text-sm">
+          <li class="flex items-center gap-3">
+            <LogOutIcon
+              class="text-fg-tertiary size-4 shrink-0 rtl:-scale-x-100"
+              aria-hidden="true"
+            />
+            Signs you out of {apps.length === 1 ? apps[0].name : "them"}
+          </li>
+          <li class="flex items-center gap-3">
+            <BellOffIcon
+              class="text-fg-tertiary size-4 shrink-0"
+              aria-hidden="true"
+            />
+            Turns off {apps.length === 1 ? "its" : "their"} notifications
+          </li>
+          <li class="flex items-center gap-3">
+            <CompassIcon
+              class="text-fg-tertiary size-4 shrink-0"
+              aria-hidden="true"
+            />
+            {apps.length === 1 ? "It stays" : "They stay"} in Explore if you want
+            {apps.length === 1 ? " it" : " them"} back
+          </li>
+        </ul>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            onclick={() => (removing = undefined)}
+            class="btn btn-secondary flex-1"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onclick={() => {
+              removing = undefined;
+              remove(apps);
+            }}
+            class="btn btn-primary btn-danger flex-1"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    </Dialog>
   {/if}
 
   {#if verifying !== undefined}

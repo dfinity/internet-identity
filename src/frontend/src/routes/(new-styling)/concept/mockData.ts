@@ -53,6 +53,8 @@ export interface ConceptApp {
   /** Not in Internet Identity today: notifications the identity has not read. Their
    *  text lives in the app's canister, and the inbox is per browser. */
   unread: MockNotification[];
+  /** From the curated list, where it has one. */
+  oneLiner?: string;
 }
 
 export interface FeaturedApp {
@@ -73,6 +75,7 @@ const app = (
     name: known.name,
     logo: known.logoSrc,
     url: known.website,
+    oneLiner: known.oneLiner,
     ...rest,
   };
 };
@@ -333,11 +336,20 @@ export const exploreFeed: (
   },
 ];
 
+/** Not in Internet Identity today: an app signed in to that isn't in My apps,
+ *  with when it was last used. */
+export interface RecentOnly {
+  app: FeaturedApp;
+  usedMillis: number;
+}
+
 export interface MockIdentity {
   identity: LastUsedIdentity;
   /** The access method this browser signed in with. */
   signedInWith: { title: string; meta: string; kind: "passkey" | "sso" };
   apps: ConceptApp[];
+  /** Used lately but never added to My apps. */
+  recentOnly: RecentOnly[];
   scenario: Scenario;
 }
 
@@ -355,6 +367,11 @@ export const identities: MockIdentity[] = [
       kind: "passkey",
     },
     apps: thomasApps,
+    recentOnly: [
+      { app: featured("Yuku"), usedMillis: now - 2 * HOUR },
+      { app: featured("Kinic"), usedMillis: now - DAY },
+      { app: featured("DecideAI"), usedMillis: now - 6 * DAY },
+    ],
     scenario: {
       recovery: "unverified",
       access: "calm",
@@ -375,6 +392,7 @@ export const identities: MockIdentity[] = [
       kind: "sso",
     },
     apps: workApps,
+    recentOnly: [],
     scenario: {
       recovery: "calm",
       access: "calm",
@@ -395,6 +413,7 @@ export const identities: MockIdentity[] = [
       kind: "passkey",
     },
     apps: [],
+    recentOnly: [],
     scenario: {
       recovery: "none",
       access: "one",
