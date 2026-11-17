@@ -1,6 +1,30 @@
 <script lang="ts" module>
+  import type { RecoveryState } from "../status";
+
   export type RecoveryMethod = "phrase" | "email";
-  export type RecoveryFlowMode = "start" | "resume" | "manage";
+  /** Where each way back in stands, as its row says it. */
+  type MethodStatus = "off" | "unchecked" | "pending" | "on" | "inUse" | "new";
+
+  const phraseStatus = (state: RecoveryState): MethodStatus =>
+    state === "none" || state === "emailOnly"
+      ? "off"
+      : state === "unverified"
+        ? "unchecked"
+        : state === "usedPhrase"
+          ? "inUse"
+          : state === "phraseReset"
+            ? "new"
+            : "on";
+
+  const emailStatus = (state: RecoveryState): MethodStatus =>
+    state === "emailPending"
+      ? "pending"
+      : state === "none" || state === "unverified" || state === "noEmail"
+        ? "off"
+        : "on";
+
+  const isOn = (status: MethodStatus) =>
+    status === "on" || status === "inUse" || status === "new";
 
   /** Each step takes focus as it arrives, so a screen reader reads where the
    *  user is and a keyboard carries on from the top of the step. The first
@@ -15,6 +39,7 @@
     BookOpenIcon,
     BriefcaseMedicalIcon,
     CheckIcon,
+    ArrowLeftIcon,
     ChevronRightIcon,
     EyeIcon,
     ListChecksIcon,
@@ -27,30 +52,36 @@
   import { prefersReducedMotion } from "svelte/motion";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Input from "$lib/components/ui/Input.svelte";
+  import Badge from "$lib/components/ui/Badge.svelte";
   import { swapIn, viewIn, viewOut } from "../motion";
+  import type { Scenario } from "../status";
+  import Elevated from "./Elevated.svelte";
 
   interface Props {
-    /** `start` opens on the choice, `resume` on the phrase check a user left
-     *  unfinished, `manage` on what to do with recovery that's already on. */
-    mode: RecoveryFlowMode;
+    /** Where recovery stands now; each way back in reads its own status. */
+    recovery: RecoveryState;
     identityName: string;
-    /** Done pressed on the success step: recovery is on with this method. */
-    onDone: (method: RecoveryMethod) => void;
+    /** Opens straight on a way back in, as the panel's button for it does. */
+    focus?: RecoveryMethod;
+    /** A way turned on or off: the scenario moves on, the dialog stays. */
+    onChange: (patch: Partial<Scenario>, message: string) => void;
     onClose: () => void;
-    /** "Turn off recovery" while managing; closes the flow when not given. */
-    onTurnOff?: () => void;
   }
 
-  const { mode, identityName, onDone, onClose, onTurnOff }: Props = $props();
+  const { recovery, identityName, focus, onChange, onClose }: Props = $props();
 
-  type Step = "choose" | "save" | "check" | "done" | "manage";
+  /** `hub` lists both ways back in; the rest belong to the one picked. */
+  type Step = "hub" | "save" | "check" | "done" | "manage";
 
-  /** The three steps the progress bar counts; done and manage sit outside. */
-  const ORDER: Step[] = ["choose", "save", "check"];
-  const LABELS: Record<RecoveryMethod | "none", string[]> = {
-    phrase: ["Choose", "Write down", "Check"],
-    email: ["Choose", "Add email", "Confirm"],
-    none: ["Choose", "Set up", "Check"],
+  /** The two steps the progress bar counts; hub, done and manage sit outside. */
+  const ORDER: Step[] = ["save", "check"];
+  const LABELS: Record<RecoveryMethod, string[]> = {
+    phrase: ["Write down", "Check"],
+    email: ["Add email", "Confirm"],
+  };
+  const NAMES: Record<RecoveryMethod, string> = {
+    email: "Recovery email",
+    phrase: "Recovery phrase",
   };
   const WORDS = [
     "harbor",
@@ -75,19 +106,10 @@
   const titleId = `${uid}-title`;
   const codeId = `${uid}-code`;
 
-  // The entry point is fixed for the flow's life, like the button that
-  // opened it; the parent mounts a new flow for another one.
-  // svelte-ignore state_referenced_locally
-  let step = $state<Step>(
-    mode === "manage" ? "manage" : mode === "resume" ? "check" : "choose",
-  );
-  // svelte-ignore state_referenced_locally
-  let method = $state<RecoveryMethod | undefined>(
-    mode === "start" ? undefined : "phrase",
-  );
+  let step = $state<Step>("hub");
+  let method = $state<RecoveryMethod>();
   /** Came back to check a phrase written down earlier but never checked. */
-  // svelte-ignore state_referenced_locally
-  let resuming = $state(mode === "resume");
+  let resuming = $state(false);
   /** Checking a phrase that's already on, from manage: nothing is set up. */
   let rechecking = $state(false);
   /** The steps behind this one, so Back returns to where the user came from. */
@@ -107,10 +129,24 @@
 
   const reduced = $derived(prefersReducedMotion.current);
   const stepIndex = $derived(ORDER.indexOf(step));
-  const labels = $derived(LABELS[method ?? "none"]);
-  const title = $derived(mode === "manage" ? "Recovery" : "Turn on recovery");
+  const labels = $derived(method === undefined ? [] : LABELS[method]);
+  /** An email added while the phrase waits to be checked: the scenario has
+   *  no state for both at once, so the dialog keeps it. */
+  let emailAdded = $state(false);
+  const statuses = $derived({
+    email: emailAdded ? ("on" as const) : emailStatus(recovery),
+    phrase: phraseStatus(recovery),
+  });
+  const onCount = $derived(
+    [statuses.email, statuses.phrase].filter(isOn).length,
+  );
+  const title = $derived(
+    step === "hub" || method === undefined ? "Recovery" : NAMES[method],
+  );
   // Only where closing loses nothing does a click outside or Escape close it.
-  const dismissable = $derived(step === "choose" || step === "manage");
+  const dismissable = $derived(
+    step === "hub" || step === "manage" || step === "done",
+  );
 
   /** The address as the code step shows it back: "th•••@gmail.com". */
   const maskedEmail = $derived.by(() => {
@@ -134,26 +170,103 @@
     if (previous === undefined) return;
     direction = -1;
     history = history.slice(0, -1);
-    if (previous === "manage") {
+    if (previous === "manage" || previous === "hub") {
       rechecking = false;
-      method = "phrase";
+    }
+    if (previous === "hub") {
+      resuming = false;
     }
     step = previous;
   };
 
+  /** Back to both ways, from wherever the user is. */
+  const home = () => {
+    direction = -1;
+    history = [];
+    resuming = false;
+    rechecking = false;
+    shown = false;
+    step = "hub";
+  };
+
+  /** A row in the hub: set the way up, finish it, or manage it. */
+  const open = (picked: RecoveryMethod) => {
+    method = picked;
+    const status = statuses[picked];
+    if (status === "off") {
+      go("save");
+    } else if (status === "unchecked") {
+      resuming = true;
+      go("check");
+    } else if (status === "pending") {
+      go("check");
+    } else {
+      go("manage");
+    }
+  };
+
+  // Opened from the panel's button for one way: straight to it.
+  // svelte-ignore state_referenced_locally
+  if (focus !== undefined) open(focus);
+
+  const emailOn = () => isOn(statuses.email);
+  const phraseOn = () => isOn(statuses.phrase);
+
+  /** Recovery is on with this way now: the scenario moves on at once, so the
+   *  row in the hub already says so when the user goes back to it. */
+  const finish = () => {
+    if (method === "phrase" && !rechecking) {
+      const withEmail = emailOn();
+      emailAdded = false;
+      onChange(
+        { recovery: withEmail ? "calm" : "noEmail" },
+        "Recovery phrase is on",
+      );
+    } else if (method === "email" && statuses.phrase === "unchecked") {
+      emailAdded = true;
+    } else if (method === "email") {
+      onChange(
+        { recovery: phraseOn() ? "calm" : "emailOnly" },
+        "Recovery email is on",
+      );
+    }
+    go("done");
+  };
+
+  const turnOff = (which: RecoveryMethod) => {
+    if (which === "email") emailAdded = false;
+    if (which === "phrase") {
+      onChange(
+        { recovery: emailOn() ? "emailOnly" : "none" },
+        "Recovery phrase turned off",
+      );
+    } else {
+      onChange(
+        {
+          recovery:
+            statuses.phrase === "unchecked"
+              ? "unverified"
+              : phraseOn()
+                ? "noEmail"
+                : "none",
+        },
+        "Recovery email turned off",
+      );
+    }
+    home();
+  };
+
   const next = () => {
-    if (step === "choose" && method !== undefined) go("save");
-    else if (step === "save") go("check");
-    else if (step === "check") go("done");
+    if (step === "save") go("check");
+    else if (step === "check") finish();
   };
 
   const startOver = () => {
     direction = -1;
-    history = [];
+    history = ["hub"];
     resuming = false;
-    method = undefined;
     shown = false;
-    step = "choose";
+    step = "save";
   };
 
   const reveal = async () => {
@@ -163,34 +276,44 @@
     wordList?.focus();
   };
 
-  // On the success step recovery is already on, so closing it counts as Done.
-  const close = () => {
-    if (step === "done" && method !== undefined) {
-      onDone(method);
-    } else {
-      onClose();
-    }
-  };
-
   const PRESS =
     "transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100";
   const PRIMARY = ["btn btn-primary rounded-full font-medium", PRESS];
   const TERTIARY = "btn btn-tertiary rounded-full font-medium";
 
-  const OPTIONS = [
+  const ROWS = [
     {
       value: "email" as const,
       icon: MailIcon,
-      title: "Email",
-      meta: "Good if you'd rather not keep anything on paper. We send a sign-in link to your inbox.",
+      title: "Recovery email",
+      off: "A code to your inbox gets you back in",
     },
     {
       value: "phrase" as const,
       icon: BookOpenIcon,
       title: "Recovery phrase",
-      meta: "Good if you want it to work without email. 12 words you write down and keep offline.",
+      off: "12 words you write down and keep offline",
     },
   ];
+
+  /** What a row says under its name, and how loudly. */
+  const said = (
+    which: RecoveryMethod,
+  ): { meta: string; badge?: string; warn?: boolean } => {
+    const status = statuses[which];
+    const row = ROWS.find(({ value }) => value === which);
+    if (status === "off") return { meta: row?.off ?? "" };
+    if (status === "unchecked")
+      return { meta: "Written down, not checked yet", warn: true };
+    if (status === "pending")
+      return { meta: "Waiting for the code from your inbox", warn: true };
+    if (status === "inUse")
+      return { meta: "You're signed in with it now", badge: "In use" };
+    if (status === "new") return { meta: "Reset 2 hours ago", badge: "On" };
+    return which === "email"
+      ? { meta: "t•••@gmail.com", badge: "On" }
+      : { meta: `Checked on ${WROTE_ON}`, badge: "On" };
+  };
 </script>
 
 <!-- Where the user is, what they can do now, and why: on every step, so the
@@ -270,17 +393,27 @@
 {/snippet}
 
 <Dialog
-  onClose={close}
+  {onClose}
   showCloseButton={false}
   closeOnOutsideClick={dismissable}
   aria-labelledby={titleId}
 >
-  <header class="mb-4 flex items-center gap-3">
-    <!-- On the success step the result leads, so the title steps aside. -->
+  <header class="mb-4 flex items-center gap-2">
+    <!-- Inside one way, the way back to both stays at hand. -->
+    {#if step !== "hub"}
+      <button
+        type="button"
+        onclick={home}
+        class="btn btn-tertiary btn-icon btn-sm -ms-2 shrink-0 rounded-full"
+      >
+        <ArrowLeftIcon class="size-5 rtl:-scale-x-100" aria-hidden="true" />
+        <span>All of recovery</span>
+      </button>
+    {/if}
     <h2
       id={titleId}
       class={[
-        "text-text-primary min-w-0 flex-1 text-base font-semibold",
+        "text-text-primary min-w-0 flex-1 truncate text-base font-semibold",
         step === "done" && "sr-only",
       ]}
     >
@@ -288,7 +421,7 @@
     </h2>
     <button
       type="button"
-      onclick={close}
+      onclick={onClose}
       class="btn btn-tertiary btn-icon btn-sm ms-auto -me-2 shrink-0 rounded-full"
     >
       <XIcon class="size-5" aria-hidden="true" />
@@ -297,7 +430,7 @@
   </header>
 
   {#if stepIndex >= 0 && !rechecking}
-    <ol aria-label="Steps" class="mb-4 grid grid-cols-3 gap-1.5">
+    <ol aria-label="Steps" class="mb-4 grid grid-cols-2 gap-1.5">
       {#each labels as label, index (index)}
         <li
           aria-current={index === stepIndex ? "step" : undefined}
@@ -338,63 +471,113 @@
         in:viewIn={{ direction: direction * readingDirection(), reduced }}
         out:viewOut={{ reduced }}
       >
-        {#if step === "choose"}
-          {@render context(
-            BriefcaseMedicalIcon,
-            `Right now only your passkeys open ${identityName}`,
-            "If you lose them, recovery is your way back in. Pick one way. It takes about two minutes, and you can change it later.",
-          )}
-          <fieldset class="flex min-w-0 flex-col gap-2">
-            <legend class="sr-only">How to get back in</legend>
-            {#each OPTIONS as option (option.value)}
-              {@const Icon = option.icon}
-              <label
-                class={[
-                  "ii-hover flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition-[border-color,box-shadow] duration-150 ease-out motion-reduce:transition-none",
-                  "has-[:focus-visible]:outline-focus-ring has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2",
-                  method === option.value
-                    ? "border-fg-primary ring-fg-primary ring-1"
-                    : "border-border-secondary",
-                ]}
-              >
-                <input
-                  type="radio"
-                  name={`${uid}-method`}
-                  value={option.value}
-                  bind:group={method}
-                  class="sr-only"
-                />
-                <span
-                  aria-hidden="true"
-                  class="text-fg-secondary grid size-9 shrink-0 place-items-center rounded-[0.625rem] bg-(--ii-selected)"
+        {#if step === "hub"}
+          <!-- Both ways back in, always in view, each with where it stands:
+               rows like the panel's, so recovery reads as one thing with
+               two parts, not two separate settings. -->
+          {#if onCount === 2}
+            {@render context(
+              ShieldCheckIcon,
+              "You're covered two ways",
+              `If you lose your passkeys, either one gets you back in to ${identityName}.`,
+            )}
+          {:else if onCount === 1}
+            {@render context(
+              ShieldCheckIcon,
+              "One way back in",
+              "Add the other one too, so losing one never locks you out.",
+            )}
+          {:else if statuses.phrase === "unchecked"}
+            {@render context(
+              ListChecksIcon,
+              "One step from done",
+              `You wrote down a phrase on ${WROTE_ON} but didn't check it. Check three words and recovery is on.`,
+            )}
+          {:else}
+            {@render context(
+              BriefcaseMedicalIcon,
+              `Right now only your passkeys open ${identityName}`,
+              "If you lose them, recovery is your way back in. Set up one way or both. Each takes about two minutes.",
+            )}
+          {/if}
+          <Elevated
+            offset={1}
+            as="ul"
+            class="ii-rows flex flex-col overflow-hidden rounded-2xl [--ii-rows-inset:4rem]"
+          >
+            {#each ROWS as row (row.value)}
+              {@const Icon = row.icon}
+              {@const status = statuses[row.value]}
+              {@const line = said(row.value)}
+              <li class="flex">
+                <button
+                  type="button"
+                  onclick={() => open(row.value)}
+                  class="ii-hover focus-visible:ring-focus-ring flex w-full items-center gap-3 px-4 py-3.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset"
                 >
-                  <Icon class="size-4.5" />
-                </span>
-                <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span class="text-text-primary text-sm font-medium">
-                    {option.title}
-                  </span>
                   <span
-                    class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
+                    aria-hidden="true"
+                    class={[
+                      "grid size-9 shrink-0 place-items-center rounded-[0.625rem]",
+                      status === "off"
+                        ? "border-border-secondary text-fg-quaternary border border-dashed"
+                        : "text-fg-secondary bg-(--ii-selected)",
+                    ]}
                   >
-                    {option.meta}
+                    <Icon class="size-4.5" />
                   </span>
-                </span>
-              </label>
+                  <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span class="text-text-primary text-sm font-medium">
+                        {row.title}
+                      </span>
+                      {#if line.badge !== undefined}
+                        <Badge size="sm" color="success" dot>{line.badge}</Badge
+                        >
+                      {/if}
+                    </span>
+                    <span
+                      class={[
+                        "text-[13px] leading-[18px] text-pretty",
+                        line.warn === true
+                          ? "text-warning-700 dark:text-text-warning-primary"
+                          : "text-text-tertiary",
+                      ]}
+                    >
+                      {line.meta}
+                    </span>
+                  </span>
+                  {#if status === "off" || status === "unchecked" || status === "pending"}
+                    <span
+                      aria-hidden="true"
+                      class={[
+                        "btn btn-sm shrink-0 rounded-full font-medium",
+                        status === "off" && onCount === 0
+                          ? "btn-primary"
+                          : "btn-secondary",
+                      ]}
+                    >
+                      {status === "off"
+                        ? "Set up"
+                        : status === "unchecked"
+                          ? "Check"
+                          : "Enter code"}
+                    </span>
+                  {:else}
+                    <ChevronRightIcon
+                      aria-hidden="true"
+                      class="text-fg-quaternary size-4 shrink-0 rtl:-scale-x-100"
+                    />
+                  {/if}
+                </button>
+              </li>
             {/each}
-          </fieldset>
-          <div class="flex items-center justify-between gap-2">
-            <button type="button" onclick={onClose} class={TERTIARY}>
-              Not now
-            </button>
-            <button
-              type="submit"
-              disabled={method === undefined}
-              class={PRIMARY}
-            >
-              Continue
-            </button>
-          </div>
+          </Elevated>
+          <p
+            class="text-text-tertiary px-1 text-[13px] leading-[18px] text-pretty"
+          >
+            To get back in, go to id.ai and choose “Lost access”.
+          </p>
         {:else if step === "save" && method === "phrase"}
           {@render context(
             BookOpenIcon,
@@ -450,7 +633,7 @@
           {@render context(
             MailIcon,
             "Which inbox should we use?",
-            "When you need to get back in, we send a link here. Pick an address you'll keep for years.",
+            "When you need to get back in, we send a code here. Pick an address you'll keep for years.",
           )}
           <Input
             label="Email"
@@ -571,38 +754,39 @@
               </span>
             </span>
             <h3 class="text-text-primary text-lg font-semibold">
-              {rechecking ? "Your phrase still works" : "Recovery is on"}
+              {rechecking
+                ? "Your phrase still works"
+                : method === "email"
+                  ? "Recovery email is on"
+                  : "Recovery phrase is on"}
             </h3>
             <p class="text-text-tertiary max-w-[32ch] text-sm text-pretty">
-              {#if rechecking}
-                Keep that paper offline. If you ever lose your passkeys, go to
-                id.ai, choose “Lost access” and type your 12 words.
-              {:else if method === "phrase"}
+              {#if method === "email" && !rechecking}
                 If you ever lose your passkeys, go to id.ai, choose “Lost
-                access” and type your 12 words.
+                access” and we'll email you a code.
               {:else}
                 If you ever lose your passkeys, go to id.ai, choose “Lost
-                access” and we'll email you a link.
+                access” and type your 12 words.
               {/if}
             </p>
           </div>
           <div class="mt-2 flex justify-center">
             <button
               type="button"
-              onclick={() => method !== undefined && onDone(method)}
+              onclick={home}
               class={[...PRIMARY, "min-w-32"]}
             >
               Done
             </button>
           </div>
-        {:else if step === "manage"}
+        {:else if step === "manage" && method === "phrase"}
           {@render context(
             ShieldCheckIcon,
-            "You're covered",
-            `${identityName} can be recovered with your recovery phrase. You last checked it on ${WROTE_ON}.`,
+            "Your phrase is on",
+            `Your 12 words get you back in to ${identityName}. You last checked them on ${WROTE_ON}.`,
           )}
           <ul
-            class="ii-rows border-border-secondary flex flex-col overflow-hidden rounded-2xl border [--ii-rows-inset:4rem]"
+            class="ii-rows border-border-tertiary flex flex-col overflow-hidden rounded-2xl border [--ii-rows-inset:4rem]"
           >
             {@render manageRow(
               ListChecksIcon,
@@ -611,37 +795,41 @@
               false,
               () => {
                 rechecking = true;
-                method = "phrase";
                 go("check");
               },
             )}
             {@render manageRow(
+              PowerOffIcon,
+              "Turn off the phrase",
+              undefined,
+              true,
+              () => turnOff("phrase"),
+            )}
+          </ul>
+        {:else if step === "manage"}
+          {@render context(
+            ShieldCheckIcon,
+            "Your recovery email is on",
+            "If you lose your passkeys, we send a code to t•••@gmail.com.",
+          )}
+          <ul
+            class="ii-rows border-border-tertiary flex flex-col overflow-hidden rounded-2xl border [--ii-rows-inset:4rem]"
+          >
+            {@render manageRow(
               MailIcon,
-              "Switch to email",
-              "Use a sign-in link instead of words",
+              "Change the email",
+              "Use another inbox",
               false,
-              () => {
-                method = "email";
-                go("save");
-              },
+              () => go("save"),
             )}
             {@render manageRow(
               PowerOffIcon,
-              "Turn off recovery",
+              "Turn off the email",
               undefined,
               true,
-              onTurnOff ?? onClose,
+              () => turnOff("email"),
             )}
           </ul>
-          <div class="flex justify-end">
-            <button
-              type="button"
-              onclick={onClose}
-              class="btn btn-secondary rounded-full font-medium"
-            >
-              Close
-            </button>
-          </div>
         {/if}
       </form>
     {/key}

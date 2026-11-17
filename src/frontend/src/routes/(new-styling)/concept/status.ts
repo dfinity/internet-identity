@@ -15,6 +15,7 @@ export type RecoveryState =
   | "emailPending"
   | "phraseReset"
   | "noEmail"
+  | "emailOnly"
   | "calm";
 export type AccessState = "one" | "newPasskey" | "unused" | "calm";
 /** `known`: the new browser stays, once the user said it was theirs. */
@@ -159,6 +160,7 @@ const RECOVERY: Record<RecoveryState, Said> = {
     ask: "Review the phrase reset",
   },
   noEmail: { tone: "tip", sentence: "Phrase set up, no email yet" },
+  emailOnly: { tone: "tip", sentence: "Email set up, no phrase yet" },
   calm: { tone: "calm", sentence: "Phrase and email set up" },
 };
 

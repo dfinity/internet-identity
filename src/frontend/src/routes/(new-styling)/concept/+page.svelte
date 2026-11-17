@@ -56,7 +56,7 @@
     type RecentEntry,
   } from "./components/RecentlyUsed.svelte";
   import RecoveryFlow, {
-    type RecoveryFlowMode,
+    type RecoveryMethod,
   } from "./components/RecoveryFlow.svelte";
   import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
@@ -359,13 +359,14 @@
     document.documentElement.dir === "rtl" ? -1 : 1;
   const reduced = $derived(prefersReducedMotion.current);
 
-  /** Recovery is one thing, on or off: setting it up, finishing it and
-   *  managing it all happen in one dialog that explains each step. */
-  let recoveryMode = $state<RecoveryFlowMode>();
-  const openRecovery = () => {
-    const state = current.scenario.recovery;
-    recoveryMode =
-      state === "none" ? "start" : state === "unverified" ? "resume" : "manage";
+  /** Recovery is one place: both ways back in, the email and the phrase,
+   *  each with where it stands, in one dialog. A button for one way opens
+   *  straight on it. */
+  let recoveryOpen = $state(false);
+  let recoveryFocus = $state<RecoveryMethod>();
+  const openRecovery = (focus?: RecoveryMethod) => {
+    recoveryFocus = focus;
+    recoveryOpen = true;
   };
 
   const openCard = (kind: CardKind) => {
@@ -791,7 +792,14 @@
    *  opens the card's section. */
   const runLead = (card: CardStatus) => {
     if (card.kind === "recovery") {
-      openRecovery();
+      const state = current.scenario.recovery;
+      openRecovery(
+        state === "unverified"
+          ? "phrase"
+          : state === "emailPending"
+            ? "email"
+            : undefined,
+      );
       return;
     }
     const action = leadActionOf(card, current.scenario);
@@ -1878,22 +1886,13 @@
     </Popup>
   {/if}
 
-  {#if recoveryMode !== undefined}
+  {#if recoveryOpen}
     <RecoveryFlow
-      mode={recoveryMode}
+      recovery={current.scenario.recovery}
       {identityName}
-      onDone={(method) => {
-        recoveryMode = undefined;
-        resolve(
-          { recovery: "calm" },
-          method === "email" ? "Recovery by email is on" : "Recovery is on",
-        );
-      }}
-      onTurnOff={() => {
-        recoveryMode = undefined;
-        resolve({ recovery: "none" }, "Recovery is off");
-      }}
-      onClose={() => (recoveryMode = undefined)}
+      focus={recoveryFocus}
+      onChange={resolve}
+      onClose={() => (recoveryOpen = false)}
     />
   {/if}
 
