@@ -1667,6 +1667,21 @@ fn should_refuse_a_signed_out_browser_its_inbox_until_it_signs_in_again(
         session_request(anchor, APP, &browser),
     );
     assert_eq!(read(browser.successor().principal()), Ok(Some(1)));
+    // Signing out dropped its subscription, which content delegations also need, so it
+    // subscribes again as a browser that signs in does.
+    subscribe_webpush(
+        &env,
+        canister_id,
+        browser.successor().principal(),
+        SetWebPushSubscriptionRequest {
+            anchor_number: anchor,
+            endpoint: BROWSER_ENDPOINT.to_string(),
+            p256dh: p256dh(7),
+            transport_key: p256dh(7),
+            sealed_auth: ByteBuf::from(vec![0u8; 32]),
+        },
+    )?
+    .expect("subscribe refused");
     assert_eq!(prepare(browser.successor().principal()), Ok(()));
     Ok(())
 }
