@@ -85,9 +85,12 @@ export const authorize = (
  * Safari user, which is what this is for.
  *
  * "Being handled" is the task of the click and its microtasks. Whatever comes
- * back in a task of its own (IndexedDB, WebCrypto, the network, a timer) is too
- * late. Safari gives timers, and lately fetches, some leeway; this gives none,
- * so that what passes here passes there.
+ * back in a task of its own (IndexedDB, the network, a timer) is too late.
+ * Safari gives timers, and lately fetches, some leeway; this gives none.
+ *
+ * Not covered: WebCrypto. Chromium settles most `crypto.subtle` promises
+ * within the click's microtasks, so a pop-up opened after awaiting a digest
+ * or a signature passes here, where WebKit refuses it.
  *
  * Applies to the pages the context opens after the call.
  * @param context The browser context II's windows open in.

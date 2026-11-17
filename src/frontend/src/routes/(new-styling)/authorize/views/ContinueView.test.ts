@@ -338,6 +338,26 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(signInsStarted()).toBe(1);
     });
 
+    it("continues with the default account when Continue is pressed while signed in", async () => {
+      const actor = sessionActor();
+      actor.get_default_account.mockResolvedValue({ Ok: workAccount });
+      render(identities[kind]);
+      authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+      isAuthenticatedStoreValue.set(true);
+      flushSync();
+
+      button("Continue").click();
+      await settle();
+
+      expect(signInsStarted()).toBe(0);
+      expect(actor.get_default_account).toHaveBeenCalledWith(
+        IDENTITY_NUMBER,
+        "https://app.example",
+      );
+      expect(onAuthorize).toHaveBeenCalledTimes(1);
+      await expect(onAuthorize.mock.calls[0][0]).resolves.toBe(BigInt(1));
+    });
+
     it("signs in when all options are switched on with no session at hand", () => {
       render(identities[kind]);
 
@@ -735,6 +755,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       flushSync();
       answer.resolve({ Err: { Unauthorized: "session" } });
       await settle();
+      expect(signInsStarted()).toBe(0);
       showAllOptions().click();
       flushSync();
       expect(signInsStarted()).toBe(1);
@@ -809,6 +830,43 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(showAllOptions().checked).toBe(false);
     });
 
+    it("reports it and switches all options off when the accounts fail to load as the screen comes up", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const failure = new Error("Failed to fetch");
+      actor.get_accounts.mockRejectedValue(failure);
+      actorForIdentityMock.mockResolvedValue(actor);
+      render(identities[kind]);
+      await settle();
+
+      // Nothing was pressed, so nothing opens, and the failure is reported.
+      expect(signInsStarted()).toBe(0);
+      expect(handleErrorMock).toHaveBeenCalledTimes(1);
+      expect(handleErrorMock).toHaveBeenCalledWith(failure);
+      // Not left on with no accounts and a Continue that does nothing.
+      expect(showAllOptions().checked).toBe(false);
+      expect(localStorage.getItem(TOGGLE_KEY)).toBeNull();
+      expect(button("Continue").getAttribute("aria-disabled")).toBe("false");
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+    });
+
+    it("leaves Continue inert while the accounts load as the screen comes up", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      actor.get_accounts.mockReturnValue(new Promise(() => {}));
+      actorForIdentityMock.mockResolvedValue(actor);
+      render(identities[kind]);
+      await settle();
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(0);
+      expect(button("Continue").getAttribute("aria-disabled")).toBe("true");
+    });
+
     it("continues with one press once the accounts are on the screen, however they got there", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
       const actor = sessionActor();
@@ -838,6 +896,40 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(onAuthorize).toHaveBeenCalledTimes(1);
     });
 
+    it("continues with one press when the accounts arrive before the session is found to be gone", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const answer = deferred<{ Ok: unknown[] }>();
+      actor.get_accounts.mockReturnValue(answer.promise);
+      actorForIdentityMock.mockResolvedValueOnce(actor);
+      render(identities[kind]);
+      await settle();
+      // Another identity is selected and then this one again, whose stored
+      // session is gone by then. That has not been found out yet.
+      actorForIdentityMock.mockReturnValue(new Promise(() => {}));
+      select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+      const lookup = deferred<undefined>();
+      actorForIdentityMock.mockReturnValue(lookup.promise);
+      select(identities[kind]);
+      await settle();
+
+      // The accounts asked for at first arrive, and only then the news that
+      // there is no session to ask for them with.
+      answer.resolve({ Ok: [primaryAccount, workAccount] });
+      await settle();
+      lookup.resolve(undefined);
+      await settle();
+      expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+      authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+      isAuthenticatedStoreValue.set(true);
+      flushSync();
+      button("Continue").click();
+      await settle();
+
+      expect(onAuthorize).toHaveBeenCalledTimes(1);
+      expect(actor.get_accounts).toHaveBeenCalledTimes(1);
+    });
+
     it("signs in once when the stored session is looked up after the options were switched off and on again", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
       const lookup = deferred<undefined>();
@@ -863,6 +955,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       actorForIdentityMock.mockResolvedValue(undefined);
       render(identities[kind]);
       await settle();
+      expect(signInsStarted()).toBe(0);
       showAllOptions().click();
       flushSync();
       showAllOptions().click();
@@ -892,6 +985,38 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(actor.get_accounts).not.toHaveBeenCalled();
       expect(signInsStarted()).toBe(0);
     });
+
+    it("does not make Continue sign in while the session of an identity selected after one that waited is looked up", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      localStorage.setItem(OTHER_TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValueOnce(undefined);
+      render(identities[kind]);
+      await settle();
+      expect(button("Continue").getAttribute("aria-disabled")).toBe("false");
+      // The lookup for the identity switched to has not answered yet.
+      actorForIdentityMock.mockReturnValue(new Promise(() => {}));
+      select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+      await settle();
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(0);
+    });
+
+    it("shows Continue as busy and locks the switch while the sign-in for the options is on its way", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+      const continueButton = button("Continue");
+
+      continueButton.click();
+      flushSync();
+
+      expect(signInsStarted()).toBe(1);
+      expect(continueButton.disabled).toBe(true);
+      expect(showAllOptions().disabled).toBe(true);
+    });
   });
 
   it("opens the pop-up of an OpenID identity on its provider", () => {
@@ -920,6 +1045,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     actorForIdentityMock.mockResolvedValueOnce(undefined);
     render(identities.SSO);
     await settle();
+    expect(signInsStarted()).toBe(0);
     button("Continue").click();
     expect(signInsStarted()).toBe(1);
     const actor = sessionActor();
@@ -941,6 +1067,45 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     await settle();
 
     expect(onAuthorize).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues with one press when the sign-in for the options fails after the accounts arrived", async () => {
+    localStorage.setItem(TOGGLE_KEY, "1");
+    const discovery = deferred<never>();
+    discoverSsoConfigMock.mockReturnValue(discovery.promise);
+    const actor = sessionActor();
+    const answer = deferred<{ Ok: unknown[] }>();
+    actor.get_accounts.mockReturnValue(answer.promise);
+    actorForIdentityMock.mockResolvedValueOnce(actor);
+    render(identities.SSO);
+    await settle();
+    // Another identity is selected and then this one again, by which time
+    // its stored session is gone: the options wait for a sign-in.
+    actorForIdentityMock.mockReturnValue(new Promise(() => {}));
+    select({ ...identities.SSO, identityNumber: OTHER_IDENTITY_NUMBER });
+    actorForIdentityMock.mockResolvedValue(undefined);
+    select(identities.SSO);
+    await settle();
+    button("Continue").click();
+    expect(signInsStarted()).toBe(1);
+    await settle();
+
+    // The accounts asked for at first arrive behind the pop-up, and then the
+    // sign-in fails.
+    answer.resolve({ Ok: [primaryAccount, workAccount] });
+    await settle();
+    discovery.reject(new Error("SSO discovery failed"));
+    await settle();
+    expect(handleErrorMock).toHaveBeenCalledTimes(1);
+    expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+    authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+    isAuthenticatedStoreValue.set(true);
+    flushSync();
+    button("Continue").click();
+    await settle();
+
+    expect(onAuthorize).toHaveBeenCalledTimes(1);
+    expect(actor.get_accounts).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the options of the identity switched to on when the sign-in the switch started for another fails", async () => {
@@ -1000,5 +1165,50 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     expect(actor.get_accounts).toHaveBeenCalledTimes(1);
     expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
     expect(signInsStarted()).toBe(0);
+
+    // With the accounts on the screen, one press of Continue continues.
+    authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+    isAuthenticatedStoreValue.set(true);
+    flushSync();
+    button("Continue").click();
+    await settle();
+
+    expect(onAuthorize).toHaveBeenCalledTimes(1);
+    expect(actor.get_accounts).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the options as the screen comes up signed in, and continues with one press", async () => {
+    localStorage.setItem(TOGGLE_KEY, "1");
+    const actor = sessionActor();
+    authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+    isAuthenticatedStoreValue.set(true);
+    // What the lookup answers with while signed in as this identity.
+    actorForIdentityMock.mockResolvedValue(actor);
+    render(identities.OpenID);
+    await settle();
+
+    expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+    button("Continue").click();
+    await settle();
+
+    expect(signInsStarted()).toBe(0);
+    expect(onAuthorize).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not keep the actor of a sign-in as a stored session once that sign-in is gone", async () => {
+    const actor = sessionActor();
+    authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+    isAuthenticatedStoreValue.set(true);
+    actorForIdentityMock.mockResolvedValue(actor);
+    render(identities.OpenID);
+    await settle();
+    authenticationStoreValue.set(undefined);
+    isAuthenticatedStoreValue.set(false);
+    flushSync();
+
+    showAllOptions().click();
+
+    expect(signInsStarted()).toBe(1);
+    expect(actor.get_accounts).not.toHaveBeenCalled();
   });
 });

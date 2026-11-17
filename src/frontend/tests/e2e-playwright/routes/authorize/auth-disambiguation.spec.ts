@@ -239,7 +239,8 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
     await page.context().clearCookies();
     // From here on II's windows open a popup the way Safari does, only inside
     // the press that asks for it: Continue below has to open the OIDC popup
-    // before it awaits anything, or no popup ever arrives.
+    // before it awaits a stored session or the canister, or no popup ever
+    // arrives.
     await blockPopUpsOutsideOfPresses(page.context(), II_URL);
 
     // Sign in via /authorize — known (iss, sub) goes straight to ContinueView.

@@ -961,7 +961,8 @@ test.describe("Continue as a last-used SSO identity", () => {
     await expect(page.locator("#principal")).toBeHidden();
     // From here on II's windows open a popup the way Safari does, only inside
     // the press that asks for it: Continue below has to open the SSO popup
-    // before it awaits anything, or no popup ever arrives.
+    // before it awaits a stored session or the canister, or no popup ever
+    // arrives.
     await blockPopUpsOutsideOfPresses(page.context(), II_URL);
     const secondAuthPromise = page.context().waitForEvent("page");
     await page.getByRole("button", { name: "Sign In" }).click();

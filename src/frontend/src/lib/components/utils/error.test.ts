@@ -31,6 +31,7 @@ describe("handleError", () => {
     expect(toasterMock.warning).toHaveBeenCalledTimes(1);
     expect(toasterMock.warning.mock.calls[0][0]).toMatchObject({
       title: "Pop-up blocked",
+      description: expect.stringContaining("blocked the sign-in window"),
     });
     expect(toasterMock.info).not.toHaveBeenCalled();
     expect(toasterMock.error).not.toHaveBeenCalled();

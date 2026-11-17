@@ -178,8 +178,9 @@
   // ever starts inside a press, so they wait for the next press of Continue.
   let isSignInNeededForOptions = $state(false);
   // Counted up when another identity is selected and when the options are
-  // switched off. What was started for the options before that has no say on
-  // the screen any more, whenever its answer arrives.
+  // switched off. What was started for the options before that neither
+  // switches them off nor has them wait for a sign-in when it ends. A failure
+  // of what a press started is still reported.
   let optionsEpoch = 0;
   // Clear old accounts data when user toggles switch off
   $effect(() => {
@@ -244,8 +245,16 @@
         account.account_number[0] === isEditAccountDialogVisibleForNumber,
     ),
   );
-  // Continue looks unchanged while the account list loads, but does nothing
-  // until it has.
+  // The options are on with no accounts to show yet. Either they wait for a
+  // sign-in, which the next press of Continue starts, or the account list
+  // loads: Continue looks unchanged then, but does nothing until it has.
+  // Neither holds with the accounts on the screen, whichever of them and of
+  // the need for a sign-in the screen learned of last: a press continues.
+  const isWaitingForSignIn = $derived(
+    isMultipleAccountsEnabled &&
+      accounts === undefined &&
+      isSignInNeededForOptions,
+  );
   const isLoadingAccounts = $derived(
     isMultipleAccountsEnabled &&
       accounts === undefined &&
@@ -420,8 +429,6 @@
       return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
     });
     defaultAccountNumber = values[1].account_number[0];
-    // With the accounts on the screen, the options wait for nothing.
-    isSignInNeededForOptions = false;
   };
 
   // What `actorForIdentity` resolves to, read rather than awaited, so that
@@ -533,8 +540,8 @@
     }
   };
   // Continue, pressed while the options wait for a sign-in (see
-  // `isSignInNeededForOptions`): signs in and shows them, for the next press
-  // to continue with what is chosen there.
+  // `isWaitingForSignIn`): signs in and shows them, for the next press to
+  // continue with what is chosen there.
   const handleSignInForOptions = async () => {
     const epoch = optionsEpoch;
     isSignInNeededForOptions = false;
@@ -831,7 +838,7 @@
           void handleContinueDefault();
           return;
         }
-        if (isSignInNeededForOptions) {
+        if (isWaitingForSignIn) {
           void handleSignInForOptions();
           return;
         }
