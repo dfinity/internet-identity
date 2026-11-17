@@ -1,4 +1,4 @@
-use crate::storage::anchor::WebPushSubscription;
+use crate::storage::anchor::{PendingTransport, WebPushSubscription};
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
@@ -34,9 +34,17 @@ pub struct AnchorApplicationConfig {
     /// The app's own installed web app subscriptions, one per browser entry and account.
     /// None if the app never subscribed one, or every one it did was removed.
     #[n(4)]
-    pub pwa_webpush_subscriptions:
-        Option<BTreeMap<PwaSubscriptionSlot, StorableWebPushSubscription>>,
+    pub pwa_webpush_subscriptions: Option<PwaSlots>,
+    /// The transport keys installed web apps fetched for a subscribe that has yet to land,
+    /// one per slot, held apart so the subscription a slot holds keeps delivering and
+    /// keeps its endpoint until the subscribe replaces it. Only the pending half is read.
+    /// None if no subscribe is waiting.
+    #[n(5)]
+    pub pwa_pending_transports: Option<PwaSlots>,
 }
+
+/// One registration per installed web app slot.
+pub type PwaSlots = BTreeMap<PwaSubscriptionSlot, StorableWebPushSubscription>;
 
 /// The identity's answer to an app asking for a permission. Switching the permission keeps
 /// the decision, so a permission that was allowed and then denied is remembered as denied.
@@ -62,6 +70,7 @@ impl AnchorApplicationConfig {
             last_notified_at_ns: _,
             notifications,
             pwa_webpush_subscriptions: _,
+            pwa_pending_transports: _,
         } = self;
         notifications.is_some()
     }
@@ -73,12 +82,14 @@ impl AnchorApplicationConfig {
             last_notified_at_ns: _,
             notifications: _,
             pwa_webpush_subscriptions: _,
+            pwa_pending_transports: _,
         } = self;
         Self {
             default_account_number,
             last_notified_at_ns: None,
             notifications: None,
             pwa_webpush_subscriptions: None,
+            pwa_pending_transports: None,
         }
     }
 
@@ -99,22 +110,60 @@ impl AnchorApplicationConfig {
             .ok()
     }
 
-    /// Puts `subscription` in `slot`, or with `None` empties the slot.
+    /// The transport key fetched for a subscribe of `slot` that has yet to land.
+    pub fn pwa_pending_transport(&self, slot: PwaSubscriptionSlot) -> Option<PendingTransport> {
+        let stored = self.pwa_pending_transports.as_ref()?.get(&slot)?.clone();
+        WebPushSubscription::try_from(stored)
+            .inspect_err(|reason| {
+                ic_cdk::println!(
+                    "ERROR: dropped the installed app transport key of browser {} as unreadable: {reason}",
+                    slot.browser_id
+                );
+            })
+            .ok()?
+            .pending()
+            .cloned()
+    }
+
+    /// Puts `subscription` in `slot`, or with `None` empties the slot. Either way the
+    /// transport key of a subscribe waiting for `slot` is spent.
     pub fn set_pwa_webpush_subscription(
         &mut self,
         slot: PwaSubscriptionSlot,
         subscription: Option<WebPushSubscription>,
     ) {
-        let mut subscriptions = self.pwa_webpush_subscriptions.take().unwrap_or_default();
-        match subscription {
-            Some(subscription) => {
-                subscriptions.insert(slot, StorableWebPushSubscription::from(subscription));
-            }
-            None => {
-                subscriptions.remove(&slot);
-            }
-        }
-        self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
+        self.refresh_pwa_webpush_subscription(slot, subscription);
+        put_slot(&mut self.pwa_pending_transports, slot, None);
+    }
+
+    /// Puts `subscription` in `slot`, or with `None` empties the slot, leaving the
+    /// transport key of a subscribe waiting for `slot` to that subscribe.
+    pub fn refresh_pwa_webpush_subscription(
+        &mut self,
+        slot: PwaSubscriptionSlot,
+        subscription: Option<WebPushSubscription>,
+    ) {
+        put_slot(
+            &mut self.pwa_webpush_subscriptions,
+            slot,
+            subscription.map(StorableWebPushSubscription::from),
+        );
+    }
+
+    /// Records the transport key fetched for a subscribe of `slot`, leaving the
+    /// subscription `slot` holds as it is.
+    pub fn set_pwa_pending_transport(
+        &mut self,
+        slot: PwaSubscriptionSlot,
+        pending: PendingTransport,
+    ) {
+        put_slot(
+            &mut self.pwa_pending_transports,
+            slot,
+            Some(StorableWebPushSubscription::from(
+                WebPushSubscription::Pending(pending),
+            )),
+        );
     }
 
     /// Moves every slot of account `from` to account `to`, answering whether any moved.
@@ -123,26 +172,9 @@ impl AnchorApplicationConfig {
         from: Option<StorableAccountNumber>,
         to: Option<StorableAccountNumber>,
     ) -> bool {
-        let Some(subscriptions) = self.pwa_webpush_subscriptions.take() else {
-            return false;
-        };
-        let mut has_moved = false;
-        let mut moved = BTreeMap::new();
-        for (slot, subscription) in subscriptions {
-            let slot = match slot.account_number == from {
-                true => {
-                    has_moved = true;
-                    PwaSubscriptionSlot {
-                        browser_id: slot.browser_id,
-                        account_number: to,
-                    }
-                }
-                false => slot,
-            };
-            moved.insert(slot, subscription);
-        }
-        self.pwa_webpush_subscriptions = Some(moved);
-        has_moved
+        let has_moved_subscription = move_slots(&mut self.pwa_webpush_subscriptions, from, to);
+        let has_moved_transport = move_slots(&mut self.pwa_pending_transports, from, to);
+        has_moved_subscription || has_moved_transport
     }
 
     /// Empties every slot of a browser entry in `browser_ids`, answering whether any was held.
@@ -150,15 +182,82 @@ impl AnchorApplicationConfig {
         &mut self,
         browser_ids: &BTreeSet<StorableBrowserId>,
     ) -> bool {
-        let Some(mut subscriptions) = self.pwa_webpush_subscriptions.take() else {
-            return false;
-        };
-        let held_count = subscriptions.len();
-        subscriptions.retain(|slot, _| !browser_ids.contains(&slot.browser_id));
-        let has_removed = subscriptions.len() != held_count;
-        self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
-        has_removed
+        let has_removed_subscription =
+            remove_browser_slots(&mut self.pwa_webpush_subscriptions, browser_ids);
+        let has_removed_transport =
+            remove_browser_slots(&mut self.pwa_pending_transports, browser_ids);
+        has_removed_subscription || has_removed_transport
     }
+
+    /// Empties every slot.
+    pub fn clear_pwa_webpush_subscriptions(&mut self) {
+        self.pwa_webpush_subscriptions = None;
+        self.pwa_pending_transports = None;
+    }
+}
+
+/// Puts `value` in `slot` of `slots`, or with `None` empties it. Slots holding nothing
+/// are stored as `None`.
+fn put_slot(
+    slots: &mut Option<PwaSlots>,
+    slot: PwaSubscriptionSlot,
+    value: Option<StorableWebPushSubscription>,
+) {
+    let mut held = slots.take().unwrap_or_default();
+    match value {
+        Some(value) => {
+            held.insert(slot, value);
+        }
+        None => {
+            held.remove(&slot);
+        }
+    }
+    *slots = (!held.is_empty()).then_some(held);
+}
+
+/// Moves every slot of account `from` in `slots` to account `to`, answering whether any
+/// moved.
+fn move_slots(
+    slots: &mut Option<PwaSlots>,
+    from: Option<StorableAccountNumber>,
+    to: Option<StorableAccountNumber>,
+) -> bool {
+    let Some(held) = slots.take() else {
+        return false;
+    };
+    let mut has_moved = false;
+    let mut moved = BTreeMap::new();
+    for (slot, value) in held {
+        let slot = match slot.account_number == from {
+            true => {
+                has_moved = true;
+                PwaSubscriptionSlot {
+                    browser_id: slot.browser_id,
+                    account_number: to,
+                }
+            }
+            false => slot,
+        };
+        moved.insert(slot, value);
+    }
+    *slots = Some(moved);
+    has_moved
+}
+
+/// Empties every slot of a browser entry in `browser_ids` in `slots`, answering whether
+/// any was held.
+fn remove_browser_slots(
+    slots: &mut Option<PwaSlots>,
+    browser_ids: &BTreeSet<StorableBrowserId>,
+) -> bool {
+    let Some(mut held) = slots.take() else {
+        return false;
+    };
+    let held_count = held.len();
+    held.retain(|slot, _| !browser_ids.contains(&slot.browser_id));
+    let has_removed = held.len() != held_count;
+    *slots = (!held.is_empty()).then_some(held);
+    has_removed
 }
 
 impl Storable for AnchorApplicationConfig {
@@ -199,6 +298,7 @@ mod tests {
                     minted_at_ns: 6,
                 },
             )])),
+            pwa_pending_transports: None,
         };
         assert_eq!(
             AnchorApplicationConfig::from_bytes(config.to_bytes()),
@@ -241,6 +341,7 @@ mod tests {
                     minted_at_ns: 6,
                 },
             )])),
+            pwa_pending_transports: None,
         };
         assert_eq!(
             config.forgotten(),
@@ -249,6 +350,7 @@ mod tests {
                 last_notified_at_ns: None,
                 notifications: None,
                 pwa_webpush_subscriptions: None,
+                pwa_pending_transports: None,
             }
         );
     }

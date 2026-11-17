@@ -115,7 +115,8 @@ use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
 use crate::storage::anchor::{
-    Anchor, BrowserError, InboxNotification, WebPushSubscription, MAX_BROWSERS,
+    Anchor, BrowserError, InboxNotification, PendingTransport, ReadySubscription,
+    WebPushSubscription, MAX_BROWSERS,
 };
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -3503,6 +3504,41 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Writes the keying material a dispatch pass refreshed for `holder`'s slot, leaving
+    /// the transport key of a subscribe waiting for the slot to that subscribe.
+    pub fn refresh_pwa_webpush_subscription(
+        &mut self,
+        holder: PwaSubscriptionHolder,
+        subscription: ReadySubscription,
+    ) -> Result<(), StorageError> {
+        let mut config = self.pwa_subscription_config(holder)?;
+        config.refresh_pwa_webpush_subscription(
+            holder.slot,
+            Some(WebPushSubscription::Ready(subscription)),
+        );
+        self.store_anchor_application_config(
+            (holder.anchor_number, holder.application_number),
+            Some(config),
+        );
+        Ok(())
+    }
+
+    /// Records the transport key fetched for a subscribe of `holder`'s slot, leaving the
+    /// subscription the slot holds, and so its endpoint, as they are.
+    pub fn write_pwa_pending_transport(
+        &mut self,
+        holder: PwaSubscriptionHolder,
+        pending: PendingTransport,
+    ) -> Result<(), StorageError> {
+        let mut config = self.pwa_subscription_config(holder)?;
+        config.set_pwa_pending_transport(holder.slot, pending);
+        self.store_anchor_application_config(
+            (holder.anchor_number, holder.application_number),
+            Some(config),
+        );
+        Ok(())
+    }
+
     /// The config holding `holder`'s slot.
     fn pwa_subscription_config(
         &self,
@@ -3529,7 +3565,10 @@ impl<M: Memory + Clone> Storage<M> {
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
             )
-            .filter(|(_, config)| config.pwa_webpush_subscriptions.is_some())
+            .filter(|(_, config)| {
+                config.pwa_webpush_subscriptions.is_some()
+                    || config.pwa_pending_transports.is_some()
+            })
             .collect();
         for (key, mut config) in configs {
             if config.remove_pwa_webpush_subscriptions_of_browsers(browser_ids) {

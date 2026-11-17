@@ -46,8 +46,8 @@ pub fn holder_of(session: &AuthorizedSession) -> Option<PwaSubscriptionHolder> {
     })
 }
 
-/// Records the key a fetch just minted in `holder`'s slot, replacing what the slot held
-/// until the subscribe that spends it lands.
+/// Records the key a fetch just minted for `holder`'s slot. What the slot holds keeps
+/// delivering, and keeps its endpoint, until the subscribe that spends the key lands.
 fn start_pwa_subscription(
     holder: PwaSubscriptionHolder,
     secret_key: [u8; 32],
@@ -57,13 +57,14 @@ fn start_pwa_subscription(
     if !is_allowed(holder) {
         return Err(AppPreparePwaWebPushSubscriptionError::NotificationsNotAllowed);
     }
-    let pending = WebPushSubscription::Pending(PendingTransport {
+    let pending = PendingTransport {
         secret_key,
         sender_seed,
         minted_at_ns: now_ns,
-    });
-    write(holder, Some(pending), None)
-        .map_err(AppPreparePwaWebPushSubscriptionError::InternalCanisterError)
+    };
+    storage_borrow_mut(|storage| storage.write_pwa_pending_transport(holder, pending)).map_err(
+        |err| AppPreparePwaWebPushSubscriptionError::InternalCanisterError(format!("{err}")),
+    )
 }
 
 /// Registers `holder`'s slot for Web Push, or with `None` empties it.
@@ -82,10 +83,7 @@ pub fn set_pwa_subscription(
     if !is_allowed(holder) {
         return Err(AppSetPwaWebPushSubscriptionError::NotificationsNotAllowed);
     }
-    let Some(pending) = read(holder)
-        .as_ref()
-        .and_then(|registered| registered.pending().cloned())
-    else {
+    let Some(pending) = read_pending(holder) else {
         return Err(AppSetPwaWebPushSubscriptionError::TransportKeyExpired);
     };
     let PwaSubscriptionRequest {
@@ -113,7 +111,7 @@ pub fn set_pwa_subscription(
 fn remove_pwa_subscription(
     holder: PwaSubscriptionHolder,
 ) -> Result<(), AppSetPwaWebPushSubscriptionError> {
-    if read(holder).is_none() {
+    if read(holder).is_none() && read_pending(holder).is_none() {
         return Ok(());
     }
     write(holder, None, None).map_err(AppSetPwaWebPushSubscriptionError::InternalCanisterError)
@@ -178,6 +176,17 @@ pub(crate) fn read(holder: PwaSubscriptionHolder) -> Option<WebPushSubscription>
         )
     })?
     .pwa_webpush_subscription(holder.slot)
+}
+
+/// The transport key fetched for a subscribe of `holder`'s slot that has yet to land.
+fn read_pending(holder: PwaSubscriptionHolder) -> Option<PendingTransport> {
+    storage_borrow(|storage| {
+        storage.read_anchor_application_config_with_number(
+            holder.anchor_number,
+            holder.application_number,
+        )
+    })?
+    .pwa_pending_transport(holder.slot)
 }
 
 /// Puts `subscription` in `holder`'s slot, or with `None` empties it, after emptying

@@ -181,9 +181,10 @@ fn write(destination: Destination, registered: ReadySubscription) -> Result<(), 
                 .set_webpush_subscription(browser_id, Some(WebPushSubscription::Ready(registered)));
             storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
         }
-        RegistrationId::Pwa(holder) => {
-            pwa_subscription::write(holder, Some(WebPushSubscription::Ready(registered)), None)
-        }
+        RegistrationId::Pwa(holder) => storage_borrow_mut(|storage| {
+            storage.refresh_pwa_webpush_subscription(holder, registered)
+        })
+        .map_err(|err| format!("{err}")),
     }
 }
 

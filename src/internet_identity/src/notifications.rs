@@ -124,7 +124,7 @@ fn write_notifications_decision(
         });
         // An installed app delivers only what the identity allows.
         if !allowed {
-            config.pwa_webpush_subscriptions = None;
+            config.clear_pwa_webpush_subscriptions();
         }
         storage.write_anchor_application_config(anchor_number, origin, config, now_ns)
     })
