@@ -11,7 +11,7 @@ use crate::notifications::delivery_metrics::{self, Labels, Path, PlannedPush, Re
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::rotation;
 use crate::notifications::webpush::{
-    clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId,
+    clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId, SubscriberKey,
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
@@ -32,6 +32,7 @@ use internet_identity_interface::internet_identity::types::{
     NotificationId, Timestamp, Urgency,
 };
 use std::cell::{Cell, RefCell};
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(1);
@@ -129,6 +130,9 @@ pub(crate) enum PostOutcome {
     NoCapacity,
     /// The wake-up could not be sealed for its destination, so it never left.
     Unsealed,
+    /// The registration it was planned for was replaced before it was sealed, so it never
+    /// left.
+    Superseded,
 }
 
 impl PostOutcome {
@@ -142,7 +146,7 @@ impl PostOutcome {
             PostOutcome::RelayServerError => Err(Reason::RelayServerError),
             PostOutcome::Rejected => Err(Reason::RelayNoAnswer),
             PostOutcome::NoCapacity => Err(Reason::NoOutcallCapacity),
-            PostOutcome::Unsealed => Err(Reason::SealFailed),
+            PostOutcome::Unsealed | PostOutcome::Superseded => Err(Reason::SealFailed),
         }
     }
 
@@ -194,9 +198,10 @@ fn record_post_outcome(outcome: PostOutcome) {
             PostOutcome::Gone => &mut tally.gone,
             PostOutcome::RateLimited => &mut tally.rate_limited,
             PostOutcome::RelayError | PostOutcome::RelayServerError => &mut tally.relay_error,
-            PostOutcome::Rejected | PostOutcome::NoCapacity | PostOutcome::Unsealed => {
-                &mut tally.rejected
-            }
+            PostOutcome::Rejected
+            | PostOutcome::NoCapacity
+            | PostOutcome::Unsealed
+            | PostOutcome::Superseded => &mut tally.rejected,
         };
         *count = count.saturating_add(1);
         counts.set(tally);
@@ -250,6 +255,9 @@ pub(crate) struct Delivery {
     /// The inbox entry this wake-up announces, named by the deposit that stored it.
     pub(crate) notification: Option<InboxNotification>,
     pub(crate) endpoint: String,
+    /// The `p256dh` of the registration at `endpoint` when the pass planned this, which a
+    /// refresh checks the registration still has.
+    pub(crate) subscriber_key: SubscriberKey,
     /// The sealed payload naming the entry above. `None` only where sealing failed, and
     /// such a wake-up is dropped rather than posted.
     pub(crate) body: Option<Vec<u8>>,
@@ -370,8 +378,12 @@ fn post_pass(deliveries: Vec<Delivery>, now_ns: Timestamp) {
 /// service worker can do nothing with: it is not posted, and its entry is taken out of
 /// the inbox rather than left to block what arrives next.
 fn seal_and_post(mut deliveries: Vec<Delivery>, pass_bytes: &[u8; 32], now_ns: Timestamp) {
-    seal_pass(&mut deliveries, pass_bytes, now_ns);
-    for delivery in deliveries {
+    let superseded = seal_pass(&mut deliveries, pass_bytes, now_ns);
+    for (index, delivery) in deliveries.into_iter().enumerate() {
+        if superseded.contains(&index) {
+            settle(&delivery, PostOutcome::Superseded);
+            continue;
+        }
         if delivery.body.is_none() {
             settle(&delivery, PostOutcome::Unsealed);
             continue;
@@ -495,6 +507,7 @@ fn fan_out_to_destinations(
                     target,
                     notification: None,
                     endpoint: subscription.endpoint.as_str().to_string(),
+                    subscriber_key: subscription.subscriber_key.clone(),
                     body: None,
                     sealing: rotation::SealingKeys::from(subscription),
                     // Filled in below, once every relay this reaches has one.
@@ -652,6 +665,7 @@ fn fan_out_to_browsers(
                         // Filled in below, where the deposit names the entry for this browser.
                         notification: None,
                         endpoint: subscription.endpoint.as_str().to_string(),
+                        subscriber_key: subscription.subscriber_key.clone(),
                         body: None,
                         sealing: rotation::SealingKeys::from(&subscription),
                         // Filled in below, once every relay this reaches has one.
@@ -1086,7 +1100,8 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
         );
     }
     match outcome {
-        PostOutcome::Sent => {}
+        // Nothing was posted, and the entry stays for whatever wakes this browser next.
+        PostOutcome::Sent | PostOutcome::Superseded => {}
         PostOutcome::Gone => {
             // An installed app's entries share the browser's inbox, so only the one this
             // wake-up announced goes with its subscription, and while the subscription still
@@ -1185,30 +1200,56 @@ fn sealed_for(
 /// drawn once the pass knows it has something to send. The refresh comes first, so a
 /// subscription picked for it seals with the key it was just given rather than the one it
 /// arrived with.
-fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timestamp) {
+fn seal_pass(
+    deliveries: &mut [Delivery],
+    pass_bytes: &[u8; 32],
+    now_ns: Timestamp,
+) -> BTreeSet<usize> {
     let candidates: Vec<(rotation::Destination, Timestamp)> = deliveries
         .iter()
         .map(|delivery| (destination_of(delivery), delivery.sealing.last_rotated_ns))
         .collect();
 
+    let mut superseded = BTreeSet::new();
     if !candidates.is_empty() {
         let sender = rotation::pass_sender(pass_bytes);
         for destination in rotation::stalest(candidates, rotation::ROTATIONS_PER_PASS) {
-            match rotation::refresh(destination, &sender, now_ns) {
+            let Some((endpoint, subscriber_key)) = deliveries
+                .iter()
+                .find(|delivery| destination_of(delivery) == destination)
+                .map(|delivery| (delivery.endpoint.clone(), delivery.subscriber_key.clone()))
+            else {
+                continue;
+            };
+            // On the registration, not the destination: a Home Screen app's is shared,
+            // and the wake-ups through it come from different identities and browsers.
+            let planned_for_it = |delivery: &Delivery| {
+                destination_of(delivery).registration() == destination.registration()
+                    && delivery.endpoint == endpoint
+                    && delivery.subscriber_key == subscriber_key
+            };
+            match rotation::refresh(destination, &endpoint, &subscriber_key, &sender, now_ns) {
                 // Onto every wake-up for that registration, not only the one that was
-                // picked: two browsers through one app share it, and a stale copy left on
-                // the others would seal against a key the header does not name.
-                Ok(Some(refreshed)) => {
-                    // On the registration, not the destination: a Home Screen app's is
-                    // shared, and the wake-ups through it come from different identities
-                    // and different browsers.
-                    for delivery in deliveries.iter_mut().filter(|delivery| {
-                        destination_of(delivery).registration() == destination.registration()
-                    }) {
+                // picked: a stale copy left on the others would seal against a key the
+                // header does not name.
+                Ok(rotation::Refresh::Refreshed(refreshed)) => {
+                    for delivery in deliveries
+                        .iter_mut()
+                        .filter(|delivery| planned_for_it(delivery))
+                    {
                         delivery.sealing = refreshed.clone();
                     }
                 }
-                Ok(None) => {}
+                Ok(rotation::Refresh::Absent) => {}
+                // What the pass planned would be sealed for the replacement's keys and
+                // posted to the old endpoint, which no device can open.
+                Ok(rotation::Refresh::Replaced) => {
+                    for (index, delivery) in deliveries.iter().enumerate() {
+                        if planned_for_it(delivery) {
+                            superseded.insert(index);
+                        }
+                    }
+                }
                 Err(err) => {
                     ic_cdk::println!("Could not refresh what a subscription seals with: {err}")
                 }
@@ -1217,6 +1258,9 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
     }
 
     for (index, delivery) in deliveries.iter_mut().enumerate() {
+        if superseded.contains(&index) {
+            continue;
+        }
         let Some(deposited) = delivery.notification.clone() else {
             continue;
         };
@@ -1229,6 +1273,7 @@ fn seal_pass(deliveries: &mut [Delivery], pass_bytes: &[u8; 32], now_ns: Timesta
             payload::salt_at(pass_bytes, index),
         );
     }
+    superseded
 }
 
 fn destination_of(delivery: &Delivery) -> rotation::Destination {
@@ -2287,6 +2332,29 @@ mod tests {
             .collect();
         assert_eq!(salts.len(), 2);
         assert_ne!(salts[0], salts[1]);
+    }
+
+    /// The pass draws its randomness between planning and sealing, and a subscribe can
+    /// land in between. What it planned is not sealed for the new keys nor posted to the
+    /// old address, and its entry stays for whatever wakes the browser next.
+    #[test]
+    fn a_wake_up_whose_registration_was_replaced_before_sealing_is_not_posted() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let mut deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        subscribe(recipient, browsers[0], ROTATED, SECOND_NS);
+        let replacement = stored_subscription(recipient, browsers[0]);
+
+        let superseded = seal_pass(&mut deliveries, &[0u8; 32], 2 * SECOND_NS);
+
+        assert_eq!(superseded, BTreeSet::from([0]));
+        assert!(deliveries.iter().all(|delivery| delivery.body.is_none()));
+        assert_eq!(stored_subscription(recipient, browsers[0]), replacement);
+        for delivery in &deliveries {
+            settle(delivery, PostOutcome::Superseded);
+        }
+        assert_eq!(queued(recipient, browsers[0]), vec![7]);
     }
 
     #[test]

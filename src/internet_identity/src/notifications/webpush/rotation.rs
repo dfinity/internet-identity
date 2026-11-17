@@ -13,7 +13,7 @@ use std::collections::HashSet;
 
 use super::payload;
 use super::pwa_subscription;
-use super::validation::{PayloadIkm, PayloadKeyId};
+use super::validation::{PayloadIkm, PayloadKeyId, SubscriberKey};
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::installed_app::NotificationAppId;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
@@ -112,18 +112,34 @@ impl From<&ReadySubscription> for SealingKeys {
     }
 }
 
-/// Derives fresh keying material against `sender` and writes it back.
-///
-/// Silent on a destination that has gone between planning and here: the pass has nothing
-/// to refresh and the wake-up it was for will not seal either.
+/// What a refresh found at a destination.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum Refresh {
+    /// Still the registration the pass planned for, now sealing with these.
+    Refreshed(SealingKeys),
+    /// Nothing ready to refresh any more: the registration went, or waits on a subscribe.
+    Absent,
+    /// Another registration, with another endpoint or `p256dh`, replaced the one the pass
+    /// planned for. Nothing posted to the planned endpoint can be sealed for it.
+    Replaced,
+}
+
+/// Derives fresh keying material against `sender` and writes it back, where the
+/// registration `destination` names is still the one at `endpoint` with `subscriber_key`
+/// the pass planned for.
 pub(crate) fn refresh(
     destination: Destination,
+    endpoint: &str,
+    subscriber_key: &SubscriberKey,
     sender: &p256::SecretKey,
     now_ns: Timestamp,
-) -> Result<Option<SealingKeys>, String> {
+) -> Result<Refresh, String> {
     let Some(mut registered) = read(destination) else {
-        return Ok(None);
+        return Ok(Refresh::Absent);
     };
+    if registered.endpoint.as_str() != endpoint || registered.subscriber_key != *subscriber_key {
+        return Ok(Refresh::Replaced);
+    }
     let (payload_ikm, payload_keyid) =
         payload::derive_ikm(sender, &registered.subscriber_key, &registered.auth)?;
     registered.payload_ikm = payload_ikm;
@@ -131,7 +147,7 @@ pub(crate) fn refresh(
     registered.last_rotated_ns = now_ns;
     let refreshed = SealingKeys::from(&registered);
     write(destination, registered)?;
-    Ok(Some(refreshed))
+    Ok(Refresh::Refreshed(refreshed))
 }
 
 /// Reads the registration `target` names, rather than the one this browser happens to
