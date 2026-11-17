@@ -229,6 +229,7 @@ describe("handleNotificationConsentRequest", () => {
       identityNumber: BigInt(20_000),
       origin: ORIGIN,
       actor: { notification_consent_granted: switchedStatus },
+      isInstalledApp: false,
     });
     expect(sent[0].result).toEqual({ granted: true });
   });
@@ -508,7 +509,28 @@ describe("handleNotificationConsentRequest", () => {
       identityNumber: BigInt(10_000),
       origin: ORIGIN,
       actor: { notification_consent_granted: consentStatus },
+      isInstalledApp: false,
     });
+  });
+
+  it("asks and reports for an installed app where the request says it comes from one", async () => {
+    const { sent } = await run({ params: { installedApp: true } });
+    expect(sent[0].result).toEqual({ granted: true });
+    expect(resolveOptIn).toHaveBeenCalledWith(
+      expect.objectContaining({ isInstalledApp: true }),
+    );
+    expect(readGranted).toHaveBeenCalledWith(
+      expect.objectContaining({ isInstalledApp: true }),
+    );
+  });
+
+  it("refuses an installed app flag that is not a boolean", async () => {
+    const { sent } = await run({
+      params: { installedApp: "yes" },
+      settle: false,
+    });
+    expect(sent[0].error).toBeDefined();
+    expect(resolveOptIn).not.toHaveBeenCalled();
   });
 
   it("accepts a request that carries no params", async () => {
