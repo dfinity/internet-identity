@@ -820,3 +820,22 @@ fn should_keep_the_subscription_and_its_endpoint_across_an_upgrade() {
         vec![PWA_ENDPOINT.to_string()]
     );
 }
+
+#[test]
+fn should_drop_the_entry_a_failed_wake_up_announced() {
+    let env = env();
+    let (canister_id, _, first) = install_subscribed(&env);
+
+    assert_eq!(
+        deliver(&env, canister_id, first.account_principal, 1, 500),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+
+    // No wake-up is coming for it, so nothing is left for the app to read.
+    assert_eq!(get_entry(&env, canister_id, session_of(&first)), None);
+    // The subscription stays: only a gone relay drops it.
+    assert_eq!(
+        deliver(&env, canister_id, first.account_principal, 2, 200),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+}

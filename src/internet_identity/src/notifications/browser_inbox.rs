@@ -10,7 +10,6 @@
 use crate::notifications::delivery_metrics::{self, Path, Reason};
 use crate::notifications::dispatch;
 use crate::notifications::dispatch::DeliveryTarget;
-use crate::notifications::webpush::pwa_subscription;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, InboxNotification, WebPushSubscription};
@@ -62,9 +61,17 @@ pub(crate) fn remove_after_failed_wake_up(
                 .webpush_subscription(browser_id)
                 .and_then(WebPushSubscription::ready)
                 .map(|registered| registered.endpoint.as_str().to_string()),
+            // Read through the storage already borrowed here.
             DeliveryTarget::Pwa { .. } => target
                 .pwa_holder(anchor_number, browser_id)
-                .and_then(pwa_subscription::read)
+                .and_then(|holder| {
+                    storage
+                        .read_anchor_application_config_with_number(
+                            holder.anchor_number,
+                            holder.application_number,
+                        )?
+                        .pwa_webpush_subscription(holder.slot)
+                })
                 .and_then(WebPushSubscription::into_ready)
                 .map(|registered| registered.endpoint.into_string()),
             DeliveryTarget::App(app_id) => {
