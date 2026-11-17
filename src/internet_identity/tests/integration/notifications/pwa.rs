@@ -4,7 +4,7 @@
 
 use super::*;
 use canister_tests::api::internet_identity::api_v2::{
-    app_revoke_session, forget_applications, revoke_browser_sessions,
+    app_revoke_session, forget_applications, revoke_browser_sessions, update_account,
 };
 use canister_tests::api::internet_identity::notifications::{
     app_get_pwa_notification, app_prepare_pwa_webpush_subscription, app_remove_pwa_notification,
@@ -13,7 +13,7 @@ use canister_tests::api::internet_identity::notifications::{
 };
 use canister_tests::framework::II_WASM_PREVIOUS;
 use internet_identity_interface::internet_identity::types::{
-    AppGetPwaNotificationError, AppGetPwaNotificationRequest,
+    AccountUpdate, AppGetPwaNotificationError, AppGetPwaNotificationRequest,
     AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionResult,
     AppRemovePwaNotificationError, AppRemovePwaNotificationRequest,
     AppSetPwaWebPushSubscriptionError, AppSetPwaWebPushSubscriptionRequest, NotAcceptedReason,
@@ -869,5 +869,34 @@ fn should_refuse_an_endpoint_taken_over_from_a_slot_a_rollback_emptied(
         )?,
         Err(AppSetPwaWebPushSubscriptionError::EndpointInUse)
     );
+    Ok(())
+}
+
+#[test]
+fn should_keep_waking_the_installed_app_once_its_account_is_named() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+
+    // Naming the unreserved default account gives it a number, under the same principal.
+    update_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        APP.into(),
+        None,
+        AccountUpdate {
+            name: Some("Main".to_string()),
+        },
+    )?
+    .expect("naming the account refused");
+
+    assert_eq!(
+        deliver(&env, canister_id, first.account_principal, 1, 200),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+    // The endpoint is still held, under the number the account was given.
+    let second = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second));
     Ok(())
 }

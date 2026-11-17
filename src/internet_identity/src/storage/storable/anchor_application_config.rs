@@ -117,6 +117,34 @@ impl AnchorApplicationConfig {
         self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
     }
 
+    /// Moves every slot of account `from` to account `to`, answering whether any moved.
+    pub fn move_pwa_webpush_subscriptions(
+        &mut self,
+        from: Option<StorableAccountNumber>,
+        to: Option<StorableAccountNumber>,
+    ) -> bool {
+        let Some(subscriptions) = self.pwa_webpush_subscriptions.take() else {
+            return false;
+        };
+        let mut has_moved = false;
+        let mut moved = BTreeMap::new();
+        for (slot, subscription) in subscriptions {
+            let slot = match slot.account_number == from {
+                true => {
+                    has_moved = true;
+                    PwaSubscriptionSlot {
+                        browser_id: slot.browser_id,
+                        account_number: to,
+                    }
+                }
+                false => slot,
+            };
+            moved.insert(slot, subscription);
+        }
+        self.pwa_webpush_subscriptions = Some(moved);
+        has_moved
+    }
+
     /// Empties every slot of a browser entry in `browser_ids`, answering whether any was held.
     pub fn remove_pwa_webpush_subscriptions_of_browsers(
         &mut self,

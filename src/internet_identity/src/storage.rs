@@ -2651,6 +2651,24 @@ impl<M: Memory + Clone> Storage<M> {
             None => None,
         };
 
+        // The tracked default's installed app subscriptions follow it to the number it was
+        // given, as its sessions do, so naming it does not take its installed app off.
+        let config = match minted.as_slice() {
+            [account_number]
+                if previous_holds_tracked_default
+                    && !references
+                        .iter()
+                        .any(|reference| reference.account_number.is_none()) =>
+            {
+                let mut renamed = config.clone().unwrap_or_else(|| stored_config.clone());
+                match renamed.move_pwa_webpush_subscriptions(None, Some(*account_number)) {
+                    true => Some(renamed),
+                    false => config,
+                }
+            }
+            _ => config,
+        };
+
         // A config names this identity's default here, so it can only name an account
         // reference this write leaves behind. Repaired rather than refused: an account
         // reference that goes takes the default with it, and the default moves to the
