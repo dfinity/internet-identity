@@ -5,6 +5,7 @@ paths:
   - "src/**/*.test.ts"
   - "src/**/*.rs"
   - "src/frontend/tests/**"
+  - "src/frontend/src/**"
 ---
 
 # Testing

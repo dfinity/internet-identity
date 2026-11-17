@@ -18,7 +18,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 
 ## Authorization and trust
 
-- `sec/authorize-first` Authorize at the top of every authenticated endpoint through `authz_utils`, before any other work. `canister_inspect_message` is not authentication.
+- `sec/authorize-first` Authorize at the top of every authenticated endpoint, before any other work: through `authz_utils`, or through the gate of the feature that owns the caller (`mcp::authorize_mcp_session` and `mcp::authorize_mcp_session_for_update` for registered MCP session keys). `canister_inspect_message` is not authentication.
 - `sec/trust-in-canister` Keep trust decisions (allowlists, gating) in the canister, not in frontend code the user can bypass.
 - `sec/fail-closed` Security defaults fail closed: trust inputs are required, a malformed config counts as unset, `Default` is the disabled state.
 - `sec/complete-revocation` Revocation (sign-out, consent withdrawal, removal) closes every path that could still mint or read for that state, including derived queues and caches.

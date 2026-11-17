@@ -5,6 +5,9 @@ paths:
   - "src/internet_identity/src/state.rs"
   - "src/internet_identity/src/state/**"
   - "src/internet_identity/src/stats/**"
+  - "src/internet_identity/src/archive.rs"
+  - "src/internet_identity_interface/src/archive/types.rs"
+  - "src/internet_identity_interface/src/internet_identity/types.rs"
   - "src/internet_identity/src/main.rs"
   - "src/internet_identity/tests/integration/upgrade.rs"
   - "src/internet_identity/tests/integration/rollback.rs"
@@ -17,9 +20,10 @@ A decoding mistake here traps every read of the affected records and can take si
 
 ## Record formats
 
-- `mem/candid-records` A few stored records are Candid (`fixed_anchor.rs`, `storable_persistent_state.rs`): there the field names are the keys, so never rename them, and new fields are `opt`. The rest of this section is about minicbor.
+- `mem/name-keyed-formats` Some stored records key fields and enum variants by name: Candid (`fixed_anchor.rs`, `storable_persistent_state.rs` with the types it embeds from the interface crate, `BufferedEntryWrapper` in `storage.rs`), serde CBOR (`EventData`, `AggregationKey` in `stats/`) and JSON (`StorableJwks`). Never rename a field or variant in them, and make new fields optional (`opt` in Candid, `Option` in serde). The rest of this section is about minicbor, where the keys are numbers.
 - `mem/minicbor-encoding` Stored records are minicbor with numeric keys (`#[n(k)]`). Pick the encoding that fits the shape (see the minicbor docs): `#[cbor(map)]` for records that may grow, `#[cbor(array)]` for a small fixed tuple, `#[cbor(transparent)]` for a newtype over a single field. In an array the key is the position, so a new field can only be added at the end. Rust field names can be renamed freely; the keys cannot.
 - `mem/new-fields-option` A new field on a stored type must be an `Option`. Existing records don't have the key, and a required field traps every read of them. `#[cbor(default)]` alone is not enough: use it only after checking the minicbor docs and adding everything it needs. This took staging down once (#4481).
+- `mem/check-storable-bound` A bounded `Storable` (`Bound::Bounded { max_size }`) can't grow past its bound, and `StorableAccountKey` and `StorableSessionHandle` already fill theirs. Before adding a field to a bounded type, compare its largest encoding with `max_size`. If it no longer fits, the change needs a new layout and a rebuild or migration of the map, not just an `Option`.
 - `mem/retire-keys` Retire a key with a `// #[n(k)] RETIRED, never reuse` comment. Never reuse a retired key for a new shape.
 
 ## Memory indices and ids

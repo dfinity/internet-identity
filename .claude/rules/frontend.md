@@ -53,7 +53,7 @@ paths:
 
 ## Errors
 
-- `fe/throw-canister-error` Unwrap canister results with `.then(throwCanisterError)` and check with `isCanisterError`; never `"Err" in result` and never fabricate a canister error.
+- `fe/throw-canister-error` Unwrap canister results with `.then(throwCanisterError)` and check with `isCanisterError`; never `"Err" in result` and never fabricate a canister error. Methods whose error is `text` (the MCP methods, such as `get_mcp_registration_delegation`) unwrap with `throwTextCanisterError` instead, which throws a plain `Error` that `isCanisterError` doesn't match.
 - `fe/route-async-errors` Route every async failure to the user-visible path (`handleError` / the flow's `onError`), the way the delegation handler does. `console.error` alone is not handling.
 - `fe/no-silent-catch` `void promise.catch(...)` that drops an error needs a comment saying why; otherwise let it propagate. When the error is unused, write bare `catch { ... }`.
 - `fe/retry-transient-only` Retry only transient failures (network, 408, 429, 5xx).
@@ -91,7 +91,7 @@ paths:
 
 `/authorize` is a state machine driven by app messages, not a set of URL routes. Three layers, decoupled through stores:
 
-- `fe/authorize-channel-handlers` Channel handlers (`lib/stores/channelHandlers/*`) receive app requests: validate the params (zod, `OriginSchema`), write the request into its store (`attributeConsentStore`, `notificationConsentStore`), wait for the user's answer from a store (`waitForStore`) and reply on the channel. They never import components or touch the DOM. Requests that drive authorization state run one at a time through `serializeAuthorizationRequest`.
+- `fe/authorize-channel-handlers` Channel handlers (`lib/stores/channelHandlers/*`) receive app requests: validate the params (zod, `OriginSchema`), write the request into its store (`attributeConsentStore`, `notificationConsentStore`), wait for the user's answer from a store (`waitForStore`) and reply on the channel. They never import components or touch the DOM. Requests that drive authorization state run one at a time through `serializeAuthorizationRequest`. Attribute consent has its own queue, `serializeConsentRequest`: it waits for the sign-in flow, so on the authorization queue it would block the sign-in it waits for.
 - `fe/authorize-stores` Stores hold the requests and the user's decisions, and are the only thing handlers and views share.
 - `fe/authorize-views` Views (`routes/(new-styling)/authorize/views/*`) read stores and write the user's decisions back to them. They never touch the channel.
 - `fe/authorize-view-precedence` `+page.svelte` picks the view with one `{#if}` chain over the stores, in precedence order: the first state that matches is what the user sees. Pending attribute consent comes before pending notification consent, both before the redirect animation, and then the sign-in screens. Add a step as a store state, a view and a handler, and place its condition in that chain. A request that needs time before it knows its screen holds the current one with `claimScreen()`, so the flow doesn't flash the redirect animation.

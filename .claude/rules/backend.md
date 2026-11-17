@@ -13,7 +13,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 
 ## No trapping
 
-`be/no-trap` Canisters must not trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`, `unreachable!()`, `todo!()`, `unimplemented!()`, `assert!`, `[index]` or panicking arithmetic outside `#[cfg(test)]`.
+`be/no-trap` Canisters must not trap. Do not introduce `panic!`, `.unwrap()`, `.expect(...)`, `unreachable!()`, `todo!()`, `unimplemented!()`, `assert!`, `[index]` or panicking arithmetic outside test code (`be/test-code-may-unwrap`).
 
 - `be/result-not-trap` Return `Result<T, E>` and propagate with `?` instead of trapping.
 - `be/no-index` Index collections with `.get()`, `.find()`, `iter_mut().find()` and `let ... else`, never `[i]`, and don't carry an index across borrows.
@@ -22,8 +22,9 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/no-default-for-missing` Never `unwrap_or_default()` a value that is then persisted or authorized on. A missing record is an error, not an empty default.
 - `be/no-expect-to-document` Push back on reviewer suggestions (Copilot and others) to add `.expect(...)` or `debug_assert!` "to document the invariant".
 - `be/storable-decode` `Storable::from_bytes` cannot return an error, so it may `expect` with an actionable message. Make decoding unable to fail instead: see `stable-memory.md`, and use the bounded helpers (`slice_to_bounded_32`) rather than `copy_from_slice`.
+- `be/storable-encode` `Storable::to_bytes` cannot return an error either, so encoding may `expect` with an actionable message. Encoding a well-formed value must not be able to fail.
 - `be/outcall-transform-trap` HTTP outcall transform functions cannot return or log errors, so they may trap on a response that is unusable as a whole. Skip a single malformed element (a key without a `kid`) rather than rejecting the response.
-- `be/test-code-may-unwrap` `#[cfg(test)]` code may `unwrap`/`expect`; prefer `expect("context")`.
+- `be/test-code-may-unwrap` `#[cfg(test)]` code and test-only crates (`src/canister_tests`) may `unwrap`/`expect`/`panic!`; prefer `expect("context")`.
 
 ## State changes, errors and `await`
 
@@ -38,7 +39,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 
 ## Layering
 
-- `be/thin-endpoints` `main.rs` is a thin entry point, and every endpoint follows the same order: authorize (through `authz_utils`: `check_authz_and_record_activity`, `anchor_operation_with_authz_check`), validate shape, destructure, narrow, make one call to the module that owns the feature, map its result. Feature logic lives in its module, not in `main.rs`, including multi-phase flows and the re-checks between their `await`s.
+- `be/thin-endpoints` `main.rs` is a thin entry point, and every endpoint follows the same order: authorize (through `authz_utils`: `check_authz_and_record_activity`, `anchor_operation_with_authz_check`, or the gate of the feature that owns the caller, like `mcp::authorize_mcp_session` for registered MCP session keys), validate shape, destructure, narrow, make one call to the module that owns the feature, map its result. Feature logic lives in its module, not in `main.rs`, including multi-phase flows and the re-checks between their `await`s.
 - `be/anchor-ops-through-authz` Anchor-mutating updates go through `anchor_operation_with_authz_check` / `post_operation_bookkeeping` so they are archived and counted.
 - `be/validate-shape-at-endpoint` Endpoints validate shape. Convert raw candid input once, through `TryFrom`, into a `Validated*` request whose fields are shared newtypes (`ApplicationOrigin`), collecting all errors.
 - `be/destructure-requests-fully` Destructure it completely at the top of the endpoint, without `..`, so the API carries no field the endpoint doesn't use and a new field is a compile error until it is handled. A field that is deliberately left unused needs a code comment saying why.
