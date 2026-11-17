@@ -420,6 +420,8 @@
       return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
     });
     defaultAccountNumber = values[1].account_number[0];
+    // With the accounts on the screen, the options wait for nothing.
+    isSignInNeededForOptions = false;
   };
 
   // What `actorForIdentity` resolves to, read rather than awaited, so that

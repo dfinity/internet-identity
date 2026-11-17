@@ -791,6 +791,53 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(localStorage.getItem(OTHER_TOGGLE_KEY)).toBe("1");
     });
 
+    it("reports nothing when the accounts fail to load after the options were switched off", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const answer = deferred<never>();
+      actor.get_accounts.mockReturnValue(answer.promise);
+      actorForIdentityMock.mockResolvedValue(actor);
+      render(identities[kind]);
+      await settle();
+      showAllOptions().click();
+      flushSync();
+
+      answer.reject(new Error("Failed to fetch"));
+      await settle();
+
+      expect(handleErrorMock).not.toHaveBeenCalled();
+      expect(showAllOptions().checked).toBe(false);
+    });
+
+    it("continues with one press once the accounts are on the screen, however they got there", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const answer = deferred<{ Ok: unknown[] }>();
+      actor.get_accounts.mockReturnValue(answer.promise);
+      actorForIdentityMock.mockResolvedValueOnce(actor);
+      render(identities[kind]);
+      await settle();
+      // Another identity is selected and then this one again, by which time
+      // its stored session is gone: the options wait for a sign-in.
+      actorForIdentityMock.mockReturnValue(new Promise(() => {}));
+      select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+      actorForIdentityMock.mockResolvedValue(undefined);
+      select(identities[kind]);
+      await settle();
+
+      // The accounts asked for at first arrive after all.
+      answer.resolve({ Ok: [primaryAccount, workAccount] });
+      await settle();
+      expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+      authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
+      isAuthenticatedStoreValue.set(true);
+      flushSync();
+      button("Continue").click();
+      await settle();
+
+      expect(onAuthorize).toHaveBeenCalledTimes(1);
+    });
+
     it("signs in once when the stored session is looked up after the options were switched off and on again", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
       const lookup = deferred<undefined>();
@@ -916,6 +963,29 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     expect(handleErrorMock).toHaveBeenCalledTimes(1);
     expect(showAllOptions().checked).toBe(true);
     expect(localStorage.getItem(OTHER_TOGGLE_KEY)).toBe("1");
+  });
+
+  it("leaves the options on when a sign-in fails that the switch started before it was switched off and on again", async () => {
+    const discovery = deferred<never>();
+    discoverSsoConfigMock.mockReturnValueOnce(discovery.promise);
+    actorForIdentityMock.mockResolvedValue(undefined);
+    render(identities.SSO);
+    await settle();
+    showAllOptions().click();
+    flushSync();
+    showAllOptions().click();
+    flushSync();
+    showAllOptions().click();
+    flushSync();
+    expect(signInsStarted()).toBe(2);
+
+    discovery.reject(new Error("SSO discovery failed"));
+    await settle();
+
+    // The second sign-in is still on its way, for options that are still on.
+    expect(handleErrorMock).toHaveBeenCalledTimes(1);
+    expect(showAllOptions().checked).toBe(true);
+    expect(localStorage.getItem(TOGGLE_KEY)).toBe("1");
   });
 
   it("loads the accounts with a stored session, without a sign-in", async () => {
