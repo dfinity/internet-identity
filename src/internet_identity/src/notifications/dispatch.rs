@@ -475,7 +475,6 @@ fn fan_out_to_destinations(
             expires_at_ns,
             account_number: None,
             event: Some(pending.event.clone()),
-            delivery_path: None,
         };
         let mut planned = Vec::new();
         for browser_id in destinations {
@@ -531,7 +530,7 @@ fn fan_out_to_destinations(
             // rather than deposited for: it cannot be woken, and the entry it would sit
             // behind would never be shown.
             let Some(jwt) = jwt else {
-                deposits.count_unreachable(path);
+                deposits.count_unreachable(path, browser_id);
                 continue;
             };
             delivery.jwt = jwt;
@@ -539,13 +538,9 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
-            let entry = InboxNotification {
-                delivery_path: Some(path),
-                ..entry
-            };
             let (deposited_entry, overflowed_entry) =
                 browser_inbox::deposit(queue, next_id, entry, now_ns);
-            deposits.count_deposit(path, overflowed_entry);
+            deposits.count_deposit(path, browser_id, overflowed_entry);
             // The body is sealed once the pass is planned, because what it is sealed with
             // may be refreshed first and the salt comes from the pass rather than the entry.
             delivery.notification = Some(deposited_entry);
@@ -619,7 +614,6 @@ fn fan_out_to_browsers(
         notification_id: pending.notification_id,
         expires_at_ns: app_expiry_ns(pending.expires_at_ns, taken.entry.received_at_ns),
         account_number: pending.account_number,
-        delivery_path: None,
     };
     let ttl_seconds = queued_entry.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
     let labels = Labels::app_number(pending.application_number, &pending.urgency);
@@ -701,7 +695,7 @@ fn fan_out_to_browsers(
             let path = Path::of(delivery.target, &delivery.endpoint);
             // Nothing answers at this browser's relay; see the identity fan-out.
             let Some(jwt) = jwt else {
-                deposits.count_unreachable(path);
+                deposits.count_unreachable(path, delivery.browser_id);
                 continue;
             };
             delivery.jwt = jwt;
@@ -711,13 +705,9 @@ fn fan_out_to_browsers(
                 continue;
             };
             queued_anywhere = true;
-            let entry = InboxNotification {
-                delivery_path: Some(path),
-                ..queued_entry.clone()
-            };
             let (deposited_entry, overflowed_entry) =
-                browser_inbox::deposit(queue, next_id, entry, now_ns);
-            deposits.count_deposit(path, overflowed_entry);
+                browser_inbox::deposit(queue, next_id, queued_entry.clone(), now_ns);
+            deposits.count_deposit(path, delivery.browser_id, overflowed_entry);
             delivery.notification = Some(deposited_entry);
             to_post.push(delivery);
         }
@@ -746,25 +736,32 @@ fn fan_out_to_browsers(
 #[derive(Default)]
 struct Deposits {
     pushes: Vec<PlannedPush>,
-    /// The entries pushed out of a full inbox, by the delivery path of that inbox.
-    overflowed_entries: Vec<(Path, InboxNotification)>,
+    /// The entries pushed out of a full inbox, by the browser whose inbox it is.
+    overflowed_entries: Vec<(BrowserId, InboxNotification)>,
 }
 
 impl Deposits {
-    fn count_unreachable(&mut self, path: Path) {
+    fn count_unreachable(&mut self, path: Path, browser_id: BrowserId) {
         self.pushes.push(PlannedPush {
             path,
+            browser_id,
             is_deposited: false,
         });
     }
 
-    fn count_deposit(&mut self, path: Path, overflowed_entry: Option<InboxNotification>) {
+    fn count_deposit(
+        &mut self,
+        path: Path,
+        browser_id: BrowserId,
+        overflowed_entry: Option<InboxNotification>,
+    ) {
         self.pushes.push(PlannedPush {
             path,
+            browser_id,
             is_deposited: true,
         });
         self.overflowed_entries
-            .extend(overflowed_entry.map(|entry| (path, entry)));
+            .extend(overflowed_entry.map(|entry| (browser_id, entry)));
     }
 
     fn count(
@@ -774,11 +771,11 @@ impl Deposits {
         labels: Labels,
         now_ns: Timestamp,
     ) {
-        for (path, overflowed_entry) in &self.overflowed_entries {
+        for (browser_id, overflowed_entry) in &self.overflowed_entries {
             delivery_metrics::count_removed_entries(
                 anchor_number,
+                *browser_id,
                 [overflowed_entry],
-                *path,
                 Reason::InboxFull,
             );
         }
@@ -1068,21 +1065,6 @@ pub(crate) fn can_wake<M: Memory + Clone>(
     wake_up_address(browser, app.as_ref(), now_ns).is_some()
 }
 
-/// The way this entry's inbox is reached, for counting what leaves it.
-pub(crate) fn path_of<M: Memory + Clone>(storage: &Storage<M>, browser: &Browser) -> Path {
-    if let Some(own) = browser
-        .webpush_subscription
-        .as_ref()
-        .and_then(WebPushSubscription::ready)
-    {
-        return Path::of(DeliveryTarget::Browser, own.endpoint.as_str());
-    }
-    match routed_app(storage, browser) {
-        Some(app) => Path::of(DeliveryTarget::App(app.id), ""),
-        None => Path::Other,
-    }
-}
-
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
 /// way: a relay that lost the subscription takes the registration and the queue with
 /// it, and any other failure removes an entry, since no wake-up is coming for it.
@@ -1091,8 +1073,8 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     if let Some(notification) = delivery.notification.as_ref() {
         delivery_metrics::count_push_outcome(
             delivery.anchor_number,
+            delivery.browser_id,
             notification,
-            Path::of(delivery.target, &delivery.endpoint),
             outcome.loss(),
         );
     }
@@ -1868,7 +1850,6 @@ mod tests {
                     expires_at_ns: 10 * SECOND_NS,
                     account_number: Some(2),
                     event: None,
-                    delivery_path: None,
                 }
             }))
         });
@@ -1996,7 +1977,6 @@ mod tests {
                 expires_at_ns: 10 * SECOND_NS,
                 account_number: Some(2),
                 event: None,
-                delivery_path: Some(Path::of(DeliveryTarget::Browser, &delivery.endpoint)),
             })
         );
     }

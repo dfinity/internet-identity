@@ -5,7 +5,7 @@ use super::pwa_subscription::clear_gone_pwa_subscription;
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
 use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
-use crate::notifications::delivery_metrics::{self, Path, Reason};
+use crate::notifications::delivery_metrics::{self, Reason};
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::NotificationAppRef;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
@@ -172,32 +172,26 @@ pub fn remove_subscription(
 fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Result<(), String> {
     let mut anchor =
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
-    let (path, cleared_notifications) = take_inbox(&mut anchor, browser_id);
+    let cleared_notifications = take_inbox(&mut anchor, browser_id);
     // The reference stays, because it is which app this browser has rather than whether
     // it is routing.
     anchor.disable_notification_app(browser_id);
     write_subscription(anchor, browser_id, None)?;
     delivery_metrics::count_removed_entries(
         anchor_number,
+        browser_id,
         &cleared_notifications,
-        path,
         Reason::SubscriptionReplaced,
     );
     Ok(())
 }
 
-/// Empties the browser's inbox, answering it with the way it was reached.
-fn take_inbox(anchor: &mut Anchor, browser_id: BrowserId) -> (Path, Vec<InboxNotification>) {
-    let path = storage_borrow(|storage| {
-        anchor
-            .browser(browser_id)
-            .map_or(Path::Other, |browser| dispatch::path_of(storage, browser))
-    });
-    let cleared_notifications = anchor
+/// Empties the browser's inbox, answering what it held.
+fn take_inbox(anchor: &mut Anchor, browser_id: BrowserId) -> Vec<InboxNotification> {
+    anchor
         .notifications_for_browser_mut(browser_id)
         .map(std::mem::take)
-        .unwrap_or_default();
-    (path, cleared_notifications)
+        .unwrap_or_default()
 }
 
 /// `target` says who held the posted endpoint, rather than whoever the entry points at by
@@ -321,14 +315,14 @@ fn write_subscription(
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    let (path, cleared_notifications) = take_inbox(&mut anchor, browser_id);
+    let cleared_notifications = take_inbox(&mut anchor, browser_id);
     let anchor_number = anchor.anchor_number();
     let left = anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
     delivery_metrics::count_removed_entries(
         anchor_number,
+        browser_id,
         &cleared_notifications,
-        path,
         Reason::SubscriptionReplaced,
     );
     // Read after the write, so the reference this browser just dropped is already gone:
@@ -518,7 +512,6 @@ mod tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
                 event: None,
-                delivery_path: None,
             });
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }

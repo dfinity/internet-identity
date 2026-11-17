@@ -32,6 +32,8 @@ const PWA_ENDPOINT: &str = "https://pwa.push.example/device";
 const BROWSER_ENDPOINT: &str = "https://browser.push.example/device";
 /// An installed app endpoint at a relay no test posts to before it subscribes there.
 const UNPROBED_PWA_ENDPOINT: &str = "https://unprobed.push.example/device";
+/// An endpoint on Mozilla's push service, which the delivery funnel labels `firefox`.
+const MOZILLA_ENDPOINT: &str = "https://updates.push.services.mozilla.com/wpush/v2/device";
 /// An endpoint on Firebase Cloud Messaging, which the delivery funnel labels `chrome`.
 const FCM_ENDPOINT: &str = "https://fcm.googleapis.com/fcm/send/device";
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
@@ -1097,5 +1099,72 @@ fn should_wake_the_installed_app_for_a_notification_waiting_while_its_account_wa
         answer_outcalls(&env, 200),
         vec![UNPROBED_PWA_ENDPOINT.to_string()]
     );
+    Ok(())
+}
+
+#[test]
+fn should_count_each_copy_under_the_path_it_was_posted_by() -> Result<(), RejectResponse> {
+    let env = env();
+    // The first browser holds the installed app on Firebase Cloud Messaging, counted as
+    // `chrome`, and a subscription of its own counted as `other`.
+    let (canister_id, anchor, signed_in) = install_signed_in(&env, None, None);
+    let session = session_of(&signed_in);
+    subscribe_pwa_webpush(
+        &env,
+        canister_id,
+        session,
+        FCM_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )?
+    .expect("subscribe refused");
+    // A second browser of the same identity, subscribed on Mozilla's push service,
+    // counted as `firefox`.
+    let other_browser = BrowserKey::new(3);
+    let other_browser_id = sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, APP, &other_browser),
+    )
+    .browser_id;
+    subscribe_webpush(
+        &env,
+        canister_id,
+        other_browser.successor().principal(),
+        SetWebPushSubscriptionRequest {
+            anchor_number: anchor,
+            endpoint: MOZILLA_ENDPOINT.to_string(),
+            p256dh: p256dh(7),
+            transport_key: p256dh(7),
+            sealed_auth: ByteBuf::from(vec![0u8; 32]),
+        },
+    )?
+    .expect("subscribe refused");
+    let mut pushed = deliver(&env, canister_id, signed_in.account_principal, 1, 200);
+    pushed.sort();
+    assert_eq!(
+        pushed,
+        vec![FCM_ENDPOINT.to_string(), MOZILLA_ENDPOINT.to_string()]
+    );
+
+    remove_entry(&env, canister_id, session);
+    browser_remove_notification(
+        &env,
+        canister_id,
+        other_browser.successor().principal(),
+        RemoveNotificationRequest {
+            anchor_number: anchor,
+            browser_id: other_browser_id,
+            inbox_notification_id: FIRST_ENTRY,
+            not_shown: None,
+        },
+    )?
+    .expect("remove refused");
+
+    let metrics = get_metrics(&env, canister_id);
+    assert_eq!(delivered_pushes(&metrics, "chrome"), 1.0);
+    assert_eq!(delivered_pushes(&metrics, "firefox"), 1.0);
+    assert_eq!(delivered_pushes(&metrics, "other"), 0.0);
     Ok(())
 }

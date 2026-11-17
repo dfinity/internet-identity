@@ -1621,7 +1621,6 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
                 event: None,
-                delivery_path: None,
             });
 
         anchor.point_at_notification_app(second, 7);
@@ -1652,7 +1651,6 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
                 event: None,
-                delivery_path: None,
             });
 
         anchor.point_at_notification_app(id, 7);
@@ -2364,7 +2362,6 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
                 event: None,
-                delivery_path: None,
             });
 
         anchor.point_at_notification_app(id, 7);
@@ -2408,7 +2405,6 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
                 event: None,
-                delivery_path: None,
             });
 
         anchor.disable_notification_app(id);
@@ -2433,7 +2429,6 @@ mod browser_tests {
                 expires_at_ns: u64::MAX,
                 account_number: None,
                 event: None,
-                delivery_path: None,
             });
         anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
 

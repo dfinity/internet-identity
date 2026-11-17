@@ -7,8 +7,7 @@
 //! The inbox lives on the browser's entry, and is cleared when its wake-up address
 //! changes.
 
-use crate::notifications::delivery_metrics::{self, Path, Reason};
-use crate::notifications::dispatch;
+use crate::notifications::delivery_metrics::{self, Reason};
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -121,20 +120,17 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
         let Ok(mut anchor) = storage.read(anchor_number) else {
             return;
         };
-        let browsers: Vec<(BrowserId, Path)> = anchor
-            .browsers()
-            .iter()
-            .map(|browser| (browser.id, dispatch::path_of(storage, browser)))
-            .collect();
+        let browser_ids: Vec<BrowserId> =
+            anchor.browsers().iter().map(|browser| browser.id).collect();
         let mut removed_entries = Vec::new();
-        for (browser_id, path) in browsers {
+        for browser_id in browser_ids {
             if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
                 let (theirs, others): (Vec<_>, Vec<_>) = std::mem::take(inbox)
                     .into_iter()
                     .partition(|entry| entry.application_number == Some(application_number));
                 *inbox = others;
                 if !theirs.is_empty() {
-                    removed_entries.push((path, theirs));
+                    removed_entries.push((browser_id, theirs));
                 }
             }
         }
@@ -145,11 +141,11 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
             ic_cdk::println!("Failed to drop what an app without consent deposited: {err}");
             return;
         }
-        for (path, entries) in removed_entries {
+        for (browser_id, entries) in removed_entries {
             delivery_metrics::count_removed_entries(
                 anchor_number,
+                browser_id,
                 &entries,
-                path,
                 Reason::ConsentRevoked,
             );
         }
@@ -212,9 +208,6 @@ pub(crate) fn remove_collected(
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
         let anchor_number = anchor.anchor_number();
-        let path = anchor
-            .browser(browser_id)
-            .map_or(Path::Other, |browser| dispatch::path_of(storage, browser));
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
             return Ok(());
         };
@@ -237,9 +230,9 @@ pub(crate) fn remove_collected(
             })
         };
         match loss_reason {
-            None => delivery_metrics::count_collected(anchor_number, &entry, path, now_ns),
+            None => delivery_metrics::count_collected(anchor_number, browser_id, &entry, now_ns),
             Some(reason) => {
-                delivery_metrics::count_removed_entries(anchor_number, [&entry], path, reason)
+                delivery_metrics::count_removed_entries(anchor_number, browser_id, [&entry], reason)
             }
         }
         Ok(())
@@ -338,7 +331,6 @@ mod tests {
             expires_at_ns,
             account_number: None,
             event: None,
-            delivery_path: None,
         }
     }
 

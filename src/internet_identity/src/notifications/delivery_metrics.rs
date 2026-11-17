@@ -27,7 +27,7 @@ use crate::storage::anchor::InboxNotification;
 use candid::Principal;
 use ic_metrics_encoder::MetricsEncoder;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, ApplicationNumber, Timestamp, Urgency,
+    AnchorNumber, ApplicationNumber, BrowserId, Timestamp, Urgency,
 };
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -458,6 +458,8 @@ fn live_key(anchor_number: AnchorNumber, entry: &InboxNotification) -> LiveKey {
 /// One push a fan-out planned for a browser.
 pub(crate) struct PlannedPush {
     pub(crate) path: Path,
+    /// The browser whose inbox holds the copy.
+    pub(crate) browser_id: BrowserId,
     /// Deposited in the browser's inbox. Not where its relay cannot be reached.
     pub(crate) is_deposited: bool,
 }
@@ -736,6 +738,9 @@ struct Counters {
     /// New series counted under `other` for want of room.
     series_folded: u64,
     live: BTreeMap<LiveKey, Live>,
+    /// The path each browser's open copy of a notification in `live` was pushed by, which
+    /// is the one it is closed on whatever the browser routes through by then.
+    copy_paths: BTreeMap<(LiveKey, BrowserId), Path>,
     evicted: u64,
 }
 
@@ -873,24 +878,40 @@ impl Counters {
         }
     }
 
-    /// Ends one open copy of `entry`'s notification on `path`, answering the labels to
-    /// count it under. `None` where no copy there is open: one already counted, or one
-    /// of a notification with no key, whose copies were counted when it went.
+    /// Ends the open copy of `entry`'s notification in `browser_id`'s inbox, answering
+    /// the labels to count it under and the path it was pushed by. `None` where that copy
+    /// is not open: one already counted, or one of a notification with no key, whose
+    /// copies were counted when it went.
     fn close(
         &mut self,
         anchor_number: AnchorNumber,
+        browser_id: BrowserId,
         entry: &InboxNotification,
-        path: Path,
         loss: Option<Reason>,
-    ) -> Option<Labels> {
-        let live = self.live.get_mut(&live_key(anchor_number, entry))?;
+    ) -> Option<(Labels, Path)> {
+        let key = live_key(anchor_number, entry);
+        let path = self.copy_paths.remove(&(key, browser_id))?;
+        let live = self.live.get_mut(&key)?;
         let open_copies = &mut live.open_copies[path as usize];
         *open_copies = open_copies.checked_sub(1)?;
         if loss.is_some() {
             live.last_loss = loss;
         }
         let live = *live;
-        Some(self.live_labels(&live))
+        Some((self.live_labels(&live), path))
+    }
+
+    /// Forgets which path each copy of the notification `key` names was pushed by.
+    fn forget_copy_paths(&mut self, key: LiveKey) -> Vec<(BrowserId, Path)> {
+        let copies: Vec<(BrowserId, Path)> = self
+            .copy_paths
+            .range((key, BrowserId::MIN)..=(key, BrowserId::MAX))
+            .map(|((_, browser_id), path)| (*browser_id, *path))
+            .collect();
+        for (browser_id, _) in &copies {
+            self.copy_paths.remove(&(key, *browser_id));
+        }
+        copies
     }
 
     /// Forgets the notifications no copy of can arrive any more, counting the copies still
@@ -905,9 +926,10 @@ impl Counters {
             if !is_gone {
                 self.evicted = self.evicted.saturating_add(1);
             }
-            let Some((_, live)) = self.live.pop_first() else {
+            let Some((key, live)) = self.live.pop_first() else {
                 break;
             };
+            self.forget_copy_paths(key);
             if !is_gone {
                 continue;
             }
@@ -1001,12 +1023,16 @@ pub(crate) fn track_fan_out(
             counters.count_lost(Reason::NoDevice, &labels);
             return;
         }
+        let key = live_key(anchor_number, entry);
         let mut open_copies = [0u8; Path::COUNT];
         for push in pushes {
             counters.count_push(Stage::Accepted, push.path, &labels);
             if push.is_deposited {
                 let copies = &mut open_copies[push.path as usize];
                 *copies = copies.saturating_add(1);
+                counters
+                    .copy_paths
+                    .insert((key, push.browser_id), push.path);
             } else {
                 counters.count_push_lost(Reason::RelayUnreachable, push.path, &labels);
             }
@@ -1021,7 +1047,7 @@ pub(crate) fn track_fan_out(
             .and_then(|index| u8::try_from(index).ok())
             .unwrap_or(1);
         counters.live.insert(
-            live_key(anchor_number, entry),
+            key,
             Live {
                 application_number: entry.application_number,
                 urgency,
@@ -1035,17 +1061,22 @@ pub(crate) fn track_fan_out(
     });
 }
 
-/// The answer to the post announcing `entry`: `Ok` where a push service took it.
+/// The answer to the post announcing `entry` to `browser_id`: `Ok` where a push service
+/// took it.
 pub(crate) fn count_push_outcome(
     anchor_number: AnchorNumber,
+    browser_id: BrowserId,
     entry: &InboxNotification,
-    path: Path,
     outcome: Result<(), Reason>,
 ) {
     with(|counters| {
         let reason = match outcome {
             Ok(()) => {
-                let Some(live) = counters.live.get_mut(&live_key(anchor_number, entry)) else {
+                let key = live_key(anchor_number, entry);
+                let Some(path) = counters.copy_paths.get(&(key, browser_id)).copied() else {
+                    return;
+                };
+                let Some(live) = counters.live.get_mut(&key) else {
                     return;
                 };
                 let is_first_push = !std::mem::replace(&mut live.is_pushed, true);
@@ -1059,24 +1090,24 @@ pub(crate) fn count_push_outcome(
             }
             Err(reason) => reason,
         };
-        if let Some(labels) = counters.close(anchor_number, entry, path, Some(reason)) {
+        if let Some((labels, path)) = counters.close(anchor_number, browser_id, entry, Some(reason))
+        {
             counters.count_push_lost(reason, path, &labels);
         }
     });
 }
 
-/// A device collected `entry`, which delivers its notification unless another did first.
-/// Counted under the path `entry` was posted by, and under `path` where it records none.
+/// A device collected `entry` from `browser_id`'s inbox, which delivers its notification
+/// unless another did first. Counted on the path that copy was pushed by.
 pub(crate) fn count_collected(
     anchor_number: AnchorNumber,
+    browser_id: BrowserId,
     entry: &InboxNotification,
-    path: Path,
     now_ns: Timestamp,
 ) {
-    let path = entry.delivery_path.unwrap_or(path);
     with(|counters| {
         counters.prune(now_ns);
-        let Some(labels) = counters.close(anchor_number, entry, path, None) else {
+        let Some((labels, path)) = counters.close(anchor_number, browser_id, entry, None) else {
             return;
         };
         counters.count_push(Stage::Delivered, path, &labels);
@@ -1099,25 +1130,31 @@ pub(crate) fn move_entry(
     current: &InboxNotification,
 ) {
     with(|counters| {
-        let Some(live) = counters.live.remove(&live_key(anchor_number, previous)) else {
+        let previous_key = live_key(anchor_number, previous);
+        let Some(live) = counters.live.remove(&previous_key) else {
             return;
         };
-        counters.live.insert(live_key(anchor_number, current), live);
+        let current_key = live_key(anchor_number, current);
+        counters.live.insert(current_key, live);
+        for (browser_id, path) in counters.forget_copy_paths(previous_key) {
+            counters.copy_paths.insert((current_key, browser_id), path);
+        }
     });
 }
 
-/// Entries taken out of an inbox, for `reason`, before a device collected them. Each is
-/// counted under the path it was posted by, and under `path` where it records none.
+/// Entries taken out of `browser_id`'s inbox, for `reason`, before a device collected
+/// them. Each is counted on the path its copy was pushed by.
 pub(crate) fn count_removed_entries<'a>(
     anchor_number: AnchorNumber,
+    browser_id: BrowserId,
     entries: impl IntoIterator<Item = &'a InboxNotification>,
-    path: Path,
     reason: Reason,
 ) {
     with(|counters| {
         for entry in entries {
-            let path = entry.delivery_path.unwrap_or(path);
-            if let Some(labels) = counters.close(anchor_number, entry, path, Some(reason)) {
+            if let Some((labels, path)) =
+                counters.close(anchor_number, browser_id, entry, Some(reason))
+            {
                 counters.count_push_lost(reason, path, &labels);
             }
         }
@@ -1279,7 +1316,6 @@ mod tests {
             notification_id,
             expires_at_ns,
             account_number: None,
-            delivery_path: None,
         }
     }
 
@@ -1287,9 +1323,10 @@ mod tests {
         Labels::app("https://app.example", None)
     }
 
-    fn deposited() -> PlannedPush {
+    fn deposited(browser_id: BrowserId) -> PlannedPush {
         PlannedPush {
             path: Path::Chrome,
+            browser_id,
             is_deposited: true,
         }
     }
@@ -1297,7 +1334,7 @@ mod tests {
     fn fan_out_to_two_browsers() -> InboxNotification {
         reset_for_testing();
         let entry = entry(7, EXPIRES);
-        track_fan_out(1, &entry, labels(), vec![deposited(), deposited()], NOW);
+        track_fan_out(1, &entry, labels(), vec![deposited(0), deposited(1)], NOW);
         entry
     }
 
@@ -1310,16 +1347,22 @@ mod tests {
 
     /// Prunes the keys gone by `LATER`, by fanning out another notification then.
     fn after_every_key_went() {
-        track_fan_out(1, &entry(99, LATER * 2), labels(), vec![deposited()], LATER);
+        track_fan_out(
+            1,
+            &entry(99, LATER * 2),
+            labels(),
+            vec![deposited(0)],
+            LATER,
+        );
     }
 
     #[test]
     fn two_collected_copies_deliver_the_notification_once() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, &entry, Path::Chrome, Ok(()));
-        count_push_outcome(1, &entry, Path::Chrome, Ok(()));
-        count_collected(1, &entry, Path::Chrome, NOW);
-        count_collected(1, &entry, Path::Chrome, NOW);
+        count_push_outcome(1, 0, &entry, Ok(()));
+        count_push_outcome(1, 1, &entry, Ok(()));
+        count_collected(1, 0, &entry, NOW);
+        count_collected(1, 1, &entry, NOW);
 
         assert_eq!(notification_count_for_testing("pushed"), 1);
         assert_eq!(notification_count_for_testing("delivered"), 1);
@@ -1330,10 +1373,10 @@ mod tests {
     #[test]
     fn a_resend_under_the_same_id_is_another_notification() {
         let first_entry = fan_out_to_two_browsers();
-        count_collected(1, &first_entry, Path::Chrome, NOW);
+        count_collected(1, 0, &first_entry, NOW);
         let resent_entry = entry(7, EXPIRES + 1);
-        track_fan_out(1, &resent_entry, labels(), vec![deposited()], NOW);
-        count_collected(1, &resent_entry, Path::Chrome, NOW);
+        track_fan_out(1, &resent_entry, labels(), vec![deposited(0)], NOW);
+        count_collected(1, 0, &resent_entry, NOW);
 
         assert_eq!(notification_count_for_testing("delivered"), 2);
     }
@@ -1341,7 +1384,7 @@ mod tests {
     #[test]
     fn a_failed_post_is_a_push_loss_at_once() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
 
         assert_eq!(push_loss_count_for_testing("relay_gone"), 1);
         assert_eq!(loss_count_for_testing("relay_gone"), 0);
@@ -1350,8 +1393,8 @@ mod tests {
     #[test]
     fn a_notification_whose_every_copy_was_lost_takes_the_last_reason() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
-        count_removed_entries(1, [&entry], Path::Chrome, Reason::InboxFull);
+        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
+        count_removed_entries(1, 1, [&entry], Reason::InboxFull);
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("inbox_full"), 1);
@@ -1361,7 +1404,7 @@ mod tests {
     #[test]
     fn an_undelivered_notification_with_a_copy_still_open_was_never_fetched() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("never_fetched"), 1);
@@ -1370,8 +1413,8 @@ mod tests {
     #[test]
     fn a_delivered_notification_is_not_lost() {
         let entry = fan_out_to_two_browsers();
-        count_collected(1, &entry, Path::Chrome, NOW);
-        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
+        count_collected(1, 0, &entry, NOW);
+        count_push_outcome(1, 1, &entry, Err(Reason::RelayGone));
         after_every_key_went();
 
         assert_eq!(loss_count_for_testing("relay_gone"), 0);
@@ -1386,10 +1429,10 @@ mod tests {
             1,
             &entry,
             Labels::app("https://app.example", Some(&Urgency::High)),
-            vec![deposited()],
+            vec![deposited(0)],
             NOW,
         );
-        count_removed_entries(1, [&entry], Path::Chrome, Reason::InboxFull);
+        count_removed_entries(1, 0, [&entry], Reason::InboxFull);
 
         assert!(with(|counters| counters
             .push_losses
@@ -1408,14 +1451,14 @@ mod tests {
     #[test]
     fn copies_still_open_when_the_key_goes_were_never_fetched() {
         let entry = fan_out_to_two_browsers();
-        count_collected(1, &entry, Path::Chrome, NOW);
+        count_collected(1, 0, &entry, NOW);
         assert_eq!(in_flight_count(NOW), 0);
 
         track_fan_out(
             1,
             &self::entry(8, LATER * 2),
             labels(),
-            vec![deposited()],
+            vec![deposited(0)],
             LATER,
         );
 
@@ -1434,10 +1477,10 @@ mod tests {
     #[test]
     fn a_copy_is_counted_once_however_often_it_is_removed() {
         let entry = fan_out_to_two_browsers();
-        count_push_outcome(1, &entry, Path::Chrome, Err(Reason::RelayGone));
-        count_removed_entries(1, [&entry], Path::Chrome, Reason::SubscriptionReplaced);
-        count_removed_entries(1, [&entry], Path::Chrome, Reason::SubscriptionReplaced);
-        count_collected(1, &entry, Path::Chrome, LATER);
+        count_push_outcome(1, 0, &entry, Err(Reason::RelayGone));
+        count_removed_entries(1, 1, [&entry], Reason::SubscriptionReplaced);
+        count_removed_entries(1, 1, [&entry], Reason::SubscriptionReplaced);
+        count_collected(1, 1, &entry, LATER);
 
         assert_eq!(push_loss_count_for_testing("relay_gone"), 1);
         assert_eq!(push_loss_count_for_testing("subscription_replaced"), 1);
@@ -1452,10 +1495,10 @@ mod tests {
             1,
             &self::entry(8, LATER * 2),
             labels(),
-            vec![deposited()],
+            vec![deposited(0)],
             LATER,
         );
-        count_removed_entries(1, [&entry], Path::Chrome, Reason::FetchedTooLate);
+        count_removed_entries(1, 0, [&entry], Reason::FetchedTooLate);
 
         assert_eq!(push_loss_count_for_testing("never_fetched"), 2);
         assert_eq!(push_loss_count_for_testing("fetched_too_late"), 0);
@@ -1469,7 +1512,7 @@ mod tests {
                 2,
                 &entry(id, EXPIRES + id),
                 labels(),
-                vec![deposited()],
+                vec![deposited(0)],
                 NOW,
             );
         }
@@ -1583,13 +1626,13 @@ mod tests {
         let labels = Labels::listed_app(&app(0), None, NOW);
         number_application(1, &app(0));
         let entry = entry(7, EXPIRES);
-        track_fan_out(1, &entry, labels, vec![deposited()], NOW);
+        track_fan_out(1, &entry, labels, vec![deposited(0)], NOW);
         with(|counters| {
             counters.apps.remove(&app(0));
             counters.drop_app(&app(0));
         });
 
-        count_collected(1, &entry, Path::Chrome, NOW);
+        count_collected(1, 0, &entry, NOW);
 
         assert!(with(|counters| counters
             .pushes

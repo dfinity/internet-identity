@@ -1668,10 +1668,12 @@ impl<M: Memory + Clone> Storage<M> {
                 .filter(|browser| browser.is_pointing_at(app_id))
                 .map(|browser| browser.id)
                 .collect();
-            let mut cleared_notifications: Vec<InboxNotification> = Vec::new();
+            let mut cleared_notifications: Vec<(BrowserId, Vec<InboxNotification>)> = Vec::new();
             for browser_id in pointing {
                 if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                    cleared_notifications.append(inbox);
+                    if !inbox.is_empty() {
+                        cleared_notifications.push((browser_id, std::mem::take(inbox)));
+                    }
                 }
             }
             if cleared_notifications.is_empty() {
@@ -1683,12 +1685,14 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 continue;
             }
-            delivery_metrics::count_removed_entries(
-                anchor_number,
-                &cleared_notifications,
-                delivery_metrics::Path::App,
-                delivery_metrics::Reason::SubscriptionReplaced,
-            );
+            for (browser_id, entries) in &cleared_notifications {
+                delivery_metrics::count_removed_entries(
+                    anchor_number,
+                    *browser_id,
+                    entries,
+                    delivery_metrics::Reason::SubscriptionReplaced,
+                );
+            }
         }
     }
 
@@ -4004,18 +4008,12 @@ impl<M: Memory + Clone> Storage<M> {
         // After the refusals above, so a ceremony that cannot happen registers nothing —
         // the record reaches storage only through the write at the end.
         // Read before the registry may give a browser up, which takes its inbox with it.
-        let inboxes_at_risk: Vec<(BrowserId, delivery_metrics::Path, Vec<InboxNotification>)> =
+        let inboxes_at_risk: Vec<(BrowserId, Vec<InboxNotification>)> =
             if anchor.browsers().len() >= MAX_BROWSERS {
                 anchor
                     .browsers()
                     .iter()
-                    .map(|browser| {
-                        (
-                            browser.id,
-                            crate::notifications::dispatch::path_of(self, browser),
-                            browser.notifications.clone(),
-                        )
-                    })
+                    .map(|browser| (browser.id, browser.notifications.clone()))
                     .collect()
             } else {
                 Vec::new()
@@ -4105,12 +4103,12 @@ impl<M: Memory + Clone> Storage<M> {
         // the sessions of every browser the registry gave up, the account reference list
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, now_ns, state)?;
-        for (browser_id, path, inbox) in &inboxes_at_risk {
+        for (browser_id, inbox) in &inboxes_at_risk {
             if evicted_browsers.contains(browser_id) {
                 delivery_metrics::count_removed_entries(
                     anchor_number,
+                    *browser_id,
                     inbox,
-                    *path,
                     delivery_metrics::Reason::BrowserEvicted,
                 );
             }
@@ -4166,11 +4164,6 @@ impl<M: Memory + Clone> Storage<M> {
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
-        let path = anchor
-            .browser(browser_id)
-            .map_or(delivery_metrics::Path::Other, |browser| {
-                crate::notifications::dispatch::path_of(self, browser)
-            });
         // A browser the identity signed out of must stop being notified for it. The entry
         // itself stays, and so does the app it points at.
         anchor.set_webpush_subscription(browser_id, None);
@@ -4203,8 +4196,8 @@ impl<M: Memory + Clone> Storage<M> {
         );
         delivery_metrics::count_removed_entries(
             anchor_number,
+            browser_id,
             &cleared_notifications,
-            path,
             delivery_metrics::Reason::BrowserSignedOut,
         );
 

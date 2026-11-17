@@ -7504,7 +7504,6 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         expires_at_ns: 100 * notification_id,
         account_number: Some(notification_id),
         event: None,
-        delivery_path: None,
     };
     for browser_id in [queued_on, left_empty] {
         anchor.set_webpush_subscription(
@@ -7971,7 +7970,6 @@ fn queued_notification(notification_id: u64) -> crate::storage::anchor::InboxNot
         expires_at_ns: u64::MAX,
         account_number: None,
         event: None,
-        delivery_path: None,
     }
 }
 
@@ -8164,7 +8162,6 @@ fn an_identity_notification_is_queued_without_an_application() {
                     name: Some("Work".to_string()),
                 },
             )),
-            delivery_path: None,
         });
     storage.write(anchor).expect("writing the anchor");
 
