@@ -104,9 +104,9 @@ vi.mock("$lib/globals", () => ({
   },
 }));
 vi.mock("$lib/legacy/features", () => ({ features: { DUMMY_AUTH: false } }));
+const discoverSsoConfigMock = vi.hoisted(() => vi.fn());
 vi.mock("$lib/utils/ssoDiscovery", () => ({
-  // Never answers: the pop-up has to open before discovery has.
-  discoverSsoConfig: () => new Promise(() => {}),
+  discoverSsoConfig: discoverSsoConfigMock,
 }));
 vi.mock("$lib/utils/analytics/authenticationV2Funnel", () => ({
   AuthenticationV2Events: {},
@@ -191,10 +191,12 @@ const sessionActor = () => ({
 /** A promise for a test to settle when it gets to that point. */
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 describe("ContinueView starts a sign-in inside the click that asks for it", () => {
@@ -311,6 +313,9 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     // press: a sign-in must not wait for it.
     actorForIdentityMock.mockReturnValue(new Promise(() => {}));
     fetchIdentityCredentialsMock.mockReturnValue(new Promise(() => {}));
+    // Never answers, unless a test has it answer: the pop-up has to open
+    // before discovery has.
+    discoverSsoConfigMock.mockReturnValue(new Promise(() => {}));
   });
 
   afterEach(async () => {
@@ -710,6 +715,73 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(signInsStarted()).toBe(1);
     });
 
+    it("does not show accounts that arrive for the identity selected before", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      localStorage.setItem(OTHER_TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const answer = deferred<{ Ok: unknown[] }>();
+      actor.get_accounts.mockReturnValue(answer.promise);
+      actorForIdentityMock.mockResolvedValueOnce(actor);
+      render(identities[kind]);
+      await settle();
+      // The identity switched to has no session to show its own with.
+      actorForIdentityMock.mockResolvedValue(undefined);
+      select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+      await settle();
+
+      answer.resolve({ Ok: [primaryAccount, workAccount] });
+      await settle();
+
+      expect(document.body.querySelector('input[type="radio"]')).toBeNull();
+      expect(
+        lastUsedIdentitiesStoreValue.syncLastUsedAccounts,
+      ).not.toHaveBeenCalled();
+      // The identity switched to still waits for its own.
+      button("Continue").click();
+      expect(signInsStarted()).toBe(1);
+    });
+
+    it("leaves the options of the identity switched to alone when those of the one before fail to load", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      localStorage.setItem(OTHER_TOGGLE_KEY, "1");
+      const actor = sessionActor();
+      const answer = deferred<never>();
+      actor.get_accounts.mockReturnValue(answer.promise);
+      actorForIdentityMock.mockResolvedValueOnce(actor);
+      render(identities[kind]);
+      await settle();
+      // The lookup for the identity switched to has not answered yet.
+      actorForIdentityMock.mockReturnValue(new Promise(() => {}));
+      select({ ...identities[kind], identityNumber: OTHER_IDENTITY_NUMBER });
+
+      answer.reject(new Error("Failed to fetch"));
+      await settle();
+
+      expect(handleErrorMock).not.toHaveBeenCalled();
+      expect(showAllOptions().checked).toBe(true);
+      expect(localStorage.getItem(OTHER_TOGGLE_KEY)).toBe("1");
+    });
+
+    it("signs in once when the stored session is looked up after the options were switched off and on again", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      const lookup = deferred<undefined>();
+      actorForIdentityMock.mockReturnValue(lookup.promise);
+      render(identities[kind]);
+      showAllOptions().click();
+      flushSync();
+      showAllOptions().click();
+      flushSync();
+      expect(signInsStarted()).toBe(1);
+
+      // No session: on its own, this would have the options wait for a press
+      // of Continue. The switch has started the sign-in for them already.
+      lookup.resolve(undefined);
+      await settle();
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+    });
+
     it("signs in once when the options were switched off and on again before Continue", async () => {
       localStorage.setItem(TOGGLE_KEY, "1");
       actorForIdentityMock.mockResolvedValue(undefined);
@@ -762,6 +834,59 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     button("Continue").click();
 
     expect(open.mock.calls[0][0]).toBe("/sso-connecting");
+  });
+
+  it("continues for the identity switched to once the sign-in for another's options has failed", async () => {
+    localStorage.setItem(TOGGLE_KEY, "1");
+    localStorage.setItem(OTHER_TOGGLE_KEY, "1");
+    const discovery = deferred<never>();
+    discoverSsoConfigMock.mockReturnValue(discovery.promise);
+    actorForIdentityMock.mockResolvedValueOnce(undefined);
+    render(identities.SSO);
+    await settle();
+    button("Continue").click();
+    expect(signInsStarted()).toBe(1);
+    const actor = sessionActor();
+    actorForIdentityMock.mockResolvedValue(actor);
+    select({ ...identities.SSO, identityNumber: OTHER_IDENTITY_NUMBER });
+    await settle();
+    expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+
+    discovery.reject(new Error("SSO discovery failed"));
+    await settle();
+    expect(handleErrorMock).toHaveBeenCalledTimes(1);
+    authenticationStoreValue.set({
+      identityNumber: OTHER_IDENTITY_NUMBER,
+      actor,
+    });
+    isAuthenticatedStoreValue.set(true);
+    flushSync();
+    button("Continue").click();
+    await settle();
+
+    expect(onAuthorize).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the options of the identity switched to on when the sign-in the switch started for another fails", async () => {
+    localStorage.setItem(OTHER_TOGGLE_KEY, "1");
+    const discovery = deferred<never>();
+    discoverSsoConfigMock.mockReturnValue(discovery.promise);
+    actorForIdentityMock.mockResolvedValueOnce(undefined);
+    render(identities.SSO);
+    await settle();
+    showAllOptions().click();
+    flushSync();
+    expect(signInsStarted()).toBe(1);
+    actorForIdentityMock.mockResolvedValue(sessionActor());
+    select({ ...identities.SSO, identityNumber: OTHER_IDENTITY_NUMBER });
+    await settle();
+
+    discovery.reject(new Error("SSO discovery failed"));
+    await settle();
+
+    expect(handleErrorMock).toHaveBeenCalledTimes(1);
+    expect(showAllOptions().checked).toBe(true);
+    expect(localStorage.getItem(OTHER_TOGGLE_KEY)).toBe("1");
   });
 
   it("loads the accounts with a stored session, without a sign-in", async () => {

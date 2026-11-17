@@ -177,12 +177,17 @@
   // sign-in: there is no session to load the accounts with. A sign-in only
   // ever starts with a press, so they wait for the next press of Continue.
   let isSignInNeededForOptions = $state(false);
+  // Counted up when another identity is selected and when the options are
+  // switched off. What was started for the options before that has no say on
+  // the screen any more, whenever its answer arrives.
+  let optionsEpoch = 0;
   // Clear old accounts data when user toggles switch off
   $effect(() => {
     if (!isMultipleAccountsEnabled) {
       accounts = undefined;
       selectedAccountNumber = null;
       isSignInNeededForOptions = false;
+      optionsEpoch++;
     }
   });
 
@@ -285,19 +290,16 @@
   // an OpenID or SSO identity. `undefined` while the lookup is in flight too,
   // which the handlers treat like having no session: they sign in.
   let sessionActor: ActorSubclass<_SERVICE> | undefined;
-  // Resolves to whether the identity is still the selected one, in which case
-  // `sessionActor` now holds what the lookup found.
-  const lookUpSessionActor = (identityNumber: bigint): Promise<boolean> =>
+  const lookUpSessionActor = (identityNumber: bigint): Promise<void> =>
     actorForIdentity(identityNumber).then((actor) => {
       // The identity may have been switched while IndexedDB was read.
       if (selectedIdentityNumber !== identityNumber) {
-        return false;
+        return;
       }
       // While signed in as this identity the lookup answers with the actor of
       // that sign-in. The handlers read that one from the store; kept here it
       // would outlive the sign-in it belongs to.
       sessionActor = actor === $authenticationStore?.actor ? undefined : actor;
-      return true;
     });
   // Re-initialize the flow and re-hydrate per-identity state when the
   // identity changes. Read the persisted values into locals so the
@@ -317,9 +319,12 @@
     accounts = undefined;
     isSignInNeededForOptions = false;
     sessionActor = undefined;
-    void lookUpSessionActor(identityNumber).then((isSelected) => {
-      if (isSelected && hydrated && isMultipleAccountsEnabled) {
-        void restoreMultipleAccounts(identityNumber);
+    const epoch = ++optionsEpoch;
+    void lookUpSessionActor(identityNumber).then(() => {
+      // Still this identity, with the options as they were found: neither
+      // switched off, nor switched back on by a press that loads them itself.
+      if (hydrated && epoch === optionsEpoch) {
+        void restoreMultipleAccounts(epoch);
       }
     });
   });
@@ -395,6 +400,7 @@
     actor: ActorSubclass<_SERVICE>,
     identityNumber: bigint,
   ) => {
+    const selectedWhenAsked = selectedIdentityNumber;
     const values = await Promise.all([
       actor
         .get_accounts(identityNumber, effectiveOrigin)
@@ -403,6 +409,11 @@
         .get_default_account(identityNumber, effectiveOrigin)
         .then(throwCanisterError),
     ]);
+    // Another identity was selected while the canister answered: its screen
+    // is not this answer's to fill.
+    if (selectedIdentityNumber !== selectedWhenAsked) {
+      return;
+    }
     accounts = values[0].sort((a, b) => {
       const aVal = a.last_used[0] ?? BigInt(-1);
       const bVal = b.last_used[0] ?? BigInt(-1);
@@ -463,7 +474,7 @@
 
   // All options were on from an earlier visit: shows them again when that
   // takes no sign-in. Nothing was pressed, so none is started from here.
-  const restoreMultipleAccounts = async (identityNumber: bigint) => {
+  const restoreMultipleAccounts = async (epoch: number) => {
     selectedTtlSeconds = rememberedTtlSeconds();
     try {
       const readActor = actorToReadWith();
@@ -473,20 +484,22 @@
       ) {
         return;
       }
-      // The identity may have been switched, or the options switched off,
-      // while the accounts were asked for.
-      if (
-        selectedIdentityNumber === identityNumber &&
-        isMultipleAccountsEnabled
-      ) {
+      // Unless the screen moved on while the accounts were asked for, see
+      // `optionsEpoch`.
+      if (epoch === optionsEpoch) {
         isSignInNeededForOptions = true;
       }
     } catch (error) {
+      // Nor is a failure this screen's to report, or to act on, by then.
+      if (epoch !== optionsEpoch) {
+        return;
+      }
       isMultipleAccountsEnabled = false;
       handleError(error);
     }
   };
   const handleEnableMultipleAccounts = async () => {
+    const epoch = optionsEpoch;
     // On already, as far as this component goes. The switch only reports its
     // change once the click has been handled, and a sign-in that fails within
     // the click (a refused pop-up) is handled before that: switching the
@@ -502,7 +515,11 @@
         await signInAndLoadAccounts();
       }
     } catch (error) {
-      isMultipleAccountsEnabled = false;
+      // The option that goes back off is the one that was pressed, not that
+      // of an identity selected since.
+      if (epoch === optionsEpoch) {
+        isMultipleAccountsEnabled = false;
+      }
       handleError(error);
     }
   };
@@ -510,13 +527,17 @@
   // `isSignInNeededForOptions`): signs in and shows them, for the next press
   // to continue with what is chosen there.
   const handleSignInForOptions = async () => {
+    const epoch = optionsEpoch;
     isSignInNeededForOptions = false;
     isAuthenticatingDefault = true;
     try {
       await signInAndLoadAccounts();
     } catch (error) {
-      // Back to where the press started, so that it can be repeated.
-      isSignInNeededForOptions = isMultipleAccountsEnabled;
+      // Back to where the press started, so that it can be repeated, unless
+      // the screen has moved on to another identity.
+      if (epoch === optionsEpoch) {
+        isSignInNeededForOptions = true;
+      }
       handleError(error);
     } finally {
       isAuthenticatingDefault = false;
