@@ -87,8 +87,18 @@ export class ConceptTheme {
         subtree: true,
         characterData: true,
       });
+      // A `<link>` stylesheet (app.css) has no rules until it loads, which
+      // mutates nothing. Its `load` doesn't bubble, so catch it on the way
+      // down.
+      const onLoad = (event: Event): void => {
+        if (event.target instanceof HTMLLinkElement) {
+          apply(forced);
+        }
+      };
+      document.addEventListener("load", onLoad, true);
       return () => {
         observer.disconnect();
+        document.removeEventListener("load", onLoad, true);
         apply(undefined);
       };
     });
