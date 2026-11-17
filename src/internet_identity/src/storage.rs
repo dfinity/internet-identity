@@ -1622,111 +1622,13 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         // The record is read back only to keep its own fields.
         let mut app = NotificationApp::from(stored);
-        // What is waiting survives only a rewrite of the same address, which is what a
-        // rotation refresh does. A subscribe cannot reach it: that passes through a
-        // pending registration, which has no address to compare. Anything else leaves
-        // entries announced to an address nothing listens on, and a full inbox posts no
-        // wake-up for what arrives after them.
-        let same_address = matches!(
-            (
-                app.webpush_subscription
-                    .as_ref()
-                    .and_then(WebPushSubscription::ready),
-                subscription.as_ref().and_then(WebPushSubscription::ready),
-            ),
-            (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
-        );
         app.webpush_subscription = subscription;
         if let Some(now) = used_at_ns {
             app.last_used_ns = now;
         }
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
-        if !same_address {
-            self.clear_queues_routed_through(app_id);
-        }
         Ok(())
-    }
-
-    /// Drops what every browser routing through `app_id` had waiting.
-    /// Left in place, entries nobody can show would suppress every wake-up until they expire.
-    fn clear_queues_routed_through(&mut self, app_id: NotificationAppId) {
-        for anchor_number in self.anchors_with_notification_app(app_id) {
-            let Ok(mut anchor) = self.read(anchor_number) else {
-                ic_cdk::println!(
-                    "Failed to read anchor {anchor_number} to clear what app {app_id} queued"
-                );
-                continue;
-            };
-            // Every entry pointing at the record, not only those it delivered for:
-            // Internet Identity's own go to the app's address whatever the entry
-            // registered for itself, so they die with that address even where the rest
-            // of the queue does not.
-            let pointing: Vec<BrowserId> = anchor
-                .browsers()
-                .iter()
-                .filter(|browser| browser.is_pointing_at(app_id))
-                .map(|browser| browser.id)
-                .collect();
-            // What was posted to an installed app on one of them stays: its address is
-            // the app's.
-            let mut cleared_notifications: Vec<(BrowserId, Vec<InboxNotification>)> = Vec::new();
-            for browser_id in pointing {
-                let held = anchor.notifications_for_browser(browser_id).to_vec();
-                if held.is_empty() {
-                    continue;
-                }
-                let (installed_app_copies, cleared): (Vec<_>, Vec<_>) =
-                    held.into_iter().partition(|entry| {
-                        self.is_installed_app_copy(anchor_number, browser_id, entry)
-                    });
-                if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                    *inbox = installed_app_copies;
-                }
-                if !cleared.is_empty() {
-                    cleared_notifications.push((browser_id, cleared));
-                }
-            }
-            if cleared_notifications.is_empty() {
-                continue;
-            }
-            if let Err(err) = self.write(anchor) {
-                ic_cdk::println!(
-                    "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
-                );
-                continue;
-            }
-            for (browser_id, entries) in &cleared_notifications {
-                delivery_metrics::count_removed_entries(
-                    anchor_number,
-                    *browser_id,
-                    entries,
-                    delivery_metrics::Reason::SubscriptionReplaced,
-                );
-            }
-        }
-    }
-
-    /// Whether `entry` in `browser_id`'s inbox was posted to an installed app there rather
-    /// than to the browser's own route: an app's entry for an account the app's installed
-    /// app on that browser delivers for.
-    pub(crate) fn is_installed_app_copy(
-        &self,
-        anchor_number: AnchorNumber,
-        browser_id: BrowserId,
-        entry: &InboxNotification,
-    ) -> bool {
-        let InboxNotificationKind::App { account_principal } = entry.kind else {
-            return false;
-        };
-        self.lookup_account_with_principal(account_principal)
-            .filter(|account| account.anchor_number == anchor_number)
-            .and_then(|account| self.lookup_application_number_with_origin(&account.origin))
-            .and_then(|application_number| {
-                self.anchor_application_config(anchor_number, application_number)
-            })
-            .and_then(|config| config.pwa_webpush_subscription(browser_id))
-            .is_some_and(|held| held.account_principal == account_principal)
     }
 
     /// Stamps that the app `app_id` names has just called, which is the only evidence
@@ -1806,8 +1708,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// Drops every reference to `app_id`, and with it what that record's address was
-    /// carrying for the entries it delivered to.
+    /// Drops every reference to `app_id`.
     ///
     /// `Err` where an anchor could not be read or written, naming the first that failed.
     /// Every other anchor is still attempted, so a failure here is a partial one and the
@@ -4112,12 +4013,8 @@ impl<M: Memory + Clone> Storage<M> {
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
         // A browser the identity signed out of must stop being notified for it. The entry
-        // itself stays, and so does the app it points at.
+        // itself stays, and so do the app it points at and what its inbox holds.
         anchor.set_webpush_subscription(browser_id, None);
-        let cleared_notifications = anchor
-            .notifications_for_browser_mut(browser_id)
-            .map(std::mem::take)
-            .unwrap_or_default();
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -4140,12 +4037,6 @@ impl<M: Memory + Clone> Storage<M> {
         self.remove_pwa_webpush_subscriptions_of_browsers(
             anchor_number,
             &BTreeSet::from([browser_id]),
-        );
-        delivery_metrics::count_removed_entries(
-            anchor_number,
-            browser_id,
-            &cleared_notifications,
-            delivery_metrics::Reason::BrowserSignedOut,
         );
 
         Ok(revoked)

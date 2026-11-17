@@ -1306,21 +1306,63 @@ fn should_drop_only_the_revoked_apps_entries() -> Result<(), RejectResponse> {
 }
 
 #[test]
-fn should_keep_the_installed_apps_entry_when_the_browser_subscribes_again(
-) -> Result<(), RejectResponse> {
+fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor, first) = install_subscribed(&env);
+    // The same browser at the other app, which has no installed app and is woken through
+    // the browser's own subscription.
+    let browser = BrowserKey::new(1).successor();
+    let at_other_app = sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, OTHER_APP, &browser),
+    );
+    grant_consent(&env, canister_id, principal_1(), anchor, OTHER_APP.into())?
+        .expect("grant refused");
+    let browser_key = browser.successor().principal();
     assert_eq!(
         deliver(&env, canister_id, first.account_principal, 1, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
+    send_accepted_from(
+        &env,
+        canister_id,
+        OTHER_APP,
+        at_other_app.account_principal,
+        2,
+        200,
+    );
+    assert_eq!(
+        answer_outcalls(&env, 200),
+        vec![BROWSER_ENDPOINT.to_string()]
+    );
+    let read = |inbox_notification_id| {
+        browser_get_notification(
+            &env,
+            canister_id,
+            browser_key,
+            GetNotificationRequest {
+                anchor_number: anchor,
+                browser_id: first.browser_id,
+                inbox_notification_id,
+            },
+        )
+        .expect("read rejected")
+        .expect("read refused")
+        .notification
+        .map(|notification| notification.id)
+    };
+    let both_held = |read: &dyn Fn(InboxNotificationId) -> Option<u64>| {
+        assert_eq!(read(0), Some(1), "the installed app's entry");
+        assert_eq!(read(1), Some(2), "the browser's own entry");
+    };
 
-    // The browser's own subscription moves, which empties what was posted to it, but not
-    // what was posted to the installed app on the same browser.
+    // The browser subscribes again, somewhere else.
     subscribe_webpush(
         &env,
         canister_id,
-        BrowserKey::new(1).successor().principal(),
+        browser_key,
         SetWebPushSubscriptionRequest {
             anchor_number: anchor,
             endpoint: format!("{BROWSER_ENDPOINT}/moved"),
@@ -1330,7 +1372,7 @@ fn should_keep_the_installed_apps_entry_when_the_browser_subscribes_again(
         },
     )?
     .expect("subscribe refused");
-
+    both_held(&read);
     assert_eq!(
         get_entry(&env, canister_id, session_of(&first)),
         Some(PwaNotification {
@@ -1338,6 +1380,34 @@ fn should_keep_the_installed_apps_entry_when_the_browser_subscribes_again(
             id: 1,
         })
     );
+
+    // Its push service calls the new subscription gone.
+    send_accepted_from(
+        &env,
+        canister_id,
+        OTHER_APP,
+        at_other_app.account_principal,
+        3,
+        404,
+    );
+    assert_eq!(
+        answer_outcalls(&env, 404),
+        vec![format!("{BROWSER_ENDPOINT}/moved")]
+    );
+    both_held(&read);
+
+    // The identity signs the browser out.
+    revoke_browser_sessions(
+        &env,
+        canister_id,
+        principal_1(),
+        RevokeBrowserSessionsRequest {
+            identity_number: anchor,
+            browser_id: first.browser_id,
+        },
+    )?
+    .expect("sign-out refused");
+    both_held(&read);
     Ok(())
 }
 

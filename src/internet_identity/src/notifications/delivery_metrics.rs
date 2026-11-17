@@ -258,15 +258,11 @@ pub(crate) enum Reason {
     PayloadUnreachable,
     /// The app's canister rejected the service worker's call for the content, or trapped.
     PayloadRejected,
-    /// The address it was pushed to was replaced or dropped, which clears the inbox.
-    SubscriptionReplaced,
     /// Pushed out of a full inbox by a newer entry.
     InboxFull,
     ConsentRevoked,
     /// The identity went over its browser cap and this browser was given up.
     BrowserEvicted,
-    /// The user signed this browser out.
-    BrowserSignedOut,
 }
 
 impl Reason {
@@ -296,11 +292,9 @@ impl Reason {
             Reason::FetchedTooLate => "fetched_too_late",
             Reason::PayloadUnreachable => "payload_unreachable",
             Reason::PayloadRejected => "payload_rejected",
-            Reason::SubscriptionReplaced => "subscription_replaced",
             Reason::InboxFull => "inbox_full",
             Reason::ConsentRevoked => "consent_revoked",
             Reason::BrowserEvicted => "browser_evicted",
-            Reason::BrowserSignedOut => "browser_signed_out",
         }
     }
 
@@ -330,11 +324,9 @@ impl Reason {
             | Reason::FetchedTooLate
             | Reason::PayloadUnreachable
             | Reason::PayloadRejected
-            | Reason::SubscriptionReplaced
             | Reason::InboxFull
             | Reason::ConsentRevoked
-            | Reason::BrowserEvicted
-            | Reason::BrowserSignedOut => DropPoint::Deliver,
+            | Reason::BrowserEvicted => DropPoint::Deliver,
         }
     }
 }
@@ -1467,12 +1459,12 @@ mod tests {
     fn a_copy_is_counted_once_however_often_it_is_removed() {
         let entry = fan_out_to_two_browsers();
         count_push_outcome(1, 0, &entry, Path::Chrome, Err(Reason::RelayGone));
-        count_removed_entries(1, 1, [&entry], Reason::SubscriptionReplaced);
-        count_removed_entries(1, 1, [&entry], Reason::SubscriptionReplaced);
+        count_removed_entries(1, 1, [&entry], Reason::InboxFull);
+        count_removed_entries(1, 1, [&entry], Reason::InboxFull);
         count_collected(1, 1, &entry, LATER);
 
         assert_eq!(push_loss_count_for_testing("relay_gone"), 1);
-        assert_eq!(push_loss_count_for_testing("subscription_replaced"), 1);
+        assert_eq!(push_loss_count_for_testing("inbox_full"), 1);
         assert_eq!(push_loss_count_for_testing("never_fetched"), 0);
         assert_eq!(push_count_for_testing("delivered"), 0);
     }

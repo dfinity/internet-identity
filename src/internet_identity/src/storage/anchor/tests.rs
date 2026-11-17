@@ -1593,7 +1593,7 @@ mod browser_tests {
     }
 
     #[test]
-    fn taking_an_app_off_an_entry_drops_what_it_had_waiting() {
+    fn taking_an_app_off_an_entry_keeps_what_it_has_waiting() {
         let mut anchor = anchor();
         let (first, _) = anchor
             .resolve_browser(
@@ -1627,7 +1627,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(second, 7);
 
-        assert!(anchor.notifications_for_browser(first).is_empty());
+        assert_eq!(anchor.notifications_for_browser(first).len(), 1);
     }
 
     /// A browser entry still carrying the retired inbox, key 11, reads with that inbox
@@ -1679,7 +1679,7 @@ mod browser_tests {
     }
 
     #[test]
-    fn repointing_a_browser_drops_what_the_old_app_was_sent() {
+    fn repointing_a_browser_keeps_what_is_waiting() {
         let mut anchor = anchor();
         let (id, _) = anchor
             .resolve_browser(
@@ -1708,7 +1708,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(id, 8);
 
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     /// A reference naming a record that is gone is no app this identity has. The record
@@ -2397,7 +2397,7 @@ mod browser_tests {
     /// A browser has one route: pointing at a record takes the address it registered for
     /// itself, and what that address was sent goes with it.
     #[test]
-    fn pointing_at_an_app_takes_the_browsers_own_address_and_what_it_was_sent() {
+    fn pointing_at_an_app_takes_the_browsers_own_address() {
         let (mut anchor, id) = anchor_with_browser();
         anchor
             .set_webpush_subscription(id, Some(subscription_at("https://push.example/one", 1_000)));
@@ -2417,7 +2417,7 @@ mod browser_tests {
         anchor.point_at_notification_app(id, 7);
 
         assert!(anchor.webpush_subscription(id).is_none());
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     /// The other half of one route per browser: registering an address of its own is how
@@ -2465,7 +2465,7 @@ mod browser_tests {
     /// An install that has not completed is a route of its own: what was posted while
     /// the entry pointed at the app before it is unreadable by the app that finishes.
     #[test]
-    fn finishing_an_install_over_an_old_app_drops_what_that_app_was_sent() {
+    fn finishing_an_install_over_an_old_app_keeps_what_is_waiting() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.point_at_notification_app(id, 7);
         anchor
@@ -2484,7 +2484,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(id, 8);
 
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     #[test]

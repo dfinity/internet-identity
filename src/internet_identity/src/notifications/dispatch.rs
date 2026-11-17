@@ -1071,8 +1071,9 @@ pub(crate) fn can_wake<M: Memory + Clone>(
 }
 
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
-/// way: a relay that lost the subscription takes the registration and the queue with
-/// it, and any other failure removes an entry, since no wake-up is coming for it.
+/// way: a relay that lost the subscription takes the registration with it, and an
+/// installed app's entry with its own, and any other failure removes an entry, since no
+/// wake-up is coming for it.
 pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     record_post_outcome(outcome);
     if let Some(notification) = delivery.notification.as_ref() {
@@ -2104,7 +2105,7 @@ mod tests {
     }
 
     #[test]
-    fn a_relay_that_lost_the_subscription_takes_the_registration_and_queue_with_it() {
+    fn a_relay_that_lost_the_subscription_takes_the_registration_and_leaves_the_queue() {
         setup();
         let (recipient, browsers) = subscribed_recipient(2);
         submit(recipient, 7, 10 * SECOND_NS);
@@ -2113,7 +2114,7 @@ mod tests {
         settle(&deliveries[0], PostOutcome::Gone);
 
         assert!(stored_subscription(recipient, browsers[0]).is_none());
-        assert!(queued(recipient, browsers[0]).is_empty());
+        assert_eq!(queued(recipient, browsers[0]), vec![7]);
         assert!(stored_subscription(recipient, browsers[1]).is_some());
         assert_eq!(queued(recipient, browsers[1]), vec![7]);
     }
@@ -2348,7 +2349,7 @@ mod tests {
 
         settle(&delivery, PostOutcome::RelayError);
 
-        assert_eq!(queued(recipient, browsers[0]), vec![8]);
+        assert_eq!(queued(recipient, browsers[0]), vec![7, 8]);
     }
 
     #[test]

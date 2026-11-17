@@ -1194,9 +1194,6 @@ impl Anchor {
                     .is_some_and(|reference| reference.linked_app() == Some(app_id))
             {
                 browser.notification_app = None;
-                // The record's address belongs to the entry being pointed now, and this
-                // one has no address of its own to have been posted at.
-                browser.notifications.clear();
             }
         }
         let Some(browser) = self
@@ -1207,11 +1204,8 @@ impl Anchor {
             return;
         };
         // A browser has one route. Pointing at a record leaves behind whatever address it
-        // registered for itself, and what is waiting goes with it: the entry only reaches
-        // here because the record it points at changed, so everything queued was posted
-        // somewhere this browser no longer reads.
+        // registered for itself.
         browser.webpush_subscription = None;
-        browser.notifications.clear();
         browser.notification_app = Some(NotificationAppRef::Linked { app_id, enabled });
     }
 
@@ -1254,8 +1248,7 @@ impl Anchor {
         browser.notifications.clear();
     }
 
-    /// Forgets `app_id` on every entry of this identity that points at it, and what the
-    /// record's address was carrying for them.
+    /// Forgets `app_id` on every entry of this identity that points at it.
     ///
     /// The record itself is not this list's to delete: only a caller holding every anchor
     /// can see whether another identity still points at it.
@@ -1265,10 +1258,6 @@ impl Anchor {
                 continue;
             }
             browser.notification_app = None;
-            // Everything waiting went to the record's address, because a browser pointing
-            // at a record has no address of its own, and nothing can read that one once
-            // the record is gone.
-            browser.notifications.clear();
         }
     }
 

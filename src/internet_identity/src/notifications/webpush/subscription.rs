@@ -5,15 +5,12 @@ use super::pwa_subscription::clear_gone_pwa_subscription;
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
 use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
-use crate::notifications::delivery_metrics::{self, Reason};
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::NotificationAppRef;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{
-    Anchor, InboxNotification, PendingTransport, ReadySubscription, WebPushSubscription,
-};
+use crate::storage::anchor::{Anchor, PendingTransport, ReadySubscription, WebPushSubscription};
 use crate::storage::{PwaSubscriptionHolder, Storage};
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
@@ -171,34 +168,10 @@ pub fn remove_subscription(
 fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Result<(), String> {
     let mut anchor =
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
-    let cleared_notifications = take_inbox(&mut anchor, browser_id);
     // The reference stays, because it is which app this browser has rather than whether
     // it is routing.
     anchor.disable_notification_app(browser_id);
-    write_subscription(anchor, browser_id, None)?;
-    delivery_metrics::count_removed_entries(
-        anchor_number,
-        browser_id,
-        &cleared_notifications,
-        Reason::SubscriptionReplaced,
-    );
-    Ok(())
-}
-
-/// Empties the browser's inbox of what was posted to its own registration, answering it.
-/// What was posted to an installed app on the browser stays: its address is the app's.
-fn take_inbox(anchor: &mut Anchor, browser_id: BrowserId) -> Vec<InboxNotification> {
-    let anchor_number = anchor.anchor_number();
-    let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
-        return Vec::new();
-    };
-    let (installed_app_copies, taken): (Vec<_>, Vec<_>) = storage_borrow(|storage| {
-        std::mem::take(inbox)
-            .into_iter()
-            .partition(|entry| storage.is_installed_app_copy(anchor_number, browser_id, entry))
-    });
-    *inbox = installed_app_copies;
-    taken
+    write_subscription(anchor, browser_id, None)
 }
 
 /// `target` says who held the posted endpoint, rather than whoever the entry points at by
@@ -304,28 +277,15 @@ pub fn subscription_status(
         })
 }
 
-/// Writes what this browser registered, and empties the inbox the old address leaves.
-///
-/// An inbox holds wake-ups already posted to one address. Every write here takes that
-/// address away: a prepare replaces the registration with a pending one, a subscribe
-/// spends that pending one, and signing out drops it. None can still show what was
-/// announced before, and entries nothing will show would fill the inbox against what
-/// arrives next.
+/// Writes what this browser registered. The inbox stays as it is: its entries leave when
+/// they are collected or removed, expire, or are pushed out of a full inbox.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    let cleared_notifications = take_inbox(&mut anchor, browser_id);
-    let anchor_number = anchor.anchor_number();
     let left = anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
-    delivery_metrics::count_removed_entries(
-        anchor_number,
-        browser_id,
-        &cleared_notifications,
-        Reason::SubscriptionReplaced,
-    );
     // Read after the write, so the reference this browser just dropped is already gone:
     // a record the last browser left behind is one nothing can reach again.
     if let Some(app_id) = left {
@@ -416,7 +376,7 @@ mod tests {
     /// A different address is a different registration, so what was announced to the old
     /// one goes with it.
     #[test]
-    fn moving_address_drops_what_was_queued_for_the_old_one() {
+    fn moving_address_keeps_what_was_queued() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         try_subscribe(anchor_number, browsers[0], ENDPOINT, 500).expect("the first subscribe");
@@ -426,7 +386,7 @@ mod tests {
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.created_at_ns, 9_000);
-        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
     }
 
     /// The key a fetch left is good for minutes, not forever.
@@ -647,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    fn removing_a_registration_takes_its_browser_inbox_with_it() {
+    fn removing_a_registration_leaves_its_browser_inbox() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(2);
         for browser in &browsers {
@@ -657,13 +617,13 @@ mod tests {
 
         remove(anchor_number, browsers[0]);
 
-        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
         assert_eq!(queued(anchor_number, browsers[1]), 1);
     }
 
     /// Wake-ups for what was queued went to the old endpoint, so none reach the new one.
     #[test]
-    fn a_rotated_endpoint_leaves_the_old_browser_inbox_behind() {
+    fn a_rotated_endpoint_keeps_the_browser_inbox() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
@@ -671,7 +631,7 @@ mod tests {
 
         subscribe(anchor_number, browsers[0], ROTATED, 2_000);
 
-        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
     }
 
     #[test]

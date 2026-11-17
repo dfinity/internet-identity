@@ -4,8 +4,9 @@
 //! collects one on every wake-up, so wake-ups and collected notifications stay one to
 //! one. What the worker renders afterwards is its own business, not this module's.
 //!
-//! The inbox lives on the browser's entry, and is cleared when its wake-up address
-//! changes.
+//! The inbox lives on the browser's entry. An entry leaves it when the worker collects or
+//! removes it, when it expires or is pushed out of a full inbox, when its wake-up fails,
+//! and when the identity stops allowing its app.
 
 use crate::notifications::delivery_metrics::{self, Reason};
 use crate::notifications::dispatch::DeliveryTarget;
@@ -975,7 +976,7 @@ mod tests {
     }
 
     #[test]
-    fn a_signed_out_browser_has_nothing_collectable() {
+    fn a_signed_out_browser_keeps_what_it_has_waiting() {
         let (anchor_number, browser_id) = signed_in();
         put(
             anchor_number,
@@ -987,11 +988,7 @@ mod tests {
         })
         .expect("signing the browser out");
 
-        assert_eq!(
-            first_collectable_id(anchor_number, browser_id, 2 * SECOND_NS),
-            None
-        );
-        assert!(left_for(anchor_number, browser_id).is_empty());
+        assert_eq!(left_for(anchor_number, browser_id), vec![1]);
     }
 
     #[test]
