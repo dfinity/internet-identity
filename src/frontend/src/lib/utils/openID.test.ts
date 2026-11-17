@@ -684,7 +684,7 @@ describe("requestWithPopup", () => {
     const rejection = expect(result).rejects.toBeInstanceOf(
       CallbackPopupClosedError,
     );
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(6000);
     await rejection;
   });
 
@@ -694,9 +694,9 @@ describe("requestWithPopup", () => {
     // The callback page posts the payload and closes itself back to back.
     // The popup already reads as closed while the message is in flight.
     popup.closed = true;
-    // Polls at 250, 500, 750 and 1000 ms all see the popup closed, 750 ms
-    // into the grace period that starts at the first of them.
-    await vi.advanceTimersByTimeAsync(1000);
+    // Polls from 250 ms to 5000 ms all see the popup closed, 4750 ms into
+    // the grace period that starts at the first of them.
+    await vi.advanceTimersByTimeAsync(5000);
     expect(channel.closed).toBe(false);
 
     channel.deliver({ id_token: "token", state });
@@ -714,9 +714,9 @@ describe("requestWithPopup", () => {
     });
 
     popup.closed = true;
-    // The first poll to see the popup closed is at 250 ms, so the 1 s grace
-    // period runs out at the 1250 ms poll.
-    await vi.advanceTimersByTimeAsync(1000);
+    // The first poll to see the popup closed is at 250 ms, so the 5 s grace
+    // period runs out at the 5250 ms poll.
+    await vi.advanceTimersByTimeAsync(5000);
     expect(error).toBeUndefined();
     expect(channel.closed).toBe(false);
 
