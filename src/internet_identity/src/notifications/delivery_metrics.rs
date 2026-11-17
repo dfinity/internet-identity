@@ -1090,6 +1090,22 @@ pub(crate) fn count_collected(
     });
 }
 
+/// Follows an entry whose account was renumbered from `previous` to `current`, so its
+/// copies are still found when they are collected or removed. Every browser's copy of a
+/// notification shares one record, so only the first of them finds anything to move.
+pub(crate) fn move_entry(
+    anchor_number: AnchorNumber,
+    previous: &InboxNotification,
+    current: &InboxNotification,
+) {
+    with(|counters| {
+        let Some(live) = counters.live.remove(&live_key(anchor_number, previous)) else {
+            return;
+        };
+        counters.live.insert(live_key(anchor_number, current), live);
+    });
+}
+
 /// Entries taken out of an inbox, for `reason`, before a device collected them. Each is
 /// counted under the path it was posted by, and under `path` where it records none.
 pub(crate) fn count_removed_entries<'a>(

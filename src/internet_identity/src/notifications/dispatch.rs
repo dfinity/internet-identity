@@ -633,11 +633,21 @@ fn fan_out_to_browsers(
             .iter()
             .map(|browser| routed_app(storage, browser))
             .collect();
+        // The account the recipient is at now: naming the unreserved default account
+        // gives it a number, under the same principal, while this waits in the backlog.
+        let account_number = storage
+            .lookup_account_with_principal(pending.recipient)
+            .filter(|account| account.anchor_number == pending.anchor_number)
+            .map_or(pending.account_number, |account| account.account_number);
+        let queued_entry = InboxNotification {
+            account_number,
+            ..queued_entry
+        };
         let pwa_route = PwaRoute::read(
             storage,
             pending.anchor_number,
             pending.application_number,
-            pending.account_number,
+            account_number,
         );
         // The sealing keys travel with each wake-up: the deposit that names its entry
         // happens below, after this borrow of the browsers has ended.

@@ -2652,22 +2652,30 @@ impl<M: Memory + Clone> Storage<M> {
             None => None,
         };
 
-        // The tracked default's installed app subscriptions follow it to the number it was
-        // given, as its sessions do, so naming it does not take its installed app off.
-        let config = match minted.as_slice() {
+        // The number the tracked default was given, where this write names it.
+        let renamed_default = match minted.as_slice() {
             [account_number]
                 if previous_holds_tracked_default
                     && !references
                         .iter()
                         .any(|reference| reference.account_number.is_none()) =>
             {
+                Some(*account_number)
+            }
+            _ => None,
+        };
+
+        // The tracked default's installed app subscriptions follow it to the number it was
+        // given, as its sessions do, so naming it does not take its installed app off.
+        let config = match renamed_default {
+            Some(account_number) => {
                 let mut renamed = config.clone().unwrap_or_else(|| stored_config.clone());
-                match renamed.move_pwa_webpush_subscriptions(None, Some(*account_number)) {
+                match renamed.move_pwa_webpush_subscriptions(None, Some(account_number)) {
                     true => Some(renamed),
                     false => config,
                 }
             }
-            _ => config,
+            None => config,
         };
 
         // A config names this identity's default here, so it can only name an account
@@ -2769,6 +2777,7 @@ impl<M: Memory + Clone> Storage<M> {
                 session_delta: 0,
                 previous_references: Vec::new(),
                 current_references: Vec::new(),
+                renamed_default: None,
             });
         }
 
@@ -2887,6 +2896,7 @@ impl<M: Memory + Clone> Storage<M> {
                 - Self::sessions_in(&previous_references) as i64,
             previous_references,
             current_references: references,
+            renamed_default,
         })
     }
 
@@ -2959,6 +2969,7 @@ impl<M: Memory + Clone> Storage<M> {
             session_delta: 0,
             previous_references: Vec::new(),
             current_references: Vec::new(),
+            renamed_default: None,
         };
 
         let Some(application_number) = stored_number else {
@@ -3018,6 +3029,7 @@ impl<M: Memory + Clone> Storage<M> {
             session_delta: -(Self::sessions_in(&previous) as i64),
             previous_references: previous,
             current_references: Vec::new(),
+            renamed_default: None,
         })
     }
 
@@ -3070,6 +3082,7 @@ impl<M: Memory + Clone> Storage<M> {
                 sessions_changed,
                 previous_references,
                 current_references,
+                renamed_default,
                 written: result,
                 ..
             } = one;
@@ -3150,6 +3163,14 @@ impl<M: Memory + Clone> Storage<M> {
                 self.store_anchor_application_config(key, Some(config));
             }
 
+            if let Some(account_number) = renamed_default {
+                Self::move_inbox_entries_to_account(
+                    &mut anchor,
+                    application_number,
+                    account_number,
+                );
+            }
+
             written.insert(origin, result);
         }
 
@@ -3171,6 +3192,33 @@ impl<M: Memory + Clone> Storage<M> {
             .expect("the identity record this write was handed cannot be written back");
 
         written
+    }
+
+    /// Moves what `application_number` queued for the tracked default in the identity's
+    /// inboxes to `account_number`, which the tracked default was given, so the sessions
+    /// that moved there with it can still collect it. Entries of the app's other accounts
+    /// stay where they are.
+    fn move_inbox_entries_to_account(
+        anchor: &mut Anchor,
+        application_number: ApplicationNumber,
+        account_number: AccountNumber,
+    ) {
+        let anchor_number = anchor.anchor_number();
+        let browser_ids: Vec<BrowserId> =
+            anchor.browsers().iter().map(|browser| browser.id).collect();
+        for browser_id in browser_ids {
+            let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
+                continue;
+            };
+            for entry in inbox.iter_mut().filter(|entry| {
+                entry.application_number == Some(application_number)
+                    && entry.account_number.is_none()
+            }) {
+                let previous = entry.clone();
+                entry.account_number = Some(account_number);
+                delivery_metrics::move_entry(anchor_number, &previous, entry);
+            }
+        }
     }
 
     /// The number the next application would be given, without giving it out.
@@ -5242,6 +5290,9 @@ struct ValidatedAccountReferenceListWrite {
     session_delta: i64,
     previous_references: Vec<AccountReference>,
     current_references: Vec<AccountReference>,
+    /// The number the tracked default was given, where this write named it. What is
+    /// queued for it in the identity's inboxes follows it there in apply.
+    renamed_default: Option<AccountNumber>,
     /// What this origin holds afterwards, handed back to the caller.
     written: AccountReferenceListWrite,
 }

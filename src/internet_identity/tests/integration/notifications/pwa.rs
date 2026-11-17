@@ -4,7 +4,8 @@
 
 use super::*;
 use canister_tests::api::internet_identity::api_v2::{
-    app_revoke_session, forget_applications, revoke_browser_sessions, update_account,
+    app_revoke_session, create_account, forget_applications, revoke_browser_sessions,
+    update_account,
 };
 use canister_tests::api::internet_identity::notifications::{
     app_get_pwa_notification, app_prepare_pwa_webpush_subscription, app_remove_pwa_notification,
@@ -29,6 +30,8 @@ const APP: &str = "https://listed-app.example";
 const OTHER_APP: &str = "https://listed-other.example";
 const PWA_ENDPOINT: &str = "https://pwa.push.example/device";
 const BROWSER_ENDPOINT: &str = "https://browser.push.example/device";
+/// An installed app endpoint at a relay no test posts to before it subscribes there.
+const UNPROBED_PWA_ENDPOINT: &str = "https://unprobed.push.example/device";
 /// An endpoint on Firebase Cloud Messaging, which the delivery funnel labels `chrome`.
 const FCM_ENDPOINT: &str = "https://fcm.googleapis.com/fcm/send/device";
 const MINUTE_NS: u64 = 60 * 1_000_000_000;
@@ -224,6 +227,19 @@ fn deliver(
     id: u64,
     push_status: u16,
 ) -> Vec<String> {
+    send_accepted(env, canister_id, recipient, id, push_status);
+    answer_outcalls(env, push_status)
+}
+
+/// Sends [`APP`]'s notification `id` to `recipient` until it is accepted, answering the
+/// sender list fetch that defers it.
+fn send_accepted(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    recipient: Principal,
+    id: u64,
+    push_status: u16,
+) {
     let send = || {
         app_send_notification(
             env,
@@ -253,7 +269,6 @@ fn deliver(
     } else {
         assert_eq!(first.not_accepted, vec![]);
     }
-    answer_outcalls(env, push_status)
 }
 
 /// Moves the clock on to `time_ns`.
@@ -988,6 +1003,99 @@ fn should_keep_the_endpoint_its_holder_is_subscribing_again() -> Result<(), Reje
             },
         )?,
         Ok(())
+    );
+    Ok(())
+}
+
+/// Names `principal_1`'s unreserved default account at [`APP`], which gives it a number.
+fn name_default_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    anchor: AnchorNumber,
+) -> Result<(), RejectResponse> {
+    update_account(
+        env,
+        canister_id,
+        principal_1(),
+        anchor,
+        APP.into(),
+        None,
+        AccountUpdate {
+            name: Some("Main".to_string()),
+        },
+    )?
+    .expect("naming the account refused");
+    Ok(())
+}
+
+#[test]
+fn should_hand_over_an_entry_queued_before_its_account_was_named() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+    let session = session_of(&first);
+    // Another account of the same identity at the same app, on the same browser.
+    let other_account = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        APP.into(),
+        "Other".to_string(),
+    )?
+    .expect("creating the account refused")
+    .account_number;
+    let other_session = session_of(&sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        PrepareAccountSessionRequest {
+            account_number: other_account,
+            ..session_request(anchor, APP, &BrowserKey::new(1).successor())
+        },
+    ));
+    assert_eq!(
+        deliver(&env, canister_id, first.account_principal, 1, 200),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+
+    name_default_account(&env, canister_id, anchor)?;
+
+    let expected = Some(PwaNotification {
+        canister_id: app_sender(),
+        id: 1,
+    });
+    assert_eq!(get_entry(&env, canister_id, session), expected);
+    assert_eq!(get_entry(&env, canister_id, other_session), None);
+    remove_entry(&env, canister_id, session);
+    assert_eq!(get_entry(&env, canister_id, session), None);
+    Ok(())
+}
+
+#[test]
+fn should_wake_the_installed_app_for_a_notification_waiting_while_its_account_was_named(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+    // Reads the sender list, so the next send is accepted at once.
+    deliver(&env, canister_id, first.account_principal, 1, 200);
+    // A relay no wake-up was posted to yet, so the next one waits in the backlog for its
+    // probe, which nothing answers until the account is named.
+    subscribe_pwa_webpush(
+        &env,
+        canister_id,
+        session_of(&first),
+        UNPROBED_PWA_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )?
+    .expect("subscribe refused");
+    send_accepted(&env, canister_id, first.account_principal, 2, 200);
+
+    name_default_account(&env, canister_id, anchor)?;
+
+    assert_eq!(
+        answer_outcalls(&env, 200),
+        vec![UNPROBED_PWA_ENDPOINT.to_string()]
     );
     Ok(())
 }
