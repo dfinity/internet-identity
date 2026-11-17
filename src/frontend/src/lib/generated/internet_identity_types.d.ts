@@ -2811,7 +2811,8 @@ export interface _SERVICE {
    * Returns II's VAPID public key, which the app passes to PushManager.subscribe, and a
    * new one-time transport public key. The app encrypts the subscription's auth secret
    * to that key and sends it with app_set_pwa_webpush_subscription within 5 minutes.
-   * Any existing subscription keeps receiving pushes until that call replaces it.
+   * It replaces this browser's existing subscription, if any, so the installed web app
+   * gets no pushes until app_set_pwa_webpush_subscription succeeds.
    * Pending: II has no fresh randomness to make the key yet. Call again shortly.
    */
   'app_prepare_pwa_webpush_subscription' : ActorMethod<
