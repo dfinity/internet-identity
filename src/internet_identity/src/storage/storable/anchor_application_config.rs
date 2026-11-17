@@ -1,4 +1,4 @@
-use crate::storage::anchor::{PendingTransport, WebPushSubscription};
+use crate::storage::anchor::WebPushSubscription;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
@@ -67,12 +67,6 @@ pub struct AnchorApplicationConfig {
     /// app never subscribed one, or every one it did was removed.
     #[n(4)]
     pub pwa_webpush_subscriptions: Option<BTreeMap<StorableBrowserId, StorablePwaSubscription>>,
-    /// The transport keys installed web apps fetched for a subscribe that has yet to land,
-    /// one per browser entry, held apart so the subscription a browser entry holds keeps
-    /// delivering and keeps its endpoint until the subscribe replaces it. Only the pending
-    /// half is read. None if no subscribe is waiting.
-    #[n(5)]
-    pub pwa_pending_transports: Option<BTreeMap<StorableBrowserId, StorableWebPushSubscription>>,
 }
 
 /// The identity's answer to an app asking for a permission. Switching the permission keeps
@@ -99,7 +93,6 @@ impl AnchorApplicationConfig {
             last_notified_at_ns: _,
             notifications,
             pwa_webpush_subscriptions: _,
-            pwa_pending_transports: _,
         } = self;
         notifications.is_some()
     }
@@ -111,14 +104,12 @@ impl AnchorApplicationConfig {
             last_notified_at_ns: _,
             notifications: _,
             pwa_webpush_subscriptions: _,
-            pwa_pending_transports: _,
         } = self;
         Self {
             default_account_number,
             last_notified_at_ns: None,
             notifications: None,
             pwa_webpush_subscriptions: None,
-            pwa_pending_transports: None,
         }
     }
 
@@ -139,38 +130,8 @@ impl AnchorApplicationConfig {
             .ok()
     }
 
-    /// The transport key fetched for a subscribe on `browser_id` that has yet to land.
-    pub fn pwa_pending_transport(&self, browser_id: BrowserId) -> Option<PendingTransport> {
-        let stored = self
-            .pwa_pending_transports
-            .as_ref()?
-            .get(&browser_id)?
-            .clone();
-        WebPushSubscription::try_from(stored)
-            .inspect_err(|reason| {
-                ic_cdk::println!(
-                    "ERROR: dropped the installed app transport key of browser {browser_id} as unreadable: {reason}"
-                );
-            })
-            .ok()?
-            .pending()
-            .cloned()
-    }
-
-    /// Puts `subscription` on `browser_id`, or with `None` empties it. Either way the
-    /// transport key of a subscribe waiting on `browser_id` is spent.
+    /// Puts `subscription` on `browser_id`, or with `None` empties it.
     pub fn set_pwa_webpush_subscription(
-        &mut self,
-        browser_id: BrowserId,
-        subscription: Option<PwaSubscription>,
-    ) {
-        self.refresh_pwa_webpush_subscription(browser_id, subscription);
-        put(&mut self.pwa_pending_transports, browser_id, None);
-    }
-
-    /// Puts `subscription` on `browser_id`, or with `None` empties it, leaving the
-    /// transport key of a subscribe waiting on `browser_id` to that subscribe.
-    pub fn refresh_pwa_webpush_subscription(
         &mut self,
         browser_id: BrowserId,
         subscription: Option<PwaSubscription>,
@@ -182,33 +143,17 @@ impl AnchorApplicationConfig {
         );
     }
 
-    /// Records the transport key fetched for a subscribe on `browser_id`, leaving the
-    /// subscription `browser_id` holds as it is.
-    pub fn set_pwa_pending_transport(&mut self, browser_id: BrowserId, pending: PendingTransport) {
-        put(
-            &mut self.pwa_pending_transports,
-            browser_id,
-            Some(StorableWebPushSubscription::from(
-                WebPushSubscription::Pending(pending),
-            )),
-        );
-    }
-
     /// Empties every browser entry in `browser_ids`, answering whether any held anything.
     pub fn remove_pwa_webpush_subscriptions_of_browsers(
         &mut self,
         browser_ids: &BTreeSet<StorableBrowserId>,
     ) -> bool {
-        let has_removed_subscription =
-            remove_browsers(&mut self.pwa_webpush_subscriptions, browser_ids);
-        let has_removed_transport = remove_browsers(&mut self.pwa_pending_transports, browser_ids);
-        has_removed_subscription || has_removed_transport
+        remove_browsers(&mut self.pwa_webpush_subscriptions, browser_ids)
     }
 
     /// Empties every browser entry.
     pub fn clear_pwa_webpush_subscriptions(&mut self) {
         self.pwa_webpush_subscriptions = None;
-        self.pwa_pending_transports = None;
     }
 }
 
@@ -284,7 +229,6 @@ mod tests {
                     account_principal: vec![5; 29],
                 },
             )])),
-            pwa_pending_transports: None,
         };
         assert_eq!(
             AnchorApplicationConfig::from_bytes(config.to_bytes()),
@@ -327,7 +271,6 @@ mod tests {
                     account_principal: vec![5; 29],
                 },
             )])),
-            pwa_pending_transports: None,
         };
         assert_eq!(
             config.forgotten(),
@@ -336,7 +279,6 @@ mod tests {
                 last_notified_at_ns: None,
                 notifications: None,
                 pwa_webpush_subscriptions: None,
-                pwa_pending_transports: None,
             }
         );
     }

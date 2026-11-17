@@ -9,7 +9,7 @@ use canister_tests::api::internet_identity::api_v2::{
 };
 use canister_tests::api::internet_identity::notifications::{
     app_get_pwa_notification, app_prepare_pwa_webpush_subscription, app_remove_pwa_notification,
-    app_send_notification, app_set_pwa_webpush_subscription, seal_auth, subscribe_pwa_webpush,
+    app_send_notification, app_set_pwa_webpush_subscription, subscribe_pwa_webpush,
     subscribe_webpush, TEST_AUTH_SECRET,
 };
 use canister_tests::framework::{get_metrics, II_WASM_PREVIOUS};
@@ -18,8 +18,8 @@ use internet_identity_interface::internet_identity::types::{
     AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionResult,
     AppRemovePwaNotificationError, AppRemovePwaNotificationRequest,
     AppSetPwaWebPushSubscriptionError, AppSetPwaWebPushSubscriptionRequest, NotAcceptedReason,
-    Notification, PrepareAccountSessionResponse, PwaNotification, PwaWebPushSubscription,
-    RevokeBrowserSessionsRequest, SendNotificationArg, SetWebPushSubscriptionRequest,
+    Notification, PrepareAccountSessionResponse, PwaNotification, RevokeBrowserSessionsRequest,
+    SendNotificationArg, SetWebPushSubscriptionRequest,
 };
 use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
 use std::time::Duration;
@@ -965,48 +965,6 @@ fn delivered_pushes(metrics: &str, path: &str) -> f64 {
         .filter(|line| line.contains(&path_label))
         .filter_map(|line| line.split_whitespace().nth(1)?.parse::<f64>().ok())
         .sum()
-}
-
-#[test]
-fn should_keep_the_endpoint_its_holder_is_subscribing_again() -> Result<(), RejectResponse> {
-    let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
-    let session = session_of(&first);
-
-    let keys = loop {
-        match app_prepare_pwa_webpush_subscription(&env, canister_id, session)? {
-            AppPreparePwaWebPushSubscriptionResult::Ok(keys) => break keys,
-            AppPreparePwaWebPushSubscriptionResult::Pending => continue,
-            AppPreparePwaWebPushSubscriptionResult::Err(err) => panic!("prepare refused: {err:?}"),
-        }
-    };
-
-    // Between the key fetch and the subscribe, the endpoint is still held and delivers.
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
-    assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
-        vec![PWA_ENDPOINT.to_string()]
-    );
-
-    let (transport_key, sealed_auth) = seal_auth(&keys.transport_public_key, &TEST_AUTH_SECRET);
-    assert_eq!(
-        app_set_pwa_webpush_subscription(
-            &env,
-            canister_id,
-            session,
-            AppSetPwaWebPushSubscriptionRequest {
-                subscription: Some(PwaWebPushSubscription {
-                    endpoint: PWA_ENDPOINT.to_string(),
-                    p256dh: p256dh(9),
-                    transport_key,
-                    sealed_auth,
-                }),
-            },
-        )?,
-        Ok(())
-    );
-    Ok(())
 }
 
 /// Names `principal_1`'s unreserved default account at [`APP`], which gives it a number.
