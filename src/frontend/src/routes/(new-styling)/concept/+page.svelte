@@ -2,8 +2,8 @@
   import "./surfaces.css";
   import {
     ArrowRightToLineIcon,
-    AtSignIcon,
     BellOffIcon,
+    BookOpenIcon,
     BotIcon,
     BriefcaseMedicalIcon,
     CheckIcon,
@@ -13,6 +13,7 @@
     Grid2x2CheckIcon,
     KeyRoundIcon,
     LogOutIcon,
+    MailIcon,
     PanelBottomIcon,
     PanelRightIcon,
     PanelTopIcon,
@@ -20,6 +21,7 @@
     MoonIcon,
     PlusIcon,
     SunIcon,
+    UserRoundIcon,
   } from "@lucide/svelte";
   import { tick, untrack, type Component } from "svelte";
   import { quintOut } from "svelte/easing";
@@ -48,6 +50,7 @@
   import BulkView from "./components/BulkView.svelte";
   import ConnectPage from "./components/ConnectPage.svelte";
   import Elevated from "./components/Elevated.svelte";
+  import type { Glyph } from "./components/Glyphs.svelte";
   import SurfaceLevel from "./components/SurfaceLevel.svelte";
   import Popup from "./components/Popup.svelte";
   import AppRow from "./components/AppRow.svelte";
@@ -93,7 +96,6 @@
     incidentOf,
     isOn,
     phraseStatus,
-    type MethodStatus,
     isLoud,
     leadActionOf,
     leadOf,
@@ -208,18 +210,60 @@
    *  identity is signed in. Apps are managed from the grid itself
    *  (Manage, by All apps' heading), so the account doesn't list them too. */
   const ACCOUNT_KINDS: CardKind[] = ["access", "recovery", "devices"];
-  /** A way back in, as the recovery card's preview says it. */
-  const RECOVERY_SAID: Record<MethodStatus, string> = {
-    off: "not set up",
-    on: "on",
-    inUse: "in use",
-    new: "reset",
-  };
   const accountCards = $derived(
     ACCOUNT_KINDS.map((kind) =>
       cards.find((card) => card.kind === kind),
     ).filter((card) => card !== undefined),
   );
+  /** What a card's message is about, as icons beside it: neutral, what's
+   *  inside (the ways in, the ways back in, the browsers); otherwise only
+   *  the item it's about, marked, as Thomas asked ("New sign-in" with the
+   *  browser's icon, "3 browsers" with theirs). */
+  const glyphsOf = (card: CardStatus): Glyph[] => {
+    const { scenario } = current;
+    const neutral = card.tone === "neutral";
+    if (card.kind === "access") {
+      if (card.tone === "warning") {
+        return [{ id: "add", icon: PlusIcon, empty: true }];
+      }
+      if (!neutral) {
+        return [{ id: "yubikey", icon: KeyRoundIcon, marked: true }];
+      }
+      return accessCount(scenario.access) === 1
+        ? [{ id: "current", icon: PasskeyIcon }]
+        : [
+            { id: "current", icon: PasskeyIcon },
+            { id: "yubikey", icon: KeyRoundIcon },
+            { id: "google", icon: UserRoundIcon },
+          ];
+    }
+    if (card.kind === "recovery") {
+      const phrase = phraseStatus(scenario.recovery);
+      const email = emailStatus(scenario.recovery);
+      if (!isOn(phrase) && !isOn(email)) {
+        return [
+          { id: "phrase", icon: BookOpenIcon, empty: true },
+          { id: "email", icon: MailIcon, empty: true },
+        ];
+      }
+      if (!neutral) {
+        return [{ id: "phrase", icon: BookOpenIcon, marked: true }];
+      }
+      return [
+        ...(isOn(phrase) ? [{ id: "phrase", icon: BookOpenIcon }] : []),
+        ...(isOn(email) ? [{ id: "email", icon: MailIcon }] : []),
+      ];
+    }
+    const shown = neutral
+      ? browsers.slice(0, 3)
+      : browsers.filter(({ isNew }) => isNew === true);
+    return shown.map((browser) => ({
+      id: browser.id,
+      src: brandIconOf(browser.description),
+      icon: MonitorSmartphoneIcon,
+      marked: !neutral,
+    }));
+  };
   /** The identities to switch to: every one on the device but this. */
   const otherIdentities = $derived(
     identities
@@ -1370,80 +1414,6 @@
   />
 {/snippet}
 
-{#snippet accessPreview()}
-  {@const methods =
-    accessCount(current.scenario.access) === 1
-      ? [PasskeyIcon]
-      : [PasskeyIcon, KeyRoundIcon, AtSignIcon]}
-  <!-- Up to three of the ways in, as overlapping circles, and how many. Each
-       cuts itself out of the card (StatusCard's surface); bg-secondary keeps
-       them apart from it in light, where a raised card is white. -->
-  <span class="flex items-center">
-    {#each methods as Glyph, index (index)}
-      <span
-        class={[
-          "bg-bg-secondary text-fg-tertiary grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-card-surface)",
-          index > 0 && "-ms-2",
-        ]}
-      >
-        <Glyph class="size-3.5" />
-      </span>
-    {/each}
-  </span>
-  <span class="text-text-tertiary text-[13px] leading-[18px]">
-    {methods.length === 1
-      ? "One way to sign in"
-      : `${methods.length} ways to sign in`}
-  </span>
-{/snippet}
-
-{#snippet recoveryPreview()}
-  <!-- Both ways back in, each with where it stands. -->
-  {#each [{ name: "Phrase", status: phraseStatus(current.scenario.recovery) }, { name: "Email", status: emailStatus(current.scenario.recovery) }] as method (method.name)}
-    <span
-      class={[
-        "inline-flex items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-medium",
-        isOn(method.status)
-          ? "border-bg-success-secondary bg-bg-success-primary text-fg-success-primary"
-          : "border-border-tertiary bg-bg-primary text-text-tertiary",
-      ]}
-    >
-      <span class="size-1.5 shrink-0 rounded-full bg-current"></span>
-      {method.name} · {RECOVERY_SAID[method.status]}
-    </span>
-  {/each}
-{/snippet}
-
-{#snippet devicesPreview()}
-  <!-- The browsers signed in, newest marked, as overlapping logos, cut out of
-       the card as the ways in are. -->
-  <span class="flex items-center">
-    {#each browsers.slice(0, 3) as browser, index (browser.id)}
-      {@const src = brandIconOf(browser.description)}
-      <span
-        class={[
-          "bg-bg-secondary relative grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-card-surface)",
-          index > 0 && "-ms-2",
-        ]}
-      >
-        {#if src !== undefined}
-          <img {src} alt="" class="size-4" />
-        {:else}
-          <MonitorSmartphoneIcon class="text-fg-tertiary size-3.5" />
-        {/if}
-        {#if browser.isNew === true}
-          <span
-            class="bg-fg-error-primary absolute -end-0.5 -top-0.5 size-2 rounded-full ring-2 ring-(color:--ii-card-surface)"
-          ></span>
-        {/if}
-      </span>
-    {/each}
-  </span>
-  <span class="text-text-tertiary text-[13px] leading-[18px]">
-    {browsers.length === 1 ? "1 browser" : `${browsers.length} browsers`}
-  </span>
-{/snippet}
-
 {#snippet addTile()}
   <!-- After the last app, the way to add one by hand: a search over the
        curated apps that also takes a link. While apps are arranged it stays
@@ -1674,11 +1644,7 @@
       morphing={morphing === card.kind}
       onOpen={() => openCard(card.kind)}
       onClose={closeSection}
-      preview={card.kind === "access"
-        ? accessPreview
-        : card.kind === "recovery"
-          ? recoveryPreview
-          : devicesPreview}
+      glyphs={glyphsOf(card)}
     >
       {@render sectionOf(card.kind as Section, "card")}
     </StatusCard>

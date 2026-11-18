@@ -14,6 +14,7 @@
   import type { CardKind, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
   import { useSurface } from "./Elevated.svelte";
+  import Glyphs, { type Glyph } from "./Glyphs.svelte";
 
   interface Props {
     kind: CardKind;
@@ -31,9 +32,10 @@
     morphing?: boolean;
     onOpen: () => void;
     onClose?: () => void;
-    /** What's inside (the methods, the two ways back in, the browsers), so
-     *  the card says more than its section's name. */
-    preview?: Snippet;
+    /** What the sentence is about, beside it: what's inside (the ways in,
+     *  the ways back in, the browsers) while the card is neutral, and the
+     *  one item it's about otherwise. */
+    glyphs?: Glyph[];
     /** The section itself, shown while the card is open. */
     children?: Snippet;
   }
@@ -48,7 +50,7 @@
     morphing = false,
     onOpen,
     onClose,
-    preview,
+    glyphs = [],
     children,
   }: Props = $props();
 
@@ -169,23 +171,29 @@
       {/if}
     </span>
   </div>
-  <!-- The preview and the section start at one line under the title, so
-       the section's lead takes the sentence's place as they cross. -->
+  <!-- The message and the section start at one line under the title, so
+       the section's lead takes the message's place as they cross. -->
   <div class={["relative", !open && "pointer-events-none"]}>
     {#if !open || morphing}
       <div
         data-layer="summary"
         aria-hidden="true"
         class={[
-          "pointer-events-none flex flex-col gap-2.5 px-4 pt-2.5 pb-4",
+          "pointer-events-none flex min-h-7 items-center gap-2.5 px-4 pt-2.5 pb-4",
           open && "absolute inset-x-0 top-0",
         ]}
       >
-        <!-- One size and weight for every sentence: the style shows in its
-             color, the info dot and the tinted icon, not in heavier text.
-             Neutral says where the card stands, quietly; info, something to
-             know, with a dot; warning tints the icon amber; risk turns the
-             icon and the sentence red. -->
+        <!-- One message, Thomas's way: the icons of what it's about and the
+             sentence, never a second line saying the same in other words.
+             One size and weight for every sentence: the style shows in its
+             color, its dot and the tinted icon, not in heavier text. Neutral
+             says where the card stands, quietly; info, something to know;
+             warning tints the icon amber; risk turns the icon and the
+             sentence red. The dot sits on the item the message is about; an
+             info about no item has it before the sentence instead. -->
+        {#if glyphs.length > 0}
+          <Glyphs {glyphs} {tone} />
+        {/if}
         <span
           class={[
             "flex min-w-0 items-center gap-1.5 text-[13px] leading-[18px] text-pretty",
@@ -197,16 +205,11 @@
             }[tone],
           ]}
         >
-          {#if tone === "info"}
+          {#if tone === "info" && !glyphs.some(({ marked }) => marked === true)}
             <span class="bg-fg-primary size-1.5 shrink-0 rounded-full"></span>
           {/if}
           <span class="min-w-0">{sentence}</span>
         </span>
-        {#if preview !== undefined}
-          <span class="flex min-w-0 flex-wrap items-center gap-2">
-            {@render preview()}
-          </span>
-        {/if}
       </div>
     {/if}
     {#if open || morphing}
