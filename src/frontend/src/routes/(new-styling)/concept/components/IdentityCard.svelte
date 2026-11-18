@@ -11,7 +11,11 @@
   import { slide } from "svelte/transition";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-  import type { IdentityPalette } from "$lib/utils/identityColors";
+  import {
+    identityInitial,
+    type IdentityPalette,
+  } from "$lib/utils/identityColors";
+  import ColourStrip from "./ColourStrip.svelte";
   import Elevated, { useSurface } from "./Elevated.svelte";
   import IdentityList from "./IdentityList.svelte";
   import IdentityStack from "./IdentityStack.svelte";
@@ -30,8 +34,11 @@
     /** The colours the user picked for an identity, over the ones its
      *  number gives. */
     paletteOf?: (one: LastUsedIdentity) => IdentityPalette | undefined;
-    /** The card's menu: the name and colour, the start page, signing out. */
-    onCustomize: () => void;
+    /** Where the identity's colours stand in IDENTITY_PALETTES, and a new
+     *  pick. Only the colour can change: passkeys have no way to rename. */
+    colour: number;
+    onColour: (paletteIndex: number) => void;
+    /** The card's menu: the start page and signing out, with the colour. */
     onStartPage: () => void;
     onSignOut: () => void;
     /** Something wrong with this identity, told inside its own card, under
@@ -47,7 +54,8 @@
     onAdd,
     signedInWith,
     paletteOf,
-    onCustomize,
+    colour,
+    onColour,
     onStartPage,
     onSignOut,
     alert,
@@ -55,6 +63,9 @@
 
   let menuAnchor = $state<HTMLElement>();
   const closeMenu = () => (menuAnchor = undefined);
+  /** The avatar, which the colour row hangs from while it's open. */
+  let avatarButton = $state<HTMLButtonElement>();
+  let colourAnchor = $state<HTMLElement>();
 
   const nameOf = (one: LastUsedIdentity): string =>
     one.name ?? `${one.identityNumber}`;
@@ -80,7 +91,29 @@
   class="ii-rows flex flex-col overflow-hidden rounded-2xl"
 >
   <li class="flex items-center gap-3 ps-4 pe-2.5 py-4">
-    <IdentityAvatar {identity} palette={paletteOf?.(identity)} size="lg" />
+    <!-- The avatar is the colour's own control: a tap opens the row of
+         colours under it, the way Thomas sketched it. -->
+    <button
+      bind:this={avatarButton}
+      type="button"
+      onclick={() => (colourAnchor = avatarButton)}
+      aria-label="Change colour"
+      aria-haspopup="true"
+      aria-expanded={colourAnchor !== undefined}
+      title="Change colour"
+      class="focus-visible:outline-focus-ring shrink-0 rounded-full transition-[scale] duration-160 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.96] motion-reduce:active:scale-100"
+    >
+      <IdentityAvatar {identity} palette={paletteOf?.(identity)} size="lg" />
+    </button>
+    {#if colourAnchor !== undefined}
+      <ColourStrip
+        anchor={colourAnchor}
+        initial={identityInitial(identity.name)}
+        current={colour}
+        onPick={onColour}
+        onClose={() => (colourAnchor = undefined)}
+      />
+    {/if}
     <div class="flex min-w-0 flex-1 flex-col items-start">
       <span
         class="text-text-primary w-full truncate text-base leading-6 font-semibold"
@@ -99,8 +132,9 @@
       {paletteOf}
       backdrop={cardSurface}
     />
-    <!-- Everything about the identity itself that isn't security: its name
-         and colour, and signing out, out of the way behind one ghost button. -->
+    <!-- Everything about the identity itself that isn't security: its colour,
+         the start page and signing out, out of the way behind one ghost
+         button. -->
     <button
       type="button"
       onclick={(event) => (menuAnchor = event.currentTarget)}
@@ -132,12 +166,12 @@
             role="menuitem"
             onclick={() => {
               closeMenu();
-              onCustomize();
+              colourAnchor = avatarButton;
             }}
             class={MENU_ROW}
           >
             <PaletteIcon class="text-fg-quaternary size-4" aria-hidden="true" />
-            Customize name and colour
+            Change colour
           </button>
           <button
             type="button"

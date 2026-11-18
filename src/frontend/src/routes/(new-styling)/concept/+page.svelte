@@ -43,7 +43,6 @@
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
   import ConnectPage from "./components/ConnectPage.svelte";
-  import CustomizeIdentityDialog from "./components/CustomizeIdentityDialog.svelte";
   import Elevated from "./components/Elevated.svelte";
   import Popup from "./components/Popup.svelte";
   import AppRow from "./components/AppRow.svelte";
@@ -108,22 +107,15 @@
   );
   let identityIndex = $state(0);
 
-  /** Names and colours picked in Customize, per identity. The name would be
-   *  saved on the canister (identity_properties_replace takes one); where a
-   *  picked colour lives is still open. */
-  const customized = $state<
-    Record<string, { name: string; paletteIndex: number }>
-  >({});
-  let customizing = $state(false);
-  const identity = $derived.by(() => {
-    const base = identities[identityIndex].identity;
-    const own = customized[`${base.identityNumber}`];
-    return own === undefined ? base : { ...base, name: own.name };
-  });
+  /** Colours picked for each identity, by their place in IDENTITY_PALETTES.
+   *  Where a picked colour would be saved is still open. The name isn't
+   *  picked here: passkeys have no way to rename. */
+  const picked = $state<Record<string, number>>({});
+  const identity = $derived(identities[identityIndex].identity);
   /** The colours picked for an identity, where they were. */
   const paletteOf = (one: LastUsedIdentity): IdentityPalette | undefined => {
-    const own = customized[`${one.identityNumber}`];
-    return own === undefined ? undefined : IDENTITY_PALETTES[own.paletteIndex];
+    const own = picked[`${one.identityNumber}`];
+    return own === undefined ? undefined : IDENTITY_PALETTES[own];
   };
   const identityPaletteOverride = $derived(paletteOf(identity));
   /** The colours the identity shows: picked, or the ones its number gives. */
@@ -1214,9 +1206,12 @@
       bind:switching
       signedInWith={signedInWith.title}
       {paletteOf}
+      colour={picked[`${identity.identityNumber}`] ??
+        identityPaletteIndex(identity.identityNumber)}
+      onColour={(paletteIndex) =>
+        (picked[`${identity.identityNumber}`] = paletteIndex)}
       onSwitch={switchIdentity}
       onAdd={() => unavailable("Adding an identity")}
-      onCustomize={() => (customizing = true)}
       onStartPage={() =>
         toaster.create({
           title: "Make id.ai your start page",
@@ -1879,20 +1874,6 @@
       focus={recoveryFocus}
       onChange={resolve}
       onClose={() => (recoveryOpen = false)}
-    />
-  {/if}
-
-  {#if customizing}
-    <CustomizeIdentityDialog
-      name={identityName}
-      paletteIndex={customized[`${identity.identityNumber}`]?.paletteIndex ??
-        identityPaletteIndex(identity.identityNumber)}
-      signedInWith={signedInWith.title}
-      onSave={(value) => {
-        customized[`${identity.identityNumber}`] = value;
-        customizing = false;
-      }}
-      onClose={() => (customizing = false)}
     />
   {/if}
 
