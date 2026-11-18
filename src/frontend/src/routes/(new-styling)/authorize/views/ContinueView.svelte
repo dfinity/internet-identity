@@ -21,8 +21,9 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import {
     authenticationStore,
-    isAuthenticatedStore,
+    type Authenticated,
   } from "$lib/stores/authentication.store";
+  import { sessionStore } from "$lib/stores/session.store";
   import {
     actorForIdentity,
     purgeSession,
@@ -347,18 +348,51 @@
     writeToggle(selectedIdentityNumber, isMultipleAccountsEnabled);
   });
 
+  // The sign-in to act with for the selected identity, which is signed in
+  // first unless it is the one signed in already. Being signed in is not
+  // enough: another identity of this browser can be, the one that signed in
+  // on this page and was removed from the list since, or one whose sign-in
+  // ended after another identity was selected.
+  //
+  // Only ever called from a press, before anything is awaited: this is what
+  // may start a sign-in, see `sessionActor`. The session is reset first, which
+  // awaits nothing, so that its key is never shared between two identities:
+  // with the one signed in until now, or with one whose sign-in is still on
+  // its way.
+  //
+  // Resolves to `undefined` when another identity was selected while the
+  // sign-in ran, whose result is not that identity's to act with. A sign-in
+  // that the canister answers with another identity than the selected one is
+  // acted with all the same.
+  const signInAsSelectedIdentity = async (): Promise<
+    Authenticated | undefined
+  > => {
+    const selectedIdentity = $lastUsedIdentitiesStore.selected;
+    if (selectedIdentity === undefined) {
+      return undefined;
+    }
+    const authenticated = $authenticationStore;
+    if (authenticated?.identityNumber === selectedIdentity.identityNumber) {
+      return authenticated;
+    }
+    sessionStore.reset();
+    await authLastUsedFlow.authenticate(selectedIdentity, effectiveOrigin);
+    if (selectedIdentityNumber !== selectedIdentity.identityNumber) {
+      return undefined;
+    }
+    return $authenticationStore;
+  };
+
   const handleContinueDefault = async () => {
     rememberAccessLevel();
     isAuthenticatingDefault = true;
     try {
-      // Nothing may be awaited before the sign-in, see `sessionActor`.
-      if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate(
-          $lastUsedIdentitiesStore.selected!,
-          effectiveOrigin,
-        );
+      const authenticated = await signInAsSelectedIdentity();
+      if (authenticated === undefined) {
+        isAuthenticatingDefault = false;
+        return;
       }
-      const { identityNumber, actor } = $authenticationStore!;
+      const { identityNumber, actor } = authenticated;
       const accountNumberPromise =
         defaultAccountNumber === null
           ? actor
@@ -385,11 +419,9 @@
     rememberAccessLevel();
     isAuthenticatingDefault = true;
     try {
-      if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate(
-          $lastUsedIdentitiesStore.selected!,
-          effectiveOrigin,
-        );
+      if ((await signInAsSelectedIdentity()) === undefined) {
+        isAuthenticatingDefault = false;
+        return;
       }
       lastUsedIdentitiesStore.setAuthorizeOptions(
         selectedIdentityNumber,
@@ -471,17 +503,17 @@
       throw error;
     }
   };
-  // Only ever called from a press, before anything is awaited: this is what
-  // may start a sign-in.
+  // Only ever called from a press, before anything is awaited, see
+  // `signInAsSelectedIdentity`.
   const signInAndLoadAccounts = async () => {
-    if (!$isAuthenticatedStore) {
-      await authLastUsedFlow.authenticate(
-        $lastUsedIdentitiesStore.selected!,
-        effectiveOrigin,
-      );
+    const authenticated = await signInAsSelectedIdentity();
+    if (authenticated === undefined) {
+      return;
     }
-    const { identityNumber, actor } = $authenticationStore!;
-    await loadAccountsViaActor(actor, identityNumber);
+    await loadAccountsViaActor(
+      authenticated.actor,
+      authenticated.identityNumber,
+    );
   };
 
   // All options were on from an earlier visit: shows them again when that
@@ -581,13 +613,7 @@
     try {
       // create_account is not in the session-delegation scope, so it needs a
       // full-auth identity even when the screen was loaded ceremony-free.
-      if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate(
-          $lastUsedIdentitiesStore.selected!,
-          effectiveOrigin,
-        );
-      }
-      const authenticated = $authenticationStore;
+      const authenticated = await signInAsSelectedIdentity();
       if (authenticated === undefined) {
         return;
       }
@@ -647,14 +673,8 @@
       }
       // Renaming an account and changing the default both take a sign-in: a
       // stored session only reads. It starts before anything is awaited, see
-      // `sessionActor`.
-      if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate(
-          $lastUsedIdentitiesStore.selected!,
-          effectiveOrigin,
-        );
-      }
-      const authenticated = $authenticationStore;
+      // `signInAsSelectedIdentity`.
+      const authenticated = await signInAsSelectedIdentity();
       if (authenticated === undefined) {
         return;
       }

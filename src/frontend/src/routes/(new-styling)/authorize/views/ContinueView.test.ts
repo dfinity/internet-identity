@@ -10,6 +10,11 @@ import { PopupBlockedError } from "$lib/utils/openID";
 // These tests press the buttons that start a sign-in and look at `window.open`
 // as soon as the click returns, before any promise has had a chance to settle.
 // An `await` put in front of the sign-in fails them, whatever it awaits.
+//
+// They also look at which identity the screen acts as. The page can be signed
+// in as another identity than the selected one, and a sign-in can end after
+// another identity was selected: neither is the selected identity's to act
+// with.
 
 vi.mock("$app/environment", () => ({ browser: true, building: false }));
 vi.mock("$app/navigation", () => ({ goto: vi.fn(), onNavigate: vi.fn() }));
@@ -49,26 +54,70 @@ const handleErrorMock = vi.hoisted(() => vi.fn());
 vi.mock("$lib/stores/last-used-identities.store", () => ({
   lastUsedIdentitiesStore: lastUsedIdentitiesStoreValue,
 }));
-// Nobody is signed in unless a test says so, and every sign-in below is left
-// pending.
-const authenticationStoreValue = vi.hoisted(() =>
-  createSubscribableStore<unknown>(undefined),
-);
-const isAuthenticatedStoreValue = vi.hoisted(() =>
-  createSubscribableStore(false),
-);
+// Nobody is signed in unless a test says so, and a sign-in is left pending
+// unless a test has it finish.
+const authenticationStoreValue = vi.hoisted(() => {
+  const store = createSubscribableStore<unknown>(undefined);
+  let pageActor: unknown;
+  return {
+    ...store,
+    /**
+     * Sets the actor of the page. As in the real store, a sign-in that
+     * finishes brings an identity and no actor of its own: whichever identity
+     * signs in is given this one.
+     */
+    setPageActor: (actor: unknown) => {
+      pageActor = actor;
+    },
+    /** What a sign-in that finishes stores: `authenticated`, with the actor of the page. */
+    finishSignIn: (authenticated: object) => {
+      store.set({ ...authenticated, actor: pageActor });
+      return Promise.resolve();
+    },
+  };
+});
 vi.mock("$lib/stores/authentication.store", () => ({
-  authenticationStore: authenticationStoreValue,
-  isAuthenticatedStore: isAuthenticatedStoreValue,
+  authenticationStore: {
+    subscribe: authenticationStoreValue.subscribe,
+    set: authenticationStoreValue.finishSignIn,
+  },
 }));
-vi.mock("$lib/stores/session.store", () => ({
-  sessionStore: createSubscribableStore({
-    nonce: "nonce",
+/**
+ * The session a sign-in runs on. `reset` replaces it with a new one, as the
+ * real store does. The two differ in their nonce, `initialNonce` and
+ * `nonceAfterReset`, so that a test can tell on which of them a sign-in was
+ * started. `restore` puts the first one back.
+ */
+const sessionStoreValue = vi.hoisted(() => {
+  const initialNonce = "nonce";
+  const nonceAfterReset = "nonce-after-reset";
+  const sessionWithNonce = (nonce: string) => ({
+    nonce,
     salt: new Uint8Array(32),
     identity: { getPublicKey: () => ({ toDer: () => new Uint8Array(32) }) },
     agent: {},
     actor: {},
-  }),
+  });
+  const store = createSubscribableStore(sessionWithNonce(initialNonce));
+  return {
+    initialNonce,
+    nonceAfterReset,
+    subscribe: store.subscribe,
+    reset: vi.fn(() => store.set(sessionWithNonce(nonceAfterReset))),
+    restore: () => store.set(sessionWithNonce(initialNonce)),
+  };
+});
+vi.mock("$lib/stores/session.store", () => ({
+  sessionStore: sessionStoreValue,
+}));
+// The canister's part of a passkey sign-in, which a test settles to have the
+// sign-in finish. Those of the pop-up sign-ins are never reached: no pop-up
+// below ever answers.
+const authenticateWithPasskeyMock = vi.hoisted(() => vi.fn());
+vi.mock("$lib/utils/authentication", () => ({
+  authenticateWithPasskey: authenticateWithPasskeyMock,
+  authenticateWithJWT: vi.fn(),
+  authenticateWithSso: vi.fn(),
 }));
 vi.mock("$lib/stores/session-delegation.store", () => ({
   actorForIdentity: actorForIdentityMock,
@@ -201,6 +250,35 @@ const sessionActor = () => ({
     .mockResolvedValue({ Err: { Unauthorized: "session" } }),
 });
 
+/**
+ * The actor of a sign-in, which the canister lets change the accounts as well
+ * as read them.
+ */
+const signInActor = () => ({
+  ...sessionActor(),
+  create_account: vi.fn().mockResolvedValue({ Ok: workAccount }),
+  update_account: vi.fn().mockResolvedValue({ Ok: workAccount }),
+  set_default_account: vi.fn().mockResolvedValue({ Ok: workAccount }),
+});
+
+/**
+ * An identity that signs in with a passkey. It opens no pop-up, and a test can
+ * have its sign-in finish: see `authenticateWithPasskeyMock`.
+ */
+const passkeyIdentity = identity({
+  passkey: { credentialId: new Uint8Array([1]) },
+});
+
+/**
+ * What the canister's part of a passkey sign-in answers with when the passkey
+ * belongs to the identity numbered `identityNumber`.
+ */
+const passkeySignInAs = (identityNumber: bigint) => ({
+  identity: {},
+  identityNumber,
+  credentialId: new Uint8Array([1]),
+});
+
 /** A promise for a test to settle when it gets to that point. */
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -313,11 +391,55 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     await settle();
   };
 
+  /**
+   * Signs the page in as the identity numbered `OTHER_IDENTITY_NUMBER` and
+   * returns the actor of the page. With the identity numbered
+   * `IDENTITY_NUMBER` selected, this is what "Manage identities" leaves behind
+   * when the identity that signed in on the page is removed and the next one
+   * is selected.
+   */
+  const signInAsOtherIdentity = () => {
+    const actor = signInActor();
+    authenticationStoreValue.setPageActor(actor);
+    authenticationStoreValue.set({
+      identityNumber: OTHER_IDENTITY_NUMBER,
+      actor,
+    });
+    flushSync();
+    return actor;
+  };
+
+  /**
+   * Expects the one pop-up that opened to have opened after the session was
+   * reset, once: the sign-in runs on the new session.
+   */
+  const expectSignInOnNewSession = () => {
+    expect(sessionStoreValue.reset).toHaveBeenCalledTimes(1);
+    expect(sessionStoreValue.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      open.mock.invocationCallOrder[0],
+    );
+  };
+
+  /**
+   * Has the passkey sign-ins that start from here on stay pending until the
+   * test settles what this returns. The page gets `signInActor()` for its
+   * actor, which is returned as `actor`.
+   */
+  const pendingPasskeySignIn = () => {
+    const signIn = deferred<ReturnType<typeof passkeySignInAs>>();
+    fetchIdentityCredentialsMock.mockResolvedValue(undefined);
+    authenticateWithPasskeyMock.mockReturnValue(signIn.promise);
+    const actor = signInActor();
+    authenticationStoreValue.setPageActor(actor);
+    return { signIn, actor };
+  };
+
   beforeEach(() => {
     localStorage.clear();
     onAuthorize = vi.fn<(...args: unknown[]) => void>();
     authenticationStoreValue.set(undefined);
-    isAuthenticatedStoreValue.set(false);
+    authenticationStoreValue.setPageActor(undefined);
+    sessionStoreValue.restore();
     // jsdom has no Popover API, which the tooltips drive, no modal dialogs,
     // no visual viewport for them to follow and no form submission for their
     // buttons, no Web Animations API, which transitions run on, and no
@@ -363,6 +485,7 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     // press: a sign-in must not wait for it.
     actorForIdentityMock.mockReturnValue(new Promise(() => {}));
     fetchIdentityCredentialsMock.mockReturnValue(new Promise(() => {}));
+    authenticateWithPasskeyMock.mockReturnValue(new Promise(() => {}));
     // Never answers, unless a test has it answer: the pop-up has to open
     // before discovery has.
     discoverSsoConfigMock.mockReturnValue(new Promise(() => {}));
@@ -396,13 +519,13 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       actor.get_default_account.mockResolvedValue({ Ok: workAccount });
       render(identities[kind]);
       authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
 
       button("Continue").click();
       await settle();
 
       expect(signInsStarted()).toBe(0);
+      expect(sessionStoreValue.reset).not.toHaveBeenCalled();
       expect(actor.get_default_account).toHaveBeenCalledWith(
         IDENTITY_NUMBER,
         "https://app.example",
@@ -491,7 +614,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
         identityNumber: IDENTITY_NUMBER,
         actor: signedInActor,
       });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
       element('button[aria-label="Edit Work"]', HTMLButtonElement).click();
       flushSync();
@@ -713,7 +835,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
         identityNumber: IDENTITY_NUMBER,
         actor: sessionActor(),
       });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
 
       button("Continue").click();
@@ -745,7 +866,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
         identityNumber: IDENTITY_NUMBER,
         actor: sessionActor(),
       });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
 
       button("Continue").click();
@@ -800,7 +920,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
         identityNumber: OTHER_IDENTITY_NUMBER,
         actor,
       });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
 
       button("Continue").click();
@@ -1020,7 +1139,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       await settle();
       expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
       authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
       button("Continue").click();
       await settle();
@@ -1053,7 +1171,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       await settle();
       expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
       authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
       button("Continue").click();
       await settle();
@@ -1089,7 +1206,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
       expect(showAllOptions().checked).toBe(true);
       authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-      isAuthenticatedStoreValue.set(true);
       flushSync();
       button("Continue").click();
       await settle();
@@ -1205,6 +1321,148 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       expect(continueButton.disabled).toBe(true);
       expect(showAllOptions().disabled).toBe(true);
     });
+
+    it("starts the sign-in on a new session when Continue is pressed with nobody signed in", () => {
+      render(identities[kind]);
+      expect(signInsStarted()).toBe(0);
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+      expectSignInOnNewSession();
+    });
+
+    it("signs in as the selected identity when Continue is pressed while another one is signed in", async () => {
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+      const actor = signInAsOtherIdentity();
+      expect(signInsStarted()).toBe(0);
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+      expectSignInOnNewSession();
+      // The app is not authorized as the identity that happens to be signed
+      // in, and the canister is not asked for that identity's default account.
+      await settle();
+      expect(actor.get_default_account).not.toHaveBeenCalled();
+      expect(onAuthorize).not.toHaveBeenCalled();
+    });
+
+    it("signs in as the selected identity when all options are switched on while another one is signed in", async () => {
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+      const actor = signInAsOtherIdentity();
+      expect(signInsStarted()).toBe(0);
+
+      showAllOptions().click();
+
+      expect(signInsStarted()).toBe(1);
+      expectSignInOnNewSession();
+      // The accounts of the identity that happens to be signed in are neither
+      // shown nor remembered for the selected one.
+      await settle();
+      expect(actor.get_accounts).not.toHaveBeenCalled();
+      expect(document.body.querySelector('input[type="radio"]')).toBeNull();
+      expect(
+        lastUsedIdentitiesStoreValue.syncLastUsedAccounts,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("signs in as the selected identity when Continue is pressed for options that waited while another one is signed in", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(undefined);
+      render(identities[kind]);
+      await settle();
+      const actor = signInAsOtherIdentity();
+      expect(signInsStarted()).toBe(0);
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+      expectSignInOnNewSession();
+      await settle();
+      expect(actor.get_accounts).not.toHaveBeenCalled();
+      expect(document.body.querySelector('input[type="radio"]')).toBeNull();
+      expect(
+        lastUsedIdentitiesStoreValue.syncLastUsedAccounts,
+      ).not.toHaveBeenCalled();
+      expect(onAuthorize).not.toHaveBeenCalled();
+    });
+
+    it("signs in as the selected identity when Continue is pressed with an account while another one is signed in", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(sessionActor());
+      render(identities[kind]);
+      await settle();
+      expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+      signInAsOtherIdentity();
+      expect(signInsStarted()).toBe(0);
+
+      button("Continue").click();
+
+      expect(signInsStarted()).toBe(1);
+      expectSignInOnNewSession();
+      // The account of the selected identity is not used to authorize the app
+      // as the identity that happens to be signed in.
+      await settle();
+      expect(
+        lastUsedIdentitiesStoreValue.setAuthorizeOptions,
+      ).not.toHaveBeenCalled();
+      expect(onAuthorize).not.toHaveBeenCalled();
+    });
+
+    it("signs in as the selected identity when an account is created while another one is signed in", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(sessionActor());
+      render(identities[kind]);
+      await settle();
+      const actor = signInAsOtherIdentity();
+      button("Add another account").click();
+      flushSync();
+      const name = element(
+        'input[aria-label="Account name"]',
+        HTMLInputElement,
+      );
+      name.value = "Demo";
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+      flushSync();
+      expect(signInsStarted()).toBe(0);
+
+      button("Create account").click();
+
+      expect(signInsStarted()).toBe(1);
+      expectSignInOnNewSession();
+      // The account is not created for the identity that happens to be
+      // signed in.
+      await settle();
+      expect(actor.create_account).not.toHaveBeenCalled();
+    });
+
+    it("signs in as the selected identity when the default account is changed while another one is signed in", async () => {
+      localStorage.setItem(TOGGLE_KEY, "1");
+      actorForIdentityMock.mockResolvedValue(sessionActor());
+      render(identities[kind]);
+      await settle();
+      const actor = signInAsOtherIdentity();
+      element('button[aria-label="Edit Work"]', HTMLButtonElement).click();
+      flushSync();
+      element('dialog input[type="checkbox"]', HTMLInputElement).click();
+      flushSync();
+      expect(signInsStarted()).toBe(0);
+
+      button("Save changes").click();
+
+      expect(signInsStarted()).toBe(1);
+      expectSignInOnNewSession();
+      // The default account of the identity that happens to be signed in is
+      // left alone.
+      await settle();
+      expect(actor.set_default_account).not.toHaveBeenCalled();
+      expect(actor.update_account).not.toHaveBeenCalled();
+    });
   });
 
   it("opens the pop-up of an OpenID identity on its provider", () => {
@@ -1249,7 +1507,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
       identityNumber: OTHER_IDENTITY_NUMBER,
       actor,
     });
-    isAuthenticatedStoreValue.set(true);
     flushSync();
     button("Continue").click();
     await settle();
@@ -1317,7 +1574,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     expect(handleErrorMock).toHaveBeenCalledTimes(1);
     expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
     authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-    isAuthenticatedStoreValue.set(true);
     flushSync();
     button("Continue").click();
     await settle();
@@ -1385,7 +1641,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     expect(signInsStarted()).toBe(0);
 
     authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-    isAuthenticatedStoreValue.set(true);
     flushSync();
     button("Continue").click();
     await settle();
@@ -1398,7 +1653,6 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
     localStorage.setItem(TOGGLE_KEY, "1");
     const actor = sessionActor();
     authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-    isAuthenticatedStoreValue.set(true);
     // What the lookup answers with while signed in as this identity.
     actorForIdentityMock.mockResolvedValue(actor);
     render(identities.OpenID);
@@ -1415,12 +1669,10 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
   it("does not keep the actor of a sign-in as a stored session once that sign-in is gone", async () => {
     const actor = sessionActor();
     authenticationStoreValue.set({ identityNumber: IDENTITY_NUMBER, actor });
-    isAuthenticatedStoreValue.set(true);
     actorForIdentityMock.mockResolvedValue(actor);
     render(identities.OpenID);
     await settle();
     authenticationStoreValue.set(undefined);
-    isAuthenticatedStoreValue.set(false);
     flushSync();
     expect(signInsStarted()).toBe(0);
 
@@ -1428,5 +1680,183 @@ describe("ContinueView starts a sign-in inside the click that asks for it", () =
 
     expect(signInsStarted()).toBe(1);
     expect(actor.get_accounts).not.toHaveBeenCalled();
+  });
+
+  it("opens the pop-up of an OpenID identity with the nonce of the session it has reset to", () => {
+    render(identities.OpenID);
+
+    button("Continue").click();
+
+    expect(
+      new URL(String(open.mock.calls[0][0])).searchParams.get("nonce"),
+    ).toBe(sessionStoreValue.nonceAfterReset);
+  });
+
+  it("shows the accounts of the selected identity from its stored session while another one is signed in", async () => {
+    const storedSessionActor = sessionActor();
+    actorForIdentityMock.mockResolvedValue(storedSessionActor);
+    render(identities.OpenID);
+    await settle();
+    const actor = signInAsOtherIdentity();
+
+    showAllOptions().click();
+    await settle();
+
+    expect(signInsStarted()).toBe(0);
+    expect(storedSessionActor.get_accounts).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      "https://app.example",
+    );
+    expect(actor.get_accounts).not.toHaveBeenCalled();
+    expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+  });
+
+  it("continues as the selected identity once it has signed in, with another one signed in before", async () => {
+    const { signIn } = pendingPasskeySignIn();
+    actorForIdentityMock.mockResolvedValue(undefined);
+    render(passkeyIdentity);
+    await settle();
+    const actor = signInAsOtherIdentity();
+    actor.get_default_account.mockResolvedValue({ Ok: workAccount });
+
+    button("Continue").click();
+    await settle();
+    expect(authenticateWithPasskeyMock).toHaveBeenCalledTimes(1);
+    expect(authenticateWithPasskeyMock.mock.calls[0][0].session.nonce).toBe(
+      sessionStoreValue.nonceAfterReset,
+    );
+    expect(actor.get_default_account).not.toHaveBeenCalled();
+    expect(onAuthorize).not.toHaveBeenCalled();
+
+    signIn.resolve(passkeySignInAs(IDENTITY_NUMBER));
+    await settle();
+
+    expect(actor.get_default_account).toHaveBeenCalledTimes(1);
+    expect(actor.get_default_account).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      "https://app.example",
+    );
+    expect(onAuthorize).toHaveBeenCalledTimes(1);
+    await expect(onAuthorize.mock.calls[0][0]).resolves.toBe(BigInt(1));
+  });
+
+  it("does not continue when the sign-in ends after another identity was selected, and signs that one in on the next press", async () => {
+    const { signIn, actor } = pendingPasskeySignIn();
+    actorForIdentityMock.mockResolvedValue(undefined);
+    render(passkeyIdentity);
+    await settle();
+    button("Continue").click();
+    await settle();
+    expect(authenticateWithPasskeyMock).toHaveBeenCalledTimes(1);
+
+    select({ ...passkeyIdentity, identityNumber: OTHER_IDENTITY_NUMBER });
+    signIn.resolve(passkeySignInAs(IDENTITY_NUMBER));
+    await settle();
+
+    expect(onAuthorize).not.toHaveBeenCalled();
+    expect(actor.get_default_account).not.toHaveBeenCalled();
+    expect(handleErrorMock).not.toHaveBeenCalled();
+    // The screen of the identity selected since is not left busy, and the
+    // sign-in that ended is not that identity's to continue with.
+    expect(button("Continue").disabled).toBe(false);
+    authenticateWithPasskeyMock.mockReturnValue(new Promise(() => {}));
+    button("Continue").click();
+    await settle();
+    expect(authenticateWithPasskeyMock).toHaveBeenCalledTimes(2);
+    expect(onAuthorize).not.toHaveBeenCalled();
+  });
+
+  it("shows no accounts when the sign-in for the options ends after another identity was selected", async () => {
+    localStorage.setItem(OTHER_TOGGLE_KEY, "1");
+    const { signIn, actor } = pendingPasskeySignIn();
+    actorForIdentityMock.mockResolvedValue(undefined);
+    render(passkeyIdentity);
+    await settle();
+    showAllOptions().click();
+    await settle();
+    expect(authenticateWithPasskeyMock).toHaveBeenCalledTimes(1);
+
+    select({ ...passkeyIdentity, identityNumber: OTHER_IDENTITY_NUMBER });
+    await settle();
+    signIn.resolve(passkeySignInAs(IDENTITY_NUMBER));
+    await settle();
+
+    expect(actor.get_accounts).not.toHaveBeenCalled();
+    expect(document.body.querySelector('input[type="radio"]')).toBeNull();
+    expect(
+      lastUsedIdentitiesStoreValue.syncLastUsedAccounts,
+    ).not.toHaveBeenCalled();
+    expect(handleErrorMock).not.toHaveBeenCalled();
+    expect(showAllOptions().checked).toBe(true);
+  });
+
+  it("does not continue with an account when the sign-in ends after another identity was selected", async () => {
+    localStorage.setItem(TOGGLE_KEY, "1");
+    const { signIn } = pendingPasskeySignIn();
+    actorForIdentityMock.mockResolvedValueOnce(sessionActor());
+    render(passkeyIdentity);
+    await settle();
+    expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+    button("Continue").click();
+    await settle();
+    expect(authenticateWithPasskeyMock).toHaveBeenCalledTimes(1);
+
+    // The identity switched to has no session to show its accounts with.
+    actorForIdentityMock.mockResolvedValue(undefined);
+    select({ ...passkeyIdentity, identityNumber: OTHER_IDENTITY_NUMBER });
+    signIn.resolve(passkeySignInAs(IDENTITY_NUMBER));
+    await settle();
+
+    expect(
+      lastUsedIdentitiesStoreValue.setAuthorizeOptions,
+    ).not.toHaveBeenCalled();
+    expect(onAuthorize).not.toHaveBeenCalled();
+    expect(handleErrorMock).not.toHaveBeenCalled();
+    expect(button("Continue").disabled).toBe(false);
+  });
+
+  // The canister answers a sign-in with the identity the credential belongs
+  // to. For an OpenID or SSO identity that is another one than the sign-in was
+  // started for when another account is picked at the provider.
+  it("continues with the identity a sign-in returned when that is not the selected one", async () => {
+    const { signIn, actor } = pendingPasskeySignIn();
+    actorForIdentityMock.mockResolvedValue(undefined);
+    render(passkeyIdentity);
+    await settle();
+    button("Continue").click();
+    await settle();
+
+    signIn.resolve(passkeySignInAs(OTHER_IDENTITY_NUMBER));
+    await settle();
+
+    expect(actor.get_default_account).toHaveBeenCalledWith(
+      OTHER_IDENTITY_NUMBER,
+      "https://app.example",
+    );
+    expect(onAuthorize).toHaveBeenCalledTimes(1);
+  });
+
+  it("signs in again on the press after a sign-in that returned another identity than the selected one", async () => {
+    const { signIn, actor } = pendingPasskeySignIn();
+    actorForIdentityMock.mockResolvedValue(undefined);
+    render(passkeyIdentity);
+    await settle();
+    showAllOptions().click();
+    await settle();
+    signIn.resolve(passkeySignInAs(OTHER_IDENTITY_NUMBER));
+    await settle();
+    expect(actor.get_accounts).toHaveBeenCalledWith(
+      OTHER_IDENTITY_NUMBER,
+      "https://app.example",
+    );
+    expect(document.body.querySelector('input[type="radio"]')).not.toBeNull();
+    expect(authenticateWithPasskeyMock).toHaveBeenCalledTimes(1);
+    authenticateWithPasskeyMock.mockReturnValue(new Promise(() => {}));
+
+    button("Continue").click();
+    await settle();
+
+    expect(authenticateWithPasskeyMock).toHaveBeenCalledTimes(2);
+    expect(onAuthorize).not.toHaveBeenCalled();
   });
 });
