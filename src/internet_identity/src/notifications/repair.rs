@@ -30,10 +30,14 @@ use internet_identity_interface::internet_identity::types::{
 pub(crate) enum DevicePath {
     /// Where the calling browser's wake-ups go.
     ThisBrowser,
-    /// The installed web apps of the app numbered `application_number` on the calling
-    /// browser's entry and on every entry linked to it as sharing its device, that
-    /// deliver for the account `account_principal` names. `None` for an app nobody has
-    /// signed in to, which has none.
+    /// The installed web apps of the app numbered `application_number` on the entries
+    /// linked to the calling browser's as sharing its device, that deliver for the account
+    /// `account_principal` names. `None` for an app nobody has signed in to, which has
+    /// none.
+    ///
+    /// Not the calling browser's own entry: an installed app sharing it holds the session
+    /// a sign-in from the browser replaces, so it could not answer a probe sent now. It
+    /// checks its own path when it next starts.
     InstalledApps {
         application_number: Option<ApplicationNumber>,
         account_principal: Principal,
@@ -190,9 +194,9 @@ fn probe_one(
 }
 
 /// Removes the installed web app subscriptions of the app numbered `application_number`
-/// on `browser_id`'s entry of `anchor` and on the entries linked to it that deliver for
-/// the account `account_principal` names, where they can deliver now and still have
-/// unanswered pushes. One that answered its probe is kept. `None` for an app nobody has
+/// on the entries of `anchor` linked to `browser_id`'s that deliver for the account
+/// `account_principal` names, where they can deliver now and a probe through them was
+/// never fetched. One that answered its probe is kept. `None` for an app nobody has
 /// signed in to, which has none.
 ///
 /// Every one is tried, so a failure to remove one leaves the others removed; failures
@@ -209,7 +213,9 @@ pub(crate) fn remove_unanswered_installed_apps(
         account_principal,
     };
     for on_path in path_subscriptions(anchor, browser_id, path, now_ns) {
-        if on_path.subscription.unanswered_pushes.is_none() {
+        // Only a probe nobody fetched is evidence: a count raised again by an ordinary
+        // push after the installed app answered its probe is not.
+        if on_path.subscription.probe_sent_at_ns.is_none() {
             continue;
         }
         let RegistrationId::Pwa(holder) = on_path.registration else {
@@ -319,11 +325,11 @@ fn installed_app_on_path(
     })
 }
 
-/// `browser`, and every entry of `anchor` linked to it as sharing its device.
+/// Every entry of `anchor` linked to `browser` as sharing its device.
 fn same_device_entries<'a>(anchor: &'a Anchor, browser: &'a Browser) -> Vec<&'a Browser> {
-    let mut entries = vec![browser];
-    entries.extend(anchor.browsers().iter().filter(|other| {
-        other.id != browser.id && other.same_device_browser_id == Some(browser.id)
-    }));
-    entries
+    anchor
+        .browsers()
+        .iter()
+        .filter(|other| other.id != browser.id && other.same_device_browser_id == Some(browser.id))
+        .collect()
 }

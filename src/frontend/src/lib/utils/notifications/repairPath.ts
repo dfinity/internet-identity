@@ -73,6 +73,7 @@ export const checkNotificationPath = async ({
   browser,
   onPastLimit,
   signal,
+  renewSubscription = resubscribe,
 }: {
   identityNumber: bigint;
   origin: string;
@@ -81,6 +82,8 @@ export const checkNotificationPath = async ({
   browser: BrowserCalls;
   onPastLimit: () => void;
   signal: AbortSignal;
+  /** Replaces this browser's own subscription without a prompt, for the identity named. */
+  renewSubscription?: (identityNumber: bigint) => Promise<void>;
 }): Promise<PathCheckOutcome> => {
   const consented = await actor.notification_consent_granted({
     anchor_number: identityNumber,
@@ -108,6 +111,7 @@ export const checkNotificationPath = async ({
     if (answer === "answered") {
       return working;
     }
+    signal.throwIfAborted();
     await browser
       .remove_unanswered_pwa_webpush_subscriptions({
         anchor_number: identityNumber,
@@ -123,6 +127,7 @@ export const checkNotificationPath = async ({
     return afterOwnPath(
       await probe(browser, identityNumber, thisBrowser, signal),
       identityNumber,
+      renewSubscription,
     );
   }
 
@@ -138,6 +143,7 @@ export const checkNotificationPath = async ({
   return afterOwnPath(
     await probe(browser, identityNumber, thisBrowser, signal),
     identityNumber,
+    renewSubscription,
   );
 };
 
@@ -145,12 +151,14 @@ export const checkNotificationPath = async ({
 const afterOwnPath = async (
   answer: ProbeAnswer,
   identityNumber: bigint,
+  renewSubscription: (identityNumber: bigint) => Promise<void>,
 ): Promise<PathCheckOutcome> => {
   switch (answer) {
     case "answered":
       return working;
+    // A push service that called the subscription gone left it as broken as one that never
+    // answered, and the same repair applies.
     case "nothing-on-path":
-      return { kind: "ask", installFirst: false };
     case "unanswered":
       break;
   }
@@ -164,7 +172,7 @@ const afterOwnPath = async (
   ) {
     return { kind: "ask", installFirst: false };
   }
-  await resubscribe(identityNumber);
+  await renewSubscription(identityNumber);
   return working;
 };
 
@@ -222,6 +230,9 @@ const probe = async (
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     signal.throwIfAborted();
     const status = await pathStatus(browser, identityNumber, path);
+    // Asked again after the query, so an answer that arrived after a switch is not
+    // acted on for the identity left behind.
+    signal.throwIfAborted();
     // A push service that called the subscription gone took it off the path.
     if (status.subscriptions.length === 0) {
       return "nothing-on-path";

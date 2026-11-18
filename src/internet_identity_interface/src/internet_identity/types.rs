@@ -1373,8 +1373,9 @@ pub enum NotificationPath {
     /// Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
     /// routes through.
     ThisBrowser,
-    /// That app's installed web apps on this browser entry, and on every entry linked to
-    /// it as sharing its device, that deliver for one account.
+    /// That app's installed web apps on the entries linked to this browser entry as
+    /// sharing its device, that deliver for one account. An installed app that shares
+    /// this browser entry itself checks its own path, and is not on this one.
     InstalledApps(InstalledAppsPath),
 }
 

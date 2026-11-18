@@ -182,3 +182,95 @@ describe("checkNotificationPath", () => {
     ]);
   });
 });
+
+describe("checkNotificationPath where this browser may notify", () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "Notification");
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(globalThis, "Notification", {
+      configurable: true,
+      value: { permission: "granted" },
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    if (original === undefined) {
+      Reflect.deleteProperty(globalThis, "Notification");
+    } else {
+      Object.defineProperty(globalThis, "Notification", original);
+    }
+  });
+
+  it("renews a subscription a push service called gone, without asking", async () => {
+    const { browser } = browserAnswering({
+      installedApps: [{ subscriptions: [] }],
+      thisBrowser: [{ subscriptions: [pastLimit] }, { subscriptions: [] }],
+    });
+    const renewed: bigint[] = [];
+
+    const checked = checkNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: ORIGIN,
+      accountPrincipal: ACCOUNT,
+      actor: consenting,
+      browser,
+      onPastLimit: () => {},
+      signal: new AbortController().signal,
+      renewSubscription: (identityNumber) => {
+        renewed.push(identityNumber);
+        return Promise.resolve();
+      },
+    });
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    await expect(checked).resolves.toEqual({ kind: "working" });
+    expect(renewed).toEqual([IDENTITY_NUMBER]);
+  });
+
+  it("acts on no answer that arrives after the identity changed", async () => {
+    const switched = new AbortController();
+    const { browser } = browserAnswering({
+      installedApps: [{ subscriptions: [] }],
+      thisBrowser: [{ subscriptions: [pastLimit] }],
+    });
+    let numPolls = 0;
+    // The user switches while the poll's query is on its way, and it answers that the
+    // subscription is gone.
+    const switchingBrowser: BrowserCalls = {
+      ...browser,
+      get_notification_path_status: (request) => {
+        if ("ThisBrowser" in request.path) {
+          numPolls += 1;
+          if (numPolls > 1) {
+            switched.abort(new Error("switched"));
+            return Promise.resolve({ Ok: { subscriptions: [] } });
+          }
+        }
+        return browser.get_notification_path_status(request);
+      },
+    };
+    const renewed: bigint[] = [];
+
+    const checked = checkNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: ORIGIN,
+      accountPrincipal: ACCOUNT,
+      actor: consenting,
+      browser: switchingBrowser,
+      onPastLimit: () => {},
+      signal: switched.signal,
+      renewSubscription: (identityNumber) => {
+        renewed.push(identityNumber);
+        return Promise.resolve();
+      },
+    });
+    const settled = checked.then(
+      () => "resolved",
+      () => "rejected",
+    );
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    await expect(settled).resolves.toBe("rejected");
+    expect(renewed).toEqual([]);
+  });
+});

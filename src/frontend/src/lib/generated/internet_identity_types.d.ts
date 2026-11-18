@@ -1942,8 +1942,9 @@ export type NotificationPath = {
   } |
   {
     /**
-     * That app's installed web apps on this browser entry, and on every entry linked to
-     * it as sharing its device, that deliver for one account.
+     * That app's installed web apps on the entries linked to this browser entry as sharing
+     * its device, that deliver for one account. An installed app that shares this browser
+     * entry itself checks its own path, and is not on this one.
      */
     'InstalledApps' : InstalledAppsPath
   };
@@ -3934,8 +3935,8 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
-   * Removes that app's installed web app subscriptions on the caller's entry and on the
-   * entries linked to it that can deliver now and still have unanswered pushes.
+   * Removes that app's installed web app subscriptions on the entries linked to the
+   * caller's that can deliver now and have a probe nobody fetched.
    */
   'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<
     [RemoveUnansweredPwaWebPushSubscriptionsRequest],

@@ -2101,8 +2101,9 @@ type NotificationPath = variant {
     // Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
     // routes through.
     ThisBrowser;
-    // That app's installed web apps on this browser entry, and on every entry linked to
-    // it as sharing its device, that deliver for one account.
+    // That app's installed web apps on the entries linked to this browser entry as sharing
+    // its device, that deliver for one account. An installed app that shares this browser
+    // entry itself checks its own path, and is not on this one.
     InstalledApps : InstalledAppsPath;
 };
 
@@ -3065,8 +3066,8 @@ service : (opt InternetIdentityInit) -> {
     // Sends Internet Identity's own notification through every subscription on the path
     // that can deliver now. A fetch through one resets its unanswered pushes.
     probe_notification_path : (ProbeNotificationPathRequest) -> (variant { Ok; Err : ProbeNotificationPathError });
-    // Removes that app's installed web app subscriptions on the caller's entry and on the
-    // entries linked to it that can deliver now and still have unanswered pushes.
+    // Removes that app's installed web app subscriptions on the entries linked to the
+    // caller's that can deliver now and have a probe nobody fetched.
     remove_unanswered_pwa_webpush_subscriptions : (RemoveUnansweredPwaWebPushSubscriptionsRequest) -> (variant { Ok; Err : RemoveUnansweredPwaWebPushSubscriptionsError });
 
     // Called by the browser, which watches for the answer leaving its own queue: that

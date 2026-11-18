@@ -533,8 +533,14 @@ fn prepare_notification_app_link(
         enabled: true,
     }) = anchor.notification_app(browser_id)
     {
+        // A repair probe through the app that had its window and was never fetched is the
+        // same evidence as an enable probe nobody answered.
         let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .is_some_and(|app| app.is_subscribed() && !app.probe_went_unanswered(now));
+            .is_some_and(|app| {
+                app.is_subscribed()
+                    && !app.probe_went_unanswered(now)
+                    && !app.repair_probe_went_unanswered(now)
+            });
         if still_answering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
         }
@@ -913,8 +919,8 @@ fn probe_notification_path(
     })
 }
 
-/// Removes an app's installed web app subscriptions on the calling browser's entry and on
-/// the entries linked to it, where they still have unanswered pushes.
+/// Removes an app's installed web app subscriptions on the entries linked to the calling
+/// browser's, where a probe through them was never fetched.
 #[update]
 fn remove_unanswered_pwa_webpush_subscriptions(
     request: RemoveUnansweredPwaWebPushSubscriptionsRequest,

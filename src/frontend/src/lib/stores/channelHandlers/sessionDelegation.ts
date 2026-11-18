@@ -12,6 +12,7 @@ import {
   authorizationPromptStore,
   authorizationStore,
   authorizedStore,
+  type Authorized,
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
@@ -291,34 +292,42 @@ export const handleSessionDelegationRequest =
           return;
         }
 
-        const created = await createSession(
-          effectiveOrigin,
-          params.maxTimeToLive,
-          params.maxTimeToIdle,
-          resumable === true,
-        );
-        const chain = await extendToApp(
-          created.record,
-          params.sessionPublicKey,
-        );
-        const repaired = await repairNotificationPath({
-          identityNumber: created.identityNumber,
-          origin: effectiveOrigin,
-          accountPrincipal: created.accountPrincipal,
-          actor: created.actor,
-        });
-        // What was minted is for an identity the user has moved away from, so nothing
-        // goes to the app: the sign-in it asked for is the one the user is now making.
-        if (repaired === "identity-changed") {
+        // The authorization a sign-in that was given up on was minted for, so the next
+        // turn waits for another one.
+        let previous: Authorized | undefined;
+        for (;;) {
+          const created = await createSession(
+            effectiveOrigin,
+            params.maxTimeToLive,
+            params.maxTimeToIdle,
+            resumable === true,
+            previous,
+          );
+          const chain = await extendToApp(
+            created.record,
+            params.sessionPublicKey,
+          );
+          const repaired = await repairNotificationPath({
+            identityNumber: created.identityNumber,
+            origin: effectiveOrigin,
+            accountPrincipal: created.accountPrincipal,
+            actor: created.actor,
+          });
+          // What was minted is for an identity the user has moved away from: the app
+          // gets the one the user authorizes next, minted in this same request.
+          if (repaired === "identity-changed") {
+            previous = created.authorized;
+            continue;
+          }
+          await channel.send({
+            jsonrpc: "2.0",
+            id: requestId,
+            result: SessionResultSchema.encode({
+              chain,
+            }),
+          });
           return;
         }
-        await channel.send({
-          jsonrpc: "2.0",
-          id: requestId,
-          result: SessionResultSchema.encode({
-            chain,
-          }),
-        });
       } catch (error) {
         console.error(error);
         if (isSilent) {
@@ -346,15 +355,20 @@ const createSession = async (
   requestedMaxTimeToLive: bigint | undefined,
   requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
+  /** An authorization already minted for and given up on, to wait past. */
+  previous?: Authorized,
 ): Promise<{
   record: AppSessionRecord;
+  authorized: Authorized;
   /** Who the session was minted for, which the notification check is about. */
   identityNumber: bigint;
   accountPrincipal: Principal;
   actor: ActorSubclass<_SERVICE>;
 }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
-  let authorized = await waitForStore(authorizedStore);
+  let authorized = await waitForStore(authorizedStore, (current) =>
+    current !== previous ? current : undefined,
+  );
   // Switching identity on a consent screen authorizes again; mint for the
   // identity the user ends on, as `delegation.ts` does.
   while (
@@ -491,6 +505,7 @@ const createSession = async (
   }
   return {
     record,
+    authorized,
     identityNumber,
     accountPrincipal: prepared.account_principal,
     actor,

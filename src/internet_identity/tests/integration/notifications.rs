@@ -1581,6 +1581,42 @@ mod installing_over_an_app {
 
     /// An install nobody has opened holds the slot but is no app: answering Ok would
     /// tell the caller the switch moved when the flag it writes does not exist yet.
+    /// A repair probe through the app that had its window and was never fetched says the
+    /// app is gone, as an unanswered enable probe does, so the reinstall the repair
+    /// offers is accepted.
+    #[test]
+    fn should_install_over_an_app_that_left_a_repair_probe_unanswered() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        canister_tests::api::internet_identity::notifications::probe_notification_path(
+            &env,
+            canister_id,
+            BrowserKey::new(FIRST_BROWSER_SEED).successor().principal(),
+            internet_identity_interface::internet_identity::types::ProbeNotificationPathRequest {
+                anchor_number: anchor,
+                path: internet_identity_interface::internet_identity::types::NotificationPath::ThisBrowser,
+            },
+        )?
+        .expect("the probe returned Err");
+
+        // Inside its window the probe may still be answered.
+        assert_eq!(
+            prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200)?,
+            Err(PrepareNotificationAppLinkError::AppAlreadyDelivering)
+        );
+        env.advance_time(std::time::Duration::from_secs(60));
+
+        assert_eq!(
+            prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 201)?,
+            Ok(())
+        );
+        Ok(())
+    }
+
     #[test]
     fn should_refuse_to_switch_an_install_nobody_has_opened() -> Result<(), RejectResponse> {
         let env = env();

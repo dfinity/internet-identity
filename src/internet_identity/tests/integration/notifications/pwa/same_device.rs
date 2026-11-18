@@ -971,7 +971,8 @@ fn should_let_the_installed_app_probe_its_own_subscription() {
 fn should_remove_the_linked_installed_app_that_did_not_answer() {
     let env = env();
     let phone = linked_phone(&env);
-    deliver(&env, phone.canister_id, phone.account_principal, 1, 201);
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    answer_outcalls(&env, 201);
 
     remove_unanswered(&env, &phone);
 
@@ -989,7 +990,8 @@ fn should_remove_the_linked_installed_app_that_did_not_answer() {
 fn should_keep_the_linked_installed_app_that_answered() {
     let env = env();
     let phone = linked_phone(&env);
-    deliver(&env, phone.canister_id, phone.account_principal, 1, 201);
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    answer_outcalls(&env, 201);
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
 
     remove_unanswered(&env, &phone);
@@ -997,6 +999,71 @@ fn should_keep_the_linked_installed_app_that_answered() {
     assert_eq!(
         deliver(&env, phone.canister_id, phone.account_principal, 2, 201),
         vec![PWA_ENDPOINT.to_string()]
+    );
+}
+
+#[test]
+fn should_keep_an_installed_app_that_answered_its_probe_though_a_later_push_waits() {
+    let env = env();
+    let phone = linked_phone(&env);
+    // A second installed app of the same account on the same phone, at an address of its own.
+    let second = another_installed_app_entry(&env, &phone);
+    subscribe_pwa_webpush(
+        &env,
+        phone.canister_id,
+        second,
+        UNPROBED_PWA_ENDPOINT,
+        p256dh(10),
+        &OTHER_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+    register_key(&env, &phone, second, &BrowserKey::new(42));
+    assert_eq!(
+        claim_with(&env, &phone, safari(), &BrowserKey::new(42)),
+        Ok(())
+    );
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    let mut probed = answer_outcalls(&env, 201);
+    probed.sort();
+    assert_eq!(
+        probed,
+        vec![PWA_ENDPOINT.to_string(), UNPROBED_PWA_ENDPOINT.to_string()]
+    );
+
+    // The first answers its probe, then an ordinary push reaches both and waits.
+    remove_pwa_entry(&env, &phone, FIRST_ENTRY);
+    deliver(&env, phone.canister_id, phone.account_principal, 1, 201);
+
+    remove_unanswered(&env, &phone);
+
+    // Only the second, whose probe nobody fetched, is gone.
+    assert_eq!(
+        deliver(&env, phone.canister_id, phone.account_principal, 2, 201),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+}
+
+#[test]
+fn should_leave_an_installed_app_sharing_the_callers_entry_off_the_path() {
+    let env = env();
+    // The installed app subscribes from the session of the very browser entry that asks.
+    let (canister_id, anchor, signed_in) = install_subscribed(&env);
+    let shared = Phone {
+        canister_id,
+        anchor,
+        account_principal: signed_in.account_principal,
+        pwa: session_of(&signed_in),
+        safari_session: session_of(&signed_in),
+    };
+
+    assert_eq!(
+        path_status(&env, &shared, installed_apps(&shared)).subscriptions,
+        vec![]
+    );
+    assert_eq!(
+        probe(&env, &shared, installed_apps(&shared)),
+        Err(ProbeNotificationPathError::NotReachable)
     );
 }
 

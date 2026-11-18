@@ -54,12 +54,22 @@ vi.mock("$lib/stores/browser-key.store", async (importOriginal) => ({
       accept: () => Promise.resolve(),
     }),
 }));
+/** What the notification check answers, call by call, and what it does as it answers. */
 const notificationCheck = vi.hoisted(() => {
-  const state: { outcome: "done" | "identity-changed" } = { outcome: "done" };
+  const state: {
+    outcomes: ("done" | "identity-changed")[];
+    onIdentityChanged: () => void;
+  } = { outcomes: [], onIdentityChanged: () => {} };
   return state;
 });
 vi.mock("$lib/stores/channelHandlers/notificationRepair", () => ({
-  repairNotificationPath: () => Promise.resolve(notificationCheck.outcome),
+  repairNotificationPath: () => {
+    const outcome = notificationCheck.outcomes.shift() ?? "done";
+    if (outcome === "identity-changed") {
+      notificationCheck.onIdentityChanged();
+    }
+    return Promise.resolve(outcome);
+  },
 }));
 vi.mock("$lib/stores/channelHandlers/describeBrowser", () => ({
   describeBrowser: () => Promise.resolve("a browser"),
@@ -762,15 +772,26 @@ describe("an identity change while notifications are checked", () => {
     await purgeAppSessions(BigInt(10_000));
   });
   afterEach(() => {
-    notificationCheck.outcome = "done";
+    notificationCheck.outcomes = [];
+    notificationCheck.onIdentityChanged = () => {};
   });
 
-  it("sends the app nothing minted for the identity the user left", async () => {
-    notificationCheck.outcome = "identity-changed";
+  it("answers the app with a session minted for the identity the user authorizes next", async () => {
+    const { authorizedStore } = await import("$lib/stores/authorization.store");
+    notificationCheck.outcomes = ["identity-changed", "done"];
+    // The user switches and authorizes again while the check runs.
+    notificationCheck.onIdentityChanged = () =>
+      (authorizedStore as unknown as Writable<unknown>).set({
+        accountNumberPromise: Promise.resolve(undefined),
+        accessLevel: "full-access",
+        maxTimeToLive: undefined,
+      });
 
-    const { sent } = await runCeremony(true);
+    const { sent, prepared } = await runCeremony(true);
 
-    expect(sent).toEqual([]);
+    expect(prepared).toHaveLength(2);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ id: 1, result: {} });
   });
 });
 

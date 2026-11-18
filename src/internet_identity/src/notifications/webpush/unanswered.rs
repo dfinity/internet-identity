@@ -60,6 +60,15 @@ pub(crate) fn is_probe_outstanding(registered: &ReadySubscription, now_ns: Times
         .is_some_and(|sent_at_ns| now_ns.saturating_sub(sent_at_ns) < PROBE_ANSWER_WINDOW_NS)
 }
 
+/// Whether a probe submitted through `registered` has had [`PROBE_ANSWER_WINDOW_NS`] by
+/// `now_ns` and no fetch answered it: evidence that nothing behind the subscription is
+/// left to answer.
+pub(crate) fn is_probe_unanswered(registered: &ReadySubscription, now_ns: Timestamp) -> bool {
+    registered
+        .probe_sent_at_ns
+        .is_some_and(|sent_at_ns| now_ns.saturating_sub(sent_at_ns) >= PROBE_ANSWER_WINDOW_NS)
+}
+
 /// Records that a probe was submitted at `now_ns` through the subscription
 /// `registration` names, where it still posts to `endpoint`. The probe is already on its
 /// way, so a failure is logged: it costs only a second probe if one is asked for.

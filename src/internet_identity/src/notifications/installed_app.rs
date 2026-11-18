@@ -1,6 +1,7 @@
 //! The record a Home Screen app has of its own, which browsers point at. One installed
 //! app is one record however many identities it serves.
 
+use crate::notifications::webpush::unanswered;
 use crate::storage::anchor::WebPushSubscription;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -63,6 +64,15 @@ impl NotificationApp {
             now_ns.saturating_sub(probe.asked_at_ns) >= PROBE_ANSWER_WINDOW_NS
                 && self.last_used_ns < probe.asked_at_ns
         })
+    }
+
+    /// Whether a repair probe through this record's subscription had its window and was
+    /// never fetched, which says the app is gone as surely as an unanswered enable probe.
+    pub fn repair_probe_went_unanswered(&self, now_ns: Timestamp) -> bool {
+        self.webpush_subscription
+            .as_ref()
+            .and_then(WebPushSubscription::ready)
+            .is_some_and(|ready| unanswered::is_probe_unanswered(ready, now_ns))
     }
 
     /// Whether this record holds an address a wake-up can go to. A registration part-way
