@@ -77,6 +77,9 @@
 
   const badge = $derived(unread.length > 99 ? "99+" : `${unread.length}`);
   const hasUnread = $derived(mode === "open" && unread.length > 0);
+  /** The corner shows a count. Not tied to the mode: while apps are picked the
+   *  corner fades away with its count still in it, and comes back with it. */
+  const counted = $derived(unread.length > 0 && showCount);
 
   const copyLink = () => {
     navigator.clipboard.writeText(url).then(
@@ -176,30 +179,6 @@
     >
       <AppLogo {logo} size="tile" />
     </span>
-    {#if mode === "select"}
-      <span
-        aria-hidden="true"
-        in:scale|global={{
-          start: 0.5,
-          duration: prefersReducedMotion.current ? 0 : 220,
-          delay: prefersReducedMotion.current ? 0 : Math.min(index, 12) * 30,
-          easing: quintOut,
-        }}
-        class={[
-          // The unread count's size and place, mirrored to the start corner:
-          // 18px, 5px over the logo's edges. The 1.5px ring matches the
-          // check's own stroke (3 on lucide's 24-unit grid, drawn at 12px).
-          "absolute -start-[5px] -top-[5px] flex size-4.5 items-center justify-center rounded-full border-[1.5px] transition-colors duration-150",
-          selected
-            ? "border-bg-brand-solid bg-bg-brand-solid text-text-primary-inversed"
-            : "border-border-primary bg-bg-primary",
-        ]}
-      >
-        {#if selected}
-          <CheckIcon class="size-3" strokeWidth={3} />
-        {/if}
-      </span>
-    {/if}
     {#if muted}
       <!-- Notifications turned off: the count's circle, in grey and on the
            logo's lower corner, where iOS puts a status on an avatar. It stays
@@ -280,29 +259,71 @@
     </button>
   {/if}
 
-  {#if mode === "open" && onDetails !== undefined}
+  {#if onToggle !== undefined}
+    <!-- The selection mark lies over the logo, not inside the tile's link or
+         button, which are swapped when picking starts and ends. So it stays
+         put and can come and go by itself: the marks arrive one after
+         another, and leave together, quicker. The layer is the logo's size
+         and place and rocks with it, on the same beat. -->
+    <span
+      aria-hidden="true"
+      class={[
+        "pointer-events-none absolute start-[calc(50%-2rem)] top-4 size-16",
+        mode === "select" && "jiggle",
+      ]}
+      style:animation-delay={mode === "select"
+        ? `-${(index * 97) % 260}ms`
+        : undefined}
+      style:animation-direction={mode === "select" && index % 2 === 1
+        ? "reverse"
+        : undefined}
+    >
+      <span
+        data-shown={mode === "select" ? "" : undefined}
+        style:--mark-delay={`${Math.min(index, 12) * 30}ms`}
+        class={[
+          // The unread count's size and place, mirrored to the start corner:
+          // 18px, 5px over the logo's edges. The 1.5px ring matches the
+          // check's own stroke (3 on lucide's 24-unit grid, drawn at 12px).
+          "mark absolute -start-[5px] -top-[5px] flex size-4.5 items-center justify-center rounded-full border-[1.5px]",
+          selected
+            ? "border-bg-brand-solid bg-bg-brand-solid text-text-primary-inversed"
+            : "border-border-primary bg-bg-primary",
+        ]}
+      >
+        {#if selected}
+          <CheckIcon class="size-3" strokeWidth={3} />
+        {/if}
+      </span>
+    </span>
+  {/if}
+
+  {#if onDetails !== undefined}
     <!-- The tile opens the app, the way Okta's does; its corner holds the
          rest: the app's notifications and settings, behind "⋯". At rest the
          corner shows the unread count, and turns into "⋯" while the tile is
          hovered; with nothing unread it is only "⋯", there on hover. Touch
          has no hover, so there the corner always takes a tap: the count, or
-         a quiet "⋯" where there's none. -->
+         a quiet "⋯" where there's none. While apps are picked the corner
+         steps away for the selection mark, and comes back after. -->
     <button
       type="button"
       onclick={onDetails}
-      aria-label={[`${name} details`, hasUnread && `${unread.length} unread`]
+      inert={mode !== "open"}
+      data-away={mode !== "open" ? "" : undefined}
+      aria-label={[`${name} details`, counted && `${unread.length} unread`]
         .filter(Boolean)
         .join(", ")}
       aria-expanded={current}
       class={[
-        "corner focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) transition-colors duration-200 ease-out outline-none before:absolute before:-inset-[13px] focus-visible:ring-4",
+        "corner focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4",
         muted
           ? "bg-(--ii-muted) text-white"
           : "bg-bg-brand-solid text-text-primary-inversed",
-        !(hasUnread && showCount) && "corner-bare",
+        !counted && "corner-bare",
       ]}
     >
-      {#if hasUnread && showCount}
+      {#if counted}
         <span class="cue-figure">{badge}</span>
       {/if}
       <span
@@ -358,10 +379,56 @@
   .tile:has(:focus-visible) {
     --cue: 1;
   }
+  .corner {
+    transition:
+      opacity 150ms ease-out,
+      scale 220ms var(--ii-ease-out),
+      color 200ms ease-out,
+      background-color 200ms ease-out;
+  }
   .corner-bare {
     opacity: var(--cue, 0);
     pointer-events: none;
-    transition: opacity 150ms ease-out;
+  }
+
+  /* Picking apps, the count and the selection mark trade places. What leaves
+     goes in 120ms, all together; what arrives grows from half its size over
+     220ms, the marks one after another, 30ms apart. */
+  .corner[data-away] {
+    opacity: 0;
+    scale: 0.5;
+    pointer-events: none;
+    transition-duration: 120ms;
+    transition-timing-function: ease-out;
+  }
+  .mark {
+    opacity: 0;
+    scale: 0.5;
+    transition:
+      opacity 120ms ease-out,
+      scale 120ms ease-out,
+      background-color 150ms ease-out,
+      border-color 150ms ease-out,
+      color 150ms ease-out;
+  }
+  .mark[data-shown] {
+    opacity: 1;
+    scale: 1;
+    transition-duration: 220ms, 220ms, 150ms, 150ms, 150ms;
+    transition-timing-function:
+      var(--ii-ease-out), var(--ii-ease-out), ease-out, ease-out, ease-out;
+    transition-delay:
+      var(--mark-delay, 0ms), var(--mark-delay, 0ms), 0ms, 0ms, 0ms;
+  }
+  /* Reduced motion: they only fade, all at once. */
+  @media (prefers-reduced-motion: reduce) {
+    .corner,
+    .corner[data-away],
+    .mark,
+    .mark[data-shown] {
+      scale: 1;
+      transition-delay: 0ms;
+    }
   }
   @media (hover: hover) {
     .tile:hover .corner-bare {
