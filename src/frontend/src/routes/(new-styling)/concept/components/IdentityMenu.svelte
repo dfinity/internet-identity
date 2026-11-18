@@ -5,6 +5,8 @@
     LogOutIcon,
     PaletteIcon,
   } from "@lucide/svelte";
+  import type { Snippet } from "svelte";
+  import type { ClassValue } from "svelte/elements";
   import Popup from "./Popup.svelte";
 
   interface Props {
@@ -12,9 +14,16 @@
     onColour: (button: HTMLElement) => void;
     onStartPage: () => void;
     onSignOut: () => void;
+    /** What the button shows in place of "⋯", e.g. the identity's avatar,
+     *  with the name it goes by and its own look. */
+    trigger?: { content: Snippet; label: string; class: ClassValue };
+    /** Over the rows, as an account menu leads with its accounts: the
+     *  identities to switch to. It gets `close`, so a pick puts the menu
+     *  away. */
+    head?: Snippet<[close: () => void]>;
   }
 
-  const { onColour, onStartPage, onSignOut }: Props = $props();
+  const { onColour, onStartPage, onSignOut, trigger, head }: Props = $props();
 
   let button = $state<HTMLButtonElement>();
   let open = $state(false);
@@ -31,15 +40,19 @@
   bind:this={button}
   type="button"
   onclick={() => (open = true)}
-  aria-label="More for this identity"
-  aria-haspopup="menu"
+  aria-label={trigger?.label ?? "More for this identity"}
+  aria-haspopup={head !== undefined ? "dialog" : "menu"}
   aria-expanded={open}
-  class={[
+  class={trigger?.class ?? [
     "text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-9 shrink-0 place-items-center rounded-xl transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2",
     open && "text-fg-secondary bg-(--ii-selected)",
   ]}
 >
-  <EllipsisIcon class="size-4.5" aria-hidden="true" />
+  {#if trigger !== undefined}
+    {@render trigger.content()}
+  {:else}
+    <EllipsisIcon class="size-4.5" aria-hidden="true" />
+  {/if}
 </button>
 {#if open && button !== undefined}
   <!-- Rendered where the button is, so the menu stands two steps above the
@@ -51,8 +64,11 @@
     align="end"
     distance="0.375rem"
     responsive={false}
-    class="!w-max"
+    class={head !== undefined ? "!w-72" : "!w-max"}
   >
+    {#if head !== undefined}
+      {@render head(close)}
+    {/if}
     <div class="flex flex-col p-1" role="menu" aria-label="Identity">
       <button
         type="button"

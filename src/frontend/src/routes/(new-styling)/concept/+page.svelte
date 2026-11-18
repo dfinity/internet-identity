@@ -54,12 +54,9 @@
   import AppSearch from "./components/AppSearch.svelte";
   import ExplorePage from "./components/ExplorePage.svelte";
   import ColourStrip from "./components/ColourStrip.svelte";
-  import IdentityCard, {
-    SWITCH_LIST_ID,
-  } from "./components/IdentityCard.svelte";
+  import IdentityCard from "./components/IdentityCard.svelte";
   import IdentityList from "./components/IdentityList.svelte";
   import IdentityMenu from "./components/IdentityMenu.svelte";
-  import IdentityStack from "./components/IdentityStack.svelte";
   import IncidentBanner from "./components/IncidentBanner.svelte";
   import IncidentCard from "./components/IncidentCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
@@ -137,7 +134,7 @@
   const pickColour = (paletteIndex: number) => {
     picked[`${identity.identityNumber}`] = paletteIndex;
   };
-  /** The phone header's colour row hangs from its "⋯" while it's open. */
+  /** The phone header's colour row hangs from its avatar while it's open. */
   let headColourAnchor = $state<HTMLElement>();
   /** The colours the identity shows: picked, or the ones its number gives. */
   const currentPalette = $derived(
@@ -1047,10 +1044,7 @@
   $effect(() => {
     if (!panelVisible) {
       appOpen = undefined;
-      // A phone lists the identities in its header, not in the sheet.
-      if (!phoneHead) {
-        switching = false;
-      }
+      switching = false;
     }
   });
 
@@ -1110,7 +1104,7 @@
   <!-- Phone: the panel's three sections as the head's own cards, side by
        side, so how you get in, how you'd get back in and where you're signed
        in are there as the page opens. Each opens its section over the apps. -->
-  <div class="pointer-events-auto grid grid-cols-3 gap-1.5 pb-4">
+  <div class="pointer-events-auto grid grid-cols-3 gap-1.5 pb-8">
     {#each accountCards as card (card.kind)}
       {@const Icon = SECTION_ICONS[card.kind]}
       <Elevated offset={1} class="overflow-hidden rounded-2xl">
@@ -1342,6 +1336,31 @@
       </li>
     </Elevated>
   </section>
+{/snippet}
+
+{#snippet headAvatar()}
+  <IdentityAvatar {identity} palette={identityPaletteOverride} size="sm" />
+{/snippet}
+
+{#snippet headIdentities(close: () => void)}
+  <!-- Every identity on the device, this one checked, then the way to add
+       one, as an account menu leads with its accounts. -->
+  <IdentityList
+    id="head-identity-list"
+    {identity}
+    signedInWith={signedInWith.title}
+    others={otherIdentities}
+    onSwitch={(identityNumber) => {
+      close();
+      switchIdentity(identityNumber);
+    }}
+    onAdd={() => {
+      close();
+      unavailable("Adding an identity");
+    }}
+    {paletteOf}
+  />
+  <hr class="border-border-tertiary" />
 {/snippet}
 
 {#snippet conceptControls(compact: boolean)}
@@ -1600,10 +1619,13 @@
             !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
           ]}
         >
-          <!-- Phone only: on desktop it keeps to the bottom-left corner. -->
-          <div class="flex md:hidden">
-            {@render conceptControls(true)}
-          </div>
+          <!-- Phone only, beside the island or the dock: on desktop, and on a
+               phone in the main layout, it keeps to the bottom-left corner. -->
+          {#if !phoneHead}
+            <div class="flex md:hidden">
+              {@render conceptControls(true)}
+            </div>
+          {/if}
           {#if isDesktop.current && panelVisible}
             <!-- Desktop, with the panel open: Close stands where the account
                  was, on the canvas, which is what the panel pushed aside. The
@@ -1697,6 +1719,35 @@
               {/each}
             </div>
           {/if}
+          {#if phoneHead}
+            <!-- Phone: the identity at the end of the top row, as an account
+                 sits in an app's corner. The greeting already names it, so
+                 the avatar is the way to the others and to its own settings:
+                 a tap lists every identity on the device, then the colour,
+                 the start page and signing out. -->
+            <IdentityMenu
+              trigger={{
+                content: headAvatar,
+                label: `${identityName}: identities and settings`,
+                class:
+                  "focus-visible:outline-focus-ring grid shrink-0 place-items-center rounded-full p-[3px] transition-[background-color,scale] duration-150 ease-out hover:bg-(--ii-hover) focus-visible:outline-2 active:scale-[0.96] aria-expanded:bg-(--ii-selected) motion-reduce:active:scale-100",
+              }}
+              head={headIdentities}
+              onColour={(button) => (headColourAnchor = button)}
+              onStartPage={showStartPage}
+              onSignOut={() => unavailable("Signing out")}
+            />
+            {#if headColourAnchor !== undefined}
+              <ColourStrip
+                anchor={headColourAnchor}
+                align="end"
+                initial={identityInitial(identity.name)}
+                current={colourIndex}
+                onPick={pickColour}
+                onClose={() => (headColourAnchor = undefined)}
+              />
+            {/if}
+          {/if}
         </div>
       </div>
       <!-- The greeting and the tabs share the grid's width, so the name, the
@@ -1719,80 +1770,24 @@
               ? 1 - headLift / greetingHeight
               : 1}
           >
-            <div class="flex items-center gap-2 pe-0.5">
-              <p
-                class={[
-                  "text-text-primary flex min-w-0 flex-1 items-center gap-x-2 pt-3 leading-7 font-semibold tracking-tight md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
-                  // A phone's row shares the line with the identities and
-                  // "⋯", so the greeting is a step smaller there.
-                  phoneHead ? "text-lg" : "text-xl",
-                  INSET,
-                  phoneHead ? "pb-3" : "pb-5",
-                ]}
-              >
-                <span class="shrink-0">{greeting},</span>
-                <span
-                  aria-hidden="true"
-                  class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
-                  style:background-color={currentPalette.background}
-                ></span>
-                <span class="min-w-0 truncate">{identityName}</span>
-              </p>
-              {#if phoneHead}
-                <!-- A phone has no panel, so the greeting is the identity's
-                     row too, as a profile heads X on a phone: the other
-                     identities across from the name, then "⋯". -->
-                <div
-                  class="pointer-events-auto flex shrink-0 items-center pt-3 pb-3"
-                >
-                  <IdentityStack
-                    others={otherIdentities}
-                    expanded={switching}
-                    controls={SWITCH_LIST_ID}
-                    onToggle={() => (switching = !switching)}
-                    {paletteOf}
-                    backdrop="var(--ii-surface-3)"
-                  />
-                  <IdentityMenu
-                    onColour={(button) => (headColourAnchor = button)}
-                    onStartPage={showStartPage}
-                    onSignOut={() => unavailable("Signing out")}
-                  />
-                  {#if headColourAnchor !== undefined}
-                    <ColourStrip
-                      anchor={headColourAnchor}
-                      align="end"
-                      initial={identityInitial(identity.name)}
-                      current={colourIndex}
-                      onPick={pickColour}
-                      onClose={() => (headColourAnchor = undefined)}
-                    />
-                  {/if}
-                </div>
-              {/if}
-            </div>
+            <!-- On a phone it's a step smaller, so a long name keeps to the
+                 line, and closer to the logo than to the cards under it. -->
+            <p
+              class={[
+                "text-text-primary flex min-w-0 items-center gap-x-2 leading-7 font-semibold tracking-tight md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
+                INSET,
+                phoneHead ? "pt-2.5 pb-6 text-lg" : "pt-3 pb-5 text-xl",
+              ]}
+            >
+              <span class="shrink-0">{greeting},</span>
+              <span
+                aria-hidden="true"
+                class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
+                style:background-color={currentPalette.background}
+              ></span>
+              <span class="min-w-0 truncate">{identityName}</span>
+            </p>
             {#if phoneHead}
-              {#if switching}
-                <div
-                  transition:slide={{
-                    duration: reduced ? 0 : 240,
-                    easing: quintOut,
-                  }}
-                  class="pointer-events-auto pb-3"
-                >
-                  <Elevated offset={1} class="overflow-hidden rounded-2xl">
-                    <IdentityList
-                      id={SWITCH_LIST_ID}
-                      {identity}
-                      signedInWith={signedInWith.title}
-                      others={otherIdentities}
-                      onSwitch={switchIdentity}
-                      onAdd={() => unavailable("Adding an identity")}
-                      {paletteOf}
-                    />
-                  </Elevated>
-                </div>
-              {/if}
               {@render headCards()}
             {/if}
           </div>
@@ -2271,11 +2266,20 @@
   {/if}
 
   <!-- Concept only: walk the panel through its states, and switch layouts.
-       On desktop it stays in the bottom-left corner in every layout; on a
-       phone it sits in the header, leaving the bottom to the island. -->
-  <div class="fixed start-4 bottom-4 z-10 max-md:hidden">
-    {@render conceptControls(false)}
-  </div>
+       On desktop it stays in the bottom-left corner in every layout. A phone
+       in the main layout has it in the same corner, its glyph under the
+       logo's, since the header's end is the identity's; it steps aside for
+       the selection bar while apps are arranged. In the other two layouts a
+       phone has it in the header, leaving the bottom to the island and the
+       dock. -->
+  {#if isDesktop.current || (phoneHead && islandView === undefined)}
+    <div
+      transition:fade={{ duration: reduced ? 0 : 150 }}
+      class="fixed start-[25px] bottom-[calc(1rem+env(safe-area-inset-bottom))] z-10 sm:start-[33px] md:start-4 md:bottom-4"
+    >
+      {@render conceptControls(false)}
+    </div>
+  {/if}
 
   {#if conceptMenu !== undefined}
     {@const close = () => (conceptMenu = undefined)}
