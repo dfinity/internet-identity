@@ -768,6 +768,7 @@
 {#snippet notificationConsentContent()}
   {#if $notificationConsentStore !== undefined}
     {#key $notificationConsentStore}
+      {@const context = $notificationConsentStore}
       <NotifOptInView
         appName={dapp.name}
         appLogo={dapp.logo}
@@ -778,7 +779,7 @@
         consented={$notificationConsentStore.consented}
         installFirst={$notificationConsentStore.installFirst}
         isRepair={$notificationConsentStore.isRepair}
-        onDone={() => notificationConsentStore.settle()}
+        onDone={() => notificationConsentStore.settle(context)}
       />
     {/key}
   {/if}
