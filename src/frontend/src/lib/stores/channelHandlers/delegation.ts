@@ -28,6 +28,7 @@ import {
 import { get } from "svelte/store";
 import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
 import { grantedTimeToLive } from "$lib/utils/sessionDuration";
+import { repairNotificationPath } from "$lib/stores/channelHandlers/notificationRepair";
 
 /**
  * ICRC-34: handle a delegation request from the relying party.
@@ -176,6 +177,11 @@ export const handleDelegationRequest =
             ),
         );
 
+        await repairNotificationPath({
+          identityNumber,
+          origin: effectiveOrigin,
+          actor,
+        });
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,

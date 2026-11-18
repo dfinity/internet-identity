@@ -52,6 +52,7 @@ import {
 } from "$lib/stores/channelHandlers/silentReauth";
 import type { AccountSessionError } from "$lib/generated/internet_identity_types";
 import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
+import { repairNotificationPath } from "$lib/stores/channelHandlers/notificationRepair";
 import {
   StaleBrowserKeyError,
   withBrowserProof,
@@ -300,6 +301,13 @@ export const handleSessionDelegationRequest =
           created.record,
           params.sessionPublicKey,
         );
+        const { identityNumber, actor } =
+          await waitForStore(authenticationStore);
+        await repairNotificationPath({
+          identityNumber,
+          origin: effectiveOrigin,
+          actor,
+        });
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,

@@ -26,7 +26,7 @@
   } from "$lib/utils/notifications/notificationDiagnostics";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { isCanisterError } from "$lib/utils/utils";
+  import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
   import {
     BrowserNotificationsEvents,
     browserNotificationsFunnel,
@@ -52,6 +52,9 @@
     consented: boolean;
     /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
     installFirst: boolean;
+    /** Opened because this device stopped receiving the app's notifications: skipping
+     *  then records the denial for the app. */
+    isRepair: boolean;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
@@ -65,6 +68,7 @@
     device,
     consented,
     installFirst,
+    isRepair,
     onDone,
   }: Props = $props();
 
@@ -95,8 +99,24 @@
     return () => started?.close();
   });
 
-  const skip = () => {
+  const skip = async () => {
     funnel?.trigger(BrowserNotificationsEvents.Skipped);
+    if (isRepair) {
+      busy = true;
+      try {
+        await actor
+          .notification_revoke_consent({
+            anchor_number: identityNumber,
+            origin,
+          })
+          .then(throwCanisterError);
+      } catch (error) {
+        reportFailure(error);
+        return;
+      } finally {
+        busy = false;
+      }
+    }
     done();
   };
 
@@ -317,7 +337,7 @@
       }
       void runEnable(device);
     }}
-    onSkip={skip}
+    onSkip={() => void skip()}
   />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
@@ -336,7 +356,11 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button class="btn btn-tertiary btn-xl" onclick={skip} disabled={busy}>
+      <button
+        class="btn btn-tertiary btn-xl"
+        onclick={() => void skip()}
+        disabled={busy}
+      >
         {$t`Not now`}
       </button>
     </div>

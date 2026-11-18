@@ -16,6 +16,10 @@ export interface NotificationConsentContext {
   consented: boolean;
   /** Whether answering sends the user to install the Home Screen app, because this browser has no prompt to raise. */
   installFirst: boolean;
+  /** Opened because the way this device receives the app's notifications stopped
+   *  working, rather than because the app asked: declining records the denial, so the
+   *  next sign-in has nothing left to check. */
+  isRepair: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();

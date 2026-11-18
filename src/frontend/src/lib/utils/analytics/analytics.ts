@@ -3,7 +3,10 @@ import { establishedChannelStore } from "$lib/stores/channelStore";
 import Plausible from "plausible-tracker";
 import { PlausibleInitOptions } from "plausible-tracker/build/main/lib/tracker";
 import { get } from "svelte/store";
-import { NOTIFICATION_APP_PATH } from "$lib/utils/notifications/appPath";
+import {
+  NOTIFICATION_APP_PATH,
+  SAME_DEVICE_LINK_PATH,
+} from "$lib/utils/notifications/appPath";
 
 let tracker: undefined | ReturnType<typeof Plausible>;
 let hashMode = false;
@@ -104,12 +107,16 @@ const withAuthorizationOrigin = (
 
 /**
  * The tracker reports `location.href` unless told otherwise, fragment included. Plausible
- * reads the fragment only in hash mode, and the notification app's fragment is never a
- * route: it holds the private link key its install was minted with.
+ * reads the fragment only in hash mode, and the fragments of the notification app and of
+ * the same-device link page are never a route: each holds a private one-shot link key.
  */
 const reportedUrl = (href: string): string => {
   const url = new URL(href);
-  if (!hashMode || url.pathname.startsWith(NOTIFICATION_APP_PATH)) {
+  if (
+    !hashMode ||
+    url.pathname.startsWith(NOTIFICATION_APP_PATH) ||
+    url.pathname.startsWith(SAME_DEVICE_LINK_PATH)
+  ) {
     url.hash = "";
   }
   return url.toString();

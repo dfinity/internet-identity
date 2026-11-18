@@ -772,6 +772,7 @@
         device={$notificationConsentStore.device}
         consented={$notificationConsentStore.consented}
         installFirst={$notificationConsentStore.installFirst}
+        isRepair={$notificationConsentStore.isRepair}
         onDone={() => notificationConsentStore.settle()}
       />
     {/key}
