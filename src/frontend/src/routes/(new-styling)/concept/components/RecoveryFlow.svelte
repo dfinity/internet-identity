@@ -3,9 +3,15 @@
 
   export type RecoveryMethod = "phrase" | "email";
   /** Where each way back in stands, as its row says it. */
-  type MethodStatus = "off" | "unchecked" | "pending" | "on" | "inUse" | "new";
+  export type MethodStatus =
+    | "off"
+    | "unchecked"
+    | "pending"
+    | "on"
+    | "inUse"
+    | "new";
 
-  const phraseStatus = (state: RecoveryState): MethodStatus =>
+  export const phraseStatus = (state: RecoveryState): MethodStatus =>
     state === "none" || state === "emailOnly"
       ? "off"
       : state === "unverified"
@@ -16,14 +22,14 @@
             ? "new"
             : "on";
 
-  const emailStatus = (state: RecoveryState): MethodStatus =>
+  export const emailStatus = (state: RecoveryState): MethodStatus =>
     state === "emailPending"
       ? "pending"
       : state === "none" || state === "unverified" || state === "noEmail"
         ? "off"
         : "on";
 
-  const isOn = (status: MethodStatus) =>
+  export const isOn = (status: MethodStatus) =>
     status === "on" || status === "inUse" || status === "new";
 
   /** Each step takes focus as it arrives, so a screen reader reads where the

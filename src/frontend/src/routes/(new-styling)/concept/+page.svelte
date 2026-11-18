@@ -53,11 +53,15 @@
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
   import RecoveryFlow, {
+    emailStatus,
+    isOn,
+    phraseStatus,
+    type MethodStatus,
     type RecoveryMethod,
   } from "./components/RecoveryFlow.svelte";
   import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
-  import StatusRow from "./components/StatusRow.svelte";
+  import StatusCard from "./components/StatusCard.svelte";
   import VerifyPhraseDialog from "./components/VerifyPhraseDialog.svelte";
   import {
     browsersFor,
@@ -178,6 +182,15 @@
    *  identity is signed in. Apps are managed from the grid itself
    *  (Manage, by All apps' heading), so the account doesn't list them too. */
   const ACCOUNT_KINDS: CardKind[] = ["access", "recovery", "devices"];
+  /** A way back in, as the recovery card's preview says it. */
+  const RECOVERY_SAID: Record<MethodStatus, string> = {
+    off: "not set up",
+    unchecked: "not verified",
+    pending: "waiting",
+    on: "on",
+    inUse: "in use",
+    new: "reset",
+  };
   const accountCards = $derived(
     ACCOUNT_KINDS.map((kind) =>
       cards.find((card) => card.kind === kind),
@@ -1005,9 +1018,13 @@
 {/snippet}
 
 {#snippet accessPreview()}
-  <!-- Up to three of the ways in, as overlapping circles. -->
+  {@const methods =
+    current.scenario.access === "one"
+      ? [PasskeyIcon]
+      : [PasskeyIcon, KeyRoundIcon, AtSignIcon]}
+  <!-- Up to three of the ways in, as overlapping circles, and how many. -->
   <span class="flex items-center">
-    {#each current.scenario.access === "one" ? [PasskeyIcon] : [PasskeyIcon, KeyRoundIcon, AtSignIcon] as Glyph, index (index)}
+    {#each methods as Glyph, index (index)}
       <span
         class={[
           "bg-bg-primary text-fg-tertiary grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-surface-2)",
@@ -1018,6 +1035,31 @@
       </span>
     {/each}
   </span>
+  <span class="text-text-tertiary text-[13px] leading-[18px]">
+    {methods.length === 1
+      ? "One way to sign in"
+      : `${methods.length} ways to sign in`}
+  </span>
+{/snippet}
+
+{#snippet recoveryPreview()}
+  <!-- Both ways back in, each with where it stands. -->
+  {#each [{ name: "Phrase", status: phraseStatus(current.scenario.recovery) }, { name: "Email", status: emailStatus(current.scenario.recovery) }] as method (method.name)}
+    {@const warn = method.status === "unchecked" || method.status === "pending"}
+    <span
+      class={[
+        "inline-flex items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-medium",
+        isOn(method.status)
+          ? "border-bg-success-secondary bg-bg-success-primary text-fg-success-primary"
+          : warn
+            ? "bg-bg-warning-secondary text-fg-warning-primary border-transparent"
+            : "border-border-tertiary bg-bg-primary text-text-tertiary",
+      ]}
+    >
+      <span class="size-1.5 shrink-0 rounded-full bg-current"></span>
+      {method.name} · {RECOVERY_SAID[method.status]}
+    </span>
+  {/each}
 {/snippet}
 
 {#snippet devicesPreview()}
@@ -1043,6 +1085,9 @@
         {/if}
       </span>
     {/each}
+  </span>
+  <span class="text-text-tertiary text-[13px] leading-[18px]">
+    {browsers.length === 1 ? "1 browser" : `${browsers.length} browsers`}
   </span>
 {/snippet}
 
@@ -1180,26 +1225,23 @@
         {/if}
       {/snippet}
     </IdentityCard>
-    <!-- A card per row, no headings: the rows' titles say what each is. -->
-    <div class="flex flex-col gap-2">
+    <!-- Three independent cards, each a large target that leads to its
+         section: the title, where it stands, and what's inside. -->
+    <div class="flex flex-col gap-2.5">
       {#each accountCards as card (card.kind)}
-        <Elevated offset={1} as="ul" class="overflow-hidden rounded-2xl">
-          <StatusRow
+        <Elevated offset={1} class="overflow-hidden rounded-2xl">
+          <StatusCard
             kind={card.kind}
             title={TITLES[card.kind]}
             sentence={card.sentence}
             tone={card.tone}
-            action={isLoud(card) && !coveredByIncident(card.kind)
-              ? leadActionOf(card, current.scenario)
-              : undefined}
             resolved={resolvedKinds.includes(card.kind)}
             onOpen={() => openCard(card.kind)}
-            onAction={() => runLead(card)}
             preview={card.kind === "access"
               ? accessPreview
-              : card.kind === "devices"
-                ? devicesPreview
-                : undefined}
+              : card.kind === "recovery"
+                ? recoveryPreview
+                : devicesPreview}
           />
         </Elevated>
       {/each}
