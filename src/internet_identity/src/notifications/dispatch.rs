@@ -32,7 +32,7 @@ use internet_identity_interface::internet_identity::types::{
     NotificationId, Timestamp, Urgency,
 };
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(1);
@@ -1033,13 +1033,12 @@ fn find_pwa_wake_up_address(
     if !has_live_session {
         return None;
     }
-    let subscription = route
-        .config
-        .as_ref()?
-        .pwa_webpush_subscription(browser.id)
-        .filter(|held| held.account_principal == route.account_principal)?
-        .subscription
-        .into_ready()?;
+    let config = route.config.as_ref()?;
+    let held_subscription = config.pwa_webpush_subscription(browser.id)?;
+    if held_subscription.account_principal != route.account_principal {
+        return None;
+    }
+    let subscription = held_subscription.subscription.into_ready()?;
     let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
     Some((
         subscription,
@@ -1108,48 +1107,54 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     match outcome {
         // Nothing was posted, and the entry stays for whatever wakes this browser next.
         PostOutcome::Sent | PostOutcome::Superseded => {}
-        PostOutcome::Gone => {
-            // The entry this wake-up announced goes, and only that one, while the
-            // registration still names the endpoint that answered: the read below is what
-            // tells the two apart, so it runs before the registration is cleared.
-            if let Some(notification) = delivery.notification.as_ref() {
-                browser_inbox::remove_after_failed_wake_up(
-                    delivery.anchor_number,
-                    delivery.browser_id,
-                    delivery.target,
-                    notification,
-                    &delivery.endpoint,
-                );
-            }
-            if let Err(err) = clear_gone_subscription(
-                delivery.anchor_number,
-                delivery.browser_id,
-                delivery.target,
-                &delivery.endpoint,
-            ) {
-                ic_cdk::println!("Failed to drop a push registration the relay called gone: {err}");
-            }
-        }
+        PostOutcome::Gone => drop_gone_subscription(delivery),
         PostOutcome::RateLimited
         | PostOutcome::RelayError
         | PostOutcome::RelayServerError
         | PostOutcome::Rejected
         | PostOutcome::NoCapacity
-        | PostOutcome::Unsealed => {
-            // A wake-up that announced nothing new leaves the queue alone: the entry it
-            // was for is one the service worker has already been told about.
-            let Some(notification) = delivery.notification.as_ref() else {
-                return;
-            };
-            browser_inbox::remove_after_failed_wake_up(
-                delivery.anchor_number,
-                delivery.browser_id,
-                delivery.target,
-                notification,
-                &delivery.endpoint,
-            );
-        }
+        | PostOutcome::Unsealed => drop_failed_wake_up(delivery),
     }
+}
+
+/// Settles a `delivery` whose relay called its subscription gone: the entry it announced
+/// goes, and only that one, while the registration still names the endpoint that
+/// answered. That read is what tells the two apart, so it runs before the registration is
+/// cleared.
+fn drop_gone_subscription(delivery: &Delivery) {
+    if let Some(notification) = delivery.notification.as_ref() {
+        browser_inbox::remove_after_failed_wake_up(
+            delivery.anchor_number,
+            delivery.browser_id,
+            delivery.target,
+            notification,
+            &delivery.endpoint,
+        );
+    }
+    if let Err(err) = clear_gone_subscription(
+        delivery.anchor_number,
+        delivery.browser_id,
+        delivery.target,
+        &delivery.endpoint,
+    ) {
+        ic_cdk::println!("Failed to drop a push registration the relay called gone: {err}");
+    }
+}
+
+/// Settles a `delivery` whose post failed: the entry it announced is removed, since no
+/// wake-up is coming for it. A wake-up that announced nothing new leaves the queue alone:
+/// the entry it was for is one the service worker has already been told about.
+fn drop_failed_wake_up(delivery: &Delivery) {
+    let Some(notification) = delivery.notification.as_ref() else {
+        return;
+    };
+    browser_inbox::remove_after_failed_wake_up(
+        delivery.anchor_number,
+        delivery.browser_id,
+        delivery.target,
+        notification,
+        &delivery.endpoint,
+    );
 }
 
 /// What the service worker is handed: the identity and inbox the entry sits in, and the
@@ -1178,7 +1183,7 @@ fn sealed_for(
     salt: u128,
 ) -> Option<Vec<u8>> {
     let inbox_notification_id = deposited.inbox_notification_id;
-    let named = match destination.target {
+    let named_payload = match destination.target {
         DeliveryTarget::Browser | DeliveryTarget::App(_) => serde_json::to_vec(&WakeUpPayload {
             anchor_number: destination.anchor_number,
             browser_id: destination.browser_id,
@@ -1190,86 +1195,37 @@ fn sealed_for(
     }
     .inspect_err(|err| ic_cdk::println!("ERROR: could not write a wake-up's payload: {err}"))
     .ok()?;
-    payload::seal(payload_ikm, payload_keyid, salt, &named)
+    payload::seal(payload_ikm, payload_keyid, salt, &named_payload)
         .inspect_err(|err| ic_cdk::println!("ERROR: could not seal a wake-up's payload: {err}"))
         .ok()
 }
 
 /// Seals every wake-up this pass is about to post, refreshing the stalest keying material
-/// on the way past.
+/// on the way past, and returns the indices of `deliveries` whose registration was
+/// replaced or removed while the pass waited for `pass_bytes`, which are left unsealed.
 ///
 /// Separate from planning because both halves need the pass's own random bytes, which are
 /// drawn once the pass knows it has something to send. The refresh comes first, so a
 /// subscription picked for it seals with the key it was just given rather than the one it
-/// arrived with.
+/// arrived with. Every registration is read once, after the await, and that one reading
+/// serves the whole pass: nothing else runs between it and the end of the pass.
 fn seal_pass(
     deliveries: &mut [Delivery],
     pass_bytes: &[u8; 32],
     now_ns: Timestamp,
 ) -> BTreeSet<usize> {
-    let candidates: Vec<(rotation::Destination, Timestamp)> = deliveries
-        .iter()
-        .map(|delivery| (destination_of(delivery), delivery.sealing.last_rotated_ns))
-        .collect();
-
-    let mut superseded_indices = BTreeSet::new();
-    if !candidates.is_empty() {
-        let sender = rotation::pass_sender(pass_bytes);
-        for destination in rotation::stalest(candidates, rotation::ROTATIONS_PER_PASS) {
-            let Some((endpoint, subscriber_key)) = deliveries
-                .iter()
-                .find(|delivery| destination_of(delivery) == destination)
-                .map(|delivery| (delivery.endpoint.clone(), delivery.subscriber_key.clone()))
-            else {
-                continue;
-            };
-            // On the registration, not the destination: a Home Screen app's is shared,
-            // and the wake-ups through it come from different identities and browsers.
-            let is_planned_for_destination = |delivery: &Delivery| {
-                destination_of(delivery).registration() == destination.registration()
-                    && delivery.endpoint == endpoint
-                    && delivery.subscriber_key == subscriber_key
-            };
-            match rotation::refresh(destination, &endpoint, &subscriber_key, &sender, now_ns) {
-                // Onto every wake-up for that registration, not only the one that was
-                // picked: a stale copy left on the others would seal against a key the
-                // header does not name.
-                Ok(rotation::Refresh::Refreshed(refreshed_sealing)) => {
-                    for delivery in deliveries
-                        .iter_mut()
-                        .filter(|delivery| is_planned_for_destination(delivery))
-                    {
-                        delivery.sealing = refreshed_sealing.clone();
-                    }
-                }
-                Ok(rotation::Refresh::Absent) => {}
-                // What the pass planned would be sealed for the replacement's keys and
-                // posted to the old endpoint, which no device can open.
-                Ok(rotation::Refresh::Replaced) => {
-                    for (index, delivery) in deliveries.iter().enumerate() {
-                        if is_planned_for_destination(delivery) {
-                            superseded_indices.insert(index);
-                        }
-                    }
-                }
-                Err(err) => {
-                    ic_cdk::println!("Could not refresh what a subscription seals with: {err}")
-                }
-            }
-        }
-    }
-    // Every registration the pass planned for, and not only the ones it rotated: any of
+    let destinations: Vec<rotation::Destination> = deliveries.iter().map(destination_of).collect();
+    let registrations = rotation::read_registrations(&destinations);
+    // Every registration the pass planned for, and not only the ones it rotates: any of
     // them may have been replaced while the pass waited for its randomness.
-    for (index, delivery) in deliveries.iter().enumerate() {
-        if !rotation::is_still_registered(
-            destination_of(delivery),
-            &delivery.endpoint,
-            &delivery.subscriber_key,
-        ) {
-            superseded_indices.insert(index);
-        }
-    }
-
+    let mut superseded_indices = find_superseded(deliveries, &registrations);
+    refresh_stalest(
+        deliveries,
+        &registrations,
+        pass_bytes,
+        now_ns,
+        &mut superseded_indices,
+    );
     for (index, delivery) in deliveries.iter_mut().enumerate() {
         if superseded_indices.contains(&index) {
             continue;
@@ -1287,6 +1243,125 @@ fn seal_pass(
         );
     }
     superseded_indices
+}
+
+/// The indices of `deliveries` whose registration in `registrations` no longer posts to
+/// the endpoint with the key the delivery was planned for, or is gone.
+fn find_superseded(
+    deliveries: &[Delivery],
+    registrations: &BTreeMap<rotation::RegistrationId, ReadySubscription>,
+) -> BTreeSet<usize> {
+    let mut superseded_indices = BTreeSet::new();
+    for (index, delivery) in deliveries.iter().enumerate() {
+        let registration_id = destination_of(delivery).registration();
+        let is_registered =
+            registrations
+                .get(&registration_id)
+                .is_some_and(|registered_subscription| {
+                    rotation::is_planned_registration(
+                        registered_subscription,
+                        &delivery.endpoint,
+                        &delivery.subscriber_key,
+                    )
+                });
+        if !is_registered {
+            superseded_indices.insert(index);
+        }
+    }
+    superseded_indices
+}
+
+/// Refreshes the keying material of the [`rotation::ROTATIONS_PER_PASS`] stalest
+/// registrations among `deliveries` against this pass's sender key, drawn from
+/// `pass_bytes`, and copies it onto every delivery planned through each of them. A
+/// registration found replaced adds its deliveries to `superseded_indices`.
+fn refresh_stalest(
+    deliveries: &mut [Delivery],
+    registrations: &BTreeMap<rotation::RegistrationId, ReadySubscription>,
+    pass_bytes: &[u8; 32],
+    now_ns: Timestamp,
+    superseded_indices: &mut BTreeSet<usize>,
+) {
+    let candidates: Vec<(rotation::Destination, Timestamp)> = deliveries
+        .iter()
+        .map(|delivery| (destination_of(delivery), delivery.sealing.last_rotated_ns))
+        .collect();
+    if candidates.is_empty() {
+        return;
+    }
+    let sender = rotation::pass_sender(pass_bytes);
+    for destination in rotation::stalest(candidates, rotation::ROTATIONS_PER_PASS) {
+        let registered_subscription = registrations.get(&destination.registration());
+        refresh_destination(
+            deliveries,
+            destination,
+            registered_subscription,
+            &sender,
+            now_ns,
+            superseded_indices,
+        );
+    }
+}
+
+/// Refreshes the keying material of `destination`'s registration, which the pass read as
+/// `registered_subscription`, against `sender`, and copies it onto every one of
+/// `deliveries` planned through that registration; where it was replaced, their indices
+/// go into `superseded_indices` instead.
+fn refresh_destination(
+    deliveries: &mut [Delivery],
+    destination: rotation::Destination,
+    registered_subscription: Option<&ReadySubscription>,
+    sender: &p256::SecretKey,
+    now_ns: Timestamp,
+    superseded_indices: &mut BTreeSet<usize>,
+) {
+    let Some((endpoint, subscriber_key)) = deliveries
+        .iter()
+        .find(|delivery| destination_of(delivery) == destination)
+        .map(|delivery| (delivery.endpoint.clone(), delivery.subscriber_key.clone()))
+    else {
+        return;
+    };
+    // On the registration, not the destination: a Home Screen app's is shared, and
+    // the wake-ups through it come from different identities and browsers.
+    let is_planned_for_destination = |delivery: &Delivery| {
+        destination_of(delivery).registration() == destination.registration()
+            && delivery.endpoint == endpoint
+            && delivery.subscriber_key == subscriber_key
+    };
+    match rotation::refresh(
+        destination,
+        registered_subscription,
+        &endpoint,
+        &subscriber_key,
+        sender,
+        now_ns,
+    ) {
+        // Onto every wake-up for that registration, not only the one that was picked:
+        // a stale copy left on the others would seal against a key the header does
+        // not name.
+        Ok(rotation::Refresh::Refreshed(refreshed_sealing)) => {
+            for delivery in deliveries
+                .iter_mut()
+                .filter(|delivery| is_planned_for_destination(delivery))
+            {
+                delivery.sealing = refreshed_sealing.clone();
+            }
+        }
+        Ok(rotation::Refresh::Absent) => {}
+        // What the pass planned would be sealed for the replacement's keys and posted
+        // to the old endpoint, which no device can open.
+        Ok(rotation::Refresh::Replaced) => {
+            for (index, delivery) in deliveries.iter().enumerate() {
+                if is_planned_for_destination(delivery) {
+                    superseded_indices.insert(index);
+                }
+            }
+        }
+        Err(err) => {
+            ic_cdk::println!("Could not refresh what a subscription seals with: {err}")
+        }
+    }
 }
 
 fn destination_of(delivery: &Delivery) -> rotation::Destination {
