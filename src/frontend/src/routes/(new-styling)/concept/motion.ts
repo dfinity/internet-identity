@@ -4,8 +4,12 @@
  * Values follow Taste Machine's motion cards, with Emil Kowalski's position where
  * sources disagree: ease-out for anything that appears, exits quicker and quieter
  * than entrances, no bounce on a click, and under reduced motion only opacity.
+ *
+ * Exits ease out too. An ease-in exit holds the old thing at full strength for
+ * the first half of its time, so it sits on top of what replaces it; easing
+ * out, it is mostly gone in the first few frames.
  */
-import { cubicIn, quintOut } from "svelte/easing";
+import { quintOut } from "svelte/easing";
 import type { TransitionConfig } from "svelte/transition";
 
 interface SwapParams {
@@ -33,7 +37,7 @@ export const swapOut = (
   { reduced = false }: SwapParams = {},
 ): TransitionConfig => ({
   duration: reduced ? 100 : 150,
-  easing: cubicIn,
+  easing: quintOut,
   css: (t) =>
     reduced
       ? `opacity: ${t}`
@@ -65,7 +69,7 @@ export const viewOut = (
   { reduced = false }: { reduced?: boolean } = {},
 ): TransitionConfig => ({
   duration: reduced ? 100 : 120,
-  easing: cubicIn,
+  easing: quintOut,
   css: (t) => `opacity: ${t}`,
 });
 
@@ -89,7 +93,7 @@ export const islandOut = (
   { reduced = false }: { reduced?: boolean } = {},
 ): TransitionConfig => ({
   duration: reduced ? 80 : 100,
-  easing: cubicIn,
+  easing: quintOut,
   css: (t) => `opacity: ${t}`,
 });
 
@@ -112,7 +116,7 @@ export const shellOut = (
   { reduced = false }: { reduced?: boolean } = {},
 ): TransitionConfig => ({
   duration: reduced ? 100 : 150,
-  easing: cubicIn,
+  easing: quintOut,
   css: (t) =>
     reduced
       ? `opacity: ${t}`
@@ -197,7 +201,7 @@ export const widgetOut = (
   { reduced = false }: WidgetParams = {},
 ): TransitionConfig => ({
   duration: reduced ? 100 : 180,
-  easing: cubicIn,
+  easing: quintOut,
   css: (t) =>
     reduced
       ? `opacity: ${t}`
