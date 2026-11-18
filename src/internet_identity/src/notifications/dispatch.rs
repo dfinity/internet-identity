@@ -136,17 +136,20 @@ pub(crate) enum PostOutcome {
 }
 
 impl PostOutcome {
-    /// Why the push was lost, or `Ok` where a push service took it.
-    fn loss(self) -> Result<(), Reason> {
+    /// Why the push was lost, or `Ok` where a push service took it. `None` where nothing
+    /// was posted and the entry stays in the inbox, so its copy stays open for whatever
+    /// wakes the browser next.
+    fn loss(self) -> Option<Result<(), Reason>> {
         match self {
-            PostOutcome::Sent => Ok(()),
-            PostOutcome::Gone => Err(Reason::RelayGone),
-            PostOutcome::RateLimited => Err(Reason::RelayRateLimited),
-            PostOutcome::RelayError => Err(Reason::RelayRejected),
-            PostOutcome::RelayServerError => Err(Reason::RelayServerError),
-            PostOutcome::Rejected => Err(Reason::RelayNoAnswer),
-            PostOutcome::NoCapacity => Err(Reason::NoOutcallCapacity),
-            PostOutcome::Unsealed | PostOutcome::Superseded => Err(Reason::SealFailed),
+            PostOutcome::Sent => Some(Ok(())),
+            PostOutcome::Gone => Some(Err(Reason::RelayGone)),
+            PostOutcome::RateLimited => Some(Err(Reason::RelayRateLimited)),
+            PostOutcome::RelayError => Some(Err(Reason::RelayRejected)),
+            PostOutcome::RelayServerError => Some(Err(Reason::RelayServerError)),
+            PostOutcome::Rejected => Some(Err(Reason::RelayNoAnswer)),
+            PostOutcome::NoCapacity => Some(Err(Reason::NoOutcallCapacity)),
+            PostOutcome::Unsealed => Some(Err(Reason::SealFailed)),
+            PostOutcome::Superseded => None,
         }
     }
 
@@ -995,8 +998,7 @@ impl PwaRoute {
             })
             .unwrap_or_default();
         Self {
-            config: storage
-                .read_anchor_application_config_with_number(anchor_number, application_number),
+            config: storage.anchor_application_config(anchor_number, application_number),
             sessions,
             application_number,
             account_principal,
@@ -1094,13 +1096,13 @@ pub(crate) fn can_wake<M: Memory + Clone>(
 /// and a relay that lost the subscription also takes the registration with it.
 pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     record_post_outcome(outcome);
-    if let Some(notification) = delivery.notification.as_ref() {
+    if let (Some(notification), Some(loss)) = (delivery.notification.as_ref(), outcome.loss()) {
         delivery_metrics::count_push_outcome(
             delivery.anchor_number,
             delivery.browser_id,
             notification,
             Path::of(delivery.target, &delivery.endpoint),
-            outcome.loss(),
+            loss,
         );
     }
     match outcome {
@@ -2127,6 +2129,30 @@ mod tests {
         settle(&delivery, PostOutcome::Sent);
 
         assert_eq!(queued(recipient, browsers[0]), vec![7]);
+    }
+
+    #[test]
+    fn a_superseded_copy_counts_as_delivered_once_a_later_wake_up_collects_it() {
+        setup();
+        delivery_metrics::reset_for_testing();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+        let entry = delivery.notification.clone().expect("an announced entry");
+
+        settle(&delivery, PostOutcome::Superseded);
+        // The entry is still in the inbox, for the next wake-up's worker to collect.
+        assert_eq!(queued(recipient, browsers[0]), vec![7]);
+        delivery_metrics::count_collected(recipient, browsers[0], &entry, 2 * SECOND_NS);
+
+        assert_eq!(
+            delivery_metrics::notification_count_for_testing("delivered"),
+            1
+        );
+        assert_eq!(
+            delivery_metrics::push_loss_count_for_testing("seal_failed"),
+            0
+        );
     }
 
     #[test]

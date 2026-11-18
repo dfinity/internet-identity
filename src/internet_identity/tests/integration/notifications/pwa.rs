@@ -1075,6 +1075,77 @@ fn should_keep_the_entry_for_the_installed_app_when_the_browser_switches_deliver
     Ok(())
 }
 
+/// The inbox moved to a layout of its own, under a key of its own: the previous release's
+/// entries are skipped on the way up, and this release's on the way back down.
+#[test]
+fn should_read_the_identity_across_an_upgrade_and_a_rollback_with_entries_waiting(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM_PREVIOUS.clone(),
+        arg_with_notifications_enabled(),
+    );
+    let anchor = flows::register_anchor(&env, canister_id);
+    let browser = BrowserKey::new(1);
+    let signed_in = sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, APP, &browser),
+    );
+    grant_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("grant refused");
+    subscribe_webpush(
+        &env,
+        canister_id,
+        browser.successor().principal(),
+        SetWebPushSubscriptionRequest {
+            anchor_number: anchor,
+            endpoint: BROWSER_ENDPOINT.to_string(),
+            p256dh: p256dh(7),
+            transport_key: p256dh(7),
+            sealed_auth: ByteBuf::from(vec![0u8; 32]),
+        },
+    )?
+    .expect("subscribe refused");
+    assert_eq!(
+        deliver(&env, canister_id, signed_in.account_principal, 1, 201),
+        vec![BROWSER_ENDPOINT.to_string()]
+    );
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    canister_tests::api::internet_identity::api_v2::identity_info(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+    )?
+    .expect("reading the identity after the upgrade");
+    assert_eq!(
+        deliver(&env, canister_id, signed_in.account_principal, 2, 201),
+        vec![BROWSER_ENDPOINT.to_string()]
+    );
+
+    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+    canister_tests::api::internet_identity::api_v2::identity_info(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+    )?
+    .expect("reading the identity after the rollback");
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    canister_tests::api::internet_identity::api_v2::identity_info(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+    )?
+    .expect("reading the identity after upgrading again");
+    Ok(())
+}
+
 #[test]
 fn should_refuse_an_endpoint_taken_over_from_a_slot_a_rollback_emptied(
 ) -> Result<(), RejectResponse> {
@@ -1730,6 +1801,47 @@ fn should_answer_pending_to_a_browser_until_the_vapid_key_is_held() -> Result<()
         }
     }
     assert!(is_ready, "the keys are answered once the VAPID key is held");
+    Ok(())
+}
+
+/// A subnet without the key answers the same however often it is asked, so a failed
+/// fetch is reported rather than answered with `Pending` for good.
+#[test]
+fn should_answer_the_failure_once_the_vapid_key_fetch_failed() -> Result<(), RejectResponse> {
+    let env = canister_tests::framework::env_without_signing_keys();
+    let canister_id =
+        install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_notifications_enabled());
+    let anchor = flows::register_anchor(&env, canister_id);
+    let browser = BrowserKey::new(1);
+    let session = session_of(&sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(anchor, APP, &browser),
+    ));
+    grant_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("grant refused");
+    let browser_key = browser.successor().principal();
+
+    let mut is_refused = false;
+    for _ in 0..OUTCALL_ROUNDS {
+        env.tick();
+        if matches!(
+            prepare_webpush_subscription(&env, canister_id, browser_key, anchor)?,
+            PrepareWebPushSubscriptionResult::Err(
+                PrepareWebPushSubscriptionError::InternalCanisterError(_)
+            )
+        ) {
+            is_refused = true;
+            break;
+        }
+    }
+    assert!(is_refused, "the failed fetch is answered to a browser");
+    assert!(matches!(
+        app_prepare_pwa_webpush_subscription(&env, canister_id, session)?,
+        AppPreparePwaWebPushSubscriptionResult::Err(
+            AppPreparePwaWebPushSubscriptionError::InternalCanisterError(_)
+        )
+    ));
     Ok(())
 }
 

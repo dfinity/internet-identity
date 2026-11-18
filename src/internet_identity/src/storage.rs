@@ -232,6 +232,8 @@ const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
 const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 39u8;
+/// The installed web app subscription that holds each push endpoint, by the endpoint's
+/// SHA-256: what an endpoint is looked up by when another subscription takes it over.
 const LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX: u8 = 40u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
@@ -3242,7 +3244,9 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    fn anchor_application_config(
+    /// The config `anchor_number` holds for the app numbered `application_number`, which
+    /// holds its notification decision and its installed web app subscriptions.
+    pub fn anchor_application_config(
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -3371,16 +3375,6 @@ impl<M: Memory + Clone> Storage<M> {
         self.lookup_pwa_webpush_subscription_with_endpoint_memory
             .get(&endpoint_sha256(endpoint))
             .map(PwaSubscriptionHolder::from)
-    }
-
-    /// The identity's config for `application_number`, which holds its installed app
-    /// subscriptions.
-    pub fn read_anchor_application_config_with_number(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-    ) -> Option<AnchorApplicationConfig> {
-        self.anchor_application_config(anchor_number, application_number)
     }
 
     /// Puts `subscription` in `holder`'s slot, or with `None` empties it, after emptying

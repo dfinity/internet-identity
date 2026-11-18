@@ -69,10 +69,7 @@ pub(crate) fn remove_after_failed_wake_up(
                 .pwa_holder(anchor_number, browser_id)
                 .and_then(|holder| {
                     storage
-                        .read_anchor_application_config_with_number(
-                            holder.anchor_number,
-                            holder.application_number,
-                        )?
+                        .anchor_application_config(holder.anchor_number, holder.application_number)?
                         .pwa_webpush_subscription(holder.browser_id)
                 })
                 .and_then(|held| held.subscription.into_ready())

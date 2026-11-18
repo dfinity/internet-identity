@@ -1592,6 +1592,8 @@ pub enum RemoveNotificationError {
 
 /// What `app_prepare_pwa_webpush_subscription` answers. `Pending` is the retry signal of
 /// [`PrepareWebPushSubscriptionResult`]: the caller re-calls the method.
+/// What `app_prepare_pwa_webpush_subscription` answers: the keys, `Pending` where II
+/// is still fetching its VAPID key or drawing randomness, or why it refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppPreparePwaWebPushSubscriptionResult {
     Ok(PrepareWebPushSubscriptionResponse),
@@ -1599,6 +1601,7 @@ pub enum AppPreparePwaWebPushSubscriptionResult {
     Err(AppPreparePwaWebPushSubscriptionError),
 }
 
+/// Why `app_prepare_pwa_webpush_subscription` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppPreparePwaWebPushSubscriptionError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -1630,6 +1633,7 @@ pub struct PwaWebPushSubscription {
     pub sealed_auth: ByteBuf,
 }
 
+/// Why `app_set_pwa_webpush_subscription` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppSetPwaWebPushSubscriptionError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -1645,6 +1649,7 @@ pub enum AppSetPwaWebPushSubscriptionError {
     InternalCanisterError(String),
 }
 
+/// Why `app_get_pwa_webpush_subscription_status` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppGetPwaWebPushSubscriptionStatusError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -1652,6 +1657,7 @@ pub enum AppGetPwaWebPushSubscriptionStatusError {
     InternalCanisterError(String),
 }
 
+/// Which inbox entry an installed web app's worker asks for.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppGetPwaNotificationRequest {
     /// As the wake-up that announced it named it.
@@ -1671,6 +1677,7 @@ pub struct PwaNotification {
     pub id: NotificationId,
 }
 
+/// Why `app_get_pwa_notification` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppGetPwaNotificationError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -1678,6 +1685,7 @@ pub enum AppGetPwaNotificationError {
     InternalCanisterError(String),
 }
 
+/// Which inbox entry an installed web app's worker is done with, and whether it showed it.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppRemovePwaNotificationRequest {
     /// As the wake-up that announced it named it.
@@ -1686,6 +1694,7 @@ pub struct AppRemovePwaNotificationRequest {
     pub not_shown: Option<NotShownReason>,
 }
 
+/// Why `app_remove_pwa_notification` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppRemovePwaNotificationError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.

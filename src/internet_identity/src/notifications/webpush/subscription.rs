@@ -1,7 +1,7 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
-use super::pwa_subscription::clear_gone_pwa_subscription;
+use super::pwa_subscription;
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
 use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
@@ -123,8 +123,8 @@ pub fn set_subscription(
 /// Opens `auth`, derives what the subscription will be sealed with, and answers the
 /// registration to write.
 ///
-/// The age and the queue follow the address: a browser re-registering where it already
-/// was keeps both, which is why the fetch kept what it was replacing.
+/// The registration is new from here: its age starts at `now_ns`. The browser's inbox is
+/// not the registration's and stays as it is.
 pub(super) fn spend_pending(
     pending: &PendingTransport,
     browser_transport_key: &SubscriberKey,
@@ -197,14 +197,16 @@ pub(crate) fn clear_gone_subscription(
             }
             write_subscription(anchor, browser_id, None)
         }
-        DeliveryTarget::Pwa { application_number } => clear_gone_pwa_subscription(
-            PwaSubscriptionHolder {
-                anchor_number,
-                application_number,
-                browser_id,
-            },
-            endpoint,
-        ),
+        DeliveryTarget::Pwa { application_number } => {
+            pwa_subscription::clear_gone_pwa_subscription(
+                PwaSubscriptionHolder {
+                    anchor_number,
+                    application_number,
+                    browser_id,
+                },
+                endpoint,
+            )
+        }
         DeliveryTarget::App(app_id) => {
             let gone = storage_borrow(|storage| {
                 storage.notification_app(app_id).is_some_and(|app| {
@@ -373,8 +375,8 @@ mod tests {
         assert!(stored_subscription(anchor_number, browsers[0]).is_none());
     }
 
-    /// A different address is a different registration, so what was announced to the old
-    /// one goes with it.
+    /// A worker reads only the entry its push named, so what waits in the inbox is kept
+    /// when the browser registers a different address.
     #[test]
     fn moving_address_keeps_what_was_queued() {
         setup();
@@ -621,7 +623,8 @@ mod tests {
         assert_eq!(queued(anchor_number, browsers[1]), 1);
     }
 
-    /// Wake-ups for what was queued went to the old endpoint, so none reach the new one.
+    /// A push service rotating the endpoint leaves the inbox as it is: each entry is still
+    /// collected by the wake-up that named it.
     #[test]
     fn a_rotated_endpoint_keeps_the_browser_inbox() {
         setup();
@@ -687,7 +690,7 @@ mod tests {
         sign_browser_out(anchor_number, browsers[0]);
 
         // Both halves refuse. The fetch matters as much as the subscribe: it writes the
-        // entry's registration and empties its inbox before any address is involved.
+        // entry's registration before any address is involved.
         assert_eq!(
             start_subscription(
                 NotificationKey::Browser(browsers[0]),

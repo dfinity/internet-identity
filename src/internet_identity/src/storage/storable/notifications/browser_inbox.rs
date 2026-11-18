@@ -10,6 +10,9 @@ use minicbor::{Decode, Encode};
 
 /// One entry of a browser's inbox: the canister that sent it, its id there, when it stops
 /// being worth showing, and who it is for.
+///
+/// A layout of its own, stored under the browser entry's key 13. The retired inbox under
+/// key 11 had keys 5 and 6 as well; nothing here reads them.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
 pub struct StorableInboxNotification {

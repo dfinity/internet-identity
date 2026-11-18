@@ -46,6 +46,7 @@ use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::pwa_subscription;
+use notifications::webpush::vapid_key::VapidPublicKey;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
 use notifications::{
     admit_batch, delivery_metrics, enabled_or, fetchable_origin, TooManyNotifications,
@@ -362,9 +363,14 @@ fn prepare_webpush_subscription(anchor_number: AnchorNumber) -> PrepareWebPushSu
         );
     };
 
-    let Some(vapid_public_key) = notifications::webpush::vapid_key::public_key() else {
-        notifications::webpush::vapid_key::ensure_public_key();
-        return PrepareWebPushSubscriptionResult::Pending;
+    let vapid_public_key = match notifications::webpush::vapid_key::public_key_or_fetch() {
+        VapidPublicKey::Held(key) => key,
+        VapidPublicKey::Fetching => return PrepareWebPushSubscriptionResult::Pending,
+        VapidPublicKey::Unavailable(reason) => {
+            return PrepareWebPushSubscriptionResult::Err(
+                PrepareWebPushSubscriptionError::InternalCanisterError(reason),
+            )
+        }
     };
 
     let now_ns = ic_cdk::api::time();
@@ -1151,11 +1157,27 @@ fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionRes
     if let Err(err) = enabled_or(InternalCanisterError) {
         return AppPreparePwaWebPushSubscriptionResult::Err(err);
     }
-    let Some(vapid_public_key) = notifications::webpush::vapid_key::public_key() else {
-        notifications::webpush::vapid_key::ensure_public_key();
-        return AppPreparePwaWebPushSubscriptionResult::Pending;
+    let vapid_public_key = match notifications::webpush::vapid_key::public_key_or_fetch() {
+        VapidPublicKey::Held(key) => key,
+        VapidPublicKey::Fetching => return AppPreparePwaWebPushSubscriptionResult::Pending,
+        VapidPublicKey::Unavailable(reason) => {
+            return AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+        }
     };
-    pwa_subscription::prepare_pwa_subscription(&session, vapid_public_key, now)
+    match pwa_subscription::prepare_pwa_subscription(&session, vapid_public_key, now) {
+        Ok(pwa_subscription::PreparedPwaSubscription::Keys(keys)) => {
+            AppPreparePwaWebPushSubscriptionResult::Ok(keys)
+        }
+        Ok(pwa_subscription::PreparedPwaSubscription::Pending) => {
+            AppPreparePwaWebPushSubscriptionResult::Pending
+        }
+        Err(pwa_subscription::PreparePwaSubscriptionError::NotificationsNotAllowed) => {
+            AppPreparePwaWebPushSubscriptionResult::Err(NotificationsNotAllowed)
+        }
+        Err(pwa_subscription::PreparePwaSubscriptionError::Internal(reason)) => {
+            AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+        }
+    }
 }
 
 /// Sets or, with `None`, removes the installed web app subscription of the calling
@@ -1171,12 +1193,22 @@ fn app_set_pwa_webpush_subscription(
     enabled_or(InternalCanisterError)?;
     let AppSetPwaWebPushSubscriptionRequest { subscription } = request;
     let subscription = subscription
-        .map(validated_pwa_subscription)
+        .map(pwa_subscription::ValidatedPwaWebPushSubscription::try_from)
         .transpose()
         .map_err(InternalCanisterError)?;
-    let holder = pwa_subscription::holder_of(&session).ok_or(NoSuchSession)?;
+    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
 
     pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
+        .map_err(|err| match err {
+            pwa_subscription::SetPwaSubscriptionError::NotificationsNotAllowed => {
+                NotificationsNotAllowed
+            }
+            pwa_subscription::SetPwaSubscriptionError::TransportKeyExpired => TransportKeyExpired,
+            pwa_subscription::SetPwaSubscriptionError::EndpointInUse => EndpointInUse,
+            pwa_subscription::SetPwaSubscriptionError::Internal(reason) => {
+                InternalCanisterError(reason)
+            }
+        })
 }
 
 /// The endpoint the calling session's browser entry is subscribed at for the session's
@@ -1189,52 +1221,12 @@ fn app_get_pwa_webpush_subscription_status(
 
     let session = check_app_authorization(time()).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::holder_of(&session).ok_or(NoSuchSession)?;
+    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
 
     Ok(pwa_subscription::pwa_subscription_status(
         holder,
         session.account_principal,
     ))
-}
-
-/// Every field at once rather than the first to fail, as `set_webpush_subscription` does.
-fn validated_pwa_subscription(
-    subscription: PwaWebPushSubscription,
-) -> Result<pwa_subscription::PwaSubscriptionRequest, String> {
-    let PwaWebPushSubscription {
-        endpoint,
-        p256dh,
-        transport_key,
-        sealed_auth,
-    } = subscription;
-    match (
-        PushEndpoint::try_from(endpoint.as_str())
-            .and_then(|endpoint| deliverable_endpoint(&endpoint).map(|()| endpoint)),
-        SubscriberKey::try_from(p256dh.into_vec()),
-        SubscriberKey::try_from(transport_key.into_vec()),
-        SealedAuth::try_from(sealed_auth.into_vec()),
-    ) {
-        (Ok(endpoint), Ok(subscriber_key), Ok(transport_key), Ok(sealed_auth)) => {
-            Ok(pwa_subscription::PwaSubscriptionRequest {
-                endpoint,
-                subscriber_key,
-                transport_key,
-                sealed_auth,
-            })
-        }
-        (endpoint, subscriber_key, transport_key, sealed_auth) => {
-            let problems: Vec<String> = [
-                endpoint.err(),
-                subscriber_key.err(),
-                transport_key.err(),
-                sealed_auth.err(),
-            ]
-            .into_iter()
-            .flatten()
-            .collect();
-            Err(problems.join("; "))
-        }
-    }
 }
 
 /// The notification a wake-up named, where it is the calling session's app's, to its
@@ -1251,7 +1243,7 @@ fn app_get_pwa_notification(
     let AppGetPwaNotificationRequest {
         inbox_notification_id,
     } = request;
-    let holder = pwa_subscription::holder_of(&session).ok_or(NoSuchSession)?;
+    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
 
     Ok(AppGetPwaNotificationResponse {
         notification: notifications::browser_inbox::pwa_notification_named(
@@ -1278,7 +1270,7 @@ fn app_remove_pwa_notification(
         inbox_notification_id,
         not_shown,
     } = request;
-    let holder = pwa_subscription::holder_of(&session).ok_or(NoSuchSession)?;
+    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
 
     notifications::browser_inbox::remove_pwa_collected(
         holder,

@@ -68,27 +68,41 @@
     onDone,
   }: Props = $props();
 
-  /** Which story this device is in follows from where its notifications arrive. */
-  const funnel = $derived(
-    device.source === "app" || installFirst
-      ? icpAlertsFunnel
-      : browserNotificationsFunnel,
-  );
+  /**
+   * Which story this device is in follows from where its notifications arrive.
+   *
+   * None for an installed web app: it subscribes in its own page, after this screen, so
+   * this screen records only the consent, and either funnel would count a device step
+   * that never happens here.
+   */
+  const funnelOf = (
+    current: DeviceNotificationState,
+  ): typeof icpAlertsFunnel | typeof browserNotificationsFunnel | undefined => {
+    switch (current.source) {
+      case "app":
+        return icpAlertsFunnel;
+      case "browser":
+        return installFirst ? icpAlertsFunnel : browserNotificationsFunnel;
+      case "installed-app":
+        return undefined;
+    }
+  };
+  const funnel = $derived(funnelOf(device));
   onMount(() => {
     const started = funnel;
-    started.init({ source: "authorize" });
+    started?.init({ source: "authorize" });
     // A new request remounts this view without `done()`, and the funnel's session listener must not outlive it.
-    return () => started.close();
+    return () => started?.close();
   });
 
   const skip = () => {
-    funnel.trigger(BrowserNotificationsEvents.Skipped);
+    funnel?.trigger(BrowserNotificationsEvents.Skipped);
     done();
   };
 
   /** Hands sign-in back, which is where this screen's funnel ends. */
   const done = () => {
-    funnel.close();
+    funnel?.close();
     onDone();
   };
 
@@ -157,7 +171,7 @@
    * message is shown as it came, which makes a screenshot enough to act on.
    */
   const reportFailure = (error: unknown) => {
-    funnel.trigger(BrowserNotificationsEvents.Failed, {
+    funnel?.trigger(BrowserNotificationsEvents.Failed, {
       reason: isCanisterError(error) ? "canister-error" : "browser-error",
     });
     if (isCanisterError(error)) {
@@ -190,15 +204,15 @@
   const enabledBy = (result: EnableNotificationsResult): boolean => {
     switch (result.status) {
       case "enabled":
-        funnel.trigger(BrowserNotificationsEvents.Enabled);
+        funnel?.trigger(BrowserNotificationsEvents.Enabled);
         return true;
       case "denied":
-        funnel.trigger(BrowserNotificationsEvents.PermissionDenied);
+        funnel?.trigger(BrowserNotificationsEvents.PermissionDenied);
         recordFailure("permission-denied");
         variant = "blocked";
         return false;
       case "unanswered":
-        funnel.trigger(BrowserNotificationsEvents.Failed, {
+        funnel?.trigger(BrowserNotificationsEvents.Failed, {
           reason: "unanswered",
         });
         // Nothing was read about this device's app, so the reason is shown and Allow stays in front of the user.
@@ -212,7 +226,7 @@
         needsInstall = true;
         return false;
       case "dismissed":
-        funnel.trigger(BrowserNotificationsEvents.PermissionDismissed);
+        funnel?.trigger(BrowserNotificationsEvents.PermissionDismissed);
         // The permission is still `default`, so the prompt can be raised again.
         // Stay where the user is, with Allow still in front of them.
         return false;
@@ -296,7 +310,7 @@
     {origin}
     {busy}
     onEnable={() => {
-      funnel.trigger(BrowserNotificationsEvents.EnablePressed);
+      funnel?.trigger(BrowserNotificationsEvents.EnablePressed);
       if (needsInstall) {
         startInstall();
         return;
