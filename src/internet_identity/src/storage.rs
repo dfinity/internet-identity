@@ -3358,14 +3358,23 @@ impl<M: Memory + Clone> Storage<M> {
         holder: StorablePwaSubscriptionHolder,
         endpoint_hash: &[u8; 32],
     ) -> bool {
-        self.anchor_application_config(holder.anchor_number, holder.application_number)
-            .and_then(|config| config.pwa_webpush_subscriptions?.remove(&holder.browser_id))
-            .is_some_and(|held_subscription| match held_subscription.subscription {
-                StorableWebPushSubscription::Ready { endpoint, .. } => {
-                    endpoint_sha256(&endpoint) == *endpoint_hash
-                }
-                StorableWebPushSubscription::Pending { .. } => false,
-            })
+        let Some(config) =
+            self.anchor_application_config(holder.anchor_number, holder.application_number)
+        else {
+            return false;
+        };
+        let Some(mut subscriptions) = config.pwa_webpush_subscriptions else {
+            return false;
+        };
+        let Some(held_subscription) = subscriptions.remove(&holder.browser_id) else {
+            return false;
+        };
+        match held_subscription.subscription {
+            StorableWebPushSubscription::Ready { endpoint, .. } => {
+                endpoint_sha256(&endpoint) == *endpoint_hash
+            }
+            StorableWebPushSubscription::Pending { .. } => false,
+        }
     }
 
     /// The installed app subscription holding `endpoint`, if any.

@@ -261,12 +261,13 @@ pub(crate) fn clear_gone_pwa_subscription(
     holder: PwaSubscriptionHolder,
     endpoint: &str,
 ) -> Result<(), String> {
-    let is_registered = read(holder)
-        .and_then(|held_subscription| held_subscription.subscription.into_ready())
-        .is_some_and(|registered_subscription| {
-            registered_subscription.endpoint.as_str() == endpoint
-        });
-    if !is_registered {
+    let Some(held_subscription) = read(holder) else {
+        return Ok(());
+    };
+    let Some(registered_subscription) = held_subscription.subscription.into_ready() else {
+        return Ok(());
+    };
+    if registered_subscription.endpoint.as_str() != endpoint {
         return Ok(());
     }
     write(holder, None, None)
@@ -278,12 +279,14 @@ pub fn pwa_subscription_status(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
 ) -> Option<WebPushSubscriptionStatus> {
-    read(holder)
-        .filter(|held_subscription| held_subscription.account_principal == account_principal)
-        .and_then(|held_subscription| held_subscription.subscription.into_ready())
-        .map(|ready_subscription| WebPushSubscriptionStatus {
-            endpoint: ready_subscription.endpoint.as_str().to_string(),
-        })
+    let held_subscription = read(holder)?;
+    if held_subscription.account_principal != account_principal {
+        return None;
+    }
+    let ready_subscription = held_subscription.subscription.into_ready()?;
+    Some(WebPushSubscriptionStatus {
+        endpoint: ready_subscription.endpoint.as_str().to_string(),
+    })
 }
 
 /// What `holder`'s browser entry holds, and the account it delivers for.
