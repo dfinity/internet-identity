@@ -390,7 +390,7 @@
   // --- Panel ---
 
   const TITLES: Record<CardKind, string> = {
-    access: "Access methods",
+    access: "Access",
     devices: "Devices",
     recovery: "Recovery",
     apps: "Manage apps",
@@ -1241,7 +1241,7 @@
           </span>
           <span class="flex flex-col gap-0.5">
             <span class="text-text-primary text-[13px] leading-4 font-semibold">
-              {card.kind === "access" ? "Access" : TITLES[card.kind]}
+              {TITLES[card.kind]}
             </span>
             <span
               class={[

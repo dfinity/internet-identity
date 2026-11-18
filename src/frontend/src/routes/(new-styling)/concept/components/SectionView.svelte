@@ -94,7 +94,7 @@
   }
 
   const TITLES: Record<Section, [string, string]> = {
-    access: ["Access methods", "The ways you can sign in."],
+    access: ["Access", "The ways you can sign in."],
     recovery: ["Recovery", "Get back in if you lose access."],
     devices: ["Devices", "Where you're signed in."],
     integrations: ["Integrations", "How other tools connect to your identity."],
