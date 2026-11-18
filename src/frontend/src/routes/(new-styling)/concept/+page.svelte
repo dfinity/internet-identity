@@ -48,6 +48,7 @@
   import BulkView from "./components/BulkView.svelte";
   import ConnectPage from "./components/ConnectPage.svelte";
   import Elevated from "./components/Elevated.svelte";
+  import SurfaceLevel from "./components/SurfaceLevel.svelte";
   import Popup from "./components/Popup.svelte";
   import AppRow from "./components/AppRow.svelte";
   import AppSearch from "./components/AppSearch.svelte";
@@ -1185,12 +1186,14 @@
     current.scenario.access === "one"
       ? [PasskeyIcon]
       : [PasskeyIcon, KeyRoundIcon, AtSignIcon]}
-  <!-- Up to three of the ways in, as overlapping circles, and how many. -->
+  <!-- Up to three of the ways in, as overlapping circles, and how many. Each
+       cuts itself out of the card (StatusCard's surface); bg-secondary keeps
+       them apart from it in light, where a raised card is white. -->
   <span class="flex items-center">
     {#each methods as Glyph, index (index)}
       <span
         class={[
-          "bg-bg-primary text-fg-tertiary grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-surface-2)",
+          "bg-bg-secondary text-fg-tertiary grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-card-surface)",
           index > 0 && "-ms-2",
         ]}
       >
@@ -1226,13 +1229,14 @@
 {/snippet}
 
 {#snippet devicesPreview()}
-  <!-- The browsers signed in, newest marked, as overlapping logos. -->
+  <!-- The browsers signed in, newest marked, as overlapping logos, cut out of
+       the card as the ways in are. -->
   <span class="flex items-center">
     {#each browsers.slice(0, 3) as browser, index (browser.id)}
       {@const src = brandIconOf(browser.description)}
       <span
         class={[
-          "bg-bg-primary relative grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-surface-2)",
+          "bg-bg-secondary relative grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-card-surface)",
           index > 0 && "-ms-2",
         ]}
       >
@@ -1243,7 +1247,7 @@
         {/if}
         {#if browser.isNew === true}
           <span
-            class="bg-fg-error-primary absolute -end-0.5 -top-0.5 size-2 rounded-full ring-2 ring-(color:--ii-surface-2)"
+            class="bg-fg-error-primary absolute -end-0.5 -top-0.5 size-2 rounded-full ring-2 ring-(color:--ii-card-surface)"
           ></span>
         {/if}
       </span>
@@ -2008,8 +2012,13 @@
       ]}
     >
       {#if isDesktop.current}
+        <!-- The panel lies on the page, but its cards stand level with the
+             canvas (3): a step lower, beside it, they read as sunk into the
+             page. So all it holds counts as standing on 2. -->
         <div class="shrink-0">
-          {@render panel(false)}
+          <SurfaceLevel level={2}>
+            {@render panel(false)}
+          </SurfaceLevel>
         </div>
         <!-- Concept only, to try both themes: it keeps to the panel's foot, at
              the bottom of the window while the panel is short, and after the

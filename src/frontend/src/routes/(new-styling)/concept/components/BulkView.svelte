@@ -3,7 +3,7 @@
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import AppLogo from "../../manage/(authenticated)/applications/components/AppLogo.svelte";
   import type { ConceptApp } from "../mockData";
-  import Elevated from "./Elevated.svelte";
+  import Elevated, { useSurface } from "./Elevated.svelte";
   import PanelHeader from "./PanelHeader.svelte";
 
   interface Props {
@@ -19,6 +19,10 @@
     apps.filter(({ notificationsAllowed }) => notificationsAllowed).length,
   );
   const switchId = $props.id();
+
+  // The logos overlap, each cut out of the section they sit in, two steps
+  // above wherever the view is (the panel, or the phone's sheet).
+  const sectionSurface = `var(--ii-surface-${Math.min(useSurface() + 2, 8)})`;
 </script>
 
 <div class="flex flex-col gap-4">
@@ -29,10 +33,15 @@
     onBack={onExit}
   />
 
-  <Elevated offset={2} as="section" class="flex flex-col gap-4 rounded-2xl p-4">
+  <Elevated
+    offset={2}
+    as="section"
+    class="flex flex-col gap-4 rounded-2xl p-4"
+    style={`--ii-card-surface: ${sectionSurface}`}
+  >
     <div class="flex" aria-hidden="true">
       {#each apps.slice(0, 5) as app (app.origin)}
-        <span class="-me-3 rounded-lg ring-3 ring-(color:--ii-surface-3)">
+        <span class="-me-3 rounded-lg ring-3 ring-(color:--ii-card-surface)">
           <AppLogo logo={app.logo} size="card" />
         </span>
       {/each}

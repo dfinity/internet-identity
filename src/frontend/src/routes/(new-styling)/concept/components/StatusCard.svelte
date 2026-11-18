@@ -12,6 +12,7 @@
   import { prefersReducedMotion } from "svelte/motion";
   import type { CardKind, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
+  import { useSurface } from "./Elevated.svelte";
 
   interface Props {
     kind: CardKind;
@@ -48,6 +49,10 @@
       integrations: BotIcon,
     }[kind],
   );
+
+  // The card's own surface, which it sits in (an Elevated), so the preview's
+  // overlapping circles cut themselves out of it at whatever level it is.
+  const cardSurface = `var(--ii-surface-${useSurface()})`;
 </script>
 
 <!-- One large target per section: the whole card leads to its page, where
@@ -58,6 +63,7 @@
   type="button"
   onclick={onOpen}
   aria-label={`${title}: ${sentence}`}
+  style:--ii-card-surface={cardSurface}
   class="ii-hover focus-visible:ring-focus-ring flex w-full flex-col gap-2.5 rounded-[inherit] px-4 pt-3.5 pb-4 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset"
 >
   <span class="flex w-full items-center gap-3">
