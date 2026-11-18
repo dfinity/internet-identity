@@ -1663,15 +1663,12 @@
                 palette={identityPaletteOverride}
                 size="sm"
               />
-              <p class="flex min-w-0 flex-1 flex-col">
-                <span class="text-text-primary truncate text-sm font-semibold">
-                  {identityName}
-                </span>
-                <span
-                  class="text-text-tertiary truncate text-[13px] leading-[18px]"
-                >
-                  {signedInWith.title}
-                </span>
+              <!-- The identity card, folded: its name only, as the card says
+                   it (how it signed in is Access's to say). -->
+              <p
+                class="text-text-primary min-w-0 flex-1 truncate text-sm font-semibold"
+              >
+                {identityName}
               </p>
             </Elevated>
           </div>

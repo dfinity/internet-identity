@@ -11,18 +11,26 @@
     /** The device's other identities, to switch to. */
     others: LastUsedIdentity[];
     /** Whether the list it opens is showing. */
-    expanded: boolean;
+    expanded?: boolean;
     /** The list's id, for `aria-controls`. */
-    controls: string;
-    onToggle: () => void;
+    controls?: string;
+    /** Without it the stack is only a picture: the card around it is the
+     *  button that opens the list. */
+    onToggle?: () => void;
     /** The colours picked for an identity, over the ones its number gives. */
     paletteOf?: (one: LastUsedIdentity) => IdentityPalette | undefined;
     /** What the avatars cut themselves out of: the surface the stack stands on. */
     backdrop: string;
   }
 
-  const { others, expanded, controls, onToggle, paletteOf, backdrop }: Props =
-    $props();
+  const {
+    others,
+    expanded = false,
+    controls,
+    onToggle,
+    paletteOf,
+    backdrop,
+  }: Props = $props();
 
   /** The first few show; the rest are a count. */
   const PREVIEW = 3;
@@ -30,22 +38,37 @@
 
 <!-- The other identities, small and overlapping, across from the current one,
      as X shows the accounts you can switch to beside your own. A tap opens
-     the list of all of them. With none yet, the same spot adds one. -->
-<button
-  type="button"
-  onclick={onToggle}
-  aria-expanded={expanded}
-  aria-controls={controls}
-  aria-label={others.length === 0
-    ? "Identities"
-    : `Switch identity, ${others.length} more`}
-  title={others.length === 0 ? "Identities" : "Switch identity"}
-  class={[
-    "focus-visible:outline-focus-ring flex shrink-0 items-center rounded-full p-1 transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2",
-    expanded && "bg-(--ii-selected)",
-  ]}
-  style:--ii-stack-cut={backdrop}
->
+     the list of all of them. With none yet, the same spot adds one. Only a
+     picture where the whole card around it opens the list. -->
+{#if onToggle !== undefined}
+  <button
+    type="button"
+    onclick={onToggle}
+    aria-expanded={expanded}
+    aria-controls={controls}
+    aria-label={others.length === 0
+      ? "Identities"
+      : `Switch identity, ${others.length} more`}
+    title={others.length === 0 ? "Identities" : "Switch identity"}
+    class={[
+      "focus-visible:outline-focus-ring flex shrink-0 items-center rounded-full p-1 transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2",
+      expanded && "bg-(--ii-selected)",
+    ]}
+    style:--ii-stack-cut={backdrop}
+  >
+    {@render avatars()}
+  </button>
+{:else}
+  <span
+    aria-hidden="true"
+    class="flex shrink-0 items-center p-1"
+    style:--ii-stack-cut={backdrop}
+  >
+    {@render avatars()}
+  </span>
+{/if}
+
+{#snippet avatars()}
   {#if others.length === 0}
     <span
       aria-hidden="true"
@@ -86,4 +109,4 @@
       </span>
     {/if}
   {/if}
-</button>
+{/snippet}
