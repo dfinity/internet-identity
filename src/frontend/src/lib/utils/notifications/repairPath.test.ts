@@ -10,6 +10,15 @@ import {
   type BrowserCalls,
   type IdentityCalls,
 } from "./repairPath";
+import { currentDeviceSubscription } from "$lib/utils/notifications/pushSubscription";
+import { ensureRegisteredDevice } from "$lib/utils/notifications/subscribeDevice";
+
+vi.mock("$lib/utils/notifications/pushSubscription", () => ({
+  currentDeviceSubscription: vi.fn(),
+}));
+vi.mock("$lib/utils/notifications/subscribeDevice", () => ({
+  ensureRegisteredDevice: vi.fn(),
+}));
 
 const ORIGIN = "https://app.example";
 const ACCOUNT = Principal.fromText("2vxsx-fae");
@@ -167,6 +176,50 @@ describe("checkNotificationPath", () => {
     });
 
     await expect(check(browser)).resolves.toEqual({ kind: "working" });
+  });
+
+  it("waits until a probe accepted late has had its answer time before removing", async () => {
+    const { browser, calls } = browserAnswering({
+      installedApps: [{ subscriptions: [pastLimit] }],
+      thisBrowser: [{ subscriptions: [] }],
+    });
+    let acceptedAtNs = BigInt(0);
+    // The push service accepts the probe 5 seconds after it is submitted, and nothing
+    // fetches it.
+    const lateBrowser: BrowserCalls = {
+      ...browser,
+      probe_notification_path: (request) => {
+        acceptedAtNs = BigInt(Date.now() + 5_000) * BigInt(1_000_000);
+        return browser.probe_notification_path(request);
+      },
+      get_notification_path_status: (request) =>
+        "InstalledApps" in request.path && acceptedAtNs > BigInt(0)
+          ? Promise.resolve({
+              Ok: {
+                subscriptions: [
+                  { ...pastLimit, probe_sent_at_ns: [acceptedAtNs] },
+                ],
+              },
+            })
+          : browser.get_notification_path_status(request),
+    };
+
+    void checkNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: ORIGIN,
+      accountPrincipal: ACCOUNT,
+      actor: consenting,
+      browser: lateBrowser,
+      onPastLimit: () => {},
+      signal: new AbortController().signal,
+    }).catch(() => {});
+
+    // Past the usual wait, the probe is only a few seconds old.
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(calls.removed).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+    expect(calls.removed).toHaveLength(1);
   });
 
   it("keeps the installed app that answered and probes nothing else", async () => {
@@ -345,6 +398,39 @@ describe("checkNotificationPath where this browser may notify", () => {
 
     await expect(settled).resolves.toBe("rejected");
     expect(calls.probed).toEqual([]);
+  });
+
+  it("drops and registers nothing once the identity changed during the renewal's lookup", async () => {
+    const switched = new AbortController();
+    const { browser } = browserAnswering({
+      installedApps: [{ subscriptions: [] }],
+      thisBrowser: [{ subscriptions: [pastLimit] }, { subscriptions: [] }],
+    });
+    const unsubscribe = vi.fn(() => Promise.resolve(true));
+    // The user switches while this browser's subscription is looked up.
+    vi.mocked(currentDeviceSubscription).mockImplementation(() => {
+      switched.abort(new Error("switched"));
+      return Promise.resolve({ unsubscribe } as unknown as PushSubscription);
+    });
+
+    const checked = checkNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: ORIGIN,
+      accountPrincipal: ACCOUNT,
+      actor: consenting,
+      browser,
+      onPastLimit: () => {},
+      signal: switched.signal,
+    });
+    const settled = checked.then(
+      () => "resolved",
+      () => "rejected",
+    );
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    await expect(settled).resolves.toBe("rejected");
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(vi.mocked(ensureRegisteredDevice)).not.toHaveBeenCalled();
   });
 
   it("acts on no answer that arrives after the identity changed", async () => {

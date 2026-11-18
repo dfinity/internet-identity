@@ -85,7 +85,10 @@ export const checkNotificationPath = async ({
   onPastLimit: () => void;
   signal: AbortSignal;
   /** Replaces this browser's own subscription without a prompt, for the identity named. */
-  renewSubscription?: (identityNumber: bigint) => Promise<void>;
+  renewSubscription?: (
+    identityNumber: bigint,
+    signal: AbortSignal,
+  ) => Promise<void>;
 }): Promise<PathCheckOutcome> => {
   const consented = await actor.notification_consent_granted({
     anchor_number: identityNumber,
@@ -131,6 +134,7 @@ export const checkNotificationPath = async ({
       browser,
       identityNumber,
       renewSubscription,
+      signal,
     );
   }
 
@@ -148,6 +152,7 @@ export const checkNotificationPath = async ({
     browser,
     identityNumber,
     renewSubscription,
+    signal,
   );
 };
 
@@ -156,7 +161,11 @@ const afterOwnPath = async (
   answer: ProbeAnswer,
   browser: BrowserCalls,
   identityNumber: bigint,
-  renewSubscription: (identityNumber: bigint) => Promise<void>,
+  renewSubscription: (
+    identityNumber: bigint,
+    signal: AbortSignal,
+  ) => Promise<void>,
+  signal: AbortSignal,
 ): Promise<PathCheckOutcome> => {
   switch (answer) {
     case "answered":
@@ -181,7 +190,7 @@ const afterOwnPath = async (
   ) {
     return { kind: "ask", installFirst: false };
   }
-  await renewSubscription(identityNumber);
+  await renewSubscription(identityNumber, signal);
   return working;
 };
 
@@ -208,8 +217,16 @@ const switchOffApp = async (
 
 /** Drops the subscription that stopped answering and registers a fresh one, which needs
  *  no prompt where the permission is held. */
-const resubscribe = async (identityNumber: bigint): Promise<void> => {
-  await (await currentDeviceSubscription())?.unsubscribe();
+const resubscribe = async (
+  identityNumber: bigint,
+  signal: AbortSignal,
+): Promise<void> => {
+  const subscription = await currentDeviceSubscription();
+  // The subscription is the whole browser's, so nothing is dropped or registered for an
+  // identity the user switched away from while it was looked up.
+  signal.throwIfAborted();
+  await subscription?.unsubscribe();
+  signal.throwIfAborted();
   await ensureRegisteredDevice(identityNumber);
 };
 
@@ -234,8 +251,28 @@ const isAnswered = (status: NotificationPathStatus): boolean =>
     ({ probe_sent_at_ns }) => probe_sent_at_ns.length === 0,
   );
 
-/** Sends the probe and waits up to {@link PROBE_WAIT_MS} for every subscription on the
- *  path to fetch it, or until `signal` is aborted. */
+/** The least time a probe the push service accepted has to be answered before its
+ *  silence counts: the canister's `MIN_PROBE_ANSWER_TIME_NS` in `webpush/unanswered.rs`,
+ *  which refuses to remove an installed app whose probe is younger. */
+const MIN_PROBE_ANSWER_TIME_MS = 10_000;
+
+/** Whether every probe on `status`'s path has had {@link MIN_PROBE_ANSWER_TIME_MS} by
+ *  now. */
+const hasEveryProbeHadItsAnswerTime = (
+  status: NotificationPathStatus,
+): boolean =>
+  status.subscriptions.every(
+    ({ probe_sent_at_ns: [sentAtNs] }) =>
+      sentAtNs === undefined ||
+      Date.now() - Number(sentAtNs / BigInt(1_000_000)) >=
+        MIN_PROBE_ANSWER_TIME_MS,
+  );
+
+/** Sends the probe and waits for every subscription on the path to fetch it: at least
+ *  {@link PROBE_WAIT_MS}, and past it until every probe has had
+ *  {@link MIN_PROBE_ANSWER_TIME_MS}, or until `signal` is aborted. A probe still too
+ *  young when that runs out is no evidence either way, so it reads as answered and
+ *  nothing is repaired for it. */
 const probe = async (
   browser: BrowserCalls,
   identityNumber: bigint,
@@ -261,7 +298,8 @@ const probe = async (
     throw error;
   }
   const deadline = Date.now() + PROBE_WAIT_MS;
-  while (Date.now() < deadline) {
+  const latest = deadline + MIN_PROBE_ANSWER_TIME_MS;
+  while (Date.now() < latest) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     signal.throwIfAborted();
     const status = await pathStatus(browser, identityNumber, path);
@@ -275,6 +313,9 @@ const probe = async (
     if (isAnswered(status)) {
       return "answered";
     }
+    if (Date.now() >= deadline && hasEveryProbeHadItsAnswerTime(status)) {
+      return "unanswered";
+    }
   }
-  return "unanswered";
+  return "answered";
 };
