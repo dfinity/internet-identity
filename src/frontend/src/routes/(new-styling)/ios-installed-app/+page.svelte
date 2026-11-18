@@ -6,27 +6,40 @@
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import { handleError } from "$lib/components/utils/error";
+  import { isCanisterError } from "$lib/utils/utils";
   import {
     claimSameDeviceLink,
     linkKeyOf,
     type LinkOutcome,
   } from "./claimLink";
 
-  let screen = $state<"working" | "failed" | LinkOutcome>("working");
+  /** What the page shows: the claim in flight, how it came out, or why it failed. */
+  type Screen =
+    | { kind: "working" }
+    | { kind: LinkOutcome }
+    | { kind: "failed"; reason: string };
+
+  let screen = $state<Screen>({ kind: "working" });
   let linkKey: Uint8Array | undefined;
 
   const claim = async () => {
     if (linkKey === undefined) {
-      screen = "not-linked";
+      screen = { kind: "not-linked" };
       return;
     }
-    screen = "working";
     try {
-      screen = await claimSameDeviceLink(linkKey);
+      screen = { kind: await claimSameDeviceLink(linkKey) };
     } catch (error) {
-      handleError(error);
-      screen = "failed";
+      console.error(error);
+      // A canister refusal carries no message, so its variant is the whole reason.
+      screen = {
+        kind: "failed",
+        reason: isCanisterError(error)
+          ? String(error.type)
+          : error instanceof Error
+            ? error.message
+            : String(error),
+      };
     }
   };
 
@@ -42,64 +55,67 @@
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<div
-  class="grid w-full flex-1 items-center max-sm:items-stretch sm:w-100 sm:max-w-100"
->
-  <AuthPanel>
-    {#if screen === "working"}
-      <div class="flex min-w-0 flex-1 flex-col items-stretch" aria-busy="true">
-        <div class="skeleton mb-4 size-12 rounded-full"></div>
-        <div class="skeleton mb-3 h-8 w-3/4 rounded"></div>
-        <div class="skeleton h-6 w-full rounded"></div>
-      </div>
-    {:else if screen === "linked"}
-      <div class="flex min-w-0 flex-col items-stretch">
-        <FeaturedIcon size="lg" class="mb-4 self-start">
-          <CheckIcon class="size-6" aria-hidden="true" />
-        </FeaturedIcon>
-        <h1 class="text-text-primary mb-3 text-2xl font-medium">
-          {$t`Notifications will arrive in the app`}
-        </h1>
-        <p class="text-text-tertiary text-base">
-          <Trans>
-            This iPhone now gets them only in the app you came from, not here as
-            well. You can close this page.
-          </Trans>
-        </p>
-      </div>
-    {:else if screen === "not-linked"}
-      <div class="flex min-w-0 flex-col items-stretch">
-        <FeaturedIcon size="lg" class="mb-4 self-start">
-          <CircleAlertIcon class="size-6" aria-hidden="true" />
-        </FeaturedIcon>
-        <h1 class="text-text-primary mb-3 text-2xl font-medium">
-          {$t`This link can't be used here`}
-        </h1>
-        <p class="text-text-tertiary text-base">
-          <Trans>
-            Sign in to Internet Identity here with the identity you use in the
-            app, then tap the button in the app again.
-          </Trans>
-        </p>
-      </div>
-    {:else}
-      <div class="flex min-w-0 flex-col items-stretch">
-        <FeaturedIcon size="lg" class="mb-4 self-start">
-          <CircleAlertIcon class="size-6" aria-hidden="true" />
-        </FeaturedIcon>
-        <h1 class="text-text-primary mb-3 text-2xl font-medium">
-          {$t`Couldn't link the app`}
-        </h1>
-        <p class="text-text-tertiary mb-7 text-base">
-          <Trans>
-            Something went wrong while linking. Check your connection and try
-            again.
-          </Trans>
-        </p>
-        <button class="btn btn-primary btn-xl" onclick={() => void claim()}>
-          {$t`Try again`}
-        </button>
-      </div>
-    {/if}
-  </AuthPanel>
+<div class="flex min-h-[100dvh] flex-col items-center justify-center">
+  <div
+    class="grid w-full flex-1 items-center max-sm:items-stretch sm:w-100 sm:max-w-100"
+  >
+    <AuthPanel>
+      {#if screen.kind === "working"}
+        <div
+          class="flex min-w-0 flex-1 flex-col items-stretch"
+          aria-busy="true"
+        >
+          <div class="skeleton mb-4 size-12 rounded-full"></div>
+          <div class="skeleton mb-3 h-8 w-3/4 rounded"></div>
+          <div class="skeleton h-6 w-full rounded"></div>
+        </div>
+      {:else if screen.kind === "failed"}
+        <div class="flex min-w-0 flex-col items-stretch">
+          <FeaturedIcon size="lg" class="mb-4 self-start">
+            <CircleAlertIcon
+              class="text-fg-error-primary size-6"
+              aria-hidden="true"
+            />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            {$t`Something went wrong`}
+          </h1>
+          <p
+            class="bg-bg-secondary border-border-secondary text-text-tertiary rounded-lg border px-3.5 py-3 font-mono text-xs/4 break-words"
+          >
+            {screen.reason}
+          </p>
+        </div>
+      {:else}
+        <div class="flex min-w-0 flex-1 flex-col items-stretch">
+          <FeaturedIcon size="lg" class="mb-4 self-start">
+            <CheckIcon class="size-6" aria-hidden="true" />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            {#if screen.kind === "linked"}
+              {$t`Done`}
+            {:else}
+              {$t`Nothing to change`}
+            {/if}
+          </h1>
+          <p class="text-text-tertiary text-base">
+            {#if screen.kind === "linked"}
+              <Trans
+                >From now on, notifications arrive directly in the app.</Trans
+              >
+            {:else}
+              <Trans>
+                This iPhone already gets notifications only in the app.
+              </Trans>
+            {/if}
+          </p>
+          <p
+            class="text-text-tertiary mt-auto flex h-20 items-center justify-center text-sm"
+          >
+            <Trans>You can close this page.</Trans>
+          </p>
+        </div>
+      {/if}
+    </AuthPanel>
+  </div>
 </div>

@@ -8,7 +8,7 @@ import { continueAs } from "../authorize/app-sessions/helpers";
  * the app's notifications arrive once. It claims the one-shot key the installed app
  * registered, for whichever identity this Safari is signed in to.
  *
- * Only the refusals are here: registering the key takes the installed app's own session,
+ * Only the links that find nothing to claim are here: registering the key takes the installed app's own session,
  * which the test app does not hold.
  */
 
@@ -38,14 +38,14 @@ const openTheLink = async (page: Page): Promise<void> => {
   await page.goto(link.toString());
 };
 
-const expectCannotLink = async (page: Page): Promise<void> => {
+const expectNothingToChange = async (page: Page): Promise<void> => {
   await expect(
-    page.getByRole("heading", { name: "This link can't be used here" }),
+    page.getByRole("heading", { name: "Nothing to change" }),
   ).toBeVisible({ timeout: 30_000 });
 };
 
 test.describe("Linking an installed app in Safari", () => {
-  test("refuses a link nobody registered for the identity signed in here", async ({
+  test("finds nothing to change for a link nobody registered for the identity signed in here", async ({
     context,
     testApp,
     identities,
@@ -60,12 +60,12 @@ test.describe("Linking an installed app in Safari", () => {
     const linkPage = await context.newPage();
     await openTheLink(linkPage);
 
-    await expectCannotLink(linkPage);
+    await expectNothingToChange(linkPage);
     // The key is gone from the URL as soon as the page has read it.
     expect(new URL(linkPage.url()).hash).toBe("");
   });
 
-  test("refuses a link in a Safari signed in to no identity", async ({
+  test("finds nothing to change in a Safari signed in to no identity", async ({
     browser,
   }) => {
     const context = await browser.newContext();
@@ -73,7 +73,7 @@ test.describe("Linking an installed app in Safari", () => {
       const page = await context.newPage();
       await openTheLink(page);
 
-      await expectCannotLink(page);
+      await expectNothingToChange(page);
     } finally {
       await context.close();
     }
