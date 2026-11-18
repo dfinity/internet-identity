@@ -57,7 +57,7 @@ vi.mock("$lib/stores/browser-key.store", async (importOriginal) => ({
 /** What the notification check answers, call by call, and what it does as it answers. */
 const notificationCheck = vi.hoisted(() => {
   const state: {
-    outcomes: ("done" | "identity-changed")[];
+    outcomes: ("done" | "asked" | "identity-changed")[];
     onIdentityChanged: () => void;
   } = { outcomes: [], onIdentityChanged: () => {} };
   return state;
@@ -110,21 +110,13 @@ import {
 } from "$lib/stores/app-session.store";
 import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
 
-/** Drives one ceremony to the point where the session it created is either kept or
- *  discarded, which is the whole of what `resumable` decides. `firstLifetimeMs` is how
- *  long the first session created is valid for. */
-const runCeremony = async (
-  resumable?: boolean,
-  extraParams: Record<string, unknown> = {},
-  whileRunning?: () => Promise<void>,
-  authorized?: bigint,
+/** An actor answering for the canister as one identity, with a session chain of its
+ *  own: `rootKey` is the public key of every chain built on it. Each session request is
+ *  pushed to `prepared`, and `firstLifetimeMs` is how long the first one is valid for. */
+const sessionActor = async (
+  prepared: Record<string, unknown>[],
   firstLifetimeMs = 60 * 60 * 1000,
 ) => {
-  const { authorizationPromptStore, authorizedStore } =
-    await import("$lib/stores/authorization.store");
-  authorizationPromptStore.set(resumable === undefined ? {} : { resumable });
-
-  const identityNumber = BigInt(10_000);
   const sessionKey = await ECDSAKeyIdentity.generate({ extractable: true });
   const expiration = BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
   const chain = await DelegationChain.create(
@@ -133,8 +125,6 @@ const runCeremony = async (
     new Date(Number(expiration / BigInt(1_000_000))),
   );
   const signed = chain.delegations[0];
-
-  const prepared: Record<string, unknown>[] = [];
   const actor = {
     prepare_account_session: (request: Record<string, unknown>) => (
       prepared.push(request),
@@ -165,6 +155,26 @@ const runCeremony = async (
         },
       }),
   };
+  return { actor, rootKey: new Uint8Array(chain.publicKey) };
+};
+
+/** Drives one ceremony to the point where the session it created is either kept or
+ *  discarded, which is the whole of what `resumable` decides. `firstLifetimeMs` is how
+ *  long the first session created is valid for. */
+const runCeremony = async (
+  resumable?: boolean,
+  extraParams: Record<string, unknown> = {},
+  whileRunning?: () => Promise<void>,
+  authorized?: bigint,
+  firstLifetimeMs = 60 * 60 * 1000,
+) => {
+  const { authorizationPromptStore, authorizedStore } =
+    await import("$lib/stores/authorization.store");
+  authorizationPromptStore.set(resumable === undefined ? {} : { resumable });
+
+  const identityNumber = BigInt(10_000);
+  const prepared: Record<string, unknown>[] = [];
+  const { actor } = await sessionActor(prepared, firstLifetimeMs);
   const { authenticationStore } =
     await import("$lib/stores/authentication.store");
   // Both stores are mocked as plain writables above; only their real types are in
@@ -784,20 +794,33 @@ describe("an identity change while notifications are checked", () => {
 
   it("answers the app with a session minted for the identity the user authorizes next", async () => {
     const { authorizedStore } = await import("$lib/stores/authorization.store");
+    const { authenticationStore } =
+      await import("$lib/stores/authentication.store");
+    const preparedForSecond: Record<string, unknown>[] = [];
+    const second = await sessionActor(preparedForSecond);
     notificationCheck.outcomes = ["identity-changed", "done"];
-    // The user switches and authorizes again while the check runs.
-    notificationCheck.onIdentityChanged = () =>
+    // The user switches to another identity and authorizes again while the check runs.
+    notificationCheck.onIdentityChanged = () => {
+      (authenticationStore as unknown as Writable<unknown>).set({
+        identityNumber: BigInt(10_001),
+        actor: second.actor,
+        authMethod: { passkey: { credentialId: new Uint8Array() } },
+      });
       (authorizedStore as unknown as Writable<unknown>).set({
         accountNumberPromise: Promise.resolve(undefined),
         accessLevel: "full-access",
         maxTimeToLive: undefined,
       });
+    };
 
     const { sent, prepared } = await runCeremony(true);
 
-    expect(prepared).toHaveLength(2);
+    expect(prepared).toHaveLength(1);
+    expect(preparedForSecond).toHaveLength(1);
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({ id: 1, result: {} });
+    expect(
+      (sent[0] as { result: { publicKey: string } }).result.publicKey,
+    ).toBe(btoa(String.fromCharCode(...second.rootKey)));
   });
 
   it("keeps only the session it answers with, for the identity switched to", async () => {
@@ -849,6 +872,26 @@ describe("a session created before the allow screen", () => {
     );
 
     expect(prepared).toHaveLength(2);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("is created again once when the canister ended it while the screen was open", async () => {
+    notificationCheck.outcomes = ["asked"];
+    checkSession.mockResolvedValueOnce(false);
+
+    const { sent, prepared } = await runCeremony(true);
+
+    expect(prepared).toHaveLength(2);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("is handed over when it is still live after the screen", async () => {
+    notificationCheck.outcomes = ["asked"];
+    checkSession.mockResolvedValueOnce(true);
+
+    const { sent, prepared } = await runCeremony(true);
+
+    expect(prepared).toHaveLength(1);
     expect(sent).toHaveLength(1);
   });
 });

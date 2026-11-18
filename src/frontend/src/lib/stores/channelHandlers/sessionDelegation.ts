@@ -317,17 +317,20 @@ export const handleSessionDelegationRequest =
             continue;
           }
           // Created again, with the same authorization and no second check, where the
-          // allow screen kept it open for most of its lifetime.
-          const answeredSession =
+          // allow screen kept it open for most of its lifetime, or long enough for the
+          // canister to end it as idle.
+          const isSessionStale =
             created.record.expiresAtMillis - Date.now() <
-            MIN_REMAINING_LIFETIME_MS
-              ? await createSession(
-                  effectiveOrigin,
-                  params.maxTimeToLive,
-                  params.maxTimeToIdle,
-                  resumable === true,
-                )
-              : created;
+              MIN_REMAINING_LIFETIME_MS ||
+            (repaired === "asked" && !(await sessionIsLive(created.record)));
+          const answeredSession = isSessionStale
+            ? await createSession(
+                effectiveOrigin,
+                params.maxTimeToLive,
+                params.maxTimeToIdle,
+                resumable === true,
+              )
+            : created;
           const chain = await extendToApp(
             answeredSession.record,
             params.sessionPublicKey,

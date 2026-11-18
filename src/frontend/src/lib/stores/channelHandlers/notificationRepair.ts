@@ -25,15 +25,17 @@ import {
 } from "$lib/utils/notifications/browserActor";
 import type { Principal } from "@icp-sdk/core/principal";
 
-/** How the check ended for the sign-in waiting on it: `done` whatever it found, or
- *  `identity-changed` where the user switched identity or signed out meanwhile, so what
- *  the sign-in minted is for an identity that is no longer the one chosen. */
-export type RepairOutcome = "done" | "identity-changed";
+/** How the check ended for the sign-in waiting on it: `done` whatever it found, `asked`
+ *  where it showed the allow screen, which has no time limit, so what the sign-in minted
+ *  before it may have run out, or `identity-changed` where the user switched identity or
+ *  signed out meanwhile, so what the sign-in minted is for an identity that is no longer
+ *  the one chosen. */
+export type RepairOutcome = "done" | "asked" | "identity-changed";
 
-/** The longest the automated part of the check may hold a sign-in: two probes and what
- *  comes between them, with room to spare. Past it the sign-in goes on and the next one
- *  checks again. */
-const CHECK_DEADLINE_MS = 30_000;
+/** The longest the automated part of the check may hold a sign-in: two probes, each
+ *  waiting until it has had its answer time, and what comes between them, with room to
+ *  spare. Past it the sign-in goes on and the next one checks again. */
+const CHECK_DEADLINE_MS = 40_000;
 
 /**
  * Checks, once the identity has signed in to `origin` as the account `accountPrincipal`
@@ -80,6 +82,7 @@ export const repairNotificationPath = async ({
     CHECK_DEADLINE_MS,
   );
   let failure: unknown;
+  let isAsked = false;
   try {
     const outcome = await checkWithin(
       stopped.signal,
@@ -113,6 +116,7 @@ export const repairNotificationPath = async ({
       );
       clearTimeout(deadline);
       if (context !== undefined) {
+        isAsked = true;
         await askToRepair(context);
       }
     }
@@ -137,7 +141,7 @@ export const repairNotificationPath = async ({
       .then(({ showRepairFailure }) => showRepairFailure(failure))
       .catch(console.error);
   }
-  return "done";
+  return isAsked ? "asked" : "done";
 };
 
 /** Whether `origin` is a web page's, the only kind an app's notifications are for. */
@@ -155,14 +159,16 @@ const isWebOrigin = (origin: string): boolean => {
 const checkWithin = <T>(signal: AbortSignal, check: Promise<T>): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(signal.reason);
+    // Handled before anything else, so a check that fails after the sign-in stopped
+    // waiting for it is not left as an unhandled rejection.
+    check.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
     if (signal.aborted) {
       onAbort();
       return;
     }
     signal.addEventListener("abort", onAbort, { once: true });
-    check.then(resolve, reject).finally(() => {
-      signal.removeEventListener("abort", onAbort);
-    });
   });
 
 /** The automated part of the check: this browser's actor, then the path. */

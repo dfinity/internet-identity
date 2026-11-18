@@ -38,7 +38,7 @@ vi.mock("$lib/stores/authorization.store", async () => {
 /** What the notification check answers, call by call, and what it does as it answers. */
 const notificationCheck = vi.hoisted(() => {
   const state: {
-    outcomes: ("done" | "identity-changed")[];
+    outcomes: ("done" | "asked" | "identity-changed")[];
     onIdentityChanged: () => void;
   } = { outcomes: [], onIdentityChanged: () => {} };
   return state;
@@ -69,23 +69,26 @@ const authorizedNow = () =>
     maxTimeToLive: undefined,
   });
 
-/** Runs one delegation request to the end, answering for the canister with a chain the
- *  app's key could use. Answers what the app was sent and how often it was minted for.
- *  `firstLifetimeMs` is how long the first credentials minted are valid for. */
-const runRequest = async (firstLifetimeMs = 60 * 60 * 1000) => {
-  const appKey = await ECDSAKeyIdentity.generate({ extractable: true });
+/** An actor answering for the canister as one identity, with a chain of its own: the
+ *  app is sent `rootKey` as the chain's public key. `minted.count` counts its mints, and
+ *  `firstLifetimeMs` is how long the first credentials it mints are valid for. */
+const actorMinting = async (
+  appKey: ECDSAKeyIdentity,
+  minted: { count: number },
+  firstLifetimeMs = 60 * 60 * 1000,
+) => {
+  const rootKey = await ECDSAKeyIdentity.generate({ extractable: true });
   const expiration = BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
   const chain = await DelegationChain.create(
-    appKey,
+    rootKey,
     appKey.getPublicKey(),
     new Date(Number(expiration / BigInt(1_000_000))),
   );
   const signed = chain.delegations[0];
-  let numMinted = 0;
   const actor = {
     prepare_account_delegation: () => {
-      numMinted += 1;
-      const lifetimeMs = numMinted === 1 ? firstLifetimeMs : 60 * 60 * 1000;
+      minted.count += 1;
+      const lifetimeMs = minted.count === 1 ? firstLifetimeMs : 60 * 60 * 1000;
       return Promise.resolve({
         Ok: {
           user_key: new Uint8Array(chain.publicKey),
@@ -106,6 +109,21 @@ const runRequest = async (firstLifetimeMs = 60 * 60 * 1000) => {
         },
       }),
   };
+  return { actor, rootKey: new Uint8Array(chain.publicKey) };
+};
+
+/** Runs one delegation request to the end for the app key `appKey`, signed in as
+ *  identity 10,000 with an actor that answers for the canister. Answers what the app was
+ *  sent and how often that identity was minted for. `firstLifetimeMs` is how long the
+ *  first credentials minted are valid for. */
+const runRequest = async (
+  firstLifetimeMs = 60 * 60 * 1000,
+  appKey?: ECDSAKeyIdentity,
+) => {
+  const key =
+    appKey ?? (await ECDSAKeyIdentity.generate({ extractable: true }));
+  const minted = { count: 0 };
+  const { actor } = await actorMinting(key, minted, firstLifetimeMs);
   signedIn.set({
     identityNumber: BigInt(10_000),
     actor,
@@ -125,7 +143,7 @@ const runRequest = async (firstLifetimeMs = 60 * 60 * 1000) => {
     },
     close: async () => {},
   };
-  const der = new Uint8Array(appKey.getPublicKey().toDer());
+  const der = new Uint8Array(key.getPublicKey().toDer());
   await handleDelegationRequest(
     channel,
     vi.fn(),
@@ -135,8 +153,15 @@ const runRequest = async (firstLifetimeMs = 60 * 60 * 1000) => {
     method: "icrc34_delegation",
     params: { publicKey: btoa(String.fromCharCode(...der)) },
   });
-  return { sent, numMinted };
+  return { sent, numMinted: minted.count };
 };
+
+/** The public key the app was sent in `response`, base64 as it travels. */
+const sentPublicKey = (response: unknown): string =>
+  (response as { result: { publicKey: string } }).result.publicKey;
+
+const toBase64 = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes));
 
 describe("an identity change while notifications are checked", () => {
   afterEach(() => {
@@ -145,32 +170,53 @@ describe("an identity change while notifications are checked", () => {
   });
 
   it("answers the app with a delegation minted for the identity the user authorizes next", async () => {
+    const appKey = await ECDSAKeyIdentity.generate({ extractable: true });
+    const mintedForSecond = { count: 0 };
+    const second = await actorMinting(appKey, mintedForSecond);
     notificationCheck.outcomes = ["identity-changed", "done"];
-    // The user switches and authorizes again while the check runs.
-    notificationCheck.onIdentityChanged = authorizedNow;
+    // The user switches to another identity and authorizes again while the check runs.
+    notificationCheck.onIdentityChanged = () => {
+      signedIn.set({
+        identityNumber: BigInt(10_001),
+        actor: second.actor,
+        authMethod: { passkey: { credentialId: new Uint8Array() } },
+      });
+      authorizedNow();
+    };
 
-    const { sent, numMinted } = await runRequest();
+    const { sent, numMinted } = await runRequest(undefined, appKey);
 
-    expect(numMinted).toBe(2);
+    expect(numMinted).toBe(1);
+    expect(mintedForSecond.count).toBe(1);
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({ id: 1, result: {} });
+    expect(sentPublicKey(sent[0])).toBe(toBase64(second.rootKey));
   });
 
   it("answers the app for an identity added from the header", async () => {
+    const appKey = await ECDSAKeyIdentity.generate({ extractable: true });
+    const mintedForAdded = { count: 0 };
+    const added = await actorMinting(appKey, mintedForAdded);
     notificationCheck.outcomes = ["identity-changed", "done"];
-    // The user adds an identity from the header while the check runs, which authorizes
-    // it as the layout's Add identity does.
-    notificationCheck.onIdentityChanged = () =>
+    // The user adds an identity from the header while the check runs, which signs it in
+    // and authorizes it as the layout's Add identity does.
+    notificationCheck.onIdentityChanged = () => {
+      signedIn.set({
+        identityNumber: BigInt(10_001),
+        actor: added.actor,
+        authMethod: { passkey: { credentialId: new Uint8Array() } },
+      });
       void authorizeAddedIdentity(() => {
         authorizedNow();
         return Promise.resolve();
       });
+    };
 
-    const { sent, numMinted } = await runRequest();
+    const { sent, numMinted } = await runRequest(undefined, appKey);
 
-    expect(numMinted).toBe(2);
+    expect(numMinted).toBe(1);
+    expect(mintedForAdded.count).toBe(1);
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({ id: 1, result: {} });
+    expect(sentPublicKey(sent[0])).toBe(toBase64(added.rootKey));
   });
 });
 

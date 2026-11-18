@@ -30,7 +30,7 @@ const WHILE_THE_PROBE_WAITS_MS = 1_000;
 /** Past it, and short of the check's deadline. */
 const PAST_THE_PROBE_WAIT_MS = 20_000;
 /** Past the longest the check may hold a sign-in. */
-const PAST_THE_CHECK_DEADLINE_MS = 31_000;
+const PAST_THE_CHECK_DEADLINE_MS = 41_000;
 
 // Mocked as a plain writable above; only its real type is in scope here.
 const signedIn = authenticationStore as unknown as Writable<unknown>;
@@ -165,6 +165,31 @@ describe("repairNotificationPath", () => {
     await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
 
     expect(get(notificationProbeStore)).toBe(false);
+  });
+
+  it("leaves no unhandled rejection from a check stopped before it started", async () => {
+    vi.useRealTimers();
+    const unhandled: unknown[] = [];
+    const recordUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", recordUnhandled);
+    try {
+      // The identity changed before the check began, and its lookup then fails.
+      signedIn.set({ identityNumber: OTHER_IDENTITY_NUMBER });
+      const repaired = repairNotificationPath({
+        identityNumber: IDENTITY_NUMBER,
+        origin: "https://app.example",
+        accountPrincipal: Principal.fromText("2vxsx-fae"),
+        actor,
+        browserActor: () => Promise.reject(new Error("the lookup failed")),
+      });
+
+      await expect(repaired).resolves.toBe("identity-changed");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", recordUnhandled);
+    }
   });
 
   it("tells the sign-in the identity changed when it switched while this browser was looked up", async () => {
