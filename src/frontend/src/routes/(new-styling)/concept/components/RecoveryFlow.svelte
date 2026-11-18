@@ -89,8 +89,6 @@
 
   let step = $state<Step>("hub");
   let method = $state<RecoveryMethod>();
-  /** Came back to check a phrase written down earlier but never checked. */
-  let resuming = $state(false);
   /** Checking a phrase that's already on, from manage: nothing is set up. */
   let rechecking = $state(false);
   /** The steps behind this one, so Back returns to where the user came from. */
@@ -111,11 +109,8 @@
   const reduced = $derived(prefersReducedMotion.current);
   const stepIndex = $derived(ORDER.indexOf(step));
   const labels = $derived(method === undefined ? [] : LABELS[method]);
-  /** An email added while the phrase waits to be checked: the scenario has
-   *  no state for both at once, so the dialog keeps it. */
-  let emailAdded = $state(false);
   const statuses = $derived({
-    email: emailAdded ? ("on" as const) : emailStatus(recovery),
+    email: emailStatus(recovery),
     phrase: phraseStatus(recovery),
   });
   const onCount = $derived(
@@ -154,9 +149,6 @@
     if (previous === "manage" || previous === "hub") {
       rechecking = false;
     }
-    if (previous === "hub") {
-      resuming = false;
-    }
     step = previous;
   };
 
@@ -164,7 +156,6 @@
   const home = () => {
     direction = -1;
     history = [];
-    resuming = false;
     rechecking = false;
     shown = false;
     step = "hub";
@@ -176,11 +167,6 @@
     const status = statuses[picked];
     if (status === "off") {
       go("save");
-    } else if (status === "unchecked") {
-      resuming = true;
-      go("check");
-    } else if (status === "pending") {
-      go("check");
     } else {
       go("manage");
     }
@@ -197,14 +183,10 @@
    *  row in the hub already says so when the user goes back to it. */
   const finish = () => {
     if (method === "phrase" && !rechecking) {
-      const withEmail = emailOn();
-      emailAdded = false;
       onChange(
-        { recovery: withEmail ? "calm" : "noEmail" },
+        { recovery: emailOn() ? "calm" : "phraseOnly" },
         "Recovery phrase is on",
       );
-    } else if (method === "email" && statuses.phrase === "unchecked") {
-      emailAdded = true;
     } else if (method === "email") {
       onChange(
         { recovery: phraseOn() ? "calm" : "emailOnly" },
@@ -215,7 +197,6 @@
   };
 
   const turnOff = (which: RecoveryMethod) => {
-    if (which === "email") emailAdded = false;
     if (which === "phrase") {
       onChange(
         { recovery: emailOn() ? "emailOnly" : "none" },
@@ -223,14 +204,7 @@
       );
     } else {
       onChange(
-        {
-          recovery:
-            statuses.phrase === "unchecked"
-              ? "unverified"
-              : phraseOn()
-                ? "noEmail"
-                : "none",
-        },
+        { recovery: phraseOn() ? "phraseOnly" : "none" },
         "Recovery email turned off",
       );
     }
@@ -240,14 +214,6 @@
   const next = () => {
     if (step === "save") go("check");
     else if (step === "check") finish();
-  };
-
-  const startOver = () => {
-    direction = -1;
-    history = ["hub"];
-    resuming = false;
-    shown = false;
-    step = "save";
   };
 
   const reveal = async () => {
@@ -278,16 +244,10 @@
   ];
 
   /** What a row says under its name, and how loudly. */
-  const said = (
-    which: RecoveryMethod,
-  ): { meta: string; badge?: string; warn?: boolean } => {
+  const said = (which: RecoveryMethod): { meta: string; badge?: string } => {
     const status = statuses[which];
     const row = ROWS.find(({ value }) => value === which);
     if (status === "off") return { meta: row?.off ?? "" };
-    if (status === "unchecked")
-      return { meta: "Written down, not checked yet", warn: true };
-    if (status === "pending")
-      return { meta: "Waiting for the code from your inbox", warn: true };
     if (status === "inUse")
       return { meta: "You're signed in with it now", badge: "In use" };
     if (status === "new") return { meta: "Reset 2 hours ago", badge: "On" };
@@ -463,16 +423,11 @@
               `If you lose your passkeys, either one gets you back in to ${identityName}.`,
             )}
           {:else if onCount === 1}
+            <!-- One way is enough: the other stays a choice, not a to-do. -->
             {@render context(
               ShieldCheckIcon,
-              "One way back in",
-              "Add the other one too, so losing one never locks you out.",
-            )}
-          {:else if statuses.phrase === "unchecked"}
-            {@render context(
-              ListChecksIcon,
-              "One step from done",
-              `You wrote down a phrase on ${WROTE_ON} but didn't check it. Check three words and recovery is on.`,
+              "You're covered",
+              `If you lose your passkeys, your ${isOn(statuses.phrase) ? "recovery phrase" : "recovery email"} gets you back in to ${identityName}.`,
             )}
           {:else}
             {@render context(
@@ -518,17 +473,12 @@
                       {/if}
                     </span>
                     <span
-                      class={[
-                        "text-[13px] leading-[18px] text-pretty",
-                        line.warn === true
-                          ? "text-warning-700 dark:text-text-warning-primary"
-                          : "text-text-tertiary",
-                      ]}
+                      class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
                     >
                       {line.meta}
                     </span>
                   </span>
-                  {#if status === "off" || status === "unchecked" || status === "pending"}
+                  {#if status === "off"}
                     <span
                       aria-hidden="true"
                       class={[
@@ -538,11 +488,7 @@
                           : "btn-secondary",
                       ]}
                     >
-                      {status === "off"
-                        ? "Set up"
-                        : status === "unchecked"
-                          ? "Check"
-                          : "Enter code"}
+                      Set up
                     </span>
                   {:else}
                     <ChevronRightIcon
@@ -635,12 +581,6 @@
               "Is your paper still right?",
               "Type three words from it, not from memory. If they match, you can still get back in with it.",
             )}
-          {:else if resuming}
-            {@render context(
-              ListChecksIcon,
-              "You're one step from done",
-              `You wrote down a phrase on ${WROTE_ON} but didn't check it. Type three of its words and recovery is on.`,
-            )}
           {:else}
             {@render context(
               ListChecksIcon,
@@ -665,24 +605,16 @@
                   autocomplete="off"
                   autocapitalize="off"
                   spellcheck={false}
-                  placeholder={resuming || rechecking
-                    ? undefined
-                    : WORDS[number - 1]}
+                  placeholder={rechecking ? undefined : WORDS[number - 1]}
                   bind:value={typed[index]}
                 />
               </div>
             {/each}
           </div>
           <div class="flex items-center justify-between gap-2">
-            {#if resuming}
-              <button type="button" onclick={startOver} class={TERTIARY}>
-                Lost them? Start over
-              </button>
-            {:else}
-              <button type="button" onclick={back} class={TERTIARY}>
-                Back
-              </button>
-            {/if}
+            <button type="button" onclick={back} class={TERTIARY}>
+              Back
+            </button>
             <button type="submit" class={PRIMARY}>Finish</button>
           </div>
         {:else if step === "check"}

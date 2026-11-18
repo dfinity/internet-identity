@@ -29,13 +29,13 @@
   } from "../../manage/(authenticated)/devices/browsers";
   import type { MockBrowser, MockIdentity } from "../mockData";
   import {
+    accessCount,
     aiAccessOn,
     cliAccessOn,
     emailStatus,
     phraseStatus,
     withAiAccess,
     withCliAccess,
-    type MethodStatus,
     type Scenario,
   } from "../status";
   import Elevated from "./Elevated.svelte";
@@ -101,13 +101,17 @@
   };
 
   const accessRows = $derived.by<Row[]>(() => {
+    // A passkey kept on this device alone, as Windows Hello keeps it, doesn't
+    // sync anywhere: the one case where losing the device loses the way in.
+    const local = scenario.access === "oneLocal";
     const rows: Row[] = [
       {
         id: "current",
         icon: signedInWith.kind === "sso" ? SsoIcon : PasskeyIcon,
-        title: signedInWith.title,
-        meta:
-          scenario.recovery === "usedPhrase"
+        title: local ? "Windows Hello" : signedInWith.title,
+        meta: local
+          ? "Passkey on this device only · In use now"
+          : scenario.recovery === "usedPhrase"
             ? signedInWith.meta
             : `${signedInWith.meta} · In use now`,
         badge:
@@ -116,7 +120,7 @@
             : { label: "Active", color: "success" },
       },
     ];
-    if (scenario.access !== "one") {
+    if (accessCount(scenario.access) > 1) {
       rows.push(
         {
           id: "yubikey",
@@ -145,27 +149,12 @@
         },
       );
     }
-    if (scenario.access === "newPasskey") {
-      rows.push({
-        id: "new-passkey",
-        icon: PasskeyIcon,
-        title: "Passkey",
-        meta: "Added from Firefox on Windows · 10 min ago",
-        badge: { label: "New" },
-        flag: "warning",
-        action: {
-          label: "Remove",
-          variant: "danger",
-          onclick: () => onResolve({ access: "calm" }, "Passkey removed"),
-        },
-      });
-    }
     return rows;
   });
 
   /** Both ways back in, said as recovery's dialog says them, each opening
-   *  the dialog on itself. Only a step left half done, or a first way when
-   *  there's none, asks loudly. */
+   *  the dialog on itself. Only a first way, when there's none, asks loudly:
+   *  one way is enough, so the other never does. */
   const recoveryRows = $derived.by<Row[]>(() => {
     const ways = [
       {
@@ -185,11 +174,9 @@
         on: "t•••@gmail.com",
       },
     ];
-    const halfDone = (status: MethodStatus) =>
-      status === "unchecked" || status === "pending";
-    const loud =
-      ways.find((way) => halfDone(way.status)) ??
-      (ways.every((way) => way.status === "off") ? ways[0] : undefined);
+    const loud = ways.every((way) => way.status === "off")
+      ? ways[0]
+      : undefined;
     return ways.map((way): Row => {
       const { status } = way;
       return {
@@ -198,8 +185,6 @@
         title: way.title,
         meta: {
           off: way.off,
-          unchecked: "Written down, not checked yet",
-          pending: "Waiting for the code from your inbox",
           inUse: "You're signed in with it now",
           new: "Reset 2 hours ago",
           on: way.on,
@@ -210,17 +195,9 @@
             : status === "on" || status === "new"
               ? { label: "On", color: "success" }
               : undefined,
-        flag: halfDone(status) ? "warning" : undefined,
         empty: status === "off",
         action: {
-          label:
-            status === "off"
-              ? "Set up"
-              : status === "unchecked"
-                ? "Verify"
-                : status === "pending"
-                  ? "Continue"
-                  : "Manage",
+          label: status === "off" ? "Set up" : "Manage",
           variant: way === loud ? "primary" : undefined,
           onclick: () => onRecovery(way.id),
         },

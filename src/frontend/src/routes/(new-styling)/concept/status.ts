@@ -1,48 +1,51 @@
 /**
  * What each card in the identity panel says, and how loudly.
  *
+ * A card says one thing at a time, in one of four styles (Thomas's): neutral
+ * for where it stands, info for something to know or a step it suggests,
+ * warning for a step it urges, risk for a change only the user can tell was
+ * theirs.
+ *
  * Three rules, carried over from the team's prototype:
  * 1. One situation is told once, by the card that can resolve it.
  * 2. During an ongoing situation or a real risk, only the cards that resolve it stay
- *    loud; every other to-do drops to a tip.
- * 3. Only one card asks for action; further to-dos wait quietly behind it.
+ *    loud; every other warning drops to info.
+ * 3. Only one card urges a step; further warnings wait as info behind it.
  */
 
+/** Thomas's list. `calm`: both the phrase and the email. One of the two is
+ *  enough, so `phraseOnly` and `emailOnly` are calm too and never ask for
+ *  the other. `usedPhrase`: signed in through recovery. `phraseReset`: the
+ *  phrase was changed from another browser. */
 export type RecoveryState =
-  | "none"
-  | "unverified"
-  | "usedPhrase"
-  | "emailPending"
-  | "phraseReset"
-  | "noEmail"
-  | "emailOnly"
-  | "calm";
+  "none" | "usedPhrase" | "phraseReset" | "phraseOnly" | "emailOnly" | "calm";
 /** Where each way back in stands, as its row says it. */
-export type MethodStatus =
-  "off" | "unchecked" | "pending" | "on" | "inUse" | "new";
+export type MethodStatus = "off" | "on" | "inUse" | "new";
 
 export const phraseStatus = (state: RecoveryState): MethodStatus =>
   state === "none" || state === "emailOnly"
     ? "off"
-    : state === "unverified"
-      ? "unchecked"
-      : state === "usedPhrase"
-        ? "inUse"
-        : state === "phraseReset"
-          ? "new"
-          : "on";
+    : state === "usedPhrase"
+      ? "inUse"
+      : state === "phraseReset"
+        ? "new"
+        : "on";
 
 export const emailStatus = (state: RecoveryState): MethodStatus =>
-  state === "emailPending"
-    ? "pending"
-    : state === "none" || state === "unverified" || state === "noEmail"
-      ? "off"
-      : "on";
+  state === "none" || state === "phraseOnly" ? "off" : "on";
 
 export const isOn = (status: MethodStatus) =>
   status === "on" || status === "inUse" || status === "new";
 
-export type AccessState = "one" | "newPasskey" | "unused" | "calm";
+/** `one`: a single passkey that syncs (a password manager's). `oneLocal`: a
+ *  single passkey kept on this device alone (Windows Hello, a security key),
+ *  so losing the device loses the identity unless recovery is set up.
+ *  `unused`: one of the ways in hasn't been used for months. */
+export type AccessState = "one" | "oneLocal" | "unused" | "calm";
+
+/** How many ways in the Access section lists. */
+export const accessCount = (state: AccessState): number =>
+  state === "one" || state === "oneLocal" ? 1 : 3;
 /** `known`: the new browser stays, once the user said it was theirs. */
 export type DevicesState = "newBrowser" | "known" | "many" | "calm";
 /** `calm`: AI and CLI access both on. `aiOnly` and `cliOnly`: one of them.
@@ -115,9 +118,8 @@ export interface Scenario {
   integrations: IntegrationsState;
 }
 
-/** From most to least urgent. `queued` is an action waiting behind the one that leads. */
-export type Tone =
-  "risk" | "action" | "queued" | "now" | "recent" | "pending" | "tip" | "calm";
+/** The four styles a card speaks in, loudest first. */
+export type Tone = "risk" | "warning" | "info" | "neutral";
 
 export type CardKind =
   "access" | "devices" | "recovery" | "apps" | "integrations";
@@ -129,6 +131,8 @@ export interface CardStatus {
   /** The step, as a verb, for the dock's button on the page. Without it, the
    *  dock says the sentence. */
   ask?: string;
+  /** Something that happened rather than a step: once seen, it's done. */
+  news?: boolean;
 }
 
 export interface StatusInput {
@@ -138,8 +142,6 @@ export interface StatusInput {
   /** Browsers left in the list, after those signed out. */
   browserCount: number;
   apps: { total: number; notifying: number };
-  /** The access method the identity is signed in with right now. */
-  signedInWith: string;
 }
 
 /** The order the cards are shown in. */
@@ -160,50 +162,45 @@ const PRIORITY: CardKind[] = [
   "apps",
 ];
 
-type Said = Pick<CardStatus, "tone" | "sentence" | "ask">;
+type Said = Pick<CardStatus, "tone" | "sentence" | "ask" | "news">;
 
-const RECOVERY: Record<RecoveryState, Said> = {
-  none: {
-    tone: "action",
-    sentence: "No recovery set up yet",
-    ask: "Set up recovery",
-  },
-  unverified: {
-    tone: "action",
-    sentence: "Recovery phrase not verified yet",
-    ask: "Verify your recovery phrase",
-  },
-  usedPhrase: { tone: "now", sentence: "You're signed in with your phrase" },
-  emailPending: {
-    tone: "pending",
-    sentence: "Waiting for your email",
-    ask: "Confirm your recovery email",
-  },
-  phraseReset: {
-    tone: "recent",
-    sentence: "Your recovery phrase was reset",
-    ask: "Review the phrase reset",
-  },
-  noEmail: { tone: "tip", sentence: "Phrase set up, no email yet" },
-  emailOnly: { tone: "tip", sentence: "Email set up, no phrase yet" },
-  calm: { tone: "calm", sentence: "Phrase and email set up" },
+const recoverySaid = ({ scenario }: StatusInput): Said => {
+  switch (scenario.recovery) {
+    case "none":
+      // Nothing here explains what recovery is; the section does. A single
+      // passkey on this device alone turns the suggestion into a warning.
+      return scenario.access === "oneLocal"
+        ? {
+            tone: "warning",
+            sentence: "Only this device can sign you in",
+            ask: "Set up recovery",
+          }
+        : { tone: "info", sentence: "Not set up yet", ask: "Set up recovery" };
+    case "usedPhrase":
+      return { tone: "info", sentence: "Signed in with your recovery phrase" };
+    case "phraseReset":
+      return {
+        tone: "info",
+        sentence: "Recovery phrase was changed",
+        ask: "Review the phrase change",
+        news: true,
+      };
+    case "phraseOnly":
+      return { tone: "neutral", sentence: "Recovery phrase set up" };
+    case "emailOnly":
+      return { tone: "neutral", sentence: "Recovery email set up" };
+    case "calm":
+      return { tone: "neutral", sentence: "Phrase and email set up" };
+  }
 };
 
-const accessSaid = ({ scenario, signedInWith }: StatusInput): Said =>
-  ({
-    one: {
-      tone: "action",
-      sentence: "Only one way to sign in",
-      ask: "Add a second way to sign in",
-    },
-    newPasskey: {
-      tone: "recent",
-      sentence: "New passkey from another device",
-      ask: "Review the new passkey",
-    },
-    unused: { tone: "tip", sentence: "YubiKey unused for 8 months" },
-    calm: { tone: "calm", sentence: `Signed in with ${signedInWith}` },
-  })[scenario.access] as Said;
+const waysIn = (count: number) =>
+  count === 1 ? "1 way to sign in" : `${count} ways to sign in`;
+
+const accessSaid = ({ scenario }: StatusInput): Said =>
+  scenario.access === "unused"
+    ? { tone: "info", sentence: "YubiKey unused for 8 months" }
+    : { tone: "neutral", sentence: waysIn(accessCount(scenario.access)) };
 
 const INTEGRATIONS: Record<IntegrationsState, Said> = {
   local: {
@@ -211,62 +208,52 @@ const INTEGRATIONS: Record<IntegrationsState, Said> = {
     sentence: "Any local program can connect",
     ask: "Review local access",
   },
-  localAllowed: { tone: "tip", sentence: "Any local program can connect" },
+  localAllowed: { tone: "neutral", sentence: "Any local program can connect" },
   cliConfirm: {
-    tone: "pending",
+    tone: "info",
     sentence: "ICP CLI is waiting for approval",
     ask: "Review the ICP CLI request",
   },
-  aiOnly: { tone: "calm", sentence: "AI access on" },
-  cliOnly: { tone: "calm", sentence: "CLI access on" },
-  off: { tone: "tip", sentence: "AI and CLI aren't connected" },
-  calm: { tone: "calm", sentence: "AI and CLI access on" },
+  aiOnly: { tone: "neutral", sentence: "AI access on" },
+  cliOnly: { tone: "neutral", sentence: "CLI access on" },
+  off: { tone: "neutral", sentence: "AI and CLI aren't connected" },
+  calm: { tone: "neutral", sentence: "AI and CLI access on" },
 };
 
 const devicesSaid = ({
   scenario,
   signedOut,
   browserCount,
-}: StatusInput): Said => {
-  switch (scenario.devices) {
-    case "newBrowser":
-      return signedOut.has("firefox")
-        ? { tone: "recent", sentence: "Firefox was signed out" }
-        : {
-            tone: "recent",
-            sentence: "New sign-in from Firefox",
-            ask: "Review the Firefox sign-in",
-          };
-    case "many":
-      return browserCount > 4
-        ? {
-            tone: "tip",
-            sentence: `Signed in on ${browserCount} browsers`,
-          }
-        : { tone: "calm", sentence: `Signed in on ${browserCount} browsers` };
-    case "known":
-    case "calm":
-      return {
-        tone: "calm",
-        sentence: `Signed in on ${browserCount} browsers`,
+}: StatusInput): Said =>
+  scenario.devices === "newBrowser" && !signedOut.has("firefox")
+    ? {
+        tone: "info",
+        sentence: "New sign-in from Firefox",
+        ask: "Review the Firefox sign-in",
+        news: true,
+      }
+    : {
+        tone: "neutral",
+        sentence:
+          browserCount === 1
+            ? "Signed in on 1 browser"
+            : `Signed in on ${browserCount} browsers`,
       };
-  }
-};
 
 const appsSaid = ({ apps }: StatusInput): Said =>
   apps.total === 0
-    ? { tone: "calm", sentence: "No apps yet" }
+    ? { tone: "neutral", sentence: "No apps yet" }
     : apps.notifying === 0
-      ? { tone: "calm", sentence: "Change permissions or remove apps" }
+      ? { tone: "neutral", sentence: "Change permissions or remove apps" }
       : {
-          tone: "calm",
+          tone: "neutral",
           sentence: `${apps.notifying} of ${apps.total} apps can notify you`,
         };
 
 export const deriveStatus = (input: StatusInput): CardStatus[] => {
   const { scenario, signedOut } = input;
   const said: Record<CardKind, Said> = {
-    recovery: RECOVERY[scenario.recovery],
+    recovery: recoverySaid(input),
     access: accessSaid(input),
     devices: devicesSaid(input),
     integrations: INTEGRATIONS[scenario.integrations],
@@ -277,41 +264,24 @@ export const deriveStatus = (input: StatusInput): CardStatus[] => {
   const newBrowserLive =
     scenario.devices === "newBrowser" && !signedOut.has("firefox");
   if (scenario.recovery === "usedPhrase") {
+    // In with the phrase, the passkey is most likely gone: Access urges a
+    // new way in, so next time doesn't take the phrase again.
     said.access = {
-      tone: "action",
-      sentence: "Add a passkey to sign in next time",
+      tone: "warning",
+      sentence: "Add a way to sign in",
       ask: "Add a passkey",
     };
   }
-  if (scenario.recovery === "none" && scenario.access === "one") {
-    said.access = {
-      tone: "action",
-      sentence: "Only one way in, no recovery",
-      ask: "Add a second way to sign in",
-    };
-  }
-  if (scenario.access === "newPasskey" && newBrowserLive) {
-    said.access = {
-      tone: "recent",
-      sentence: "New passkey from Firefox",
-      ask: "Review the new passkey",
-    };
-  }
   if (scenario.recovery === "phraseReset" && newBrowserLive) {
+    // Recovery changed by a browser that has only just signed in: together
+    // the strongest warning there is, on both cards.
+    const ask = "Check what Firefox changed";
     said.recovery = {
       tone: "risk",
-      sentence: "Phrase reset from a new browser",
-      ask: "Review the phrase reset",
+      sentence: "Recovery phrase changed from Firefox",
+      ask,
     };
-    if (scenario.access === "newPasskey") {
-      // The incident tells the whole story under that title; the row keeps
-      // to its own part of it.
-      said.devices = {
-        tone: "risk",
-        sentence: "New sign-in from Firefox",
-        ask: "Check what Firefox changed",
-      };
-    }
+    said.devices = { tone: "risk", sentence: "New sign-in from Firefox", ask };
   }
 
   // 2. During an ongoing situation or a risk, only the cards resolving it stay loud.
@@ -324,37 +294,35 @@ export const deriveStatus = (input: StatusInput): CardStatus[] => {
         : undefined;
   if (focus !== undefined) {
     for (const kind of CARD_ORDER) {
-      const { tone } = said[kind];
-      if (!focus.includes(kind) && (tone === "action" || tone === "pending")) {
-        said[kind] = { ...said[kind], tone: "tip" };
+      if (!focus.includes(kind) && said[kind].tone === "warning") {
+        said[kind] = { ...said[kind], tone: "info" };
       }
     }
   }
 
-  // 3. Only one card asks for action; the others wait behind it.
-  const lead = PRIORITY.find((kind) => said[kind].tone === "action");
+  // 3. Only one card urges a step; the others wait behind it, as info.
+  const lead = PRIORITY.find((kind) => said[kind].tone === "warning");
   for (const kind of PRIORITY) {
-    if (kind !== lead && said[kind].tone === "action") {
-      said[kind] = { ...said[kind], tone: "queued" };
+    if (kind !== lead && said[kind].tone === "warning") {
+      said[kind] = { ...said[kind], tone: "info" };
     }
   }
 
   return CARD_ORDER.map((kind) => ({ kind, ...said[kind] }));
 };
 
-/** Whether anything on the panel waits on the user, for the dot on the mobile button. */
-/** A card that is loud: it holds a risk or the one action the user should take. */
+/** A card that is loud: it holds a risk or the one step the user should take. */
 export const isLoud = ({ tone }: CardStatus): boolean =>
-  tone === "risk" || tone === "action";
+  tone === "risk" || tone === "warning";
 
-/** The card the collapsed panel speaks for: a risk first, then the action. */
+/** The card the collapsed panel speaks for: a risk first, then the warning. */
 export const leadOf = (cards: CardStatus[]): CardStatus | undefined => {
   const byPriority = PRIORITY.map((kind) =>
     cards.find((card) => card.kind === kind),
   ).filter((card) => card !== undefined);
   return (
     byPriority.find(({ tone }) => tone === "risk") ??
-    byPriority.find(({ tone }) => tone === "action")
+    byPriority.find(({ tone }) => tone === "warning")
   );
 };
 
@@ -365,8 +333,6 @@ export interface LeadAction {
    *  the card's title and sentence, which say what it acts on. */
   label: string;
   resolve?: { patch: Partial<Scenario>; message: string };
-  /** The product's own flow runs first, and the step resolves once it's done. */
-  flow?: "verifyPhrase";
 }
 
 export const leadActionOf = (
@@ -375,16 +341,6 @@ export const leadActionOf = (
 ): LeadAction => {
   if (tone === "risk") {
     return { label: "Review" };
-  }
-  if (kind === "recovery" && scenario.recovery === "unverified") {
-    return {
-      label: "Verify",
-      resolve: {
-        patch: { recovery: "calm" },
-        message: "Recovery phrase verified",
-      },
-      flow: "verifyPhrase",
-    };
   }
   if (kind === "recovery" && scenario.recovery === "none") {
     return {
@@ -401,9 +357,14 @@ export const leadActionOf = (
   return { label: "Review" };
 };
 
+/** Whether anything waits on the user, for the dot on the account: a risk,
+ *  a warning, or a step suggested. News asks for nothing. */
 export const needsAttention = (cards: CardStatus[]): boolean =>
-  cards.some(({ tone }) =>
-    (["risk", "action", "queued", "pending"] as Tone[]).includes(tone),
+  cards.some(
+    ({ tone, ask, news }) =>
+      tone === "risk" ||
+      tone === "warning" ||
+      (tone === "info" && ask !== undefined && news !== true),
   );
 
 /** One way to answer an incident, and what the answer changes. */
@@ -445,15 +406,9 @@ export const incidentOf = ({
   const newBrowserLive =
     scenario.devices === "newBrowser" && !signedOut.has("firefox");
   if (scenario.recovery === "phraseReset" && newBrowserLive) {
-    const passkey = scenario.access === "newPasskey";
-    const access: Partial<Scenario> = passkey ? { access: "calm" } : {};
     return {
-      kinds: passkey
-        ? ["devices", "access", "recovery"]
-        : ["devices", "recovery"],
-      title: passkey
-        ? "Firefox changed how you sign in"
-        : "Firefox reset your recovery phrase",
+      kinds: ["devices", "recovery"],
+      title: "Firefox changed your recovery phrase",
       question: "Was this you?",
       facts: [
         {
@@ -461,34 +416,23 @@ export const incidentOf = ({
           text: "Signed in from Firefox",
           meta: "12 min ago",
         },
-        ...(passkey
-          ? [
-              {
-                kind: "access" as const,
-                text: "Added a passkey",
-                meta: "10 min ago",
-              },
-            ]
-          : []),
         {
           kind: "recovery",
-          text: "Reset the recovery phrase",
+          text: "Changed the recovery phrase",
           meta: "9 min ago",
         },
       ],
       ask: "Check what Firefox changed",
       secure: {
         label: "This wasn't me",
-        detail: passkey
-          ? "Signs Firefox out and removes its passkey. Then you set a new recovery phrase."
-          : "Signs Firefox out. Then you set a new recovery phrase.",
+        detail: "Signs Firefox out. Then you set a new recovery phrase.",
         // The phrase Firefox set is void, so recovery starts over.
-        patch: { devices: "calm", recovery: "none", ...access },
+        patch: { devices: "calm", recovery: "none" },
         message: "Firefox signed out",
       },
       confirm: {
         label: "This was me",
-        patch: { devices: "known", recovery: "calm", ...access },
+        patch: { devices: "known", recovery: "calm" },
         message: "Firefox stays signed in",
       },
     };

@@ -45,12 +45,11 @@
   // red, not dark, so it doesn't pass for one more step: its glyph is white.
   const GLYPH: Partial<Record<Tone, string>> = {
     risk: "text-fg-error-primary",
-    action: "text-fg-warning-primary",
-    queued: "text-fg-warning-primary",
+    warning: "text-fg-warning-primary",
   };
   const GLYPH_ON_PRIMARY: Partial<Record<Tone, string>> = {
     risk: "text-white",
-    action: "text-warning-400 dark:text-warning-600",
+    warning: "text-warning-400 dark:text-warning-600",
   };
 
   // The widgets lie in a stack: the most urgent in front, the rest tucked

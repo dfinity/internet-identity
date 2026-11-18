@@ -28,84 +28,137 @@ const derive = (
       signedOut: new Set(signedOut),
       browserCount,
       apps: { total: 10, notifying: 4 },
-      signedInWith: "iCloud Keychain",
     }).map(({ kind, tone, sentence }) => [kind, { tone, sentence }]),
   );
 
 describe("deriveStatus", () => {
-  it("keeps every card calm when nothing needs the user", () => {
+  it("keeps every card neutral when nothing needs the user", () => {
     const cards = derive({});
     expect(Object.values(cards).map(({ tone }) => tone)).toEqual([
-      "calm",
-      "calm",
-      "calm",
-      "calm",
-      "calm",
+      "neutral",
+      "neutral",
+      "neutral",
+      "neutral",
+      "neutral",
     ]);
-    expect(cards.access.sentence).toBe("Signed in with iCloud Keychain");
+    expect(cards.access.sentence).toBe("3 ways to sign in");
+    expect(cards.recovery.sentence).toBe("Phrase and email set up");
+    expect(cards.devices.sentence).toBe("Signed in on 2 browsers");
     expect(cards.apps.sentence).toBe("4 of 10 apps can notify you");
   });
 
-  it("tells a missing recovery once, by the access card", () => {
-    const cards = derive({ recovery: "none", access: "one" });
-    expect(cards.access.sentence).toBe("Only one way in, no recovery");
-    // Recovery leads, so the access card's to-do waits behind it.
-    expect(cards.recovery.tone).toBe("action");
-    expect(cards.access.tone).toBe("queued");
+  it("takes one way back in as enough", () => {
+    expect(derive({ recovery: "phraseOnly" }).recovery).toEqual({
+      tone: "neutral",
+      sentence: "Recovery phrase set up",
+    });
+    expect(derive({ recovery: "emailOnly" }).recovery).toEqual({
+      tone: "neutral",
+      sentence: "Recovery email set up",
+    });
   });
 
-  it("lets only one card ask for action", () => {
-    const cards = derive({ recovery: "unverified", access: "one" });
-    const loud = Object.values(cards).filter(({ tone }) => tone === "action");
-    expect(loud).toHaveLength(1);
+  it("suggests recovery, and urges it for a passkey on this device alone", () => {
+    const synced = derive({ recovery: "none", access: "one" });
+    expect(synced.recovery).toEqual({
+      tone: "info",
+      sentence: "Not set up yet",
+    });
+    expect(synced.access).toEqual({
+      tone: "neutral",
+      sentence: "1 way to sign in",
+    });
+    expect(derive({ recovery: "none", access: "oneLocal" }).recovery).toEqual({
+      tone: "warning",
+      sentence: "Only this device can sign you in",
+    });
   });
 
-  it("asks for a passkey while signed in with the recovery phrase", () => {
+  it("lets only one card urge a step, whatever the state", () => {
+    const recovery = [
+      "none",
+      "usedPhrase",
+      "phraseReset",
+      "phraseOnly",
+      "emailOnly",
+      "calm",
+    ] as const;
+    const access = ["one", "oneLocal", "unused", "calm"] as const;
+    const devices = ["newBrowser", "known", "many", "calm"] as const;
+    for (const r of recovery) {
+      for (const a of access) {
+        for (const d of devices) {
+          const cards = Object.values(
+            derive({ recovery: r, access: a, devices: d }),
+          );
+          expect(
+            cards.filter(({ tone }) => tone === "warning").length,
+          ).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+  });
+
+  it("urges a new way in while signed in with the recovery phrase", () => {
     const cards = derive({
       recovery: "usedPhrase",
       integrations: "cliConfirm",
     });
-    expect(cards.recovery.tone).toBe("now");
-    expect(cards.access).toEqual({
-      tone: "action",
-      sentence: "Add a passkey to sign in next time",
+    expect(cards.recovery).toEqual({
+      tone: "info",
+      sentence: "Signed in with your recovery phrase",
     });
-    // Out of focus while the situation lasts.
-    expect(cards.integrations.tone).toBe("tip");
+    expect(cards.access).toEqual({
+      tone: "warning",
+      sentence: "Add a way to sign in",
+    });
+    expect(cards.integrations.tone).toBe("info");
   });
 
-  it("flags a phrase reset from a new browser as a risk", () => {
-    const cards = derive({
-      recovery: "phraseReset",
-      access: "newPasskey",
-      devices: "newBrowser",
+  it("flags a phrase change from a new browser as a risk on both cards", () => {
+    const cards = derive({ recovery: "phraseReset", devices: "newBrowser" });
+    expect(cards.recovery).toEqual({
+      tone: "risk",
+      sentence: "Recovery phrase changed from Firefox",
     });
-    expect(cards.recovery.tone).toBe("risk");
-    expect(cards.devices.tone).toBe("risk");
-    expect(cards.access.sentence).toBe("New passkey from Firefox");
+    expect(cards.devices).toEqual({
+      tone: "risk",
+      sentence: "New sign-in from Firefox",
+    });
+    expect(cards.access.tone).toBe("neutral");
+  });
+
+  it("tells a new sign-in alone as info", () => {
+    expect(derive({ devices: "newBrowser" }).devices).toEqual({
+      tone: "info",
+      sentence: "New sign-in from Firefox",
+    });
   });
 
   it("calms down once the new browser is signed out", () => {
-    const cards = derive(
-      { recovery: "phraseReset", access: "newPasskey", devices: "newBrowser" },
-      ["firefox"],
-    );
+    const cards = derive({ recovery: "phraseReset", devices: "newBrowser" }, [
+      "firefox",
+    ]);
     expect(cards.devices).toEqual({
-      tone: "recent",
-      sentence: "Firefox was signed out",
+      tone: "neutral",
+      sentence: "Signed in on 2 browsers",
     });
-    expect(cards.recovery.tone).toBe("recent");
+    expect(cards.recovery.tone).toBe("info");
   });
 
-  it("drops other to-dos to tips while there is a risk", () => {
-    const cards = derive({ integrations: "local", recovery: "unverified" });
+  it("drops other warnings to info while there is a risk", () => {
+    const cards = derive({
+      integrations: "local",
+      recovery: "none",
+      access: "oneLocal",
+    });
     expect(cards.integrations.tone).toBe("risk");
-    expect(cards.recovery.tone).toBe("tip");
+    expect(cards.recovery.tone).toBe("info");
   });
 });
 
 describe("needsAttention", () => {
-  it("is set by a to-do and not by news", () => {
+  it("is set by a step and not by news", () => {
     const of = (scenario: Partial<Scenario>) =>
       needsAttention(
         deriveStatus({
@@ -113,11 +166,12 @@ describe("needsAttention", () => {
           signedOut: new Set(),
           browserCount: 2,
           apps: { total: 1, notifying: 0 },
-          signedInWith: "a passkey",
         }),
       );
+    expect(of({})).toBe(false);
     expect(of({ devices: "newBrowser" })).toBe(false);
-    expect(of({ recovery: "unverified" })).toBe(true);
+    expect(of({ recovery: "none" })).toBe(true);
+    expect(of({ recovery: "none", access: "oneLocal" })).toBe(true);
     expect(of({ integrations: "local" })).toBe(true);
   });
 });
@@ -130,15 +184,13 @@ describe("incidentOf", () => {
     });
   const firefox: Partial<Scenario> = {
     recovery: "phraseReset",
-    access: "newPasskey",
     devices: "newBrowser",
   };
 
-  it("tells a phrase reset from a new browser as one story", () => {
-    expect(incident(firefox)?.kinds).toEqual(["devices", "access", "recovery"]);
+  it("tells a phrase change from a new browser as one story", () => {
+    expect(incident(firefox)?.kinds).toEqual(["devices", "recovery"]);
     expect(incident(firefox)?.facts.map(({ kind }) => kind)).toEqual([
       "devices",
-      "access",
       "recovery",
     ]);
   });
@@ -160,12 +212,14 @@ describe("incidentOf", () => {
   it("asks about a local server left open, and keeps it quietly", () => {
     const local = incident({ integrations: "local" });
     expect(local?.kinds).toEqual(["integrations"]);
-    expect(derive({ ...local?.confirm.patch }).integrations.tone).toBe("tip");
+    expect(derive({ ...local?.confirm.patch }).integrations.tone).toBe(
+      "neutral",
+    );
   });
 
   it("is not raised by news or a to-do", () => {
     expect(incident({ devices: "newBrowser" })).toBeUndefined();
-    expect(incident({ recovery: "unverified" })).toBeUndefined();
+    expect(incident({ recovery: "none" })).toBeUndefined();
   });
 });
 

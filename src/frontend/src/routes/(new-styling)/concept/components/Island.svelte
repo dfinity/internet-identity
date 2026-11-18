@@ -75,13 +75,9 @@
 
   const DOT: Record<Tone, string> = {
     risk: "bg-fg-error-primary",
-    action: "bg-fg-warning-primary",
-    queued: "bg-fg-warning-primary",
-    pending: "bg-fg-tertiary",
-    now: "bg-fg-primary",
-    recent: "bg-fg-primary",
-    tip: "bg-fg-quaternary",
-    calm: "bg-fg-quaternary",
+    warning: "bg-fg-warning-primary",
+    info: "bg-fg-primary",
+    neutral: "bg-fg-quaternary",
   };
   const PRESS =
     "transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100";

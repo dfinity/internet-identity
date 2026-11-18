@@ -119,8 +119,8 @@
         "grid size-9 shrink-0 place-items-center rounded-[0.625rem] transition-colors duration-200 *:col-start-1 *:row-start-1",
         {
           risk: "text-fg-error-primary bg-(--ii-error-tint)",
-          action: "text-fg-warning-primary bg-(--ii-warning-tint)",
-        }[tone as "risk" | "action"] ?? "text-fg-secondary bg-(--ii-selected)",
+          warning: "text-fg-warning-primary bg-(--ii-warning-tint)",
+        }[tone as "risk" | "warning"] ?? "text-fg-secondary bg-(--ii-selected)",
       ]}
     >
       {#if resolved}
@@ -181,24 +181,23 @@
           open && "absolute inset-x-0 top-0",
         ]}
       >
-        <!-- One size and weight for every sentence: the tone shows in its
-             color and the tinted icon, not in heavier text. -->
+        <!-- One size and weight for every sentence: the style shows in its
+             color, the info dot and the tinted icon, not in heavier text.
+             Neutral says where the card stands, quietly; info, something to
+             know, with a dot; warning tints the icon amber; risk turns the
+             icon and the sentence red. -->
         <span
           class={[
             "flex min-w-0 items-center gap-1.5 text-[13px] leading-[18px] text-pretty",
             {
               risk: "text-text-error-primary",
-              action: "text-text-primary",
-              queued: "text-text-primary",
-              now: "text-text-primary",
-              recent: "text-text-primary",
-              pending: "text-text-secondary",
-              tip: "text-text-tertiary",
-              calm: "text-text-tertiary",
+              warning: "text-text-primary",
+              info: "text-text-primary",
+              neutral: "text-text-tertiary",
             }[tone],
           ]}
         >
-          {#if tone === "now" || tone === "recent"}
+          {#if tone === "info"}
             <span class="bg-fg-primary size-1.5 shrink-0 rounded-full"></span>
           {/if}
           <span class="min-w-0">{sentence}</span>

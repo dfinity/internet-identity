@@ -388,7 +388,7 @@ export const identities: MockIdentity[] = [
       { app: featured("DecideAI"), usedMillis: now - 6 * DAY },
     ],
     scenario: {
-      recovery: "unverified",
+      recovery: "none",
       access: "calm",
       devices: "newBrowser",
       integrations: "calm",
@@ -438,10 +438,11 @@ export const identities: MockIdentity[] = [
   },
 ];
 
-/** Presets for the concept's scenario picker, so each card state can be reviewed. */
+/** Presets for the concept's scenario picker, so each card state can be
+ *  reviewed: the states in Thomas's list, and the ones they combine into. */
 export const scenarioPresets: { label: string; scenario: Scenario }[] = [
   {
-    label: "Phrase not verified, new browser",
+    label: "No recovery, new browser",
     scenario: identities[0].scenario,
   },
   {
@@ -454,10 +455,37 @@ export const scenarioPresets: { label: string; scenario: Scenario }[] = [
     },
   },
   {
-    label: "No recovery, one passkey",
+    label: "Recovery phrase only",
+    scenario: {
+      recovery: "phraseOnly",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Recovery email only",
+    scenario: {
+      recovery: "emailOnly",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "No recovery, one synced passkey",
     scenario: {
       recovery: "none",
       access: "one",
+      devices: "calm",
+      integrations: "off",
+    },
+  },
+  {
+    label: "No recovery, passkey on this device only",
+    scenario: {
+      recovery: "none",
+      access: "oneLocal",
       devices: "calm",
       integrations: "off",
     },
@@ -472,18 +500,18 @@ export const scenarioPresets: { label: string; scenario: Scenario }[] = [
     },
   },
   {
-    label: "Phrase reset from a new browser",
+    label: "Phrase changed from a new browser",
     scenario: {
       recovery: "phraseReset",
-      access: "newPasskey",
+      access: "calm",
       devices: "newBrowser",
       integrations: "calm",
     },
   },
   {
-    label: "Email recovery pending",
+    label: "YubiKey unused, many browsers",
     scenario: {
-      recovery: "emailPending",
+      recovery: "phraseOnly",
       access: "unused",
       devices: "many",
       integrations: "cliConfirm",

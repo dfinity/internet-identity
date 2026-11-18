@@ -68,7 +68,6 @@
   import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StatusCard from "./components/StatusCard.svelte";
-  import VerifyPhraseDialog from "./components/VerifyPhraseDialog.svelte";
   import {
     browsersFor,
     featuredApps,
@@ -88,6 +87,7 @@
   } from "./motion";
   import { ConceptTheme } from "./theme.svelte";
   import {
+    accessCount,
     deriveStatus,
     emailStatus,
     incidentOf,
@@ -189,7 +189,6 @@
         notifying: current.apps.filter((app) => app.notificationsAllowed)
           .length,
       },
-      signedInWith: signedInWith.title,
     }),
   );
   const lead = $derived(leadOf(cards));
@@ -212,8 +211,6 @@
   /** A way back in, as the recovery card's preview says it. */
   const RECOVERY_SAID: Record<MethodStatus, string> = {
     off: "not set up",
-    unchecked: "not verified",
-    pending: "waiting",
     on: "on",
     inUse: "in use",
     new: "reset",
@@ -241,33 +238,14 @@
   const dotOf = (tone: Tone): "risk" | "action" | "news" | undefined =>
     tone === "risk"
       ? "risk"
-      : tone === "action" || tone === "queued" || tone === "pending"
+      : tone === "warning"
         ? "action"
-        : tone === "recent" || tone === "now"
+        : tone === "info"
           ? "news"
           : undefined;
-  /** What a phone's head card says: what happened when something did,
-   *  otherwise where it stands in a few words. */
-  const briefOf = (card: CardStatus): string => {
-    if (card.tone !== "calm" && card.tone !== "tip") return card.sentence;
-    if (card.kind === "access") {
-      return current.scenario.access === "one"
-        ? "One way to sign in"
-        : "3 ways to sign in";
-    }
-    if (card.kind === "devices") {
-      return browsers.length === 1
-        ? "1 browser"
-        : `${browsers.length} browsers`;
-    }
-    return card.sentence;
-  };
-  /** What the calm island mentions: something new or waiting, never a tip. */
-  const note = $derived(
-    cards.find(({ tone }) =>
-      (["queued", "pending", "now", "recent"] as const).some((t) => t === tone),
-    ),
-  );
+  /** What the calm island mentions: something to know, never where a card
+   *  merely stands. */
+  const note = $derived(cards.find(({ tone }) => tone === "info"));
 
   // --- Apps ---
 
@@ -613,12 +591,17 @@
 
   // --- Top layout: the account in the header, what needs you below ---
 
-  /** What earns a widget, most urgent first: a risk, the step to take, steps
-   *  waiting behind it, something on its way, and anything new. */
-  const URGENCY: Tone[] = ["risk", "action", "queued", "pending", "recent"];
+  /** What earns a widget, most urgent first: a risk, the step urged, and
+   *  info that offers a step (something new, a step suggested). */
+  const URGENCY: Tone[] = ["risk", "warning", "info"];
   const attention = $derived(
     cards
-      .filter(({ tone }) => URGENCY.includes(tone))
+      .filter(
+        ({ tone, ask }) =>
+          tone === "risk" ||
+          tone === "warning" ||
+          (tone === "info" && ask !== undefined),
+      )
       .sort((a, b) => URGENCY.indexOf(a.tone) - URGENCY.indexOf(b.tone)),
   );
   /** An incident takes one widget for all its cards, in front: it opens the
@@ -641,7 +624,7 @@
         // News leaves once the panel has shown it; a step stays until done.
         .filter(
           (card) =>
-            card.tone !== "recent" ||
+            card.news !== true ||
             !(seen[seenId] ?? []).includes(seenKeyOf(card)),
         )
         .map((card) => ({
@@ -961,18 +944,6 @@
     toaster.success({ title: message, duration: 2500 });
   };
 
-  /** The product's phrase check, while it's open, and what passing it resolves. */
-  let verifying = $state<{ patch: Partial<Scenario>; message: string }>();
-  const verifyPhrase = (patch: Partial<Scenario>, message: string) => {
-    verifying = { patch, message };
-  };
-  const passVerify = () => {
-    if (verifying === undefined) return;
-    const { patch, message } = verifying;
-    verifying = undefined;
-    resolve(patch, message);
-  };
-
   /** Either answer settles the incident; "it wasn't me" leaves the next step
    *  (a new recovery phrase) to the cards. */
   const answerIncident = ({ patch, message }: IncidentAnswer) => {
@@ -983,23 +954,12 @@
    *  opens the card's section. */
   const runLead = (card: CardStatus) => {
     if (card.kind === "recovery") {
-      const state = current.scenario.recovery;
-      openRecovery(
-        state === "unverified"
-          ? "phrase"
-          : state === "emailPending"
-            ? "email"
-            : undefined,
-      );
+      openRecovery();
       return;
     }
     const action = leadActionOf(card, current.scenario);
     if (action.resolve !== undefined) {
-      if (action.flow === "verifyPhrase") {
-        verifyPhrase(action.resolve.patch, action.resolve.message);
-      } else {
-        resolve(action.resolve.patch, action.resolve.message);
-      }
+      resolve(action.resolve.patch, action.resolve.message);
       return;
     }
     openCard(card.kind);
@@ -1232,8 +1192,8 @@
               "grid size-7 shrink-0 place-items-center rounded-lg",
               {
                 risk: "text-fg-error-primary bg-(--ii-error-tint)",
-                action: "text-fg-warning-primary bg-(--ii-warning-tint)",
-              }[card.tone as "risk" | "action"] ??
+                warning: "text-fg-warning-primary bg-(--ii-warning-tint)",
+              }[card.tone as "risk" | "warning"] ??
                 "text-fg-secondary bg-(--ii-selected)",
             ]}
           >
@@ -1248,12 +1208,12 @@
                 "line-clamp-3 text-xs leading-4 text-pretty",
                 card.tone === "risk"
                   ? "text-text-error-primary"
-                  : card.tone === "calm" || card.tone === "tip"
+                  : card.tone === "neutral"
                     ? "text-text-tertiary"
                     : "text-text-primary",
               ]}
             >
-              {briefOf(card)}
+              {card.sentence}
             </span>
           </span>
         </button>
@@ -1412,7 +1372,7 @@
 
 {#snippet accessPreview()}
   {@const methods =
-    current.scenario.access === "one"
+    accessCount(current.scenario.access) === 1
       ? [PasskeyIcon]
       : [PasskeyIcon, KeyRoundIcon, AtSignIcon]}
   <!-- Up to three of the ways in, as overlapping circles, and how many. Each
@@ -1440,15 +1400,12 @@
 {#snippet recoveryPreview()}
   <!-- Both ways back in, each with where it stands. -->
   {#each [{ name: "Phrase", status: phraseStatus(current.scenario.recovery) }, { name: "Email", status: emailStatus(current.scenario.recovery) }] as method (method.name)}
-    {@const warn = method.status === "unchecked" || method.status === "pending"}
     <span
       class={[
         "inline-flex items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-medium",
         isOn(method.status)
           ? "border-bg-success-secondary bg-bg-success-primary text-fg-success-primary"
-          : warn
-            ? "text-fg-warning-primary border-transparent bg-(--ii-warning-tint)"
-            : "border-border-tertiary bg-bg-primary text-text-tertiary",
+          : "border-border-tertiary bg-bg-primary text-text-tertiary",
       ]}
     >
       <span class="size-1.5 shrink-0 rounded-full bg-current"></span>
@@ -2357,7 +2314,7 @@
 
   <!-- Phone: an unanswered incident meets the user over the apps on every
        visit, until they answer it. Put away, it waits at the top of the apps. -->
-  {#if !isDesktop.current && incident !== undefined && !incidentDismissed && !panelOpen && verifying === undefined}
+  {#if !isDesktop.current && incident !== undefined && !incidentDismissed && !panelOpen}
     <Dialog onClose={() => (incidentDismissed = true)}>
       <IncidentCard {incident} variant="sheet" onAnswer={answerIncident} />
     </Dialog>
@@ -2515,13 +2472,6 @@
         </div>
       </div>
     </Dialog>
-  {/if}
-
-  {#if verifying !== undefined}
-    <VerifyPhraseDialog
-      onVerified={passVerify}
-      onClose={() => (verifying = undefined)}
-    />
   {/if}
 
   <!-- Concept only: walk the panel through its states, and switch layouts.
