@@ -747,6 +747,9 @@
     { id: "explore", label: "Explore" },
     { id: "connect", label: "Connect" },
   ] as const;
+  /** A phone's Explore and Connect are headed by their title, where My
+   *  apps has the greeting. */
+  const PAGE_TITLES = ["My apps", "Explore apps", "Connect"] as const;
   let activePage = $state(0);
   let pager = $state<HTMLElement>();
   const pageRefs = $state<HTMLElement[]>([]);
@@ -1205,18 +1208,36 @@
 {/snippet}
 
 {#snippet pageHead(index: number)}
-  <!-- Phone: the greeting and the cards head the page itself, so they scroll
-       with it from wherever a touch starts. As wide as the grid (the page
-       keeps 10px short of the edge, so they step in by those). Only the shown
-       page's copy is live; the others are what a swipe brings in. -->
-  <div
-    bind:clientHeight={pageHeadHeights[index]}
-    inert={index !== activePage}
-    class="mx-2.5 shrink-0 @lg:mx-auto @lg:w-[29.5rem] @lg:max-w-full @2xl:w-[37rem]"
-  >
-    {@render greetingLine(true)}
-    {@render headCards()}
-  </div>
+  <!-- Phone: the greeting and the cards head My apps itself, so they scroll
+       with it from wherever a touch starts. Explore and Connect open with
+       their own title in the greeting's place instead, so the head isn't
+       said again on every page (Thomas: the identity's access and recovery
+       are what get you into these apps, so they belong to My apps). As wide
+       as the grid (the page keeps 10px short of the edge, so they step in by
+       those). Only the shown page's copy is live; the others are what a
+       swipe brings in. Only My apps' head is measured: the section icons
+       that take the cards' place in the top row once they've scrolled away
+       belong to My apps too. -->
+  {#if index === 0}
+    <div
+      bind:clientHeight={pageHeadHeights[index]}
+      inert={index !== activePage}
+      class="mx-2.5 shrink-0 @lg:mx-auto @lg:w-[29.5rem] @lg:max-w-full @2xl:w-[37rem]"
+    >
+      {@render greetingLine(true)}
+      {@render headCards()}
+    </div>
+  {:else}
+    <h2
+      inert={index !== activePage}
+      class={[
+        "text-text-primary mx-2.5 shrink-0 pb-6 text-lg leading-7 font-semibold tracking-tight @lg:mx-auto @lg:w-[29.5rem] @lg:max-w-full @2xl:w-[37rem]",
+        INSET,
+      ]}
+    >
+      {PAGE_TITLES[index]}
+    </h2>
+  {/if}
 {/snippet}
 
 {#snippet pageTabs(atBottom: boolean)}
