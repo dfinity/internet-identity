@@ -32,8 +32,11 @@
   import { brandIconOf } from "../manage/(authenticated)/devices/browsers";
   import {
     IDENTITY_PALETTES,
+    identityPalette,
     identityPaletteIndex,
+    type IdentityPalette,
   } from "$lib/utils/identityColors";
+  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import ActionDock, { type DockItem } from "./components/ActionDock.svelte";
   import AppTile from "./components/AppTile.svelte";
   import AttentionDot from "./components/AttentionDot.svelte";
@@ -117,10 +120,16 @@
     const own = customized[`${base.identityNumber}`];
     return own === undefined ? base : { ...base, name: own.name };
   });
-  const identityPaletteOverride = $derived.by(() => {
-    const own = customized[`${identity.identityNumber}`];
+  /** The colours picked for an identity, where they were. */
+  const paletteOf = (one: LastUsedIdentity): IdentityPalette | undefined => {
+    const own = customized[`${one.identityNumber}`];
     return own === undefined ? undefined : IDENTITY_PALETTES[own.paletteIndex];
-  });
+  };
+  const identityPaletteOverride = $derived(paletteOf(identity));
+  /** The colours the identity shows: picked, or the ones its number gives. */
+  const currentPalette = $derived(
+    identityPaletteOverride ?? identityPalette(identity.identityNumber),
+  );
   const identityName = $derived(identity.name ?? `${identity.identityNumber}`);
   const signedInWith = $derived(identities[identityIndex].signedInWith);
   const current = $derived(states[identityIndex]);
@@ -1204,7 +1213,7 @@
         .filter((one) => one.identityNumber !== identity.identityNumber)}
       bind:switching
       signedInWith={signedInWith.title}
-      palette={identityPaletteOverride}
+      {paletteOf}
       onSwitch={switchIdentity}
       onAdd={() => unavailable("Adding an identity")}
       onCustomize={() => (customizing = true)}
@@ -1219,7 +1228,10 @@
     >
       {#snippet alert()}
         {#if incident !== undefined}
-          <div out:slide={{ duration: reduced ? 0 : 260, easing: quintOut }}>
+          <div
+            class="px-2 pb-2"
+            out:slide={{ duration: reduced ? 0 : 260, easing: quintOut }}
+          >
             <IncidentCard {incident} onAnswer={answerIncident} />
           </div>
         {/if}
@@ -1564,32 +1576,25 @@
           class={[PAGE, settled[0] && SETTLED]}
         >
           <div class="mx-auto flex w-fit max-w-full flex-col md:my-auto">
-            <!-- The page says whose it is before anything else: the identity's
-                 own avatar and name, said the way a person would. -->
+            <!-- The page says whose it is before anything else, the way a
+                 person would: the name, with a dot in the identity's colour
+                 before it. The name is said here only; the panel's card is
+                 for switching, and how it signed in is Access's to say. -->
             {#if !managing}
-              <div
+              <p
                 class={[
-                  "mb-8 flex items-center gap-3.5 lg:mb-10",
+                  "text-text-primary mb-8 flex min-w-0 items-center gap-x-2 text-xl leading-7 font-semibold tracking-tight lg:mb-10",
                   INSET,
-                  "lg:@lg:ps-5",
                 ]}
               >
-                <IdentityAvatar
-                  {identity}
-                  palette={identityPaletteOverride}
-                  size="lg"
-                />
-                <div class="flex min-w-0 flex-col">
-                  <p
-                    class="text-text-primary truncate text-xl leading-7 font-semibold tracking-tight"
-                  >
-                    {greeting}, {identityName}
-                  </p>
-                  <p class="text-text-tertiary text-sm">
-                    Signed in with {signedInWith.title}
-                  </p>
-                </div>
-              </div>
+                <span class="shrink-0">{greeting},</span>
+                <span
+                  aria-hidden="true"
+                  class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
+                  style:background-color={currentPalette.background}
+                ></span>
+                <span class="min-w-0 truncate">{identityName}</span>
+              </p>
             {/if}
             <!-- Phone: an incident put away unanswered heads the apps. -->
             {#if !isDesktop.current && incident !== undefined && !managing}
