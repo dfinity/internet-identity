@@ -1,11 +1,11 @@
 <script lang="ts">
   import {
-    ArrowUpRightIcon,
     BellIcon,
     BellOffIcon,
     CheckCheckIcon,
     CheckIcon,
     CircleCheckIcon,
+    EllipsisIcon,
     ExternalLinkIcon,
     LinkIcon,
     Trash2Icon,
@@ -33,9 +33,10 @@
     /** Place in the grid, so the selection marks arrive one after another. */
     index?: number;
     onToggle?: () => void;
-    /** A plain click picks the app and shows its details beside the grid; the
-     *  corner's arrow, ⌘-click and a middle click still open it in a new tab. */
-    onSelect?: () => void;
+    /** The corner's "⋯": the app's details beside the grid (a sheet on a
+     *  phone), with its notifications and settings. A click on the tile
+     *  itself opens the app. */
+    onDetails?: () => void;
     /** The app whose details are showing: its logo is ringed. */
     current?: boolean;
     /** Opening the app reads everything it sent. */
@@ -63,7 +64,7 @@
     selected = false,
     index = 0,
     onToggle,
-    onSelect,
+    onDetails,
     current = false,
     onOpen,
     onClearAll,
@@ -76,24 +77,6 @@
 
   const badge = $derived(unread.length > 99 ? "99+" : `${unread.length}`);
   const hasUnread = $derived(mode === "open" && unread.length > 0);
-
-  /** A plain click shows the app's details; anything a browser treats as
-   *  "open in a new tab" still does that. */
-  const onLinkClick = (event: MouseEvent) => {
-    if (
-      onSelect !== undefined &&
-      event.button === 0 &&
-      !event.metaKey &&
-      !event.ctrlKey &&
-      !event.shiftKey &&
-      !event.altKey
-    ) {
-      event.preventDefault();
-      onSelect();
-      return;
-    }
-    onOpen?.();
-  };
 
   const copyLink = () => {
     navigator.clipboard.writeText(url).then(
@@ -258,10 +241,10 @@
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          onclick={onLinkClick}
+          onclick={onOpen}
           aria-current={current ? "true" : undefined}
           aria-label={[
-            onSelect !== undefined ? name : `Open ${name}`,
+            `Open ${name}`,
             hasUnread && `${unread.length} unread`,
             muted && "notifications off",
           ]
@@ -297,18 +280,20 @@
     </button>
   {/if}
 
-  {#if mode === "open"}
-    <!-- The corner opens the app in a new tab. It shows the unread count at
-         rest and turns into an arrow while the tile is hovered; with nothing
-         unread it is only the arrow, there on hover. On touch there's no
-         hover, so a tap on the tile shows the details, which hold the count's
-         notifications and an Open button. -->
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onclick={onOpen}
-      aria-label={`Open ${name} in a new tab`}
+  {#if mode === "open" && onDetails !== undefined}
+    <!-- The tile opens the app, the way Okta's does; its corner holds the
+         rest: the app's notifications and settings, behind "⋯". At rest the
+         corner shows the unread count, and turns into "⋯" while the tile is
+         hovered; with nothing unread it is only "⋯", there on hover. Touch
+         has no hover, so there the corner always takes a tap: the count, or
+         a quiet "⋯" where there's none. -->
+    <button
+      type="button"
+      onclick={onDetails}
+      aria-label={[`${name} details`, hasUnread && `${unread.length} unread`]
+        .filter(Boolean)
+        .join(", ")}
+      aria-expanded={current}
       class={[
         "corner focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) transition-colors duration-200 ease-out outline-none before:absolute before:-inset-[13px] focus-visible:ring-4",
         muted
@@ -322,11 +307,11 @@
       {/if}
       <span
         aria-hidden="true"
-        class="cue-arrow absolute inset-0 grid place-items-center"
+        class="cue-more absolute inset-0 grid place-items-center"
       >
-        <ArrowUpRightIcon class="size-3.5" strokeWidth={2.75} />
+        <EllipsisIcon class="size-3.5" strokeWidth={2.75} />
       </span>
-    </a>
+    </button>
   {/if}
 </div>
 
@@ -361,10 +346,10 @@
     }
   }
 
-  /* Hovering the tile shows the way out to a new tab: the count's circle
-     turns into an arrow up and to the right, or the same circle appears
-     where a count would sit. --cue is 1 meanwhile. With no count, the arrow
-     takes clicks only while it shows. */
+  /* Hovering the tile shows the way to its details: the count's circle
+     turns into "⋯", or the same circle appears where a count would sit.
+     --cue is 1 meanwhile. With no count, "⋯" takes clicks only while it
+     shows. */
   @media (hover: hover) {
     .tile:hover {
       --cue: 1;
@@ -383,16 +368,24 @@
       pointer-events: auto;
     }
   }
+  /* Touch: the count stays the count, and a tile without one keeps a quiet
+     "⋯" on the canvas's own grey, so every tile's details are a tap away. */
   @media (hover: none) {
-    .corner {
-      pointer-events: none;
+    .corner-bare {
+      opacity: 1;
+      pointer-events: auto;
+      background-color: var(--ii-shelf);
+      color: var(--color-fg-tertiary);
+    }
+    .corner-bare .cue-more {
+      --cue: 1;
     }
   }
-  .cue-arrow,
+  .cue-more,
   .cue-figure {
     transition: opacity 150ms ease-out;
   }
-  .cue-arrow {
+  .cue-more {
     opacity: var(--cue, 0);
   }
   .cue-figure {
@@ -400,13 +393,13 @@
   }
   /* The contextual icon cross-fade: scale 0.25, blur 4px, 300ms. */
   @media (prefers-reduced-motion: no-preference) {
-    .cue-arrow,
+    .cue-more,
     .cue-figure {
       transition-property: opacity, scale, filter;
       transition-duration: 300ms;
       transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
     }
-    .cue-arrow {
+    .cue-more {
       scale: calc(0.25 + 0.75 * var(--cue, 0));
       filter: blur(calc(4px * (1 - var(--cue, 0))));
     }

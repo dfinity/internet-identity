@@ -121,8 +121,8 @@
   const signedInWith = $derived(identities[identityIndex].signedInWith);
   const current = $derived(states[identityIndex]);
 
-  /** The app whose details the panel shows: a tile's plain click opens them
-   *  beside the grid (in the sheet on a phone). */
+  /** The app whose details the panel shows: a tile's "⋯" opens them beside
+   *  the grid (in the sheet on a phone); the tile itself opens the app. */
   let appOpen = $state<string>();
   const openedApp = $derived(
     current.apps.find((app) => app.origin === appOpen),
@@ -391,7 +391,7 @@
     navDirection = selected.length > before ? 1 : -1;
   };
 
-  /** A tile's plain click: its details take the panel, or the sheet. */
+  /** A tile's "⋯": its details take the panel, or the sheet. */
   const openAppDetails = (app: ConceptApp) => {
     if (managing) return;
     if (appOpen === undefined) {
@@ -990,7 +990,7 @@
     current={appOpen === app.origin && panelVisible}
     {index}
     onToggle={() => toggleSelected(app.origin)}
-    onSelect={() => openAppDetails(app)}
+    onDetails={() => openAppDetails(app)}
     onOpen={() => {
       readAll(app);
       markUsed(app);
