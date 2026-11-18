@@ -1,37 +1,12 @@
 <script lang="ts" module>
-  import type { RecoveryState } from "../status";
+  import {
+    emailStatus,
+    isOn,
+    phraseStatus,
+    type RecoveryState,
+  } from "../status";
 
   export type RecoveryMethod = "phrase" | "email";
-  /** Where each way back in stands, as its row says it. */
-  export type MethodStatus =
-    | "off"
-    | "unchecked"
-    | "pending"
-    | "on"
-    | "inUse"
-    | "new";
-
-  export const phraseStatus = (state: RecoveryState): MethodStatus =>
-    state === "none" || state === "emailOnly"
-      ? "off"
-      : state === "unverified"
-        ? "unchecked"
-        : state === "usedPhrase"
-          ? "inUse"
-          : state === "phraseReset"
-            ? "new"
-            : "on";
-
-  export const emailStatus = (state: RecoveryState): MethodStatus =>
-    state === "emailPending"
-      ? "pending"
-      : state === "none" || state === "unverified" || state === "noEmail"
-        ? "off"
-        : "on";
-
-  export const isOn = (status: MethodStatus) =>
-    status === "on" || status === "inUse" || status === "new";
-
   /** Each step takes focus as it arrives, so a screen reader reads where the
    *  user is and a keyboard carries on from the top of the step. The first
    *  one also carries `autofocus`, which the dialog honours as it opens. */

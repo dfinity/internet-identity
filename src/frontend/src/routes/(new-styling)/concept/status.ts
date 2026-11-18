@@ -17,6 +17,31 @@ export type RecoveryState =
   | "noEmail"
   | "emailOnly"
   | "calm";
+/** Where each way back in stands, as its row says it. */
+export type MethodStatus =
+  "off" | "unchecked" | "pending" | "on" | "inUse" | "new";
+
+export const phraseStatus = (state: RecoveryState): MethodStatus =>
+  state === "none" || state === "emailOnly"
+    ? "off"
+    : state === "unverified"
+      ? "unchecked"
+      : state === "usedPhrase"
+        ? "inUse"
+        : state === "phraseReset"
+          ? "new"
+          : "on";
+
+export const emailStatus = (state: RecoveryState): MethodStatus =>
+  state === "emailPending"
+    ? "pending"
+    : state === "none" || state === "unverified" || state === "noEmail"
+      ? "off"
+      : "on";
+
+export const isOn = (status: MethodStatus) =>
+  status === "on" || status === "inUse" || status === "new";
+
 export type AccessState = "one" | "newPasskey" | "unused" | "calm";
 /** `known`: the new browser stays, once the user said it was theirs. */
 export type DevicesState = "newBrowser" | "known" | "many" | "calm";

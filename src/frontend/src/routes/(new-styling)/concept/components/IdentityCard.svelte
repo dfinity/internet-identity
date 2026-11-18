@@ -83,7 +83,7 @@
   as="ul"
   class="ii-rows flex flex-col overflow-hidden rounded-2xl"
 >
-  <li class="flex items-center gap-3 ps-4 pe-2.5 py-4">
+  <li class="flex items-center gap-3 py-4 ps-4 pe-2.5">
     <!-- The avatar is the colour's own control: a tap opens the row of
          colours under it, the way Thomas sketched it. -->
     <button

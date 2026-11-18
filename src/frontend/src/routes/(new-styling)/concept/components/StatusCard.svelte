@@ -114,7 +114,9 @@
     ]}
   >
     {#if tone === "now" || tone === "recent"}
-      <span aria-hidden="true" class="bg-fg-primary size-1.5 shrink-0 rounded-full"
+      <span
+        aria-hidden="true"
+        class="bg-fg-primary size-1.5 shrink-0 rounded-full"
       ></span>
     {/if}
     <span class="min-w-0">{sentence}</span>

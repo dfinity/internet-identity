@@ -65,10 +65,6 @@
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
   import RecoveryFlow, {
-    emailStatus,
-    isOn,
-    phraseStatus,
-    type MethodStatus,
     type RecoveryMethod,
   } from "./components/RecoveryFlow.svelte";
   import ReorderGrid from "./components/ReorderGrid.svelte";
@@ -87,7 +83,11 @@
   import { ConceptTheme } from "./theme.svelte";
   import {
     deriveStatus,
+    emailStatus,
     incidentOf,
+    isOn,
+    phraseStatus,
+    type MethodStatus,
     isLoud,
     leadActionOf,
     leadOf,
@@ -250,7 +250,9 @@
         : "3 ways to sign in";
     }
     if (card.kind === "devices") {
-      return browsers.length === 1 ? "1 browser" : `${browsers.length} browsers`;
+      return browsers.length === 1
+        ? "1 browser"
+        : `${browsers.length} browsers`;
     }
     return card.sentence;
   };
@@ -833,7 +835,8 @@
   const showStartPage = () =>
     toaster.create({
       title: "Make id.ai your start page",
-      description: "In your browser's settings, under “On startup”, open id.ai.",
+      description:
+        "In your browser's settings, under “On startup”, open id.ai.",
       duration: 5000,
     });
 

@@ -21,14 +21,8 @@
     backdrop: string;
   }
 
-  const {
-    others,
-    expanded,
-    controls,
-    onToggle,
-    paletteOf,
-    backdrop,
-  }: Props = $props();
+  const { others, expanded, controls, onToggle, paletteOf, backdrop }: Props =
+    $props();
 
   /** The first few show; the rest are a count. */
   const PREVIEW = 3;

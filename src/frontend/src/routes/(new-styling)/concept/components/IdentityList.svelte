@@ -80,7 +80,11 @@
         onclick={() => onSwitch(other.identityNumber)}
         class={["ii-hover", ROW]}
       >
-        <IdentityAvatar identity={other} palette={paletteOf?.(other)} size="sm" />
+        <IdentityAvatar
+          identity={other}
+          palette={paletteOf?.(other)}
+          size="sm"
+        />
         <span class="flex min-w-0 flex-1 flex-col">
           <span class="text-text-primary truncate text-sm font-medium">
             {nameOf(other)}

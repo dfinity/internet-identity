@@ -61,7 +61,9 @@
   // Focus starts on the colour in use, so arrow keys move from there.
   $effect(() => {
     const index = choices.indexOf(untrack(() => current));
-    requestAnimationFrame(() => swatches[index]?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      swatches[index]?.focus({ preventScroll: true }),
+    );
   });
 
   // Arrow keys walk the row and pick as they go, as a radio group does.
@@ -117,10 +119,7 @@
   <div
     role="radiogroup"
     aria-label="Colour"
-    class={[
-      "grid gap-1 p-1.5",
-      wide.current ? "grid-flow-col" : "grid-cols-5",
-    ]}
+    class={["grid gap-1 p-1.5", wide.current ? "grid-flow-col" : "grid-cols-5"]}
   >
     {#each choices as paletteIndex, index (paletteIndex)}
       {@const pair = IDENTITY_PALETTES[paletteIndex]}
