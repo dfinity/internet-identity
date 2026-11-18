@@ -1646,6 +1646,13 @@ pub enum AppSetPwaWebPushSubscriptionError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppGetPwaWebPushSubscriptionStatusError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppGetPwaNotificationRequest {
     /// As the wake-up that announced it named it.
     pub inbox_notification_id: InboxNotificationId,

@@ -2315,6 +2315,12 @@ type AppSetPwaWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
+type AppGetPwaWebPushSubscriptionStatusError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
 type AppGetPwaNotificationRequest = record {
     // As the wake-up that announced it named it.
     inbox_notification_id : InboxNotificationId;
@@ -2928,6 +2934,10 @@ service : (opt InternetIdentityInit) -> {
     app_prepare_pwa_webpush_subscription : () -> (variant { Ok : PrepareWebPushSubscriptionResponse; Pending; Err : AppPreparePwaWebPushSubscriptionError });
     // Sets or, with null, removes the subscription of the session's browser and account.
     app_set_pwa_webpush_subscription : (AppSetPwaWebPushSubscriptionRequest) -> (variant { Ok; Err : AppSetPwaWebPushSubscriptionError });
+    // The endpoint the session's browser and account are subscribed at. Null where nothing
+    // is subscribed, where the subscription awaits its app_set_pwa_webpush_subscription, or
+    // where it delivers for another account.
+    app_get_pwa_webpush_subscription_status : () -> (variant { Ok : opt WebPushSubscriptionStatus; Err : AppGetPwaWebPushSubscriptionStatusError }) query;
     // The notification a wake-up named, where it is this app's for the session's browser
     // and account.
     app_get_pwa_notification : (AppGetPwaNotificationRequest) -> (variant { Ok : AppGetPwaNotificationResponse; Err : AppGetPwaNotificationError }) query;

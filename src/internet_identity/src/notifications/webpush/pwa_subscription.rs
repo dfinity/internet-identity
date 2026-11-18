@@ -19,7 +19,7 @@ use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionResult,
     AppSetPwaWebPushSubscriptionError, PrepareWebPushSubscriptionResponse,
-    SetWebPushSubscriptionError, Timestamp,
+    SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
 };
 use p256::elliptic_curve::subtle::ConstantTimeEq;
 use serde_bytes::ByteBuf;
@@ -180,6 +180,20 @@ pub(crate) fn clear_gone_pwa_subscription(
         return Ok(());
     }
     write(holder, None, None)
+}
+
+/// The endpoint `holder`'s browser entry is subscribed at, where it is ready and delivers
+/// for `account_principal`'s account.
+pub fn pwa_subscription_status(
+    holder: PwaSubscriptionHolder,
+    account_principal: Principal,
+) -> Option<WebPushSubscriptionStatus> {
+    read(holder)
+        .filter(|held| held.account_principal == account_principal)
+        .and_then(|held| held.subscription.into_ready())
+        .map(|ready| WebPushSubscriptionStatus {
+            endpoint: ready.endpoint.as_str().to_string(),
+        })
 }
 
 /// What `holder`'s browser entry holds, and the account it delivers for.

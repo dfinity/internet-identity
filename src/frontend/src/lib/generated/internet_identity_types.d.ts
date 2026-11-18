@@ -115,6 +115,15 @@ export interface AppGetPwaNotificationRequest {
 export interface AppGetPwaNotificationResponse {
   'notification' : [] | [PwaNotification],
 }
+export type AppGetPwaWebPushSubscriptionStatusError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
 export type AppNotificationConsentStatusError = {
     'InternalCanisterError' : string
   } |
@@ -2785,6 +2794,16 @@ export interface _SERVICE {
     [AppGetPwaNotificationRequest],
     { 'Ok' : AppGetPwaNotificationResponse } |
       { 'Err' : AppGetPwaNotificationError }
+  >,
+  /**
+   * The endpoint the session's browser and account are subscribed at. Null where nothing
+   * is subscribed, where the subscription awaits its app_set_pwa_webpush_subscription, or
+   * where it delivers for another account.
+   */
+  'app_get_pwa_webpush_subscription_status' : ActorMethod<
+    [],
+    { 'Ok' : [] | [WebPushSubscriptionStatus] } |
+      { 'Err' : AppGetPwaWebPushSubscriptionStatusError }
   >,
   /**
    * Called by an app's frontend, as its session.

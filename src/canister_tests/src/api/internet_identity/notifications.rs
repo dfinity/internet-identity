@@ -3,14 +3,14 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, AppGetPwaNotificationError, AppGetPwaNotificationRequest,
-    AppGetPwaNotificationResponse, AppNotificationConsentStatusError,
-    AppNotificationConsentStatusResponse, AppPreparePwaWebPushSubscriptionResult,
-    AppRemovePwaNotificationError, AppRemovePwaNotificationRequest,
-    AppRevokeNotificationConsentError, AppSetPwaWebPushSubscriptionError,
-    AppSetPwaWebPushSubscriptionRequest, BrowserId, ClaimNotificationAppError,
-    ClaimNotificationAppRequest, DisableNotificationAppError, DisableNotificationAppRequest,
-    EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
-    GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
+    AppGetPwaNotificationResponse, AppGetPwaWebPushSubscriptionStatusError,
+    AppNotificationConsentStatusError, AppNotificationConsentStatusResponse,
+    AppPreparePwaWebPushSubscriptionResult, AppRemovePwaNotificationError,
+    AppRemovePwaNotificationRequest, AppRevokeNotificationConsentError,
+    AppSetPwaWebPushSubscriptionError, AppSetPwaWebPushSubscriptionRequest, BrowserId,
+    ClaimNotificationAppError, ClaimNotificationAppRequest, DisableNotificationAppError,
+    DisableNotificationAppRequest, EnableNotificationAppError, EnableNotificationAppRequest,
+    FrontendHostname, GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetNotificationError, GetNotificationRequest,
     GetNotificationResponse, GetWebPushSubscriptionStatusRequest, LinkNotificationAppError,
     LinkNotificationAppRequest, LinkNotificationAppResponse, NotificationAppAnchorsRequest,
@@ -579,6 +579,24 @@ pub fn subscribe_pwa_webpush(
             }),
         },
     )
+}
+
+pub fn app_get_pwa_webpush_subscription_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<
+    Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError>,
+    RejectResponse,
+> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_get_pwa_webpush_subscription_status",
+        (),
+    )
+    .map(|(x,)| x)
 }
 
 pub fn app_get_pwa_notification(

@@ -1179,6 +1179,24 @@ fn app_set_pwa_webpush_subscription(
     pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
 }
 
+/// The endpoint the calling session's browser entry is subscribed at for the session's
+/// account. `None` where nothing is subscribed, where the subscription awaits its
+/// `app_set_pwa_webpush_subscription`, or where it delivers for another account.
+#[query]
+fn app_get_pwa_webpush_subscription_status(
+) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
+    use AppGetPwaWebPushSubscriptionStatusError::*;
+
+    let session = check_app_authorization(time()).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let holder = pwa_subscription::holder_of(&session).ok_or(NoSuchSession)?;
+
+    Ok(pwa_subscription::pwa_subscription_status(
+        holder,
+        session.account_principal,
+    ))
+}
+
 /// Every field at once rather than the first to fail, as `set_webpush_subscription` does.
 fn validated_pwa_subscription(
     subscription: PwaWebPushSubscription,

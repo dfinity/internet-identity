@@ -178,6 +178,11 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
+  const WebPushSubscriptionStatus = IDL.Record({ 'endpoint' : IDL.Text });
+  const AppGetPwaWebPushSubscriptionStatusError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
   const AppNotificationConsentStatusResponse = IDL.Record({
     'is_granted' : IDL.Bool,
   });
@@ -789,7 +794,6 @@ export const idlFactory = ({ IDL }) => {
   const GetWebPushSubscriptionStatusRequest = IDL.Record({
     'anchor_number' : UserNumber,
   });
-  const WebPushSubscriptionStatus = IDL.Record({ 'endpoint' : IDL.Text });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -1288,6 +1292,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : AppGetPwaNotificationResponse,
             'Err' : AppGetPwaNotificationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'app_get_pwa_webpush_subscription_status' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Opt(WebPushSubscriptionStatus),
+            'Err' : AppGetPwaWebPushSubscriptionStatusError,
           }),
         ],
         ['query'],
