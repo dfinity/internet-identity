@@ -138,13 +138,13 @@ fn start_pwa_subscription(
     if !is_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
-    let pending = PendingTransport {
+    let pending_transport = PendingTransport {
         secret_key,
         sender_seed,
         minted_at_ns: now_ns,
     };
     let subscription = PwaSubscription {
-        subscription: WebPushSubscription::Pending(pending),
+        subscription: WebPushSubscription::Pending(pending_transport),
         account_principal,
     };
     write(holder, Some(subscription), None).map_err(PreparePwaSubscriptionError::Internal)
@@ -169,7 +169,9 @@ pub fn set_pwa_subscription(
     if !is_allowed(holder) {
         return Err(SetPwaSubscriptionError::NotificationsNotAllowed);
     }
-    let Some(pending) = read(holder).and_then(|held| held.subscription.pending().cloned()) else {
+    let Some(pending_transport) = read(holder)
+        .and_then(|held_subscription| held_subscription.subscription.pending().cloned())
+    else {
         return Err(SetPwaSubscriptionError::TransportKeyExpired);
     };
     let ValidatedPwaWebPushSubscription {
@@ -178,8 +180,8 @@ pub fn set_pwa_subscription(
         transport_key,
         sealed_auth,
     } = request;
-    let ready = subscription::spend_pending(
-        &pending,
+    let ready_subscription = subscription::spend_pending(
+        &pending_transport,
         &transport_key,
         &sealed_auth,
         subscriber_key,
@@ -187,13 +189,13 @@ pub fn set_pwa_subscription(
         now_ns,
     )
     .map_err(set_error)?;
-    let displaced = displaced_holder(holder, &ready)?;
+    let displaced_holder = displaced_holder(holder, &ready_subscription)?;
 
     let subscription = PwaSubscription {
-        subscription: WebPushSubscription::Ready(ready),
+        subscription: WebPushSubscription::Ready(ready_subscription),
         account_principal,
     };
-    write(holder, Some(subscription), displaced).map_err(SetPwaSubscriptionError::Internal)
+    write(holder, Some(subscription), displaced_holder).map_err(SetPwaSubscriptionError::Internal)
 }
 
 /// Empties `holder`'s browser entry where it delivers for `account_principal`'s account.
@@ -203,46 +205,54 @@ fn remove_pwa_subscription(
     account_principal: Principal,
 ) -> Result<(), SetPwaSubscriptionError> {
     match read(holder) {
-        Some(held) if held.account_principal != account_principal => return Ok(()),
+        Some(held_subscription) if held_subscription.account_principal != account_principal => {
+            return Ok(())
+        }
         Some(_) => {}
         None => return Ok(()),
     }
     write(holder, None, None).map_err(SetPwaSubscriptionError::Internal)
 }
 
-/// The other slot `ready`'s endpoint is taken over from, refusing where it is not the
+/// The other slot `ready_subscription`'s endpoint is taken over from, refusing where it is not the
 /// same app's or holds other keys. `None` where no other slot holds it.
 fn displaced_holder(
     holder: PwaSubscriptionHolder,
-    ready: &ReadySubscription,
+    ready_subscription: &ReadySubscription,
 ) -> Result<Option<PwaSubscriptionHolder>, SetPwaSubscriptionError> {
-    let Some(indexed) = storage_borrow(|storage| {
-        storage.lookup_pwa_webpush_subscription_with_endpoint(ready.endpoint.as_str())
+    let Some(indexed_holder) = storage_borrow(|storage| {
+        storage.lookup_pwa_webpush_subscription_with_endpoint(ready_subscription.endpoint.as_str())
     }) else {
         return Ok(None);
     };
-    if indexed == holder {
+    if indexed_holder == holder {
         return Ok(None);
     }
     // The lookup is derived from the configs, so a slot that no longer holds the endpoint
     // holds nothing to protect.
-    let Some(held) = read(indexed)
-        .and_then(|held| held.subscription.into_ready())
-        .filter(|held| held.endpoint == ready.endpoint)
+    let Some(held_subscription) = read(indexed_holder)
+        .and_then(|held_subscription| held_subscription.subscription.into_ready())
+        .filter(|held_subscription| held_subscription.endpoint == ready_subscription.endpoint)
     else {
         return Ok(None);
     };
-    let is_same_application = indexed.application_number == holder.application_number;
+    let is_same_application = indexed_holder.application_number == holder.application_number;
     let is_same_subscriber_key = bool::from(
-        held.subscriber_key
+        held_subscription
+            .subscriber_key
             .as_slice()
-            .ct_eq(ready.subscriber_key.as_slice()),
+            .ct_eq(ready_subscription.subscriber_key.as_slice()),
     );
-    let is_same_auth = bool::from(held.auth.as_slice().ct_eq(ready.auth.as_slice()));
+    let is_same_auth = bool::from(
+        held_subscription
+            .auth
+            .as_slice()
+            .ct_eq(ready_subscription.auth.as_slice()),
+    );
     if !(is_same_application && is_same_subscriber_key && is_same_auth) {
         return Err(SetPwaSubscriptionError::EndpointInUse);
     }
-    Ok(Some(indexed))
+    Ok(Some(indexed_holder))
 }
 
 /// The subscription a relay answered gone for, dropped where `holder`'s browser entry
@@ -252,8 +262,10 @@ pub(crate) fn clear_gone_pwa_subscription(
     endpoint: &str,
 ) -> Result<(), String> {
     let is_registered = read(holder)
-        .and_then(|held| held.subscription.into_ready())
-        .is_some_and(|registered| registered.endpoint.as_str() == endpoint);
+        .and_then(|held_subscription| held_subscription.subscription.into_ready())
+        .is_some_and(|registered_subscription| {
+            registered_subscription.endpoint.as_str() == endpoint
+        });
     if !is_registered {
         return Ok(());
     }
@@ -267,10 +279,10 @@ pub fn pwa_subscription_status(
     account_principal: Principal,
 ) -> Option<WebPushSubscriptionStatus> {
     read(holder)
-        .filter(|held| held.account_principal == account_principal)
-        .and_then(|held| held.subscription.into_ready())
-        .map(|ready| WebPushSubscriptionStatus {
-            endpoint: ready.endpoint.as_str().to_string(),
+        .filter(|held_subscription| held_subscription.account_principal == account_principal)
+        .and_then(|held_subscription| held_subscription.subscription.into_ready())
+        .map(|ready_subscription| WebPushSubscriptionStatus {
+            endpoint: ready_subscription.endpoint.as_str().to_string(),
         })
 }
 
@@ -283,14 +295,14 @@ pub(crate) fn read(holder: PwaSubscriptionHolder) -> Option<PwaSubscription> {
 }
 
 /// Puts `subscription` on `holder`'s browser entry, or with `None` empties it, after
-/// emptying `displaced`'s where one is given.
+/// emptying `displaced_holder`'s where one is given.
 pub(crate) fn write(
     holder: PwaSubscriptionHolder,
     subscription: Option<PwaSubscription>,
-    displaced: Option<PwaSubscriptionHolder>,
+    displaced_holder: Option<PwaSubscriptionHolder>,
 ) -> Result<(), String> {
     storage_borrow_mut(|storage| {
-        storage.write_pwa_webpush_subscription(holder, subscription, displaced)
+        storage.write_pwa_webpush_subscription(holder, subscription, displaced_holder)
     })
     .map_err(|err| format!("{err}"))
 }

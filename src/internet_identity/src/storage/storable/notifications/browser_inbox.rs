@@ -32,12 +32,12 @@ impl<C> Encode<C> for StorableInbox {
 
 impl<'b, C> Decode<'b, C> for StorableInbox {
     fn decode(decoder: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, decode::Error> {
-        let mut remaining = decoder.array()?;
+        let mut num_remaining_entries = decoder.array()?;
         let mut entries = Vec::new();
         loop {
-            match remaining {
+            match num_remaining_entries {
                 Some(0) => break,
-                Some(count) => remaining = Some(count.saturating_sub(1)),
+                Some(count) => num_remaining_entries = Some(count.saturating_sub(1)),
                 None => {
                     if decoder.datatype()? == Type::Break {
                         decoder.skip()?;
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn an_inbox_entry_of_an_unknown_kind_is_skipped_and_the_rest_read() {
-        let known = StorableInboxNotification {
+        let known_entry = StorableInboxNotification {
             inbox_notification_id: 2,
             sender: vec![1; 10],
             notification_id: 3,
@@ -208,11 +208,13 @@ mod tests {
                 kind: UnknownKind::Later { field: 5 },
             })
             .expect("encoding the unknown entry");
-        encoder.encode(&known).expect("encoding the known entry");
+        encoder
+            .encode(&known_entry)
+            .expect("encoding the known entry");
 
         let inbox: StorableInbox = minicbor::decode(&bytes).expect("decoding the inbox");
 
-        assert_eq!(inbox, StorableInbox(vec![known]));
+        assert_eq!(inbox, StorableInbox(vec![known_entry]));
     }
 
     #[test]

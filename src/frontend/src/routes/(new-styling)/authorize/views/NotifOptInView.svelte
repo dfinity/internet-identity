@@ -76,9 +76,9 @@
    * that never happens here.
    */
   const funnelOf = (
-    current: DeviceNotificationState,
+    deviceState: DeviceNotificationState,
   ): typeof icpAlertsFunnel | typeof browserNotificationsFunnel | undefined => {
-    switch (current.source) {
+    switch (deviceState.source) {
       case "app":
         return icpAlertsFunnel;
       case "browser":

@@ -105,8 +105,8 @@ fn sign_in(
         .expect("prepare_account_session refused")
 }
 
-fn session_of(signed_in: &PrepareAccountSessionResponse) -> Principal {
-    Principal::self_authenticating(&signed_in.user_key)
+fn session_of(account_session: &PrepareAccountSessionResponse) -> Principal {
+    Principal::self_authenticating(&account_session.user_key)
 }
 
 /// A canister that notifies, and `principal_1`'s identity signed in at [`APP`] from the
@@ -121,7 +121,7 @@ fn install_signed_in(
         install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
     let anchor = flows::register_anchor(env, canister_id);
     let browser = BrowserKey::new(1);
-    let signed_in = sign_in(
+    let account_session = sign_in(
         env,
         canister_id,
         principal_1(),
@@ -148,24 +148,24 @@ fn install_signed_in(
     )
     .expect("subscribe rejected")
     .expect("subscribe refused");
-    (canister_id, anchor, signed_in)
+    (canister_id, anchor, account_session)
 }
 
 /// [`install_signed_in`] with a session of the defaults, whose installed web app holds
 /// [`PWA_ENDPOINT`] with `p256dh(9)` and [`TEST_AUTH_SECRET`].
 fn install_subscribed(env: &PocketIc) -> (CanisterId, AnchorNumber, PrepareAccountSessionResponse) {
-    let (canister_id, anchor, signed_in) = install_signed_in(env, None, None);
+    let (canister_id, anchor, account_session) = install_signed_in(env, None, None);
     subscribe_pwa_webpush(
         env,
         canister_id,
-        session_of(&signed_in),
+        session_of(&account_session),
         PWA_ENDPOINT,
         p256dh(9),
         &TEST_AUTH_SECRET,
     )
     .expect("subscribe rejected")
     .expect("subscribe refused");
-    (canister_id, anchor, signed_in)
+    (canister_id, anchor, account_session)
 }
 
 /// A second identity, `principal_2`'s, signed in at `origin` from the browser seed 2
@@ -176,7 +176,7 @@ fn second_identity_at(
     origin: &str,
 ) -> PrepareAccountSessionResponse {
     let anchor = flows::register_anchor_with_device(env, canister_id, &device_data_2());
-    let signed_in = sign_in(
+    let account_session = sign_in(
         env,
         canister_id,
         principal_2(),
@@ -185,14 +185,14 @@ fn second_identity_at(
     grant_consent(env, canister_id, principal_2(), anchor, origin.into())
         .expect("grant rejected")
         .expect("grant refused");
-    signed_in
+    account_session
 }
 
 /// Answers every outcall for [`OUTCALL_ROUNDS`] rounds: a sender list with
 /// [`app_sender`], `push_status` to every push, and any other `GET`, a relay probe, with
 /// `200`. Answers the URLs pushed to.
 fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
-    let mut pushed = Vec::new();
+    let mut pushed_urls = Vec::new();
     for _ in 0..OUTCALL_ROUNDS {
         env.advance_time(Duration::from_millis(ROUND_MILLIS));
         env.tick();
@@ -203,7 +203,7 @@ fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
                     format!(r#"{{"senders":["{}"]}}"#, app_sender().to_text()).into_bytes(),
                 )
             } else if request.http_method == CanisterHttpMethod::POST {
-                pushed.push(request.url.clone());
+                pushed_urls.push(request.url.clone());
                 (push_status, vec![])
             } else {
                 (200, vec![])
@@ -220,7 +220,7 @@ fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
             });
         }
     }
-    pushed
+    pushed_urls
 }
 
 /// Sends [`APP`]'s notification `id` to `recipient` and runs the dispatch, answering the
@@ -275,16 +275,16 @@ fn send_accepted_from(
         .expect("send rejected")
         .expect("send refused")
     };
-    let first = send();
-    let is_deferred = first
+    let first_response = send();
+    let is_deferred = first_response
         .not_accepted
         .iter()
-        .any(|refused| matches!(refused.reason, NotAcceptedReason::Deferred { .. }));
+        .any(|refusal| matches!(refusal.reason, NotAcceptedReason::Deferred { .. }));
     if is_deferred {
         answer_outcalls(env, push_status);
         assert_eq!(send().not_accepted, vec![]);
     } else {
-        assert_eq!(first.not_accepted, vec![]);
+        assert_eq!(first_response.not_accepted, vec![]);
     }
 }
 
@@ -352,7 +352,7 @@ fn is_endpoint_free(env: &PocketIc, canister_id: CanisterId, session: Principal)
 #[test]
 fn should_refuse_every_caller_without_a_live_app_session() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, _, signed_in) = install_subscribed(&env);
+    let (canister_id, _, account_session) = install_subscribed(&env);
 
     // The identity's own principal, its browser key, a stranger and anonymous hold no app
     // session.
@@ -407,7 +407,7 @@ fn should_refuse_every_caller_without_a_live_app_session() -> Result<(), RejectR
     }
     // None of them removed the subscription.
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        deliver(&env, canister_id, account_session.account_principal, 1, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
     Ok(())
@@ -517,10 +517,10 @@ fn should_refuse_to_subscribe_an_app_the_identity_has_not_allowed() -> Result<()
 #[test]
 fn should_wake_the_installed_app_while_its_session_is_live() {
     let env = env();
-    let (canister_id, _, signed_in) = install_subscribed(&env);
+    let (canister_id, _, account_session) = install_subscribed(&env);
 
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        deliver(&env, canister_id, account_session.account_principal, 1, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
 }
@@ -529,11 +529,11 @@ fn should_wake_the_installed_app_while_its_session_is_live() {
 fn should_wake_the_browser_instead_once_the_session_expires_within_a_minute() {
     let env = env();
     let signed_in_at_ns = env.get_time().as_nanos_since_unix_epoch();
-    let (canister_id, _, signed_in) = install_signed_in(&env, Some(20 * MINUTE_NS), None);
+    let (canister_id, _, account_session) = install_signed_in(&env, Some(20 * MINUTE_NS), None);
     subscribe_pwa_webpush(
         &env,
         canister_id,
-        session_of(&signed_in),
+        session_of(&account_session),
         PWA_ENDPOINT,
         p256dh(9),
         &TEST_AUTH_SECRET,
@@ -541,13 +541,13 @@ fn should_wake_the_browser_instead_once_the_session_expires_within_a_minute() {
     .expect("subscribe rejected")
     .expect("subscribe refused");
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        deliver(&env, canister_id, account_session.account_principal, 1, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
 
     advance_to(&env, signed_in_at_ns + 20 * MINUTE_NS - BEFORE_END_NS);
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 2, 200),
+        deliver(&env, canister_id, account_session.account_principal, 2, 200),
         vec![BROWSER_ENDPOINT.to_string()]
     );
 }
@@ -556,11 +556,11 @@ fn should_wake_the_browser_instead_once_the_session_expires_within_a_minute() {
 fn should_wake_the_browser_instead_once_the_session_goes_idle_within_a_minute() {
     let env = env();
     let signed_in_at_ns = env.get_time().as_nanos_since_unix_epoch();
-    let (canister_id, _, signed_in) = install_signed_in(&env, None, Some(10 * MINUTE_NS));
+    let (canister_id, _, account_session) = install_signed_in(&env, None, Some(10 * MINUTE_NS));
     subscribe_pwa_webpush(
         &env,
         canister_id,
-        session_of(&signed_in),
+        session_of(&account_session),
         PWA_ENDPOINT,
         p256dh(9),
         &TEST_AUTH_SECRET,
@@ -568,13 +568,13 @@ fn should_wake_the_browser_instead_once_the_session_goes_idle_within_a_minute() 
     .expect("subscribe rejected")
     .expect("subscribe refused");
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        deliver(&env, canister_id, account_session.account_principal, 1, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
 
     advance_to(&env, signed_in_at_ns + 10 * MINUTE_NS - BEFORE_END_NS);
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 2, 200),
+        deliver(&env, canister_id, account_session.account_principal, 2, 200),
         vec![BROWSER_ENDPOINT.to_string()]
     );
 }
@@ -582,16 +582,16 @@ fn should_wake_the_browser_instead_once_the_session_goes_idle_within_a_minute() 
 #[test]
 fn should_wake_nothing_once_the_app_signed_out_of_the_browsers_last_session() {
     let env = env();
-    let (canister_id, _, signed_in) = install_subscribed(&env);
+    let (canister_id, _, account_session) = install_subscribed(&env);
 
-    app_revoke_session(&env, canister_id, session_of(&signed_in))
+    app_revoke_session(&env, canister_id, session_of(&account_session))
         .expect("sign-out rejected")
         .expect("sign-out refused");
 
     // The browser's own subscription is still there, but a browser with no session left
     // is woken at nothing, so the recipient has no channel.
     assert_eq!(
-        send_refusal(&env, canister_id, signed_in.account_principal, 1),
+        send_refusal(&env, canister_id, account_session.account_principal, 1),
         Some(NotAcceptedReason::NoChannel)
     );
 }
@@ -600,7 +600,7 @@ fn should_wake_nothing_once_the_app_signed_out_of_the_browsers_last_session() {
 fn should_answer_no_channel_for_a_recipient_whose_only_browser_is_signed_out(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, signed_in) = install_subscribed(&env);
+    let (canister_id, anchor, account_session) = install_subscribed(&env);
 
     revoke_browser_sessions(
         &env,
@@ -608,13 +608,13 @@ fn should_answer_no_channel_for_a_recipient_whose_only_browser_is_signed_out(
         principal_1(),
         RevokeBrowserSessionsRequest {
             identity_number: anchor,
-            browser_id: signed_in.browser_id,
+            browser_id: account_session.browser_id,
         },
     )?
     .expect("sign-out refused");
 
     assert_eq!(
-        send_refusal(&env, canister_id, signed_in.account_principal, 1),
+        send_refusal(&env, canister_id, account_session.account_principal, 1),
         Some(NotAcceptedReason::NoChannel)
     );
     Ok(())
@@ -647,28 +647,28 @@ fn send_refusal(
         .expect("send refused")
         .not_accepted
         .first()
-        .map(|refused| refused.reason.clone())
+        .map(|refusal| refusal.reason.clone())
     };
     match send() {
         Some(NotAcceptedReason::Deferred { .. }) => {
             answer_outcalls(env, 200);
             send()
         }
-        answered => answered,
+        response => response,
     }
 }
 
 #[test]
 fn should_take_an_endpoint_over_with_the_same_keys_for_the_same_app() {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
-    let second = second_identity_at(&env, canister_id, APP);
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
+    let second_account_session = second_identity_at(&env, canister_id, APP);
 
     assert_eq!(
         subscribe_pwa_webpush(
             &env,
             canister_id,
-            session_of(&second),
+            session_of(&second_account_session),
             PWA_ENDPOINT,
             p256dh(9),
             &TEST_AUTH_SECRET
@@ -677,12 +677,24 @@ fn should_take_an_endpoint_over_with_the_same_keys_for_the_same_app() {
     );
 
     assert_eq!(
-        deliver(&env, canister_id, second.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            second_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
     // The identity it was taken from is woken where it was before it had an app.
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 2, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            2,
+            200
+        ),
         vec![BROWSER_ENDPOINT.to_string()]
     );
 }
@@ -690,15 +702,15 @@ fn should_take_an_endpoint_over_with_the_same_keys_for_the_same_app() {
 #[test]
 fn should_refuse_an_endpoint_held_with_other_keys_and_leave_its_holder() {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
-    let second = second_identity_at(&env, canister_id, APP);
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
+    let second_account_session = second_identity_at(&env, canister_id, APP);
 
     // Another `auth`, then another `p256dh`.
     assert_eq!(
         subscribe_pwa_webpush(
             &env,
             canister_id,
-            session_of(&second),
+            session_of(&second_account_session),
             PWA_ENDPOINT,
             p256dh(9),
             &OTHER_AUTH_SECRET
@@ -709,7 +721,7 @@ fn should_refuse_an_endpoint_held_with_other_keys_and_leave_its_holder() {
         subscribe_pwa_webpush(
             &env,
             canister_id,
-            session_of(&second),
+            session_of(&second_account_session),
             PWA_ENDPOINT,
             p256dh(11),
             &TEST_AUTH_SECRET
@@ -718,7 +730,13 @@ fn should_refuse_an_endpoint_held_with_other_keys_and_leave_its_holder() {
     );
 
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 }
@@ -726,7 +744,7 @@ fn should_refuse_an_endpoint_held_with_other_keys_and_leave_its_holder() {
 #[test]
 fn should_refuse_an_endpoint_held_for_another_app_and_leave_its_holder() {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
     let other_app = second_identity_at(&env, canister_id, OTHER_APP);
 
     assert_eq!(
@@ -742,7 +760,13 @@ fn should_refuse_an_endpoint_held_for_another_app_and_leave_its_holder() {
     );
 
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 }
@@ -762,22 +786,22 @@ fn pwa_status(
 fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_signed_in(&env, None, None);
-    let first_session = session_of(&first);
+    let (canister_id, anchor, first_account_session) = install_signed_in(&env, None, None);
+    let first_session = session_of(&first_account_session);
     assert_eq!(pwa_status(&env, canister_id, first_session), None);
 
     // A prepared subscription awaiting its set is not one yet.
-    let prepared = (0..10)
+    let prepare_result = (0..10)
         .map(|_| app_prepare_pwa_webpush_subscription(&env, canister_id, first_session))
-        .find(|prepared| {
+        .find(|prepare_result| {
             !matches!(
-                prepared,
+                prepare_result,
                 Ok(AppPreparePwaWebPushSubscriptionResult::Pending)
             )
         })
         .expect("prepare stayed pending")?;
     assert!(matches!(
-        prepared,
+        prepare_result,
         AppPreparePwaWebPushSubscriptionResult::Ok(_)
     ));
     assert_eq!(pwa_status(&env, canister_id, first_session), None);
@@ -850,21 +874,27 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
 #[test]
 fn should_free_the_endpoint_when_the_app_removes_its_subscription() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
 
     app_set_pwa_webpush_subscription(
         &env,
         canister_id,
-        session_of(&first),
+        session_of(&first_account_session),
         AppSetPwaWebPushSubscriptionRequest { subscription: None },
     )?
     .expect("remove refused");
 
-    assert!(is_endpoint_free(&env, canister_id, second));
+    assert!(is_endpoint_free(&env, canister_id, second_session));
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![BROWSER_ENDPOINT.to_string()]
     );
     Ok(())
@@ -873,17 +903,23 @@ fn should_free_the_endpoint_when_the_app_removes_its_subscription() -> Result<()
 #[test]
 fn should_drop_the_subscription_when_notifications_are_denied() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
 
     revoke_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("revoke refused");
 
-    assert!(is_endpoint_free(&env, canister_id, second));
+    assert!(is_endpoint_free(&env, canister_id, second_session));
     // Allowed again, the app is woken in the browser until it subscribes again.
     grant_consent(&env, canister_id, principal_1(), anchor, APP.into())?.expect("grant refused");
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![BROWSER_ENDPOINT.to_string()]
     );
     Ok(())
@@ -893,22 +929,22 @@ fn should_drop_the_subscription_when_notifications_are_denied() -> Result<(), Re
 fn should_drop_the_subscription_when_the_app_is_forgotten() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor, _) = install_subscribed(&env);
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
 
     forget_applications(&env, canister_id, principal_1(), anchor, vec![APP.into()])?
         .expect("forget refused");
 
-    assert!(is_endpoint_free(&env, canister_id, second));
+    assert!(is_endpoint_free(&env, canister_id, second_session));
     Ok(())
 }
 
 #[test]
 fn should_drop_the_subscription_when_its_browser_is_signed_out() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
 
     revoke_browser_sessions(
         &env,
@@ -916,12 +952,12 @@ fn should_drop_the_subscription_when_its_browser_is_signed_out() -> Result<(), R
         principal_1(),
         RevokeBrowserSessionsRequest {
             identity_number: anchor,
-            browser_id: first.browser_id,
+            browser_id: first_account_session.browser_id,
         },
     )?
     .expect("sign-out refused");
 
-    assert!(is_endpoint_free(&env, canister_id, second));
+    assert!(is_endpoint_free(&env, canister_id, second_session));
     Ok(())
 }
 
@@ -929,8 +965,8 @@ fn should_drop_the_subscription_when_its_browser_is_signed_out() -> Result<(), R
 fn should_drop_the_subscription_when_its_browser_is_evicted() {
     let env = env();
     let (canister_id, anchor, _) = install_subscribed(&env);
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
 
     // Twenty browsers more than the one the app is installed on, which is the least
     // recently used and the one the registry gives up.
@@ -944,31 +980,40 @@ fn should_drop_the_subscription_when_its_browser_is_evicted() {
         );
     }
 
-    assert!(is_endpoint_free(&env, canister_id, second));
+    assert!(is_endpoint_free(&env, canister_id, second_session));
 }
 
 #[test]
 fn should_drop_the_subscription_its_push_service_calls_gone() {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
 
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 410),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            410
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 
     // No wake-up reached the app, so the entry it announced goes too.
-    assert_eq!(get_entry(&env, canister_id, session_of(&first)), None);
-    assert!(is_endpoint_free(&env, canister_id, second));
+    assert_eq!(
+        get_entry(&env, canister_id, session_of(&first_account_session)),
+        None
+    );
+    assert!(is_endpoint_free(&env, canister_id, second_session));
 }
 
 #[test]
 fn should_hand_the_entry_only_to_its_apps_session_on_its_browser() {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
-    let session = session_of(&first);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
+    let session = session_of(&first_account_session);
     // The same identity at another app on the same browser, which has rotated its key.
     let other_app = second_app_on_the_same_browser(&env, canister_id, anchor);
     // The same identity at the same app on another browser.
@@ -979,22 +1024,28 @@ fn should_hand_the_entry_only_to_its_apps_session_on_its_browser() {
         session_request(anchor, APP, &BrowserKey::new(3)),
     ));
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 
-    let expected = Some(PwaNotification {
+    let expected_notification = Some(PwaNotification {
         canister_id: app_sender(),
         id: 1,
     });
-    assert_eq!(get_entry(&env, canister_id, session), expected);
+    assert_eq!(get_entry(&env, canister_id, session), expected_notification);
     assert_eq!(get_entry(&env, canister_id, other_app), None);
     assert_eq!(get_entry(&env, canister_id, other_browser), None);
 
     // Removing from either of the others leaves the entry where it is.
     remove_entry(&env, canister_id, other_app);
     remove_entry(&env, canister_id, other_browser);
-    assert_eq!(get_entry(&env, canister_id, session), expected);
+    assert_eq!(get_entry(&env, canister_id, session), expected_notification);
 
     remove_entry(&env, canister_id, session);
     assert_eq!(get_entry(&env, canister_id, session), None);
@@ -1018,14 +1069,20 @@ fn second_app_on_the_same_browser(
 #[test]
 fn should_keep_the_subscription_and_its_endpoint_across_an_upgrade() {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 }
@@ -1033,18 +1090,33 @@ fn should_keep_the_subscription_and_its_endpoint_across_an_upgrade() {
 #[test]
 fn should_drop_the_entry_a_failed_wake_up_announced() {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
 
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 500),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            500
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 
     // No wake-up is coming for it, so nothing is left for the app to read.
-    assert_eq!(get_entry(&env, canister_id, session_of(&first)), None);
+    assert_eq!(
+        get_entry(&env, canister_id, session_of(&first_account_session)),
+        None
+    );
     // The subscription stays: only a gone relay drops it.
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 2, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            2,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 }
@@ -1053,11 +1125,17 @@ fn should_drop_the_entry_a_failed_wake_up_announced() {
 fn should_keep_the_entry_for_the_installed_app_when_the_browser_switches_delivery_off(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
     // The browser entry the installed app shares also points at a Home Screen app.
     super::link_app(&env, canister_id, anchor, 1, 50);
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 
@@ -1071,7 +1149,7 @@ fn should_keep_the_entry_for_the_installed_app_when_the_browser_switches_deliver
     )?
     .expect("switching delivery off refused");
 
-    assert!(get_entry(&env, canister_id, session_of(&first)).is_some());
+    assert!(get_entry(&env, canister_id, session_of(&first_account_session)).is_some());
     Ok(())
 }
 
@@ -1088,7 +1166,7 @@ fn should_read_the_identity_across_an_upgrade_and_a_rollback_with_entries_waitin
     );
     let anchor = flows::register_anchor(&env, canister_id);
     let browser = BrowserKey::new(1);
-    let signed_in = sign_in(
+    let account_session = sign_in(
         &env,
         canister_id,
         principal_1(),
@@ -1109,7 +1187,7 @@ fn should_read_the_identity_across_an_upgrade_and_a_rollback_with_entries_waitin
     )?
     .expect("subscribe refused");
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 201),
+        deliver(&env, canister_id, account_session.account_principal, 1, 201),
         vec![BROWSER_ENDPOINT.to_string()]
     );
 
@@ -1122,7 +1200,7 @@ fn should_read_the_identity_across_an_upgrade_and_a_rollback_with_entries_waitin
     )?
     .expect("reading the identity after the upgrade");
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 2, 201),
+        deliver(&env, canister_id, account_session.account_principal, 2, 201),
         vec![BROWSER_ENDPOINT.to_string()]
     );
 
@@ -1150,7 +1228,7 @@ fn should_read_the_identity_across_an_upgrade_and_a_rollback_with_entries_waitin
 fn should_refuse_an_endpoint_taken_over_from_a_slot_a_rollback_emptied(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
     // The previous release decodes the config without its installed app subscriptions and
     // writes it back without them, which leaves the endpoint indexed for an empty slot.
     upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
@@ -1159,15 +1237,15 @@ fn should_refuse_an_endpoint_taken_over_from_a_slot_a_rollback_emptied(
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     // Nothing holds the endpoint any more, so another identity takes it.
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(is_endpoint_free(&env, canister_id, second));
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(is_endpoint_free(&env, canister_id, second_session));
 
     // It is that identity's now, which keys other than its own cannot take.
     assert_eq!(
         subscribe_pwa_webpush(
             &env,
             canister_id,
-            session_of(&first),
+            session_of(&first_account_session),
             PWA_ENDPOINT,
             p256dh(9),
             &TEST_AUTH_SECRET
@@ -1180,7 +1258,7 @@ fn should_refuse_an_endpoint_taken_over_from_a_slot_a_rollback_emptied(
 #[test]
 fn should_keep_waking_the_installed_app_once_its_account_is_named() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
 
     // Naming the unreserved default account gives it a number, under the same principal.
     update_account(
@@ -1197,12 +1275,18 @@ fn should_keep_waking_the_installed_app_once_its_account_is_named() -> Result<()
     .expect("naming the account refused");
 
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
     // The endpoint is still held, under the number the account was given.
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
-    assert!(!is_endpoint_free(&env, canister_id, second));
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert!(!is_endpoint_free(&env, canister_id, second_session));
     Ok(())
 }
 
@@ -1211,8 +1295,8 @@ fn should_count_an_installed_app_delivery_under_the_path_it_was_posted_by() {
     let env = env();
     // The browser's own subscription posts by a relay counted as `other`, and the
     // installed app's by Firebase Cloud Messaging, counted as `chrome`.
-    let (canister_id, _, signed_in) = install_signed_in(&env, None, None);
-    let session = session_of(&signed_in);
+    let (canister_id, _, account_session) = install_signed_in(&env, None, None);
+    let session = session_of(&account_session);
     subscribe_pwa_webpush(
         &env,
         canister_id,
@@ -1224,7 +1308,7 @@ fn should_count_an_installed_app_delivery_under_the_path_it_was_posted_by() {
     .expect("subscribe rejected")
     .expect("subscribe refused");
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        deliver(&env, canister_id, account_session.account_principal, 1, 200),
         vec![FCM_ENDPOINT.to_string()]
     );
 
@@ -1277,8 +1361,8 @@ fn name_default_account(
 #[test]
 fn should_hand_over_an_entry_queued_before_its_account_was_named() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
-    let session = session_of(&first);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
+    let session = session_of(&first_account_session);
     // Another account of the same identity at the same app, on the same browser.
     let other_account = create_account(
         &env,
@@ -1300,17 +1384,23 @@ fn should_hand_over_an_entry_queued_before_its_account_was_named() -> Result<(),
         },
     ));
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
 
     name_default_account(&env, canister_id, anchor)?;
 
-    let expected = Some(PwaNotification {
+    let expected_notification = Some(PwaNotification {
         canister_id: app_sender(),
         id: 1,
     });
-    assert_eq!(get_entry(&env, canister_id, session), expected);
+    assert_eq!(get_entry(&env, canister_id, session), expected_notification);
     assert_eq!(get_entry(&env, canister_id, other_session), None);
     remove_entry(&env, canister_id, session);
     assert_eq!(get_entry(&env, canister_id, session), None);
@@ -1321,21 +1411,33 @@ fn should_hand_over_an_entry_queued_before_its_account_was_named() -> Result<(),
 fn should_wake_the_installed_app_for_a_notification_waiting_while_its_account_was_named(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
     // Reads the sender list, so the next send is accepted at once.
-    deliver(&env, canister_id, first.account_principal, 1, 200);
+    deliver(
+        &env,
+        canister_id,
+        first_account_session.account_principal,
+        1,
+        200,
+    );
     // A relay no wake-up was posted to yet, so the next one waits in the backlog for its
     // probe, which nothing answers until the account is named.
     subscribe_pwa_webpush(
         &env,
         canister_id,
-        session_of(&first),
+        session_of(&first_account_session),
         UNPROBED_PWA_ENDPOINT,
         p256dh(9),
         &TEST_AUTH_SECRET,
     )?
     .expect("subscribe refused");
-    send_accepted(&env, canister_id, first.account_principal, 2, 200);
+    send_accepted(
+        &env,
+        canister_id,
+        first_account_session.account_principal,
+        2,
+        200,
+    );
 
     name_default_account(&env, canister_id, anchor)?;
 
@@ -1351,8 +1453,8 @@ fn should_count_each_copy_under_the_path_it_was_posted_by() -> Result<(), Reject
     let env = env();
     // The first browser holds the installed app on Firebase Cloud Messaging, counted as
     // `chrome`, and a subscription of its own counted as `other`.
-    let (canister_id, anchor, signed_in) = install_signed_in(&env, None, None);
-    let session = session_of(&signed_in);
+    let (canister_id, anchor, account_session) = install_signed_in(&env, None, None);
+    let session = session_of(&account_session);
     subscribe_pwa_webpush(
         &env,
         canister_id,
@@ -1385,10 +1487,10 @@ fn should_count_each_copy_under_the_path_it_was_posted_by() -> Result<(), Reject
         },
     )?
     .expect("subscribe refused");
-    let mut pushed = deliver(&env, canister_id, signed_in.account_principal, 1, 200);
-    pushed.sort();
+    let mut pushed_urls = deliver(&env, canister_id, account_session.account_principal, 1, 200);
+    pushed_urls.sort();
     assert_eq!(
-        pushed,
+        pushed_urls,
         vec![FCM_ENDPOINT.to_string(), MOZILLA_ENDPOINT.to_string()]
     );
 
@@ -1450,11 +1552,23 @@ fn reply(env: &PocketIc, request: &CanisterHttpRequest, status: u16, body: Vec<u
 fn should_drop_the_subscription_a_wake_up_in_flight_while_its_account_was_named_finds_gone(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
-    let second = session_of(&second_identity_at(&env, canister_id, APP));
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
+    let second_session = session_of(&second_identity_at(&env, canister_id, APP));
     // Reads the sender list and probes the relay, so the next wake-up is posted at once.
-    deliver(&env, canister_id, first.account_principal, 1, 200);
-    send_accepted(&env, canister_id, first.account_principal, 2, 200);
+    deliver(
+        &env,
+        canister_id,
+        first_account_session.account_principal,
+        1,
+        200,
+    );
+    send_accepted(
+        &env,
+        canister_id,
+        first_account_session.account_principal,
+        2,
+        200,
+    );
     let wake_up = hold_wake_up(&env);
     assert_eq!(wake_up.url, PWA_ENDPOINT);
 
@@ -1462,7 +1576,7 @@ fn should_drop_the_subscription_a_wake_up_in_flight_while_its_account_was_named_
     reply(&env, &wake_up, 404, vec![]);
     answer_outcalls(&env, 200);
 
-    assert!(is_endpoint_free(&env, canister_id, second));
+    assert!(is_endpoint_free(&env, canister_id, second_session));
     Ok(())
 }
 
@@ -1470,7 +1584,7 @@ fn should_drop_the_subscription_a_wake_up_in_flight_while_its_account_was_named_
 fn should_deliver_for_the_account_that_subscribed_the_installed_app_last(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
     let other_account = create_account(
         &env,
         canister_id,
@@ -1482,7 +1596,7 @@ fn should_deliver_for_the_account_that_subscribed_the_installed_app_last(
     .expect("creating the account refused")
     .account_number;
     // The same installed app on the same browser, signed in to the other account.
-    let other = sign_in(
+    let other_account_session = sign_in(
         &env,
         canister_id,
         principal_1(),
@@ -1494,7 +1608,7 @@ fn should_deliver_for_the_account_that_subscribed_the_installed_app_last(
     subscribe_pwa_webpush(
         &env,
         canister_id,
-        session_of(&other),
+        session_of(&other_account_session),
         PWA_ENDPOINT,
         p256dh(9),
         &TEST_AUTH_SECRET,
@@ -1502,11 +1616,23 @@ fn should_deliver_for_the_account_that_subscribed_the_installed_app_last(
     .expect("subscribe refused");
 
     assert_eq!(
-        deliver(&env, canister_id, other.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            other_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 2, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            2,
+            200
+        ),
         vec![BROWSER_ENDPOINT.to_string()]
     );
     // One subscription on the browser, the other account's: removing from the first
@@ -1514,12 +1640,18 @@ fn should_deliver_for_the_account_that_subscribed_the_installed_app_last(
     app_set_pwa_webpush_subscription(
         &env,
         canister_id,
-        session_of(&first),
+        session_of(&first_account_session),
         AppSetPwaWebPushSubscriptionRequest { subscription: None },
     )?
     .expect("remove refused");
     assert_eq!(
-        deliver(&env, canister_id, other.account_principal, 3, 200),
+        deliver(
+            &env,
+            canister_id,
+            other_account_session.account_principal,
+            3,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
     Ok(())
@@ -1580,7 +1712,7 @@ fn should_drop_only_the_revoked_apps_entries() -> Result<(), RejectResponse> {
 #[test]
 fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, first) = install_subscribed(&env);
+    let (canister_id, anchor, first_account_session) = install_subscribed(&env);
     // The same browser at the other app, which has no installed app and is woken through
     // the browser's own subscription.
     let browser = BrowserKey::new(1).successor();
@@ -1594,7 +1726,13 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
         .expect("grant refused");
     let browser_key = browser.successor().principal();
     assert_eq!(
-        deliver(&env, canister_id, first.account_principal, 1, 200),
+        deliver(
+            &env,
+            canister_id,
+            first_account_session.account_principal,
+            1,
+            200
+        ),
         vec![PWA_ENDPOINT.to_string()]
     );
     send_accepted_from(
@@ -1616,7 +1754,7 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
             browser_key,
             GetNotificationRequest {
                 anchor_number: anchor,
-                browser_id: first.browser_id,
+                browser_id: first_account_session.browser_id,
                 inbox_notification_id,
             },
         )
@@ -1625,7 +1763,7 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
         .notification
         .map(|notification| notification.id)
     };
-    let both_held = |read: &dyn Fn(InboxNotificationId) -> Option<u64>| {
+    let assert_both_entries_held = |read: &dyn Fn(InboxNotificationId) -> Option<u64>| {
         assert_eq!(read(0), Some(1), "the installed app's entry");
         assert_eq!(read(1), Some(2), "the browser's own entry");
     };
@@ -1644,9 +1782,9 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
         },
     )?
     .expect("subscribe refused");
-    both_held(&read);
+    assert_both_entries_held(&read);
     assert_eq!(
-        get_entry(&env, canister_id, session_of(&first)),
+        get_entry(&env, canister_id, session_of(&first_account_session)),
         Some(PwaNotification {
             canister_id: app_sender(),
             id: 1,
@@ -1666,7 +1804,7 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
         answer_outcalls(&env, 404),
         vec![format!("{BROWSER_ENDPOINT}/moved")]
     );
-    both_held(&read);
+    assert_both_entries_held(&read);
 
     // The identity signs the browser out, and it signs in again.
     revoke_browser_sessions(
@@ -1675,7 +1813,7 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
         principal_1(),
         RevokeBrowserSessionsRequest {
             identity_number: anchor,
-            browser_id: first.browser_id,
+            browser_id: first_account_session.browser_id,
         },
     )?
     .expect("sign-out refused");
@@ -1694,7 +1832,7 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
             browser_key,
             GetNotificationRequest {
                 anchor_number: anchor,
-                browser_id: first.browser_id,
+                browser_id: first_account_session.browser_id,
                 inbox_notification_id,
             },
         )
@@ -1703,24 +1841,36 @@ fn should_leave_the_inbox_as_it_is_when_a_subscription_changes() -> Result<(), R
         .notification
         .map(|notification| notification.id)
     };
-    both_held(&read_again);
+    assert_both_entries_held(&read_again);
     Ok(())
 }
 
 #[test]
 fn should_count_a_push_whose_entry_was_collected_before_its_answer() {
     let env = env();
-    let (canister_id, _, first) = install_subscribed(&env);
+    let (canister_id, _, first_account_session) = install_subscribed(&env);
     // Reads the sender list and probes the relay, so the next wake-up is posted at once.
-    deliver(&env, canister_id, first.account_principal, 1, 200);
-    send_accepted(&env, canister_id, first.account_principal, 2, 200);
+    deliver(
+        &env,
+        canister_id,
+        first_account_session.account_principal,
+        1,
+        200,
+    );
+    send_accepted(
+        &env,
+        canister_id,
+        first_account_session.account_principal,
+        2,
+        200,
+    );
     let wake_up = hold_wake_up(&env);
 
     // The app collects the entry before the push service has answered the post.
     app_remove_pwa_notification(
         &env,
         canister_id,
-        session_of(&first),
+        session_of(&first_account_session),
         AppRemovePwaNotificationRequest {
             inbox_notification_id: 1,
             not_shown: None,
@@ -1875,16 +2025,22 @@ fn should_answer_pending_to_an_installed_app_until_the_vapid_key_is_held(
 #[test]
 fn should_drop_only_the_entry_a_gone_wake_up_announced() -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, signed_in) = install_signed_in(&env, None, None);
+    let (canister_id, anchor, account_session) = install_signed_in(&env, None, None);
     for id in 1..=2 {
         assert_eq!(
-            deliver(&env, canister_id, signed_in.account_principal, id, 200),
+            deliver(
+                &env,
+                canister_id,
+                account_session.account_principal,
+                id,
+                200
+            ),
             vec![BROWSER_ENDPOINT.to_string()]
         );
     }
 
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 3, 404),
+        deliver(&env, canister_id, account_session.account_principal, 3, 404),
         vec![BROWSER_ENDPOINT.to_string()]
     );
 
@@ -1895,7 +2051,7 @@ fn should_drop_only_the_entry_a_gone_wake_up_announced() -> Result<(), RejectRes
             BrowserKey::new(1).successor().principal(),
             GetNotificationRequest {
                 anchor_number: anchor,
-                browser_id: signed_in.browser_id,
+                browser_id: account_session.browser_id,
                 inbox_notification_id,
             },
         )
@@ -1914,9 +2070,9 @@ fn should_drop_only_the_entry_a_gone_wake_up_announced() -> Result<(), RejectRes
 fn should_refuse_a_signed_out_browser_its_inbox_until_it_signs_in_again(
 ) -> Result<(), RejectResponse> {
     let env = env();
-    let (canister_id, anchor, signed_in) = install_signed_in(&env, None, None);
+    let (canister_id, anchor, account_session) = install_signed_in(&env, None, None);
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
+        deliver(&env, canister_id, account_session.account_principal, 1, 200),
         vec![BROWSER_ENDPOINT.to_string()]
     );
     let read = |browser_key| {
@@ -1926,7 +2082,7 @@ fn should_refuse_a_signed_out_browser_its_inbox_until_it_signs_in_again(
             browser_key,
             GetNotificationRequest {
                 anchor_number: anchor,
-                browser_id: signed_in.browser_id,
+                browser_id: account_session.browser_id,
                 inbox_notification_id: FIRST_ENTRY,
             },
         )
@@ -1957,7 +2113,7 @@ fn should_refuse_a_signed_out_browser_its_inbox_until_it_signs_in_again(
         principal_1(),
         RevokeBrowserSessionsRequest {
             identity_number: anchor,
-            browser_id: signed_in.browser_id,
+            browser_id: account_session.browser_id,
         },
     )?
     .expect("sign-out refused");

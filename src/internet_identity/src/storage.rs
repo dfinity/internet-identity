@@ -2160,9 +2160,9 @@ impl<M: Memory + Clone> Storage<M> {
             now,
             writes,
         )?;
-        let written = self.apply_account_state(anchor, validated);
+        let account_state = self.apply_account_state(anchor, validated);
         self.remove_pwa_webpush_subscriptions_of_browsers(anchor_number, &given_up);
-        Ok(written)
+        Ok(account_state)
     }
 
     /// Browsers this write gives up, whose sessions have to go with them.
@@ -3228,7 +3228,7 @@ impl<M: Memory + Clone> Storage<M> {
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
                 // An app's entry whose account no longer resolves is gone too.
-                queue.retain(|queued| match queued.kind {
+                queue.retain(|queued_notification| match queued_notification.kind {
                     InboxNotificationKind::App { account_principal } => self
                         .lookup_account_with_principal(account_principal)
                         .is_some_and(|account| {
@@ -3280,7 +3280,7 @@ impl<M: Memory + Clone> Storage<M> {
         key: (AnchorNumber, ApplicationNumber),
         config: Option<AnchorApplicationConfig>,
     ) {
-        let previous = match &config {
+        let previous_config = match &config {
             Some(config) => self
                 .stable_anchor_application_config_memory
                 .insert(key, config.clone()),
@@ -3290,7 +3290,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.sync_pwa_webpush_subscription_with_endpoint_index(
             anchor_number,
             application_number,
-            previous
+            previous_config
                 .as_ref()
                 .and_then(|config| config.pwa_webpush_subscriptions.as_ref()),
             config
@@ -3299,28 +3299,29 @@ impl<M: Memory + Clone> Storage<M> {
         );
     }
 
-    /// Adds the endpoints `current` holds that `previous` did not, and removes the ones it
-    /// dropped where the lookup still names this row.
+    /// Adds the endpoints `current_subscriptions` holds that `previous_subscriptions` did
+    /// not, and removes the ones it dropped where the lookup still names this row.
     fn sync_pwa_webpush_subscription_with_endpoint_index(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        previous: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
-        current: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+        previous_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+        current_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
     ) {
         let previous_holders =
-            pwa_subscription_holders(anchor_number, application_number, previous);
-        let current_holders = pwa_subscription_holders(anchor_number, application_number, current);
+            pwa_subscription_holders(anchor_number, application_number, previous_subscriptions);
+        let current_holders =
+            pwa_subscription_holders(anchor_number, application_number, current_subscriptions);
 
         for (endpoint_hash, holder) in previous_holders.difference(&current_holders) {
-            let Some(indexed) = self
+            let Some(indexed_holder) = self
                 .lookup_pwa_webpush_subscription_with_endpoint_memory
                 .get(endpoint_hash)
             else {
                 continue;
             };
             // Another row took this endpoint over, and the entry is that row's now.
-            if indexed != *holder {
+            if indexed_holder != *holder {
                 continue;
             }
             self.lookup_pwa_webpush_subscription_with_endpoint_memory
@@ -3328,19 +3329,19 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         for (endpoint_hash, holder) in current_holders.difference(&previous_holders) {
-            if let Some(indexed) = self
+            if let Some(indexed_holder) = self
                 .lookup_pwa_webpush_subscription_with_endpoint_memory
                 .get(endpoint_hash)
             {
-                if indexed == *holder {
+                if indexed_holder == *holder {
                     continue;
                 }
                 // An entry whose slot no longer holds the endpoint, which a config written
                 // by a release that does not know the slots leaves behind, is replaced.
-                if self.holds_pwa_endpoint(indexed, endpoint_hash) {
+                if self.holds_pwa_endpoint(indexed_holder, endpoint_hash) {
                     ic_cdk::println!(
                         "ERROR: an installed app endpoint is held by two subscriptions; the \
-                         lookup keeps {indexed:?} rather than {holder:?}"
+                         lookup keeps {indexed_holder:?} rather than {holder:?}"
                     );
                     continue;
                 }
@@ -3359,7 +3360,7 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> bool {
         self.anchor_application_config(holder.anchor_number, holder.application_number)
             .and_then(|config| config.pwa_webpush_subscriptions?.remove(&holder.browser_id))
-            .is_some_and(|held| match held.subscription {
+            .is_some_and(|held_subscription| match held_subscription.subscription {
                 StorableWebPushSubscription::Ready { endpoint, .. } => {
                     endpoint_sha256(&endpoint) == *endpoint_hash
                 }
@@ -3378,25 +3379,31 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Puts `subscription` in `holder`'s slot, or with `None` empties it, after emptying
-    /// `displaced`'s slot where one is given. Both configs must exist: a config is started
-    /// only by the account state write, so a missing one is refused, before anything is
-    /// written.
+    /// `displaced_holder`'s slot where one is given. Both configs must exist: a config is
+    /// started only by the account state write, so a missing one is refused, before
+    /// anything is written.
     pub fn write_pwa_webpush_subscription(
         &mut self,
         holder: PwaSubscriptionHolder,
         subscription: Option<PwaSubscription>,
-        displaced: Option<PwaSubscriptionHolder>,
+        displaced_holder: Option<PwaSubscriptionHolder>,
     ) -> Result<(), StorageError> {
-        let displaced_config = match displaced {
-            Some(displaced) => Some((displaced, self.pwa_subscription_config(displaced)?)),
+        let displaced_config = match displaced_holder {
+            Some(displaced_holder) => Some((
+                displaced_holder,
+                self.pwa_subscription_config(displaced_holder)?,
+            )),
             None => None,
         };
         self.pwa_subscription_config(holder)?;
 
-        if let Some((displaced, mut config)) = displaced_config {
-            config.set_pwa_webpush_subscription(displaced.browser_id, None);
+        if let Some((displaced_holder, mut config)) = displaced_config {
+            config.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
             self.store_anchor_application_config(
-                (displaced.anchor_number, displaced.application_number),
+                (
+                    displaced_holder.anchor_number,
+                    displaced_holder.application_number,
+                ),
                 Some(config),
             );
         }
@@ -3419,14 +3426,14 @@ impl<M: Memory + Clone> Storage<M> {
         subscription: ReadySubscription,
     ) -> Result<(), StorageError> {
         let mut config = self.pwa_subscription_config(holder)?;
-        let Some(held) = config.pwa_webpush_subscription(holder.browser_id) else {
+        let Some(held_subscription) = config.pwa_webpush_subscription(holder.browser_id) else {
             return Ok(());
         };
         config.set_pwa_webpush_subscription(
             holder.browser_id,
             Some(PwaSubscription {
                 subscription: WebPushSubscription::Ready(subscription),
-                account_principal: held.account_principal,
+                account_principal: held_subscription.account_principal,
             }),
         );
         self.store_anchor_application_config(

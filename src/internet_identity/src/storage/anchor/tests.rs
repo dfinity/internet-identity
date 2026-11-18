@@ -1647,19 +1647,19 @@ mod browser_tests {
             )
             .unwrap();
         let browser = anchor.browser(id).expect("a listed browser").clone();
-        let mut current = Vec::new();
-        minicbor::encode(StorableBrowser::from(browser), &mut current).expect("encoding it");
+        let mut current_bytes = Vec::new();
+        minicbor::encode(StorableBrowser::from(browser), &mut current_bytes).expect("encoding it");
 
         // The same map with one entry more: key 11, holding one entry in the shape it had,
         // an app's notification for an account by number.
-        let header = *current.first().expect("a map header");
+        let header = *current_bytes.first().expect("a map header");
         assert!(
             (0xa0..0xb7).contains(&header),
             "a map of fewer than 23 keys"
         );
-        let mut retired = vec![header + 1];
-        retired.extend_from_slice(current.get(1..).expect("the map's entries"));
-        let mut encoder = minicbor::Encoder::new(&mut retired);
+        let mut retired_bytes = vec![header + 1];
+        retired_bytes.extend_from_slice(current_bytes.get(1..).expect("the map's entries"));
+        let mut encoder = minicbor::Encoder::new(&mut retired_bytes);
         encoder.u8(11).unwrap().array(1).unwrap().map(6).unwrap();
         encoder.u8(0).unwrap().u64(1).unwrap();
         encoder.u8(6).unwrap().u64(0).unwrap();
@@ -1668,14 +1668,16 @@ mod browser_tests {
         encoder.u8(3).unwrap().u64(u64::MAX).unwrap();
         encoder.u8(4).unwrap().u64(3).unwrap();
 
-        let read = Browser::from(
-            minicbor::decode::<StorableBrowser>(&retired).expect("decoding the retired shape"),
+        let decoded_browser = Browser::from(
+            minicbor::decode::<StorableBrowser>(&retired_bytes)
+                .expect("decoding the retired shape"),
         );
-        assert!(read.notifications.is_empty());
+        assert!(decoded_browser.notifications.is_empty());
 
-        let mut rewritten = Vec::new();
-        minicbor::encode(StorableBrowser::from(read), &mut rewritten).expect("encoding it");
-        assert_eq!(rewritten, current);
+        let mut rewritten_bytes = Vec::new();
+        minicbor::encode(StorableBrowser::from(decoded_browser), &mut rewritten_bytes)
+            .expect("encoding it");
+        assert_eq!(rewritten_bytes, current_bytes);
     }
 
     #[test]

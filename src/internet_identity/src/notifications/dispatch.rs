@@ -381,9 +381,9 @@ fn post_pass(deliveries: Vec<Delivery>, now_ns: Timestamp) {
 /// service worker can do nothing with: it is not posted, and its entry is taken out of
 /// the inbox rather than left to block what arrives next.
 fn seal_and_post(mut deliveries: Vec<Delivery>, pass_bytes: &[u8; 32], now_ns: Timestamp) {
-    let superseded = seal_pass(&mut deliveries, pass_bytes, now_ns);
+    let superseded_indices = seal_pass(&mut deliveries, pass_bytes, now_ns);
     for (index, delivery) in deliveries.into_iter().enumerate() {
-        if superseded.contains(&index) {
+        if superseded_indices.contains(&index) {
             settle(&delivery, PostOutcome::Superseded);
             continue;
         }
@@ -1212,7 +1212,7 @@ fn seal_pass(
         .map(|delivery| (destination_of(delivery), delivery.sealing.last_rotated_ns))
         .collect();
 
-    let mut superseded = BTreeSet::new();
+    let mut superseded_indices = BTreeSet::new();
     if !candidates.is_empty() {
         let sender = rotation::pass_sender(pass_bytes);
         for destination in rotation::stalest(candidates, rotation::ROTATIONS_PER_PASS) {
@@ -1225,7 +1225,7 @@ fn seal_pass(
             };
             // On the registration, not the destination: a Home Screen app's is shared,
             // and the wake-ups through it come from different identities and browsers.
-            let planned_for_it = |delivery: &Delivery| {
+            let is_planned_for_destination = |delivery: &Delivery| {
                 destination_of(delivery).registration() == destination.registration()
                     && delivery.endpoint == endpoint
                     && delivery.subscriber_key == subscriber_key
@@ -1234,12 +1234,12 @@ fn seal_pass(
                 // Onto every wake-up for that registration, not only the one that was
                 // picked: a stale copy left on the others would seal against a key the
                 // header does not name.
-                Ok(rotation::Refresh::Refreshed(refreshed)) => {
+                Ok(rotation::Refresh::Refreshed(refreshed_sealing)) => {
                     for delivery in deliveries
                         .iter_mut()
-                        .filter(|delivery| planned_for_it(delivery))
+                        .filter(|delivery| is_planned_for_destination(delivery))
                     {
-                        delivery.sealing = refreshed.clone();
+                        delivery.sealing = refreshed_sealing.clone();
                     }
                 }
                 Ok(rotation::Refresh::Absent) => {}
@@ -1247,8 +1247,8 @@ fn seal_pass(
                 // posted to the old endpoint, which no device can open.
                 Ok(rotation::Refresh::Replaced) => {
                     for (index, delivery) in deliveries.iter().enumerate() {
-                        if planned_for_it(delivery) {
-                            superseded.insert(index);
+                        if is_planned_for_destination(delivery) {
+                            superseded_indices.insert(index);
                         }
                     }
                 }
@@ -1260,7 +1260,7 @@ fn seal_pass(
     }
 
     for (index, delivery) in deliveries.iter_mut().enumerate() {
-        if superseded.contains(&index) {
+        if superseded_indices.contains(&index) {
             continue;
         }
         let Some(deposited) = delivery.notification.clone() else {
@@ -1275,7 +1275,7 @@ fn seal_pass(
             payload::salt_at(pass_bytes, index),
         );
     }
-    superseded
+    superseded_indices
 }
 
 fn destination_of(delivery: &Delivery) -> rotation::Destination {
@@ -2372,9 +2372,9 @@ mod tests {
         subscribe(recipient, browsers[0], ROTATED, SECOND_NS);
         let replacement = stored_subscription(recipient, browsers[0]);
 
-        let superseded = seal_pass(&mut deliveries, &[0u8; 32], 2 * SECOND_NS);
+        let superseded_indices = seal_pass(&mut deliveries, &[0u8; 32], 2 * SECOND_NS);
 
-        assert_eq!(superseded, BTreeSet::from([0]));
+        assert_eq!(superseded_indices, BTreeSet::from([0]));
         assert!(deliveries.iter().all(|delivery| delivery.body.is_none()));
         assert_eq!(stored_subscription(recipient, browsers[0]), replacement);
         for delivery in &deliveries {

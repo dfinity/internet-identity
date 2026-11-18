@@ -116,12 +116,12 @@ impl AnchorApplicationConfig {
     /// The installed app subscription on `browser_id`. One that does not read back reads
     /// as none, which the app recovers from by subscribing again.
     pub fn pwa_webpush_subscription(&self, browser_id: BrowserId) -> Option<PwaSubscription> {
-        let stored = self
+        let stored_subscription = self
             .pwa_webpush_subscriptions
             .as_ref()?
             .get(&browser_id)?
             .clone();
-        PwaSubscription::try_from(stored)
+        PwaSubscription::try_from(stored_subscription)
             .inspect_err(|reason| {
                 ic_cdk::println!(
                     "ERROR: dropped the installed app subscription of browser {browser_id} as unreadable: {reason}"
@@ -157,14 +157,14 @@ impl AnchorApplicationConfig {
     }
 }
 
-/// Puts `value` on `browser_id` in `held`, or with `None` empties it. A map holding
-/// nothing is stored as `None`.
+/// Puts `value` on `browser_id` in `entries_by_browser`, or with `None` empties it. A
+/// map holding nothing is stored as `None`.
 fn put<T>(
-    held: &mut Option<BTreeMap<StorableBrowserId, T>>,
+    entries_by_browser: &mut Option<BTreeMap<StorableBrowserId, T>>,
     browser_id: BrowserId,
     value: Option<T>,
 ) {
-    let mut entries = held.take().unwrap_or_default();
+    let mut entries = entries_by_browser.take().unwrap_or_default();
     match value {
         Some(value) => {
             entries.insert(browser_id, value);
@@ -173,21 +173,22 @@ fn put<T>(
             entries.remove(&browser_id);
         }
     }
-    *held = (!entries.is_empty()).then_some(entries);
+    *entries_by_browser = (!entries.is_empty()).then_some(entries);
 }
 
-/// Empties every browser entry in `browser_ids` in `held`, answering whether any was held.
+/// Empties every browser entry in `browser_ids` in `entries_by_browser`, answering
+/// whether any was held.
 fn remove_browsers<T>(
-    held: &mut Option<BTreeMap<StorableBrowserId, T>>,
+    entries_by_browser: &mut Option<BTreeMap<StorableBrowserId, T>>,
     browser_ids: &BTreeSet<StorableBrowserId>,
 ) -> bool {
-    let Some(mut entries) = held.take() else {
+    let Some(mut entries) = entries_by_browser.take() else {
         return false;
     };
     let held_count = entries.len();
     entries.retain(|browser_id, _| !browser_ids.contains(browser_id));
     let has_removed = entries.len() != held_count;
-    *held = (!entries.is_empty()).then_some(entries);
+    *entries_by_browser = (!entries.is_empty()).then_some(entries);
     has_removed
 }
 

@@ -2,7 +2,8 @@
 
 ## Names
 
-- `style/names-say-what` Name things for what they are and do. Values and types are nouns, functions are verbs, predicates are `is_*`/`has_*`/`should_*` (`isOpen`, `isLoading` in TS). Never use an adjective for a binding (`cleared`, `available`): say what it holds (`num_available_slots`).
+- `style/names-say-what` Name things for what they are and do. Values and types are nouns, functions are verbs, predicates are `is_*`/`has_*`/`should_*` (`isOpen`, `isLoading` in TS).
+- `style/keep-the-noun` A name that qualifies a value keeps the noun it qualifies: `previous_config`, not `previous`; `num_available_slots`, not `available`; `pending_transport`, not `pending`. This holds for locals, parameters, closure parameters and fields alike. Never drop the noun to save space, and never leave a bare adjective, participle or ordinal (`cleared`, `stored`, `first`) as a binding.
 - `style/lookup-does-not-write` A function named like a lookup must not write. Use `ensure_*` for get-or-create, `check_*` for a pure check, `validate_*` for a check that returns the reason it failed.
 - `style/unabbreviated-names` Prefer long, unabbreviated names over short ones, locals included (`existing_devices`, not `devs`; no `cb`, `cfg`). Reuse the terms the surrounding code and UI already use, and don't coin new ones unless the design introduces the concept.
 - `style/units-in-names` Put the unit in the name of every quantity: `_ns`, `_SECS`, `_MILLIS`, `_BYTES` (`expires_at_ns`, `MAX_SESSION_KEY_BYTES`). Don't rename a shipped candid field just to add one.
@@ -13,7 +14,7 @@
 
 Reviewers remove more comments than they ask for. Make the code say it first: let names carry the meaning, and write a comment only for what the code cannot say.
 
-- `style/fix-dont-explain` Fix the code rather than explain it. Remove hidden catches, implicit fallbacks and surprising behaviour instead of commenting on them. A *why* comment is only for the rare case where the code genuinely can't be made clearer: then name the constraint, the threat guarded against, the bug avoided or where a value comes from. Never narrate what the next line does.
+- `style/fix-dont-explain` Fix the code rather than explain it. Remove hidden catches, implicit fallbacks and surprising behaviour instead of commenting on them. A _why_ comment is only for the rare case where the code genuinely can't be made clearer: then name the constraint, the threat guarded against, the bug avoided or where a value comes from. Never narrate what the next line does.
 - `style/doc-comments-required` Every constant and every new type gets a doc comment. A module that implements a non-trivial mechanism opens with a doc comment stating the problem it solves and how.
 - `style/self-contained-doc-comments` Doc comments must make sense on their own: name every value, all arguments of the involved functions, and define all the terms they mention. Don't explain a function by pointing at its call site (unless this is a single-use function, in which case that should be indicated).
 - `style/comments-current-only` Comments describe the current code only. No history ("previously", "now uses"), no PR or issue numbers, no reasons for what is absent, no design-process justification ("we chose this because the reviewer..."). History belongs in git and the PR.
