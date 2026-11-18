@@ -924,6 +924,7 @@ fn remove_unanswered_pwa_webpush_subscriptions(
     let RemoveUnansweredPwaWebPushSubscriptionsRequest {
         anchor_number,
         origin,
+        account_principal,
     } = request;
     enabled_or(InternalCanisterError)?;
     let (anchor, browser_id) =
@@ -935,6 +936,7 @@ fn remove_unanswered_pwa_webpush_subscriptions(
         &anchor,
         browser_id,
         application_number,
+        account_principal,
         time(),
     );
     Ok(())
@@ -1402,7 +1404,11 @@ fn app_remove_pwa_notification(
         now,
     )
     .map_err(InternalCanisterError)?;
-    notifications::webpush::unanswered::reset(rotation::RegistrationId::Pwa(holder));
+    // Only the account the installed app delivers for answers for its subscription: a
+    // session of an account it no longer delivers for may still remove its own entries.
+    if pwa_subscription::delivers_for(holder, session.account_principal) {
+        notifications::webpush::unanswered::reset(rotation::RegistrationId::Pwa(holder));
+    }
     Ok(RemoveNotificationResponse {})
 }
 

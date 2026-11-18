@@ -7,34 +7,55 @@ import {
   notificationConsentSettledStore,
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
-import { checkNotificationPath } from "$lib/utils/notifications/repairPath";
+import {
+  checkNotificationPath,
+  type BrowserCalls,
+} from "$lib/utils/notifications/repairPath";
 import {
   readBrowserPushState,
   resolveOptIn,
 } from "$lib/utils/notifications/notificationState";
 import { waitForStore } from "$lib/utils/utils";
 import { claimScreen } from "$lib/stores/pendingScreen.store";
-import { handleError } from "$lib/components/utils/error";
+import { toaster } from "$lib/components/utils/toaster";
+import { t } from "$lib/stores/locale.store";
+import { failureMessage } from "$lib/utils/notifications/notificationDiagnostics";
+import {
+  browserKeyActor,
+  UnregisteredBrowserError,
+} from "$lib/utils/notifications/browserActor";
+import type { Principal } from "@icp-sdk/core/principal";
+
+/** How the check ended for the sign-in waiting on it: `done` whatever it found, or
+ *  `identity-changed` where the user switched identity or signed out meanwhile, so what
+ *  the sign-in minted is for an identity that is no longer the one chosen. */
+export type RepairOutcome = "done" | "identity-changed";
 
 /**
- * Checks, once the identity has signed in to `origin`, that this device still receives
- * the app's notifications, and puts the allow screen in front of the user where only
- * they can repair it. Holds the sign-in only while a path past its limit is probed.
+ * Checks, once the identity has signed in to `origin` as the account `accountPrincipal`
+ * names, that this device still receives the app's notifications, and puts the allow
+ * screen in front of the user where only they can repair it. Holds the sign-in only
+ * while a path past its limit is probed. `browserActor` is what signs as this browser.
  *
  * Resolves rather than rejects: the sign-in the app asked for is not the user's to lose
- * over a notification path, so a check that fails leaves the device as it was.
+ * over a notification path, so a check that fails is shown and leaves the device as it
+ * was.
  */
 export const repairNotificationPath = async ({
   identityNumber,
   origin,
+  accountPrincipal,
   actor,
+  browserActor = browserKeyActor,
 }: {
   identityNumber: bigint;
   origin: string;
+  accountPrincipal: Principal;
   actor: ActorSubclass<_SERVICE>;
-}): Promise<void> => {
+  browserActor?: (identityNumber: bigint) => Promise<BrowserCalls>;
+}): Promise<RepairOutcome> => {
   if (!get(PUSH_NOTIFICATIONS)) {
-    return;
+    return "done";
   }
   // Held only once a path is past its limit, which is when the check takes long enough
   // to show; released when the check, and the screen it may open, has settled.
@@ -42,15 +63,26 @@ export const repairNotificationPath = async ({
   // A switch to another identity ends a check that was about this one.
   const switched = new AbortController();
   const stopWatching = authenticationStore.subscribe((current) => {
-    if (current !== undefined && current.identityNumber !== identityNumber) {
+    if (current?.identityNumber !== identityNumber) {
       switched.abort(new IdentitySwitchedError());
     }
   });
   try {
+    let browser: BrowserCalls;
+    try {
+      browser = await browserActor(identityNumber);
+    } catch (error) {
+      if (error instanceof UnregisteredBrowserError) {
+        return "done";
+      }
+      throw error;
+    }
     const outcome = await checkNotificationPath({
       identityNumber,
       origin,
+      accountPrincipal,
       actor,
+      browser,
       onPastLimit: () => {
         releaseScreen ??= claimScreen();
       },
@@ -58,7 +90,7 @@ export const repairNotificationPath = async ({
     });
     switch (outcome.kind) {
       case "working":
-        return;
+        break;
       case "ask":
         await askToRepair({
           identityNumber,
@@ -66,15 +98,19 @@ export const repairNotificationPath = async ({
           actor,
           installFirst: outcome.installFirst,
         });
-        return;
+        break;
     }
+    return switched.signal.aborted ? "identity-changed" : "done";
   } catch (error) {
-    if (error instanceof IdentitySwitchedError) {
-      return;
+    if (switched.signal.aborted) {
+      return "identity-changed";
     }
-    // Shown, not thrown: the sign-in goes on, and the next one checks again.
     console.error(error);
-    handleError(error);
+    toaster.error({
+      title: t`Notifications unavailable`,
+      description: failureMessage(error),
+    });
+    return "done";
   } finally {
     stopWatching();
     releaseScreen?.();
@@ -138,8 +174,9 @@ const askToRepair = async ({
     // about the identity that signed in, so a switch ends it.
     await Promise.race([
       waitForStore(notificationConsentSettledStore),
-      waitForStore(authenticationStore, (current) =>
-        current?.identityNumber !== identityNumber ? true : undefined,
+      waitForStore(
+        authenticationStore,
+        (current) => current?.identityNumber !== identityNumber || undefined,
       ),
     ]);
   } finally {

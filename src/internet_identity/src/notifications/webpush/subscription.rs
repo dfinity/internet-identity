@@ -286,6 +286,7 @@ pub(crate) fn status_of(ready: &ReadySubscription, now_ns: Timestamp) -> WebPush
     WebPushSubscriptionStatus {
         endpoint: ready.endpoint.as_str().to_string(),
         unanswered_pushes: unanswered_pushes_of(ready, now_ns),
+        probe_sent_at_ns: ready.probe_sent_at_ns,
     }
 }
 
@@ -670,6 +671,7 @@ mod tests {
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
                 unanswered_pushes: None,
+                probe_sent_at_ns: None,
             })
         );
 
@@ -756,6 +758,7 @@ mod tests {
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
                 unanswered_pushes: None,
+                probe_sent_at_ns: None,
             })
         );
         // The browser is answered about its own entry, which the app's write left alone.

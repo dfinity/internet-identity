@@ -3494,6 +3494,20 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
+    /// Whether `browser_id`'s entry of `anchor_number` holds an installed web app
+    /// subscription for any app.
+    pub fn holds_pwa_webpush_subscription(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> bool {
+        self.stable_anchor_application_config_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .any(|(_, config)| config.pwa_webpush_subscription(browser_id).is_some())
+    }
+
     /// What this identity has configured for the app at `origin`, or `None` where it has
     /// never signed in there or has configured nothing since.
     pub fn read_anchor_application_config(

@@ -1353,6 +1353,9 @@ pub struct WebPushSubscriptionStatus {
     pub endpoint: String,
     /// `None` where every push posted through it has been fetched since.
     pub unanswered_pushes: Option<UnansweredPushes>,
+    /// When Internet Identity last sent its own notification through it to check it.
+    /// `None` once a notification has been fetched through it since: that is the answer.
+    pub probe_sent_at_ns: Option<Timestamp>,
 }
 
 /// Pushes posted through one subscription that nothing has fetched since.
@@ -1371,8 +1374,16 @@ pub enum NotificationPath {
     /// routes through.
     ThisBrowser,
     /// That app's installed web apps on this browser entry, and on every entry linked to
-    /// it as sharing its device.
-    InstalledApps(FrontendHostname),
+    /// it as sharing its device, that deliver for one account.
+    InstalledApps(InstalledAppsPath),
+}
+
+/// An app's installed web apps that deliver for one account at it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct InstalledAppsPath {
+    pub origin: FrontendHostname,
+    /// The account at that app whose installed web apps these are.
+    pub account_principal: Principal,
 }
 
 /// Which path to the calling browser's device to read, for the identity it signs for.
@@ -1394,6 +1405,9 @@ pub struct NotificationPathStatus {
 pub struct SubscriptionDeliveryStatus {
     /// `None` where every push posted through it has been fetched since.
     pub unanswered_pushes: Option<UnansweredPushes>,
+    /// When Internet Identity last sent its own notification through it to check it.
+    /// `None` once a notification has been fetched through it since: that is the answer.
+    pub probe_sent_at_ns: Option<Timestamp>,
 }
 
 /// Why `get_notification_path_status` refused.
@@ -1426,6 +1440,8 @@ pub enum ProbeNotificationPathError {
 pub struct RemoveUnansweredPwaWebPushSubscriptionsRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
+    /// The account at that app whose installed web apps to remove.
+    pub account_principal: Principal,
 }
 
 /// Why `remove_unanswered_pwa_webpush_subscriptions` refused.

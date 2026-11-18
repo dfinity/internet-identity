@@ -20,8 +20,8 @@ use crate::storage::anchor::{Anchor, Browser, ReadySubscription};
 use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, ApplicationNumber, BrowserId, IdentityForNotification, NotificationPath,
-    NotificationPathStatus, SubscriptionDeliveryStatus, Timestamp,
+    AnchorNumber, ApplicationNumber, BrowserId, IdentityForNotification, InstalledAppsPath,
+    NotificationPath, NotificationPathStatus, SubscriptionDeliveryStatus, Timestamp,
 };
 
 /// A way an identity's notifications reach the calling browser's device, with the app
@@ -31,10 +31,12 @@ pub(crate) enum DevicePath {
     /// Where the calling browser's wake-ups go.
     ThisBrowser,
     /// The installed web apps of the app numbered `application_number` on the calling
-    /// browser's entry and on every entry linked to it as sharing its device. `None` for
-    /// an app nobody has signed in to, which has none.
+    /// browser's entry and on every entry linked to it as sharing its device, that
+    /// deliver for the account `account_principal` names. `None` for an app nobody has
+    /// signed in to, which has none.
     InstalledApps {
         application_number: Option<ApplicationNumber>,
+        account_principal: Principal,
     },
 }
 
@@ -43,8 +45,12 @@ impl DevicePath {
     pub(crate) fn resolve(path: NotificationPath) -> Result<Self, String> {
         match path {
             NotificationPath::ThisBrowser => Ok(DevicePath::ThisBrowser),
-            NotificationPath::InstalledApps(origin) => Ok(DevicePath::InstalledApps {
+            NotificationPath::InstalledApps(InstalledAppsPath {
+                origin,
+                account_principal,
+            }) => Ok(DevicePath::InstalledApps {
                 application_number: application_number_of(&origin)?,
+                account_principal,
             }),
         }
     }
@@ -92,6 +98,7 @@ pub(crate) fn path_status(
             .iter()
             .map(|on_path| SubscriptionDeliveryStatus {
                 unanswered_pushes: webpush::unanswered_pushes_of(&on_path.subscription, now_ns),
+                probe_sent_at_ns: on_path.subscription.probe_sent_at_ns,
             })
             .collect(),
     }
@@ -183,9 +190,10 @@ fn probe_one(
 }
 
 /// Removes the installed web app subscriptions of the app numbered `application_number`
-/// on `browser_id`'s entry of `anchor` and on the entries linked to it, where they can
-/// deliver now and still have unanswered pushes. One that answered its probe is kept.
-/// `None` for an app nobody has signed in to, which has none.
+/// on `browser_id`'s entry of `anchor` and on the entries linked to it that deliver for
+/// the account `account_principal` names, where they can deliver now and still have
+/// unanswered pushes. One that answered its probe is kept. `None` for an app nobody has
+/// signed in to, which has none.
 ///
 /// Every one is tried, so a failure to remove one leaves the others removed; failures
 /// are logged.
@@ -193,9 +201,13 @@ pub(crate) fn remove_unanswered_installed_apps(
     anchor: &Anchor,
     browser_id: BrowserId,
     application_number: Option<ApplicationNumber>,
+    account_principal: Principal,
     now_ns: Timestamp,
 ) {
-    let path = DevicePath::InstalledApps { application_number };
+    let path = DevicePath::InstalledApps {
+        application_number,
+        account_principal,
+    };
     for on_path in path_subscriptions(anchor, browser_id, path, now_ns) {
         if on_path.subscription.unanswered_pushes.is_none() {
             continue;
@@ -225,18 +237,29 @@ fn path_subscriptions(
             .collect(),
         DevicePath::InstalledApps {
             application_number: None,
+            ..
         } => Vec::new(),
         DevicePath::InstalledApps {
             application_number: Some(application_number),
+            account_principal,
         } => {
             let mut on_path = Vec::new();
             for entry in same_device_entries(anchor, browser) {
-                on_path.extend(installed_app_on_path(
-                    entry,
-                    anchor.anchor_number(),
-                    application_number,
-                    now_ns,
-                ));
+                on_path.extend(
+                    installed_app_on_path(
+                        entry,
+                        anchor.anchor_number(),
+                        application_number,
+                        now_ns,
+                    )
+                    .filter(|one| {
+                        one.wake_up_path
+                            == IdentityWakeUpPath::InstalledApp {
+                                application_number,
+                                account_principal,
+                            }
+                    }),
+                );
             }
             on_path
         }

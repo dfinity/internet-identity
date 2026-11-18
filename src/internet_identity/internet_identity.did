@@ -2083,6 +2083,9 @@ type WebPushSubscriptionStatus = record {
     endpoint : text;        // compared against the one the browser holds
     // Null where every push posted through it has been fetched since.
     unanswered_pushes : opt UnansweredPushes;
+    // When Internet Identity last sent its own notification through it to check it. Null
+    // once a notification has been fetched through it since: that is the answer.
+    probe_sent_at_ns : opt Timestamp;
 };
 
 // Pushes posted through one subscription that nothing has fetched since.
@@ -2099,8 +2102,14 @@ type NotificationPath = variant {
     // routes through.
     ThisBrowser;
     // That app's installed web apps on this browser entry, and on every entry linked to
-    // it as sharing its device.
-    InstalledApps : FrontendHostname;
+    // it as sharing its device, that deliver for one account.
+    InstalledApps : InstalledAppsPath;
+};
+
+type InstalledAppsPath = record {
+    origin : FrontendHostname;
+    // The account at that app whose installed web apps these are.
+    account_principal : principal;
 };
 
 type GetNotificationPathStatusRequest = record {
@@ -2116,6 +2125,9 @@ type NotificationPathStatus = record {
 type SubscriptionDeliveryStatus = record {
     // Null where every push posted through it has been fetched since.
     unanswered_pushes : opt UnansweredPushes;
+    // When Internet Identity last sent its own notification through it to check it. Null
+    // once a notification has been fetched through it since: that is the answer.
+    probe_sent_at_ns : opt Timestamp;
 };
 
 type GetNotificationPathStatusError = variant {
@@ -2140,6 +2152,8 @@ type ProbeNotificationPathError = variant {
 type RemoveUnansweredPwaWebPushSubscriptionsRequest = record {
     anchor_number : UserNumber;
     origin : FrontendHostname;
+    // The account at that app whose installed web apps to remove.
+    account_principal : principal;
 };
 
 type RemoveUnansweredPwaWebPushSubscriptionsError = variant {

@@ -310,6 +310,12 @@ pub fn read_pwa_subscription_status(
     Some(subscription::status_of(&ready_subscription, now_ns))
 }
 
+/// Whether `holder`'s browser entry holds a subscription that delivers for the account
+/// `account_principal` names.
+pub fn delivers_for(holder: PwaSubscriptionHolder, account_principal: Principal) -> bool {
+    read(holder).is_some_and(|held| held.account_principal == account_principal)
+}
+
 /// What `holder`'s browser entry holds, and the account it delivers for.
 pub(crate) fn read(holder: PwaSubscriptionHolder) -> Option<PwaSubscription> {
     storage_borrow(|storage| {

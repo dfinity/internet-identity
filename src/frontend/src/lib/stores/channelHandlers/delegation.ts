@@ -29,6 +29,7 @@ import { get } from "svelte/store";
 import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
 import { grantedTimeToLive } from "$lib/utils/sessionDuration";
 import { repairNotificationPath } from "$lib/stores/channelHandlers/notificationRepair";
+import { Principal } from "@icp-sdk/core/principal";
 
 /**
  * ICRC-34: handle a delegation request from the relying party.
@@ -177,11 +178,19 @@ export const handleDelegationRequest =
             ),
         );
 
-        await repairNotificationPath({
+        const repaired = await repairNotificationPath({
           identityNumber,
           origin: effectiveOrigin,
+          accountPrincipal: Principal.selfAuthenticating(
+            new Uint8Array(user_key),
+          ),
           actor,
         });
+        // What was minted is for an identity the user has moved away from, so nothing
+        // goes to the app: the sign-in it asked for is the one the user is now making.
+        if (repaired === "identity-changed") {
+          return;
+        }
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,

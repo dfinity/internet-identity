@@ -822,6 +822,7 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
         Some(WebPushSubscriptionStatus {
             endpoint: PWA_ENDPOINT.to_string(),
             unanswered_pushes: None,
+            probe_sent_at_ns: None,
         })
     );
 
@@ -861,6 +862,7 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
         Some(WebPushSubscriptionStatus {
             endpoint: PWA_ENDPOINT.to_string(),
             unanswered_pushes: None,
+            probe_sent_at_ns: None,
         })
     );
 

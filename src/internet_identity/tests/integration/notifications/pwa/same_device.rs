@@ -14,7 +14,7 @@ use internet_identity_interface::internet_identity::types::{
     AppGetPwaNotificationResponse, AppGetSameDeviceLinkStatusError, AppPrepareSameDeviceLinkError,
     AppPrepareSameDeviceLinkRequest, AppProbePwaWebPushSubscriptionError, ClaimSameDeviceLinkError,
     ClaimSameDeviceLinkRequest, GetNotificationPathStatusError, GetNotificationPathStatusRequest,
-    NotificationPath, NotificationPathStatus, ProbeNotificationPathError,
+    InstalledAppsPath, NotificationPath, NotificationPathStatus, ProbeNotificationPathError,
     ProbeNotificationPathRequest, PwaNotificationEvent, RemoveNotificationRequest,
     RemoveUnansweredPwaWebPushSubscriptionsError, RemoveUnansweredPwaWebPushSubscriptionsRequest,
     SameDeviceLinkStatus, UnansweredPushes,
@@ -43,6 +43,8 @@ struct Phone {
     account_principal: Principal,
     /// The installed web app's session.
     pwa: Principal,
+    /// Safari's session at [`APP`].
+    safari_session: Principal,
 }
 
 fn phone(env: &PocketIc) -> Phone {
@@ -69,6 +71,7 @@ fn phone(env: &PocketIc) -> Phone {
         anchor,
         account_principal: pwa.account_principal,
         pwa: session_of(&pwa),
+        safari_session: session_of(&safari_session),
     }
 }
 
@@ -146,8 +149,11 @@ fn unanswered(
         .collect()
 }
 
-fn installed_apps() -> NotificationPath {
-    NotificationPath::InstalledApps(APP.to_string())
+fn installed_apps(phone: &Phone) -> NotificationPath {
+    NotificationPath::InstalledApps(InstalledAppsPath {
+        origin: APP.to_string(),
+        account_principal: phone.account_principal,
+    })
 }
 
 fn probe(
@@ -175,6 +181,7 @@ fn remove_unanswered(env: &PocketIc, phone: &Phone) {
         RemoveUnansweredPwaWebPushSubscriptionsRequest {
             anchor_number: phone.anchor,
             origin: APP.to_string(),
+            account_principal: phone.account_principal,
         },
     )
     .expect("remove rejected")
@@ -619,12 +626,13 @@ fn should_probe_the_linked_installed_app_and_be_answered_by_its_fetch() {
     let env = env();
     let phone = linked_phone(&env);
 
-    assert_eq!(probe(&env, &phone, installed_apps()), Ok(()));
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     assert_eq!(answer_outcalls(&env, 201), vec![PWA_ENDPOINT.to_string()]);
     assert_eq!(
-        count(&unanswered(&env, &phone, installed_apps())),
+        count(&unanswered(&env, &phone, installed_apps(&phone))),
         vec![Some((1, false))]
     );
+    assert!(is_probe_waiting(&env, &phone));
 
     assert_eq!(
         pwa_entry(&env, &phone, FIRST_ENTRY),
@@ -636,9 +644,199 @@ fn should_probe_the_linked_installed_app_and_be_answered_by_its_fetch() {
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
 
     assert_eq!(
-        count(&unanswered(&env, &phone, installed_apps())),
+        count(&unanswered(&env, &phone, installed_apps(&phone))),
         vec![None]
     );
+    assert!(!is_probe_waiting(&env, &phone));
+}
+
+/// Whether the installed app's subscription has a probe nobody fetched yet.
+fn is_probe_waiting(env: &PocketIc, phone: &Phone) -> bool {
+    path_status(env, phone, installed_apps(phone))
+        .subscriptions
+        .iter()
+        .any(|subscription| subscription.probe_sent_at_ns.is_some())
+}
+
+/// Another account at [`APP`] of `phone`'s identity, signed in to the installed app on
+/// its entry and subscribed there, so the installed app now delivers for it. Answers
+/// that account's session and principal.
+fn switch_the_installed_app_to_another_account(
+    env: &PocketIc,
+    phone: &Phone,
+) -> (Principal, Principal) {
+    let other_account = create_account(
+        env,
+        phone.canister_id,
+        principal_1(),
+        phone.anchor,
+        APP.into(),
+        "Other".to_string(),
+    )
+    .expect("creating the account rejected")
+    .expect("creating the account refused")
+    .account_number;
+    let other = sign_in(
+        env,
+        phone.canister_id,
+        principal_1(),
+        PrepareAccountSessionRequest {
+            account_number: other_account,
+            ..session_request(phone.anchor, APP, &BrowserKey::new(5).successor())
+        },
+    );
+    subscribe_pwa_webpush(
+        env,
+        phone.canister_id,
+        session_of(&other),
+        PWA_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+    (session_of(&other), other.account_principal)
+}
+
+#[test]
+fn should_leave_the_count_of_another_accounts_installed_app_when_one_account_removes() {
+    let env = env();
+    let phone = phone(&env);
+    let (other_session, other_account) = switch_the_installed_app_to_another_account(&env, &phone);
+    deliver(&env, phone.canister_id, other_account, 1, 201);
+
+    // The first account's session removes an entry of its own, which is no answer for the
+    // installed app that now delivers for the other account.
+    remove_pwa_entry(&env, &phone, FIRST_ENTRY);
+
+    assert_eq!(
+        app_get_pwa_webpush_subscription_status(&env, phone.canister_id, other_session)
+            .expect("status rejected")
+            .expect("status refused")
+            .and_then(|status| status.unanswered_pushes)
+            .map(|unanswered| unanswered.count),
+        Some(1)
+    );
+}
+
+#[test]
+fn should_see_only_the_installed_apps_of_the_account_asked_about() {
+    let env = env();
+    let phone = linked_phone(&env);
+    let (_, other_account) = switch_the_installed_app_to_another_account(&env, &phone);
+    deliver(&env, phone.canister_id, other_account, 1, 201);
+
+    // The first account's view of the installed apps, which deliver for the other one.
+    assert_eq!(
+        path_status(&env, &phone, installed_apps(&phone)).subscriptions,
+        vec![]
+    );
+    remove_unanswered(&env, &phone);
+
+    // Still delivering for the other account, which the first one's repair did not touch.
+    assert_eq!(
+        deliver(&env, phone.canister_id, other_account, 2, 201),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+}
+
+#[test]
+fn should_refuse_a_claim_from_an_entry_already_linked() {
+    let env = env();
+    let phone = linked_phone(&env);
+    // Without a subscription of its own, so only the link it already has stands in the way.
+    app_set_pwa_webpush_subscription(
+        &env,
+        phone.canister_id,
+        phone.pwa,
+        AppSetPwaWebPushSubscriptionRequest { subscription: None },
+    )
+    .expect("remove rejected")
+    .expect("remove refused");
+    let third = another_installed_app_entry(&env, &phone);
+    register_key(&env, &phone, third, &BrowserKey::new(42));
+
+    // The installed app's entry already points at Safari's, so it cannot point again.
+    let installed_app_browser = BrowserKey::new(5).successor().principal();
+    assert_eq!(
+        claim_with(&env, &phone, installed_app_browser, &BrowserKey::new(42)),
+        Err(ClaimSameDeviceLinkError::NoPendingLink)
+    );
+}
+
+#[test]
+fn should_refuse_a_claim_of_a_key_whose_entry_is_pointed_at() {
+    let env = env();
+    let phone = linked_phone(&env);
+    let third_browser = BrowserKey::new(6).successor().principal();
+    another_installed_app_entry(&env, &phone);
+    // Safari's own session registers a key: its entry is the one the installed app points at.
+    register_key(&env, &phone, phone.safari_session, &BrowserKey::new(42));
+
+    assert_eq!(
+        claim_with(&env, &phone, third_browser, &BrowserKey::new(42)),
+        Err(ClaimSameDeviceLinkError::NoPendingLink)
+    );
+}
+
+#[test]
+fn should_refuse_a_claim_from_an_entry_holding_an_installed_app_of_its_own() {
+    let env = env();
+    let phone = phone(&env);
+    let third = another_installed_app_entry(&env, &phone);
+    register_key(&env, &phone, third, &BrowserKey::new(42));
+
+    // The installed app's entry is not linked, but it holds the app's subscription.
+    let installed_app_browser = BrowserKey::new(5).successor().principal();
+    assert_eq!(
+        claim_with(&env, &phone, installed_app_browser, &BrowserKey::new(42)),
+        Err(ClaimSameDeviceLinkError::NoPendingLink)
+    );
+}
+
+/// A third entry of `phone`'s identity, signed in to [`APP`] from the browser seed 6
+/// names, holding nothing. Answers its session.
+fn another_installed_app_entry(env: &PocketIc, phone: &Phone) -> Principal {
+    session_of(&sign_in(
+        env,
+        phone.canister_id,
+        principal_1(),
+        session_request(phone.anchor, APP, &BrowserKey::new(6)),
+    ))
+}
+
+/// `session` registers `key` for its entry's same-device link.
+fn register_key(env: &PocketIc, phone: &Phone, session: Principal, key: &BrowserKey) {
+    app_prepare_same_device_link(
+        env,
+        phone.canister_id,
+        session,
+        AppPrepareSameDeviceLinkRequest {
+            link_public_key: key.public_key(),
+        },
+    )
+    .expect("prepare rejected")
+    .expect("prepare refused");
+}
+
+/// `caller` claims the link registered with `key`.
+fn claim_with(
+    env: &PocketIc,
+    phone: &Phone,
+    caller: Principal,
+    key: &BrowserKey,
+) -> Result<(), ClaimSameDeviceLinkError> {
+    claim_same_device_link(
+        env,
+        phone.canister_id,
+        caller,
+        ClaimSameDeviceLinkRequest {
+            anchor_number: phone.anchor,
+            link_public_key: key.public_key(),
+            signature: key.sign_same_device_link_claim(phone.anchor, caller),
+        },
+    )
+    .expect("claim rejected")
 }
 
 #[test]
@@ -646,7 +844,7 @@ fn should_keep_the_installed_apps_probe_from_internet_identitys_own_worker(
 ) -> Result<(), RejectResponse> {
     let env = env();
     let phone = linked_phone(&env);
-    assert_eq!(probe(&env, &phone, installed_apps()), Ok(()));
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     answer_outcalls(&env, 201);
     let pwa_browser = BrowserKey::new(5).successor().principal();
     let pwa_browser_id: BrowserId = 1;
@@ -700,10 +898,10 @@ fn should_probe_this_browser_through_its_own_subscription() {
 fn should_send_no_second_probe_while_the_first_waits_to_be_fetched() {
     let env = env();
     let phone = linked_phone(&env);
-    assert_eq!(probe(&env, &phone, installed_apps()), Ok(()));
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     assert_eq!(answer_outcalls(&env, 201), vec![PWA_ENDPOINT.to_string()]);
 
-    assert_eq!(probe(&env, &phone, installed_apps()), Ok(()));
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     assert_eq!(
         app_probe_pwa_webpush_subscription(&env, phone.canister_id, phone.pwa)
             .expect("probe rejected"),
@@ -712,7 +910,7 @@ fn should_send_no_second_probe_while_the_first_waits_to_be_fetched() {
     assert_eq!(answer_outcalls(&env, 201), Vec::<String>::new());
 
     env.advance_time(Duration::from_secs(60));
-    assert_eq!(probe(&env, &phone, installed_apps()), Ok(()));
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     assert_eq!(answer_outcalls(&env, 201), vec![PWA_ENDPOINT.to_string()]);
 }
 
@@ -720,11 +918,11 @@ fn should_send_no_second_probe_while_the_first_waits_to_be_fetched() {
 fn should_probe_again_once_the_probe_was_fetched() {
     let env = env();
     let phone = linked_phone(&env);
-    assert_eq!(probe(&env, &phone, installed_apps()), Ok(()));
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     answer_outcalls(&env, 201);
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
 
-    assert_eq!(probe(&env, &phone, installed_apps()), Ok(()));
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
 
     assert_eq!(answer_outcalls(&env, 201), vec![PWA_ENDPOINT.to_string()]);
 }
@@ -736,11 +934,11 @@ fn should_answer_not_reachable_for_a_path_with_nothing_on_it() {
 
     // Not linked, so Safari's entry reaches no installed app.
     assert_eq!(
-        probe(&env, &phone, installed_apps()),
+        probe(&env, &phone, installed_apps(&phone)),
         Err(ProbeNotificationPathError::NotReachable)
     );
     assert_eq!(
-        path_status(&env, &phone, installed_apps()).subscriptions,
+        path_status(&env, &phone, installed_apps(&phone)).subscriptions,
         vec![]
     );
 }
@@ -778,7 +976,7 @@ fn should_remove_the_linked_installed_app_that_did_not_answer() {
     remove_unanswered(&env, &phone);
 
     assert_eq!(
-        path_status(&env, &phone, installed_apps()).subscriptions,
+        path_status(&env, &phone, installed_apps(&phone)).subscriptions,
         vec![]
     );
     assert_eq!(
@@ -876,7 +1074,7 @@ fn should_refuse_the_browser_methods_to_a_caller_that_is_no_browser_of_the_ident
                 stranger,
                 GetNotificationPathStatusRequest {
                     anchor_number: phone.anchor,
-                    path: installed_apps(),
+                    path: installed_apps(&phone),
                 },
             )?,
             Err(GetNotificationPathStatusError::InvalidBrowserKey)
@@ -888,7 +1086,7 @@ fn should_refuse_the_browser_methods_to_a_caller_that_is_no_browser_of_the_ident
                 stranger,
                 ProbeNotificationPathRequest {
                     anchor_number: phone.anchor,
-                    path: installed_apps(),
+                    path: installed_apps(&phone),
                 },
             )?,
             Err(ProbeNotificationPathError::InvalidBrowserKey)
@@ -901,6 +1099,7 @@ fn should_refuse_the_browser_methods_to_a_caller_that_is_no_browser_of_the_ident
                 RemoveUnansweredPwaWebPushSubscriptionsRequest {
                     anchor_number: phone.anchor,
                     origin: APP.to_string(),
+                    account_principal: phone.account_principal,
                 },
             )?,
             Err(RemoveUnansweredPwaWebPushSubscriptionsError::InvalidBrowserKey)
@@ -913,7 +1112,7 @@ fn should_refuse_the_browser_methods_to_a_caller_that_is_no_browser_of_the_ident
     // None of them probed or removed anything.
     assert_eq!(answer_outcalls(&env, 201), Vec::<String>::new());
     assert_eq!(
-        count(&unanswered(&env, &phone, installed_apps())),
+        count(&unanswered(&env, &phone, installed_apps(&phone))),
         vec![Some((1, false))]
     );
     Ok(())
@@ -981,6 +1180,7 @@ fn should_refuse_the_new_methods_while_notifications_are_disabled() -> Result<()
             RemoveUnansweredPwaWebPushSubscriptionsRequest {
                 anchor_number: anchor,
                 origin: APP.to_string(),
+                account_principal: principal_1(),
             },
         )?,
         Err(RemoveUnansweredPwaWebPushSubscriptionsError::InternalCanisterError(_))

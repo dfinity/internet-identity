@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
@@ -53,6 +53,13 @@ vi.mock("$lib/stores/browser-key.store", async (importOriginal) => ({
       nextSignature: new Uint8Array(),
       accept: () => Promise.resolve(),
     }),
+}));
+const notificationCheck = vi.hoisted(() => {
+  const state: { outcome: "done" | "identity-changed" } = { outcome: "done" };
+  return state;
+});
+vi.mock("$lib/stores/channelHandlers/notificationRepair", () => ({
+  repairNotificationPath: () => Promise.resolve(notificationCheck.outcome),
 }));
 vi.mock("$lib/stores/channelHandlers/describeBrowser", () => ({
   describeBrowser: () => Promise.resolve("a browser"),
@@ -747,6 +754,23 @@ describe("keeping a session for later", () => {
     await expect(appAccountsForOrigin(ORIGIN)).resolves.toMatchObject([
       { record: { accountPrincipal: "2vxsx-fae" } },
     ]);
+  });
+});
+
+describe("an identity change while notifications are checked", () => {
+  beforeEach(async () => {
+    await purgeAppSessions(BigInt(10_000));
+  });
+  afterEach(() => {
+    notificationCheck.outcome = "done";
+  });
+
+  it("sends the app nothing minted for the identity the user left", async () => {
+    notificationCheck.outcome = "identity-changed";
+
+    const { sent } = await runCeremony(true);
+
+    expect(sent).toEqual([]);
   });
 });
 

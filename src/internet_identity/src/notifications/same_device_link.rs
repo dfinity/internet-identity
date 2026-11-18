@@ -90,6 +90,13 @@ pub(crate) fn prepare(
 /// Links the entry of `anchor` whose pending link holds `link_public_key` to
 /// `claimer`'s, the entry of `anchor` that `claimer_principal` signs as, where
 /// `signature` is that key's over the claim.
+///
+/// Links never chain: the claimer must point at nothing and the entry that registered
+/// the key must be pointed at by nothing. And the claimer must hold no installed web
+/// app of its own, which an entry shares with its installed apps only where one browser
+/// runs both, so there is no second entry to link. An entry that is skipped therefore
+/// never has an installed web app of its own that would compete with the one skipping
+/// it.
 pub(crate) fn claim(
     mut anchor: Anchor,
     claimer: BrowserId,
@@ -101,6 +108,19 @@ pub(crate) fn claim(
     let linking = anchor
         .browser_awaiting_same_device_link(link_public_key, claimer, now_ns)
         .ok_or(ClaimRefusal::NoPendingLink)?;
+    let is_claimer_linked = anchor
+        .browser(claimer)
+        .is_some_and(|browser| browser.same_device_browser_id.is_some());
+    let is_linking_pointed_at = anchor
+        .browsers()
+        .iter()
+        .any(|browser| browser.same_device_browser_id == Some(linking));
+    let is_claimer_installed_app = storage_borrow(|storage| {
+        storage.holds_pwa_webpush_subscription(anchor.anchor_number(), claimer)
+    });
+    if is_claimer_linked || is_linking_pointed_at || is_claimer_installed_app {
+        return Err(ClaimRefusal::NoPendingLink);
+    }
     let is_signed = browser_key::verify_same_device_link_claim(
         link_public_key,
         signature,

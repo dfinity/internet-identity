@@ -15,7 +15,7 @@ use crate::notifications::webpush::{
     clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId, SubscriberKey,
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
-use crate::state::{self, storage_borrow_mut};
+use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::Session;
 use crate::storage::anchor::{
     Browser, InboxNotification, InboxNotificationKind, ReadySubscription, WebPushSubscription,
@@ -1227,7 +1227,18 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
     }
     match outcome {
         PostOutcome::Sent => {
-            if delivery.notification.is_none() {
+            // Counted only while what it announced is still waiting: a worker that took
+            // the entry before the push service's answer arrived has already answered.
+            let Some(notification) = delivery.notification.as_ref() else {
+                return;
+            };
+            let is_waiting = storage_borrow(|storage| storage.read(delivery.anchor_number))
+                .is_ok_and(|anchor| {
+                    anchor
+                        .notifications_for_browser(delivery.browser_id)
+                        .contains(notification)
+                });
+            if !is_waiting {
                 return;
             }
             let registration = rotation::Destination {
@@ -2299,6 +2310,41 @@ mod tests {
         assert_eq!(
             delivery_metrics::push_loss_count_for_testing("seal_failed"),
             0
+        );
+    }
+
+    #[test]
+    fn a_sent_wake_up_counts_as_unanswered_while_its_entry_waits() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+
+        settle(&delivery, PostOutcome::Sent, 2 * SECOND_NS);
+
+        assert_eq!(
+            stored_subscription(recipient, browsers[0])
+                .and_then(|ready| ready.unanswered_pushes)
+                .map(|unanswered| unanswered.count),
+            Some(1)
+        );
+    }
+
+    /// The push service may answer after the worker has already taken the entry, and the
+    /// taking is the answer.
+    #[test]
+    fn a_push_answered_before_the_push_service_replied_is_not_counted() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+        take_oldest(recipient, browsers[0]);
+
+        settle(&delivery, PostOutcome::Sent, 2 * SECOND_NS);
+
+        assert_eq!(
+            stored_subscription(recipient, browsers[0]).and_then(|ready| ready.unanswered_pushes),
+            None
         );
     }
 

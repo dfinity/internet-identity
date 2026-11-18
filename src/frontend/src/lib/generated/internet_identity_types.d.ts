@@ -1533,6 +1533,13 @@ export type IdentityPropertiesReplaceError = {
  * service worker shows the notification the push was sent for.
  */
 export type InboxNotificationId = bigint;
+export interface InstalledAppsPath {
+  'origin' : FrontendHostname,
+  /**
+   * The account at that app whose installed web apps these are.
+   */
+  'account_principal' : Principal,
+}
 /**
  * Init arguments of II which can be supplied on install and upgrade.
  * 
@@ -1936,9 +1943,9 @@ export type NotificationPath = {
   {
     /**
      * That app's installed web apps on this browser entry, and on every entry linked to
-     * it as sharing its device.
+     * it as sharing its device, that deliver for one account.
      */
-    'InstalledApps' : FrontendHostname
+    'InstalledApps' : InstalledAppsPath
   };
 export interface NotificationPathStatus {
   /**
@@ -2553,6 +2560,10 @@ export type RemoveUnansweredPwaWebPushSubscriptionsError = {
   { 'InternalCanisterError' : string };
 export interface RemoveUnansweredPwaWebPushSubscriptionsRequest {
   'origin' : FrontendHostname,
+  /**
+   * The account at that app whose installed web apps to remove.
+   */
+  'account_principal' : Principal,
   'anchor_number' : UserNumber,
 }
 export type RemoveWebPushSubscriptionError = {
@@ -2862,6 +2873,11 @@ export interface SubscriptionDeliveryStatus {
    * Null where every push posted through it has been fetched since.
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
+  /**
+   * When Internet Identity last sent its own notification through it to check it. Null
+   * once a notification has been fetched through it since: that is the answer.
+   */
+  'probe_sent_at_ns' : [] | [Timestamp],
 }
 export type Timestamp = bigint;
 export type Token = {};
@@ -2953,6 +2969,11 @@ export interface WebPushSubscriptionStatus {
    * Null where every push posted through it has been fetched since.
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
+  /**
+   * When Internet Identity last sent its own notification through it to check it. Null
+   * once a notification has been fetched through it since: that is the answer.
+   */
+  'probe_sent_at_ns' : [] | [Timestamp],
 }
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,

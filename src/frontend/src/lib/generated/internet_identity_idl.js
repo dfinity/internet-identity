@@ -188,6 +188,7 @@ export const idlFactory = ({ IDL }) => {
   const WebPushSubscriptionStatus = IDL.Record({
     'endpoint' : IDL.Text,
     'unanswered_pushes' : IDL.Opt(UnansweredPushes),
+    'probe_sent_at_ns' : IDL.Opt(Timestamp),
   });
   const AppGetPwaWebPushSubscriptionStatusError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -805,9 +806,13 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
+  const InstalledAppsPath = IDL.Record({
+    'origin' : FrontendHostname,
+    'account_principal' : IDL.Principal,
+  });
   const NotificationPath = IDL.Variant({
     'ThisBrowser' : IDL.Null,
-    'InstalledApps' : FrontendHostname,
+    'InstalledApps' : InstalledAppsPath,
   });
   const GetNotificationPathStatusRequest = IDL.Record({
     'path' : NotificationPath,
@@ -815,6 +820,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const SubscriptionDeliveryStatus = IDL.Record({
     'unanswered_pushes' : IDL.Opt(UnansweredPushes),
+    'probe_sent_at_ns' : IDL.Opt(Timestamp),
   });
   const NotificationPathStatus = IDL.Record({
     'subscriptions' : IDL.Vec(SubscriptionDeliveryStatus),
@@ -1228,6 +1234,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const RemoveUnansweredPwaWebPushSubscriptionsRequest = IDL.Record({
     'origin' : FrontendHostname,
+    'account_principal' : IDL.Principal,
     'anchor_number' : UserNumber,
   });
   const RemoveUnansweredPwaWebPushSubscriptionsError = IDL.Variant({

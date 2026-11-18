@@ -44,7 +44,7 @@ import {
   DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@icp-sdk/core/identity";
-import type { PublicKey, Signature } from "@icp-sdk/core/agent";
+import type { ActorSubclass, PublicKey, Signature } from "@icp-sdk/core/agent";
 import { get } from "svelte/store";
 import {
   chooseSilentSession,
@@ -301,13 +301,17 @@ export const handleSessionDelegationRequest =
           created.record,
           params.sessionPublicKey,
         );
-        const { identityNumber, actor } =
-          await waitForStore(authenticationStore);
-        await repairNotificationPath({
-          identityNumber,
+        const repaired = await repairNotificationPath({
+          identityNumber: created.identityNumber,
           origin: effectiveOrigin,
-          actor,
+          accountPrincipal: created.accountPrincipal,
+          actor: created.actor,
         });
+        // What was minted is for an identity the user has moved away from, so nothing
+        // goes to the app: the sign-in it asked for is the one the user is now making.
+        if (repaired === "identity-changed") {
+          return;
+        }
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,
@@ -342,7 +346,13 @@ const createSession = async (
   requestedMaxTimeToLive: bigint | undefined,
   requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
-): Promise<{ record: AppSessionRecord }> => {
+): Promise<{
+  record: AppSessionRecord;
+  /** Who the session was minted for, which the notification check is about. */
+  identityNumber: bigint;
+  accountPrincipal: Principal;
+  actor: ActorSubclass<_SERVICE>;
+}> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   let authorized = await waitForStore(authorizedStore);
   // Switching identity on a consent screen authorizes again; mint for the
@@ -479,5 +489,10 @@ const createSession = async (
   if (resumable) {
     await storeAppSession(recordKey, record);
   }
-  return { record };
+  return {
+    record,
+    identityNumber,
+    accountPrincipal: prepared.account_principal,
+    actor,
+  };
 };

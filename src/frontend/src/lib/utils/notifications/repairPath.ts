@@ -16,11 +16,8 @@ import type {
   ProbeNotificationPathError,
 } from "$lib/generated/internet_identity_types";
 import { POLL_INTERVAL_MS } from "$lib/constants/polling.constants";
+import type { Principal } from "@icp-sdk/core/principal";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
-import {
-  browserKeyActor,
-  UnregisteredBrowserError,
-} from "$lib/utils/notifications/browserActor";
 import { PROBE_WAIT_MS } from "$lib/utils/notifications/turnOnAndProve";
 import { notificationsNeedInstallHere } from "$lib/utils/notifications/notificationState";
 import { currentDeviceSubscription } from "$lib/utils/notifications/pushSubscription";
@@ -37,23 +34,51 @@ export type PathCheckOutcome =
 /** Whether a probe was answered, or the path had nothing on it to probe. */
 type ProbeAnswer = "answered" | "unanswered" | "nothing-on-path";
 
+/** The calls the check makes as the identity: only its consent is read that way. */
+export type IdentityCalls = {
+  notification_consent_granted: (
+    ...args: Parameters<ActorSubclass<_SERVICE>["notification_consent_granted"]>
+  ) => ReturnType<ActorSubclass<_SERVICE>["notification_consent_granted"]>;
+};
+
+/** The calls the check makes as this browser. */
+export type BrowserCalls = {
+  [
+    Method in
+      | "get_notification_path_status"
+      | "probe_notification_path"
+      | "remove_unanswered_pwa_webpush_subscriptions"
+  ]: (
+    ...args: Parameters<ActorSubclass<_SERVICE>[Method]>
+  ) => ReturnType<ActorSubclass<_SERVICE>[Method]>;
+};
+
 /** The outcome where nothing is left for the user to do. */
 const working: PathCheckOutcome = { kind: "working" };
 
-/** Checks the path that delivers `origin`'s notifications to this device for the identity
- *  `identityNumber` names, signing as it with `actor`. Calls `onPastLimit` once a path is
- *  past its limit, before anything is probed, and stops with `signal`'s reason once it
- *  is aborted. */
+/** Checks the path that delivers `origin`'s notifications to this device for the account
+ *  `accountPrincipal` names, of the identity `identityNumber` names: `actor` signs as the
+ *  identity and `browser` as this browser. Calls `onPastLimit` once a path is past its
+ *  limit, before anything is probed, and stops with `signal`'s reason once it is
+ *  aborted.
+ *
+ *  An installed web app that delivers for the account is the path, and this browser's
+ *  own only takes over where none is left: one that is not past its limit is working,
+ *  and whatever this browser's own path holds is beside the point. */
 export const checkNotificationPath = async ({
   identityNumber,
   origin,
+  accountPrincipal,
   actor,
+  browser,
   onPastLimit,
   signal,
 }: {
   identityNumber: bigint;
   origin: string;
-  actor: ActorSubclass<_SERVICE>;
+  accountPrincipal: Principal;
+  actor: IdentityCalls;
+  browser: BrowserCalls;
   onPastLimit: () => void;
   signal: AbortSignal;
 }): Promise<PathCheckOutcome> => {
@@ -64,16 +89,9 @@ export const checkNotificationPath = async ({
   if (!consented) {
     return working;
   }
-  let browser: ActorSubclass<_SERVICE>;
-  try {
-    browser = await browserKeyActor(identityNumber);
-  } catch (error) {
-    if (error instanceof UnregisteredBrowserError) {
-      return working;
-    }
-    throw error;
-  }
-  const installedApps: NotificationPath = { InstalledApps: origin };
+  const installedApps: NotificationPath = {
+    InstalledApps: { origin, account_principal: accountPrincipal },
+  };
   const thisBrowser: NotificationPath = { ThisBrowser: null };
 
   const installedAppsStatus = await pathStatus(
@@ -81,7 +99,10 @@ export const checkNotificationPath = async ({
     identityNumber,
     installedApps,
   );
-  if (isPastLimit(installedAppsStatus)) {
+  if (installedAppsStatus.subscriptions.length > 0) {
+    if (!isPastLimit(installedAppsStatus)) {
+      return working;
+    }
     onPastLimit();
     const answer = await probe(browser, identityNumber, installedApps, signal);
     if (answer === "answered") {
@@ -91,8 +112,13 @@ export const checkNotificationPath = async ({
       .remove_unanswered_pwa_webpush_subscriptions({
         anchor_number: identityNumber,
         origin,
+        account_principal: accountPrincipal,
       })
       .then(throwCanisterError);
+    const remaining = await pathStatus(browser, identityNumber, installedApps);
+    if (remaining.subscriptions.length > 0) {
+      return working;
+    }
     // This browser's own path carries the app's notifications from here on, whatever its count says.
     return afterOwnPath(
       await probe(browser, identityNumber, thisBrowser, signal),
@@ -150,7 +176,7 @@ const resubscribe = async (identityNumber: bigint): Promise<void> => {
 };
 
 const pathStatus = (
-  browser: ActorSubclass<_SERVICE>,
+  browser: BrowserCalls,
   identityNumber: bigint,
   path: NotificationPath,
 ): Promise<NotificationPathStatus> =>
@@ -163,16 +189,17 @@ const isPastLimit = (status: NotificationPathStatus): boolean =>
     ({ unanswered_pushes: [unanswered] }) => unanswered?.is_past_limit === true,
   );
 
-/** Every subscription on the path fetched what was sent through it since. */
+/** Every subscription on the path had its probe fetched: a remove clears the probe
+ *  record, and nothing else does. */
 const isAnswered = (status: NotificationPathStatus): boolean =>
   status.subscriptions.every(
-    ({ unanswered_pushes }) => unanswered_pushes.length === 0,
+    ({ probe_sent_at_ns }) => probe_sent_at_ns.length === 0,
   );
 
 /** Sends the probe and waits up to {@link PROBE_WAIT_MS} for every subscription on the
  *  path to fetch it, or until `signal` is aborted. */
 const probe = async (
-  browser: ActorSubclass<_SERVICE>,
+  browser: BrowserCalls,
   identityNumber: bigint,
   path: NotificationPath,
   signal: AbortSignal,
@@ -194,7 +221,12 @@ const probe = async (
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     signal.throwIfAborted();
-    if (isAnswered(await pathStatus(browser, identityNumber, path))) {
+    const status = await pathStatus(browser, identityNumber, path);
+    // A push service that called the subscription gone took it off the path.
+    if (status.subscriptions.length === 0) {
+      return "nothing-on-path";
+    }
+    if (isAnswered(status)) {
       return "answered";
     }
   }
