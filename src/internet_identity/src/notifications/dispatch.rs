@@ -1218,6 +1218,18 @@ pub(crate) fn can_wake<M: Memory + Clone>(
     wake_up_address(browser, app.as_ref(), now_ns).is_some()
 }
 
+/// Whether `notification` is Internet Identity's own check that a path still delivers:
+/// the notification a browser's own path is probed with, or an installed app's probe.
+fn is_probe(notification: &InboxNotification) -> bool {
+    match &notification.kind {
+        InboxNotificationKind::Identity {
+            event: NotificationEvent::NotificationsOn(_),
+        }
+        | InboxNotificationKind::InstalledAppProbe { .. } => true,
+        InboxNotificationKind::App { .. } => false,
+    }
+}
+
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
 /// way: a failed post removes the entry it announced, since no wake-up is coming for it,
 /// and a relay that lost the subscription also takes the registration with it.
@@ -1263,6 +1275,11 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
                 ic_cdk::println!(
                     "ERROR: Failed to count a push posted through a subscription: {err}"
                 );
+            }
+            // A probe is evidence only once the push service has taken it: one still
+            // waiting for its pass, or refused, reached no device.
+            if is_probe(notification) {
+                unanswered::mark_probed(registration, &delivery.endpoint, now_ns);
             }
         }
         // Nothing was posted, and the entry stays for whatever wakes this browser next.

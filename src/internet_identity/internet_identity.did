@@ -2083,8 +2083,9 @@ type WebPushSubscriptionStatus = record {
     endpoint : text;        // compared against the one the browser holds
     // Null where every push posted through it has been fetched since.
     unanswered_pushes : opt UnansweredPushes;
-    // When Internet Identity last sent its own notification through it to check it. Null
-    // once a notification has been fetched through it since: that is the answer.
+    // When the push service last accepted Internet Identity's own notification, sent
+    // through it to check it. Null once a notification has been fetched through it
+    // since: that is the answer.
     probe_sent_at_ns : opt Timestamp;
 };
 
@@ -2126,8 +2127,9 @@ type NotificationPathStatus = record {
 type SubscriptionDeliveryStatus = record {
     // Null where every push posted through it has been fetched since.
     unanswered_pushes : opt UnansweredPushes;
-    // When Internet Identity last sent its own notification through it to check it. Null
-    // once a notification has been fetched through it since: that is the answer.
+    // When the push service last accepted Internet Identity's own notification, sent
+    // through it to check it. Null once a notification has been fetched through it
+    // since: that is the answer.
     probe_sent_at_ns : opt Timestamp;
 };
 

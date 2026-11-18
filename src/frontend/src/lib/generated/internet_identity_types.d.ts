@@ -2875,8 +2875,9 @@ export interface SubscriptionDeliveryStatus {
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
   /**
-   * When Internet Identity last sent its own notification through it to check it. Null
-   * once a notification has been fetched through it since: that is the answer.
+   * When the push service last accepted Internet Identity's own notification, sent
+   * through it to check it. Null once a notification has been fetched through it
+   * since: that is the answer.
    */
   'probe_sent_at_ns' : [] | [Timestamp],
 }
@@ -2971,8 +2972,9 @@ export interface WebPushSubscriptionStatus {
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
   /**
-   * When Internet Identity last sent its own notification through it to check it. Null
-   * once a notification has been fetched through it since: that is the answer.
+   * When the push service last accepted Internet Identity's own notification, sent
+   * through it to check it. Null once a notification has been fetched through it
+   * since: that is the answer.
    */
   'probe_sent_at_ns' : [] | [Timestamp],
 }

@@ -311,8 +311,9 @@ pub struct ReadySubscription {
     /// The pushes posted through this subscription since a notification was last fetched
     /// through it. `None` where there are none.
     pub unanswered_pushes: Option<UnansweredPushCount>,
-    /// When Internet Identity last submitted its own notification through this
-    /// subscription to check it, where no fetch through it has answered that since.
+    /// When a push service last accepted Internet Identity's own notification, sent
+    /// through this subscription to check it, where no fetch through it has answered
+    /// that since.
     pub probe_sent_at_ns: Option<Timestamp>,
 }
 

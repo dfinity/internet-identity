@@ -672,6 +672,43 @@ fn should_probe_the_linked_installed_app_and_be_answered_by_its_fetch() {
     assert!(!is_probe_waiting(&env, &phone));
 }
 
+/// A probe the push service refused never reached the device, so it is no evidence
+/// either way: nothing is recorded, and the repair removes nothing.
+#[test]
+fn should_record_no_probe_the_push_service_refused() {
+    let env = env();
+    let phone = linked_phone(&env);
+
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    answer_outcalls(&env, 503);
+    assert!(!is_probe_waiting(&env, &phone));
+
+    remove_unanswered(&env, &phone);
+
+    assert_eq!(
+        deliver(&env, phone.canister_id, phone.account_principal, 1, 201),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+}
+
+/// A probe still waiting for its dispatch pass has reached nobody yet, so it is recorded
+/// only once the push service accepts it.
+#[test]
+fn should_record_no_probe_before_the_push_service_accepts_it() {
+    let env = env();
+    let phone = linked_phone(&env);
+
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    assert!(!is_probe_waiting(&env, &phone));
+
+    remove_unanswered(&env, &phone);
+
+    assert_eq!(
+        deliver(&env, phone.canister_id, phone.account_principal, 1, 201),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+}
+
 /// Whether the installed app's subscription has a probe nobody fetched yet.
 fn is_probe_waiting(env: &PocketIc, phone: &Phone) -> bool {
     path_status(env, phone, installed_apps(phone))

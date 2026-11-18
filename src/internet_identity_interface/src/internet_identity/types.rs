@@ -1353,8 +1353,9 @@ pub struct WebPushSubscriptionStatus {
     pub endpoint: String,
     /// `None` where every push posted through it has been fetched since.
     pub unanswered_pushes: Option<UnansweredPushes>,
-    /// When Internet Identity last sent its own notification through it to check it.
-    /// `None` once a notification has been fetched through it since: that is the answer.
+    /// When the push service last accepted Internet Identity's own notification, sent
+    /// through it to check it. `None` once a notification has been fetched through it
+    /// since: that is the answer.
     pub probe_sent_at_ns: Option<Timestamp>,
 }
 
@@ -1406,8 +1407,9 @@ pub struct NotificationPathStatus {
 pub struct SubscriptionDeliveryStatus {
     /// `None` where every push posted through it has been fetched since.
     pub unanswered_pushes: Option<UnansweredPushes>,
-    /// When Internet Identity last sent its own notification through it to check it.
-    /// `None` once a notification has been fetched through it since: that is the answer.
+    /// When the push service last accepted Internet Identity's own notification, sent
+    /// through it to check it. `None` once a notification has been fetched through it
+    /// since: that is the answer.
     pub probe_sent_at_ns: Option<Timestamp>,
 }
 

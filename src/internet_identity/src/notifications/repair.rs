@@ -169,7 +169,9 @@ pub(crate) fn probe_installed_app(
     probe_one(holder.anchor_number, one, identity, now_ns)
 }
 
-/// Submits a probe through `one` and records it there, unless one is outstanding.
+/// Submits a probe through `one`, unless one is outstanding. It is recorded there only
+/// once the push service accepts it: one still waiting for its pass, or refused, reached
+/// no device and is no evidence that nothing answers.
 fn probe_one(
     anchor_number: AnchorNumber,
     one: PathSubscription,
@@ -189,7 +191,6 @@ fn probe_one(
     if !is_admitted {
         return Err(ProbeRefusal::BacklogFull);
     }
-    unanswered::mark_probed(one.registration, one.subscription.endpoint.as_str(), now_ns);
     Ok(())
 }
 
