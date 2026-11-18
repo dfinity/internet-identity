@@ -12,7 +12,8 @@ use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCr
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_inbox::{
-    StorableInboxNotification, StorableInboxNotificationKind, StorableNotificationEvent,
+    StorableInbox, StorableInboxNotification, StorableInboxNotificationKind,
+    StorableNotificationEvent,
 };
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -380,6 +381,7 @@ impl From<StorableBrowser> for Browser {
             notifications: value
                 .inbox
                 .unwrap_or_default()
+                .0
                 .into_iter()
                 .filter_map(|queued| {
                     InboxNotification::try_from(queued)
@@ -414,11 +416,13 @@ impl From<Browser> for StorableBrowser {
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
             next_inbox_notification_id: Some(value.next_inbox_notification_id),
             inbox: (!value.notifications.is_empty()).then(|| {
-                value
-                    .notifications
-                    .into_iter()
-                    .map(StorableInboxNotification::from)
-                    .collect()
+                StorableInbox(
+                    value
+                        .notifications
+                        .into_iter()
+                        .map(StorableInboxNotification::from)
+                        .collect(),
+                )
             }),
         }
     }
