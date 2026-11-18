@@ -1850,7 +1850,31 @@
                 "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-3.5 h-10 px-3.5 text-sm font-medium focus-visible:outline-2",
               ]}
             >
-              {managing ? "Done" : "Edit"}
+              <!-- Both words share one cell, so the pill keeps the wider
+                   one's width and doesn't shift as Edit turns into Done; the
+                   word in use fades in over the other. -->
+              <span
+                class="grid justify-items-center *:col-start-1 *:row-start-1"
+              >
+                <span
+                  aria-hidden={managing}
+                  class={[
+                    "transition-opacity duration-150 ease-out",
+                    managing && "opacity-0",
+                  ]}
+                >
+                  Edit
+                </span>
+                <span
+                  aria-hidden={!managing}
+                  class={[
+                    "transition-opacity duration-150 ease-out",
+                    !managing && "opacity-0",
+                  ]}
+                >
+                  Done
+                </span>
+              </span>
             </button>
           {/if}
         </div>
