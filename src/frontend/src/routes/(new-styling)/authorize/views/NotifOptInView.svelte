@@ -8,6 +8,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import { startAppInstall } from "./notifInstall";
+  import { stopRepairChecks } from "./stopRepairChecks";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import {
     turnOnNotifications,
@@ -26,7 +27,7 @@
   } from "$lib/utils/notifications/notificationDiagnostics";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+  import { isCanisterError } from "$lib/utils/utils";
   import {
     BrowserNotificationsEvents,
     browserNotificationsFunnel,
@@ -54,7 +55,7 @@
     /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
     installFirst: boolean;
     /** Opened because this device stopped receiving the app's notifications: skipping
-     *  then records the denial for the app. */
+     *  then stops the checks on this device, and leaves the app's consent as it is. */
     isRepair: boolean;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
@@ -107,12 +108,7 @@
     if (isRepair) {
       busy = true;
       try {
-        await actor
-          .notification_revoke_consent({
-            anchor_number: identityNumber,
-            origin,
-          })
-          .then(throwCanisterError);
+        await stopRepairChecks({ identityNumber, actor });
       } catch (error) {
         reportFailure(error);
         return;

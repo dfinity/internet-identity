@@ -1537,7 +1537,9 @@ mod installing_over_an_app {
         disable_notification_app, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
-        DisableNotificationAppError, DisableNotificationAppRequest, PrepareNotificationAppLinkError,
+        DisableNotificationAppError, DisableNotificationAppRequest,
+        GetNotificationPathStatusRequest, NotificationPath, PrepareNotificationAppLinkError,
+        ProbeNotificationPathError, ProbeNotificationPathRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -1613,6 +1615,61 @@ mod installing_over_an_app {
         assert_eq!(
             prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 201)?,
             Ok(())
+        );
+        Ok(())
+    }
+
+    /// Declining a repair drops this browser's registration, and with it the Home Screen
+    /// app it routes through, so a later sign-in finds nothing on this browser's path to
+    /// probe.
+    #[test]
+    fn should_leave_nothing_to_probe_once_the_browser_is_unregistered() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) =
+            super::subscriptions::install_with_browser(&env);
+        let (app, _) = link_app(&env, canister_id, anchor, 1, 100);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        let this_browser = || {
+            canister_tests::api::internet_identity::notifications::get_notification_path_status(
+                &env,
+                canister_id,
+                browser.successor().principal(),
+                GetNotificationPathStatusRequest {
+                    anchor_number: anchor,
+                    path: NotificationPath::ThisBrowser,
+                },
+            )
+        };
+        assert_eq!(
+            this_browser()?
+                .expect("the status returned Err")
+                .subscriptions
+                .len(),
+            1
+        );
+
+        remove_webpush_subscription(&env, canister_id, principal_1(), anchor, browser_id)?
+            .expect("the remove returned Err");
+
+        assert_eq!(
+            this_browser()?
+                .expect("the status returned Err")
+                .subscriptions,
+            vec![]
+        );
+        assert_eq!(
+            canister_tests::api::internet_identity::notifications::probe_notification_path(
+                &env,
+                canister_id,
+                browser.successor().principal(),
+                ProbeNotificationPathRequest {
+                    anchor_number: anchor,
+                    path: NotificationPath::ThisBrowser,
+                },
+            )?,
+            Err(ProbeNotificationPathError::NotReachable)
         );
         Ok(())
     }
