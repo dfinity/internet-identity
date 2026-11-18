@@ -45,7 +45,8 @@ const browserAnswering = (answers: {
   const probed: NotificationPath[] = [];
   const removed: unknown[] = [];
   const asked: NotificationPath[] = [];
-  const calls = { probed, removed, asked };
+  const disabled: bigint[] = [];
+  const calls = { probed, removed, asked, disabled };
   const next = (path: NotificationPath): NotificationPathStatus => {
     const queue =
       "ThisBrowser" in path ? answers.thisBrowser : answers.installedApps;
@@ -63,6 +64,10 @@ const browserAnswering = (answers: {
     },
     remove_unanswered_pwa_webpush_subscriptions: (request) => {
       calls.removed.push(request);
+      return Promise.resolve({ Ok: null });
+    },
+    disable_notification_app: ({ anchor_number }) => {
+      calls.disabled.push(anchor_number);
       return Promise.resolve({ Ok: null });
     },
   };
@@ -180,6 +185,45 @@ describe("checkNotificationPath", () => {
     expect(calls.probed).toEqual([
       { InstalledApps: { origin: ORIGIN, account_principal: ACCOUNT } },
     ]);
+  });
+});
+
+describe("checkNotificationPath on an iPhone", () => {
+  const originalAgent = Object.getOwnPropertyDescriptor(
+    window.navigator,
+    "userAgent",
+  );
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window.navigator, "userAgent", {
+      configurable: true,
+      value:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    if (originalAgent === undefined) {
+      Reflect.deleteProperty(window.navigator, "userAgent");
+    } else {
+      Object.defineProperty(window.navigator, "userAgent", originalAgent);
+    }
+  });
+
+  it("switches the silent Home Screen app off before offering to install it again", async () => {
+    const { browser, calls } = browserAnswering({
+      installedApps: [{ subscriptions: [] }],
+      thisBrowser: [
+        { subscriptions: [pastLimit] },
+        { subscriptions: [probeWaiting] },
+      ],
+    });
+
+    await expect(check(browser)).resolves.toEqual({
+      kind: "ask",
+      installFirst: true,
+    });
+    expect(calls.disabled).toEqual([IDENTITY_NUMBER]);
   });
 });
 

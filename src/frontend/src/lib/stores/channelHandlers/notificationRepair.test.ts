@@ -64,6 +64,7 @@ const silentInstalledApp: BrowserCalls = {
   probe_notification_path: () => Promise.resolve({ Ok: null }),
   remove_unanswered_pwa_webpush_subscriptions: () =>
     Promise.resolve({ Ok: null }),
+  disable_notification_app: () => Promise.resolve({ Ok: null }),
 };
 
 const repair = () =>

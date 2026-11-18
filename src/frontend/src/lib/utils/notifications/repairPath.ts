@@ -11,6 +11,7 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
   _SERVICE,
+  DisableNotificationAppError,
   NotificationPath,
   NotificationPathStatus,
   ProbeNotificationPathError,
@@ -48,6 +49,7 @@ export type BrowserCalls = {
       | "get_notification_path_status"
       | "probe_notification_path"
       | "remove_unanswered_pwa_webpush_subscriptions"
+      | "disable_notification_app"
   ]: (
     ...args: Parameters<ActorSubclass<_SERVICE>[Method]>
   ) => ReturnType<ActorSubclass<_SERVICE>[Method]>;
@@ -126,6 +128,7 @@ export const checkNotificationPath = async ({
     // This browser's own path carries the app's notifications from here on, whatever its count says.
     return afterOwnPath(
       await probe(browser, identityNumber, thisBrowser, signal),
+      browser,
       identityNumber,
       renewSubscription,
     );
@@ -142,6 +145,7 @@ export const checkNotificationPath = async ({
   onPastLimit();
   return afterOwnPath(
     await probe(browser, identityNumber, thisBrowser, signal),
+    browser,
     identityNumber,
     renewSubscription,
   );
@@ -150,6 +154,7 @@ export const checkNotificationPath = async ({
 /** What is left once this browser's own path was probed. */
 const afterOwnPath = async (
   answer: ProbeAnswer,
+  browser: BrowserCalls,
   identityNumber: bigint,
   renewSubscription: (identityNumber: bigint) => Promise<void>,
 ): Promise<PathCheckOutcome> => {
@@ -164,6 +169,10 @@ const afterOwnPath = async (
   }
   // The Home Screen app this browser routes through is gone, and only installing it again brings it back.
   if (notificationsNeedInstallHere()) {
+    // Switched off before the install is offered, as an unanswered enable probe is: the
+    // canister refuses to replace an app that is on until the probe's whole window has
+    // passed, which is longer than the check waits.
+    await switchOffApp(browser, identityNumber);
     return { kind: "ask", installFirst: true };
   }
   if (
@@ -174,6 +183,27 @@ const afterOwnPath = async (
   }
   await renewSubscription(identityNumber);
   return working;
+};
+
+/** Switches off delivery through the app this browser points at. A browser that points
+ *  at none has nothing to switch off. */
+const switchOffApp = async (
+  browser: BrowserCalls,
+  identityNumber: bigint,
+): Promise<void> => {
+  try {
+    await browser
+      .disable_notification_app({ anchor_number: identityNumber })
+      .then(throwCanisterError);
+  } catch (error) {
+    if (
+      isCanisterError<DisableNotificationAppError>(error) &&
+      error.type === "NoNotificationApp"
+    ) {
+      return;
+    }
+    throw error;
+  }
 };
 
 /** Drops the subscription that stopped answering and registers a fresh one, which needs
