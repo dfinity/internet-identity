@@ -1119,8 +1119,8 @@
             class={[
               "grid size-7 shrink-0 place-items-center rounded-lg",
               {
-                risk: "bg-bg-error-secondary text-fg-error-primary",
-                action: "bg-bg-warning-secondary text-fg-warning-primary",
+                risk: "text-fg-error-primary bg-(--ii-error-tint)",
+                action: "text-fg-warning-primary bg-(--ii-warning-tint)",
               }[card.tone as "risk" | "action"] ??
                 "text-fg-secondary bg-(--ii-selected)",
             ]}
@@ -1212,7 +1212,7 @@
         isOn(method.status)
           ? "border-bg-success-secondary bg-bg-success-primary text-fg-success-primary"
           : warn
-            ? "bg-bg-warning-secondary text-fg-warning-primary border-transparent"
+            ? "text-fg-warning-primary border-transparent bg-(--ii-warning-tint)"
             : "border-border-tertiary bg-bg-primary text-text-tertiary",
       ]}
     >

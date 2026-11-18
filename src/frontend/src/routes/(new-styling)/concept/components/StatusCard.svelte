@@ -72,8 +72,8 @@
       class={[
         "grid size-9 shrink-0 place-items-center rounded-[0.625rem] transition-colors duration-200 *:col-start-1 *:row-start-1",
         {
-          risk: "bg-bg-error-secondary text-fg-error-primary",
-          action: "bg-bg-warning-secondary text-fg-warning-primary",
+          risk: "text-fg-error-primary bg-(--ii-error-tint)",
+          action: "text-fg-warning-primary bg-(--ii-warning-tint)",
         }[tone as "risk" | "action"] ?? "text-fg-secondary bg-(--ii-selected)",
       ]}
     >

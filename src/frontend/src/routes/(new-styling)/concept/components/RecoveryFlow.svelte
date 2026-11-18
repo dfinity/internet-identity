@@ -342,7 +342,7 @@
         class={[
           "grid size-9 shrink-0 place-items-center rounded-[0.625rem]",
           danger
-            ? "bg-bg-error-secondary text-fg-error-primary"
+            ? "text-fg-error-primary bg-(--ii-error-tint)"
             : "text-fg-secondary bg-(--ii-selected)",
         ]}
       >

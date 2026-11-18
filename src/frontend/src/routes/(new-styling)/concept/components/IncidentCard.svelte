@@ -108,7 +108,7 @@
     <div class="flex items-start gap-3">
       <span
         aria-hidden="true"
-        class="bg-bg-error-secondary text-fg-error-primary grid size-9 shrink-0 place-items-center rounded-[0.625rem]"
+        class="text-fg-error-primary grid size-9 shrink-0 place-items-center rounded-[0.625rem] bg-(--ii-error-tint)"
       >
         <ShieldAlertIcon class="size-4.5" />
       </span>
