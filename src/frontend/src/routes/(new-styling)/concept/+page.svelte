@@ -77,7 +77,7 @@
     type ConceptApp,
     type FeaturedApp,
   } from "./mockData";
-  import { viewIn, viewOut } from "./motion";
+  import { shellIn, shellOut, viewIn, viewOut } from "./motion";
   import { ConceptTheme } from "./theme.svelte";
   import {
     deriveStatus,
@@ -704,15 +704,21 @@
   // they stop under the logo: the pages stay a tap away however far down.
   /** Each page's scroll, which moves the head while that page is shown. */
   const pageScroll = $state(PAGES.map(() => 0));
-  /** The greeting's height: how far the head goes up before the tabs stop. */
+  /** The greeting's height in the header: how far the head goes up before
+   *  the tabs stop. */
   let greetingHeight = $state(0);
-  const headLift = $derived(
-    Math.min(pageScroll[activePage] ?? 0, greetingHeight),
+  // On a phone the head (the greeting and the cards) is the top of each page
+  // instead, and the tabs are the tab bar at the bottom: a touch anywhere on
+  // the head scrolls the page, as on any phone screen, and the cards go up
+  // under the logo whole. Each page's copy, measured.
+  const pageHeadHeights = $state(PAGES.map(() => 0));
+  /** How far the head goes before it's out of sight. */
+  const headHeight = $derived(
+    phoneHead ? (pageHeadHeights[activePage] ?? 0) : greetingHeight,
   );
+  const headLift = $derived(Math.min(pageScroll[activePage] ?? 0, headHeight));
   /** The head has gone up out of sight. */
-  const headCollapsed = $derived(
-    greetingHeight > 0 && headLift >= greetingHeight - 2,
-  );
+  const headCollapsed = $derived(headHeight > 0 && headLift >= headHeight - 2);
   /** A page switch brings that page's head along, so it moves, not jumps. */
   let switchingPage = $state(false);
   $effect(() => {
@@ -725,9 +731,10 @@
   // they don't show. Once a page's content runs under the tabs they lift off
   // the canvas, as the dock's pills sit over it, and keep the header readable
   // over whatever runs under it. The content reaches them once the greeting
-  // is gone and the 0.75rem PAGE keeps under them is passed.
+  // in the header is gone (a phone's is in the page) and the 0.75rem PAGE
+  // keeps under them is passed.
   const headerLifted = $derived(
-    (pageScroll[activePage] ?? 0) > greetingHeight + 12,
+    (pageScroll[activePage] ?? 0) > (phoneHead ? 0 : greetingHeight) + 12,
   );
   /** The pages scroll on their own; the pager hears them while capturing. */
   const onPageScroll = (event: Event) => {
@@ -1155,6 +1162,127 @@
       </Elevated>
     {/each}
   </div>
+{/snippet}
+
+{#snippet greetingLine(inPage: boolean)}
+  <!-- On a phone, at the top of the page, it's a step smaller, so a long name
+       keeps to the line, and closer to the logo than to the cards under it. -->
+  <p
+    class={[
+      "text-text-primary flex min-w-0 items-center gap-x-2 leading-7 font-semibold tracking-tight",
+      INSET,
+      inPage
+        ? "pb-6 text-lg"
+        : "pt-3 pb-5 text-xl md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
+    ]}
+  >
+    <span class="shrink-0">{greeting},</span>
+    <span
+      aria-hidden="true"
+      class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
+      style:background-color={currentPalette.background}
+    ></span>
+    <span class="min-w-0 truncate">{identityName}</span>
+  </p>
+{/snippet}
+
+{#snippet pageHead(index: number)}
+  <!-- Phone: the greeting and the cards head the page itself, so they scroll
+       with it from wherever a touch starts. As wide as the grid (the page
+       keeps 10px short of the edge, so they step in by those). Only the shown
+       page's copy is live; the others are what a swipe brings in. -->
+  <div
+    bind:clientHeight={pageHeadHeights[index]}
+    inert={index !== activePage}
+    class="mx-2.5 shrink-0 @lg:mx-auto @lg:w-[29.5rem] @lg:max-w-full @2xl:w-[37rem]"
+  >
+    {@render greetingLine(true)}
+    {@render headCards()}
+  </div>
+{/snippet}
+
+{#snippet pageTabs(atBottom: boolean)}
+  <!-- The pages. Over the grid they're a pill in the header (see `pill`); on
+       a phone they're the tab bar, floating over the blur at the bottom,
+       always lifted since content always runs under it, and a step larger
+       for a thumb. -->
+  <div
+    role="tablist"
+    aria-label="Apps"
+    tabindex="-1"
+    onkeydown={onTabKeydown}
+    class={[
+      "relative flex items-center p-1",
+      atBottom
+        ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6)"
+        : [pill, PILL_MOTION, "-ms-[5px] h-10"],
+    ]}
+  >
+    <!-- The selected tab sits on a thumb, as in a segmented control, so it
+         reads by its shape and not only by its darker text. The thumb is the
+         selected overlay, so it shows on the pill at rest, in the canvas's
+         colour, and on the lifted one; it slides to a tab picked or swiped
+         to. Mounted once the tabs are measured, so it doesn't grow in from
+         nothing on load. -->
+    {#if thumb !== undefined}
+      <span
+        aria-hidden="true"
+        class="absolute inset-y-1 rounded-full bg-(--ii-selected) transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none"
+        style:inset-inline-start={`${thumb.start}px`}
+        style:width={`${thumb.width}px`}
+      ></span>
+    {/if}
+    {#each PAGES as page, index (page.id)}
+      <button
+        bind:this={tabRefs[index]}
+        bind:offsetWidth={tabWidths[index]}
+        type="button"
+        role="tab"
+        id={`tab-${page.id}`}
+        aria-selected={activePage === index}
+        aria-controls={`page-${page.id}`}
+        tabindex={activePage === index ? 0 : -1}
+        onclick={() => goToPage(index)}
+        class={[
+          "focus-visible:outline-focus-ring relative rounded-full text-sm font-semibold whitespace-nowrap transition-colors duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
+          atBottom ? "h-10 px-4" : "h-8 px-3.5",
+          activePage === index
+            ? "text-text-primary"
+            : "text-text-tertiary hover:text-text-secondary",
+        ]}
+      >
+        {page.label}
+      </button>
+    {/each}
+  </div>
+{/snippet}
+
+{#snippet editWords(align: string)}
+  <!-- Both words share one cell, so the button keeps the wider one's width
+       and doesn't shift as Edit turns into Done; the word in use fades in
+       over the other. -->
+  <span
+    class={["grid justify-items-center *:col-start-1 *:row-start-1", align]}
+  >
+    <span
+      aria-hidden={managing}
+      class={[
+        "transition-opacity duration-150 ease-out",
+        managing && "opacity-0",
+      ]}
+    >
+      Edit
+    </span>
+    <span
+      aria-hidden={!managing}
+      class={[
+        "transition-opacity duration-150 ease-out",
+        !managing && "opacity-0",
+      ]}
+    >
+      Done
+    </span>
+  </span>
 {/snippet}
 
 {#snippet appTile(app: ConceptApp, index: number)}
@@ -1775,137 +1903,52 @@
              person would: the name, with a dot in the identity's colour
              before it. It stays on every page, since it's true of all of
              them. The name is said here only; the panel's card is for
-             switching, and how it signed in is Access's to say. -->
-        <div bind:clientHeight={greetingHeight} class="overflow-hidden">
+             switching, and how it signed in is Access's to say. A phone has
+             it at the top of each page instead (pageHead). -->
+        {#if !phoneHead}
+          <div bind:clientHeight={greetingHeight} class="overflow-hidden">
+            <div
+              class={[
+                switchingPage &&
+                  "transition-[translate,opacity] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
+              ]}
+              style:translate={`0 ${-headLift}px`}
+              style:opacity={greetingHeight > 0
+                ? 1 - headLift / greetingHeight
+                : 1}
+            >
+              {@render greetingLine(false)}
+            </div>
+          </div>
+          <!-- The pages, right above what they show, with Edit across from
+               them on My apps, as over a list on iOS (Done while apps are
+               arranged). -->
           <div
             class={[
+              "flex items-center justify-between gap-3 @lg:pe-6",
+              INSET,
               switchingPage &&
-                "transition-[translate,opacity] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
+                "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
             ]}
             style:translate={`0 ${-headLift}px`}
-            style:opacity={greetingHeight > 0
-              ? 1 - headLift / greetingHeight
-              : 1}
           >
-            <!-- On a phone it's a step smaller, so a long name keeps to the
-                 line, and closer to the logo than to the cards under it. -->
-            <p
-              class={[
-                "text-text-primary flex min-w-0 items-center gap-x-2 leading-7 font-semibold tracking-tight md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
-                INSET,
-                phoneHead ? "pt-2.5 pb-6 text-lg" : "pt-3 pb-5 text-xl",
-              ]}
-            >
-              <span class="shrink-0">{greeting},</span>
-              <span
-                aria-hidden="true"
-                class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
-                style:background-color={currentPalette.background}
-              ></span>
-              <span class="min-w-0 truncate">{identityName}</span>
-            </p>
-            {#if phoneHead}
-              {@render headCards()}
-            {/if}
-          </div>
-        </div>
-        <!-- The pages, right above what they show, with Edit across from them
-             on My apps, as over a list on iOS (Done while apps are arranged). -->
-        <div
-          class={[
-            "flex items-center justify-between gap-3 @lg:pe-6",
-            INSET,
-            switchingPage &&
-              "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
-          ]}
-          style:translate={`0 ${-headLift}px`}
-        >
-          <div
-            role="tablist"
-            aria-label="Apps"
-            tabindex="-1"
-            onkeydown={onTabKeydown}
-            class={[
-              pill,
-              PILL_MOTION,
-              "relative -ms-[5px] flex h-10 items-center p-1",
-            ]}
-          >
-            <!-- The selected tab sits on a thumb, as in a segmented control, so it
-                 reads by its shape and not only by its darker text. The thumb is
-                 the selected overlay, so it shows on the pill at rest, in the
-                 canvas's colour, and on the lifted one; it slides to a tab picked
-                 or swiped to. Mounted once the tabs are measured, so it doesn't
-                 grow in from nothing on load. -->
-            {#if thumb !== undefined}
-              <span
-                aria-hidden="true"
-                class="absolute inset-y-1 rounded-full bg-(--ii-selected) transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none"
-                style:inset-inline-start={`${thumb.start}px`}
-                style:width={`${thumb.width}px`}
-              ></span>
-            {/if}
-            {#each PAGES as page, index (page.id)}
+            {@render pageTabs(false)}
+            {#if activePage === 0 && current.apps.length > 0}
               <button
-                bind:this={tabRefs[index]}
-                bind:offsetWidth={tabWidths[index]}
                 type="button"
-                role="tab"
-                id={`tab-${page.id}`}
-                aria-selected={activePage === index}
-                aria-controls={`page-${page.id}`}
-                tabindex={activePage === index ? 0 : -1}
-                onclick={() => goToPage(index)}
+                onclick={managing ? stopManaging : startManaging}
+                in:fade={{ duration: reduced ? 0 : 150 }}
                 class={[
-                  "focus-visible:outline-focus-ring relative h-8 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
-                  activePage === index
-                    ? "text-text-primary"
-                    : "text-text-tertiary hover:text-text-secondary",
+                  pill,
+                  PILL_MOTION,
+                  "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-3.5 h-10 px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]",
                 ]}
               >
-                {page.label}
+                {@render editWords("@max-lg/canvas:justify-items-end")}
               </button>
-            {/each}
+            {/if}
           </div>
-          {#if activePage === 0 && current.apps.length > 0}
-            <button
-              type="button"
-              onclick={managing ? stopManaging : startManaging}
-              in:fade={{ duration: reduced ? 0 : 150 }}
-              class={[
-                pill,
-                PILL_MOTION,
-                "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-3.5 h-10 px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]",
-              ]}
-            >
-              <!-- Both words share one cell, so the pill keeps the wider
-                   one's width and doesn't shift as Edit turns into Done; the
-                   word in use fades in over the other. -->
-              <span
-                class="grid justify-items-center *:col-start-1 *:row-start-1 @max-lg/canvas:justify-items-end"
-              >
-                <span
-                  aria-hidden={managing}
-                  class={[
-                    "transition-opacity duration-150 ease-out",
-                    managing && "opacity-0",
-                  ]}
-                >
-                  Edit
-                </span>
-                <span
-                  aria-hidden={!managing}
-                  class={[
-                    "transition-opacity duration-150 ease-out",
-                    !managing && "opacity-0",
-                  ]}
-                >
-                  Done
-                </span>
-              </span>
-            </button>
-          {/if}
-        </div>
+        {/if}
       </div>
     </header>
 
@@ -1929,6 +1972,9 @@
           aria-labelledby="tab-mine"
           class={[PAGE, settled[0] && SETTLED]}
         >
+          {#if phoneHead}
+            {@render pageHead(0)}
+          {/if}
           <div
             class="mx-auto flex w-fit max-w-full flex-col @max-lg/canvas:w-full"
           >
@@ -2013,6 +2059,17 @@
                     {/if}
                   {/snippet}
                 </ReorderGrid>
+                {#if phoneHead}
+                  <!-- Phone: the tabs are down in the tab bar, so Edit stands
+                       under the apps, as iOS puts Edit under the widgets. -->
+                  <button
+                    type="button"
+                    onclick={managing ? stopManaging : startManaging}
+                    class="btn btn-secondary btn-sm mt-6 self-center rounded-full px-5"
+                  >
+                    {@render editWords("")}
+                  </button>
+                {/if}
               </section>
             {:else}
               {@render firstApps()}
@@ -2027,6 +2084,9 @@
           aria-labelledby="tab-explore"
           class={[PAGE, settled[1] && SETTLED]}
         >
+          {#if phoneHead}
+            {@render pageHead(1)}
+          {/if}
           <!-- Explore reads like the App Store: a banner, a shelf, another
                banner, more shelves. The featured shelf keeps to apps this
                identity doesn't use yet, and steps aside when there are none. -->
@@ -2047,6 +2107,9 @@
           aria-labelledby="tab-connect"
           class={[PAGE, settled[2] && SETTLED]}
         >
+          {#if phoneHead}
+            {@render pageHead(2)}
+          {/if}
           <ConnectPage
             integrations={current.scenario.integrations}
             apps={current.apps}
@@ -2058,6 +2121,11 @@
       <!-- Content comes up from under the island through a blur that deepens
            into the canvas. A page keeps clear of it at rest (PAGE's pb-32). -->
       <ProgressiveBlur side="bottom" fade class="h-24" />
+      <!-- Phone: the head's cards go up under the logo whole, so they leave
+             through a blur too, rather than at the screen's edge. -->
+      {#if phoneHead}
+        <ProgressiveBlur side="top" fade class="h-(--header-h)" />
+      {/if}
     </div>
   </Elevated>
 
@@ -2145,6 +2213,19 @@
     <Dialog onClose={() => (panelOpen = false)}>
       {@render panel(true)}
     </Dialog>
+  {/if}
+
+  {#if phoneHead && !managing}
+    <!-- Phone: the pages are the tab bar, fixed at the bottom over the blur
+         the pages fade into. While apps are arranged the selection bar takes
+         its place, as a phone's toolbar does in a selection. -->
+    <div
+      in:shellIn={{ reduced }}
+      out:shellOut={{ reduced }}
+      class="pointer-events-none fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 flex justify-center px-3"
+    >
+      {@render pageTabs(true)}
+    </div>
   {/if}
 
   {#if islandView !== undefined}
@@ -2292,9 +2373,11 @@
        phone has it in the header, leaving the bottom to the island and the
        dock. -->
   {#if isDesktop.current || (phoneHead && islandView === undefined)}
+    <!-- On a phone it's level with the tab bar's middle (48px tall, the glyph
+         32px). -->
     <div
       transition:fade={{ duration: reduced ? 0 : 150 }}
-      class="fixed start-[calc(var(--ii-edge)-0.5rem)] bottom-[calc(1rem+env(safe-area-inset-bottom))] z-10 min-[32rem]:start-[25px] sm:start-[33px] md:start-4 md:bottom-4"
+      class="fixed start-[calc(var(--ii-edge)-0.5rem)] bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-10 min-[32rem]:start-[25px] sm:start-[33px] md:start-4 md:bottom-4"
     >
       {@render conceptControls(false)}
     </div>
