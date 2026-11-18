@@ -13,6 +13,7 @@
     ServerIcon,
     SquareTerminalIcon,
     UserRoundIcon,
+    XIcon,
   } from "@lucide/svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
@@ -30,37 +31,48 @@
   import {
     aiAccessOn,
     cliAccessOn,
+    emailStatus,
+    phraseStatus,
     withAiAccess,
     withCliAccess,
+    type MethodStatus,
     type Scenario,
   } from "../status";
   import Elevated from "./Elevated.svelte";
-  import PanelHeader from "./PanelHeader.svelte";
+  import type { RecoveryMethod } from "./RecoveryFlow.svelte";
 
   interface Props {
     section: Section;
+    /** `card`: inside its own card, grown in the panel, which names it and
+     *  closes it: the lead, then the rows on the card itself. `page`: a view
+     *  of its own, as in a phone's sheet: the title, the lead and Close,
+     *  then the rows on a card. */
+    variant: "card" | "page";
     scenario: Scenario;
     signedInWith: MockIdentity["signedInWith"];
     browsers: MockBrowser[];
-    onBack: () => void;
+    /** Close, at the end of a page's title. */
+    onClose?: () => void;
     onSignOut: (id: string) => void;
     /** Moves the scenario on, as finishing the step would. */
     onResolve: (patch: Partial<Scenario>, message: string) => void;
-    /** Opens the product's phrase check; the scenario moves on once it passes. */
-    onVerifyPhrase: (patch: Partial<Scenario>, message: string) => void;
+    /** Opens recovery's dialog on one way back in, where it's set up,
+     *  checked or managed. */
+    onRecovery: (method: RecoveryMethod) => void;
     /** For the steps the concept doesn't walk through. */
     onUnavailable: (step: string) => void;
   }
 
   const {
     section,
+    variant,
     scenario,
     signedInWith,
     browsers,
-    onBack,
+    onClose,
     onSignOut,
     onResolve,
-    onVerifyPhrase,
+    onRecovery,
     onUnavailable,
   }: Props = $props();
 
@@ -151,95 +163,69 @@
     return rows;
   });
 
+  /** Both ways back in, said as recovery's dialog says them, each opening
+   *  the dialog on itself. Only a step left half done, or a first way when
+   *  there's none, asks loudly. */
   const recoveryRows = $derived.by<Row[]>(() => {
-    const { recovery } = scenario;
-    const phrase: Row = {
-      id: "phrase",
-      icon: BookOpenIcon,
-      title: "Recovery phrase",
-      ...(recovery === "none"
-        ? {
-            meta: "Not set up · 24 words you write down and keep offline",
-            empty: true,
-            action: {
-              label: "Set up",
-              variant: "primary",
-              onclick: () =>
-                onResolve({ recovery: "noEmail" }, "Recovery phrase set up"),
-            },
-          }
-        : recovery === "unverified"
-          ? {
-              meta: "Not verified yet · Check you wrote it down right",
-              flag: "warning",
-              action: {
-                label: "Verify",
-                variant: "primary",
-                onclick: () =>
-                  onVerifyPhrase(
-                    { recovery: "noEmail" },
-                    "Recovery phrase verified",
-                  ),
-              },
-            }
-          : recovery === "usedPhrase"
-            ? {
-                meta: "You're signed in with it right now",
-                badge: { label: "Active", color: "success" },
-              }
-            : recovery === "phraseReset"
-              ? {
-                  meta: "Reset 2 hours ago",
-                  badge: { label: "New" },
-                  action: {
-                    label: "Reset",
-                    onclick: () => onUnavailable("Resetting the phrase"),
-                  },
-                }
-              : {
-                  meta: "Verified",
-                  action: {
-                    label: "Reset",
-                    onclick: () => onUnavailable("Resetting the phrase"),
-                  },
-                }),
-    } as Row;
-    const email: Row = {
-      id: "email",
-      icon: MailIcon,
-      title: "Recovery email",
-      ...(recovery === "emailPending"
-        ? {
-            meta: "Waiting for your email from t•••@gmail.com",
-            flag: "warning",
-            action: {
-              label: "See steps",
-              onclick: () => onUnavailable("Email recovery steps"),
-            },
-          }
-        : recovery === "none" ||
-            recovery === "unverified" ||
-            recovery === "noEmail"
-          ? {
-              meta: "Not set up · Send an email from your inbox to get back in",
-              empty: true,
-              action: {
-                label: "Set up",
-                onclick: () =>
-                  recovery === "noEmail"
-                    ? onResolve({ recovery: "calm" }, "Recovery email added")
-                    : onUnavailable("Setting up a recovery email"),
-              },
-            }
-          : {
-              meta: "t•••@gmail.com",
-              action: {
-                label: "Replace",
-                onclick: () => onUnavailable("Replacing the recovery email"),
-              },
-            }),
-    } as Row;
-    return [phrase, email];
+    const ways = [
+      {
+        id: "phrase" as const,
+        icon: BookOpenIcon,
+        title: "Recovery phrase",
+        status: phraseStatus(scenario.recovery),
+        off: "12 words you write down and keep offline",
+        on: "Checked on 14 Nov",
+      },
+      {
+        id: "email" as const,
+        icon: MailIcon,
+        title: "Recovery email",
+        status: emailStatus(scenario.recovery),
+        off: "A code to your inbox gets you back in",
+        on: "t•••@gmail.com",
+      },
+    ];
+    const halfDone = (status: MethodStatus) =>
+      status === "unchecked" || status === "pending";
+    const loud =
+      ways.find((way) => halfDone(way.status)) ??
+      (ways.every((way) => way.status === "off") ? ways[0] : undefined);
+    return ways.map((way): Row => {
+      const { status } = way;
+      return {
+        id: way.id,
+        icon: way.icon,
+        title: way.title,
+        meta: {
+          off: way.off,
+          unchecked: "Written down, not checked yet",
+          pending: "Waiting for the code from your inbox",
+          inUse: "You're signed in with it now",
+          new: "Reset 2 hours ago",
+          on: way.on,
+        }[status],
+        badge:
+          status === "inUse"
+            ? { label: "In use", color: "success" }
+            : status === "on" || status === "new"
+              ? { label: "On", color: "success" }
+              : undefined,
+        flag: halfDone(status) ? "warning" : undefined,
+        empty: status === "off",
+        action: {
+          label:
+            status === "off"
+              ? "Set up"
+              : status === "unchecked"
+                ? "Verify"
+                : status === "pending"
+                  ? "Continue"
+                  : "Manage",
+          variant: way === loud ? "primary" : undefined,
+          onclick: () => onRecovery(way.id),
+        },
+      };
+    });
   });
 
   const integrationRows = $derived.by<Row[]>(() => {
@@ -430,49 +416,93 @@
   </li>
 {/snippet}
 
-<div class="flex flex-col gap-4">
-  <PanelHeader title={TITLES[section][0]} lead={TITLES[section][1]} {onBack} />
+<!-- The rows lie on the grown card itself, or, on a page, on a card of their
+     own. -->
+{#snippet rows(items: Row[])}
+  <ul class="ii-rows flex flex-col [--ii-rows-inset:4rem]">
+    {#each items as item (item.id)}
+      {@render row(item)}
+    {/each}
+  </ul>
+{/snippet}
 
+{#snippet body()}
   {#if section === "devices"}
-    <Elevated offset={1} class="flex flex-col overflow-hidden rounded-2xl pb-1">
-      {#each deviceGroups as group (group.platform)}
-        <GroupHeading
-          kind={kindOf(group.browsers[0].description)}
-          platform={group.platform}
-          count={group.browsers.length}
-        />
-        <ul class="ii-rows flex flex-col [--ii-rows-inset:4rem]">
-          {#each group.browsers as browser (browser.id)}
-            {@render row(browserRow(browser))}
-          {/each}
-        </ul>
-      {/each}
-    </Elevated>
+    {#each deviceGroups as group (group.platform)}
+      <GroupHeading
+        kind={kindOf(group.browsers[0].description)}
+        platform={group.platform}
+        count={group.browsers.length}
+      />
+      {@render rows(group.browsers.map(browserRow))}
+    {/each}
   {:else}
-    {@const rows =
+    {@render rows(
       section === "access"
         ? accessRows
         : section === "recovery"
           ? recoveryRows
-          : integrationRows}
-    <Elevated
-      offset={1}
-      as="ul"
-      class="ii-rows flex flex-col overflow-hidden rounded-2xl [--ii-rows-inset:4rem]"
-    >
-      {#each rows as item (item.id)}
-        {@render row(item)}
-      {/each}
-    </Elevated>
+          : integrationRows,
+    )}
+  {/if}
+{/snippet}
+
+{#snippet addMethod()}
+  <button
+    type="button"
+    onclick={() => onUnavailable("Adding an access method")}
+    class="btn btn-secondary w-full font-medium"
+  >
+    <PlusIcon class="size-4" />
+    Add access method
+  </button>
+{/snippet}
+
+{#if variant === "card"}
+  <!-- Under the card's title, where its status sentence was. -->
+  <div class="flex flex-col pt-2.5">
+    <p class="text-text-tertiary px-4 text-[13px] leading-[18px]">
+      {TITLES[section][1]}
+    </p>
+    <div class={["flex flex-col", section !== "devices" && "pt-1"]}>
+      {@render body()}
+    </div>
     {#if section === "access"}
+      <div class="px-4 pt-1 pb-4">{@render addMethod()}</div>
+    {:else}
+      <div class="h-1"></div>
+    {/if}
+  </div>
+{:else}
+  <div class="flex flex-col gap-4">
+    <!-- Only what this is and the way out: Close at the end, across from the
+         title, as recovery's dialog has it. -->
+    <header class="flex items-start gap-3">
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5 pt-1.5">
+        <h2 class="text-text-primary text-base leading-6 font-semibold">
+          {TITLES[section][0]}
+        </h2>
+        <p class="text-text-tertiary text-[13px] leading-[18px]">
+          {TITLES[section][1]}
+        </p>
+      </div>
       <button
         type="button"
-        onclick={() => onUnavailable("Adding an access method")}
-        class="btn btn-secondary w-full font-medium"
+        onclick={onClose}
+        class="btn btn-tertiary btn-icon btn-sm -me-2 shrink-0 rounded-full"
       >
-        <PlusIcon class="size-4" />
-        Add access method
+        <XIcon class="size-5" aria-hidden="true" />
+        <span>Close</span>
       </button>
+    </header>
+    <Elevated offset={1} class="flex flex-col overflow-hidden rounded-2xl">
+      {@render body()}
+      {#if section === "devices"}
+        <div class="h-1"></div>
+      {/if}
+    </Elevated>
+    {#if section === "access"}
+      {@render addMethod()}
     {/if}
-  {/if}
-</div>
+  </div>
+{/if}

@@ -252,3 +252,167 @@ export const hop = (
     { duration: elapsed },
   );
 };
+
+/** The concept's `--ii-ease-out`, for animations run from script. */
+const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
+
+/** Where an item of a list stood, against the list (its offset parent). */
+export interface Spot {
+  top: number;
+  left: number;
+  width: number;
+}
+
+/** Where each `[data-morph]` item of a list stands now, by its id. */
+export const spotsOf = (list: HTMLElement): Record<string, Spot> =>
+  Object.fromEntries(
+    Array.from(list.querySelectorAll<HTMLElement>(":scope > [data-morph]")).map(
+      (item) => [
+        item.dataset.morph,
+        { top: item.offsetTop, left: item.offsetLeft, width: item.offsetWidth },
+      ],
+    ),
+  );
+
+interface MorphParams {
+  /** The list: its `[data-morph]` items, one of which grows. */
+  list: HTMLElement;
+  /** The item that grows or shrinks back. */
+  id: string;
+  opening: boolean;
+  /** Changes the state and resolves once the DOM shows it. Before it, the
+   *  page holds the others where they stood (`spotsOf`) as they fade; the
+   *  card keeps both its layers, `[data-layer="summary"]` and
+   *  `[data-layer="content"]`, the leaving one out of the flow. */
+  change: () => Promise<void>;
+  /** Called once, as the list is laid out the new way: on an opening, the
+   *  panel goes back to its top, where the grown card now starts. */
+  settle?: () => void;
+  reduced: boolean;
+}
+
+/**
+ * A card of a list growing into its whole section, and back: FLIP on the
+ * card's box (`[data-morph-box]`, which clips what it holds). Measured, then
+ * changed, then measured again, it starts where it stood and glides to where
+ * it now is, its height following, while the preview and the section cross
+ * inside it and the other items fade where they stood.
+ *
+ * Opening takes 420ms, a large move that a strong ease-out still makes feel
+ * quick; closing, 340ms. Under reduced motion only opacity moves. Resolves
+ * when the card has landed, false if a newer morph took over.
+ */
+export const morph = async ({
+  list,
+  id,
+  opening,
+  change,
+  settle,
+  reduced,
+}: MorphParams): Promise<boolean> => {
+  const item = list.querySelector<HTMLElement>(`:scope > [data-morph="${id}"]`);
+  const box = item?.querySelector<HTMLElement>("[data-morph-box]");
+  if (item === null || box === null || box === undefined) {
+    await change();
+    return true;
+  }
+  const others = Array.from(
+    list.querySelectorAll<HTMLElement>(":scope > [data-morph]"),
+  ).filter((one) => one !== item);
+  // Measured mid-flight too, so a reversal starts from where things are.
+  const first = box.getBoundingClientRect();
+  const shown = new Map(
+    others.map((one) => [one, Number(getComputedStyle(one).opacity)]),
+  );
+  // Only what a morph runs: Svelte's own transitions inside stay theirs.
+  for (const one of [
+    box,
+    ...others,
+    ...Array.from(box.querySelectorAll<HTMLElement>("[data-layer]")),
+  ]) {
+    for (const animation of one.getAnimations()) {
+      animation.cancel();
+    }
+  }
+  for (const one of [item, ...others]) {
+    one.style.height = "";
+  }
+
+  await change();
+  settle?.();
+  const last = box.getBoundingClientRect();
+  const duration = opening ? 420 : 340;
+
+  if (!opening) {
+    // Its slot is already the small card's, so the items after it stand
+    // where they'll be while it shrinks back down over them.
+    item.style.height = `${last.height}px`;
+  }
+
+  const layers = {
+    summary: box.querySelector<HTMLElement>('[data-layer="summary"]'),
+    content: box.querySelector<HTMLElement>('[data-layer="content"]'),
+  };
+  const arriving = opening ? layers.content : layers.summary;
+  const leaving = opening ? layers.summary : layers.content;
+  arriving?.animate([{ opacity: 0 }, { opacity: 1 }], {
+    delay: reduced ? 0 : 40,
+    duration: reduced ? 150 : opening ? 280 : 220,
+    easing: EASE_OUT,
+    fill: "backwards",
+  });
+  leaving?.animate([{ opacity: 1 }, { opacity: 0 }], {
+    duration: reduced ? 100 : 120,
+    easing: EASE_OUT,
+    fill: "forwards",
+  });
+
+  for (const one of others) {
+    const from = shown.get(one) ?? 1;
+    one.animate(
+      opening
+        ? [
+            { opacity: from, transform: "scale(1)" },
+            { opacity: 0, transform: reduced ? "none" : "scale(0.97)" },
+          ]
+        : [
+            { opacity: from, transform: reduced ? "none" : "scale(0.97)" },
+            { opacity: 1, transform: "none" },
+          ],
+      opening
+        ? {
+            duration: reduced ? 100 : 180,
+            easing: EASE_OUT,
+            fill: "forwards",
+          }
+        : {
+            delay: reduced ? 0 : 80,
+            duration: reduced ? 150 : 260,
+            easing: EASE_OUT,
+            fill: "backwards",
+          },
+    );
+  }
+
+  const landing = reduced
+    ? undefined
+    : box.animate(
+        [
+          {
+            transform: `translateY(${first.top - last.top}px)`,
+            height: `${first.height}px`,
+          },
+          { transform: "none", height: `${last.height}px` },
+        ],
+        { duration, easing: EASE_OUT },
+      );
+  try {
+    await (landing?.finished ??
+      new Promise((resolve) => setTimeout(resolve, 150)));
+  } catch {
+    // Cancelled: a newer morph took over and measured from here.
+    return false;
+  }
+  item.style.height = "";
+  return true;
+};

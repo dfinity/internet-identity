@@ -77,7 +77,15 @@
     type ConceptApp,
     type FeaturedApp,
   } from "./mockData";
-  import { shellIn, shellOut, viewIn, viewOut } from "./motion";
+  import {
+    morph,
+    shellIn,
+    shellOut,
+    spotsOf,
+    viewIn,
+    viewOut,
+    type Spot,
+  } from "./motion";
   import { ConceptTheme } from "./theme.svelte";
   import {
     deriveStatus,
@@ -395,6 +403,18 @@
       .filter((app) => app !== undefined),
   );
 
+  /** On desktop the three sections open in place: the card grows into its
+   *  section and the rest of the overview steps away. */
+  const grown = $derived(
+    isDesktop.current &&
+      section !== undefined &&
+      ACCOUNT_KINDS.includes(section)
+      ? section
+      : undefined,
+  );
+  /** A section as a view of its own: in a phone's sheet, and integrations. */
+  const sectionPage = $derived(grown === undefined ? section : undefined);
+
   // Which view the panel shows, and which way it moved to get there.
   const viewKey = $derived(
     managing
@@ -405,8 +425,11 @@
           : "manage"
       : openedApp !== undefined
         ? `details:${openedApp.origin}`
-        : (section ?? "overview"),
+        : (sectionPage ?? "overview"),
   );
+  /** Views that keep the identity's line on top, past the overview: an
+   *  app's details and managing apps. A section names itself. */
+  const nested = $derived(viewKey !== "overview" && sectionPage === undefined);
   let navDirection = $state(1);
   const readingDirection = () =>
     document.documentElement.dir === "rtl" ? -1 : 1;
@@ -422,27 +445,85 @@
     recoveryOpen = true;
   };
 
-  const openCard = (kind: CardKind) => {
-    if (kind === "recovery") {
-      openRecovery();
+  /** The overview's cards, where one grows into its section on desktop. */
+  let morphList = $state<HTMLElement>();
+  /** While a card grows, where the others stood, so they fade there. */
+  let held = $state<Record<string, Spot>>();
+  /** The card with both its preview and its section while it grows or
+   *  shrinks back. */
+  let morphing = $state<CardKind>();
+  let morphRun = 0;
+
+  /** Opens a section, or closes the open one. On desktop, with the overview
+   *  in view, its card grows into it in place and shrinks back. */
+  const showSection = async (next: Section | undefined) => {
+    const target = next ?? section;
+    const list = morphList;
+    if (
+      target === undefined ||
+      list === undefined ||
+      !list.isConnected ||
+      !isDesktop.current ||
+      !panelVisible ||
+      viewKey !== "overview" ||
+      !ACCOUNT_KINDS.includes(target)
+    ) {
+      section = next;
       return;
     }
+    const run = ++morphRun;
+    const opening = next !== undefined;
+    await morph({
+      list,
+      id: target,
+      opening,
+      reduced,
+      change: async () => {
+        held = opening ? spotsOf(list) : undefined;
+        morphing = target;
+        section = next;
+        await tick();
+      },
+      // The grown card starts at the top of the panel, so the panel does.
+      settle: () => {
+        if (opening && aside !== undefined) {
+          aside.scrollTop = 0;
+        }
+      },
+    });
+    if (run === morphRun) {
+      morphing = undefined;
+      held = undefined;
+    }
+  };
+
+  /** Where an item of the overview is held while a card grows over it. */
+  const heldAt = (id: string): Spot | undefined =>
+    grown !== undefined && grown !== id ? held?.[id] : undefined;
+
+  const openCard = (kind: CardKind) => {
     navDirection = 1;
     switching = false;
     if (kind === "apps") {
       startManaging();
+    } else if (kind === "recovery" && !isDesktop.current) {
+      // A phone has recovery's own sheet for it: both ways back in, each a
+      // tap from its steps, under its title and Close.
+      openRecovery();
     } else {
-      section = kind;
+      void showSection(kind);
     }
   };
 
   const closeSection = () => {
     navDirection = -1;
-    section = undefined;
-    // A phone opened the section from its header, so back is back there.
-    if (phoneHead) {
-      panelOpen = false;
+    if (isDesktop.current) {
+      void showSection(undefined);
+      return;
     }
+    // A phone's sheet holds only the section, so Close puts it away.
+    section = undefined;
+    panelOpen = false;
   };
 
   /** A section from the phone's header: in the sheet, over the apps. */
@@ -1059,6 +1140,7 @@
     if (!panelVisible) {
       appOpen = undefined;
       switching = false;
+      section = undefined;
     }
   });
 
@@ -1098,6 +1180,14 @@
 
   const onWindowKeydown = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) {
+      return;
+    }
+    // An open popover or dialog takes Escape first.
+    const overlaid =
+      document.querySelector(".popover:popover-open, dialog[open]") !== null;
+    if (grown !== undefined && viewKey === "overview" && !overlaid) {
+      event.preventDefault();
+      closeSection();
       return;
     }
     if (
@@ -1537,54 +1627,114 @@
         Identity
       </h2>
     {/if}
-    <IdentityCard
-      {identity}
-      others={identities
-        .map((entry) => entry.identity)
-        .filter((one) => one.identityNumber !== identity.identityNumber)}
-      bind:switching
-      signedInWith={signedInWith.title}
-      {paletteOf}
-      colour={colourIndex}
-      onColour={pickColour}
-      onSwitch={switchIdentity}
-      onAdd={() => unavailable("Adding an identity")}
-      onStartPage={showStartPage}
-      onSignOut={() => unavailable("Signing out")}
-    >
-      {#snippet alert()}
-        {#if incident !== undefined}
-          <div
-            class="px-2 pb-2"
-            out:slide={{ duration: reduced ? 0 : 260, easing: quintOut }}
-          >
-            <IncidentCard {incident} onAnswer={answerIncident} />
-          </div>
-        {/if}
-      {/snippet}
-    </IdentityCard>
-    <!-- Three independent cards, each a large target that leads to its
-         section: the title, where it stands, and what's inside. -->
-    <div class="flex flex-col gap-2.5">
-      {#each accountCards as card (card.kind)}
-        <Elevated offset={1} class="overflow-hidden rounded-2xl">
-          <StatusCard
-            kind={card.kind}
-            title={TITLES[card.kind]}
-            sentence={card.sentence}
-            tone={card.tone}
-            resolved={resolvedKinds.includes(card.kind)}
-            onOpen={() => openCard(card.kind)}
-            preview={card.kind === "access"
-              ? accessPreview
-              : card.kind === "recovery"
-                ? recoveryPreview
-                : devicesPreview}
-          />
-        </Elevated>
+    <!-- The identity, then three independent cards, each a large target that
+         leads to its section: the title, where it stands, and what's inside.
+         On desktop a card grows into its section in place: it rises to the
+         top as it opens, and the identity and the other two fade where they
+         stand (held there out of the flow, then gone), so the section has
+         the panel to itself until Close shrinks it back into its slot. -->
+    <div bind:this={morphList} class="relative flex flex-col">
+      {@render overviewItem("identity", "")}
+      {#each accountCards as card, index (card.kind)}
+        {@render overviewItem(
+          card.kind,
+          grown === card.kind ? "" : index === 0 ? "mt-5" : "mt-2.5",
+          card,
+        )}
       {/each}
     </div>
   </div>
+{/snippet}
+
+{#snippet overviewItem(id: string, space: string, card?: CardStatus)}
+  {@const at = heldAt(id)}
+  <div
+    data-morph={id}
+    inert={grown !== undefined && grown !== id}
+    style:top={at !== undefined ? `${at.top}px` : undefined}
+    style:left={at !== undefined ? `${at.left}px` : undefined}
+    style:width={at !== undefined ? `${at.width}px` : undefined}
+    class={[
+      space,
+      (grown === id || morphing === id) && "relative z-1",
+      grown !== undefined &&
+        grown !== id &&
+        (at !== undefined ? "pointer-events-none absolute" : "hidden"),
+    ]}
+  >
+    {#if card === undefined}
+      {@render identityItem()}
+    {:else}
+      {@render statusCard(card)}
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet identityItem()}
+  <IdentityCard
+    {identity}
+    others={identities
+      .map((entry) => entry.identity)
+      .filter((one) => one.identityNumber !== identity.identityNumber)}
+    bind:switching
+    signedInWith={signedInWith.title}
+    {paletteOf}
+    colour={colourIndex}
+    onColour={pickColour}
+    onSwitch={switchIdentity}
+    onAdd={() => unavailable("Adding an identity")}
+    onStartPage={showStartPage}
+    onSignOut={() => unavailable("Signing out")}
+  >
+    {#snippet alert()}
+      {#if incident !== undefined}
+        <div
+          class="px-2 pb-2"
+          out:slide={{ duration: reduced ? 0 : 260, easing: quintOut }}
+        >
+          <IncidentCard {incident} onAnswer={answerIncident} />
+        </div>
+      {/if}
+    {/snippet}
+  </IdentityCard>
+{/snippet}
+
+{#snippet statusCard(card: CardStatus)}
+  <Elevated offset={1} data-morph-box class="overflow-hidden rounded-2xl">
+    <StatusCard
+      kind={card.kind}
+      title={TITLES[card.kind]}
+      sentence={card.sentence}
+      tone={card.tone}
+      resolved={resolvedKinds.includes(card.kind)}
+      open={grown === card.kind}
+      morphing={morphing === card.kind}
+      onOpen={() => openCard(card.kind)}
+      onClose={closeSection}
+      preview={card.kind === "access"
+        ? accessPreview
+        : card.kind === "recovery"
+          ? recoveryPreview
+          : devicesPreview}
+    >
+      {@render sectionOf(card.kind as Section, "card")}
+    </StatusCard>
+  </Elevated>
+{/snippet}
+
+{#snippet sectionOf(kind: Section, variant: "card" | "page")}
+  <SectionView
+    section={kind}
+    {variant}
+    scenario={current.scenario}
+    {signedInWith}
+    {browsers}
+    onClose={closeSection}
+    onSignOut={signOut}
+    onResolve={resolve}
+    onRecovery={openRecovery}
+    onUnavailable={unavailable}
+  />
 {/snippet}
 
 {#snippet panelBody(inSheet: boolean)}
@@ -1631,18 +1781,8 @@
       onRead={(id) => read(app, id)}
       onReadAll={() => readAll(app)}
     />
-  {:else if section !== undefined}
-    <SectionView
-      {section}
-      scenario={current.scenario}
-      {signedInWith}
-      {browsers}
-      onBack={closeSection}
-      onSignOut={signOut}
-      onResolve={resolve}
-      onVerifyPhrase={verifyPhrase}
-      onUnavailable={unavailable}
-    />
+  {:else if sectionPage !== undefined}
+    {@render sectionOf(sectionPage, "page")}
   {:else}
     {@render overview(inSheet)}
   {/if}
@@ -1650,20 +1790,21 @@
 
 {#snippet panel(inSheet: boolean)}
   <!-- Views stack in one cell, so the old one fades while the new one arrives.
-       Past the overview, the identity card folds into one line at the top of
-       every section, so it's always clear whose access methods, devices or
-       apps these are. The line is part of that move: it comes in with the
-       first section and leaves with the last, alongside the view, instead of
-       growing above the views and pushing both down. Between sections it
-       stays put, and only the view under it changes. -->
+       Past the overview, in an app's details and while apps are managed, the
+       identity card folds into one line at the top, so it's always clear
+       whose apps these are. The line is part of that move: it comes in with
+       the first of those views and leaves with the last, alongside the view,
+       instead of growing above the views and pushing both down. Between them
+       it stays put, and only the view under it changes. A section heads
+       itself, with its title and Close. -->
   <div class="grid">
-    {#key viewKey === "overview"}
+    {#key nested ? "nested" : viewKey}
       <div
         class="col-start-1 row-start-1 min-w-0"
         in:viewIn={{ direction: navDirection * readingDirection(), reduced }}
         out:viewOut={{ reduced }}
       >
-        {#if viewKey === "overview"}
+        {#if !nested}
           {@render panelBody(inSheet)}
         {:else}
           <div class={[inSheet && "pe-10"]}>
@@ -2212,9 +2353,13 @@
     </Dialog>
   {/if}
 
-  <!-- Phone: the panel is a sheet from the bottom, as dialogs are elsewhere. -->
+  <!-- Phone: the panel is a sheet from the bottom, as dialogs are elsewhere.
+       A section brings its own Close, across from its title. -->
   {#if panelOpen && !isDesktop.current}
-    <Dialog onClose={() => (panelOpen = false)}>
+    <Dialog
+      onClose={() => (panelOpen = false)}
+      showCloseButton={sectionPage === undefined}
+    >
       {@render panel(true)}
     </Dialog>
   {/if}
