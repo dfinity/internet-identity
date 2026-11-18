@@ -193,7 +193,7 @@ fn second_identity_at(
 /// Answers every outcall for [`OUTCALL_ROUNDS`] rounds: a sender list with
 /// [`app_sender`], `push_status` to every push, and any other `GET`, a relay probe, with
 /// `200`. Answers the URLs pushed to.
-fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
+pub(super) fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
     let mut pushed_urls = Vec::new();
     for _ in 0..OUTCALL_ROUNDS {
         env.advance_time(Duration::from_millis(ROUND_MILLIS));

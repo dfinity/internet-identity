@@ -1604,6 +1604,8 @@ mod installing_over_an_app {
             },
         )?
         .expect("the probe returned Err");
+        // Recorded once the push service accepts it.
+        super::pwa::answer_outcalls(&env, 201);
 
         // Inside its window the probe may still be answered.
         assert_eq!(
