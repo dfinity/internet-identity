@@ -3308,10 +3308,16 @@ impl<M: Memory + Clone> Storage<M> {
         previous_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
         current_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
     ) {
-        let previous_holders =
-            pwa_subscription_holders(anchor_number, application_number, previous_subscriptions);
-        let current_holders =
-            pwa_subscription_holders(anchor_number, application_number, current_subscriptions);
+        let previous_holders = collect_pwa_subscription_holders(
+            anchor_number,
+            application_number,
+            previous_subscriptions,
+        );
+        let current_holders = collect_pwa_subscription_holders(
+            anchor_number,
+            application_number,
+            current_subscriptions,
+        );
 
         for (endpoint_hash, holder) in previous_holders.difference(&current_holders) {
             let Some(indexed_holder) = self
@@ -3371,7 +3377,7 @@ impl<M: Memory + Clone> Storage<M> {
         };
         match held_subscription.subscription {
             StorableWebPushSubscription::Ready { endpoint, .. } => {
-                endpoint_sha256(&endpoint) == *endpoint_hash
+                hash_endpoint(&endpoint) == *endpoint_hash
             }
             StorableWebPushSubscription::Pending { .. } => false,
         }
@@ -3383,7 +3389,7 @@ impl<M: Memory + Clone> Storage<M> {
         endpoint: &str,
     ) -> Option<PwaSubscriptionHolder> {
         self.lookup_pwa_webpush_subscription_with_endpoint_memory
-            .get(&endpoint_sha256(endpoint))
+            .get(&hash_endpoint(endpoint))
             .map(PwaSubscriptionHolder::from)
     }
 
@@ -3397,32 +3403,30 @@ impl<M: Memory + Clone> Storage<M> {
         subscription: Option<PwaSubscription>,
         displaced_holder: Option<PwaSubscriptionHolder>,
     ) -> Result<(), StorageError> {
-        let displaced_config = match displaced_holder {
-            Some(displaced_holder) => Some((
-                displaced_holder,
-                self.pwa_subscription_config(displaced_holder)?,
-            )),
-            None => None,
-        };
-        self.pwa_subscription_config(holder)?;
-
-        if let Some((displaced_holder, mut config)) = displaced_config {
-            config.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
-            self.store_anchor_application_config(
-                (
-                    displaced_holder.anchor_number,
-                    displaced_holder.application_number,
-                ),
-                Some(config),
-            );
-        }
-        // Read after the displaced slot is emptied: both slots may be on one config.
+        let config_key = (holder.anchor_number, holder.application_number);
         let mut config = self.pwa_subscription_config(holder)?;
+        // Both configs are read before either is written. A displaced slot on the same
+        // config is emptied on that one copy, so the write below carries both changes.
+        let mut displaced_config = None;
+        if let Some(displaced_holder) = displaced_holder {
+            let displaced_config_key = (
+                displaced_holder.anchor_number,
+                displaced_holder.application_number,
+            );
+            if displaced_config_key == config_key {
+                config.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
+            } else {
+                let mut config_of_displaced = self.pwa_subscription_config(displaced_holder)?;
+                config_of_displaced.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
+                displaced_config = Some((displaced_config_key, config_of_displaced));
+            }
+        }
+
         config.set_pwa_webpush_subscription(holder.browser_id, subscription);
-        self.store_anchor_application_config(
-            (holder.anchor_number, holder.application_number),
-            Some(config),
-        );
+        if let Some((displaced_config_key, config_of_displaced)) = displaced_config {
+            self.store_anchor_application_config(displaced_config_key, Some(config_of_displaced));
+        }
+        self.store_anchor_application_config(config_key, Some(config));
         Ok(())
     }
 
@@ -3438,11 +3442,13 @@ impl<M: Memory + Clone> Storage<M> {
         let Some(held_subscription) = config.pwa_webpush_subscription(holder.browser_id) else {
             return Ok(());
         };
+        let subscription = WebPushSubscription::Ready(subscription);
+        let account_principal = held_subscription.account_principal;
         config.set_pwa_webpush_subscription(
             holder.browser_id,
             Some(PwaSubscription {
-                subscription: WebPushSubscription::Ready(subscription),
-                account_principal: held_subscription.account_principal,
+                subscription,
+                account_principal,
             }),
         );
         self.store_anchor_application_config(
@@ -5755,13 +5761,13 @@ impl From<StorablePwaSubscriptionHolder> for PwaSubscriptionHolder {
 }
 
 /// What the endpoint lookup is keyed by: an endpoint is up to 512 bytes, its hash 32.
-fn endpoint_sha256(endpoint: &str) -> [u8; 32] {
+fn hash_endpoint(endpoint: &str) -> [u8; 32] {
     Sha256::digest(endpoint.as_bytes()).into()
 }
 
 /// The lookup entries `subscriptions` implies: one per subscribed endpoint. A subscription
 /// waiting on its subscribe has no endpoint yet.
-fn pwa_subscription_holders(
+fn collect_pwa_subscription_holders(
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
     subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
@@ -5772,12 +5778,13 @@ fn pwa_subscription_holders(
             StorableWebPushSubscription::Ready { endpoint, .. } => endpoint,
             StorableWebPushSubscription::Pending { .. } => continue,
         };
+        let browser_id = *browser_id;
         holders.insert((
-            endpoint_sha256(endpoint),
+            hash_endpoint(endpoint),
             StorablePwaSubscriptionHolder {
                 anchor_number,
                 application_number,
-                browser_id: *browser_id,
+                browser_id,
             },
         ));
     }

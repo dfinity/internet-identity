@@ -172,23 +172,30 @@ impl InboxNotification {
 
 impl From<InboxNotification> for StorableInboxNotification {
     fn from(value: InboxNotification) -> Self {
+        let InboxNotification {
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
+        } = value;
+        let sender = sender.as_slice().to_vec();
+        let kind = match kind {
+            InboxNotificationKind::App { account_principal } => {
+                let account_principal = account_principal.as_slice().to_vec();
+                StorableInboxNotificationKind::App { account_principal }
+            }
+            InboxNotificationKind::Identity { event } => {
+                let event = StorableNotificationEvent::from(event);
+                StorableInboxNotificationKind::Identity { event }
+            }
+        };
         StorableInboxNotification {
-            inbox_notification_id: value.inbox_notification_id,
-            sender: value.sender.as_slice().to_vec(),
-            notification_id: value.notification_id,
-            expires_at_ns: value.expires_at_ns,
-            kind: match value.kind {
-                InboxNotificationKind::App { account_principal } => {
-                    StorableInboxNotificationKind::App {
-                        account_principal: account_principal.as_slice().to_vec(),
-                    }
-                }
-                InboxNotificationKind::Identity { event } => {
-                    StorableInboxNotificationKind::Identity {
-                        event: StorableNotificationEvent::from(event),
-                    }
-                }
-            },
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
         }
     }
 }
@@ -202,23 +209,30 @@ impl TryFrom<StorableInboxNotification> for InboxNotification {
         let principal = |bytes: &[u8]| {
             Principal::try_from_slice(bytes).map_err(|err| format!("not a principal: {err}"))
         };
+        let StorableInboxNotification {
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
+        } = value;
+        let sender = principal(&sender)?;
+        let kind = match kind {
+            StorableInboxNotificationKind::App { account_principal } => {
+                let account_principal = principal(&account_principal)?;
+                InboxNotificationKind::App { account_principal }
+            }
+            StorableInboxNotificationKind::Identity { event } => {
+                let event = NotificationEvent::from(event);
+                InboxNotificationKind::Identity { event }
+            }
+        };
         Ok(InboxNotification {
-            inbox_notification_id: value.inbox_notification_id,
-            sender: principal(&value.sender)?,
-            notification_id: value.notification_id,
-            expires_at_ns: value.expires_at_ns,
-            kind: match value.kind {
-                StorableInboxNotificationKind::App { account_principal } => {
-                    InboxNotificationKind::App {
-                        account_principal: principal(&account_principal)?,
-                    }
-                }
-                StorableInboxNotificationKind::Identity { event } => {
-                    InboxNotificationKind::Identity {
-                        event: NotificationEvent::from(event),
-                    }
-                }
-            },
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
         })
     }
 }

@@ -105,13 +105,13 @@ pub enum PreparedPwaSubscription {
     Pending,
 }
 
-/// What [`holder_of`] answers for a session whose app has no application number.
+/// What [`resolve_pwa_holder`] answers for a session whose app has no application number.
 const NO_APPLICATION_NUMBER: &str = "the session's app has no application number";
 
 /// Where `session` registers: its identity, its app and the browser entry it signed in
 /// from. An error, logged, where the session's app has no application number, which an
 /// app with a session always has.
-pub fn holder_of(session: &AuthorizedSession) -> Result<PwaSubscriptionHolder, String> {
+pub fn resolve_pwa_holder(session: &AuthorizedSession) -> Result<PwaSubscriptionHolder, String> {
     let Some(application_number) =
         storage_borrow(|storage| storage.lookup_application_number_with_origin(&session.origin))
     else {
@@ -188,11 +188,20 @@ pub fn set_pwa_subscription(
         endpoint,
         now_ns,
     )
-    .map_err(set_error)?;
-    let displaced_holder = displaced_holder(holder, &ready_subscription)?;
+    .inspect_err(|err| {
+        if matches!(err, SetWebPushSubscriptionError::InvalidBrowserKey) {
+            ic_cdk::println!("ERROR: spending a transport key refused a browser key");
+        }
+    })
+    .map_err(map_set_error)?;
+    let displaced_holder = find_endpoint_holder(holder, &ready_subscription.endpoint);
+    if let Some(endpoint_holder) = displaced_holder {
+        check_takeover(holder, endpoint_holder, &ready_subscription)?;
+    }
 
+    let subscription = WebPushSubscription::Ready(ready_subscription);
     let subscription = PwaSubscription {
-        subscription: WebPushSubscription::Ready(ready_subscription),
+        subscription,
         account_principal,
     };
     write(holder, Some(subscription), displaced_holder).map_err(SetPwaSubscriptionError::Internal)
@@ -214,29 +223,42 @@ fn remove_pwa_subscription(
     write(holder, None, None).map_err(SetPwaSubscriptionError::Internal)
 }
 
-/// The other slot `ready_subscription`'s endpoint is taken over from, refusing where it is not the
-/// same app's or holds other keys. `None` where no other slot holds it.
-fn displaced_holder(
+/// The other slot that holds `endpoint` now, which a subscription for `holder` at that
+/// endpoint takes it over from. `None` where no other slot holds it: the lookup is derived
+/// from the configs, so a slot it still names that no longer holds the endpoint holds
+/// nothing to take over.
+fn find_endpoint_holder(
     holder: PwaSubscriptionHolder,
-    ready_subscription: &ReadySubscription,
-) -> Result<Option<PwaSubscriptionHolder>, SetPwaSubscriptionError> {
-    let Some(indexed_holder) = storage_borrow(|storage| {
-        storage.lookup_pwa_webpush_subscription_with_endpoint(ready_subscription.endpoint.as_str())
-    }) else {
-        return Ok(None);
-    };
+    endpoint: &PushEndpoint,
+) -> Option<PwaSubscriptionHolder> {
+    let indexed_holder = storage_borrow(|storage| {
+        storage.lookup_pwa_webpush_subscription_with_endpoint(endpoint.as_str())
+    })?;
     if indexed_holder == holder {
-        return Ok(None);
+        return None;
     }
-    // The lookup is derived from the configs, so a slot that no longer holds the endpoint
-    // holds nothing to protect.
-    let Some(held_subscription) = read(indexed_holder)
+    let held_subscription = read(indexed_holder)?;
+    let ready_subscription = held_subscription.subscription.into_ready()?;
+    if ready_subscription.endpoint != *endpoint {
+        return None;
+    }
+    Some(indexed_holder)
+}
+
+/// Whether `holder` may take `ready_subscription`'s endpoint over from `endpoint_holder`:
+/// only the same app may, with the same keys, which is the same app on the same device
+/// subscribing again. Refused with `EndpointInUse` otherwise.
+fn check_takeover(
+    holder: PwaSubscriptionHolder,
+    endpoint_holder: PwaSubscriptionHolder,
+    ready_subscription: &ReadySubscription,
+) -> Result<(), SetPwaSubscriptionError> {
+    let Some(held_subscription) = read(endpoint_holder)
         .and_then(|held_subscription| held_subscription.subscription.into_ready())
-        .filter(|held_subscription| held_subscription.endpoint == ready_subscription.endpoint)
     else {
-        return Ok(None);
+        return Ok(());
     };
-    let is_same_application = indexed_holder.application_number == holder.application_number;
+    let is_same_application = endpoint_holder.application_number == holder.application_number;
     let is_same_subscriber_key = bool::from(
         held_subscription
             .subscriber_key
@@ -252,7 +274,7 @@ fn displaced_holder(
     if !(is_same_application && is_same_subscriber_key && is_same_auth) {
         return Err(SetPwaSubscriptionError::EndpointInUse);
     }
-    Ok(Some(indexed_holder))
+    Ok(())
 }
 
 /// The subscription a relay answered gone for, dropped where `holder`'s browser entry
@@ -275,7 +297,7 @@ pub(crate) fn clear_gone_pwa_subscription(
 
 /// The endpoint `holder`'s browser entry is subscribed at, where it is ready and delivers
 /// for `account_principal`'s account.
-pub fn pwa_subscription_status(
+pub fn read_pwa_subscription_status(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
 ) -> Option<WebPushSubscriptionStatus> {
@@ -284,9 +306,8 @@ pub fn pwa_subscription_status(
         return None;
     }
     let ready_subscription = held_subscription.subscription.into_ready()?;
-    Some(WebPushSubscriptionStatus {
-        endpoint: ready_subscription.endpoint.as_str().to_string(),
-    })
+    let endpoint = ready_subscription.endpoint.as_str().to_string();
+    Some(WebPushSubscriptionStatus { endpoint })
 }
 
 /// What `holder`'s browser entry holds, and the account it delivers for.
@@ -319,7 +340,7 @@ fn is_allowed(holder: PwaSubscriptionHolder) -> bool {
 
 /// What spending the transport key answers, in this module's terms. Spending names no
 /// browser key, so a refusal of one is a broken invariant.
-fn set_error(err: SetWebPushSubscriptionError) -> SetPwaSubscriptionError {
+fn map_set_error(err: SetWebPushSubscriptionError) -> SetPwaSubscriptionError {
     match err {
         SetWebPushSubscriptionError::TransportKeyExpired => {
             SetPwaSubscriptionError::TransportKeyExpired
@@ -328,7 +349,6 @@ fn set_error(err: SetWebPushSubscriptionError) -> SetPwaSubscriptionError {
             SetPwaSubscriptionError::Internal(err)
         }
         SetWebPushSubscriptionError::InvalidBrowserKey => {
-            ic_cdk::println!("ERROR: spending a transport key refused a browser key");
             SetPwaSubscriptionError::Internal("a browser key was refused".to_string())
         }
     }
@@ -341,13 +361,13 @@ pub fn prepare_pwa_subscription(
     vapid_public_key: Vec<u8>,
     now_ns: Timestamp,
 ) -> Result<PreparedPwaSubscription, PreparePwaSubscriptionError> {
-    let holder = holder_of(session).map_err(PreparePwaSubscriptionError::Internal)?;
+    let holder = resolve_pwa_holder(session).map_err(PreparePwaSubscriptionError::Internal)?;
     // Before the pool is asked, so an app without consent is told so rather than to come
     // back.
     if !is_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
-    let Some(seeds) = seed_pool::seeds_for_pwa(holder, now_ns) else {
+    let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {
         return Ok(PreparedPwaSubscription::Pending);
     };
     let transport_public_key = transport::public_key_of(&seeds.transport_secret);
@@ -358,10 +378,12 @@ pub fn prepare_pwa_subscription(
         seeds.sender_seed,
         now_ns,
     )?;
+    let vapid_public_key = ByteBuf::from(vapid_public_key);
+    let transport_public_key = ByteBuf::from(transport_public_key);
     Ok(PreparedPwaSubscription::Keys(
         PrepareWebPushSubscriptionResponse {
-            vapid_public_key: ByteBuf::from(vapid_public_key),
-            transport_public_key: ByteBuf::from(transport_public_key),
+            vapid_public_key,
+            transport_public_key,
         },
     ))
 }

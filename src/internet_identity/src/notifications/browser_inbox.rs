@@ -178,12 +178,13 @@ pub(crate) fn notification_named(
         // Ours names no app, so there is no origin to resolve and no consent to read: the
         // words for it are written in the service worker.
         InboxNotificationKind::Identity { event } => {
+            let event = Some(event.clone());
             return Some(NotificationToShow {
                 origin: None,
                 account_number: None,
                 canister_id: entry.sender,
                 id: entry.notification_id,
-                event: Some(event.clone()),
+                event,
             });
         }
     };
@@ -255,7 +256,7 @@ pub(crate) fn remove_collected(
 /// [`notification_named`] for an installed web app: only an entry of `holder`'s app for
 /// the account `account_principal` names, in its browser entry's inbox, and only what the
 /// app fetches the content with.
-pub(crate) fn pwa_notification_named(
+pub(crate) fn find_pwa_notification(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
     inbox_notification_id: InboxNotificationId,

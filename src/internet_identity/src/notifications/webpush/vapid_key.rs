@@ -244,7 +244,7 @@ pub(crate) enum VapidPublicKey {
 }
 
 /// [`public_key`], asking for it where we hold none.
-pub(crate) fn public_key_or_fetch() -> VapidPublicKey {
+pub(crate) fn read_or_fetch_public_key() -> VapidPublicKey {
     if let Some(key) = public_key() {
         return VapidPublicKey::Held(key);
     }

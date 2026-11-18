@@ -35,19 +35,31 @@ impl TryFrom<StorablePwaSubscription> for PwaSubscription {
     /// A row this canister wrote, read back: refusing it means the row is not what it
     /// claims to be.
     fn try_from(value: StorablePwaSubscription) -> Result<Self, Self::Error> {
+        let StorablePwaSubscription {
+            subscription,
+            account_principal,
+        } = value;
+        let subscription = WebPushSubscription::try_from(subscription)?;
+        let account_principal = Principal::try_from_slice(&account_principal)
+            .map_err(|err| format!("the account principal does not read back: {err}"))?;
         Ok(Self {
-            subscription: WebPushSubscription::try_from(value.subscription)?,
-            account_principal: Principal::try_from_slice(&value.account_principal)
-                .map_err(|err| format!("the account principal does not read back: {err}"))?,
+            subscription,
+            account_principal,
         })
     }
 }
 
 impl From<PwaSubscription> for StorablePwaSubscription {
     fn from(value: PwaSubscription) -> Self {
+        let PwaSubscription {
+            subscription,
+            account_principal,
+        } = value;
+        let subscription = StorableWebPushSubscription::from(subscription);
+        let account_principal = account_principal.as_slice().to_vec();
         Self {
-            subscription: StorableWebPushSubscription::from(value.subscription),
-            account_principal: value.account_principal.as_slice().to_vec(),
+            subscription,
+            account_principal,
         }
     }
 }

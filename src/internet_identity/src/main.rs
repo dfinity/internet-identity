@@ -363,7 +363,7 @@ fn prepare_webpush_subscription(anchor_number: AnchorNumber) -> PrepareWebPushSu
         );
     };
 
-    let vapid_public_key = match notifications::webpush::vapid_key::public_key_or_fetch() {
+    let vapid_public_key = match notifications::webpush::vapid_key::read_or_fetch_public_key() {
         VapidPublicKey::Held(key) => key,
         VapidPublicKey::Fetching => return PrepareWebPushSubscriptionResult::Pending,
         VapidPublicKey::Unavailable(reason) => {
@@ -1157,7 +1157,7 @@ fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionRes
     if let Err(err) = enabled_or(InternalCanisterError) {
         return AppPreparePwaWebPushSubscriptionResult::Err(err);
     }
-    let vapid_public_key = match notifications::webpush::vapid_key::public_key_or_fetch() {
+    let vapid_public_key = match notifications::webpush::vapid_key::read_or_fetch_public_key() {
         VapidPublicKey::Held(key) => key,
         VapidPublicKey::Fetching => return AppPreparePwaWebPushSubscriptionResult::Pending,
         VapidPublicKey::Unavailable(reason) => {
@@ -1196,7 +1196,7 @@ fn app_set_pwa_webpush_subscription(
         .map(pwa_subscription::ValidatedPwaWebPushSubscription::try_from)
         .transpose()
         .map_err(InternalCanisterError)?;
-    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
 
     pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
         .map_err(|err| match err {
@@ -1213,7 +1213,9 @@ fn app_set_pwa_webpush_subscription(
 
 /// The endpoint the calling session's browser entry is subscribed at for the session's
 /// account. `None` where nothing is subscribed, where the subscription awaits its
-/// `app_set_pwa_webpush_subscription`, or where it delivers for another account.
+/// `app_set_pwa_webpush_subscription`, or where it delivers for another account. An
+/// `Option` inside the `Result` because nothing subscribed is an answer the app acts on,
+/// while the error is only ever a refused caller.
 #[query]
 fn app_get_pwa_webpush_subscription_status(
 ) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
@@ -1221,9 +1223,9 @@ fn app_get_pwa_webpush_subscription_status(
 
     let session = check_app_authorization(time()).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
 
-    Ok(pwa_subscription::pwa_subscription_status(
+    Ok(pwa_subscription::read_pwa_subscription_status(
         holder,
         session.account_principal,
     ))
@@ -1243,10 +1245,10 @@ fn app_get_pwa_notification(
     let AppGetPwaNotificationRequest {
         inbox_notification_id,
     } = request;
-    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
 
     Ok(AppGetPwaNotificationResponse {
-        notification: notifications::browser_inbox::pwa_notification_named(
+        notification: notifications::browser_inbox::find_pwa_notification(
             holder,
             session.account_principal,
             inbox_notification_id,
@@ -1270,7 +1272,7 @@ fn app_remove_pwa_notification(
         inbox_notification_id,
         not_shown,
     } = request;
-    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
 
     notifications::browser_inbox::remove_pwa_collected(
         holder,

@@ -35,7 +35,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/never-drop-result` Never drop a result: no `let _ =` on a `Result`, check what `.remove()`/`.insert()` return, and use `#[must_use]` where a value must be consumed.
 - `be/insert-detects-collision` A map insert must not silently overwrite an existing binding: detect the collision and return an error.
 - `be/time-once` Call `time()` once at the endpoint and pass `now: Timestamp` (nanoseconds) down.
-- `be/log-invariant-violations` Log internal-invariant violations with `ic_cdk::println!("ERROR: ...")`.
+- `be/log-invariant-violations` Log internal-invariant violations with `ic_cdk::println!("ERROR: ...")`, at the call site that handles the error, never inside an error conversion (`map_err` target, `From` impl): a conversion only maps.
 
 ## Layering
 
@@ -62,6 +62,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/shadow-with-validated` Shadow a raw value with its validated form (`let request = ValidatedRequest::try_from(request)?;`), so the raw value can't be used afterwards.
 - `be/exhaustive-match` Prefer a full `match` over `if let` on enums, and keep distinct cases in distinct arms (no catch-all `_` merging them).
 - `be/one-question-mark-per-line` At most one `?` per line.
+- `be/visible-early-exit` A `?` ends its own `let` or statement, so every early exit is at the end of a line: never inside a tuple, a struct literal, a call argument or a match arm. Bind the value first (`let sender = principal(&bytes)?;`). Test code may keep a `?` inside an assertion's arguments.
 - `be/no-mutation-in-conditions` No state-changing calls inside `if` conditions.
 - `be/deterministic-collections` Use `BTreeSet`/`BTreeMap` (deterministic order).
 - `be/option-not-sentinel` Use `Option` for absence, never sentinels like `""` or `0`.
@@ -73,6 +74,8 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/canister-dependencies` New canister dependencies: check maintenance, advisories, wasm/`no_std` fit and the wasm size budget, and use `default-features = false`. Dev-dependencies use `.workspace = true`. List every added, removed or changed dependency in the PR description with its reason (see `scripts-and-ci.md`).
 - `be/newtype-when-meaningful` Make a value a newtype rather than a type alias when it has rules of its own, needs its own methods, or is easy to mix up with another value of the same underlying type.
 - `be/named-fields` Prefer named fields over tuples and tuple structs, except for a single-field newtype.
+- `be/field-init-shorthand` Build a struct field from a binding of the same name, so the literal uses the shorthand: shadow the binding with its converted form first (`let subscription = WebPushSubscription::Ready(subscription);`, then `PwaSubscription { subscription, .. }`), and destructure the source in a conversion rather than projecting `value.field` into each field.
+- `be/avoid-result-option` Avoid `Result<Option<T>, E>`: split the lookup that may find nothing from the check that may refuse, and let the caller combine them. Where it is the right shape, the doc comment says why.
 - `be/std-naming` Follow the standard library's naming: `new` for a constructor, `try_new` when it can fail, `from_*` next to a `From` impl; `as_*`/`to_*`/`into_*` for conversions; `foo()` for a getter, with `set_foo`, `take_foo` and `replace_foo`.
 - `be/std-traits` Implement the standard traits (`TryFrom`, `FromStr`, `Display`, `Default`) instead of custom methods that do the same, and `#[derive]` them when possible.
 - `be/flexible-borrows` Take `&str`, `&[T]` and `Option<&T>`, not `&String`, `&Vec<T>` or `&Option<T>`.
