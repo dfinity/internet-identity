@@ -1050,24 +1050,26 @@ fn should_drop_the_entry_a_failed_wake_up_announced() {
 }
 
 #[test]
-fn should_keep_the_entry_for_the_installed_app_when_the_browser_removes_its_own_subscription(
+fn should_keep_the_entry_for_the_installed_app_when_the_browser_switches_delivery_off(
 ) -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor, first) = install_subscribed(&env);
+    // The browser entry the installed app shares also points at a Home Screen app.
+    super::link_app(&env, canister_id, anchor, 1, 50);
     assert_eq!(
         deliver(&env, canister_id, first.account_principal, 1, 200),
         vec![PWA_ENDPOINT.to_string()]
     );
 
-    // Removing the browser's own subscription also switches its delivery off.
-    canister_tests::api::internet_identity::notifications::remove_webpush_subscription(
+    canister_tests::api::internet_identity::notifications::disable_notification_app(
         &env,
         canister_id,
-        principal_1(),
-        anchor,
-        first.browser_id,
+        BrowserKey::new(1).successor().principal(),
+        internet_identity_interface::internet_identity::types::DisableNotificationAppRequest {
+            anchor_number: anchor,
+        },
     )?
-    .expect("remove refused");
+    .expect("switching delivery off refused");
 
     assert!(get_entry(&env, canister_id, session_of(&first)).is_some());
     Ok(())
