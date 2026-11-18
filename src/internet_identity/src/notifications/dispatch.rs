@@ -926,15 +926,17 @@ fn proves_the_app_is_reachable(event: &NotificationEvent) -> bool {
 }
 
 /// A browser that registered an address of its own is woken at it. Otherwise the app it
-/// points at is, as long as this identity has it enabled and is still signed in here.
+/// points at is, as long as this identity has it enabled. A browser the identity is
+/// signed out of is woken at neither.
 fn wake_up_address<'a>(
     browser: &'a Browser,
     app: Option<&'a NotificationApp>,
     now_ns: Timestamp,
 ) -> Option<(&'a ReadySubscription, String, DeliveryTarget)> {
-    // Only the flag is read here, never the session count: an entry that is merely signed
-    // out is still an entry the user left switched on. An install that has not completed
-    // has no app to reach and no flag to read.
+    if browser.session_count == 0 {
+        return None;
+    }
+    // An install that has not completed has no app to reach and no flag to read.
     match browser.notification_app {
         Some(NotificationAppRef::Pending { .. }) => return None,
         Some(NotificationAppRef::Linked { enabled: false, .. }) => return None,
@@ -1019,6 +1021,9 @@ fn pwa_wake_up_address(
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    if browser.session_count == 0 {
+        return None;
+    }
     let live_until_ns = now_ns.checked_add(PWA_SESSION_MARGIN_NS)?;
     let has_live_session = route.sessions.iter().any(|session| {
         session.browser_id == browser.id && !session.is_expired_or_idle(live_until_ns)

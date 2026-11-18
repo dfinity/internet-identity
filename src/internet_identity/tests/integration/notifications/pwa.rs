@@ -570,7 +570,7 @@ fn should_wake_the_browser_instead_once_the_session_goes_idle_within_a_minute() 
 }
 
 #[test]
-fn should_wake_the_browser_instead_once_the_app_signed_out() {
+fn should_wake_nothing_once_the_app_signed_out_of_the_browsers_last_session() {
     let env = env();
     let (canister_id, _, signed_in) = install_subscribed(&env);
 
@@ -578,10 +578,74 @@ fn should_wake_the_browser_instead_once_the_app_signed_out() {
         .expect("sign-out rejected")
         .expect("sign-out refused");
 
+    // The browser's own subscription is still there, but a browser with no session left
+    // is woken at nothing, so the recipient has no channel.
     assert_eq!(
-        deliver(&env, canister_id, signed_in.account_principal, 1, 200),
-        vec![BROWSER_ENDPOINT.to_string()]
+        send_refusal(&env, canister_id, signed_in.account_principal, 1),
+        Some(NotAcceptedReason::NoChannel)
     );
+}
+
+#[test]
+fn should_answer_no_channel_for_a_recipient_whose_only_browser_is_signed_out(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, signed_in) = install_subscribed(&env);
+
+    revoke_browser_sessions(
+        &env,
+        canister_id,
+        principal_1(),
+        RevokeBrowserSessionsRequest {
+            identity_number: anchor,
+            browser_id: signed_in.browser_id,
+        },
+    )?
+    .expect("sign-out refused");
+
+    assert_eq!(
+        send_refusal(&env, canister_id, signed_in.account_principal, 1),
+        Some(NotAcceptedReason::NoChannel)
+    );
+    Ok(())
+}
+
+/// Sends [`APP`]'s notification `id` to `recipient`, past the sender list fetch that defers
+/// the first, and answers why it was not accepted, `None` where it was.
+fn send_refusal(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    recipient: Principal,
+    id: u64,
+) -> Option<NotAcceptedReason> {
+    let send = || {
+        app_send_notification(
+            env,
+            canister_id,
+            app_sender(),
+            SendNotificationArg {
+                origin: APP.to_string(),
+                notifications: vec![Notification {
+                    id,
+                    recipient,
+                    expires_at: None,
+                    urgency: None,
+                }],
+            },
+        )
+        .expect("send rejected")
+        .expect("send refused")
+        .not_accepted
+        .first()
+        .map(|refused| refused.reason.clone())
+    };
+    match send() {
+        Some(NotAcceptedReason::Deferred { .. }) => {
+            answer_outcalls(env, 200);
+            send()
+        }
+        answered => answered,
+    }
 }
 
 #[test]
