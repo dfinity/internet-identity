@@ -1896,37 +1896,53 @@
             {/if}
             {#if current.apps.length > 0}
               <!-- Named by its tab, right above it. -->
-              <section aria-labelledby="tab-mine" class="flex flex-col gap-2">
-                {#if managing}
-                  <label
-                    transition:slide={{
-                      duration: reduced ? 0 : 220,
-                      easing: quintOut,
-                    }}
-                    class="bg-bg-primary border-border-tertiary mx-1.5 mb-3 flex items-center gap-4 rounded-2xl border px-4 py-3 @lg:mx-2"
-                  >
-                    <!-- A privacy setting, not a list setting: it decides
-                         whether there is any record of where this identity
-                         signs in. -->
-                    <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span class="text-text-primary text-sm font-medium">
-                        Remember apps I sign in to
+              <section aria-labelledby="tab-mine" class="flex flex-col">
+                <!-- While apps are arranged, a privacy setting heads the grid.
+                     Its room opens as the grid glides down and the card fades
+                     in within it; on Done the card fades first and the room
+                     closes. It stays mounted, inert while hidden, so a quick
+                     Edit and Done turn around midway instead of starting
+                     over. It is as wide as the grid (w-0 min-w-full): a long
+                     line can't widen the column and shift the grid sideways. -->
+                <div
+                  inert={!managing}
+                  class={[
+                    "grid w-0 min-w-full transition-[grid-template-rows] duration-250 ease-(--ii-ease-out) motion-reduce:transition-none",
+                    managing ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+                  ]}
+                >
+                  <div class="min-h-0 overflow-hidden">
+                    <label
+                      class={[
+                        "bg-bg-primary border-border-tertiary mx-1.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 @lg:mx-2",
+                        managing
+                          ? "scale-100 opacity-100 delay-50 duration-200 ease-(--ii-ease-out)"
+                          : "scale-[0.98] opacity-0 duration-120 ease-out",
+                      ]}
+                    >
+                      <!-- A privacy setting, not a list setting: it decides
+                           whether there is any record of where this identity
+                           signs in. -->
+                      <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span class="text-text-primary text-sm font-medium">
+                          Remember apps I sign in to
+                        </span>
+                        <span
+                          class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
+                        >
+                          {current.keepHistory
+                            ? "An app shows up here once you sign in to it."
+                            : "No record of where you sign in. Only apps you add yourself show up here, and signing in still works everywhere."}
+                        </span>
                       </span>
-                      <span
-                        class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
-                      >
-                        {current.keepHistory
-                          ? "An app shows up here once you sign in to it."
-                          : "No record of where you sign in. Only apps you add yourself show up here, and signing in still works everywhere."}
-                      </span>
-                    </span>
-                    <Toggle
-                      checked={current.keepHistory}
-                      onchange={(event) =>
-                        (current.keepHistory = event.currentTarget.checked)}
-                    />
-                  </label>
-                {/if}
+                      <Toggle
+                        checked={current.keepHistory}
+                        onchange={(event) =>
+                          (current.keepHistory = event.currentTarget.checked)}
+                      />
+                    </label>
+                  </div>
+                </div>
                 <ReorderGrid
                   items={gridItems}
                   key={(item) => item.origin}
