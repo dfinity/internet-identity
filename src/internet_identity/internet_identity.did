@@ -3069,7 +3069,8 @@ service : (opt InternetIdentityInit) -> {
     // that can deliver now. A fetch through one resets its unanswered pushes.
     probe_notification_path : (ProbeNotificationPathRequest) -> (variant { Ok; Err : ProbeNotificationPathError });
     // Removes that app's installed web app subscriptions on the entries linked to the
-    // caller's that can deliver now and have a probe nobody fetched.
+    // caller's that can deliver now and have a probe nobody fetched in the 10 seconds
+    // after the push service accepted it.
     remove_unanswered_pwa_webpush_subscriptions : (RemoveUnansweredPwaWebPushSubscriptionsRequest) -> (variant { Ok; Err : RemoveUnansweredPwaWebPushSubscriptionsError });
 
     // Called by the browser, which watches for the answer leaving its own queue: that

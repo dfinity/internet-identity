@@ -1456,7 +1456,7 @@ fn app_get_same_device_link_status() -> Result<SameDeviceLinkStatus, AppGetSameD
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
     let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
         .map_err(|err| InternalCanisterError(format!("{err}")))?;
 

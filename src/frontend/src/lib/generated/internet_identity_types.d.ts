@@ -3938,7 +3938,8 @@ export interface _SERVICE {
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
    * Removes that app's installed web app subscriptions on the entries linked to the
-   * caller's that can deliver now and have a probe nobody fetched.
+   * caller's that can deliver now and have a probe nobody fetched in the 10 seconds
+   * after the push service accepted it.
    */
   'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<
     [RemoveUnansweredPwaWebPushSubscriptionsRequest],

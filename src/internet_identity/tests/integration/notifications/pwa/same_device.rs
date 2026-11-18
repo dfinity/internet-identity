@@ -25,6 +25,10 @@ const SAFARI_BROWSER_ID: BrowserId = 0;
 const HOUR_NS: u64 = 60 * MINUTE_NS;
 
 /// The key calls from the entry [`install_signed_in`] signs in from are signed with.
+/// How long a probe has to be answered before its silence is evidence: the canister's
+/// `MIN_PROBE_ANSWER_TIME_NS`, written out.
+const PROBE_ANSWER_TIME: std::time::Duration = std::time::Duration::from_secs(10);
+
 fn safari() -> Principal {
     BrowserKey::new(1).successor().principal()
 }
@@ -709,6 +713,68 @@ fn should_record_no_probe_before_the_push_service_accepts_it() {
     );
 }
 
+/// A probe the push service accepted a moment ago has not had the time a device needs to
+/// answer it, so its silence is no evidence yet.
+#[test]
+fn should_keep_an_installed_app_whose_probe_is_younger_than_its_answer_time() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    answer_outcalls(&env, 201);
+    assert!(is_probe_waiting(&env, &phone));
+
+    remove_unanswered(&env, &phone);
+    assert_eq!(
+        path_status(&env, &phone, installed_apps(&phone))
+            .subscriptions
+            .len(),
+        1
+    );
+
+    env.advance_time(PROBE_ANSWER_TIME);
+    remove_unanswered(&env, &phone);
+    assert_eq!(
+        path_status(&env, &phone, installed_apps(&phone)).subscriptions,
+        vec![]
+    );
+}
+
+/// A push service's answer belongs to the registration it was posted to: one made since
+/// at the same endpoint was never sent the probe, so the answer records nothing on it.
+#[test]
+fn should_record_no_probe_on_a_registration_replaced_while_it_was_posted() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    // The probe is posted, and the installed app subscribes again before the push service
+    // answers.
+    for _ in 0..40 {
+        if !env.get_canister_http().is_empty() {
+            break;
+        }
+        env.advance_time(std::time::Duration::from_millis(250));
+        env.tick();
+    }
+    assert!(
+        !env.get_canister_http().is_empty(),
+        "the probe was never posted"
+    );
+    subscribe_pwa_webpush(
+        &env,
+        phone.canister_id,
+        phone.pwa,
+        PWA_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+
+    answer_outcalls(&env, 201);
+
+    assert!(!is_probe_waiting(&env, &phone));
+}
+
 /// Whether the installed app's subscription has a probe nobody fetched yet.
 fn is_probe_waiting(env: &PocketIc, phone: &Phone) -> bool {
     path_status(env, phone, installed_apps(phone))
@@ -1032,6 +1098,7 @@ fn should_remove_the_linked_installed_app_that_did_not_answer() {
     let phone = linked_phone(&env);
     assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     answer_outcalls(&env, 201);
+    env.advance_time(PROBE_ANSWER_TIME);
 
     remove_unanswered(&env, &phone);
 
@@ -1093,6 +1160,7 @@ fn should_keep_an_installed_app_that_answered_its_probe_though_a_later_push_wait
     // The first answers its probe, then an ordinary push reaches both and waits.
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
     deliver(&env, phone.canister_id, phone.account_principal, 1, 201);
+    env.advance_time(PROBE_ANSWER_TIME);
 
     remove_unanswered(&env, &phone);
 

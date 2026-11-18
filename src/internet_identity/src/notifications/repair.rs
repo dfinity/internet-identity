@@ -197,8 +197,9 @@ fn probe_one(
 /// Removes the installed web app subscriptions of the app numbered `application_number`
 /// on the entries of `anchor` linked to `browser_id`'s that deliver for the account
 /// `account_principal` names, where they can deliver now and a probe through them was
-/// never fetched. One that answered its probe is kept. `None` for an app nobody has
-/// signed in to, which has none.
+/// never fetched in [`unanswered::MIN_PROBE_ANSWER_TIME_NS`]. One that answered its probe,
+/// or whose probe is younger than that, is kept. `None` for an app nobody has signed in
+/// to, which has none.
 ///
 /// Every one is tried, so a failure to remove one leaves the others removed; failures
 /// are logged.
@@ -214,9 +215,10 @@ pub(crate) fn remove_unanswered_installed_apps(
         account_principal,
     };
     for on_path in path_subscriptions(anchor, browser_id, path, now_ns) {
-        // Only a probe nobody fetched is evidence: a count raised again by an ordinary
-        // push after the installed app answered its probe is not.
-        if on_path.subscription.probe_sent_at_ns.is_none() {
+        // Only a probe nobody fetched, in the time it takes to answer one, is evidence: a
+        // count raised again by an ordinary push after the installed app answered its
+        // probe is not, and neither is a probe the push service accepted a moment ago.
+        if !unanswered::has_probe_had_its_answer_time(&on_path.subscription, now_ns) {
             continue;
         }
         let RegistrationId::Pwa(holder) = on_path.registration else {

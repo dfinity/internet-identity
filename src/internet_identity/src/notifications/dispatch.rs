@@ -1279,7 +1279,12 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
             // A probe is evidence only once the push service has taken it: one still
             // waiting for its pass, or refused, reached no device.
             if is_probe(notification) {
-                unanswered::mark_probed(registration, &delivery.endpoint, now_ns);
+                unanswered::mark_probed(
+                    registration,
+                    &delivery.endpoint,
+                    delivery.registered_at_ns,
+                    now_ns,
+                );
             }
         }
         // Nothing was posted, and the entry stays for whatever wakes this browser next.
