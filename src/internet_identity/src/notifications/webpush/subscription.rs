@@ -42,9 +42,9 @@ pub fn start_subscription(
         .map_err(|err| PrepareWebPushSubscriptionError::InternalCanisterError(format!("{err}"))),
         NotificationKey::Browser(browser_id) => {
             let anchor = state::anchor(anchor_number);
-            // This writes the entry's registration and empties its inbox, so it is
-            // refused on the same ground `set_subscription` is: a browser the identity
-            // signed out of stays signed out, whoever asks.
+            // This writes the entry's registration, so it is refused on the same ground
+            // `set_subscription` is: a browser the identity signed out of stays signed
+            // out, whoever asks.
             if anchor
                 .browser(browser_id)
                 .is_none_or(|browser| browser.session_count == 0)

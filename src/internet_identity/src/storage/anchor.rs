@@ -1238,14 +1238,6 @@ impl Anchor {
             return;
         };
         *current = enabled;
-        if enabled {
-            return;
-        }
-        // What is queued was posted to an address this entry has just stopped being
-        // delivered at. Nothing drains it while delivery is off and nothing joins it, so
-        // leaving it would only mean the first wake-up after switching back on shows
-        // something from before the switch-off instead of what caused it.
-        browser.notifications.clear();
     }
 
     /// Forgets `app_id` on every entry of this identity that points at it.

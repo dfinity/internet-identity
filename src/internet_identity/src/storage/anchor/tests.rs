@@ -2437,11 +2437,11 @@ mod browser_tests {
         assert!(anchor.notification_app(id).is_some());
     }
 
-    /// Switching delivery off empties the queue: nothing drains it while it is off and
-    /// nothing joins it, so what is left would only be shown in place of whatever causes
-    /// the first wake-up after switching back on.
+    /// A worker reads only the entry its push named, so an entry waiting when delivery is
+    /// switched off is never shown in place of another, and the inbox is shared with the
+    /// entry's installed web apps.
     #[test]
-    fn switching_delivery_off_clears_what_was_queued() {
+    fn switching_delivery_off_keeps_what_was_queued() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.point_at_notification_app(id, 7);
         anchor
@@ -2459,7 +2459,7 @@ mod browser_tests {
 
         anchor.disable_notification_app(id);
 
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     /// An install that has not completed is a route of its own: what was posted while

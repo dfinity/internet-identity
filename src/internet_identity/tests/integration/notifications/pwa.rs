@@ -1050,6 +1050,30 @@ fn should_drop_the_entry_a_failed_wake_up_announced() {
 }
 
 #[test]
+fn should_keep_the_entry_for_the_installed_app_when_the_browser_removes_its_own_subscription(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor, first) = install_subscribed(&env);
+    assert_eq!(
+        deliver(&env, canister_id, first.account_principal, 1, 200),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+
+    // Removing the browser's own subscription also switches its delivery off.
+    canister_tests::api::internet_identity::notifications::remove_webpush_subscription(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        first.browser_id,
+    )?
+    .expect("remove refused");
+
+    assert!(get_entry(&env, canister_id, session_of(&first)).is_some());
+    Ok(())
+}
+
+#[test]
 fn should_refuse_an_endpoint_taken_over_from_a_slot_a_rollback_emptied(
 ) -> Result<(), RejectResponse> {
     let env = env();
