@@ -262,6 +262,10 @@ pub(crate) struct Delivery {
     /// The `p256dh` of the registration at `endpoint` when the pass planned this, which a
     /// refresh checks the registration still has.
     pub(crate) subscriber_key: SubscriberKey,
+    /// When the registration at `endpoint` was made, which a re-subscribe at the same
+    /// endpoint, for another account included, replaces: what an answer to this wake-up
+    /// may be counted against.
+    pub(crate) registered_at_ns: Timestamp,
     /// The sealed payload naming the entry above. `None` only where sealing failed, and
     /// such a wake-up is dropped rather than posted.
     pub(crate) body: Option<Vec<u8>>,
@@ -538,6 +542,7 @@ fn fan_out_to_destinations(
                     notification: None,
                     endpoint: subscription.endpoint.as_str().to_string(),
                     subscriber_key: subscription.subscriber_key.clone(),
+                    registered_at_ns: subscription.created_at_ns,
                     body: None,
                     sealing: rotation::SealingKeys::from(&subscription),
                     // Filled in below, once every relay this reaches has one.
@@ -689,6 +694,7 @@ fn fan_out_to_browsers(
                         notification: None,
                         endpoint: subscription.endpoint.as_str().to_string(),
                         subscriber_key: subscription.subscriber_key.clone(),
+                        registered_at_ns: subscription.created_at_ns,
                         body: None,
                         sealing: rotation::SealingKeys::from(&subscription),
                         // Filled in below, once every relay this reaches has one.
@@ -1109,10 +1115,11 @@ pub(crate) fn can_wake_for_app<M: Memory + Clone>(
 }
 
 /// Where `browser`, one of the identity's `browsers`, is woken for the app notification
-/// `route` describes. Its installed web app for that app is, where that can deliver it.
-/// Otherwise the address [`wake_up_address`] gives, unless an installed web app on an
-/// entry linked to `browser` as sharing its device can deliver it: that one is woken
-/// instead, so the device is notified once.
+/// `route` describes. Nowhere where an installed web app on an entry linked to `browser`
+/// as sharing its device can deliver it: that one is woken instead, so the device is
+/// notified once, whatever `browser` registered of its own. Otherwise its own installed
+/// web app for that app, where that can deliver it, and else the address
+/// [`wake_up_address`] gives.
 fn app_wake_up_address(
     browsers: &[Browser],
     browser: &Browser,
@@ -1120,9 +1127,6 @@ fn app_wake_up_address(
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> Option<(ReadySubscription, String, DeliveryTarget)> {
-    if let Some(installed_app) = find_pwa_wake_up_address(browser, route, now_ns) {
-        return Some(installed_app);
-    }
     let is_delivered_on_same_device = browsers.iter().any(|other| {
         other.id != browser.id
             && other.same_device_browser_id == Some(browser.id)
@@ -1130,6 +1134,9 @@ fn app_wake_up_address(
     });
     if is_delivered_on_same_device {
         return None;
+    }
+    if let Some(installed_app) = find_pwa_wake_up_address(browser, route, now_ns) {
+        return Some(installed_app);
     }
     let (subscription, relay_origin, target) = wake_up_address(browser, app, now_ns)?;
     Some((subscription.clone(), relay_origin, target))
@@ -1247,7 +1254,12 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
                 target: delivery.target,
             }
             .registration();
-            if let Err(err) = unanswered::count_push(registration, &delivery.endpoint, now_ns) {
+            if let Err(err) = unanswered::count_push(
+                registration,
+                &delivery.endpoint,
+                delivery.registered_at_ns,
+                now_ns,
+            ) {
                 ic_cdk::println!(
                     "ERROR: Failed to count a push posted through a subscription: {err}"
                 );
@@ -2327,6 +2339,24 @@ mod tests {
                 .and_then(|ready| ready.unanswered_pushes)
                 .map(|unanswered| unanswered.count),
             Some(1)
+        );
+    }
+
+    /// A wake-up for the registration that held the endpoint before is no push to the one
+    /// that holds it now, though the endpoint is the same.
+    #[test]
+    fn a_push_to_a_registration_replaced_at_the_same_endpoint_is_not_counted() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+        subscribe(recipient, browsers[0], RELAY, 3 * SECOND_NS);
+
+        settle(&delivery, PostOutcome::Sent, 4 * SECOND_NS);
+
+        assert_eq!(
+            stored_subscription(recipient, browsers[0]).and_then(|ready| ready.unanswered_pushes),
+            None
         );
     }
 

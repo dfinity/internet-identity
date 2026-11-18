@@ -466,6 +466,28 @@ fn should_wake_safari_again_once_the_installed_app_signs_out() -> Result<(), Rej
 }
 
 #[test]
+fn should_skip_the_linked_entrys_own_installed_app_too() {
+    let env = env();
+    let phone = linked_phone(&env);
+    // Safari's own session registers an installed app of its own after the link.
+    subscribe_pwa_webpush(
+        &env,
+        phone.canister_id,
+        phone.safari_session,
+        UNPROBED_PWA_ENDPOINT,
+        p256dh(10),
+        &OTHER_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+
+    assert_eq!(
+        deliver(&env, phone.canister_id, phone.account_principal, 1, 201),
+        vec![PWA_ENDPOINT.to_string()]
+    );
+}
+
+#[test]
 fn should_still_wake_safari_for_another_app() {
     let env = env();
     let phone = linked_phone(&env);

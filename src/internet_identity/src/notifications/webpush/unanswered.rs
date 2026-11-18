@@ -11,16 +11,18 @@ use crate::storage::anchor::{ReadySubscription, UnansweredPushCount};
 use internet_identity_interface::internet_identity::types::Timestamp;
 
 /// Counts one push posted to `endpoint` at `now_ns` against the subscription
-/// `registration` names, where it still posts there.
+/// `registration` names, where it is still the registration made at `registered_at_ns`
+/// there: one made since, at the same endpoint or not, was never sent it.
 pub(crate) fn count_push(
     registration: RegistrationId,
     endpoint: &str,
+    registered_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Result<(), String> {
     let Some(mut registered) = rotation::read(registration) else {
         return Ok(());
     };
-    if registered.endpoint.as_str() != endpoint {
+    if registered.endpoint.as_str() != endpoint || registered.created_at_ns != registered_at_ns {
         return Ok(());
     }
     registered.unanswered_pushes = Some(UnansweredPushCount::after_push(

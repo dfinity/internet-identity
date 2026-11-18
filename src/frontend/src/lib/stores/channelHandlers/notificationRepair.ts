@@ -10,6 +10,7 @@ import {
 import {
   checkNotificationPath,
   type BrowserCalls,
+  type PathCheckOutcome,
 } from "$lib/utils/notifications/repairPath";
 import {
   readBrowserPushState,
@@ -31,15 +32,21 @@ import type { Principal } from "@icp-sdk/core/principal";
  *  the sign-in minted is for an identity that is no longer the one chosen. */
 export type RepairOutcome = "done" | "identity-changed";
 
+/** The longest the automated part of the check may hold a sign-in: two probes and what
+ *  comes between them, with room to spare. Past it the sign-in goes on and the next one
+ *  checks again. */
+const CHECK_DEADLINE_MS = 30_000;
+
 /**
  * Checks, once the identity has signed in to `origin` as the account `accountPrincipal`
  * names, that this device still receives the app's notifications, and puts the allow
  * screen in front of the user where only they can repair it. Holds the sign-in only
- * while a path past its limit is probed. `browserActor` is what signs as this browser.
+ * while a path past its limit is probed, and never past {@link CHECK_DEADLINE_MS}.
+ * `browserActor` is what signs as this browser.
  *
- * Resolves rather than rejects: the sign-in the app asked for is not the user's to lose
- * over a notification path, so a check that fails is shown and leaves the device as it
- * was.
+ * Only a web origin is checked: nothing else is notified. Resolves rather than rejects:
+ * the sign-in the app asked for is not the user's to lose over a notification path, so
+ * a check that fails is shown and leaves the device as it was.
  */
 export const repairNotificationPath = async ({
   identityNumber,
@@ -54,67 +61,133 @@ export const repairNotificationPath = async ({
   actor: ActorSubclass<_SERVICE>;
   browserActor?: (identityNumber: bigint) => Promise<BrowserCalls>;
 }): Promise<RepairOutcome> => {
-  if (!get(PUSH_NOTIFICATIONS)) {
+  if (!get(PUSH_NOTIFICATIONS) || !isWebOrigin(origin)) {
     return "done";
   }
   // Held only once a path is past its limit, which is when the check takes long enough
   // to show; released when the check, and the screen it may open, has settled.
   let releaseScreen: (() => void) | undefined;
-  // A switch to another identity ends a check that was about this one.
-  const switched = new AbortController();
+  // A switch to another identity ends a check that was about this one, and so does
+  // running out of time.
+  let isIdentityChanged = false;
+  const stopped = new AbortController();
   const stopWatching = authenticationStore.subscribe((current) => {
     if (current?.identityNumber !== identityNumber) {
-      switched.abort(new IdentitySwitchedError());
+      isIdentityChanged = true;
+      stopped.abort(new IdentitySwitchedError());
     }
   });
+  const deadline = setTimeout(
+    () => stopped.abort(new CheckTimedOutError()),
+    CHECK_DEADLINE_MS,
+  );
+  let failure: unknown;
   try {
-    let browser: BrowserCalls;
-    try {
-      browser = await browserActor(identityNumber);
-    } catch (error) {
-      if (error instanceof UnregisteredBrowserError) {
-        return "done";
-      }
-      throw error;
+    const outcome = await checkWithin(
+      stopped.signal,
+      checkPath({
+        identityNumber,
+        origin,
+        accountPrincipal,
+        actor,
+        browserActor,
+        onPastLimit: () => {
+          releaseScreen ??= claimScreen();
+        },
+        signal: stopped.signal,
+      }),
+    );
+    clearTimeout(deadline);
+    if (outcome.kind === "ask" && !isIdentityChanged) {
+      await askToRepair({
+        identityNumber,
+        origin,
+        actor,
+        installFirst: outcome.installFirst,
+      });
     }
-    const outcome = await checkNotificationPath({
-      identityNumber,
-      origin,
-      accountPrincipal,
-      actor,
-      browser,
-      onPastLimit: () => {
-        releaseScreen ??= claimScreen();
-      },
-      signal: switched.signal,
-    });
-    switch (outcome.kind) {
-      case "working":
-        break;
-      case "ask":
-        await askToRepair({
-          identityNumber,
-          origin,
-          actor,
-          installFirst: outcome.installFirst,
-        });
-        break;
-    }
-    return switched.signal.aborted ? "identity-changed" : "done";
   } catch (error) {
-    if (switched.signal.aborted) {
-      return "identity-changed";
-    }
-    console.error(error);
-    toaster.error({
-      title: t`Notifications unavailable`,
-      description: failureMessage(error),
-    });
-    return "done";
+    failure = error;
   } finally {
+    clearTimeout(deadline);
     stopWatching();
     releaseScreen?.();
   }
+  // The one way out, so no path answers for an identity the user has left.
+  if (isIdentityChanged) {
+    return "identity-changed";
+  }
+  if (failure !== undefined && !(failure instanceof CheckTimedOutError)) {
+    console.error(failure);
+    toaster.error({
+      title: t`Notifications unavailable`,
+      description: failureMessage(failure),
+    });
+  }
+  return "done";
+};
+
+/** Whether `origin` is a web page's, the only kind an app's notifications are for. */
+const isWebOrigin = (origin: string): boolean => {
+  try {
+    const { protocol } = new URL(origin);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+/** `check`, or `signal`'s reason as soon as it is aborted, whichever comes first: a call
+ *  the check is waiting on cannot be stopped, but the sign-in need not wait for it. */
+const checkWithin = <T>(signal: AbortSignal, check: Promise<T>): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    check.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
+  });
+
+/** The automated part of the check: this browser's actor, then the path. */
+const checkPath = async ({
+  identityNumber,
+  origin,
+  accountPrincipal,
+  actor,
+  browserActor,
+  onPastLimit,
+  signal,
+}: {
+  identityNumber: bigint;
+  origin: string;
+  accountPrincipal: Principal;
+  actor: ActorSubclass<_SERVICE>;
+  browserActor: (identityNumber: bigint) => Promise<BrowserCalls>;
+  onPastLimit: () => void;
+  signal: AbortSignal;
+}): Promise<PathCheckOutcome> => {
+  let browser: BrowserCalls;
+  try {
+    browser = await browserActor(identityNumber);
+  } catch (error) {
+    if (error instanceof UnregisteredBrowserError) {
+      return { kind: "working" };
+    }
+    throw error;
+  }
+  return checkNotificationPath({
+    identityNumber,
+    origin,
+    accountPrincipal,
+    actor,
+    browser,
+    onPastLimit,
+    signal,
+  });
 };
 
 /** Ends a check about an identity the user has switched away from. */
@@ -122,6 +195,14 @@ class IdentitySwitchedError extends Error {
   constructor() {
     super("the identity being checked is no longer the one signed in");
     this.name = "IdentitySwitchedError";
+  }
+}
+
+/** Ends a check that held the sign-in for {@link CHECK_DEADLINE_MS}. */
+class CheckTimedOutError extends Error {
+  constructor() {
+    super("the notification check ran out of time");
+    this.name = "CheckTimedOutError";
   }
 }
 
