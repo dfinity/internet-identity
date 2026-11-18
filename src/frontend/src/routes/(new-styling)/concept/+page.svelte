@@ -3,7 +3,6 @@
   import {
     ArrowRightToLineIcon,
     BellOffIcon,
-    BookOpenIcon,
     BotIcon,
     BriefcaseMedicalIcon,
     CheckIcon,
@@ -13,7 +12,6 @@
     Grid2x2CheckIcon,
     KeyRoundIcon,
     LogOutIcon,
-    MailIcon,
     PanelBottomIcon,
     PanelRightIcon,
     PanelTopIcon,
@@ -21,7 +19,6 @@
     MoonIcon,
     PlusIcon,
     SunIcon,
-    UserRoundIcon,
   } from "@lucide/svelte";
   import { tick, untrack, type Component } from "svelte";
   import { quintOut } from "svelte/easing";
@@ -32,9 +29,7 @@
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
-  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import { toaster } from "$lib/components/utils/toaster";
-  import { brandIconOf } from "../manage/(authenticated)/devices/browsers";
   import {
     IDENTITY_PALETTES,
     identityInitial,
@@ -50,7 +45,7 @@
   import BulkView from "./components/BulkView.svelte";
   import ConnectPage from "./components/ConnectPage.svelte";
   import Elevated from "./components/Elevated.svelte";
-  import type { Glyph } from "./components/Glyphs.svelte";
+  import HeadCard from "./components/HeadCard.svelte";
   import SurfaceLevel from "./components/SurfaceLevel.svelte";
   import Popup from "./components/Popup.svelte";
   import AppRow from "./components/AppRow.svelte";
@@ -70,7 +65,9 @@
   } from "./components/RecoveryFlow.svelte";
   import ReorderGrid from "./components/ReorderGrid.svelte";
   import SectionView, { type Section } from "./components/SectionView.svelte";
+  import StateBoard from "./components/StateBoard.svelte";
   import StatusCard from "./components/StatusCard.svelte";
+  import { glyphsOf } from "./glyphs";
   import {
     browsersFor,
     featuredApps,
@@ -90,12 +87,8 @@
   } from "./motion";
   import { ConceptTheme } from "./theme.svelte";
   import {
-    accessCount,
     deriveStatus,
-    emailStatus,
     incidentOf,
-    isOn,
-    phraseStatus,
     isLoud,
     leadActionOf,
     leadOf,
@@ -215,55 +208,6 @@
       cards.find((card) => card.kind === kind),
     ).filter((card) => card !== undefined),
   );
-  /** What a card's message is about, as icons beside it: neutral, what's
-   *  inside (the ways in, the ways back in, the browsers); otherwise only
-   *  the item it's about, marked, as Thomas asked ("New sign-in" with the
-   *  browser's icon, "3 browsers" with theirs). */
-  const glyphsOf = (card: CardStatus): Glyph[] => {
-    const { scenario } = current;
-    const neutral = card.tone === "neutral";
-    if (card.kind === "access") {
-      if (card.tone === "warning") {
-        return [{ id: "add", icon: PlusIcon, empty: true }];
-      }
-      if (!neutral) {
-        return [{ id: "yubikey", icon: KeyRoundIcon, marked: true }];
-      }
-      return accessCount(scenario.access) === 1
-        ? [{ id: "current", icon: PasskeyIcon }]
-        : [
-            { id: "current", icon: PasskeyIcon },
-            { id: "yubikey", icon: KeyRoundIcon },
-            { id: "google", icon: UserRoundIcon },
-          ];
-    }
-    if (card.kind === "recovery") {
-      const phrase = phraseStatus(scenario.recovery);
-      const email = emailStatus(scenario.recovery);
-      if (!isOn(phrase) && !isOn(email)) {
-        return [
-          { id: "phrase", icon: BookOpenIcon, empty: true },
-          { id: "email", icon: MailIcon, empty: true },
-        ];
-      }
-      if (!neutral) {
-        return [{ id: "phrase", icon: BookOpenIcon, marked: true }];
-      }
-      return [
-        ...(isOn(phrase) ? [{ id: "phrase", icon: BookOpenIcon }] : []),
-        ...(isOn(email) ? [{ id: "email", icon: MailIcon }] : []),
-      ];
-    }
-    const shown = neutral
-      ? browsers.slice(0, 3)
-      : browsers.filter(({ isNew }) => isNew === true);
-    return shown.map((browser) => ({
-      id: browser.id,
-      src: brandIconOf(browser.description),
-      icon: MonitorSmartphoneIcon,
-      marked: !neutral,
-    }));
-  };
   /** The identities to switch to: every one on the device but this. */
   const otherIdentities = $derived(
     identities
@@ -403,6 +347,11 @@
   /** The concept's one menu (layout and scenario), and where it was opened:
    *  the corner on desktop opens it upwards, the header downwards. */
   let conceptMenu = $state<{ anchor: HTMLElement; compact: boolean }>();
+  /** Concept only: every card state on one board, for review. Open from
+   *  the concept menu, or with `?board=states` in the address. */
+  let board = $state(
+    new URLSearchParams(location.search).get("board") === "states",
+  );
   /** Where the add-an-app search hangs from, while it's open. */
   let addAnchor = $state<HTMLElement>();
   /** A phone's header controls. The menu hangs from this pill's end, at the
@@ -1222,46 +1171,12 @@
        in are there as the page opens. Each opens its section over the apps. -->
   <div class="pointer-events-auto grid grid-cols-3 gap-1.5 pb-8">
     {#each accountCards as card (card.kind)}
-      {@const Icon = SECTION_ICONS[card.kind]}
-      <Elevated offset={1} class="overflow-hidden rounded-2xl">
-        <button
-          type="button"
-          onclick={() => openFromHead(card.kind)}
-          aria-label={`${TITLES[card.kind]}: ${card.sentence}`}
-          class="ii-hover focus-visible:ring-focus-ring flex h-full w-full flex-col items-start gap-2 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset"
-        >
-          <span
-            aria-hidden="true"
-            class={[
-              "grid size-7 shrink-0 place-items-center rounded-lg",
-              {
-                risk: "text-fg-error-primary bg-(--ii-error-tint)",
-                warning: "text-fg-warning-primary bg-(--ii-warning-tint)",
-              }[card.tone as "risk" | "warning"] ??
-                "text-fg-secondary bg-(--ii-selected)",
-            ]}
-          >
-            <Icon class="size-4" />
-          </span>
-          <span class="flex flex-col gap-0.5">
-            <span class="text-text-primary text-[13px] leading-4 font-semibold">
-              {TITLES[card.kind]}
-            </span>
-            <span
-              class={[
-                "line-clamp-3 text-xs leading-4 text-pretty",
-                card.tone === "risk"
-                  ? "text-text-error-primary"
-                  : card.tone === "neutral"
-                    ? "text-text-tertiary"
-                    : "text-text-primary",
-              ]}
-            >
-              {card.sentence}
-            </span>
-          </span>
-        </button>
-      </Elevated>
+      <HeadCard
+        {card}
+        title={TITLES[card.kind]}
+        icon={SECTION_ICONS[card.kind]}
+        onOpen={() => openFromHead(card.kind)}
+      />
     {/each}
   </div>
 {/snippet}
@@ -1644,7 +1559,7 @@
       morphing={morphing === card.kind}
       onOpen={() => openCard(card.kind)}
       onClose={closeSection}
-      glyphs={glyphsOf(card)}
+      glyphs={glyphsOf(card, current.scenario, browsers)}
     >
       {@render sectionOf(card.kind as Section, "card")}
     </StatusCard>
@@ -2459,6 +2374,15 @@
     </div>
   {/if}
 
+  {#if board}
+    <StateBoard
+      titles={TITLES}
+      icons={SECTION_ICONS}
+      {signedInWith}
+      onClose={() => (board = false)}
+    />
+  {/if}
+
   {#if conceptMenu !== undefined}
     {@const close = () => (conceptMenu = undefined)}
     <Popup
@@ -2553,6 +2477,18 @@
           class="btn btn-tertiary justify-start !px-3 text-start"
         >
           First visit
+        </button>
+        <hr class="border-border-secondary -mx-1.5 my-1.5" />
+        <button
+          type="button"
+          role="menuitem"
+          onclick={() => {
+            close();
+            board = true;
+          }}
+          class="btn btn-tertiary justify-start !px-3 text-start"
+        >
+          All card states
         </button>
       </div>
     </Popup>
