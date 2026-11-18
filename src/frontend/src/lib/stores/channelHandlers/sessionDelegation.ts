@@ -54,6 +54,7 @@ import {
 import type { AccountSessionError } from "$lib/generated/internet_identity_types";
 import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
 import { repairNotificationPath } from "$lib/stores/channelHandlers/notificationRepair";
+import { MIN_REMAINING_LIFETIME_MS } from "$lib/stores/channelHandlers/credentialLifetime";
 import {
   StaleBrowserKeyError,
   withBrowserProof,
@@ -303,10 +304,6 @@ export const handleSessionDelegationRequest =
             resumable === true,
             previous,
           );
-          const chain = await extendToApp(
-            created.record,
-            params.sessionPublicKey,
-          );
           const repaired = await repairNotificationPath({
             identityNumber: created.identityNumber,
             origin: effectiveOrigin,
@@ -319,6 +316,23 @@ export const handleSessionDelegationRequest =
             previous = created.authorized;
             continue;
           }
+          // Created again, with the same authorization and no second check, where the
+          // allow screen kept it open for most of its lifetime.
+          const answeredSession =
+            created.record.expiresAtMillis - Date.now() <
+            MIN_REMAINING_LIFETIME_MS
+              ? await createSession(
+                  effectiveOrigin,
+                  params.maxTimeToLive,
+                  params.maxTimeToIdle,
+                  resumable === true,
+                )
+              : created;
+          const chain = await extendToApp(
+            answeredSession.record,
+            params.sessionPublicKey,
+          );
+          await answeredSession.keepSession();
           await channel.send({
             jsonrpc: "2.0",
             id: requestId,
@@ -359,6 +373,10 @@ const createSession = async (
   previous?: Authorized,
 ): Promise<{
   record: AppSessionRecord;
+  /** Keeps the session for a later silent sign-in where the app asked for that. Called
+   *  only for the session the app is sent: one minted for an identity the user then
+   *  switched away from must not be the one a later request resumes. */
+  keepSession: () => Promise<void>;
   authorized: Authorized;
   /** Who the session was minted for, which the notification check is about. */
   identityNumber: bigint;
@@ -500,11 +518,10 @@ const createSession = async (
   await rememberAppAccount(recordKey, {
     accountPrincipal: prepared.account_principal.toText(),
   });
-  if (resumable) {
-    await storeAppSession(recordKey, record);
-  }
   return {
     record,
+    keepSession: () =>
+      resumable ? storeAppSession(recordKey, record) : Promise.resolve(),
     authorized,
     identityNumber,
     accountPrincipal: prepared.account_principal,

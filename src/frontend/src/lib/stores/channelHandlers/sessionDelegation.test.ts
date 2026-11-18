@@ -111,12 +111,14 @@ import {
 import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
 
 /** Drives one ceremony to the point where the session it created is either kept or
- *  discarded, which is the whole of what `resumable` decides. */
+ *  discarded, which is the whole of what `resumable` decides. `firstLifetimeMs` is how
+ *  long the first session created is valid for. */
 const runCeremony = async (
   resumable?: boolean,
   extraParams: Record<string, unknown> = {},
   whileRunning?: () => Promise<void>,
   authorized?: bigint,
+  firstLifetimeMs = 60 * 60 * 1000,
 ) => {
   const { authorizationPromptStore, authorizedStore } =
     await import("$lib/stores/authorization.store");
@@ -139,7 +141,10 @@ const runCeremony = async (
       Promise.resolve({
         Ok: {
           user_key: new Uint8Array(chain.publicKey),
-          expiration,
+          expiration:
+            prepared.length === 1
+              ? BigInt(Date.now() + firstLifetimeMs) * BigInt(1_000_000)
+              : expiration,
           session_id: BigInt(1_000),
           account_principal: Principal.fromText("2vxsx-fae"),
           browser_id: BigInt(1),
@@ -770,6 +775,7 @@ describe("keeping a session for later", () => {
 describe("an identity change while notifications are checked", () => {
   beforeEach(async () => {
     await purgeAppSessions(BigInt(10_000));
+    await purgeAppSessions(BigInt(10_001));
   });
   afterEach(() => {
     notificationCheck.outcomes = [];
@@ -792,6 +798,58 @@ describe("an identity change while notifications are checked", () => {
     expect(prepared).toHaveLength(2);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ id: 1, result: {} });
+  });
+
+  it("keeps only the session it answers with, for the identity switched to", async () => {
+    const { authorizedStore } = await import("$lib/stores/authorization.store");
+    const { authenticationStore } =
+      await import("$lib/stores/authentication.store");
+    notificationCheck.outcomes = ["identity-changed", "done"];
+    // The user switches to another identity and authorizes again while the check runs.
+    notificationCheck.onIdentityChanged = () => {
+      const signedIn = authenticationStore as unknown as Writable<{
+        identityNumber: bigint;
+      }>;
+      signedIn.update((current) => ({
+        ...current,
+        identityNumber: BigInt(10_001),
+      }));
+      (authorizedStore as unknown as Writable<unknown>).set({
+        accountNumberPromise: Promise.resolve(undefined),
+        accessLevel: "full-access",
+        maxTimeToLive: undefined,
+      });
+    };
+
+    await runCeremony(true);
+
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toMatchObject([
+      { identityNumber: BigInt(10_001) },
+    ]);
+  });
+});
+
+describe("a session created before the allow screen", () => {
+  beforeEach(async () => {
+    await purgeAppSessions(BigInt(10_000));
+  });
+  afterEach(() => {
+    notificationCheck.outcomes = [];
+  });
+
+  it("is created again once when the screen left it less than a minute", async () => {
+    notificationCheck.outcomes = ["done"];
+
+    const { sent, prepared } = await runCeremony(
+      true,
+      {},
+      undefined,
+      undefined,
+      30_000,
+    );
+
+    expect(prepared).toHaveLength(2);
+    expect(sent).toHaveLength(1);
   });
 });
 

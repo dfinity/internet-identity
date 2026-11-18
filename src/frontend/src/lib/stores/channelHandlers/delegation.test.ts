@@ -70,8 +70,9 @@ const authorizedNow = () =>
   });
 
 /** Runs one delegation request to the end, answering for the canister with a chain the
- *  app's key could use. Answers what the app was sent and how often it was minted for. */
-const runRequest = async () => {
+ *  app's key could use. Answers what the app was sent and how often it was minted for.
+ *  `firstLifetimeMs` is how long the first credentials minted are valid for. */
+const runRequest = async (firstLifetimeMs = 60 * 60 * 1000) => {
   const appKey = await ECDSAKeyIdentity.generate({ extractable: true });
   const expiration = BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
   const chain = await DelegationChain.create(
@@ -84,8 +85,12 @@ const runRequest = async () => {
   const actor = {
     prepare_account_delegation: () => {
       numMinted += 1;
+      const lifetimeMs = numMinted === 1 ? firstLifetimeMs : 60 * 60 * 1000;
       return Promise.resolve({
-        Ok: { user_key: new Uint8Array(chain.publicKey), expiration },
+        Ok: {
+          user_key: new Uint8Array(chain.publicKey),
+          expiration: BigInt(Date.now() + lifetimeMs) * BigInt(1_000_000),
+        },
       });
     },
     get_account_delegation: () =>
@@ -166,5 +171,29 @@ describe("an identity change while notifications are checked", () => {
     expect(numMinted).toBe(2);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ id: 1, result: {} });
+  });
+});
+
+describe("credentials minted before the allow screen", () => {
+  afterEach(() => {
+    notificationCheck.outcomes = [];
+  });
+
+  it("mints again once when the screen left them less than a minute", async () => {
+    notificationCheck.outcomes = ["done"];
+
+    const { sent, numMinted } = await runRequest(30_000);
+
+    expect(numMinted).toBe(2);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("hands over what was minted while it has time left", async () => {
+    notificationCheck.outcomes = ["done"];
+
+    const { sent, numMinted } = await runRequest();
+
+    expect(numMinted).toBe(1);
+    expect(sent).toHaveLength(1);
   });
 });

@@ -30,6 +30,7 @@ import { get } from "svelte/store";
 import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
 import { grantedTimeToLive } from "$lib/utils/sessionDuration";
 import { repairNotificationPath } from "$lib/stores/channelHandlers/notificationRepair";
+import { MIN_REMAINING_LIFETIME_MS } from "$lib/stores/channelHandlers/credentialLifetime";
 import { Principal } from "@icp-sdk/core/principal";
 
 /**
@@ -154,42 +155,45 @@ export const handleDelegationRequest =
             ssoSessionMaxAgeNs,
           });
 
-          const { user_key, expiration } = await actor
-            .prepare_account_delegation(
-              identityNumber,
-              effectiveOrigin,
-              accountNumber !== undefined ? [accountNumber] : [],
-              sessionPublicKey,
-              maxTimeToLive !== undefined ? [maxTimeToLive] : [],
-              permissions,
-            )
-            .then(throwCanisterError);
-
-          const delegationChain = await retryFor(8, () =>
-            actor
-              .get_account_delegation(
+          const mint = async () => {
+            const { user_key, expiration } = await actor
+              .prepare_account_delegation(
                 identityNumber,
                 effectiveOrigin,
                 accountNumber !== undefined ? [accountNumber] : [],
                 sessionPublicKey,
-                expiration,
+                maxTimeToLive !== undefined ? [maxTimeToLive] : [],
                 permissions,
               )
-              .then(throwCanisterError)
-              .then(transformSignedDelegation)
-              .then((delegation) =>
-                DelegationChain.fromDelegations(
-                  [delegation],
-                  new Uint8Array(user_key),
+              .then(throwCanisterError);
+            const delegationChain = await retryFor(8, () =>
+              actor
+                .get_account_delegation(
+                  identityNumber,
+                  effectiveOrigin,
+                  accountNumber !== undefined ? [accountNumber] : [],
+                  sessionPublicKey,
+                  expiration,
+                  permissions,
+                )
+                .then(throwCanisterError)
+                .then(transformSignedDelegation)
+                .then((delegation) =>
+                  DelegationChain.fromDelegations(
+                    [delegation],
+                    new Uint8Array(user_key),
+                  ),
                 ),
-              ),
-          );
+            );
+            return { user_key, expiration, delegationChain };
+          };
+          const mintedDelegation = await mint();
 
           const repaired = await repairNotificationPath({
             identityNumber,
             origin: effectiveOrigin,
             accountPrincipal: Principal.selfAuthenticating(
-              new Uint8Array(user_key),
+              new Uint8Array(mintedDelegation.user_key),
             ),
             actor,
           });
@@ -199,6 +203,15 @@ export const handleDelegationRequest =
             previous = authorized;
             continue;
           }
+          // Minted again, with the same authorization and no second check, where the
+          // allow screen kept it open for most of its lifetime.
+          const expiresAtMillis = Number(
+            mintedDelegation.expiration / BigInt(1_000_000),
+          );
+          const { delegationChain } =
+            expiresAtMillis - Date.now() < MIN_REMAINING_LIFETIME_MS
+              ? await mint()
+              : mintedDelegation;
           await channel.send({
             jsonrpc: "2.0",
             id: requestId,
