@@ -1205,7 +1205,11 @@
   <!-- The pages. Over the grid they're a pill in the header (see `pill`); on
        a phone they're the tab bar, floating over the blur at the bottom,
        always lifted since content always runs under it, and a step larger
-       for a thumb. -->
+       for a thumb. In the header the first tab's word stands on the
+       greeting's line, as Edit's word does on the other side, and the thumb
+       reaches past it by the tab's padding: otherwise My apps, unselected,
+       starts 14px in from the name and the apps. A phone's canvas keeps the
+       thumb on the edge, with no room past it for the lifted pill. -->
   <div
     role="tablist"
     aria-label="Apps"
@@ -1215,7 +1219,7 @@
       "relative flex items-center p-1",
       atBottom
         ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6)"
-        : [pill, PILL_MOTION, "-ms-[5px] h-10"],
+        : [pill, PILL_MOTION, "-ms-[5px] h-10 @lg:-ms-[19px]"],
     ]}
   >
     <!-- The selected tab sits on a thumb, as in a segmented control, so it
