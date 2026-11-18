@@ -23,6 +23,7 @@ Internet Identity is an authentication service: a bug here hands someone else's 
 - `sec/fail-closed` Security defaults fail closed: trust inputs are required, a malformed config counts as unset, `Default` is the disabled state.
 - `sec/complete-revocation` Revocation (sign-out, consent withdrawal, removal) closes every path that could still mint or read for that state, including derived queues and caches.
 - `sec/reset-session-on-identity-change` Reset the session store whenever the identity changes or the current access method is removed, so session keys are never reused across identities.
+- `sec/act-as-selected-identity` Being signed in is not being signed in as the selected identity: the page's sign-in can belong to another identity of the browser, such as one removed from the list after it signed in. Before acting for an identity with `authenticationStore`, compare its `identityNumber` with that identity's, and when they differ call `sessionStore.reset()` and sign that identity in. Don't gate such an action on `isAuthenticatedStore`, and don't tell identities apart by `actor`: every sign-in shares the store's one actor.
 
 ## Origins, URLs and hostnames
 
