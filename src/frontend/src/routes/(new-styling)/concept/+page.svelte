@@ -60,6 +60,7 @@
   import Island, { type IslandView } from "./components/Island.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
+  import Sheet from "./components/Sheet.svelte";
   import RecoveryFlow, {
     type RecoveryMethod,
   } from "./components/RecoveryFlow.svelte";
@@ -1641,18 +1642,19 @@
        the first of those views and leaves with the last, alongside the view,
        instead of growing above the views and pushing both down. Between them
        it stays put, and only the view under it changes. A section heads
-       itself, with its title and Close. -->
+       itself, with its title and Close. A phone's sheet doesn't repeat the
+       name (Thomas): the page behind it already says whose it is. -->
   <div class="grid">
-    {#key nested ? "nested" : viewKey}
+    {#key nested && !inSheet ? "nested" : viewKey}
       <div
         class="col-start-1 row-start-1 min-w-0"
         in:viewIn={{ direction: navDirection * readingDirection(), reduced }}
         out:viewOut={{ reduced }}
       >
-        {#if !nested}
+        {#if !nested || inSheet}
           {@render panelBody(inSheet)}
         {:else}
-          <div class={[inSheet && "pe-10"]}>
+          <div>
             <Elevated
               offset={1}
               as="header"
@@ -2194,20 +2196,21 @@
   <!-- Phone: an unanswered incident meets the user over the apps on every
        visit, until they answer it. Put away, it waits at the top of the apps. -->
   {#if !isDesktop.current && incident !== undefined && !incidentDismissed && !panelOpen}
-    <Dialog onClose={() => (incidentDismissed = true)}>
+    <Sheet onClose={() => (incidentDismissed = true)}>
       <IncidentCard {incident} variant="sheet" onAnswer={answerIncident} />
-    </Dialog>
+    </Sheet>
   {/if}
 
-  <!-- Phone: the panel is a sheet from the bottom, as dialogs are elsewhere.
-       A section brings its own Close, across from its title. -->
+  <!-- Phone (Thomas): the panel is a sheet from the bottom, with a grabber
+       to swipe it away. A section brings its own Close, across from its
+       title. -->
   {#if panelOpen && !isDesktop.current}
-    <Dialog
+    <Sheet
       onClose={() => (panelOpen = false)}
       showCloseButton={sectionPage === undefined}
     >
       {@render panel(true)}
-    </Dialog>
+    </Sheet>
   {/if}
 
   {#if phoneHead && !managing}
@@ -2295,6 +2298,7 @@
       focus={recoveryFocus}
       onChange={resolve}
       onClose={() => (recoveryOpen = false)}
+      sheet={!isDesktop.current}
     />
   {/if}
 

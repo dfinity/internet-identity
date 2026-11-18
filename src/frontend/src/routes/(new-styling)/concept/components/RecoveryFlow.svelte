@@ -32,6 +32,7 @@
   import { tick } from "svelte";
   import { prefersReducedMotion } from "svelte/motion";
   import Dialog from "$lib/components/ui/Dialog.svelte";
+  import Sheet from "./Sheet.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { swapIn, viewIn, viewOut } from "../motion";
@@ -47,9 +48,18 @@
     /** A way turned on or off: the scenario moves on, the dialog stays. */
     onChange: (patch: Partial<Scenario>, message: string) => void;
     onClose: () => void;
+    /** A phone: a sheet from the bottom, swiped away like the panel's. */
+    sheet?: boolean;
   }
 
-  const { recovery, identityName, focus, onChange, onClose }: Props = $props();
+  const {
+    recovery,
+    identityName,
+    focus,
+    onChange,
+    onClose,
+    sheet = false,
+  }: Props = $props();
 
   /** `hub` lists both ways back in; the rest belong to the one picked. */
   type Step = "hub" | "save" | "check" | "done" | "manage";
@@ -333,12 +343,22 @@
   </li>
 {/snippet}
 
-<Dialog
-  {onClose}
-  showCloseButton={false}
-  closeOnOutsideClick={dismissable}
-  aria-labelledby={titleId}
->
+{#if sheet}
+  <Sheet {onClose} {dismissable} aria-labelledby={titleId}>
+    {@render body()}
+  </Sheet>
+{:else}
+  <Dialog
+    {onClose}
+    showCloseButton={false}
+    closeOnOutsideClick={dismissable}
+    aria-labelledby={titleId}
+  >
+    {@render body()}
+  </Dialog>
+{/if}
+
+{#snippet body()}
   <header class="mb-4 flex items-center gap-2">
     <!-- Inside one way, the way back to both stays at hand. -->
     {#if step !== "hub"}
@@ -747,4 +767,4 @@
       </form>
     {/key}
   </div>
-</Dialog>
+{/snippet}
