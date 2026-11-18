@@ -33,9 +33,18 @@
     current: number;
     onPick: (paletteIndex: number) => void;
     onClose: () => void;
+    /** Which edge of the anchor the row starts from. */
+    align?: "start" | "end";
   }
 
-  const { anchor, initial, current, onPick, onClose }: Props = $props();
+  const {
+    anchor,
+    initial,
+    current,
+    onPick,
+    onClose,
+    align = "start",
+  }: Props = $props();
 
   // A colour the number gave that isn't among the choices still shows, first,
   // so the strip always holds the one in use.
@@ -100,7 +109,7 @@
   {anchor}
   {onClose}
   direction="down"
-  align="start"
+  {align}
   distance="0.5rem"
   responsive={false}
   class="!w-max !rounded-[1.25rem]"

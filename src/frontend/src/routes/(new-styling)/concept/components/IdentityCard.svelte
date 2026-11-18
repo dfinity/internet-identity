@@ -4,7 +4,6 @@
 </script>
 
 <script lang="ts">
-  import { EllipsisIcon, HouseIcon, LogOutIcon, PaletteIcon } from "@lucide/svelte";
   import type { Snippet } from "svelte";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
@@ -18,8 +17,8 @@
   import ColourStrip from "./ColourStrip.svelte";
   import Elevated, { useSurface } from "./Elevated.svelte";
   import IdentityList from "./IdentityList.svelte";
+  import IdentityMenu from "./IdentityMenu.svelte";
   import IdentityStack from "./IdentityStack.svelte";
-  import Popup from "./Popup.svelte";
 
   interface Props {
     identity: LastUsedIdentity;
@@ -61,8 +60,6 @@
     alert,
   }: Props = $props();
 
-  let menuAnchor = $state<HTMLElement>();
-  const closeMenu = () => (menuAnchor = undefined);
   /** The avatar, which the colour row hangs from while it's open. */
   let avatarButton = $state<HTMLButtonElement>();
   let colourAnchor = $state<HTMLElement>();
@@ -73,10 +70,6 @@
   // The card is one step above what it stands on (Elevated, below), and the
   // avatars across from the name cut themselves out of it.
   const cardSurface = `var(--ii-surface-${Math.min(useSurface() + 1, 8)})`;
-
-  /** A menu's row: in a menu the lit row is the focus, so no ring. */
-  const MENU_ROW =
-    "ii-hover text-text-primary flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-sm outline-none";
 </script>
 
 <!-- Whose panel this is, as an account switcher heads its menu: the identity
@@ -132,78 +125,13 @@
       {paletteOf}
       backdrop={cardSurface}
     />
-    <!-- Everything about the identity itself that isn't security: its colour,
-         the start page and signing out, out of the way behind one ghost
-         button. -->
-    <button
-      type="button"
-      onclick={(event) => (menuAnchor = event.currentTarget)}
-      aria-label="More for this identity"
-      aria-haspopup="menu"
-      aria-expanded={menuAnchor !== undefined}
-      class={[
-        "text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring -ms-1 grid size-9 shrink-0 place-items-center rounded-xl transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2",
-        menuAnchor !== undefined && "text-fg-secondary bg-(--ii-selected)",
-      ]}
-    >
-      <EllipsisIcon class="size-4.5" aria-hidden="true" />
-    </button>
-    {#if menuAnchor !== undefined}
-      <!-- Inside the card, so the menu stands two steps above the card it
-           opens over, not above the panel. -->
-      <Popup
-        anchor={menuAnchor}
-        onClose={closeMenu}
-        direction="down"
-        align="end"
-        distance="0.375rem"
-        responsive={false}
-        class="!w-max"
-      >
-        <div class="flex flex-col p-1" role="menu" aria-label="Identity">
-          <button
-            type="button"
-            role="menuitem"
-            onclick={() => {
-              closeMenu();
-              colourAnchor = avatarButton;
-            }}
-            class={MENU_ROW}
-          >
-            <PaletteIcon class="text-fg-quaternary size-4" aria-hidden="true" />
-            Change colour
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onclick={() => {
-              closeMenu();
-              onStartPage();
-            }}
-            class={MENU_ROW}
-          >
-            <HouseIcon class="text-fg-quaternary size-4" aria-hidden="true" />
-            Make id.ai your start page
-          </button>
-          <hr class="border-border-tertiary -mx-1 my-1" />
-          <button
-            type="button"
-            role="menuitem"
-            onclick={() => {
-              closeMenu();
-              onSignOut();
-            }}
-            class={MENU_ROW}
-          >
-            <LogOutIcon
-              class="text-fg-quaternary size-4 rtl:-scale-x-100"
-              aria-hidden="true"
-            />
-            Sign out
-          </button>
-        </div>
-      </Popup>
-    {/if}
+    <div class="-ms-1">
+      <IdentityMenu
+        onColour={() => (colourAnchor = avatarButton)}
+        {onStartPage}
+        {onSignOut}
+      />
+    </div>
   </li>
   {#if alert !== undefined}
     <!-- Its own padding comes with what it says, so with nothing to say it

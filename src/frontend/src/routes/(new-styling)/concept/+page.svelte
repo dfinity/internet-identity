@@ -4,10 +4,13 @@
     ArrowRightToLineIcon,
     AtSignIcon,
     BellOffIcon,
+    BotIcon,
+    BriefcaseMedicalIcon,
     CheckIcon,
     ChevronRightIcon,
     CompassIcon,
     FlaskConicalIcon,
+    Grid2x2CheckIcon,
     KeyRoundIcon,
     LogOutIcon,
     PanelBottomIcon,
@@ -32,6 +35,7 @@
   import { brandIconOf } from "../manage/(authenticated)/devices/browsers";
   import {
     IDENTITY_PALETTES,
+    identityInitial,
     identityPalette,
     identityPaletteIndex,
     type IdentityPalette,
@@ -48,7 +52,13 @@
   import AppRow from "./components/AppRow.svelte";
   import AppSearch from "./components/AppSearch.svelte";
   import ExplorePage from "./components/ExplorePage.svelte";
-  import IdentityCard from "./components/IdentityCard.svelte";
+  import ColourStrip from "./components/ColourStrip.svelte";
+  import IdentityCard, {
+    SWITCH_LIST_ID,
+  } from "./components/IdentityCard.svelte";
+  import IdentityList from "./components/IdentityList.svelte";
+  import IdentityMenu from "./components/IdentityMenu.svelte";
+  import IdentityStack from "./components/IdentityStack.svelte";
   import IncidentBanner from "./components/IncidentBanner.svelte";
   import IncidentCard from "./components/IncidentCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
@@ -118,6 +128,16 @@
     return own === undefined ? undefined : IDENTITY_PALETTES[own];
   };
   const identityPaletteOverride = $derived(paletteOf(identity));
+  /** Where the identity's colours stand in IDENTITY_PALETTES, and a pick. */
+  const colourIndex = $derived(
+    picked[`${identity.identityNumber}`] ??
+      identityPaletteIndex(identity.identityNumber),
+  );
+  const pickColour = (paletteIndex: number) => {
+    picked[`${identity.identityNumber}`] = paletteIndex;
+  };
+  /** The phone header's colour row hangs from its "⋯" while it's open. */
+  let headColourAnchor = $state<HTMLElement>();
   /** The colours the identity shows: picked, or the ones its number gives. */
   const currentPalette = $derived(
     identityPaletteOverride ?? identityPalette(identity.identityNumber),
@@ -197,6 +217,43 @@
       cards.find((card) => card.kind === kind),
     ).filter((card) => card !== undefined),
   );
+  /** The identities to switch to: every one on the device but this. */
+  const otherIdentities = $derived(
+    identities
+      .map((entry) => entry.identity)
+      .filter((one) => one.identityNumber !== identity.identityNumber),
+  );
+  /** The sections' glyphs, as their cards have them. */
+  const SECTION_ICONS: Record<CardKind, Component> = {
+    access: KeyRoundIcon,
+    recovery: BriefcaseMedicalIcon,
+    devices: MonitorSmartphoneIcon,
+    apps: Grid2x2CheckIcon,
+    integrations: BotIcon,
+  };
+  /** The dot a section's icon carries on a phone, for how loud it is. */
+  const dotOf = (tone: Tone): "risk" | "action" | "news" | undefined =>
+    tone === "risk"
+      ? "risk"
+      : tone === "action" || tone === "queued" || tone === "pending"
+        ? "action"
+        : tone === "recent" || tone === "now"
+          ? "news"
+          : undefined;
+  /** What a phone's head card says: what happened when something did,
+   *  otherwise where it stands in a few words. */
+  const briefOf = (card: CardStatus): string => {
+    if (card.tone !== "calm" && card.tone !== "tip") return card.sentence;
+    if (card.kind === "access") {
+      return current.scenario.access === "one"
+        ? "One way to sign in"
+        : "3 ways to sign in";
+    }
+    if (card.kind === "devices") {
+      return browsers.length === 1 ? "1 browser" : `${browsers.length} browsers`;
+    }
+    return card.sentence;
+  };
   /** What the calm island mentions: something new or waiting, never a tip. */
   const note = $derived(
     cards.find(({ tone }) =>
@@ -279,6 +336,9 @@
   };
   let layout = $state<Layout>(readLayout());
   const isDesktop = new MediaQuery("min-width: 768px");
+  /** A phone in the main layout: the panel is the head of the canvas, above
+   *  the tabs, so the identity's state is there without a tap. */
+  const phoneHead = $derived(!isDesktop.current && layout === "panel");
   /** Wide enough that the panel beside the canvas still leaves the apps their
    *  room, so news may open it on arrival. Narrower, only a risk does. */
   const roomy = new MediaQuery("min-width: 1024px");
@@ -371,6 +431,18 @@
   const closeSection = () => {
     navDirection = -1;
     section = undefined;
+    // A phone opened the section from its header, so back is back there.
+    if (phoneHead) {
+      panelOpen = false;
+    }
+  };
+
+  /** A section from the phone's header: in the sheet, over the apps. */
+  const openFromHead = (kind: CardKind) => {
+    openCard(kind);
+    if (kind !== "recovery") {
+      panelOpen = true;
+    }
   };
 
   const startManaging = () => {
@@ -629,6 +701,10 @@
   const headLift = $derived(
     Math.min(pageScroll[activePage] ?? 0, greetingHeight),
   );
+  /** The head has gone up out of sight. */
+  const headCollapsed = $derived(
+    greetingHeight > 0 && headLift >= greetingHeight - 2,
+  );
   /** A page switch brings that page's head along, so it moves, not jumps. */
   let switchingPage = $state(false);
   $effect(() => {
@@ -753,6 +829,13 @@
   });
 
   // --- Actions on the mock ---
+
+  const showStartPage = () =>
+    toaster.create({
+      title: "Make id.ai your start page",
+      description: "In your browser's settings, under “On startup”, open id.ai.",
+      duration: 5000,
+    });
 
   const unavailable = (step: string) =>
     toaster.create({
@@ -958,8 +1041,11 @@
   // A panel that opens again starts with the list folded, on its overview.
   $effect(() => {
     if (!panelVisible) {
-      switching = false;
       appOpen = undefined;
+      // A phone lists the identities in its header, not in the sheet.
+      if (!phoneHead) {
+        switching = false;
+      }
     }
   });
 
@@ -1014,6 +1100,56 @@
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
+
+{#snippet headCards()}
+  <!-- Phone: the panel's three sections as the head's own cards, side by
+       side, so how you get in, how you'd get back in and where you're signed
+       in are there as the page opens. Each opens its section over the apps. -->
+  <div class="pointer-events-auto grid grid-cols-3 gap-1.5 pb-4">
+    {#each accountCards as card (card.kind)}
+      {@const Icon = SECTION_ICONS[card.kind]}
+      <Elevated offset={1} class="overflow-hidden rounded-2xl">
+        <button
+          type="button"
+          onclick={() => openFromHead(card.kind)}
+          aria-label={`${TITLES[card.kind]}: ${card.sentence}`}
+          class="ii-hover focus-visible:ring-focus-ring flex h-full w-full flex-col items-start gap-2 p-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset"
+        >
+          <span
+            aria-hidden="true"
+            class={[
+              "grid size-7 shrink-0 place-items-center rounded-lg",
+              {
+                risk: "bg-bg-error-secondary text-fg-error-primary",
+                action: "bg-bg-warning-secondary text-fg-warning-primary",
+              }[card.tone as "risk" | "action"] ??
+                "text-fg-secondary bg-(--ii-selected)",
+            ]}
+          >
+            <Icon class="size-4" />
+          </span>
+          <span class="flex flex-col gap-0.5">
+            <span class="text-text-primary text-[13px] leading-4 font-semibold">
+              {card.kind === "access" ? "Access" : TITLES[card.kind]}
+            </span>
+            <span
+              class={[
+                "line-clamp-3 text-xs leading-4 text-pretty",
+                card.tone === "risk"
+                  ? "text-text-error-primary"
+                  : card.tone === "calm" || card.tone === "tip"
+                    ? "text-text-tertiary"
+                    : "text-text-primary",
+              ]}
+            >
+              {briefOf(card)}
+            </span>
+          </span>
+        </button>
+      </Elevated>
+    {/each}
+  </div>
+{/snippet}
 
 {#snippet appTile(app: ConceptApp, index: number)}
   <AppTile
@@ -1228,19 +1364,11 @@
       bind:switching
       signedInWith={signedInWith.title}
       {paletteOf}
-      colour={picked[`${identity.identityNumber}`] ??
-        identityPaletteIndex(identity.identityNumber)}
-      onColour={(paletteIndex) =>
-        (picked[`${identity.identityNumber}`] = paletteIndex)}
+      colour={colourIndex}
+      onColour={pickColour}
       onSwitch={switchIdentity}
       onAdd={() => unavailable("Adding an identity")}
-      onStartPage={() =>
-        toaster.create({
-          title: "Make id.ai your start page",
-          description:
-            "In your browser's settings, under “On startup”, open id.ai.",
-          duration: 5000,
-        })}
+      onStartPage={showStartPage}
       onSignOut={() => unavailable("Signing out")}
     >
       {#snippet alert()}
@@ -1503,26 +1631,34 @@
               </span>
             </button>
           {/if}
-          {#if layout === "panel"}
-            <!-- Phone: the panel opens from here; the dot says it has something for you. -->
-            <button
-              type="button"
-              onclick={() => (panelOpen = true)}
-              aria-label={`Open ${identityName}${needsAttention(cards) ? ", needs your attention" : ""}`}
-              class="relative -me-2 flex size-11 items-center justify-center rounded-full md:hidden"
+          {#if phoneHead && headCollapsed}
+            <!-- Phone, with the head scrolled away: its three sections stay
+                 at the top as icons, each with its dot, a tap away. -->
+            <div
+              transition:fade={{ duration: reduced ? 0 : 160 }}
+              class="flex items-center"
+              style:--ii-dot-backdrop={headerLifted
+                ? "var(--ii-surface-6)"
+                : "var(--ii-surface-3)"}
             >
-              <IdentityAvatar
-                {identity}
-                palette={identityPaletteOverride}
-                size="sm"
-              />
-              {#if needsAttention(cards)}
-                <span
-                  aria-hidden="true"
-                  class="bg-bg-warning-solid absolute end-1 top-1 size-3 rounded-full ring-2 ring-(color:--ii-surface-3)"
-                ></span>
-              {/if}
-            </button>
+              {#each accountCards as card (card.kind)}
+                {@const Icon = SECTION_ICONS[card.kind]}
+                {@const dot = dotOf(card.tone)}
+                <button
+                  type="button"
+                  onclick={() => openFromHead(card.kind)}
+                  aria-label={`${TITLES[card.kind]}: ${card.sentence}`}
+                  class="text-fg-secondary focus-visible:outline-focus-ring grid size-8 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
+                >
+                  <span class="relative">
+                    <Icon class="size-4" aria-hidden="true" />
+                    {#if dot !== undefined}
+                      <AttentionDot tone={dot} />
+                    {/if}
+                  </span>
+                </button>
+              {/each}
+            </div>
           {/if}
         </div>
       </div>
@@ -1536,10 +1672,8 @@
              them. The name is said here only; the panel's card is for
              switching, and how it signed in is Access's to say. -->
         <div bind:clientHeight={greetingHeight} class="overflow-hidden">
-          <p
+          <div
             class={[
-              "text-text-primary flex min-w-0 items-center gap-x-2 pt-3 pb-5 text-xl leading-7 font-semibold tracking-tight md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
-              INSET,
               switchingPage &&
                 "transition-[translate,opacity] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
             ]}
@@ -1548,14 +1682,83 @@
               ? 1 - headLift / greetingHeight
               : 1}
           >
-            <span class="shrink-0">{greeting},</span>
-            <span
-              aria-hidden="true"
-              class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
-              style:background-color={currentPalette.background}
-            ></span>
-            <span class="min-w-0 truncate">{identityName}</span>
-          </p>
+            <div class="flex items-center gap-2 pe-0.5">
+              <p
+                class={[
+                  "text-text-primary flex min-w-0 flex-1 items-center gap-x-2 pt-3 leading-7 font-semibold tracking-tight md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
+                  // A phone's row shares the line with the identities and
+                  // "⋯", so the greeting is a step smaller there.
+                  phoneHead ? "text-lg" : "text-xl",
+                  INSET,
+                  phoneHead ? "pb-3" : "pb-5",
+                ]}
+              >
+                <span class="shrink-0">{greeting},</span>
+                <span
+                  aria-hidden="true"
+                  class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
+                  style:background-color={currentPalette.background}
+                ></span>
+                <span class="min-w-0 truncate">{identityName}</span>
+              </p>
+              {#if phoneHead}
+                <!-- A phone has no panel, so the greeting is the identity's
+                     row too, as a profile heads X on a phone: the other
+                     identities across from the name, then "⋯". -->
+                <div
+                  class="pointer-events-auto flex shrink-0 items-center pt-3 pb-3"
+                >
+                  <IdentityStack
+                    others={otherIdentities}
+                    expanded={switching}
+                    controls={SWITCH_LIST_ID}
+                    onToggle={() => (switching = !switching)}
+                    {paletteOf}
+                    backdrop="var(--ii-surface-3)"
+                  />
+                  <IdentityMenu
+                    onColour={(button) => (headColourAnchor = button)}
+                    onStartPage={showStartPage}
+                    onSignOut={() => unavailable("Signing out")}
+                  />
+                  {#if headColourAnchor !== undefined}
+                    <ColourStrip
+                      anchor={headColourAnchor}
+                      align="end"
+                      initial={identityInitial(identity.name)}
+                      current={colourIndex}
+                      onPick={pickColour}
+                      onClose={() => (headColourAnchor = undefined)}
+                    />
+                  {/if}
+                </div>
+              {/if}
+            </div>
+            {#if phoneHead}
+              {#if switching}
+                <div
+                  transition:slide={{
+                    duration: reduced ? 0 : 240,
+                    easing: quintOut,
+                  }}
+                  class="pointer-events-auto pb-3"
+                >
+                  <Elevated offset={1} class="overflow-hidden rounded-2xl">
+                    <IdentityList
+                      id={SWITCH_LIST_ID}
+                      {identity}
+                      signedInWith={signedInWith.title}
+                      others={otherIdentities}
+                      onSwitch={switchIdentity}
+                      onAdd={() => unavailable("Adding an identity")}
+                      {paletteOf}
+                    />
+                  </Elevated>
+                </div>
+              {/if}
+              {@render headCards()}
+            {/if}
+          </div>
         </div>
         <!-- The pages, right above what they show, with Edit across from them
              on My apps, as over a list on iOS (Done while apps are arranged). -->

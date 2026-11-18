@@ -1,7 +1,8 @@
 <script lang="ts">
   interface Props {
-    /** A risk shows red; a step to take, or one waiting, amber. */
-    tone: "risk" | "action";
+    /** A risk shows red; a step to take, or one waiting, amber; something
+     *  new that asks for nothing, the text's own colour. */
+    tone: "risk" | "action" | "news";
   }
 
   const { tone }: Props = $props();
@@ -15,6 +16,10 @@
   aria-hidden="true"
   class={[
     "pointer-events-none absolute -end-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-[color:var(--ii-dot-backdrop,var(--ii-surface-3))]",
-    tone === "risk" ? "bg-bg-error-solid" : "bg-bg-warning-solid",
+    tone === "risk"
+      ? "bg-bg-error-solid"
+      : tone === "action"
+        ? "bg-bg-warning-solid"
+        : "bg-fg-primary",
   ]}
 ></span>
