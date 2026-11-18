@@ -53,10 +53,10 @@ pub(crate) async fn prepare_common(
     //   `dns_proof` is supplied. Validates the *skeleton chain*
     //   synchronously and caches the deepest-zone DNSKEY for later leaf
     //   admission; a bundled DMARC leaf is validated and its TXT cached.
-    // - DoH path: the default. With the flag off any supplied proof is
-    //   ignored and we fall through to the allowlist check; `smtp_request`
-    //   resolves the DKIM TXT via `crate::doh::fetch_txt` at email arrival.
-    // - Non-allowlisted domain on the DoH path → reject; the FE surfaces a
+    // - DoH path: the default, for any domain. With the flag off any
+    //   supplied proof is ignored; `smtp_request` resolves the DKIM TXT via
+    //   `crate::doh::fetch_txt` at email arrival.
+    // - No `DohConfig` set on the DoH path → reject; the FE surfaces a
     //   "we can't accept email from this domain" error.
     let (cached_root_dnskey, cached_zones, cached_dmarc_txt) = match dns_proof {
         Some(proof) if super::dnssec_email_recovery_enabled() => {
@@ -68,18 +68,8 @@ pub(crate) async fn prepare_common(
             )
         }
         _ => {
-            // DoH allowlist gate.
-            let allowlisted = state::persistent_state(|p| {
-                p.doh_config
-                    .as_ref()
-                    .map(|c| {
-                        c.allowed_domains
-                            .iter()
-                            .any(|d| d.eq_ignore_ascii_case(&registered_domain))
-                    })
-                    .unwrap_or(false)
-            });
-            if !allowlisted {
+            let is_doh_configured = state::persistent_state(|p| p.doh_config.is_some());
+            if !is_doh_configured {
                 return Err(EmailChallengeError::DomainNotAllowlisted(registered_domain));
             }
             (None, crate::dnssec::ZoneKeysMap::new(), None)
@@ -310,8 +300,8 @@ fn normalize_address(input: &str) -> Option<String> {
 /// Pull the registered domain out of an already-normalised address.
 /// "Registered domain" here is the part after the rightmost `@`.
 /// We deliberately don't try to compute the eTLD+1 (no PSL — see
-/// design doc §6.4); the DoH allowlist is checked against this exact
-/// value, which is what the operator configures.
+/// design doc §6.4); `DohConfig.reserved_domains` is matched against this
+/// exact value, which is what the operator configures.
 fn registered_domain_of(address: &str) -> Option<String> {
     address.rsplit_once('@').map(|(_, d)| d.to_string())
 }

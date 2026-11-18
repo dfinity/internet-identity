@@ -142,7 +142,7 @@
     // eventual email's `DKIM-Signature: s=` tag, so we walk that
     // leaf later (after polling sees `NeedDkimLeaf`). If the chain
     // assembly yields nothing (no DNSSEC) we still let the canister
-    // try the DoH path; only when *neither* domain config applies
+    // try the DoH path; only when *neither* path is configured
     // does the user get a "DomainNotAllowlisted" error back, which
     // we translate into the unsupported-domain view.
     let dnsProof: DnsProofBundle | undefined;
@@ -167,7 +167,7 @@
       void runPoll(challenge.nonce, domain, address);
     } catch (e) {
       // `DomainNotAllowlisted` / `DomainNotSupported` at prepare
-      // time means we've got neither DNSSEC nor an allowlist entry
+      // time means we've got neither DNSSEC nor the DoH path
       // — route to the dedicated unsupported view so the user gets
       // the technical "why + how to fix" treatment instead of an
       // opaque inline error string.

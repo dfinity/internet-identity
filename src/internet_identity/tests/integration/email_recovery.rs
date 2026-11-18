@@ -19,7 +19,7 @@
 //! so the canister-side verification logic is the same — only the
 //! TXT-source plumbing differs.
 //!
-//! Negative paths (allowlist gate, authz, unknown nonce, TTL expiry,
+//! Negative paths (DoH config gate, authz, unknown nonce, TTL expiry,
 //! malformed DNSSEC bundle, …) are tested separately at the top of
 //! the file.
 //!
@@ -71,15 +71,15 @@ fn dns_input() -> EmailChallengeDnsInput {
 // Setup
 // ===================================================================
 
-/// Stand up a canister with an `allowed_domains` list that lets
-/// `test.example.com` through to the DoH path, and a `related_origins`
+/// Stand up a canister with a DoH config that reserves outcall capacity
+/// for `test.example.com`, and a `related_origins`
 /// entry so `mailbox_domains()` accepts `register@id.ai` /
 /// `recover@id.ai` envelopes (recipient acceptance reads from
 /// `related_origins`; see `email_recovery::mailbox_domains`).
 pub(crate) fn setup_canister(env: &PocketIc) -> candid::Principal {
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
-            allowed_domains: vec![TEST_DOMAIN.into()],
+            reserved_domains: Some(vec![TEST_DOMAIN.into()]),
             max_cache_age_secs: Some(3600),
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
@@ -96,7 +96,7 @@ pub(crate) fn setup_canister(env: &PocketIc) -> candid::Principal {
 fn setup_canister_dnssec_enabled(env: &PocketIc) -> candid::Principal {
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
-            allowed_domains: vec![TEST_DOMAIN.into()],
+            reserved_domains: Some(vec![TEST_DOMAIN.into()]),
             max_cache_age_secs: Some(3600),
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
@@ -113,9 +113,21 @@ fn setup_canister_dnssec_enabled(env: &PocketIc) -> candid::Principal {
 fn setup_canister_dnssec_disabled(env: &PocketIc) -> candid::Principal {
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
-            allowed_domains: vec![TEST_DOMAIN.into()],
+            reserved_domains: Some(vec![TEST_DOMAIN.into()]),
             max_cache_age_secs: Some(3600),
         })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(false),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
+/// Like [`setup_canister_dnssec_disabled`] but without a DoH config, so the
+/// DoH path is disabled and no email domain is accepted.
+fn setup_canister_without_doh(env: &PocketIc) -> candid::Principal {
+    let args = InternetIdentityInit {
         related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
         enable_dnssec_email_recovery: Some(false),
@@ -185,20 +197,36 @@ fn prepare_add_returns_well_formed_challenge() {
 }
 
 #[test]
-fn prepare_add_rejects_non_allowlisted_domain() {
+fn prepare_add_accepts_a_domain_that_is_not_reserved() {
     let env = env();
     let canister_id = setup_canister(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
-    let bad_input = EmailChallengeDnsInput {
-        address: "bob@evil.com".into(),
+    let input = EmailChallengeDnsInput {
+        address: "bob@other.example".into(),
         dns_proof: None,
     };
-    let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, bad_input)
+    let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
         .expect("call failed")
-        .expect_err("expected failure for non-allowlisted domain");
+        .expect("prepare_add should accept a domain outside reserved_domains");
+    assert!(
+        challenge.nonce.starts_with("II-Recovery-"),
+        "unexpected nonce: {}",
+        challenge.nonce
+    );
+}
+
+#[test]
+fn prepare_add_rejects_every_domain_without_doh_config() {
+    let env = env();
+    let canister_id = setup_canister_without_doh(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+        .expect("call failed")
+        .expect_err("expected failure without a DoH config");
     match err {
-        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, "evil.com"),
+        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, TEST_DOMAIN),
         other => panic!("expected DomainNotAllowlisted, got {other:?}"),
     }
 }
@@ -451,8 +479,8 @@ fn remove_credential_rejects_when_nothing_bound() {
 //   asserts no DoH outcalls are observed.
 // - `dnssec_path_rejects_when_no_trust_anchors_configured` — config
 //   gate: the canister refuses to validate without anchors set.
-// - `dnssec_path_takes_precedence_over_doh_allowlist` — path picker:
-//   even when the domain is on the DoH allowlist, supplying a
+// - `dnssec_path_takes_precedence_over_doh` — path picker:
+//   even when the DoH path would accept the domain, supplying a
 //   `dns_proof` forces the DNSSEC branch.
 
 #[test]
@@ -519,7 +547,7 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
         .expect_err("expected DNSSEC rejection");
     // Without `dnssec_config.root_anchors`, prepare returns the
     // "DNSSEC trust anchors not configured" message via
-    // `DomainNotSupported`. The DoH allowlist isn't consulted at all
+    // `DomainNotSupported`. The DoH path isn't consulted at all
     // when `dns_proof` is supplied.
     match err {
         EmailChallengeError::DomainNotSupported(msg) => {
@@ -533,14 +561,14 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
 }
 
 #[test]
-fn dnssec_path_takes_precedence_over_doh_allowlist() {
+fn dnssec_path_takes_precedence_over_doh() {
     use internet_identity_interface::internet_identity::types::dnssec::{
         DelegationChain, DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
     };
     use serde_bytes::ByteBuf;
 
-    // With the DNSSEC path enabled, even when the registered domain *is*
-    // on the DoH allowlist, supplying a `dns_proof` puts us on the DNSSEC
+    // With the DNSSEC path enabled, even when the DoH path would accept
+    // the registered domain, supplying a `dns_proof` puts us on the DNSSEC
     // path. This test confirms that by sending a malformed DNSSEC bundle
     // and checking we get a DNSSEC error rather than the call falling
     // through to the DoH happy path.
@@ -589,8 +617,8 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
         }],
     };
     let input = EmailChallengeDnsInput {
-        // test.example.com IS on the allowlist — but the DNSSEC path
-        // takes precedence.
+        // The DoH path would accept test.example.com — but the DNSSEC
+        // path takes precedence.
         address: TEST_ADDRESS.into(),
         dns_proof: Some(proof),
     };
@@ -609,14 +637,13 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
 }
 
 #[test]
-fn register_with_dnssec_disabled_and_non_allowlisted_email_fails() {
+fn register_with_dnssec_disabled_and_doh_unconfigured_fails() {
     // Setup (register) flow with the DNSSEC path disabled: even when the
     // caller supplies a DNSSEC proof, the canister drops it and falls
-    // through to the DoH allowlist. `example.com` is not on the allowlist
-    // (only `test.example.com` is), so the call fails with
-    // `DomainNotAllowlisted`.
+    // through to the DoH path. No DoH config is set, so the call fails
+    // with `DomainNotAllowlisted`.
     let env = env();
-    let canister_id = setup_canister_dnssec_disabled(&env);
+    let canister_id = setup_canister_without_doh(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     let now_secs: u32 = (time(&env) / 1_000_000_000)
@@ -644,16 +671,16 @@ fn register_with_dnssec_disabled_and_non_allowlisted_email_fails() {
 }
 
 #[test]
-fn recovery_with_dnssec_disabled_and_non_allowlisted_email_fails() {
+fn recovery_with_dnssec_disabled_and_doh_unconfigured_fails() {
     // Recovery (prepare_delegation) flow, same scenario: DNSSEC disabled +
-    // a supplied proof that gets dropped + a non-allowlisted domain →
-    // `DomainNotAllowlisted`. The allowlist gate runs before any
+    // a supplied proof that gets dropped + no DoH config →
+    // `DomainNotAllowlisted`. The DoH config gate runs before any
     // address→anchor resolution, so an unbound address still surfaces the
-    // allowlist rejection.
+    // rejection.
     let env = env();
-    let canister_id = setup_canister_dnssec_disabled(&env);
+    let canister_id = setup_canister_without_doh(&env);
 
-    // Dummy session key — the call is rejected at the allowlist gate long
+    // Dummy session key — the call is rejected at the DoH config gate long
     // before the key is used.
     let session_key = ByteBuf::from(vec![0u8; 32]);
     let now_secs: u32 = (time(&env) / 1_000_000_000)
@@ -681,10 +708,10 @@ fn recovery_with_dnssec_disabled_and_non_allowlisted_email_fails() {
 }
 
 #[test]
-fn register_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
-    // Setup (register) flow with DNSSEC disabled and an allowlisted
-    // domain: the supplied proof is dropped and the DoH path accepts the
-    // allowlisted domain, so prepare_add issues a challenge.
+fn register_with_dnssec_disabled_uses_doh() {
+    // Setup (register) flow with DNSSEC disabled: the supplied proof is
+    // dropped and the DoH path accepts the domain, so prepare_add issues a
+    // challenge.
     let env = env();
     let canister_id = setup_canister_dnssec_disabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
@@ -715,9 +742,9 @@ fn register_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
 }
 
 #[test]
-fn recovery_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
+fn recovery_with_dnssec_disabled_uses_doh() {
     // Recovery (prepare_delegation) flow, same scenario: the proof is
-    // dropped and the allowlisted domain is accepted on the DoH path, so
+    // dropped and the domain is accepted on the DoH path, so
     // prepare_delegation issues a challenge.
     let env = env();
     let canister_id = setup_canister_dnssec_disabled(&env);
@@ -780,14 +807,14 @@ fn full_setup_flow_via_dnssec_path() {
         now_secs,
     );
 
-    // Stand up the canister with both the DoH allowlist (so the
-    // domain check on the DoH path would pass too — proving we're
-    // actually exercising the DNSSEC branch), the trust anchor, and
+    // Stand up the canister with both a DoH config (so the DoH path
+    // would accept the domain too — proving we're actually exercising
+    // the DNSSEC branch), the trust anchor, and
     // a `related_origins` entry for `id.ai` so `smtp_request`'s
     // recipient dispatch accepts `register@id.ai`.
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
-            allowed_domains: vec![TEST_DOMAIN.into()],
+            reserved_domains: Some(vec![TEST_DOMAIN.into()]),
             max_cache_age_secs: Some(3600),
         })),
         dnssec_config: Some(Some(DnssecConfig {
@@ -906,22 +933,22 @@ fn full_setup_flow_via_dnssec_path() {
 // CNAME into the unsigned `outbound.protection.outlook.com`,
 // `live.com` likewise. The FE's DNSSEC hop-walk can't authenticate
 // that hop, so it submits an EMPTY `hops` set, asking the canister to
-// resolve the DKIM key over its own (allowlist-gated) DoH path using
+// resolve the DKIM key over its own DoH path using
 // the cached `partial_verification` crypto material instead of leaving
 // the entry stuck in `NeedDkimLeaf` until it expires.
 //
 // These tests reuse the same DNSSEC-signed `TEST_DOMAIN` fixture to
-// reach `NeedDkimLeaf`, then exercise the empty-hops fallback with the
-// domain on / off the DoH allowlist.
+// reach `NeedDkimLeaf`, then exercise the empty-hops fallback with and
+// without a DoH config.
 
 /// Drive a DNSSEC-path setup flow up to the `NeedDkimLeaf` state.
-/// `allowed_domains` sets the DoH allowlist the subsequent empty-hops
-/// fallback will be gated on. Returns the canister + identity handles,
+/// `doh_config` is the DoH config the subsequent empty-hops fallback runs
+/// with (`None` disables the DoH path). Returns the canister + identity handles,
 /// the issued nonce, and the DKIM TXT the fallback's outcall expects
 /// to fetch (so the caller can fulfil the DoH fan-out).
 fn dnssec_flow_until_need_dkim_leaf(
     env: &PocketIc,
-    allowed_domains: Vec<String>,
+    doh_config: Option<DohConfig>,
 ) -> (candid::Principal, u64, candid::Principal, String, Vec<u8>) {
     use internet_identity_interface::internet_identity::types::DnssecConfig;
 
@@ -942,10 +969,7 @@ fn dnssec_flow_until_need_dkim_leaf(
     );
 
     let args = InternetIdentityInit {
-        doh_config: Some(Some(DohConfig {
-            allowed_domains,
-            max_cache_age_secs: Some(3600),
-        })),
+        doh_config: Some(doh_config),
         dnssec_config: Some(Some(DnssecConfig {
             root_anchors: vec![chain.anchor],
         })),
@@ -1016,9 +1040,15 @@ fn dnssec_flow_until_need_dkim_leaf(
 #[test]
 fn dnssec_path_falls_back_to_doh_when_leaf_is_unsigned() {
     let env = env();
-    // Domain IS on the DoH allowlist, so the fallback can complete.
-    let (canister_id, id, p, nonce, dkim_txt) =
-        dnssec_flow_until_need_dkim_leaf(&env, vec![TEST_DOMAIN.into()]);
+    // DoH is configured without reserving TEST_DOMAIN, so the fallback
+    // completes on the shared outcall budget.
+    let (canister_id, id, p, nonce, dkim_txt) = dnssec_flow_until_need_dkim_leaf(
+        &env,
+        Some(DohConfig {
+            reserved_domains: None,
+            max_cache_age_secs: Some(3600),
+        }),
+    );
 
     // The FE could not DNSSEC-resolve the leaf, so it drives the DoH path
     // instead: `resolve_via_doh` flips the status from `NeedDkimLeaf` to
@@ -1037,13 +1067,13 @@ fn dnssec_path_falls_back_to_doh_when_leaf_is_unsigned() {
 }
 
 #[test]
-fn dnssec_path_doh_fallback_rejects_non_allowlisted_domain() {
+fn dnssec_path_doh_fallback_rejects_without_doh_config() {
     let env = env();
     // TEST_DOMAIN is DNSSEC-signed (so the DNSSEC path + NeedDkimLeaf
-    // are reached) but is NOT on the DoH allowlist.
-    let (canister_id, _id, _p, nonce, _dkim_txt) = dnssec_flow_until_need_dkim_leaf(&env, vec![]);
+    // are reached) but no DoH config is set.
+    let (canister_id, _id, _p, nonce, _dkim_txt) = dnssec_flow_until_need_dkim_leaf(&env, None);
 
-    // DoH fallback. The allowlist gate rejects before any outcall (the
+    // DoH fallback. The DoH config gate rejects before any outcall (the
     // synchronous gate in `fetch_txt`), so a single `resolve_via_doh` poll
     // accepts (`Ok(())`) and writes the rejection to the polled status —
     // surfaced below.

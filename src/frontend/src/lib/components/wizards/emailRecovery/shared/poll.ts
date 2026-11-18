@@ -212,7 +212,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
         // CNAMEs into an unsigned zone (outlook.com ->
         // outbound.protection.outlook.com) the walk yields `undefined`;
         // we then ask the canister to resolve the key over its own
-        // (allowlist-gated) DoH path instead of leaving the entry stuck
+        // DoH path instead of leaving the entry stuck
         // at NeedDkimLeaf until it expires.
         const selector = result.NeedDkimLeaf.selector;
         try {

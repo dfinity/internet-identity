@@ -13,7 +13,7 @@
 //!   dispatches by `PendingKind`.
 //! - The DKIM-leaf submission path in [`submit_leaf`].
 //! - The shared `prepare_common` core in [`prepare`] — input
-//!   validation, path picking (DNSSEC skeleton vs. DoH allowlist), and
+//!   validation, path picking (DNSSEC skeleton vs. DoH), and
 //!   nonce issuing. Both flow-specific `prepare_add` wrappers (recovery
 //!   and verified-email) call this directly.
 //!

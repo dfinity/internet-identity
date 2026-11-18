@@ -2,8 +2,8 @@ export const idlFactory = ({ IDL }) => {
   const MetadataMap = IDL.Rec();
   const MetadataMapV2 = IDL.Rec();
   const DohConfig = IDL.Record({
+    'reserved_domains' : IDL.Opt(IDL.Vec(IDL.Text)),
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
-    'allowed_domains' : IDL.Vec(IDL.Text),
   });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,
@@ -2049,8 +2049,8 @@ export const idlFactory = ({ IDL }) => {
 };
 export const init = ({ IDL }) => {
   const DohConfig = IDL.Record({
+    'reserved_domains' : IDL.Opt(IDL.Vec(IDL.Text)),
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
-    'allowed_domains' : IDL.Vec(IDL.Text),
   });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,

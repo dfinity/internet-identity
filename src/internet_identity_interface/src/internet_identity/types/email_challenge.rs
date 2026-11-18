@@ -25,10 +25,8 @@
 //!    pipeline. See `docs/ongoing/email-recovery.md` §8.4 / §8.5 for
 //!    the rationale (no selector probing — the selector is
 //!    authoritative from the email itself).
-//! 2. **DoH allowlist** — when no bundle is supplied, the canister
-//!    checks the registered domain against `DohConfig.allowed_domains`
-//!    (deploy-arg). Used for the major consumer mailbox providers
-//!    (Gmail, Outlook, iCloud, …) that don't publish DNSSEC. The
+//! 2. **DoH** — when no bundle is supplied and a `DohConfig` is set
+//!    (deploy-arg), for any email domain. The
 //!    DKIM TXT is resolved via a 3-of-5 DoH quorum
 //!    (`crate::doh::fetch_txt`) at `smtp_request` time, and
 //!    verification finishes inside that one call — no `submit_leaf`
@@ -78,9 +76,8 @@ pub struct EmailChallenge {
 ///   skeleton chain synchronously, cache the deepest-zone DNSKEY
 ///   for later leaf admission, and (if the FE included a DMARC
 ///   leaf in the bundle) cache the DMARC policy bytes.
-/// - Otherwise, check the registered domain against
-///   `DohConfig.allowed_domains` (deploy-arg) and resolve the DKIM
-///   TXT via `crate::doh::fetch_txt` at `smtp_request` time.
+/// - Otherwise, when a `DohConfig` is set (deploy-arg), resolve the
+///   DKIM TXT via `crate::doh::fetch_txt` at `smtp_request` time.
 /// - If neither path applies, prepare fails with
 ///   `DomainNotSupported`.
 ///
@@ -120,9 +117,8 @@ pub struct EmailChallengeDnsInput {
     ///    and verified) so `submit_dkim_leaf` doesn't need to
     ///    fetch them via DoH.
     ///
-    /// When absent, the canister falls back to the DoH-allowlist
-    /// path (the registered domain must be in
-    /// `DohConfig.allowed_domains`). The FE doesn't need to know
+    /// When absent, the canister falls back to the DoH path (a
+    /// `DohConfig` must be set). The FE doesn't need to know
     /// which path the canister chose; it just submits whatever it
     /// could gather and reads back the typed error variants.
     pub dns_proof: Option<DnsProofBundle>,
@@ -226,8 +222,8 @@ pub enum EmailChallengeError {
     NonceUnknown,
     /// A pending challenge existed but its 30-minute TTL has lapsed.
     NonceExpired,
-    /// The DoH path was requested but the registered domain isn't on
-    /// the allowlist (`DohConfig.allowed_domains`).
+    /// The DoH path was requested but no `DohConfig` is set, so the
+    /// canister doesn't accept email from this registered domain.
     DomainNotAllowlisted(String),
     /// DoH path: `crate::doh::fetch_txt` couldn't reach quorum or
     /// reported a transport failure. The inner [`DohFailureReason`]

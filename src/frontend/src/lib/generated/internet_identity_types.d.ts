@@ -754,16 +754,17 @@ export interface DnssecRootAnchor {
   'digest' : Uint8Array | number[],
 }
 /**
- * DoH (DNS-over-HTTPS) fallback configuration.
+ * DoH (DNS-over-HTTPS) configuration.
  * 
- * The canister will only fetch DKIM/DMARC TXT records via HTTP outcalls
- * for an FQDN whose registered domain is in `allowed_domains`. Cache
- * entries are populated on demand and re-used until `max_cache_age_secs`
- * elapses (default 3600s when null, capped at 24h).
+ * Lookups for a registered domain in `reserved_domains` (matched
+ * case-insensitively) draw from an outcall budget of their own, so lookups
+ * for other domains can never use up the capacity these domains rely on.
+ * Null reserves no domain. Cache entries are populated on demand and re-used
+ * until `max_cache_age_secs` elapses (default 3600s when null).
  */
 export interface DohConfig {
+  'reserved_domains' : [] | [Array<string>],
   'max_cache_age_secs' : [] | [bigint],
-  'allowed_domains' : Array<string>,
 }
 /**
  * Why a DoH resolution failed, as a typed discriminant rather than a
@@ -1370,10 +1371,10 @@ export type InboxNotificationId = bigint;
  */
 export interface InternetIdentityInit {
   /**
-   * DoH (DNS-over-HTTPS) fallback configuration. Allowlists the
-   * domains for which the canister may fetch DKIM/DMARC TXT records
-   * via HTTP outcalls when no DNSSEC chain is available — see
-   * `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
+   * DoH (DNS-over-HTTPS) configuration. While set, the canister fetches
+   * DKIM/DMARC TXT records via HTTP outcalls for any email domain when no
+   * DNSSEC chain is available; while unset, it doesn't. Same set/clear
+   * pattern.
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**

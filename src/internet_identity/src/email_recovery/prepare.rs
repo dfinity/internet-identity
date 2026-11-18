@@ -2,7 +2,7 @@
 //!
 //! Authenticated entry point that validates the FE's input, picks
 //! the verification path (DNSSEC if a skeleton bundle is supplied,
-//! DoH allowlist otherwise), draws a fresh nonce from the heap PRNG,
+//! DoH otherwise), draws a fresh nonce from the heap PRNG,
 //! and parks a `PendingChallenge` keyed by that nonce. Returns the
 //! user-visible challenge (nonce + expiry) so the FE can render
 //! the "send a magic email" screen.
@@ -17,8 +17,8 @@
 //!   we validate it and cache the TXT bytes. The DKIM leaf is *not*
 //!   in this bundle — it lands later via
 //!   `email_challenge_submit_dkim_leaf`.
-//! - **DoH allowlist**: when `dns_proof` is absent, the registered
-//!   domain must be in `DohConfig.allowed_domains`. The DKIM TXT is
+//! - **DoH**: when `dns_proof` is absent, for any registered domain,
+//!   provided a `DohConfig` is set. The DKIM TXT is
 //!   resolved via `crate::doh::fetch_txt` at email-arrival time and
 //!   verification finishes inside `smtp_request` (no submit-leaf
 //!   follow-up).
@@ -105,10 +105,10 @@ mod tests {
     use super::*;
     use internet_identity_interface::internet_identity::types::doh::DohConfig;
 
-    fn install_doh_allowlist(domains: &[&str]) {
+    fn install_doh_config(reserved_domains: &[&str]) {
         crate::state::persistent_state_mut(|p| {
             p.doh_config = Some(DohConfig {
-                allowed_domains: domains.iter().map(|d| (*d).to_string()).collect(),
+                reserved_domains: Some(reserved_domains.iter().map(|d| (*d).to_string()).collect()),
                 max_cache_age_secs: None,
             });
         });
@@ -180,19 +180,21 @@ mod tests {
     }
 
     #[test]
-    fn rejects_non_allowlisted_domain() {
+    fn accepts_a_domain_that_is_not_reserved() {
         crate::email_inbound::pending::reset_for_tests();
-        install_doh_allowlist(&["gmail.com"]);
-        let result = block_on(prepare_add(
+        crate::email_inbound::rng::tests::seed_for_tests([5u8; 32]);
+        install_doh_config(&["gmail.com"]);
+        let challenge = block_on(prepare_add(
             1,
             doh_input("alice@example.com"),
             100,
             test_auth_key(),
-        ));
-        match result {
-            Err(EmailChallengeError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
-            other => panic!("expected DomainNotAllowlisted, got {other:?}"),
-        }
+        ))
+        .expect("expected Ok for a domain outside reserved_domains");
+        crate::email_inbound::pending::with_mut(&challenge.nonce, 101, |c| {
+            assert_eq!(c.registered_domain, "example.com");
+        })
+        .expect("entry should exist");
     }
 
     fn test_auth_key() -> AuthorizationKey {
@@ -218,12 +220,12 @@ mod tests {
     #[test]
     fn flag_off_drops_proof_and_takes_doh_path() {
         // Flag off (the deploy default): a present `dns_proof` is ignored
-        // and the allowlist gate decides. A non-allowlisted domain is
-        // rejected with DomainNotAllowlisted — never reaching the DNSSEC
-        // verifier (which, on this bogus bundle, would fail differently).
+        // and the DoH gate decides. With no DoH config set it rejects with
+        // DomainNotAllowlisted — never reaching the DNSSEC verifier (which,
+        // on this bogus bundle, would fail differently).
         crate::email_inbound::pending::reset_for_tests();
         set_dnssec_flag(false);
-        install_doh_allowlist(&["gmail.com"]);
+        crate::state::persistent_state_mut(|p| p.doh_config = None);
         let result = block_on(prepare_add(
             1,
             dnssec_input("alice@example.com"),
@@ -237,14 +239,14 @@ mod tests {
     }
 
     #[test]
-    fn flag_off_with_proof_succeeds_via_doh_when_allowlisted() {
-        // Strongest form: a proof is present *and* the domain is
-        // allowlisted. The flag being off means we take the DoH path and
-        // succeed, proving the bogus proof was never validated.
+    fn flag_off_with_proof_succeeds_via_doh() {
+        // Strongest form: a proof is present *and* DoH is configured. The
+        // flag being off means we take the DoH path and succeed, proving the
+        // bogus proof was never validated.
         crate::email_inbound::pending::reset_for_tests();
         crate::email_inbound::rng::tests::seed_for_tests([9u8; 32]);
         set_dnssec_flag(false);
-        install_doh_allowlist(&["gmail.com"]);
+        install_doh_config(&["gmail.com"]);
         let result = block_on(prepare_add(
             1,
             dnssec_input("alice@gmail.com"),
@@ -259,7 +261,7 @@ mod tests {
         // Flag on re-enables the DNSSEC path: a present proof reaches
         // `verify_dnssec_skeleton`. With no trust anchors configured it
         // fails there with the dedicated message — distinct from the DoH
-        // allowlist rejection, proving the DNSSEC branch was taken.
+        // rejection, proving the DNSSEC branch was taken.
         crate::email_inbound::pending::reset_for_tests();
         set_dnssec_flag(true);
         crate::state::persistent_state_mut(|p| p.dnssec_config = None);
@@ -280,7 +282,7 @@ mod tests {
     #[test]
     fn rejects_obviously_malformed_address() {
         crate::email_inbound::pending::reset_for_tests();
-        install_doh_allowlist(&["gmail.com"]);
+        install_doh_config(&["gmail.com"]);
         for bad in &[
             "",
             " ",
@@ -304,7 +306,7 @@ mod tests {
         // sub-caps (64 / 255) are rejected at prepare time so the
         // pending-challenge map can't be inflated.
         crate::email_inbound::pending::reset_for_tests();
-        install_doh_allowlist(&["example.com"]);
+        install_doh_config(&["example.com"]);
 
         let oversized_total = format!("{}@example.com", "a".repeat(250));
         let oversized_local = format!("{}@example.com", "a".repeat(65));
@@ -327,7 +329,7 @@ mod tests {
     fn happy_path_returns_a_well_formed_challenge() {
         crate::email_inbound::pending::reset_for_tests();
         crate::email_inbound::rng::tests::seed_for_tests([7u8; 32]);
-        install_doh_allowlist(&["gmail.com"]);
+        install_doh_config(&["gmail.com"]);
 
         let authorization_key = test_auth_key();
         let result = block_on(prepare_add(
@@ -361,21 +363,5 @@ mod tests {
             ));
         })
         .expect("entry should exist");
-    }
-
-    #[test]
-    fn allowlist_match_is_case_insensitive() {
-        crate::email_inbound::pending::reset_for_tests();
-        crate::email_inbound::rng::tests::seed_for_tests([3u8; 32]);
-        // Operator stored the domain in caps; user typed it lowercase.
-        // We accept either side mixed-case.
-        install_doh_allowlist(&["GMAIL.COM"]);
-        let result = block_on(prepare_add(
-            1,
-            doh_input("alice@gmail.com"),
-            1_000,
-            test_auth_key(),
-        ));
-        assert!(result.is_ok(), "expected Ok, got {result:?}");
     }
 }

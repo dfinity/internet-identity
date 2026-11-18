@@ -41,7 +41,7 @@
 //!
 //! - **DoH path** (no DNSSEC chain cached at prepare time): `status` →
 //!   `ResolvingDoh`. The FE drives `email_challenge_resolve_via_doh`, which
-//!   resolves the DKIM key (and DMARC) over the canister's allowlist-gated
+//!   resolves the DKIM key (and DMARC) over the canister's
 //!   DoH cache and finishes off the stashed partial.
 //!
 //! - **DNSSEC path** (skeleton chain cached at prepare time): `status` →
@@ -359,7 +359,7 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // - DNSSEC path → `NeedDkimLeaf { selector }`: the FE walks the signed
     //   DNSSEC resolution and calls `email_challenge_submit_dkim_leaf`.
     // - DoH path → `ResolvingDoh`: the FE drives `email_challenge_resolve_via_doh`,
-    //   which resolves the key over the canister's allowlist-gated DoH cache.
+    //   which resolves the key over the canister's DoH cache.
     //
     // The completion (signature check + bind/stamp) runs later, off the
     // partial, in whichever of those methods the FE calls — so it's the same
@@ -714,8 +714,8 @@ pub(super) fn extract_from_address(
 }
 
 /// Translate an internal `DohError` into the `EmailChallengeError` the FE
-/// polls, grouped into the buckets the FE acts on: config misses
-/// (`DomainNotAllowed` / `NotConfigured`) → `DomainNotAllowlisted`; a
+/// polls, grouped into the buckets the FE acts on: a config miss
+/// (`NotConfigured`) → `DomainNotAllowlisted`; a
 /// quorum "no record" (`NoAnswer`) → `EmailVerificationFailed` (signed
 /// selector gone); caller bugs (`InvalidName` /
 /// `NameOutsideRegisteredDomain`) → `InternalCanisterError`; everything
@@ -733,9 +733,7 @@ pub(super) fn extract_from_address(
 pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailChallengeError {
     use crate::doh::DohError;
     match err {
-        DohError::DomainNotAllowed | DohError::NotConfigured => {
-            EmailChallengeError::DomainNotAllowlisted(domain.to_string())
-        }
+        DohError::NotConfigured => EmailChallengeError::DomainNotAllowlisted(domain.to_string()),
         DohError::AllProvidersFailed => {
             EmailChallengeError::DohFetchFailed(DohFailureReason::AllProvidersFailed)
         }
@@ -1058,7 +1056,7 @@ mod tests {
             EmailChallengeError::EmailVerificationFailed(_)
         ));
         assert!(matches!(
-            map_doh_error(DohError::DomainNotAllowed, "example.com"),
+            map_doh_error(DohError::NotConfigured, "example.com"),
             EmailChallengeError::DomainNotAllowlisted(_)
         ));
     }

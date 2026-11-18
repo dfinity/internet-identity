@@ -12,10 +12,10 @@ source "$SOURCE_DIR/frontend-arg-helpers.bash"
 # IANA root-anchor fetcher (used to fill dnssec_config in BE init args).
 # shellcheck source=fetch-iana-root-anchors.bash
 source "$SOURCE_DIR/fetch-iana-root-anchors.bash"
-# Default DoH allowlist — shared with deploy-common.bash so beta and
-# prod deploys agree on which domains use the DoH-fallback path.
-# shellcheck source=default-doh-domains.bash
-source "$SOURCE_DIR/default-doh-domains.bash"
+# Default DoH reserved domains — shared with deploy-common.bash so beta
+# and prod deploys agree on which domains get reserved outcall capacity.
+# shellcheck source=default-doh-reserved-domains.bash
+source "$SOURCE_DIR/default-doh-reserved-domains.bash"
 # NNS-aware proposal-tag resolution: skips rejected/open tags so
 # "the last release" really means "the last release that shipped".
 # shellcheck source=proposal-status.bash
@@ -674,17 +674,18 @@ didc_assist_ii_init() {
   run_didc_command_for_ii_init assist | awk '/\(/ {flag=1} flag {print} /\)/ {flag=0}'
 }
 
-# Default DoH allowlist for the email-recovery flow on production.
-# Reads `DEFAULT_DOH_ALLOWED_DOMAINS` from `default-doh-domains.bash`
-# (sourced at the top of this script) so beta and prod always agree.
+# Default DoH reserved domains for the email flows on production.
+# Reads `DEFAULT_DOH_RESERVED_DOMAINS` from
+# `default-doh-reserved-domains.bash` (sourced at the top of this script)
+# so beta and prod always agree.
 #
-# The `II_DOH_DOMAINS` env var overrides — including with the empty
-# string, which yields `allowed_domains = vec {}` (DoH disabled,
-# DNSSEC-only). The check looks for "is the var *set*", not "is it
-# non-empty", so the documented "empty disables" semantics work.
-default_doh_domains_for_prod() {
-  if [ -n "${II_DOH_DOMAINS+set}" ]; then
-    echo "$II_DOH_DOMAINS"
+# The `II_DOH_RESERVED_DOMAINS` env var overrides — including with the
+# empty string, which yields `reserved_domains = opt vec {}` (no domain
+# reserved). The check looks for "is the var *set*", not "is it
+# non-empty", so the documented "empty reserves none" semantics work.
+default_doh_reserved_domains_for_prod() {
+  if [ -n "${II_DOH_RESERVED_DOMAINS+set}" ]; then
+    echo "$II_DOH_RESERVED_DOMAINS"
     return
   fi
   # Bash array → comma-separated for the patcher. printf with `,` as
@@ -693,12 +694,12 @@ default_doh_domains_for_prod() {
   # deploy-common.bash and by `build_doh_config_candid_for_prod`'s
   # equivalent below, which both skip empty elements.
   local IFS=,
-  echo "${DEFAULT_DOH_ALLOWED_DOMAINS[*]}"
+  echo "${DEFAULT_DOH_RESERVED_DOMAINS[*]}"
 }
 
-# Render the DoH allowlist as a Candid `opt opt DohConfig` value.
+# Render the DoH config as a Candid `opt opt DohConfig` value.
 build_doh_config_candid_for_prod() {
-  local list_csv="$(default_doh_domains_for_prod)"
+  local list_csv="$(default_doh_reserved_domains_for_prod)"
   local list=""
   local IFS=','
   for d in $list_csv; do
@@ -708,7 +709,7 @@ build_doh_config_candid_for_prod() {
   done
   cat <<EOF
 opt opt record {
-      allowed_domains = vec { $list};
+      reserved_domains = opt vec { $list};
       max_cache_age_secs = opt (3600 : nat64);
     }
 EOF
@@ -716,7 +717,7 @@ EOF
 
 # After didc-assist has produced a Candid arg file, replace whatever
 # the user typed (or didn't) for `dnssec_config` and `doh_config` with
-# values fetched live from IANA + the curated DoH allowlist. This keeps
+# values fetched live from IANA + the curated DoH reserved domains. This keeps
 # the rest of the didc-assist flow (each opt field can stay as null
 # = preserve, or be set explicitly) untouched while making sure these
 # two fields land with operator-controlled values rather than human-
