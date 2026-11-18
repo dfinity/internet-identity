@@ -818,7 +818,8 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
     assert_eq!(
         pwa_status(&env, canister_id, first_session),
         Some(WebPushSubscriptionStatus {
-            endpoint: PWA_ENDPOINT.to_string()
+            endpoint: PWA_ENDPOINT.to_string(),
+            unanswered_pushes: None,
         })
     );
 
@@ -856,7 +857,8 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
     assert_eq!(
         pwa_status(&env, canister_id, other_session),
         Some(WebPushSubscriptionStatus {
-            endpoint: PWA_ENDPOINT.to_string()
+            endpoint: PWA_ENDPOINT.to_string(),
+            unanswered_pushes: None,
         })
     );
 

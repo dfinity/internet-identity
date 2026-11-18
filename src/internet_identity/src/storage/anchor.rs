@@ -6,7 +6,7 @@ use crate::notifications::webpush::{
 };
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
-use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::browser::{StorableBrowser, StorablePendingSameDeviceLink};
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
@@ -15,6 +15,7 @@ use crate::storage::storable::notifications::browser_inbox::{
     StorableInbox, StorableInboxNotification, StorableInboxNotificationKind,
     StorableNotificationEvent,
 };
+use crate::storage::storable::notifications::webpush::subscription::StorableUnansweredPushCount;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -117,6 +118,20 @@ pub struct Browser {
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
+    /// The entry of this identity that this one shares a device with, set where an
+    /// installed web app on this entry claimed the link from that entry.
+    pub same_device_browser_id: Option<BrowserId>,
+    /// The one-shot key an installed web app on this entry registered for that claim.
+    pub pending_same_device_link: Option<PendingSameDeviceLink>,
+}
+
+/// A one-shot key another entry of the identity proves possession of to link itself to
+/// this entry as sharing its device, and when it stops being accepted.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingSameDeviceLink {
+    /// DER-encoded P-256 SPKI.
+    pub link_public_key: PublicKey,
+    pub expires_at_ns: Timestamp,
 }
 
 impl Browser {
@@ -158,13 +173,21 @@ pub enum InboxNotificationKind {
     App { account_principal: Principal },
     /// Internet Identity's own, and what it has to say.
     Identity { event: NotificationEvent },
+    /// Internet Identity's own, checking that an app's installed web app on this entry
+    /// receives notifications for the account with this principal, which names the app.
+    /// Only that app's session for that account reads it.
+    InstalledAppProbe { account_principal: Principal },
 }
 
 impl InboxNotification {
-    /// The account principal of an app's notification. `None` for our own.
+    /// The account principal of an entry for an account at an app. `None` for one about
+    /// the identity.
     pub fn account_principal(&self) -> Option<Principal> {
         match &self.kind {
-            InboxNotificationKind::App { account_principal } => Some(*account_principal),
+            InboxNotificationKind::App { account_principal }
+            | InboxNotificationKind::InstalledAppProbe { account_principal } => {
+                Some(*account_principal)
+            }
             InboxNotificationKind::Identity { .. } => None,
         }
     }
@@ -188,6 +211,10 @@ impl From<InboxNotification> for StorableInboxNotification {
             InboxNotificationKind::Identity { event } => {
                 let event = StorableNotificationEvent::from(event);
                 StorableInboxNotificationKind::Identity { event }
+            }
+            InboxNotificationKind::InstalledAppProbe { account_principal } => {
+                let account_principal = account_principal.as_slice().to_vec();
+                StorableInboxNotificationKind::InstalledAppProbe { account_principal }
             }
         };
         StorableInboxNotification {
@@ -225,6 +252,10 @@ impl TryFrom<StorableInboxNotification> for InboxNotification {
             StorableInboxNotificationKind::Identity { event } => {
                 let event = NotificationEvent::from(event);
                 InboxNotificationKind::Identity { event }
+            }
+            StorableInboxNotificationKind::InstalledAppProbe { account_principal } => {
+                let account_principal = principal(&account_principal)?;
+                InboxNotificationKind::InstalledAppProbe { account_principal }
             }
         };
         Ok(InboxNotification {
@@ -277,6 +308,51 @@ pub struct ReadySubscription {
     pub auth: AuthSecret,
     /// When `payload_ikm` was last derived.
     pub last_rotated_ns: Timestamp,
+    /// The pushes posted through this subscription since a notification was last fetched
+    /// through it. `None` where there are none.
+    pub unanswered_pushes: Option<UnansweredPushCount>,
+    /// When Internet Identity last submitted its own notification through this
+    /// subscription to check it, where no fetch through it has answered that since.
+    pub probe_sent_at_ns: Option<Timestamp>,
+}
+
+/// How many pushes went unanswered through one subscription, and when the first of them
+/// was posted.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UnansweredPushCount {
+    pub count: u32,
+    pub first_sent_at_ns: Timestamp,
+}
+
+/// How many unanswered pushes make a subscription worth probing.
+const UNANSWERED_PUSHES_LIMIT: u32 = 3;
+
+/// How long the first unanswered push must have waited for its subscription to be worth
+/// probing, so that a burst of pushes a device has not caught up with yet is not enough.
+const UNANSWERED_PUSHES_MIN_AGE_NS: u64 = 60 * 60 * 1_000_000_000;
+
+impl UnansweredPushCount {
+    /// The count after one more push posted at `now_ns`, starting from `previous`.
+    pub fn after_push(previous: Option<Self>, now_ns: Timestamp) -> Self {
+        match previous {
+            Some(count) => Self {
+                count: count.count.saturating_add(1),
+                first_sent_at_ns: count.first_sent_at_ns,
+            },
+            None => Self {
+                count: 1,
+                first_sent_at_ns: now_ns,
+            },
+        }
+    }
+
+    /// Whether the subscription is worth a probe at `now_ns`: at least
+    /// [`UNANSWERED_PUSHES_LIMIT`] pushes, the first at least
+    /// [`UNANSWERED_PUSHES_MIN_AGE_NS`] old.
+    pub fn is_past_limit(&self, now_ns: Timestamp) -> bool {
+        self.count >= UNANSWERED_PUSHES_LIMIT
+            && now_ns.saturating_sub(self.first_sent_at_ns) >= UNANSWERED_PUSHES_MIN_AGE_NS
+    }
 }
 
 impl WebPushSubscription {
@@ -333,6 +409,8 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                 subscriber_key,
                 auth,
                 last_rotated_ns,
+                unanswered_pushes,
+                probe_sent_at_ns,
             } => Ok(WebPushSubscription::Ready(ReadySubscription {
                 endpoint: PushEndpoint::try_from(endpoint.as_str())?,
                 created_at_ns,
@@ -341,6 +419,11 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                 subscriber_key: SubscriberKey::try_from(subscriber_key)?,
                 auth: AuthSecret::try_from(auth)?,
                 last_rotated_ns,
+                unanswered_pushes: unanswered_pushes.map(|stored| UnansweredPushCount {
+                    count: stored.count,
+                    first_sent_at_ns: stored.first_sent_at_ns,
+                }),
+                probe_sent_at_ns,
             })),
         }
     }
@@ -362,6 +445,13 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 subscriber_key: ready.subscriber_key.into_vec(),
                 auth: ready.auth.into_vec(),
                 last_rotated_ns: ready.last_rotated_ns,
+                unanswered_pushes: ready.unanswered_pushes.map(|count| {
+                    StorableUnansweredPushCount {
+                        count: count.count,
+                        first_sent_at_ns: count.first_sent_at_ns,
+                    }
+                }),
+                probe_sent_at_ns: ready.probe_sent_at_ns,
             },
         }
     }
@@ -410,6 +500,13 @@ impl From<StorableBrowser> for Browser {
                 .collect(),
             next_inbox_notification_id: value.next_inbox_notification_id.unwrap_or_default(),
             notification_app: value.notification_app.map(NotificationAppRef::from),
+            same_device_browser_id: value.same_device_browser_id,
+            pending_same_device_link: value.pending_same_device_link.map(|pending| {
+                PendingSameDeviceLink {
+                    link_public_key: ByteBuf::from(pending.link_public_key),
+                    expires_at_ns: pending.expires_at_ns,
+                }
+            }),
         }
     }
 }
@@ -429,6 +526,13 @@ impl From<Browser> for StorableBrowser {
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
             next_inbox_notification_id: Some(value.next_inbox_notification_id),
+            same_device_browser_id: value.same_device_browser_id,
+            pending_same_device_link: value.pending_same_device_link.map(|pending| {
+                StorablePendingSameDeviceLink {
+                    link_public_key: pending.link_public_key.into_vec(),
+                    expires_at_ns: pending.expires_at_ns,
+                }
+            }),
             inbox: (!value.notifications.is_empty()).then(|| {
                 StorableInbox(
                     value
@@ -1148,6 +1252,56 @@ impl Anchor {
         });
     }
 
+    /// Registers `link_public_key` on `browser_id`'s entry, replacing any earlier one, for
+    /// another entry of this identity to claim until `expires_at_ns`.
+    pub fn start_same_device_link(
+        &mut self,
+        browser_id: BrowserId,
+        link_public_key: PublicKey,
+        expires_at_ns: Timestamp,
+    ) {
+        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+            return;
+        };
+        browser.pending_same_device_link = Some(PendingSameDeviceLink {
+            link_public_key,
+            expires_at_ns,
+        });
+    }
+
+    /// The entry of this anchor other than `claimer`, whose pending same-device link holds
+    /// `link_public_key` and has not expired at `now_ns`.
+    pub fn browser_awaiting_same_device_link(
+        &self,
+        link_public_key: &PublicKey,
+        claimer: BrowserId,
+        now_ns: Timestamp,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                browser.id != claimer
+                    && browser
+                        .pending_same_device_link
+                        .as_ref()
+                        .is_some_and(|pending| {
+                            pending.link_public_key == *link_public_key
+                                && pending.expires_at_ns > now_ns
+                        })
+            })
+            .map(|browser| browser.id)
+    }
+
+    /// Links `browser_id`'s entry to `same_device_browser_id`'s as sharing its device,
+    /// spending the pending link that authorized it.
+    pub fn link_same_device(&mut self, browser_id: BrowserId, same_device_browser_id: BrowserId) {
+        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+            return;
+        };
+        browser.same_device_browser_id = Some(same_device_browser_id);
+        browser.pending_same_device_link = None;
+    }
+
     /// The browser of this anchor whose pending install names `caller`, where the slot has
     /// not expired.
     pub fn browser_awaiting_link(&self, caller: Principal, now_ns: Timestamp) -> Option<BrowserId> {
@@ -1590,6 +1744,8 @@ impl Anchor {
             webpush_subscription: None,
             notifications: Vec::new(),
             notification_app: None,
+            same_device_browser_id: None,
+            pending_same_device_link: None,
         });
 
         let mut dropped = vec![];

@@ -3229,7 +3229,8 @@ impl<M: Memory + Clone> Storage<M> {
             if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
                 // An app's entry whose account no longer resolves is gone too.
                 queue.retain(|queued_notification| match queued_notification.kind {
-                    InboxNotificationKind::App { account_principal } => self
+                    InboxNotificationKind::App { account_principal }
+                    | InboxNotificationKind::InstalledAppProbe { account_principal } => self
                         .lookup_account_with_principal(account_principal)
                         .is_some_and(|account| {
                             account.anchor_number == anchor_number

@@ -51,5 +51,24 @@ pub enum StorableWebPushSubscription {
         /// When `payload_ikm` was last derived. A pass refreshes the oldest it reaches.
         #[n(6)]
         last_rotated_ns: StorableTimestamp,
+        /// The pushes posted through this subscription since a notification was last
+        /// fetched through it.
+        #[n(7)]
+        unanswered_pushes: Option<StorableUnansweredPushCount>,
+        /// When Internet Identity last submitted its own notification through this
+        /// subscription to check it, where no fetch through it has answered that since.
+        #[n(8)]
+        probe_sent_at_ns: Option<StorableTimestamp>,
     },
+}
+
+/// How many pushes went unanswered through one subscription, and when the first of them
+/// was posted.
+#[derive(Encode, Decode, Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[cbor(map)]
+pub struct StorableUnansweredPushCount {
+    #[n(0)]
+    pub count: u32,
+    #[n(1)]
+    pub first_sent_at_ns: StorableTimestamp,
 }

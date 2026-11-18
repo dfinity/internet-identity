@@ -300,14 +300,14 @@ pub(crate) fn clear_gone_pwa_subscription(
 pub fn read_pwa_subscription_status(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
+    now_ns: Timestamp,
 ) -> Option<WebPushSubscriptionStatus> {
     let held_subscription = read(holder)?;
     if held_subscription.account_principal != account_principal {
         return None;
     }
     let ready_subscription = held_subscription.subscription.into_ready()?;
-    let endpoint = ready_subscription.endpoint.as_str().to_string();
-    Some(WebPushSubscriptionStatus { endpoint })
+    Some(subscription::status_of(&ready_subscription, now_ns))
 }
 
 /// What `holder`'s browser entry holds, and the account it delivers for.

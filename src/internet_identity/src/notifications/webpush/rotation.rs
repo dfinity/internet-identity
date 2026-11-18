@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use super::payload;
 use super::pwa_subscription;
 use super::validation::{PayloadIkm, PayloadKeyId, SubscriberKey};
+use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::installed_app::NotificationAppId;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
@@ -53,6 +54,20 @@ pub(crate) enum RegistrationId {
         browser_id: BrowserId,
     },
     Pwa(PwaSubscriptionHolder),
+}
+
+impl RegistrationId {
+    /// The subscription a call signed with `key` for `anchor_number` was woken through: the
+    /// calling browser's own, or the record of the app that signed.
+    pub(crate) fn of_key(anchor_number: AnchorNumber, key: NotificationKey) -> Self {
+        match key {
+            NotificationKey::Browser(browser_id) => RegistrationId::Browser {
+                anchor_number,
+                browser_id,
+            },
+            NotificationKey::App(app_id) => RegistrationId::App(app_id),
+        }
+    }
 }
 
 impl Destination {
@@ -134,7 +149,7 @@ pub(crate) fn refresh(
     sender: &p256::SecretKey,
     now_ns: Timestamp,
 ) -> Result<Refresh, String> {
-    let Some(mut registered) = read(destination) else {
+    let Some(mut registered) = read(destination.registration()) else {
         return Ok(Refresh::Absent);
     };
     if registered.endpoint.as_str() != endpoint || registered.subscriber_key != *subscriber_key {
@@ -146,13 +161,10 @@ pub(crate) fn refresh(
     registered.payload_keyid = payload_keyid;
     registered.last_rotated_ns = now_ns;
     let refreshed = SealingKeys::from(&registered);
-    write(destination, registered)?;
+    write(destination.registration(), registered)?;
     Ok(Refresh::Refreshed(refreshed))
 }
 
-/// Reads the registration `target` names, rather than the one this browser happens to
-/// deliver through now. A browser that holds its own and also points at an app would
-/// otherwise be read from one and written to the other.
 /// Whether `destination`'s registration still posts to `endpoint` with `subscriber_key`,
 /// as it did when a pass planned a wake-up through it. One replaced or removed since is
 /// not: what was planned would be sealed for keys its device no longer holds.
@@ -161,13 +173,16 @@ pub(crate) fn is_still_registered(
     endpoint: &str,
     subscriber_key: &SubscriberKey,
 ) -> bool {
-    read(destination).is_some_and(|registered| {
+    read(destination.registration()).is_some_and(|registered| {
         registered.endpoint.as_str() == endpoint && registered.subscriber_key == *subscriber_key
     })
 }
 
-fn read(destination: Destination) -> Option<ReadySubscription> {
-    match destination.registration() {
+/// Reads the ready subscription `registration` names, rather than the one its browser
+/// happens to deliver through now. A browser that holds its own and also points at an app
+/// would otherwise be read from one and written to the other.
+pub(super) fn read(registration: RegistrationId) -> Option<ReadySubscription> {
+    match registration {
         RegistrationId::App(app_id) => storage_borrow(|storage| storage.notification_app(app_id))?
             .webpush_subscription
             .and_then(WebPushSubscription::into_ready),
@@ -184,8 +199,12 @@ fn read(destination: Destination) -> Option<ReadySubscription> {
     }
 }
 
-fn write(destination: Destination, registered: ReadySubscription) -> Result<(), String> {
-    match destination.registration() {
+/// Writes `registered` to the subscription `registration` names.
+pub(super) fn write(
+    registration: RegistrationId,
+    registered: ReadySubscription,
+) -> Result<(), String> {
+    match registration {
         // Without stamping the record as used: a refresh is this canister's work, and an
         // app that has not called is how a deleted one is told apart from a live one.
         RegistrationId::App(app_id) => storage_borrow_mut(|storage| {

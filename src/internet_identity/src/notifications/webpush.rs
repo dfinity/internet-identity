@@ -11,13 +11,16 @@ pub(crate) mod rotation;
 pub(crate) mod seed_pool;
 mod subscription;
 pub(crate) mod transport;
+pub(crate) mod unanswered;
 mod validation;
 pub(crate) mod vapid_key;
 
 #[cfg(test)]
 pub(crate) mod fixtures;
 
-pub(crate) use subscription::{clear_gone_subscription, delivering_subscription};
+pub(crate) use subscription::{
+    clear_gone_subscription, delivering_subscription, unanswered_pushes_of,
+};
 pub use subscription::{
     remove_subscription, set_subscription, start_subscription, subscription_status,
 };

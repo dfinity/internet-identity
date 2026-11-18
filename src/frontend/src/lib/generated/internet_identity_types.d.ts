@@ -110,12 +110,25 @@ export interface AppGetPwaNotificationRequest {
   'inbox_notification_id' : InboxNotificationId,
 }
 /**
- * Null where the named entry is gone, or is not this app's for this session.
+ * Both null where the named entry is gone, or is not this app's for this session.
  */
 export interface AppGetPwaNotificationResponse {
   'notification' : [] | [PwaNotification],
+  /**
+   * Set where Internet Identity sent this itself, and what it has to say.
+   */
+  'event' : [] | [PwaNotificationEvent],
 }
 export type AppGetPwaWebPushSubscriptionStatusError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+export type AppGetSameDeviceLinkStatusError = {
     'InternalCanisterError' : string
   } |
   {
@@ -163,6 +176,37 @@ export type AppPreparePwaWebPushSubscriptionError = {
      * The identity has not allowed this app to notify it.
      */
     'NotificationsNotAllowed' : null
+  };
+export type AppPrepareSameDeviceLinkError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+export interface AppPrepareSameDeviceLinkRequest {
+  /**
+   * A one-shot P-256 public key, DER-encoded SPKI as WebCrypto exports it. Accepted by
+   * claim_same_device_link for 30 minutes.
+   */
+  'link_public_key' : Uint8Array | number[],
+}
+export type AppProbePwaWebPushSubscriptionError = {
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  } |
+  {
+    /**
+     * The session's installed web app has no subscription that can be woken now.
+     */
+    'NotReachable' : null
   };
 export type AppRemovePwaNotificationError = {
     'InternalCanisterError' : string
@@ -683,6 +727,29 @@ export interface ClaimNotificationAppRequest {
   'offering_anchor_number' : UserNumber,
   'anchor_number' : UserNumber,
   'expires_at_ns' : bigint,
+}
+export type ClaimSameDeviceLinkError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  { 'InvalidSignature' : null } |
+  {
+    /**
+     * No other entry of this identity awaits that key, or its 30 minutes are up.
+     */
+    'NoPendingLink' : null
+  };
+export interface ClaimSameDeviceLinkRequest {
+  /**
+   * By the one-shot key, over "ii-same-device-link", anchor_number as 8 big-endian
+   * bytes, the length of the caller's principal as one byte, and that principal.
+   */
+  'signature' : Uint8Array | number[],
+  'link_public_key' : Uint8Array | number[],
+  'anchor_number' : UserNumber,
 }
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
@@ -1206,6 +1273,17 @@ export type GetNotificationError = {
     'InvalidBrowserKey' : null
   } |
   { 'InternalCanisterError' : string };
+export type GetNotificationPathStatusError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+export interface GetNotificationPathStatusRequest {
+  'path' : NotificationPath,
+  'anchor_number' : UserNumber,
+}
 export interface GetNotificationRequest {
   'inbox_notification_id' : InboxNotificationId,
   /**
@@ -1845,6 +1923,29 @@ export interface NotificationGrantConsentRequest {
  * one origin.
  */
 export type NotificationId = bigint;
+/**
+ * A way this identity's notifications reach the calling browser's device.
+ */
+export type NotificationPath = {
+    /**
+     * Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
+     * routes through.
+     */
+    'ThisBrowser' : null
+  } |
+  {
+    /**
+     * That app's installed web apps on this browser entry, and on every entry linked to
+     * it as sharing its device.
+     */
+    'InstalledApps' : FrontendHostname
+  };
+export interface NotificationPathStatus {
+  /**
+   * One per subscription on the path that can deliver now. Empty where none can.
+   */
+  'subscriptions' : Array<SubscriptionDeliveryStatus>,
+}
 export type NotificationRevokeConsentError = {
     'InternalCanisterError' : string
   } |
@@ -2314,6 +2415,23 @@ export type ProbeNotificationAppError = {
  * the only way to find out is to send it something and see what happens.
  */
 export interface ProbeNotificationAppRequest { 'anchor_number' : UserNumber }
+export type ProbeNotificationPathError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * Nothing on the path can be woken now.
+     */
+    'NotReachable' : null
+  };
+export interface ProbeNotificationPathRequest {
+  'path' : NotificationPath,
+  'anchor_number' : UserNumber,
+}
 export type PublicKey = Uint8Array | number[];
 /**
  * Authentication method using generic signatures
@@ -2330,6 +2448,15 @@ export interface PwaNotification {
   'id' : NotificationId,
   'canister_id' : Principal,
 }
+/**
+ * Something Internet Identity tells an installed web app's user.
+ */
+export type PwaNotificationEvent = {
+    /**
+     * This installed web app receives notifications.
+     */
+    'NotificationsOn' : null
+  };
 /**
  * The fields and encodings of SetWebPushSubscriptionRequest, with sealed_auth encrypted
  * to the transport key app_prepare_pwa_webpush_subscription answered.
@@ -2417,6 +2544,17 @@ export interface RemoveNotificationRequest {
   'not_shown' : [] | [NotShownReason],
 }
 export type RemoveNotificationResponse = {};
+export type RemoveUnansweredPwaWebPushSubscriptionsError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+export interface RemoveUnansweredPwaWebPushSubscriptionsRequest {
+  'origin' : FrontendHostname,
+  'anchor_number' : UserNumber,
+}
 export type RemoveWebPushSubscriptionError = {
     'InternalCanisterError' : string
   } |
@@ -2445,6 +2583,24 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+/**
+ * Whether the calling installed web app's browser entry shares its device with another
+ * way this identity is notified.
+ */
+export type SameDeviceLinkStatus = {
+    /**
+     * Another signed-in entry of the identity may deliver this app's notifications:
+     * through ICP Alerts it has switched on, or through its own subscription.
+     */
+    'OtherPathMayDeliver' : null
+  } |
+  {
+    /**
+     * This entry is already linked to another entry of the identity.
+     */
+    'Linked' : null
+  } |
+  { 'NoOtherPath' : null };
 /**
  * Applies in order: a later entry for a (recipient, id) replaces an earlier
  * one, as a re-send replaces a notification that is still pending.
@@ -2700,8 +2856,25 @@ export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
 export type Sub = string;
+export interface SubscriptionDeliveryStatus {
+  /**
+   * Null where every push posted through it has been fetched since.
+   */
+  'unanswered_pushes' : [] | [UnansweredPushes],
+}
 export type Timestamp = bigint;
 export type Token = {};
+/**
+ * Pushes posted through one subscription that nothing has fetched since.
+ */
+export interface UnansweredPushes {
+  'first_sent_at_ns' : Timestamp,
+  'count' : number,
+  /**
+   * At least 3 of them, the first sent at least an hour ago: worth a probe.
+   */
+  'is_past_limit' : boolean,
+}
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -2773,7 +2946,13 @@ export interface WebAuthnCredential {
  * What a browser is registered with, so the frontend can tell a registration that is
  * still live from one another identity's re-subscribe left behind.
  */
-export interface WebPushSubscriptionStatus { 'endpoint' : string }
+export interface WebPushSubscriptionStatus {
+  'endpoint' : string,
+  /**
+   * Null where every push posted through it has been fetched since.
+   */
+  'unanswered_pushes' : [] | [UnansweredPushes],
+}
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
@@ -2804,6 +2983,11 @@ export interface _SERVICE {
     [],
     { 'Ok' : [] | [WebPushSubscriptionStatus] } |
       { 'Err' : AppGetPwaWebPushSubscriptionStatusError }
+  >,
+  'app_get_same_device_link_status' : ActorMethod<
+    [],
+    { 'Ok' : SameDeviceLinkStatus } |
+      { 'Err' : AppGetSameDeviceLinkStatusError }
   >,
   /**
    * Called by an app's frontend, as its session.
@@ -2841,6 +3025,24 @@ export interface _SERVICE {
     { 'Ok' : PrepareWebPushSubscriptionResponse } |
       { 'Err' : AppPreparePwaWebPushSubscriptionError } |
       { 'Pending' : null }
+  >,
+  /**
+   * Registers a one-shot key for this entry, replacing any earlier one. Another entry of
+   * the identity on the same device proves it with claim_same_device_link.
+   */
+  'app_prepare_same_device_link' : ActorMethod<
+    [AppPrepareSameDeviceLinkRequest],
+    { 'Ok' : null } |
+      { 'Err' : AppPrepareSameDeviceLinkError }
+  >,
+  /**
+   * Sends Internet Identity's own notification to the session's installed web app, whose
+   * fetch resets its unanswered pushes.
+   */
+  'app_probe_pwa_webpush_subscription' : ActorMethod<
+    [],
+    { 'Ok' : null } |
+      { 'Err' : AppProbePwaWebPushSubscriptionError }
   >,
   /**
    * Removes the notification a wake-up named once the worker has handled it.
@@ -3036,6 +3238,16 @@ export interface _SERVICE {
     [ClaimNotificationAppRequest],
     { 'Ok' : null } |
       { 'Err' : ClaimNotificationAppError }
+  >,
+  /**
+   * Called by the browser that the installed web app's link names. Links the entry
+   * that registered the key to the caller's: an app's notification skips the caller's
+   * entry while that entry's installed web app can deliver it.
+   */
+  'claim_same_device_link' : ActorMethod<
+    [ClaimSameDeviceLinkRequest],
+    { 'Ok' : null } |
+      { 'Err' : ClaimSameDeviceLinkError }
   >,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
@@ -3265,6 +3477,14 @@ export interface _SERVICE {
     [GetNotificationDelegationRequest],
     { 'Ok' : GetNotificationDelegationResponse } |
       { 'Err' : NotificationDelegationError }
+  >,
+  /**
+   * Called by the browser. The path's subscriptions and their unanswered pushes.
+   */
+  'get_notification_path_status' : ActorMethod<
+    [GetNotificationPathStatusRequest],
+    { 'Ok' : NotificationPathStatus } |
+      { 'Err' : GetNotificationPathStatusError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
@@ -3677,11 +3897,29 @@ export interface _SERVICE {
     { 'Ok' : NotificationId } |
       { 'Err' : ProbeNotificationAppError }
   >,
+  /**
+   * Sends Internet Identity's own notification through every subscription on the path
+   * that can deliver now. A fetch through one resets its unanswered pushes.
+   */
+  'probe_notification_path' : ActorMethod<
+    [ProbeNotificationPathRequest],
+    { 'Ok' : null } |
+      { 'Err' : ProbeNotificationPathError }
+  >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
     RegisterResponse
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
+  /**
+   * Removes that app's installed web app subscriptions on the caller's entry and on the
+   * entries linked to it that can deliver now and still have unanswered pushes.
+   */
+  'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<
+    [RemoveUnansweredPwaWebPushSubscriptionsRequest],
+    { 'Ok' : null } |
+      { 'Err' : RemoveUnansweredPwaWebPushSubscriptionsError }
+  >,
   /**
    * Called by the identity, so one browser can silence another.
    */

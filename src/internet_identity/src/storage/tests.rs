@@ -8172,7 +8172,8 @@ fn an_identity_notification_is_queued_without_an_application() {
             .first()
             .and_then(|one| match &one.kind {
                 InboxNotificationKind::Identity { event } => Some(event.clone()),
-                InboxNotificationKind::App { .. } => None,
+                InboxNotificationKind::App { .. }
+                | InboxNotificationKind::InstalledAppProbe { .. } => None,
             }),
         Some(NotificationEvent::NotificationsOn(
             IdentityForNotification {

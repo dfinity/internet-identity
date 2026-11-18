@@ -2081,6 +2081,125 @@ type GetWebPushSubscriptionStatusRequest = record {
 // still live from one another identity's re-subscribe left behind.
 type WebPushSubscriptionStatus = record {
     endpoint : text;        // compared against the one the browser holds
+    // Null where every push posted through it has been fetched since.
+    unanswered_pushes : opt UnansweredPushes;
+};
+
+// Pushes posted through one subscription that nothing has fetched since.
+type UnansweredPushes = record {
+    count : nat32;
+    first_sent_at_ns : Timestamp;
+    // At least 3 of them, the first sent at least an hour ago: worth a probe.
+    is_past_limit : bool;
+};
+
+// A way this identity's notifications reach the calling browser's device.
+type NotificationPath = variant {
+    // Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
+    // routes through.
+    ThisBrowser;
+    // That app's installed web apps on this browser entry, and on every entry linked to
+    // it as sharing its device.
+    InstalledApps : FrontendHostname;
+};
+
+type GetNotificationPathStatusRequest = record {
+    anchor_number : UserNumber;
+    path : NotificationPath;
+};
+
+type NotificationPathStatus = record {
+    // One per subscription on the path that can deliver now. Empty where none can.
+    subscriptions : vec SubscriptionDeliveryStatus;
+};
+
+type SubscriptionDeliveryStatus = record {
+    // Null where every push posted through it has been fetched since.
+    unanswered_pushes : opt UnansweredPushes;
+};
+
+type GetNotificationPathStatusError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
+type ProbeNotificationPathRequest = record {
+    anchor_number : UserNumber;
+    path : NotificationPath;
+};
+
+type ProbeNotificationPathError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // Nothing on the path can be woken now.
+    NotReachable;
+    InternalCanisterError : text;
+};
+
+type RemoveUnansweredPwaWebPushSubscriptionsRequest = record {
+    anchor_number : UserNumber;
+    origin : FrontendHostname;
+};
+
+type RemoveUnansweredPwaWebPushSubscriptionsError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
+// Whether the calling installed web app's browser entry shares its device with another
+// way this identity is notified.
+type SameDeviceLinkStatus = variant {
+    // This entry is already linked to another entry of the identity.
+    Linked;
+    // Another signed-in entry of the identity may deliver this app's notifications:
+    // through ICP Alerts it has switched on, or through its own subscription.
+    OtherPathMayDeliver;
+    NoOtherPath;
+};
+
+type AppGetSameDeviceLinkStatusError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
+type AppPrepareSameDeviceLinkRequest = record {
+    // A one-shot P-256 public key, DER-encoded SPKI as WebCrypto exports it. Accepted by
+    // claim_same_device_link for 30 minutes.
+    link_public_key : blob;
+};
+
+type AppPrepareSameDeviceLinkError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
+type ClaimSameDeviceLinkRequest = record {
+    anchor_number : UserNumber;
+    link_public_key : blob;
+    // By the one-shot key, over "ii-same-device-link", anchor_number as 8 big-endian
+    // bytes, the length of the caller's principal as one byte, and that principal.
+    signature : blob;
+};
+
+type ClaimSameDeviceLinkError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // No other entry of this identity awaits that key, or its 30 minutes are up.
+    NoPendingLink;
+    InvalidSignature;
+    InternalCanisterError : text;
+};
+
+type AppProbePwaWebPushSubscriptionError = variant {
+    // No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession;
+    // The session's installed web app has no subscription that can be woken now.
+    NotReachable;
+    InternalCanisterError : text;
 };
 
 // ===== Notifications sent by an app =====
@@ -2326,9 +2445,17 @@ type AppGetPwaNotificationRequest = record {
     inbox_notification_id : InboxNotificationId;
 };
 
-// Null where the named entry is gone, or is not this app's for this session.
+// Both null where the named entry is gone, or is not this app's for this session.
 type AppGetPwaNotificationResponse = record {
     notification : opt PwaNotification;
+    // Set where Internet Identity sent this itself, and what it has to say.
+    event : opt PwaNotificationEvent;
+};
+
+// Something Internet Identity tells an installed web app's user.
+type PwaNotificationEvent = variant {
+    // This installed web app receives notifications.
+    NotificationsOn;
 };
 
 // Which notification to fetch the content of, and from which canister.
@@ -2913,6 +3040,20 @@ service : (opt InternetIdentityInit) -> {
     enable_notification_app : (EnableNotificationAppRequest) -> (variant { Ok : NotificationId; Err : EnableNotificationAppError });
     disable_notification_app : (DisableNotificationAppRequest) -> (variant { Ok; Err : DisableNotificationAppError });
 
+    // Called by the browser that the installed web app's link names. Links the entry
+    // that registered the key to the caller's: an app's notification skips the caller's
+    // entry while that entry's installed web app can deliver it.
+    claim_same_device_link : (ClaimSameDeviceLinkRequest) -> (variant { Ok; Err : ClaimSameDeviceLinkError });
+
+    // Called by the browser. The path's subscriptions and their unanswered pushes.
+    get_notification_path_status : (GetNotificationPathStatusRequest) -> (variant { Ok : NotificationPathStatus; Err : GetNotificationPathStatusError }) query;
+    // Sends Internet Identity's own notification through every subscription on the path
+    // that can deliver now. A fetch through one resets its unanswered pushes.
+    probe_notification_path : (ProbeNotificationPathRequest) -> (variant { Ok; Err : ProbeNotificationPathError });
+    // Removes that app's installed web app subscriptions on the caller's entry and on the
+    // entries linked to it that can deliver now and still have unanswered pushes.
+    remove_unanswered_pwa_webpush_subscriptions : (RemoveUnansweredPwaWebPushSubscriptionsRequest) -> (variant { Ok; Err : RemoveUnansweredPwaWebPushSubscriptionsError });
+
     // Called by the browser, which watches for the answer leaving its own queue: that
     // is what says the app this browser points at is still installed.
     probe_notification_app : (ProbeNotificationAppRequest) -> (variant { Ok : NotificationId; Err : ProbeNotificationAppError });
@@ -2940,6 +3081,13 @@ service : (opt InternetIdentityInit) -> {
     // is subscribed, where the subscription awaits its app_set_pwa_webpush_subscription, or
     // where it delivers for another account.
     app_get_pwa_webpush_subscription_status : () -> (variant { Ok : opt WebPushSubscriptionStatus; Err : AppGetPwaWebPushSubscriptionStatusError }) query;
+    // Sends Internet Identity's own notification to the session's installed web app, whose
+    // fetch resets its unanswered pushes.
+    app_probe_pwa_webpush_subscription : () -> (variant { Ok; Err : AppProbePwaWebPushSubscriptionError });
+    app_get_same_device_link_status : () -> (variant { Ok : SameDeviceLinkStatus; Err : AppGetSameDeviceLinkStatusError }) query;
+    // Registers a one-shot key for this entry, replacing any earlier one. Another entry of
+    // the identity on the same device proves it with claim_same_device_link.
+    app_prepare_same_device_link : (AppPrepareSameDeviceLinkRequest) -> (variant { Ok; Err : AppPrepareSameDeviceLinkError });
     // The notification a wake-up named, where it is this app's for the session's browser
     // and account.
     app_get_pwa_notification : (AppGetPwaNotificationRequest) -> (variant { Ok : AppGetPwaNotificationResponse; Err : AppGetPwaNotificationError }) query;

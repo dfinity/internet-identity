@@ -15,7 +15,7 @@ use crate::storage::{PwaSubscriptionHolder, Storage};
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, PrepareWebPushSubscriptionError, RemoveWebPushSubscriptionError,
-    SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
+    SetWebPushSubscriptionError, Timestamp, UnansweredPushes, WebPushSubscriptionStatus,
 };
 
 /// Records the key a fetch just minted, against the registration that will spend it.
@@ -150,6 +150,8 @@ pub(super) fn spend_pending(
         subscriber_key,
         auth,
         last_rotated_ns: now_ns,
+        unanswered_pushes: None,
+        probe_sent_at_ns: None,
     })
 }
 
@@ -261,6 +263,7 @@ pub(crate) fn delivering_subscription<M: Memory + Clone>(
 pub fn subscription_status(
     anchor_number: AnchorNumber,
     key: NotificationKey,
+    now_ns: Timestamp,
 ) -> Option<WebPushSubscriptionStatus> {
     let subscription = match key {
         NotificationKey::App(app_id) => {
@@ -274,9 +277,28 @@ pub fn subscription_status(
     // nothing, which is what a caller deciding whether to register needs to hear.
     subscription
         .and_then(WebPushSubscription::into_ready)
-        .map(|registered| WebPushSubscriptionStatus {
-            endpoint: registered.endpoint.as_str().to_string(),
-        })
+        .map(|registered| status_of(&registered, now_ns))
+}
+
+/// What a caller is told about `ready` at `now_ns`: where it posts to, and the pushes
+/// posted through it that nothing has fetched since.
+pub(crate) fn status_of(ready: &ReadySubscription, now_ns: Timestamp) -> WebPushSubscriptionStatus {
+    WebPushSubscriptionStatus {
+        endpoint: ready.endpoint.as_str().to_string(),
+        unanswered_pushes: unanswered_pushes_of(ready, now_ns),
+    }
+}
+
+/// The pushes posted through `ready` that nothing has fetched since, as at `now_ns`.
+pub(crate) fn unanswered_pushes_of(
+    ready: &ReadySubscription,
+    now_ns: Timestamp,
+) -> Option<UnansweredPushes> {
+    ready.unanswered_pushes.map(|unanswered| UnansweredPushes {
+        count: unanswered.count,
+        first_sent_at_ns: unanswered.first_sent_at_ns,
+        is_past_limit: unanswered.is_past_limit(now_ns),
+    })
 }
 
 /// Writes what this browser registered. The inbox stays as it is: its entries leave when
@@ -459,7 +481,7 @@ mod tests {
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> Option<WebPushSubscriptionStatus> {
-        subscription_status(anchor_number, NotificationKey::Browser(browser_id))
+        subscription_status(anchor_number, NotificationKey::Browser(browser_id), 0)
     }
 
     fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
@@ -647,6 +669,7 @@ mod tests {
             status(anchor_number, browsers[0]),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
+                unanswered_pushes: None,
             })
         );
 
@@ -729,9 +752,10 @@ mod tests {
         );
         assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
         assert_eq!(
-            subscription_status(anchor_number, app_authorization(app_id)),
+            subscription_status(anchor_number, app_authorization(app_id), 0),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
+                unanswered_pushes: None,
             })
         );
         // The browser is answered about its own entry, which the app's write left alone.
@@ -771,7 +795,8 @@ mod tests {
 
         for anchor_number in [first, second] {
             assert_eq!(
-                subscription_status(anchor_number, app_authorization(app_id)).map(|s| s.endpoint),
+                subscription_status(anchor_number, app_authorization(app_id), 0)
+                    .map(|s| s.endpoint),
                 Some(ENDPOINT.to_string()),
                 "every identity pointing at the app reads its one registration"
             );
