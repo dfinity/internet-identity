@@ -70,7 +70,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/dependency-injection` Use dependency injection rather than `#[cfg(test)]` / `#[cfg(not(test))]` branches or test-only thread-locals in production code, so the production branch is the one tested.
 - `be/no-widened-visibility` Don't widen visibility (`pub`, `pub(crate)`) or add test-only accessors and `#![allow(dead_code)]` to keep code alive. Delete unused code. Don't add thin `pub` re-export wrappers.
 - `be/no-clippy-allow` Don't add `#[allow(clippy::...)]`; restructure instead (a type alias, a smaller function).
-- `be/short-functions` Keep function bodies short enough to read on one screen.
+- `be/short-functions` Keep a function body under about 50 lines. Re-check the whole function after every addition, not just the lines you added: functions grow long a few lines at a time. When one passes the limit, split it into named steps, e.g. one function per `match` arm.
 - `be/canister-dependencies` New canister dependencies: check maintenance, advisories, wasm/`no_std` fit and the wasm size budget, and use `default-features = false`. Dev-dependencies use `.workspace = true`. List every added, removed or changed dependency in the PR description with its reason (see `scripts-and-ci.md`).
 - `be/newtype-when-meaningful` Make a value a newtype rather than a type alias when it has rules of its own, needs its own methods, or is easy to mix up with another value of the same underlying type.
 - `be/named-fields` Prefer named fields over tuples and tuple structs, except for a single-field newtype.
