@@ -221,6 +221,8 @@ const probe = async (
       isCanisterError<ProbeNotificationPathError>(error) &&
       error.type === "NotReachable"
     ) {
+      // Asked after the call, as after every poll: the answer may belong to the identity left behind.
+      signal.throwIfAborted();
       return "nothing-on-path";
     }
     throw error;

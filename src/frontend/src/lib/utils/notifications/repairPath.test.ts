@@ -227,6 +227,46 @@ describe("checkNotificationPath where this browser may notify", () => {
     expect(renewed).toEqual([IDENTITY_NUMBER]);
   });
 
+  it("acts on no probe refusal that arrives after the identity changed", async () => {
+    const switched = new AbortController();
+    const { browser } = browserAnswering({
+      installedApps: [{ subscriptions: [] }],
+      thisBrowser: [{ subscriptions: [pastLimit] }],
+    });
+    // The user switches while the probe is on its way, and it answers that nothing on
+    // the path can be reached.
+    const switchingBrowser: BrowserCalls = {
+      ...browser,
+      probe_notification_path: () => {
+        switched.abort(new Error("switched"));
+        return Promise.resolve({ Err: { NotReachable: null } });
+      },
+    };
+    const renewed: bigint[] = [];
+
+    const checked = checkNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: ORIGIN,
+      accountPrincipal: ACCOUNT,
+      actor: consenting,
+      browser: switchingBrowser,
+      onPastLimit: () => {},
+      signal: switched.signal,
+      renewSubscription: (identityNumber) => {
+        renewed.push(identityNumber);
+        return Promise.resolve();
+      },
+    });
+    const settled = checked.then(
+      () => "resolved",
+      () => "rejected",
+    );
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    await expect(settled).resolves.toBe("rejected");
+    expect(renewed).toEqual([]);
+  });
+
   it("acts on no answer that arrives after the identity changed", async () => {
     const switched = new AbortController();
     const { browser } = browserAnswering({
