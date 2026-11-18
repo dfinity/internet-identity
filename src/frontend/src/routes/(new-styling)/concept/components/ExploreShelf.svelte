@@ -19,17 +19,14 @@
   const { title, apps, isAdded, onAdd }: Props = $props();
 </script>
 
-<!-- On a phone the title and the rows' logos stand on the canvas's edge, and
-     a row's plate reaches 8px past it, as a tile's does on My apps. -->
+<!-- The title and the rows' logos stand on the page's edge, the line the
+     banners and the search start on, and a row's plate reaches 8px past it,
+     as a tile's does on My apps. -->
 <section class="flex flex-col gap-2">
-  <h2
-    class="text-text-primary px-2 text-xl font-semibold tracking-tight @max-lg/canvas:px-0"
-  >
+  <h2 class="text-text-primary text-xl font-semibold tracking-tight">
     {title}
   </h2>
-  <ul
-    class="grid grid-cols-[minmax(0,1fr)] gap-x-4 @max-lg/canvas:-mx-2 @2xl:grid-cols-2"
-  >
+  <ul class="-mx-2 grid grid-cols-[minmax(0,1fr)] gap-x-4 @4xl:grid-cols-2">
     {#each apps as app (app.origin)}
       <li>
         <AppRow {app} added={isAdded(app.origin)} onAdd={() => onAdd(app)} />

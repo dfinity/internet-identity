@@ -325,6 +325,13 @@
    *  from edge to edge, where the first and the last logo stand. */
   const GRID_WIDTH =
     "w-[calc(100%-2*var(--ii-edge))] @lg:w-[29.5rem] @2xl:w-[37rem] @4xl:w-[52rem] max-w-full";
+  /** How far the logos reach: the grid less the 1.5rem each end column
+   *  leaves beside its logo (INSET). Explore and Connect keep to it, so they
+   *  start on the line the greeting, the tabs and the logos share, and end
+   *  where the last logo does. On a phone the logos stand on the canvas's
+   *  edges, and so do the pages' contents. */
+  const LOGO_SPAN =
+    "w-full @lg:w-[26.5rem] @2xl:w-[34rem] @4xl:w-[49rem] max-w-full";
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
@@ -2234,12 +2241,14 @@
           <!-- Explore reads like the App Store: a banner, a shelf, another
                banner, more shelves. The featured shelf keeps to apps this
                identity doesn't use yet, and steps aside when there are none. -->
-          <ExplorePage
-            {featured}
-            {isAdded}
-            onAdd={(app) => addApp(app)}
-            onAddLink={addLink}
-          />
+          <div class={["mx-auto", LOGO_SPAN]}>
+            <ExplorePage
+              {featured}
+              {isAdded}
+              onAdd={(app) => addApp(app)}
+              onAddLink={addLink}
+            />
+          </div>
         </div>
 
         <!-- Connect: AI and command-line access to this identity's apps,
@@ -2254,12 +2263,14 @@
           {#if phoneHead}
             {@render pageHead(2)}
           {/if}
-          <ConnectPage
-            integrations={current.scenario.integrations}
-            apps={current.apps}
-            onResolve={resolve}
-            onUnavailable={unavailable}
-          />
+          <div class={["mx-auto", LOGO_SPAN]}>
+            <ConnectPage
+              integrations={current.scenario.integrations}
+              apps={current.apps}
+              onResolve={resolve}
+              onUnavailable={unavailable}
+            />
+          </div>
         </div>
       </div>
       <!-- Content comes up from under the island through a blur that deepens

@@ -25,6 +25,10 @@
     /** Focuses the field once it shows, as in a popover opened to search. */
     autofocus?: boolean;
     query?: string;
+    /** The rows' titles and logos stand on the field's edge and their
+     *  plates reach past it, as on Explore's shelves. In a popover they keep
+     *  their inset, inside its padding. */
+    flush?: boolean;
   }
 
   let {
@@ -36,7 +40,10 @@
     limit = 6,
     autofocus = false,
     query = $bindable(""),
+    flush = false,
   }: Props = $props();
+
+  const ROWS = "grid grid-cols-[minmax(0,1fr)] gap-x-4 @xl/search:grid-cols-2";
 
   let input = $state<HTMLInputElement>();
 
@@ -75,16 +82,11 @@
 </script>
 
 {#snippet rows(title: string, apps: FeaturedApp[])}
-  <!-- On a phone's Explore the title and the rows' logos stand on the
-       canvas's edge, the rows' plates past it, as on the shelves. In a
-       popover, outside the canvas, they keep their inset. -->
   <section class="flex flex-col gap-1">
-    <h2 class="text-text-tertiary px-2 text-sm font-medium @max-lg/canvas:px-0">
+    <h2 class={["text-text-tertiary text-sm font-medium", !flush && "px-2"]}>
       {title}
     </h2>
-    <ul
-      class="grid grid-cols-[minmax(0,1fr)] gap-x-4 @max-lg/canvas:-mx-2 @xl/search:grid-cols-2"
-    >
+    <ul class={[ROWS, flush && "-mx-2"]}>
       {#each apps as app (app.origin)}
         <li>
           <AppRow {app} added={isAdded(app.origin)} onAdd={() => onAdd(app)} />
@@ -135,9 +137,7 @@
   {:else}
     {#if link !== undefined}
       {@const added = isAdded(link.origin)}
-      <ul
-        class="grid grid-cols-[minmax(0,1fr)] gap-x-4 @max-lg/canvas:-mx-2 @xl/search:grid-cols-2"
-      >
+      <ul class={[ROWS, flush && "-mx-2"]}>
         <li>
           <AppRow
             app={{
