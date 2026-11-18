@@ -242,6 +242,9 @@ const probe = async (
   path: NotificationPath,
   signal: AbortSignal,
 ): Promise<ProbeAnswer> => {
+  // A probe is a notification the device shows, so none goes out for an identity the
+  // user has left, however late the lookup before it answered.
+  signal.throwIfAborted();
   try {
     await browser
       .probe_notification_path({ anchor_number: identityNumber, path })

@@ -311,6 +311,42 @@ describe("checkNotificationPath where this browser may notify", () => {
     expect(renewed).toEqual([]);
   });
 
+  it("sends no probe once the identity changed during the lookup before it", async () => {
+    const switched = new AbortController();
+    const { browser, calls } = browserAnswering({
+      installedApps: [{ subscriptions: [] }],
+      thisBrowser: [{ subscriptions: [pastLimit] }],
+    });
+    // The user switches while this browser's path is looked up, and it answers late.
+    const switchingBrowser: BrowserCalls = {
+      ...browser,
+      get_notification_path_status: (request) => {
+        if ("ThisBrowser" in request.path) {
+          switched.abort(new Error("switched"));
+        }
+        return browser.get_notification_path_status(request);
+      },
+    };
+
+    const checked = checkNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: ORIGIN,
+      accountPrincipal: ACCOUNT,
+      actor: consenting,
+      browser: switchingBrowser,
+      onPastLimit: () => {},
+      signal: switched.signal,
+    });
+    const settled = checked.then(
+      () => "resolved",
+      () => "rejected",
+    );
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    await expect(settled).resolves.toBe("rejected");
+    expect(calls.probed).toEqual([]);
+  });
+
   it("acts on no answer that arrives after the identity changed", async () => {
     const switched = new AbortController();
     const { browser } = browserAnswering({
