@@ -153,6 +153,19 @@ pub(crate) fn refresh(
 /// Reads the registration `target` names, rather than the one this browser happens to
 /// deliver through now. A browser that holds its own and also points at an app would
 /// otherwise be read from one and written to the other.
+/// Whether `destination`'s registration still posts to `endpoint` with `subscriber_key`,
+/// as it did when a pass planned a wake-up through it. One replaced or removed since is
+/// not: what was planned would be sealed for keys its device no longer holds.
+pub(crate) fn is_still_registered(
+    destination: Destination,
+    endpoint: &str,
+    subscriber_key: &SubscriberKey,
+) -> bool {
+    read(destination).is_some_and(|registered| {
+        registered.endpoint.as_str() == endpoint && registered.subscriber_key == *subscriber_key
+    })
+}
+
 fn read(destination: Destination) -> Option<ReadySubscription> {
     match destination.registration() {
         RegistrationId::App(app_id) => storage_borrow(|storage| storage.notification_app(app_id))?

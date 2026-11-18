@@ -651,7 +651,7 @@ fn fan_out_to_browsers(
             .zip(apps.iter())
             .filter_map(|(browser, app)| {
                 let (subscription, relay_origin, target) =
-                    match pwa_wake_up_address(browser, &pwa_route, now_ns) {
+                    match find_pwa_wake_up_address(browser, &pwa_route, now_ns) {
                         Some(installed_app) => installed_app,
                         None => {
                             let (subscription, relay_origin, target) =
@@ -1012,13 +1012,13 @@ pub(crate) fn can_wake_installed_app(
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> bool {
-    pwa_wake_up_address(browser, route, now_ns).is_some()
+    find_pwa_wake_up_address(browser, route, now_ns).is_some()
 }
 
 /// The entry's installed web app for this app, where it subscribed for the recipient
 /// account and a session of that account on this entry stays live past
 /// [`PWA_SESSION_MARGIN_NS`].
-fn pwa_wake_up_address(
+fn find_pwa_wake_up_address(
     browser: &Browser,
     route: &PwaRoute,
     now_ns: Timestamp,
@@ -1256,6 +1256,17 @@ fn seal_pass(
                     ic_cdk::println!("Could not refresh what a subscription seals with: {err}")
                 }
             }
+        }
+    }
+    // Every registration the pass planned for, and not only the ones it rotated: any of
+    // them may have been replaced while the pass waited for its randomness.
+    for (index, delivery) in deliveries.iter().enumerate() {
+        if !rotation::is_still_registered(
+            destination_of(delivery),
+            &delivery.endpoint,
+            &delivery.subscriber_key,
+        ) {
+            superseded_indices.insert(index);
         }
     }
 
@@ -2358,6 +2369,33 @@ mod tests {
             .collect();
         assert_eq!(salts.len(), 2);
         assert_ne!(salts[0], salts[1]);
+    }
+
+    /// The check after the draw covers every registration the pass planned for, past
+    /// the few it rotates.
+    #[test]
+    fn wake_ups_past_the_rotation_limit_whose_registrations_were_replaced_are_not_posted() {
+        setup();
+        let (recipient, browsers) = anchor_with_browsers(9);
+        for (index, browser) in browsers.iter().enumerate() {
+            subscribe(recipient, *browser, &format!("{RELAY}/{index}"), 0);
+        }
+        submit(recipient, 7, 10 * SECOND_NS);
+        let mut deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        assert_eq!(deliveries.len(), 9);
+        for (index, browser) in browsers.iter().enumerate() {
+            subscribe(
+                recipient,
+                *browser,
+                &format!("{ROTATED}/{index}"),
+                SECOND_NS,
+            );
+        }
+
+        let superseded_indices = seal_pass(&mut deliveries, &[0u8; 32], 2 * SECOND_NS);
+
+        assert_eq!(superseded_indices, (0..9).collect::<BTreeSet<usize>>());
+        assert!(deliveries.iter().all(|delivery| delivery.body.is_none()));
     }
 
     /// The pass draws its randomness between planning and sealing, and a subscribe can
