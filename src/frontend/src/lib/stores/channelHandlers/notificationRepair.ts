@@ -18,9 +18,6 @@ import {
 } from "$lib/utils/notifications/notificationState";
 import { waitForStore } from "$lib/utils/utils";
 import { claimScreen } from "$lib/stores/pendingScreen.store";
-import { toaster } from "$lib/components/utils/toaster";
-import { t } from "$lib/stores/locale.store";
-import { failureMessage } from "$lib/utils/notifications/notificationDiagnostics";
 import {
   browserKeyActor,
   UnregisteredBrowserError,
@@ -119,10 +116,13 @@ export const repairNotificationPath = async ({
   }
   if (failure !== undefined && !(failure instanceof CheckTimedOutError)) {
     console.error(failure);
-    toaster.error({
-      title: t`Notifications unavailable`,
-      description: failureMessage(failure),
-    });
+    // Loaded only when there is a failure to show: its translations read the feature
+    // flags, and this module is evaluated before them, in the import cycle every channel
+    // handler sits in through the channel store. Not awaited, so the sign-in never waits
+    // on the toast.
+    void import("$lib/utils/notifications/repairFailure")
+      .then(({ showRepairFailure }) => showRepairFailure(failure))
+      .catch(console.error);
   }
   return "done";
 };
