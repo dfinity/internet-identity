@@ -230,7 +230,7 @@
   // while the page rests in the pager (SETTLED): mid-swipe it would ride the
   // seam between two pages across the canvas.
   const PAGE =
-    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-[calc(var(--header-h)+3rem)] pb-32 scroll-pt-[calc(var(--header-h)+3rem)] [scrollbar-color:transparent_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:px-6";
+    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-[calc(var(--header-h)+0.75rem)] pb-32 scroll-pt-[calc(var(--header-h)+0.75rem)] [scrollbar-color:transparent_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:px-6";
   /** A page at rest: its thumb fades in. It hides at once when a swipe
    *  starts, as the transition is only here. */
   const SETTLED =
@@ -247,6 +247,10 @@
   // iOS. The 4rem logo sits centered in its column, so the inset is half of
   // what the column leaves: (5.25rem − 4rem) / 2, then (7rem − 4rem) / 2.
   const INSET = "ps-2.5 @lg:ps-6";
+  /** The grid's own width at each size, so the greeting and the tabs above
+   *  the pages line up with the apps: columns and gaps of GRID. */
+  const GRID_WIDTH =
+    "w-[21.75rem] @lg:w-[29.5rem] @2xl:w-[37rem] @4xl:w-[52rem] max-w-full";
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
@@ -614,20 +618,38 @@
       : undefined,
   );
 
-  // The header is a row of pills in the canvas's own colour, so at rest they
-  // don't show. Once a page's content reaches the header they lift off the
-  // canvas, as the dock's pills sit over it, and keep the header readable
-  // over whatever runs under it.
-  /** The scroll at which a page's content reaches the header: the 3rem PAGE
-   *  keeps under it. */
-  const UNDER_HEADER_AT = 48;
-  const underHeader = $state(PAGES.map(() => false));
-  const headerLifted = $derived(underHeader[activePage]);
+  // Over the pages, the canvas says whose it is (the greeting), then the
+  // pages themselves (the tabs), lined up with the grid. As a page scrolls,
+  // the greeting goes up with it and out of sight, and the tabs follow until
+  // they stop under the logo: the pages stay a tap away however far down.
+  /** Each page's scroll, which moves the head while that page is shown. */
+  const pageScroll = $state(PAGES.map(() => 0));
+  /** The greeting's height: how far the head goes up before the tabs stop. */
+  let greetingHeight = $state(0);
+  const headLift = $derived(
+    Math.min(pageScroll[activePage] ?? 0, greetingHeight),
+  );
+  /** A page switch brings that page's head along, so it moves, not jumps. */
+  let switchingPage = $state(false);
+  $effect(() => {
+    void activePage;
+    switchingPage = true;
+    const timer = setTimeout(() => (switchingPage = false), 320);
+    return () => clearTimeout(timer);
+  });
+  // The header's controls are pills in the canvas's own colour, so at rest
+  // they don't show. Once a page's content runs under the tabs they lift off
+  // the canvas, as the dock's pills sit over it, and keep the header readable
+  // over whatever runs under it. The content reaches them once the greeting
+  // is gone and the 0.75rem PAGE keeps under them is passed.
+  const headerLifted = $derived(
+    (pageScroll[activePage] ?? 0) > greetingHeight + 12,
+  );
   /** The pages scroll on their own; the pager hears them while capturing. */
   const onPageScroll = (event: Event) => {
     const index = pageRefs.indexOf(event.target as HTMLElement);
     if (index !== -1) {
-      underHeader[index] = pageRefs[index].scrollTop > UNDER_HEADER_AT;
+      pageScroll[index] = pageRefs[index].scrollTop;
     }
   };
   const pill = $derived([
@@ -1375,178 +1397,239 @@
     <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
     <h1 class="sr-only">Apps</h1>
 
-    <!-- On desktop one row: the logo, the pages centered on the canvas, and an
-         empty column that keeps them centered. A phone has no room for the
-         pages beside its controls, so they drop to a row of their own. Each
+    <!-- The header: on top, the logo and the controls; under them, whose
+         canvas this is and its pages, lined up with the grid. Each control
          is a pill (see `pill`); between them the pages show through. From
          `md` the inset is 20px, where the account's pill ends. -->
     <header
       bind:clientHeight={headerHeight}
-      class="pointer-events-none relative z-10 grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr] md:px-5"
+      class="pointer-events-none relative z-10 flex shrink-0 flex-col"
     >
-      <!-- The logo is the way home: it goes back to the first page. Its hover
-           is a layer over the pill's own colour (`ii-hover`), so the pill
-           stays solid over the pages when it is lifted. -->
-      <button
-        type="button"
-        dir="ltr"
-        onclick={() => goToPage(0)}
-        aria-label={`id.ai, go to ${PAGES[0].label}`}
-        class={[
-          pill,
-          PILL_MOTION,
-          "ii-hover focus-visible:outline-focus-ring my-3 flex h-10 items-center gap-3 justify-self-start px-4 focus-visible:outline-2 focus-visible:outline-offset-2",
-        ]}
-      >
-        <Logo class="text-fg-primary h-4" />
-        <span class="text-text-primary text-base font-semibold"> id.ai </span>
-      </button>
       <div
-        role="tablist"
-        aria-label="Apps"
-        tabindex="-1"
-        onkeydown={onTabKeydown}
-        class={[
-          pill,
-          PILL_MOTION,
-          "relative col-span-2 row-start-2 mt-2 flex h-10 items-center justify-self-center p-1 md:col-span-1 md:col-start-2 md:row-start-1 md:mt-0",
-        ]}
+        class="grid grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr] md:px-5"
       >
-        <!-- The selected tab sits on a thumb, as in a segmented control, so it
-             reads by its shape and not only by its darker text. The thumb is
-             the selected overlay, so it shows on the pill at rest, in the
-             canvas's colour, and on the lifted one; it slides to a tab picked
-             or swiped to. Mounted once the tabs are measured, so it doesn't
-             grow in from nothing on load. -->
-        {#if thumb !== undefined}
-          <span
-            aria-hidden="true"
-            class="absolute inset-y-1 rounded-full bg-(--ii-selected) transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none"
-            style:inset-inline-start={`${thumb.start}px`}
-            style:width={`${thumb.width}px`}
-          ></span>
-        {/if}
-        {#each PAGES as page, index (page.id)}
-          <button
-            bind:this={tabRefs[index]}
-            bind:offsetWidth={tabWidths[index]}
-            type="button"
-            role="tab"
-            id={`tab-${page.id}`}
-            aria-selected={activePage === index}
-            aria-controls={`page-${page.id}`}
-            tabindex={activePage === index ? 0 : -1}
-            onclick={() => goToPage(index)}
-            class={[
-              "focus-visible:outline-focus-ring relative h-8 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
-              activePage === index
-                ? "text-text-primary"
-                : "text-text-tertiary hover:text-text-secondary",
-            ]}
-          >
-            {page.label}
-          </button>
-        {/each}
-      </div>
-      <div
-        bind:this={controlsPill}
-        class={[
-          "col-start-2 row-start-1 flex items-center gap-1 justify-self-end md:col-start-3",
-          layout === "panel" && "md:hidden",
-          // A phone's controls share one pill; on desktop the account, or
-          // Close, has its own.
-          !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
-        ]}
-      >
-        <!-- Phone only: on desktop it keeps to the bottom-left corner. -->
-        <div class="flex md:hidden">
-          {@render conceptControls(true)}
-        </div>
-        {#if isDesktop.current && panelVisible}
-          <!-- Desktop, with the panel open: Close stands where the account
-               was, on the canvas, which is what the panel pushed aside. The
-               glyph is an arrow to the edge: the panel goes back to the right
-               edge it came from. The identity itself heads the panel now, so
-               the canvas doesn't name it twice. -->
-          <button
-            bind:this={closeButton}
-            type="button"
-            onclick={() => (panelOpen = false)}
-            title="Close"
-            in:fade={{ duration: reduced ? 0 : 200 }}
-            class={[
-              pill,
-              PILL_MOTION,
-              "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
-            ]}
-          >
-            <ArrowRightToLineIcon
-              class="size-4 rtl:-scale-x-100"
-              aria-hidden="true"
-            />
-            <span class="sr-only">Close identity</span>
-          </button>
-        {:else if layout === "top"}
-          <!-- The account, name then avatar at the edge; it opens the panel
-               on desktop and the sheet on a phone. On desktop it has a pill of
-               its own; on a phone it shares the controls'. -->
-          <button
-            bind:this={accountButton}
-            type="button"
-            onclick={openAccount}
-            aria-label={`${identityName}. Open identity${accountAttention !== undefined ? ", needs your attention" : ""}`}
-            in:fade={{ duration: reduced ? 0 : 200 }}
-            class={[
-              "ii-hover focus-visible:outline-focus-ring flex min-w-0 items-center gap-2.5 rounded-full ps-3 focus-visible:outline-2 focus-visible:outline-offset-2",
-              isDesktop.current
-                ? [pill, PILL_MOTION, "h-10 pe-[3px]"]
-                : "-me-1 py-1 pe-1",
-            ]}
-          >
-            <span
-              class="text-text-primary max-w-28 truncate text-sm font-medium md:max-w-40"
+        <!-- The logo is the way home: it goes back to the first page. Its hover
+             is a layer over the pill's own colour (`ii-hover`), so the pill
+             stays solid over the pages when it is lifted. -->
+        <button
+          type="button"
+          dir="ltr"
+          onclick={() => goToPage(0)}
+          aria-label={`id.ai, go to ${PAGES[0].label}`}
+          class={[
+            pill,
+            PILL_MOTION,
+            "ii-hover focus-visible:outline-focus-ring my-3 flex h-10 items-center gap-3 justify-self-start px-4 focus-visible:outline-2 focus-visible:outline-offset-2",
+          ]}
+        >
+          <Logo class="text-fg-primary h-4" />
+          <span class="text-text-primary text-base font-semibold"> id.ai </span>
+        </button>
+        <div
+          bind:this={controlsPill}
+          class={[
+            "col-start-2 row-start-1 flex items-center gap-1 justify-self-end md:col-start-3",
+            layout === "panel" && "md:hidden",
+            // A phone's controls share one pill; on desktop the account, or
+            // Close, has its own.
+            !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
+          ]}
+        >
+          <!-- Phone only: on desktop it keeps to the bottom-left corner. -->
+          <div class="flex md:hidden">
+            {@render conceptControls(true)}
+          </div>
+          {#if isDesktop.current && panelVisible}
+            <!-- Desktop, with the panel open: Close stands where the account
+                 was, on the canvas, which is what the panel pushed aside. The
+                 glyph is an arrow to the edge: the panel goes back to the right
+                 edge it came from. The identity itself heads the panel now, so
+                 the canvas doesn't name it twice. -->
+            <button
+              bind:this={closeButton}
+              type="button"
+              onclick={() => (panelOpen = false)}
+              title="Close"
+              in:fade={{ duration: reduced ? 0 : 200 }}
+              class={[
+                pill,
+                PILL_MOTION,
+                "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
+              ]}
             >
-              {identityName}
-            </span>
-            <!-- The dot cuts itself out of the pill the account stands on. -->
-            <span
-              class="relative"
-              style:--ii-dot-backdrop={headerLifted
-                ? "var(--ii-surface-6)"
-                : "var(--ii-surface-3)"}
+              <ArrowRightToLineIcon
+                class="size-4 rtl:-scale-x-100"
+                aria-hidden="true"
+              />
+              <span class="sr-only">Close identity</span>
+            </button>
+          {:else if layout === "top"}
+            <!-- The account, name then avatar at the edge; it opens the panel
+                 on desktop and the sheet on a phone. On desktop it has a pill of
+                 its own; on a phone it shares the controls'. -->
+            <button
+              bind:this={accountButton}
+              type="button"
+              onclick={openAccount}
+              aria-label={`${identityName}. Open identity${accountAttention !== undefined ? ", needs your attention" : ""}`}
+              in:fade={{ duration: reduced ? 0 : 200 }}
+              class={[
+                "ii-hover focus-visible:outline-focus-ring flex min-w-0 items-center gap-2.5 rounded-full ps-3 focus-visible:outline-2 focus-visible:outline-offset-2",
+                isDesktop.current
+                  ? [pill, PILL_MOTION, "h-10 pe-[3px]"]
+                  : "-me-1 py-1 pe-1",
+              ]}
+            >
+              <span
+                class="text-text-primary max-w-28 truncate text-sm font-medium md:max-w-40"
+              >
+                {identityName}
+              </span>
+              <!-- The dot cuts itself out of the pill the account stands on. -->
+              <span
+                class="relative"
+                style:--ii-dot-backdrop={headerLifted
+                  ? "var(--ii-surface-6)"
+                  : "var(--ii-surface-3)"}
+              >
+                <IdentityAvatar
+                  {identity}
+                  palette={identityPaletteOverride}
+                  size="sm"
+                />
+                {#if accountAttention !== undefined}
+                  <AttentionDot tone={accountAttention} />
+                {/if}
+              </span>
+            </button>
+          {/if}
+          {#if layout === "panel"}
+            <!-- Phone: the panel opens from here; the dot says it has something for you. -->
+            <button
+              type="button"
+              onclick={() => (panelOpen = true)}
+              aria-label={`Open ${identityName}${needsAttention(cards) ? ", needs your attention" : ""}`}
+              class="relative -me-2 flex size-11 items-center justify-center rounded-full md:hidden"
             >
               <IdentityAvatar
                 {identity}
                 palette={identityPaletteOverride}
                 size="sm"
               />
-              {#if accountAttention !== undefined}
-                <AttentionDot tone={accountAttention} />
+              {#if needsAttention(cards)}
+                <span
+                  aria-hidden="true"
+                  class="bg-bg-warning-solid absolute end-1 top-1 size-3 rounded-full ring-2 ring-(color:--ii-surface-3)"
+                ></span>
               {/if}
-            </span>
-          </button>
-        {/if}
-        {#if layout === "panel"}
-          <!-- Phone: the panel opens from here; the dot says it has something for you. -->
-          <button
-            type="button"
-            onclick={() => (panelOpen = true)}
-            aria-label={`Open ${identityName}${needsAttention(cards) ? ", needs your attention" : ""}`}
-            class="relative -me-2 flex size-11 items-center justify-center rounded-full md:hidden"
+            </button>
+          {/if}
+        </div>
+      </div>
+      <!-- The greeting and the tabs share the grid's width, so the name, the
+           first tab and the first app start on one line, and Edit ends where
+           the last column does. -->
+      <div class={["mx-auto flex flex-col", GRID_WIDTH]}>
+        <!-- The canvas says whose it is before anything else, the way a
+             person would: the name, with a dot in the identity's colour
+             before it. It stays on every page, since it's true of all of
+             them. The name is said here only; the panel's card is for
+             switching, and how it signed in is Access's to say. -->
+        <div bind:clientHeight={greetingHeight} class="overflow-hidden">
+          <p
+            class={[
+              "text-text-primary flex min-w-0 items-center gap-x-2 pt-3 pb-5 text-xl leading-7 font-semibold tracking-tight md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
+              INSET,
+              switchingPage &&
+                "transition-[translate,opacity] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
+            ]}
+            style:translate={`0 ${-headLift}px`}
+            style:opacity={greetingHeight > 0
+              ? 1 - headLift / greetingHeight
+              : 1}
           >
-            <IdentityAvatar
-              {identity}
-              palette={identityPaletteOverride}
-              size="sm"
-            />
-            {#if needsAttention(cards)}
+            <span class="shrink-0">{greeting},</span>
+            <span
+              aria-hidden="true"
+              class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
+              style:background-color={currentPalette.background}
+            ></span>
+            <span class="min-w-0 truncate">{identityName}</span>
+          </p>
+        </div>
+        <!-- The pages, right above what they show, with Edit across from them
+             on My apps, as over a list on iOS (Done while apps are arranged). -->
+        <div
+          class={[
+            "flex items-center justify-between gap-3 pe-2.5 @lg:pe-6",
+            INSET,
+            switchingPage &&
+              "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
+          ]}
+          style:translate={`0 ${-headLift}px`}
+        >
+          <div
+            role="tablist"
+            aria-label="Apps"
+            tabindex="-1"
+            onkeydown={onTabKeydown}
+            class={[
+              pill,
+              PILL_MOTION,
+              "relative -ms-1 flex h-10 items-center p-1",
+            ]}
+          >
+            <!-- The selected tab sits on a thumb, as in a segmented control, so it
+                 reads by its shape and not only by its darker text. The thumb is
+                 the selected overlay, so it shows on the pill at rest, in the
+                 canvas's colour, and on the lifted one; it slides to a tab picked
+                 or swiped to. Mounted once the tabs are measured, so it doesn't
+                 grow in from nothing on load. -->
+            {#if thumb !== undefined}
               <span
                 aria-hidden="true"
-                class="bg-bg-warning-solid absolute end-1 top-1 size-3 rounded-full ring-2 ring-(color:--ii-surface-3)"
+                class="absolute inset-y-1 rounded-full bg-(--ii-selected) transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none"
+                style:inset-inline-start={`${thumb.start}px`}
+                style:width={`${thumb.width}px`}
               ></span>
             {/if}
-          </button>
-        {/if}
+            {#each PAGES as page, index (page.id)}
+              <button
+                bind:this={tabRefs[index]}
+                bind:offsetWidth={tabWidths[index]}
+                type="button"
+                role="tab"
+                id={`tab-${page.id}`}
+                aria-selected={activePage === index}
+                aria-controls={`page-${page.id}`}
+                tabindex={activePage === index ? 0 : -1}
+                onclick={() => goToPage(index)}
+                class={[
+                  "focus-visible:outline-focus-ring relative h-8 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
+                  activePage === index
+                    ? "text-text-primary"
+                    : "text-text-tertiary hover:text-text-secondary",
+                ]}
+              >
+                {page.label}
+              </button>
+            {/each}
+          </div>
+          {#if activePage === 0 && current.apps.length > 0}
+            <button
+              type="button"
+              onclick={managing ? stopManaging : startManaging}
+              in:fade={{ duration: reduced ? 0 : 150 }}
+              class={[
+                pill,
+                PILL_MOTION,
+                "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-3.5 h-10 px-3.5 text-sm font-medium focus-visible:outline-2",
+              ]}
+            >
+              {managing ? "Done" : "Edit"}
+            </button>
+          {/if}
+        </div>
       </div>
     </header>
 
@@ -1570,27 +1653,7 @@
           aria-labelledby="tab-mine"
           class={[PAGE, settled[0] && SETTLED]}
         >
-          <div class="mx-auto flex w-fit max-w-full flex-col md:my-auto">
-            <!-- The page says whose it is before anything else, the way a
-                 person would: the name, with a dot in the identity's colour
-                 before it. The name is said here only; the panel's card is
-                 for switching, and how it signed in is Access's to say. -->
-            {#if !managing}
-              <p
-                class={[
-                  "text-text-primary mb-8 flex min-w-0 items-center gap-x-2 text-xl leading-7 font-semibold tracking-tight lg:mb-10",
-                  INSET,
-                ]}
-              >
-                <span class="shrink-0">{greeting},</span>
-                <span
-                  aria-hidden="true"
-                  class="size-2.5 shrink-0 rounded-full outline-1 -outline-offset-1 outline-black/8 transition-colors duration-200 ease-out motion-reduce:transition-none dark:outline-white/12"
-                  style:background-color={currentPalette.background}
-                ></span>
-                <span class="min-w-0 truncate">{identityName}</span>
-              </p>
-            {/if}
+          <div class="mx-auto flex w-fit max-w-full flex-col">
             <!-- Phone: an incident put away unanswered heads the apps. -->
             {#if !isDesktop.current && incident !== undefined && !managing}
               <div
@@ -1608,26 +1671,8 @@
               </div>
             {/if}
             {#if current.apps.length > 0}
-              <section class="flex flex-col gap-2">
-                <!-- Edit stands at the heading's other end, as over a list on
-                     iOS, and Done while apps are arranged. -->
-                <div
-                  class={[
-                    "flex items-baseline justify-between gap-4 pe-2.5 @lg:pe-6",
-                    INSET,
-                  ]}
-                >
-                  <h2 class="text-text-tertiary text-sm font-medium">
-                    My apps
-                  </h2>
-                  <button
-                    type="button"
-                    onclick={managing ? stopManaging : startManaging}
-                    class="text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -mx-1.5 rounded-md px-1.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2"
-                  >
-                    {managing ? "Done" : "Edit"}
-                  </button>
-                </div>
+              <!-- Named by its tab, right above it. -->
+              <section aria-labelledby="tab-mine" class="flex flex-col gap-2">
                 {#if managing}
                   <label
                     transition:slide={{
