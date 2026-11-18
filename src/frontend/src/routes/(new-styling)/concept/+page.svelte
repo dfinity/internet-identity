@@ -1656,6 +1656,7 @@
     section={kind}
     {variant}
     scenario={current.scenario}
+    card={cards.find((card) => card.kind === kind)}
     {signedInWith}
     {browsers}
     onClose={closeSection}

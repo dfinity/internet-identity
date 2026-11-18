@@ -36,7 +36,9 @@
     phraseStatus,
     withAiAccess,
     withCliAccess,
+    type CardStatus,
     type Scenario,
+    type Tone,
   } from "../status";
   import Elevated from "./Elevated.svelte";
   import type { RecoveryMethod } from "./RecoveryFlow.svelte";
@@ -49,6 +51,9 @@
      *  then the rows on a card. */
     variant: "card" | "page";
     scenario: Scenario;
+    /** What the section's card says. Open, a card that isn't neutral says
+     *  the same on the item it's about, with the same cue (Thomas). */
+    card?: CardStatus;
     signedInWith: MockIdentity["signedInWith"];
     browsers: MockBrowser[];
     /** Close, at the end of a page's title. */
@@ -67,6 +72,7 @@
     section,
     variant,
     scenario,
+    card,
     signedInWith,
     browsers,
     onClose,
@@ -82,8 +88,9 @@
     title: string;
     meta: string;
     badge?: { label: string; color?: "surface" | "success" };
-    /** Why this row is worth a look: a warning or a risk. */
-    flag?: "warning" | "error";
+    /** The card's message is about this row: its word for it ("New",
+     *  "Changed"), in the card's style. */
+    cue?: { label: string; tone: Tone };
     /** Not set up yet. */
     empty?: boolean;
     action?: {
@@ -98,6 +105,63 @@
     recovery: ["Recovery", "Get back in if you lose access."],
     devices: ["Devices", "Where you're signed in."],
     integrations: ["Integrations", "How other tools connect to your identity."],
+  };
+
+  /** The row the card's message is about, and the word its cue says there.
+   *  A message about no item (recovery not set up, a way in to add) has
+   *  none: the section's lead says it instead. */
+  const subject = $derived.by<{ row: string; label: string } | undefined>(
+    () => {
+      if (card === undefined || card.tone === "neutral") return undefined;
+      switch (section) {
+        case "access":
+          return card.tone !== "warning" && scenario.access === "unused"
+            ? { row: "yubikey", label: "Unused" }
+            : undefined;
+        case "recovery":
+          return scenario.recovery === "usedPhrase"
+            ? { row: "phrase", label: "In use" }
+            : scenario.recovery === "phraseReset"
+              ? { row: "phrase", label: "Changed" }
+              : undefined;
+        case "devices":
+          return browsers.some(({ isNew }) => isNew === true)
+            ? { row: "firefox", label: "New" }
+            : undefined;
+        case "integrations":
+          return scenario.integrations === "local"
+            ? { row: "local", label: "Open" }
+            : scenario.integrations === "cliConfirm"
+              ? { row: "cli", label: "Waiting" }
+              : undefined;
+      }
+    },
+  );
+  /** The card's message, told by the lead, where it's about no row. */
+  const told = $derived(
+    card !== undefined && card.tone !== "neutral" && subject === undefined
+      ? card
+      : undefined,
+  );
+
+  /** The row the message is about comes first and says the card's own
+   *  sentence, with its cue in place of a badge. */
+  const withSubject = (rows: Row[]): Row[] => {
+    if (subject === undefined || card === undefined) return rows;
+    const marked = rows.map((row): Row =>
+      row.id === subject.row
+        ? {
+            ...row,
+            meta: card.sentence,
+            badge: undefined,
+            cue: { label: subject.label, tone: card.tone },
+          }
+        : row,
+    );
+    return [
+      ...marked.filter(({ id }) => id === subject.row),
+      ...marked.filter(({ id }) => id !== subject.row),
+    ];
   };
 
   const accessRows = $derived.by<Row[]>(() => {
@@ -130,7 +194,6 @@
             scenario.access === "unused"
               ? "Security key · Last used 8 months ago"
               : "Security key · Last used 3 days ago",
-          flag: scenario.access === "unused" ? "warning" : undefined,
           action:
             scenario.access === "unused"
               ? {
@@ -244,7 +307,6 @@
         icon: ServerIcon,
         title: "Local server",
         meta: "Runs on this computer · Any local program can connect",
-        flag: integrations === "local" ? "error" : undefined,
         action: {
           label: "Remove",
           variant: "danger",
@@ -260,7 +322,6 @@
             icon: SquareTerminalIcon,
             title: "CLI access",
             meta: "The ICP CLI is waiting for approval on this device",
-            flag: "warning",
             action: {
               label: "Approve",
               variant: "primary",
@@ -297,7 +358,12 @@
 
   const deviceGroups = $derived.by(() => {
     const groups: { platform: string; browsers: MockBrowser[] }[] = [];
-    for (const browser of browsers) {
+    // The browser the message is about leads, with its platform's group.
+    const ordered = [
+      ...browsers.filter(({ id }) => id === subject?.row),
+      ...browsers.filter(({ id }) => id !== subject?.row),
+    ];
+    for (const browser of ordered) {
       const platform = platformWordOf(browser.description);
       const group = groups.find((g) => g.platform === platform);
       if (group === undefined) {
@@ -322,18 +388,51 @@
         : isNew
           ? `First seen ${$formatRelative(new Date(browser.lastUsedMillis), { style: "long" })}`
           : `Last used ${$formatRelative(new Date(browser.lastUsedMillis), { style: "long" })}`,
-      badge: isCurrent
-        ? { label: "This browser" }
-        : isNew
-          ? { label: "New" }
-          : undefined,
-      flag: isNew || browser.isStale === true ? "warning" : undefined,
+      badge: isCurrent ? { label: "This browser" } : undefined,
       action: isCurrent
         ? undefined
         : { label: "Sign out", onclick: () => onSignOut(browser.id) },
     };
   };
+
+  /** A cue's pill, as recovery's dialog draws a way back in: the style's
+   *  own tint for a warning or a risk, the plain pill with the text's own
+   *  dot for info. */
+  const CUE: Record<Tone, string> = {
+    risk: "text-fg-error-primary border-transparent bg-(--ii-error-tint)",
+    warning:
+      "text-fg-warning-primary border-transparent bg-(--ii-warning-tint)",
+    info: "border-border-tertiary bg-bg-primary text-text-primary",
+    neutral: "border-border-tertiary bg-bg-primary text-text-tertiary",
+  };
+  /** What a message says in each style, on a row or in the lead. */
+  const SAID: Record<Tone, string> = {
+    risk: "text-text-error-primary",
+    warning: "text-warning-700 dark:text-text-warning-primary",
+    info: "text-text-primary",
+    neutral: "text-text-tertiary",
+  };
 </script>
+
+{#snippet lead()}
+  <!-- What the section holds; a message about no row (recovery not set up,
+       a way in to add) takes its place, in its card's style. -->
+  {#if told !== undefined}
+    <span
+      class={[
+        "flex items-center gap-1.5 text-[13px] leading-[18px] text-pretty",
+        SAID[told.tone],
+      ]}
+    >
+      {#if told.tone === "info"}
+        <span class="bg-fg-primary size-1.5 shrink-0 rounded-full"></span>
+      {/if}
+      {told.sentence}
+    </span>
+  {:else}
+    {TITLES[section][1]}
+  {/if}
+{/snippet}
 
 {#snippet row(item: Row)}
   <li class="flex items-center gap-3 px-4 py-3.5">
@@ -356,7 +455,17 @@
     <span class="flex min-w-0 flex-1 flex-col gap-0.5">
       <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <span class="text-text-primary text-sm font-medium">{item.title}</span>
-        {#if item.badge !== undefined}
+        {#if item.cue !== undefined}
+          <span
+            class={[
+              "inline-flex items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-medium",
+              CUE[item.cue.tone],
+            ]}
+          >
+            <span class="size-1.5 shrink-0 rounded-full bg-current"></span>
+            {item.cue.label}
+          </span>
+        {:else if item.badge !== undefined}
           <Badge
             size="sm"
             color={item.badge.color}
@@ -367,11 +476,7 @@
       <span
         class={[
           "text-[13px] leading-[18px] text-pretty",
-          item.flag === "error"
-            ? "text-text-error-primary"
-            : item.flag === "warning"
-              ? "text-warning-700 dark:text-text-warning-primary"
-              : "text-text-tertiary",
+          SAID[item.cue?.tone ?? "neutral"],
         ]}
       >
         {item.meta}
@@ -411,15 +516,17 @@
         platform={group.platform}
         count={group.browsers.length}
       />
-      {@render rows(group.browsers.map(browserRow))}
+      {@render rows(withSubject(group.browsers.map(browserRow)))}
     {/each}
   {:else}
     {@render rows(
-      section === "access"
-        ? accessRows
-        : section === "recovery"
-          ? recoveryRows
-          : integrationRows,
+      withSubject(
+        section === "access"
+          ? accessRows
+          : section === "recovery"
+            ? recoveryRows
+            : integrationRows,
+      ),
     )}
   {/if}
 {/snippet}
@@ -428,7 +535,11 @@
   <button
     type="button"
     onclick={() => onUnavailable("Adding an access method")}
-    class="btn btn-secondary w-full font-medium"
+    class={[
+      "btn w-full font-medium",
+      // The step Access urges: its card's message is the lead above.
+      told?.tone === "warning" ? "btn-primary" : "btn-secondary",
+    ]}
   >
     <PlusIcon class="size-4" />
     Add access method
@@ -439,7 +550,7 @@
   <!-- Under the card's title, where its status sentence was. -->
   <div class="flex flex-col pt-2.5">
     <p class="text-text-tertiary px-4 text-[13px] leading-[18px]">
-      {TITLES[section][1]}
+      {@render lead()}
     </p>
     <div class={["flex flex-col", section !== "devices" && "pt-1"]}>
       {@render body()}
@@ -460,7 +571,7 @@
           {TITLES[section][0]}
         </h2>
         <p class="text-text-tertiary text-[13px] leading-[18px]">
-          {TITLES[section][1]}
+          {@render lead()}
         </p>
       </div>
       <button
