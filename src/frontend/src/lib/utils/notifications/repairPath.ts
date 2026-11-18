@@ -3,9 +3,9 @@
  * notifications still works, and repairs what can be repaired without asking.
  *
  * Nothing tells the canister that a Home Screen app was deleted or a subscription broke,
- * so each subscription counts the pushes nobody fetched. Only a path past the limit is
- * probed: the probe is Internet Identity's own notification, and a fetch through the
- * subscription answers it. An installed web app that does not answer is removed, so the
+ * so each subscription counts the pushes whose notifications nobody removed. Only a path
+ * past the limit is probed: the probe is Internet Identity's own notification, and
+ * removing it through the subscription answers it. An installed web app that does not answer is removed, so the
  * app's notifications come back here; this browser's own path is then probed in turn.
  */
 import type { ActorSubclass } from "@icp-sdk/core/agent";
@@ -56,7 +56,7 @@ export type BrowserCalls = {
 };
 
 /** The outcome where nothing is left for the user to do. */
-const working: PathCheckOutcome = { kind: "working" };
+const workingOutcome: PathCheckOutcome = { kind: "working" };
 
 /** Checks the path that delivers `origin`'s notifications to this device for the account
  *  `accountPrincipal` names, of the identity `identityNumber` names: `actor` signs as the
@@ -90,12 +90,12 @@ export const checkNotificationPath = async ({
     signal: AbortSignal,
   ) => Promise<void>;
 }): Promise<PathCheckOutcome> => {
-  const consented = await actor.notification_consent_granted({
+  const hasConsent = await actor.notification_consent_granted({
     anchor_number: identityNumber,
     origin,
   });
-  if (!consented) {
-    return working;
+  if (!hasConsent) {
+    return workingOutcome;
   }
   const installedApps: NotificationPath = {
     InstalledApps: { origin, account_principal: accountPrincipal },
@@ -109,12 +109,12 @@ export const checkNotificationPath = async ({
   );
   if (installedAppsStatus.subscriptions.length > 0) {
     if (!isPastLimit(installedAppsStatus)) {
-      return working;
+      return workingOutcome;
     }
     onPastLimit();
     const answer = await probe(browser, identityNumber, installedApps, signal);
     if (answer === "answered") {
-      return working;
+      return workingOutcome;
     }
     signal.throwIfAborted();
     await browser
@@ -124,9 +124,13 @@ export const checkNotificationPath = async ({
         account_principal: accountPrincipal,
       })
       .then(throwCanisterError);
-    const remaining = await pathStatus(browser, identityNumber, installedApps);
-    if (remaining.subscriptions.length > 0) {
-      return working;
+    const remainingStatus = await pathStatus(
+      browser,
+      identityNumber,
+      installedApps,
+    );
+    if (remainingStatus.subscriptions.length > 0) {
+      return workingOutcome;
     }
     // This browser's own path carries the app's notifications from here on, whatever its count says.
     return afterOwnPath(
@@ -144,7 +148,7 @@ export const checkNotificationPath = async ({
     thisBrowser,
   );
   if (!isPastLimit(thisBrowserStatus)) {
-    return working;
+    return workingOutcome;
   }
   onPastLimit();
   return afterOwnPath(
@@ -169,7 +173,7 @@ const afterOwnPath = async (
 ): Promise<PathCheckOutcome> => {
   switch (answer) {
     case "answered":
-      return working;
+      return workingOutcome;
     // A push service that called the subscription gone left it as broken as one that never
     // answered, and the same repair applies.
     case "nothing-on-path":
@@ -191,7 +195,7 @@ const afterOwnPath = async (
     return { kind: "ask", installFirst: false };
   }
   await renewSubscription(identityNumber, signal);
-  return working;
+  return workingOutcome;
 };
 
 /** Switches off delivery through the app this browser points at. A browser that points
@@ -226,7 +230,8 @@ const resubscribe = async (
   // identity the user switched away from while it was looked up.
   signal.throwIfAborted();
   await subscription?.unsubscribe();
-  signal.throwIfAborted();
+  // Finished whatever happens meanwhile: once the old subscription is dropped, stopping
+  // here would leave the browser with none at all.
   await ensureRegisteredDevice(identityNumber);
 };
 
@@ -244,33 +249,30 @@ const isPastLimit = (status: NotificationPathStatus): boolean =>
     ({ unanswered_pushes: [unanswered] }) => unanswered?.is_past_limit === true,
   );
 
-/** Every subscription on the path had its probe fetched: a remove clears the probe
- *  record, and nothing else does. */
+/** Every subscription on the path had its probe removed, which clears the probe record;
+ *  nothing else does. */
 const isAnswered = (status: NotificationPathStatus): boolean =>
   status.subscriptions.every(
     ({ probe_sent_at_ns }) => probe_sent_at_ns.length === 0,
   );
 
-/** The least time a probe the push service accepted has to be answered before its
- *  silence counts: the canister's `MIN_PROBE_ANSWER_TIME_NS` in `webpush/unanswered.rs`,
- *  which refuses to remove an installed app whose probe is younger. */
-const MIN_PROBE_ANSWER_TIME_MS = 10_000;
+/** How long past {@link PROBE_WAIT_MS} the check keeps polling for the canister to say
+ *  every probe on the path has had its answer time, which it gives a probe 10 seconds
+ *  after the push service accepts it. */
+const ANSWER_TIME_WAIT_MS = 12_000;
 
-/** Whether every probe on `status`'s path has had {@link MIN_PROBE_ANSWER_TIME_MS} by
- *  now. */
+/** Whether the canister says every probe on `status`'s path has had its answer time. */
 const hasEveryProbeHadItsAnswerTime = (
   status: NotificationPathStatus,
 ): boolean =>
   status.subscriptions.every(
-    ({ probe_sent_at_ns: [sentAtNs] }) =>
-      sentAtNs === undefined ||
-      Date.now() - Number(sentAtNs / BigInt(1_000_000)) >=
-        MIN_PROBE_ANSWER_TIME_MS,
+    ({ probe_sent_at_ns, has_probe_had_its_answer_time }) =>
+      probe_sent_at_ns.length === 0 || has_probe_had_its_answer_time,
   );
 
-/** Sends the probe and waits for every subscription on the path to fetch it: at least
- *  {@link PROBE_WAIT_MS}, and past it until every probe has had
- *  {@link MIN_PROBE_ANSWER_TIME_MS}, or until `signal` is aborted. A probe still too
+/** Sends the probe and waits for every subscription on the path to answer it: at least
+ *  {@link PROBE_WAIT_MS}, and past it for up to {@link ANSWER_TIME_WAIT_MS} until the
+ *  canister says every probe has had its answer time, or until `signal` is aborted. A probe still too
  *  young when that runs out is no evidence either way, so it reads as answered and
  *  nothing is repaired for it. */
 const probe = async (
@@ -298,8 +300,8 @@ const probe = async (
     throw error;
   }
   const deadline = Date.now() + PROBE_WAIT_MS;
-  const latest = deadline + MIN_PROBE_ANSWER_TIME_MS;
-  while (Date.now() < latest) {
+  const latestPollAtMs = deadline + ANSWER_TIME_WAIT_MS;
+  while (Date.now() < latestPollAtMs) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     signal.throwIfAborted();
     const status = await pathStatus(browser, identityNumber, path);

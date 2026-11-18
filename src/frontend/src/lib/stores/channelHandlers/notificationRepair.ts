@@ -70,22 +70,22 @@ export const repairNotificationPath = async ({
   // A switch to another identity ends a check that was about this one, and so does
   // running out of time.
   let isIdentityChanged = false;
-  const stopped = new AbortController();
+  const stopController = new AbortController();
   const stopWatching = authenticationStore.subscribe((current) => {
     if (current?.identityNumber !== identityNumber) {
       isIdentityChanged = true;
-      stopped.abort(new IdentitySwitchedError());
+      stopController.abort(new IdentitySwitchedError());
     }
   });
   const deadline = setTimeout(
-    () => stopped.abort(new CheckTimedOutError()),
+    () => stopController.abort(new CheckTimedOutError()),
     CHECK_DEADLINE_MS,
   );
   let failure: unknown;
   let isAsked = false;
   try {
     const outcome = await checkWithin(
-      stopped.signal,
+      stopController.signal,
       checkPath({
         identityNumber,
         origin,
@@ -94,11 +94,11 @@ export const repairNotificationPath = async ({
         browserActor,
         onPastLimit: () => {
           // A check that runs on after it was stopped finds the view already taken down.
-          if (!stopped.signal.aborted) {
+          if (!stopController.signal.aborted) {
             hideProbe ??= showNotificationProbe();
           }
         },
-        signal: stopped.signal,
+        signal: stopController.signal,
       }),
     );
     hideProbe?.();
@@ -106,7 +106,7 @@ export const repairNotificationPath = async ({
       // What the screen shows is read under the same deadline and switch as the check:
       // only a screen the user can answer may hold the sign-in for longer.
       const context = await checkWithin(
-        stopped.signal,
+        stopController.signal,
         repairContext({
           identityNumber,
           origin,

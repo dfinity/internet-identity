@@ -93,10 +93,10 @@ export const handleDelegationRequest =
 
         // The authorization a sign-in that was given up on was minted for, so the next
         // turn waits for another one.
-        let previous: Authorized | undefined;
+        let previousAuthorization: Authorized | undefined;
         for (;;) {
           let authorized = await waitForStore(authorizedStore, (current) =>
-            current !== previous ? current : undefined,
+            current !== previousAuthorization ? current : undefined,
           );
           while (
             get(attributeConsentStore) !== undefined &&
@@ -189,7 +189,7 @@ export const handleDelegationRequest =
           };
           const mintedDelegation = await mint();
 
-          const repaired = await repairNotificationPath({
+          const repairOutcome = await repairNotificationPath({
             identityNumber,
             origin: effectiveOrigin,
             accountPrincipal: Principal.selfAuthenticating(
@@ -199,8 +199,8 @@ export const handleDelegationRequest =
           });
           // What was minted is for an identity the user has moved away from: the app gets
           // the one the user authorizes next, minted in this same request.
-          if (repaired === "identity-changed") {
-            previous = authorized;
+          if (repairOutcome === "identity-changed") {
+            previousAuthorization = authorized;
             continue;
           }
           // Minted again, with the same authorization and no second check, where the

@@ -295,34 +295,35 @@ export const handleSessionDelegationRequest =
 
         // The authorization a sign-in that was given up on was minted for, so the next
         // turn waits for another one.
-        let previous: Authorized | undefined;
+        let previousAuthorization: Authorized | undefined;
         for (;;) {
-          const created = await createSession(
+          const createdSession = await createSession(
             effectiveOrigin,
             params.maxTimeToLive,
             params.maxTimeToIdle,
             resumable === true,
-            previous,
+            previousAuthorization,
           );
-          const repaired = await repairNotificationPath({
-            identityNumber: created.identityNumber,
+          const repairOutcome = await repairNotificationPath({
+            identityNumber: createdSession.identityNumber,
             origin: effectiveOrigin,
-            accountPrincipal: created.accountPrincipal,
-            actor: created.actor,
+            accountPrincipal: createdSession.accountPrincipal,
+            actor: createdSession.actor,
           });
           // What was minted is for an identity the user has moved away from: the app
           // gets the one the user authorizes next, minted in this same request.
-          if (repaired === "identity-changed") {
-            previous = created.authorized;
+          if (repairOutcome === "identity-changed") {
+            previousAuthorization = createdSession.authorized;
             continue;
           }
           // Created again, with the same authorization and no second check, where the
           // allow screen kept it open for most of its lifetime, or long enough for the
           // canister to end it as idle.
           const isSessionStale =
-            created.record.expiresAtMillis - Date.now() <
+            createdSession.record.expiresAtMillis - Date.now() <
               MIN_REMAINING_LIFETIME_MS ||
-            (repaired === "asked" && !(await sessionIsLive(created.record)));
+            (repairOutcome === "asked" &&
+              !(await sessionIsLive(createdSession.record)));
           const answeredSession = isSessionStale
             ? await createSession(
                 effectiveOrigin,
@@ -330,7 +331,7 @@ export const handleSessionDelegationRequest =
                 params.maxTimeToIdle,
                 resumable === true,
               )
-            : created;
+            : createdSession;
           const chain = await extendToApp(
             answeredSession.record,
             params.sessionPublicKey,
@@ -373,7 +374,7 @@ const createSession = async (
   requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
   /** An authorization already minted for and given up on, to wait past. */
-  previous?: Authorized,
+  previousAuthorization?: Authorized,
 ): Promise<{
   record: AppSessionRecord;
   /** Keeps the session for a later silent sign-in where the app asked for that. Called
@@ -388,7 +389,7 @@ const createSession = async (
 }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   let authorized = await waitForStore(authorizedStore, (current) =>
-    current !== previous ? current : undefined,
+    current !== previousAuthorization ? current : undefined,
   );
   // Switching identity on a consent screen authorizes again; mint for the
   // identity the user ends on, as `delegation.ts` does.

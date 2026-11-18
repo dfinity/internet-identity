@@ -31,15 +31,19 @@ const pastLimit: SubscriptionDeliveryStatus = {
     { count: 3, first_sent_at_ns: BigInt(0), is_past_limit: true },
   ],
   probe_sent_at_ns: [],
+  has_probe_had_its_answer_time: false,
 };
 const underLimit: SubscriptionDeliveryStatus = {
   unanswered_pushes: [],
   probe_sent_at_ns: [],
+  has_probe_had_its_answer_time: false,
 };
-/** A probe was sent and nothing fetched it, whatever the count says. */
+/** A probe was sent, has had its answer time and nothing removed it, whatever the count
+ *  says. */
 const probeWaiting: SubscriptionDeliveryStatus = {
   unanswered_pushes: [],
   probe_sent_at_ns: [BigInt(1)],
+  has_probe_had_its_answer_time: true,
 };
 
 const consenting: IdentityCalls = {
@@ -178,26 +182,31 @@ describe("checkNotificationPath", () => {
     await expect(check(browser)).resolves.toEqual({ kind: "working" });
   });
 
-  it("waits until a probe accepted late has had its answer time before removing", async () => {
+  it("waits until the canister says a probe has had its answer time before removing", async () => {
     const { browser, calls } = browserAnswering({
       installedApps: [{ subscriptions: [pastLimit] }],
       thisBrowser: [{ subscriptions: [] }],
     });
-    let acceptedAtNs = BigInt(0);
-    // The push service accepts the probe 5 seconds after it is submitted, and nothing
-    // fetches it.
-    const lateBrowser: BrowserCalls = {
+    let probedAtMs: number | undefined;
+    // Nothing removes the probe, and the canister gives it its answer time 10 seconds
+    // after the probe call, whatever this device's clock says.
+    const slowBrowser: BrowserCalls = {
       ...browser,
       probe_notification_path: (request) => {
-        acceptedAtNs = BigInt(Date.now() + 5_000) * BigInt(1_000_000);
+        probedAtMs = Date.now();
         return browser.probe_notification_path(request);
       },
       get_notification_path_status: (request) =>
-        "InstalledApps" in request.path && acceptedAtNs > BigInt(0)
+        "InstalledApps" in request.path && probedAtMs !== undefined
           ? Promise.resolve({
               Ok: {
                 subscriptions: [
-                  { ...pastLimit, probe_sent_at_ns: [acceptedAtNs] },
+                  {
+                    ...pastLimit,
+                    probe_sent_at_ns: [BigInt(1)],
+                    has_probe_had_its_answer_time:
+                      Date.now() - probedAtMs >= 10_000,
+                  },
                 ],
               },
             })
@@ -209,12 +218,12 @@ describe("checkNotificationPath", () => {
       origin: ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
-      browser: lateBrowser,
+      browser: slowBrowser,
       onPastLimit: () => {},
       signal: new AbortController().signal,
     }).catch(() => {});
 
-    // Past the usual wait, the probe is only a few seconds old.
+    // Past the usual wait, the canister still says the probe is too young.
     await vi.advanceTimersByTimeAsync(9_000);
     expect(calls.removed).toEqual([]);
 
@@ -431,6 +440,39 @@ describe("checkNotificationPath where this browser may notify", () => {
     await expect(settled).resolves.toBe("rejected");
     expect(unsubscribe).not.toHaveBeenCalled();
     expect(vi.mocked(ensureRegisteredDevice)).not.toHaveBeenCalled();
+  });
+
+  it("finishes the renewal once the old subscription is dropped, whatever happens meanwhile", async () => {
+    const switched = new AbortController();
+    const { browser } = browserAnswering({
+      installedApps: [{ subscriptions: [] }],
+      thisBrowser: [{ subscriptions: [pastLimit] }, { subscriptions: [] }],
+    });
+    // The user switches while the old subscription is dropped.
+    const unsubscribe = vi.fn(() => {
+      switched.abort(new Error("switched"));
+      return Promise.resolve(true);
+    });
+    vi.mocked(currentDeviceSubscription).mockResolvedValue({
+      unsubscribe,
+    } as unknown as PushSubscription);
+
+    const checked = checkNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: ORIGIN,
+      accountPrincipal: ACCOUNT,
+      actor: consenting,
+      browser,
+      onPastLimit: () => {},
+      signal: switched.signal,
+    });
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    await expect(checked).resolves.toEqual({ kind: "working" });
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ensureRegisteredDevice)).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+    );
   });
 
   it("acts on no answer that arrives after the identity changed", async () => {

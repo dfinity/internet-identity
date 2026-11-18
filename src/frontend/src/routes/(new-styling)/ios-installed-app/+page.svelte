@@ -64,6 +64,7 @@
         <div
           class="flex min-w-0 flex-1 flex-col items-stretch"
           aria-busy="true"
+          aria-label={$t`Setting up notifications`}
         >
           <div class="skeleton mb-4 size-12 rounded-full"></div>
           <div class="skeleton mb-3 h-8 w-3/4 rounded"></div>

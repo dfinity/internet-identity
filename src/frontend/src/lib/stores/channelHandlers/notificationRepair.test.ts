@@ -58,6 +58,7 @@ const silentInstalledApp: BrowserCalls = {
                     },
                   ],
                   probe_sent_at_ns: [BigInt(1)],
+                  has_probe_had_its_answer_time: true,
                 },
               ],
       },
@@ -229,6 +230,7 @@ describe("repairNotificationPath while the allow screen is prepared", () => {
                       },
                     ],
                     probe_sent_at_ns: [BigInt(1)],
+                    has_probe_had_its_answer_time: true,
                   },
                 ]
               : [],
@@ -327,6 +329,7 @@ describe("repairNotificationPath on an iPhone", () => {
                         },
                       ],
                       probe_sent_at_ns: [BigInt(1)],
+                      has_probe_had_its_answer_time: true,
                     },
                   ]
                 : [],

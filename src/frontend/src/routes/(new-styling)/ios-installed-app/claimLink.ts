@@ -42,15 +42,15 @@ const LinkFragmentSchema = z.object({ key: z.string() });
 /** The one-shot key the fragment carries as `key`, or `undefined` where it carries none
  *  of the right length. */
 export const linkKeyOf = (hash: string): Uint8Array | undefined => {
-  const parsed = LinkFragmentSchema.safeParse(
+  const parsedFragment = LinkFragmentSchema.safeParse(
     Object.fromEntries(new URLSearchParams(hash.replace(/^#/, ""))),
   );
-  if (!parsed.success) {
+  if (!parsedFragment.success) {
     return undefined;
   }
   let linkKey: Uint8Array;
   try {
-    linkKey = fromBase64URL(parsed.data.key);
+    linkKey = fromBase64URL(parsedFragment.data.key);
   } catch {
     return undefined;
   }
