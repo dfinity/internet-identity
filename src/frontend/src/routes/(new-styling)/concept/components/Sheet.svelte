@@ -13,6 +13,8 @@
      *  that would lose a step half done; its own buttons close it then. */
     dismissable?: boolean;
     "aria-labelledby"?: string;
+    /** A name, for a sheet with no heading of its own to point at. */
+    "aria-label"?: string;
     children: Snippet;
   }
 
@@ -21,6 +23,7 @@
     showCloseButton = false,
     dismissable = true,
     "aria-labelledby": labelledBy,
+    "aria-label": label,
     children,
   }: Props = $props();
 
@@ -42,10 +45,13 @@
   let viewportHeight = $state<number>();
 
   onMount(() => {
+    // What had focus, to hand it back once the sheet is gone: while it is
+    // still going down, the page under it is inert and won't take focus.
+    const opener = document.activeElement;
     dialog?.showModal();
     const viewport = window.visualViewport;
-    if (viewport === null) return;
     const update = () => {
+      if (viewport === null) return;
       keyboard = Math.max(
         0,
         window.innerHeight - viewport.height - viewport.offsetTop,
@@ -53,11 +59,19 @@
       viewportHeight = viewport.height;
     };
     update();
-    viewport.addEventListener("resize", update);
-    viewport.addEventListener("scroll", update);
+    viewport?.addEventListener("resize", update);
+    viewport?.addEventListener("scroll", update);
     return () => {
-      viewport.removeEventListener("resize", update);
-      viewport.removeEventListener("scroll", update);
+      viewport?.removeEventListener("resize", update);
+      viewport?.removeEventListener("scroll", update);
+      const active = document.activeElement;
+      if (
+        opener instanceof HTMLElement &&
+        opener.isConnected &&
+        (active === null || active === document.body)
+      ) {
+        opener.focus({ preventScroll: true });
+      }
     };
   });
 
@@ -106,23 +120,35 @@
 <!-- Phone: a sheet from the bottom, as iOS has them, over everything. The
      page underneath dims; a tap on it, Escape or a swipe down on the
      grabber puts the sheet away, and the sheet goes down from wherever the
-     finger left it. -->
+     finger left it.
+     The dialog clips rather than hides what runs past it: coming in, the
+     sheet starts a whole height below, and a hidden overflow could still be
+     scrolled, by the browser bringing what it focuses into view, which
+     would throw the dimmed page and the sheet up mid-flight. A drag on the
+     dimmed page does nothing, so it can't scroll or bounce what's under.
+     Opening, the sheet takes focus itself instead of handing it to its
+     first control: when that's a field (the add-an-app search), a phone
+     would bring up its keyboard over the sheet and shove it and the page
+     up. Tab goes on from it to the first control. -->
 <dialog
   bind:this={dialog}
   oncancel={onCancel}
   aria-labelledby={labelledBy}
-  class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-transparent p-0 outline-none backdrop:bg-transparent"
+  aria-label={label}
+  class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-clip bg-transparent p-0 outline-none backdrop:bg-transparent"
 >
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div
-    class="bg-bg-overlay/80 absolute inset-0"
+    class="bg-bg-overlay/80 absolute inset-0 touch-none"
     onclick={() => dismissable && onClose()}
     transition:fade|global={{ duration: reduced ? 0 : 200 }}
   ></div>
   <div
     bind:this={panel}
+    autofocus
+    tabindex="-1"
     class={[
-      "bg-bg-primary_alt absolute inset-x-0 flex flex-col overflow-hidden rounded-t-2xl",
+      "bg-bg-primary_alt absolute inset-x-0 flex flex-col overflow-hidden rounded-t-2xl outline-none",
       !dragging &&
         "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
     ]}

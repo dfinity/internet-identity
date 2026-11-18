@@ -188,6 +188,18 @@
 :root:has(.concept) {
   background-color: var(--ii-surface-3);
 }
+
+/*
+ * The document itself never scrolls: the canvas is the screen's height and
+ * its pages and sheets scroll on their own. Without this, a drag that starts
+ * on what doesn't scroll (the header, the tab bar, a sheet's dimmed page)
+ * or runs past a page's end hands over to the root, and iOS rubber-bands the
+ * whole screen, header and tab bar with it, so nothing feels fixed.
+ */
+:root:has(.concept),
+:root:has(.concept) body {
+  overscroll-behavior: none;
+}
 @media (width >= 48rem) {
   :root:has(.concept) {
     background-color: var(--ii-surface-1);

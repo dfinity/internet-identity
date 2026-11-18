@@ -265,8 +265,12 @@
   // On a phone a page keeps to the edge (--ii-edge) less the 10px a tile's
   // plate reaches past its logo, so the logos stand on the edge and the
   // pages' own content steps in by those 10px to stand there too.
+  // A page scrolls only up and down, and sideways is the pager's: a tile's
+  // count or ⋯ reaches a couple of px into the page's padding, which made
+  // My apps that much wider than the screen, so a vertical swipe drifted it
+  // sideways as well.
   const PAGE =
-    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 @max-lg/canvas:px-[calc(var(--ii-edge)-0.625rem)] pt-[calc(var(--header-h)+0.75rem)] pb-32 scroll-pt-[calc(var(--header-h)+0.75rem)] [scrollbar-color:transparent_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:px-6";
+    "flex w-full shrink-0 snap-start snap-always flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 @max-lg/canvas:px-[calc(var(--ii-edge)-0.625rem)] pt-[calc(var(--header-h)+0.75rem)] pb-32 scroll-pt-[calc(var(--header-h)+0.75rem)] [scrollbar-color:transparent_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:px-6";
   /** A page at rest: its thumb fades in. It hides at once when a swipe
    *  starts, as the transition is only here. */
   const SETTLED =
@@ -2280,38 +2284,58 @@
     <ActionDock items={dockItems} onAction={actFromDock} />
   {/if}
 
-  {#if addAnchor !== undefined}
-    <!-- Rendered here, outside the canvas, but it opens over the canvas. -->
-    <Popup
-      over={3}
-      anchor={addAnchor}
-      onClose={() => (addAnchor = undefined)}
-      direction="down"
-      align="center"
-      distance="0.5rem"
-      class="!w-[min(26rem,calc(100vw-2rem))]"
+  {#snippet addSearch(inSheet: boolean)}
+    <!-- In a sheet the field and the rows keep to its edge, as the page's
+         do, and the keyboard waits for a tap on the field: brought up on
+         its own it would cover the suggestions, and push the sheet and the
+         page up as it comes. -->
+    <AppSearch
+      autofocus={!inSheet}
+      flush={inSheet}
+      suggestions={featured.slice(0, 4)}
+      {isAdded}
+      onAdd={(app) => addApp(app)}
+      onAddLink={addLink}
+    />
+    <button
+      type="button"
+      onclick={() => {
+        addAnchor = undefined;
+        goToPage(1);
+      }}
+      class={[
+        "ii-hover text-text-primary focus-visible:ring-focus-ring mt-2 flex items-center gap-2.5 rounded-xl py-2.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset",
+        inSheet ? "-mx-2 px-2" : "px-3",
+      ]}
     >
-      <div class="flex max-h-[min(32rem,70dvh)] flex-col overflow-y-auto p-3">
-        <AppSearch
-          autofocus
-          suggestions={featured.slice(0, 4)}
-          {isAdded}
-          onAdd={(app) => addApp(app)}
-          onAddLink={addLink}
-        />
-        <button
-          type="button"
-          onclick={() => {
-            addAnchor = undefined;
-            goToPage(1);
-          }}
-          class="ii-hover text-text-primary focus-visible:ring-focus-ring mt-2 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset"
-        >
-          <CompassIcon class="text-fg-quaternary size-4" aria-hidden="true" />
-          Browse Explore
-        </button>
-      </div>
-    </Popup>
+      <CompassIcon class="text-fg-quaternary size-4" aria-hidden="true" />
+      Browse Explore
+    </button>
+  {/snippet}
+
+  {#if addAnchor !== undefined}
+    {#if isDesktop.current}
+      <!-- Rendered here, outside the canvas, but it opens over the canvas. -->
+      <Popup
+        over={3}
+        anchor={addAnchor}
+        onClose={() => (addAnchor = undefined)}
+        direction="down"
+        align="center"
+        distance="0.5rem"
+        class="!w-[min(26rem,calc(100vw-2rem))]"
+      >
+        <div class="flex max-h-[min(32rem,70dvh)] flex-col overflow-y-auto p-3">
+          {@render addSearch(false)}
+        </div>
+      </Popup>
+    {:else}
+      <!-- Phone: a sheet from the bottom, as the sections and the
+           identity's menu are, rather than the product's own sheet. -->
+      <Sheet onClose={() => (addAnchor = undefined)} aria-label="Add an app">
+        {@render addSearch(true)}
+      </Sheet>
+    {/if}
   {/if}
 
   {#if recoveryOpen}
@@ -2328,9 +2352,12 @@
   {#if removing !== undefined}
     {@const apps = removing}
     {@const what = apps.length === 1 ? apps[0].name : `${apps.length} apps`}
-    <Dialog onClose={() => (removing = undefined)}>
+    {#snippet confirmRemove()}
       <div class="flex flex-col gap-5">
-        <h2 class="text-text-primary text-lg font-semibold">
+        <h2
+          id="concept-remove-title"
+          class="text-text-primary text-lg font-semibold"
+        >
           Remove {what}?
         </h2>
         <ul class="text-text-secondary flex flex-col gap-3 text-sm">
@@ -2377,7 +2404,21 @@
           </button>
         </div>
       </div>
-    </Dialog>
+    {/snippet}
+    <!-- Phone: a sheet, as every other one there, rather than the product's
+         own; desktop keeps the product's dialog. -->
+    {#if isDesktop.current}
+      <Dialog onClose={() => (removing = undefined)}>
+        {@render confirmRemove()}
+      </Dialog>
+    {:else}
+      <Sheet
+        onClose={() => (removing = undefined)}
+        aria-labelledby="concept-remove-title"
+      >
+        {@render confirmRemove()}
+      </Sheet>
+    {/if}
   {/if}
 
   <!-- Concept only: walk the panel through its states, and switch layouts.
