@@ -32,7 +32,11 @@ describe("stopRepairChecks", () => {
     vi.mocked(currentBrowserId).mockResolvedValue(THIS_BROWSER_ID);
     const { actor, calls } = recordingActor();
 
-    await stopRepairChecks({ identityNumber: IDENTITY_NUMBER, actor });
+    await stopRepairChecks({
+      identityNumber: IDENTITY_NUMBER,
+      actor,
+      onFailure: () => {},
+    });
 
     expect(calls).toEqual([
       {
@@ -49,8 +53,30 @@ describe("stopRepairChecks", () => {
     vi.mocked(currentBrowserId).mockResolvedValue(undefined);
     const { actor, calls } = recordingActor();
 
-    await stopRepairChecks({ identityNumber: IDENTITY_NUMBER, actor });
+    await stopRepairChecks({
+      identityNumber: IDENTITY_NUMBER,
+      actor,
+      onFailure: () => {},
+    });
 
     expect(calls).toEqual([]);
+  });
+
+  it("hands a failed removal to be reported instead of failing the decline", async () => {
+    vi.mocked(currentBrowserId).mockResolvedValue(THIS_BROWSER_ID);
+    const refusal = new Error("the removal failed");
+    const actor = {
+      remove_webpush_subscription: () => Promise.reject(refusal),
+    } as unknown as ActorSubclass<_SERVICE>;
+    const failures: unknown[] = [];
+
+    await expect(
+      stopRepairChecks({
+        identityNumber: IDENTITY_NUMBER,
+        actor,
+        onFailure: (error) => failures.push(error),
+      }),
+    ).resolves.toBeUndefined();
+    expect(failures).toEqual([refusal]);
   });
 });

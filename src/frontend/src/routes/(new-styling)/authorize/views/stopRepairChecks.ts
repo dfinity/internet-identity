@@ -12,22 +12,31 @@ import { throwCanisterError } from "$lib/utils/utils";
  *
  * `identityNumber` is the identity signed in, and `actor` signs as it. A browser with
  * no registration of its own has no path to check and nothing to drop.
+ *
+ * Never fails: a removal that does not go through is handed to `onFailure` to report,
+ * and the sign-in goes on, since the next one checks this device again.
  */
 export const stopRepairChecks = async ({
   identityNumber,
   actor,
+  onFailure,
 }: {
   identityNumber: bigint;
   actor: ActorSubclass<_SERVICE>;
+  onFailure: (error: unknown) => void;
 }): Promise<void> => {
-  const browserId = await currentBrowserId(identityNumber);
-  if (browserId === undefined) {
-    return;
+  try {
+    const browserId = await currentBrowserId(identityNumber);
+    if (browserId === undefined) {
+      return;
+    }
+    await actor
+      .remove_webpush_subscription({
+        anchor_number: identityNumber,
+        browser_id: browserId,
+      })
+      .then(throwCanisterError);
+  } catch (error) {
+    onFailure(error);
   }
-  await actor
-    .remove_webpush_subscription({
-      anchor_number: identityNumber,
-      browser_id: browserId,
-    })
-    .then(throwCanisterError);
 };

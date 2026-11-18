@@ -107,14 +107,12 @@
     funnel?.trigger(BrowserNotificationsEvents.Skipped);
     if (isRepair) {
       busy = true;
-      try {
-        await stopRepairChecks({ identityNumber, actor });
-      } catch (error) {
-        reportFailure(error);
-        return;
-      } finally {
-        busy = false;
-      }
+      await stopRepairChecks({
+        identityNumber,
+        actor,
+        onFailure: reportFailure,
+      });
+      busy = false;
     }
     done();
   };
