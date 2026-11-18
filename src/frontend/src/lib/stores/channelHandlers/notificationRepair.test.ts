@@ -139,9 +139,9 @@ describe("repairNotificationPath", () => {
       origin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
       actor,
-      browserActor: async () => {
+      browserActor: () => {
         signedIn.set({ identityNumber: OTHER_IDENTITY_NUMBER });
-        throw new UnregisteredBrowserError();
+        return Promise.reject(new UnregisteredBrowserError());
       },
     });
     await vi.advanceTimersByTimeAsync(WHILE_THE_PROBE_WAITS_MS);
