@@ -41,6 +41,7 @@
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
   import { authorizeAddedIdentity } from "./addIdentity";
+  import { notificationProbeStore } from "$lib/stores/notificationProbe.store";
 
   const { children }: LayoutProps = $props();
 
@@ -135,8 +136,8 @@
     $attributeConsentStore !== undefined &&
       $attributeConsentResultStore === undefined,
   );
-  // Notification consent runs after authorize for the same reason, so it needs
-  // the same exemption.
+  // Notification consent, and the probe that can lead to it, run after authorize for
+  // the same reason, so they need the same exemption.
   const isNotificationConsenting = $derived(
     $notificationConsentStore !== undefined &&
       $notificationConsentSettledStore === undefined,
@@ -145,6 +146,7 @@
     isReady &&
       (isAttributeConsenting ||
         isNotificationConsenting ||
+        $notificationProbeStore ||
         ($authorizedStore === undefined &&
           flow !== "openid-init" &&
           flow !== "sso-init" &&

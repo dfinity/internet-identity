@@ -17,7 +17,7 @@ import {
   resolveOptIn,
 } from "$lib/utils/notifications/notificationState";
 import { waitForStore } from "$lib/utils/utils";
-import { claimScreen } from "$lib/stores/pendingScreen.store";
+import { showNotificationProbe } from "$lib/stores/notificationProbe.store";
 import {
   browserKeyActor,
   UnregisteredBrowserError,
@@ -61,9 +61,9 @@ export const repairNotificationPath = async ({
   if (!get(PUSH_NOTIFICATIONS) || !isWebOrigin(origin)) {
     return "done";
   }
-  // Held only once a path is past its limit, which is when the check takes long enough
-  // to show; released when the check, and the screen it may open, has settled.
-  let releaseScreen: (() => void) | undefined;
+  // Shown once a path is past its limit, which is when the check probes it, and taken
+  // down as soon as the check has an answer.
+  let hideProbe: (() => void) | undefined;
   // A switch to another identity ends a check that was about this one, and so does
   // running out of time.
   let isIdentityChanged = false;
@@ -89,15 +89,16 @@ export const repairNotificationPath = async ({
         actor,
         browserActor,
         onPastLimit: () => {
-          // A check that runs on after it was stopped finds the release already done.
+          // A check that runs on after it was stopped finds the view already taken down.
           if (!stopped.signal.aborted) {
-            releaseScreen ??= claimScreen();
+            hideProbe ??= showNotificationProbe();
           }
         },
         signal: stopped.signal,
       }),
     );
     clearTimeout(deadline);
+    hideProbe?.();
     if (outcome.kind === "ask" && !isIdentityChanged) {
       await askToRepair({
         identityNumber,
@@ -111,7 +112,7 @@ export const repairNotificationPath = async ({
   } finally {
     clearTimeout(deadline);
     stopWatching();
-    releaseScreen?.();
+    hideProbe?.();
   }
   // The one way out, so no path answers for an identity the user has left.
   if (isIdentityChanged) {

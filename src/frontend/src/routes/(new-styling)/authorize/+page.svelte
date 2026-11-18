@@ -33,6 +33,7 @@
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
   import NotifOptInView from "./views/NotifOptInView.svelte";
+  import NotifProbingView from "./views/NotifProbingView.svelte";
   import {
     type AttributeConsent,
     attributeConsentStore,
@@ -40,6 +41,7 @@
     attributeConsentResultStore,
   } from "$lib/stores/attributeConsent.store";
   import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
+  import { notificationProbeStore } from "$lib/stores/notificationProbe.store";
   import {
     notificationConsentSettledStore,
     notificationConsentStore,
@@ -728,6 +730,9 @@
 {:else if $notificationConsentStore !== undefined && $notificationConsentSettledStore === undefined}
   <!-- Notification consent — runs after authorize, before the redirect. -->
   {@render panelWrapper(notificationConsentContent)}
+{:else if $notificationProbeStore && $authorizedStore !== undefined}
+  <!-- The sign-in is probing this device's notification path before it answers. -->
+  {@render panelWrapper(notificationProbeContent)}
 {:else if (!holdingScreen && $authorizedStore !== undefined) || (data.flow === "openid-resume" && openIdResumeProcessing)}
   <!-- Authorized or OpenID callback processing — show redirect animation. -->
   <RedirectAnimationView />
@@ -777,6 +782,10 @@
       />
     {/key}
   {/if}
+{/snippet}
+
+{#snippet notificationProbeContent()}
+  <NotifProbingView />
 {/snippet}
 
 {#snippet upgradeSuccessContent()}

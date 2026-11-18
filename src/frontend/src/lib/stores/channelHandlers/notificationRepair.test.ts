@@ -9,7 +9,7 @@ import { repairNotificationPath } from "./notificationRepair";
 import { notificationConsentStore } from "$lib/stores/notificationConsent.store";
 import { UnregisteredBrowserError } from "$lib/utils/notifications/browserActor";
 import { get } from "svelte/store";
-import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
+import { notificationProbeStore } from "$lib/stores/notificationProbe.store";
 
 vi.mock("$lib/stores/authentication.store", async () => {
   const { writable } = await import("svelte/store");
@@ -135,7 +135,18 @@ describe("repairNotificationPath", () => {
     await expect(repaired).resolves.toBe("done");
   });
 
-  it("holds no screen for a lookup that finishes after the deadline", async () => {
+  it("shows the probe while it waits and takes it down once the check is over", async () => {
+    const repaired = repair();
+    await vi.advanceTimersByTimeAsync(WHILE_THE_PROBE_WAITS_MS);
+    expect(get(notificationProbeStore)).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    await expect(repaired).resolves.toBe("done");
+    expect(get(notificationProbeStore)).toBe(false);
+  });
+
+  it("shows no probe for a lookup that finishes after the deadline", async () => {
     let lookedUp: (browser: BrowserCalls) => void = () => {};
     const repaired = repairNotificationPath({
       identityNumber: IDENTITY_NUMBER,
@@ -153,7 +164,7 @@ describe("repairNotificationPath", () => {
     lookedUp(silentInstalledApp);
     await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
 
-    expect(get(pendingScreenStore)).toBe(false);
+    expect(get(notificationProbeStore)).toBe(false);
   });
 
   it("tells the sign-in the identity changed when it switched while this browser was looked up", async () => {
