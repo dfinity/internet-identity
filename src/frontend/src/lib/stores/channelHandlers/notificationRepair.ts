@@ -6,6 +6,7 @@ import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   notificationConsentSettledStore,
   notificationConsentStore,
+  type NotificationConsentContext,
 } from "$lib/stores/notificationConsent.store";
 import {
   checkNotificationPath,
@@ -97,15 +98,23 @@ export const repairNotificationPath = async ({
         signal: stopped.signal,
       }),
     );
-    clearTimeout(deadline);
     hideProbe?.();
     if (outcome.kind === "ask" && !isIdentityChanged) {
-      await askToRepair({
-        identityNumber,
-        origin,
-        actor,
-        installFirst: outcome.installFirst,
-      });
+      // What the screen shows is read under the same deadline and switch as the check:
+      // only a screen the user can answer may hold the sign-in for longer.
+      const context = await checkWithin(
+        stopped.signal,
+        repairContext({
+          identityNumber,
+          origin,
+          actor,
+          installFirst: outcome.installFirst,
+        }),
+      );
+      clearTimeout(deadline);
+      if (context !== undefined) {
+        await askToRepair(context);
+      }
     }
   } catch (error) {
     failure = error;
@@ -210,8 +219,9 @@ class CheckTimedOutError extends Error {
   }
 }
 
-/** The allow screen, opened by the check rather than by the app. */
-const askToRepair = async ({
+/** What the allow screen the check opens shows, or `undefined` where there is nothing
+ *  left to ask. */
+const repairContext = async ({
   identityNumber,
   origin,
   actor,
@@ -222,9 +232,9 @@ const askToRepair = async ({
   actor: ActorSubclass<_SERVICE>;
   /** The Home Screen app this device routes through stopped answering. */
   installFirst: boolean;
-}): Promise<void> => {
+}): Promise<NotificationConsentContext | undefined> => {
   if (installFirst) {
-    notificationConsentStore.setContext({
+    return {
       effectiveOrigin: origin,
       identityNumber,
       actor,
@@ -232,28 +242,36 @@ const askToRepair = async ({
       consented: true,
       installFirst: true,
       isRepair: true,
-    });
-  } else {
-    const resolution = await resolveOptIn({
-      identityNumber,
-      origin,
-      actor,
-      browser: readBrowserPushState(),
-      isInstalledApp: false,
-    });
-    if (resolution.screen === "skip") {
-      return;
-    }
-    notificationConsentStore.setContext({
-      effectiveOrigin: origin,
-      identityNumber,
-      actor,
-      device: resolution.state,
-      consented: resolution.consented,
-      installFirst: resolution.installFirst,
-      isRepair: true,
-    });
+    };
   }
+  const resolution = await resolveOptIn({
+    identityNumber,
+    origin,
+    actor,
+    browser: readBrowserPushState(),
+    isInstalledApp: false,
+  });
+  if (resolution.screen === "skip") {
+    return undefined;
+  }
+  return {
+    effectiveOrigin: origin,
+    identityNumber,
+    actor,
+    device: resolution.state,
+    consented: resolution.consented,
+    installFirst: resolution.installFirst,
+    isRepair: true,
+  };
+};
+
+/** The allow screen, opened by the check rather than by the app, until it is answered or
+ *  the identity it asks about is switched away from. */
+const askToRepair = async (
+  context: NotificationConsentContext,
+): Promise<void> => {
+  const { identityNumber } = context;
+  notificationConsentStore.setContext(context);
   try {
     // The header lets the user switch identity on this screen, and the question was
     // about the identity that signed in, so a switch ends it.

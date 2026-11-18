@@ -184,6 +184,81 @@ describe("repairNotificationPath", () => {
   });
 });
 
+describe("repairNotificationPath while the allow screen is prepared", () => {
+  /** This browser's own path is past its limit and its probe never answers, so the
+   *  check asks the user, on the steps that need a permission prompt. */
+  const silentBrowser: BrowserCalls = {
+    ...silentInstalledApp,
+    get_notification_path_status: ({ path }) =>
+      Promise.resolve({
+        Ok: {
+          subscriptions:
+            "ThisBrowser" in path
+              ? [
+                  {
+                    unanswered_pushes: [
+                      {
+                        count: 3,
+                        first_sent_at_ns: BigInt(0),
+                        is_past_limit: true,
+                      },
+                    ],
+                    probe_sent_at_ns: [BigInt(1)],
+                  },
+                ]
+              : [],
+        },
+      }),
+  };
+  /** Answers the check's consent read, then never answers the screen's. */
+  const stallingActor = () => {
+    let numReads = 0;
+    return {
+      notification_consent_granted: () => {
+        numReads += 1;
+        return numReads === 1
+          ? Promise.resolve(true)
+          : new Promise<boolean>(() => {});
+      },
+    } as unknown as ActorSubclass<_SERVICE>;
+  };
+  const repairStalling = () =>
+    repairNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: "https://app.example",
+      accountPrincipal: Principal.fromText("2vxsx-fae"),
+      actor: stallingActor(),
+      browserActor: () => Promise.resolve(silentBrowser),
+    });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    signedIn.set({ identityNumber: IDENTITY_NUMBER });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    notificationConsentStore.clear();
+  });
+
+  it("lets the sign-in go on when what the screen shows never loads", async () => {
+    const repaired = repairStalling();
+
+    await vi.advanceTimersByTimeAsync(PAST_THE_CHECK_DEADLINE_MS);
+
+    await expect(repaired).resolves.toBe("done");
+    expect(get(notificationConsentStore)).toBeUndefined();
+  });
+
+  it("tells the sign-in the identity changed when the user switches while the screen loads", async () => {
+    const repaired = repairStalling();
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    signedIn.set({ identityNumber: OTHER_IDENTITY_NUMBER });
+
+    await expect(repaired).resolves.toBe("identity-changed");
+  });
+});
+
 describe("repairNotificationPath on an iPhone", () => {
   const originalAgent = Object.getOwnPropertyDescriptor(
     window.navigator,
