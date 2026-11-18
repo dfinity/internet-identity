@@ -17,7 +17,7 @@ pub(crate) struct PendingNotification {
     pub(crate) recipient: Principal,
     /// The identity behind `recipient`, whose browsers are woken.
     pub(crate) anchor_number: AnchorNumber,
-    /// II's number for the app's origin, which the service worker is told.
+    /// II's number for the app's origin. Kept inside II: the service worker is told the origin.
     pub(crate) application_number: ApplicationNumber,
     /// The app canister that sent it, which the service worker fetches it from.
     pub(crate) sender: Principal,
