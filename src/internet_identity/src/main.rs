@@ -1412,7 +1412,7 @@ fn app_remove_pwa_notification(
     .map_err(InternalCanisterError)?;
     // Only the account the installed app delivers for answers for its subscription: a
     // session of an account it no longer delivers for may still remove its own entries.
-    if pwa_subscription::delivers_for(holder, session.account_principal) {
+    if pwa_subscription::is_delivering_for(holder, session.account_principal) {
         notifications::webpush::unanswered::reset(rotation::RegistrationId::Pwa(holder));
     }
     Ok(RemoveNotificationResponse {})

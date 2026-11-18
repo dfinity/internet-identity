@@ -1294,7 +1294,7 @@ mod tests {
         Labels::app("https://app.example", None)
     }
 
-    fn deposited(browser_id: BrowserId) -> PlannedPush {
+    fn deposited_push(browser_id: BrowserId) -> PlannedPush {
         PlannedPush {
             path: Path::Chrome,
             browser_id,
@@ -1310,7 +1310,7 @@ mod tests {
             &entry,
             Some(1),
             labels(),
-            vec![deposited(0), deposited(1)],
+            vec![deposited_push(0), deposited_push(1)],
             NOW,
         );
         entry
@@ -1330,7 +1330,7 @@ mod tests {
             &entry(99, LATER * 2),
             Some(1),
             labels(),
-            vec![deposited(0)],
+            vec![deposited_push(0)],
             LATER,
         );
     }
@@ -1354,7 +1354,14 @@ mod tests {
         let first_entry = fan_out_to_two_browsers();
         count_collected(1, 0, &first_entry, NOW);
         let resent_entry = entry(7, EXPIRES + 1);
-        track_fan_out(1, &resent_entry, Some(1), labels(), vec![deposited(0)], NOW);
+        track_fan_out(
+            1,
+            &resent_entry,
+            Some(1),
+            labels(),
+            vec![deposited_push(0)],
+            NOW,
+        );
         count_collected(1, 0, &resent_entry, NOW);
 
         assert_eq!(notification_count_for_testing("delivered"), 2);
@@ -1409,7 +1416,7 @@ mod tests {
             &entry,
             Some(1),
             Labels::app("https://app.example", Some(&Urgency::High)),
-            vec![deposited(0)],
+            vec![deposited_push(0)],
             NOW,
         );
         count_removed_entries(1, 0, [&entry], Reason::InboxFull);
@@ -1439,7 +1446,7 @@ mod tests {
             &self::entry(8, LATER * 2),
             Some(1),
             labels(),
-            vec![deposited(0)],
+            vec![deposited_push(0)],
             LATER,
         );
 
@@ -1477,7 +1484,7 @@ mod tests {
             &self::entry(8, LATER * 2),
             Some(1),
             labels(),
-            vec![deposited(0)],
+            vec![deposited_push(0)],
             LATER,
         );
         count_removed_entries(1, 0, [&entry], Reason::FetchedTooLate);
@@ -1495,7 +1502,7 @@ mod tests {
                 &entry(id, EXPIRES + id),
                 Some(1),
                 labels(),
-                vec![deposited(0)],
+                vec![deposited_push(0)],
                 NOW,
             );
         }
@@ -1609,7 +1616,7 @@ mod tests {
         let labels = Labels::listed_app(&app(0), None, NOW);
         number_application(1, &app(0));
         let entry = entry(7, EXPIRES);
-        track_fan_out(1, &entry, Some(1), labels, vec![deposited(0)], NOW);
+        track_fan_out(1, &entry, Some(1), labels, vec![deposited_push(0)], NOW);
         with(|counters| {
             counters.apps.remove(&app(0));
             counters.drop_app(&app(0));

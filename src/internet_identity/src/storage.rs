@@ -5758,7 +5758,7 @@ mod allocate_anchor_safe_tests {
 
 /// Where an installed app subscription is held: the identity, the application whose config
 /// holds it, and the browser entry it is on there.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct PwaSubscriptionHolder {
     pub anchor_number: AnchorNumber,
     pub application_number: ApplicationNumber,
@@ -5788,8 +5788,8 @@ fn collect_pwa_subscription_holders(
     subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
 ) -> BTreeSet<([u8; 32], StorablePwaSubscriptionHolder)> {
     let mut holders = BTreeSet::new();
-    for (browser_id, held) in subscriptions.into_iter().flatten() {
-        let endpoint = match &held.subscription {
+    for (browser_id, held_subscription) in subscriptions.into_iter().flatten() {
+        let endpoint = match &held_subscription.subscription {
             StorableWebPushSubscription::Ready { endpoint, .. } => endpoint,
             StorableWebPushSubscription::Pending { .. } => continue,
         };

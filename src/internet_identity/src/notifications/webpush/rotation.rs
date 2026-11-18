@@ -9,7 +9,7 @@
 //! key as its `keyid`, because the specification expects that key to change every time.
 
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::payload;
 use super::pwa_subscription;
@@ -18,7 +18,7 @@ use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::installed_app::NotificationAppId;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{ReadySubscription, WebPushSubscription};
+use crate::storage::anchor::{Anchor, ReadySubscription, WebPushSubscription};
 use crate::storage::PwaSubscriptionHolder;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, BrowserId, Timestamp};
 
@@ -46,7 +46,7 @@ pub(crate) struct Destination {
 /// What a refresh writes to, which is not the destination itself: a Home Screen app's
 /// record is shared by every browser pointing at it, so two of them in one pass are one
 /// thing to refresh and one scalar multiplication, not two.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum RegistrationId {
     App(NotificationAppId),
     Browser {
@@ -139,53 +139,94 @@ pub(crate) enum Refresh {
     Replaced,
 }
 
-/// Derives fresh keying material against `sender` and writes it back, where the
-/// registration `destination` names is still the one at `endpoint` with `subscriber_key`
-/// the pass planned for.
+/// Derives fresh keying material against `sender` and writes it back, where
+/// `registered_subscription`, the registration `destination` names as the pass read it,
+/// is still the one at `endpoint` with `subscriber_key` the pass planned for.
 pub(crate) fn refresh(
     destination: Destination,
+    registered_subscription: Option<&ReadySubscription>,
     endpoint: &str,
     subscriber_key: &SubscriberKey,
     sender: &p256::SecretKey,
     now_ns: Timestamp,
 ) -> Result<Refresh, String> {
-    let Some(mut registered) = read(destination.registration()) else {
+    let Some(registered_subscription) = registered_subscription else {
         return Ok(Refresh::Absent);
     };
-    if registered.endpoint.as_str() != endpoint || registered.subscriber_key != *subscriber_key {
+    if !is_planned_registration(registered_subscription, endpoint, subscriber_key) {
         return Ok(Refresh::Replaced);
     }
-    let (payload_ikm, payload_keyid) =
-        payload::derive_ikm(sender, &registered.subscriber_key, &registered.auth)?;
-    registered.payload_ikm = payload_ikm;
-    registered.payload_keyid = payload_keyid;
-    registered.last_rotated_ns = now_ns;
-    let refreshed = SealingKeys::from(&registered);
-    write(destination.registration(), registered)?;
-    Ok(Refresh::Refreshed(refreshed))
+    let (payload_ikm, payload_keyid) = payload::derive_ikm(
+        sender,
+        &registered_subscription.subscriber_key,
+        &registered_subscription.auth,
+    )?;
+    let mut registered_subscription = registered_subscription.clone();
+    registered_subscription.payload_ikm = payload_ikm;
+    registered_subscription.payload_keyid = payload_keyid;
+    registered_subscription.last_rotated_ns = now_ns;
+    let refreshed_sealing = SealingKeys::from(&registered_subscription);
+    write_registration(destination.registration(), registered_subscription)?;
+    Ok(Refresh::Refreshed(refreshed_sealing))
 }
 
-/// Whether `destination`'s registration still posts to `endpoint` with `subscriber_key`,
-/// as it did when a pass planned a wake-up through it. One replaced or removed since is
-/// not: what was planned would be sealed for keys its device no longer holds.
-pub(crate) fn is_still_registered(
-    destination: Destination,
+/// Whether `registered_subscription` still posts to `endpoint` with `subscriber_key`, as
+/// it did when a pass planned a wake-up through it. One replaced since is not: what was
+/// planned would be sealed for keys its device no longer holds.
+pub(crate) fn is_planned_registration(
+    registered_subscription: &ReadySubscription,
     endpoint: &str,
     subscriber_key: &SubscriberKey,
 ) -> bool {
-    read(destination.registration()).is_some_and(|registered| {
-        registered.endpoint.as_str() == endpoint && registered.subscriber_key == *subscriber_key
-    })
+    registered_subscription.endpoint.as_str() == endpoint
+        && registered_subscription.subscriber_key == *subscriber_key
 }
 
-/// Reads the ready subscription `registration` names, rather than the one its browser
-/// happens to deliver through now. A browser that holds its own and also points at an app
-/// would otherwise be read from one and written to the other.
-pub(super) fn read(registration: RegistrationId) -> Option<ReadySubscription> {
-    match registration {
-        RegistrationId::App(app_id) => storage_borrow(|storage| storage.notification_app(app_id))?
-            .webpush_subscription
-            .and_then(WebPushSubscription::into_ready),
+/// The ready subscription each registration of `destinations` names, as
+/// [`read_registration`] reads it, keyed by the registration; one that is gone or waits
+/// on a subscribe has no entry. Each anchor is decoded once however many of its browsers
+/// are among `destinations`, since decoding one reads every browser's inbox with it.
+pub(crate) fn read_registrations(
+    destinations: &[Destination],
+) -> BTreeMap<RegistrationId, ReadySubscription> {
+    let mut anchors: BTreeMap<AnchorNumber, Anchor> = BTreeMap::new();
+    let mut registrations = BTreeMap::new();
+    let mut read_registration_ids = BTreeSet::new();
+    for destination in destinations {
+        let registration_id = destination.registration();
+        if !read_registration_ids.insert(registration_id) {
+            continue;
+        }
+        let registered_subscription = match registration_id {
+            RegistrationId::Browser {
+                anchor_number,
+                browser_id,
+            } => anchors
+                .entry(anchor_number)
+                .or_insert_with(|| state::anchor(anchor_number))
+                .webpush_subscription(browser_id)
+                .and_then(WebPushSubscription::ready)
+                .cloned(),
+            RegistrationId::App(_) => read_registration(registration_id),
+            RegistrationId::Pwa(_) => read_registration(registration_id),
+        };
+        if let Some(registered_subscription) = registered_subscription {
+            registrations.insert(registration_id, registered_subscription);
+        }
+    }
+    registrations
+}
+
+/// The ready subscription `registration_id` names, read through the registration rather
+/// than the route its browser delivers through now. A browser that holds its own and also
+/// points at an app would otherwise be read from one and written to the other.
+pub(super) fn read_registration(registration_id: RegistrationId) -> Option<ReadySubscription> {
+    match registration_id {
+        RegistrationId::App(app_id) => {
+            let app = storage_borrow(|storage| storage.notification_app(app_id))?;
+            app.webpush_subscription
+                .and_then(WebPushSubscription::into_ready)
+        }
         RegistrationId::Browser {
             anchor_number,
             browser_id,
@@ -193,24 +234,23 @@ pub(super) fn read(registration: RegistrationId) -> Option<ReadySubscription> {
             .webpush_subscription(browser_id)
             .and_then(WebPushSubscription::ready)
             .cloned(),
-        RegistrationId::Pwa(holder) => {
-            pwa_subscription::read(holder).and_then(|held| held.subscription.into_ready())
-        }
+        RegistrationId::Pwa(holder) => pwa_subscription::read_pwa_subscription(holder)
+            .and_then(|held_subscription| held_subscription.subscription.into_ready()),
     }
 }
 
-/// Writes `registered` to the subscription `registration` names.
-pub(super) fn write(
-    registration: RegistrationId,
-    registered: ReadySubscription,
+/// Writes `registered_subscription` to the subscription `registration_id` names.
+pub(super) fn write_registration(
+    registration_id: RegistrationId,
+    registered_subscription: ReadySubscription,
 ) -> Result<(), String> {
-    match registration {
+    match registration_id {
         // Without stamping the record as used: a refresh is this canister's work, and an
         // app that has not called is how a deleted one is told apart from a live one.
         RegistrationId::App(app_id) => storage_borrow_mut(|storage| {
             storage.refresh_notification_app_subscription(
                 app_id,
-                Some(WebPushSubscription::Ready(registered)),
+                Some(WebPushSubscription::Ready(registered_subscription)),
             )
         })
         .map_err(|err| format!("{err}")),
@@ -220,12 +260,14 @@ pub(super) fn write(
         } => {
             let mut anchor = storage_borrow(|storage| storage.read(anchor_number))
                 .map_err(|err| format!("{err}"))?;
-            anchor
-                .set_webpush_subscription(browser_id, Some(WebPushSubscription::Ready(registered)));
+            anchor.set_webpush_subscription(
+                browser_id,
+                Some(WebPushSubscription::Ready(registered_subscription)),
+            );
             storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
         }
         RegistrationId::Pwa(holder) => storage_borrow_mut(|storage| {
-            storage.refresh_pwa_webpush_subscription(holder, registered)
+            storage.refresh_pwa_webpush_subscription(holder, registered_subscription)
         })
         .map_err(|err| format!("{err}")),
     }

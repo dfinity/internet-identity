@@ -128,12 +128,9 @@ impl AnchorApplicationConfig {
     /// The installed app subscription on `browser_id`. One that does not read back reads
     /// as none, which the app recovers from by subscribing again.
     pub fn pwa_webpush_subscription(&self, browser_id: BrowserId) -> Option<PwaSubscription> {
-        let stored_subscription = self
-            .pwa_webpush_subscriptions
-            .as_ref()?
-            .get(&browser_id)?
-            .clone();
-        PwaSubscription::try_from(stored_subscription)
+        let stored_subscriptions = self.pwa_webpush_subscriptions.as_ref()?;
+        let stored_subscription = stored_subscriptions.get(&browser_id)?;
+        PwaSubscription::try_from(stored_subscription.clone())
             .inspect_err(|reason| {
                 ic_cdk::println!(
                     "ERROR: dropped the installed app subscription of browser {browser_id} as unreadable: {reason}"
@@ -148,7 +145,7 @@ impl AnchorApplicationConfig {
         browser_id: BrowserId,
         subscription: Option<PwaSubscription>,
     ) {
-        put(
+        put_browser_entry(
             &mut self.pwa_webpush_subscriptions,
             browser_id,
             subscription.map(StorablePwaSubscription::from),
@@ -160,7 +157,7 @@ impl AnchorApplicationConfig {
         &mut self,
         browser_ids: &BTreeSet<StorableBrowserId>,
     ) -> bool {
-        remove_browsers(&mut self.pwa_webpush_subscriptions, browser_ids)
+        remove_browser_entries(&mut self.pwa_webpush_subscriptions, browser_ids)
     }
 
     /// Empties every browser entry.
@@ -171,7 +168,7 @@ impl AnchorApplicationConfig {
 
 /// Puts `value` on `browser_id` in `entries_by_browser`, or with `None` empties it. A
 /// map holding nothing is stored as `None`.
-fn put<T>(
+fn put_browser_entry<T>(
     entries_by_browser: &mut Option<BTreeMap<StorableBrowserId, T>>,
     browser_id: BrowserId,
     value: Option<T>,
@@ -190,7 +187,7 @@ fn put<T>(
 
 /// Empties every browser entry in `browser_ids` in `entries_by_browser`, answering
 /// whether any was held.
-fn remove_browsers<T>(
+fn remove_browser_entries<T>(
     entries_by_browser: &mut Option<BTreeMap<StorableBrowserId, T>>,
     browser_ids: &BTreeSet<StorableBrowserId>,
 ) -> bool {
