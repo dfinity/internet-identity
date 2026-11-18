@@ -1489,45 +1489,61 @@
 {/snippet}
 
 {#snippet panel(inSheet: boolean)}
-  <!-- Past the overview, the identity card folds into one line that stays at
-       the top through every section, so it's always clear whose access
-       methods, devices or apps these are. It stays put while the views below
-       it change. -->
-  {#if viewKey !== "overview"}
-    <div
-      transition:slide={{ duration: reduced ? 0 : 240, easing: quintOut }}
-      class={[inSheet && "pe-10"]}
-    >
-      <Elevated
-        offset={1}
-        as="header"
-        class="mb-4 flex items-center gap-3 rounded-2xl px-3 py-2.5"
-      >
-        <IdentityAvatar
-          {identity}
-          palette={identityPaletteOverride}
-          size="sm"
-        />
-        <p class="flex min-w-0 flex-1 flex-col">
-          <span class="text-text-primary truncate text-sm font-semibold">
-            {identityName}
-          </span>
-          <span class="text-text-tertiary truncate text-[13px] leading-[18px]">
-            {signedInWith.title}
-          </span>
-        </p>
-      </Elevated>
-    </div>
-  {/if}
-  <!-- Views stack in one cell, so the old one fades while the new one arrives. -->
+  <!-- Views stack in one cell, so the old one fades while the new one arrives.
+       Past the overview, the identity card folds into one line at the top of
+       every section, so it's always clear whose access methods, devices or
+       apps these are. The line is part of that move: it comes in with the
+       first section and leaves with the last, alongside the view, instead of
+       growing above the views and pushing both down. Between sections it
+       stays put, and only the view under it changes. -->
   <div class="grid">
-    {#key viewKey}
+    {#key viewKey === "overview"}
       <div
         class="col-start-1 row-start-1 min-w-0"
         in:viewIn={{ direction: navDirection * readingDirection(), reduced }}
         out:viewOut={{ reduced }}
       >
-        {@render panelBody(inSheet)}
+        {#if viewKey === "overview"}
+          {@render panelBody(inSheet)}
+        {:else}
+          <div class={[inSheet && "pe-10"]}>
+            <Elevated
+              offset={1}
+              as="header"
+              class="mb-4 flex items-center gap-3 rounded-2xl px-3 py-2.5"
+            >
+              <IdentityAvatar
+                {identity}
+                palette={identityPaletteOverride}
+                size="sm"
+              />
+              <p class="flex min-w-0 flex-1 flex-col">
+                <span class="text-text-primary truncate text-sm font-semibold">
+                  {identityName}
+                </span>
+                <span
+                  class="text-text-tertiary truncate text-[13px] leading-[18px]"
+                >
+                  {signedInWith.title}
+                </span>
+              </p>
+            </Elevated>
+          </div>
+          <div class="grid">
+            {#key viewKey}
+              <div
+                class="col-start-1 row-start-1 min-w-0"
+                in:viewIn={{
+                  direction: navDirection * readingDirection(),
+                  reduced,
+                }}
+                out:viewOut={{ reduced }}
+              >
+                {@render panelBody(inSheet)}
+              </div>
+            {/key}
+          </div>
+        {/if}
       </div>
     {/key}
   </div>
