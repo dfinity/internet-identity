@@ -9,6 +9,7 @@ import { repairNotificationPath } from "./notificationRepair";
 import { notificationConsentStore } from "$lib/stores/notificationConsent.store";
 import { UnregisteredBrowserError } from "$lib/utils/notifications/browserActor";
 import { get } from "svelte/store";
+import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
 
 vi.mock("$lib/stores/authentication.store", async () => {
   const { writable } = await import("svelte/store");
@@ -132,6 +133,27 @@ describe("repairNotificationPath", () => {
     await vi.advanceTimersByTimeAsync(PAST_THE_CHECK_DEADLINE_MS);
 
     await expect(repaired).resolves.toBe("done");
+  });
+
+  it("holds no screen for a lookup that finishes after the deadline", async () => {
+    let lookedUp: (browser: BrowserCalls) => void = () => {};
+    const repaired = repairNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: "https://app.example",
+      accountPrincipal: Principal.fromText("2vxsx-fae"),
+      actor,
+      browserActor: () =>
+        new Promise<BrowserCalls>((resolve) => {
+          lookedUp = resolve;
+        }),
+    });
+    await vi.advanceTimersByTimeAsync(PAST_THE_CHECK_DEADLINE_MS);
+    await expect(repaired).resolves.toBe("done");
+
+    lookedUp(silentInstalledApp);
+    await vi.advanceTimersByTimeAsync(PAST_THE_PROBE_WAIT_MS);
+
+    expect(get(pendingScreenStore)).toBe(false);
   });
 
   it("tells the sign-in the identity changed when it switched while this browser was looked up", async () => {

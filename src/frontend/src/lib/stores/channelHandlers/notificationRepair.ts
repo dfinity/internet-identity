@@ -89,7 +89,10 @@ export const repairNotificationPath = async ({
         actor,
         browserActor,
         onPastLimit: () => {
-          releaseScreen ??= claimScreen();
+          // A check that runs on after it was stopped finds the release already done.
+          if (!stopped.signal.aborted) {
+            releaseScreen ??= claimScreen();
+          }
         },
         signal: stopped.signal,
       }),
