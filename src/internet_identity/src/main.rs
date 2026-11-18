@@ -2995,7 +2995,7 @@ mod email_challenge_api {
     /// spawns the fetch and returns `Ok(())` with the status left at
     /// `ResolvingDoh` (poll again); a cache hit verifies and stamps the
     /// terminal verdict. Idempotent — completing more than once is a no-op. With
-    /// no DoH configuration set, it lands as `DomainNotAllowlisted`.
+    /// no DoH configuration set, it lands as `InternalCanisterError`.
     ///
     /// Anonymous for the same reason as `email_challenge_submit_dkim_leaf`:
     /// the 64-bit nonce is the only authentication, and the call is a no-op

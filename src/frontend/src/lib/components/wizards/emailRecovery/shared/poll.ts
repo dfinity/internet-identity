@@ -133,7 +133,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
   };
 
   // Route a terminal `Failed`/`Expired` status to the right view. A
-  // DomainNotAllowlisted / DomainNotSupported verdict gets the dedicated
+  // DomainNotSupported verdict gets the dedicated
   // unsupported-domain view (matching the prepare-time routing); every
   // other reason gets the generic failed view with diagnostics.
   const handleTerminalFailure = async (
@@ -141,7 +141,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
   ): Promise<void> => {
     if ("Failed" in terminal) {
       const reason = terminal.Failed;
-      if ("DomainNotAllowlisted" in reason || "DomainNotSupported" in reason) {
+      if ("DomainNotSupported" in reason) {
         funnel.trigger(events.unsupportedDomain, {
           reason: plausibleFailureReason(terminal),
         });
@@ -236,8 +236,8 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
         } catch (e) {
           // A canister `Err` IS the terminal verdict — the contract hands
           // it to us directly, so route it now (exactly as an
-          // `Ok(Failed)` status is routed: DomainNotAllowlisted /
-          // DomainNotSupported to the unsupported view, everything else to
+          // `Ok(Failed)` status is routed: DomainNotSupported to the
+          // unsupported view, everything else to
           // the failed view) instead of discarding it and re-polling
           // canister state we don't own.
           if (isCanisterError<EmailChallengeError>(e)) {

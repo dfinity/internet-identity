@@ -118,8 +118,8 @@ pub async fn submit_dkim_leaf(
 /// - cache [`Ready`](Cached::Ready) — the key is in hand; verify against the
 ///   stashed partial and stamp the terminal verdict.
 ///
-/// A domain the operator hasn't enabled lands as
-/// `Failed(DomainNotAllowlisted)`. Returns `Ok(())` and the verdict is read
+/// With the DoH path disabled (no `DohConfig`) it lands as
+/// `Failed(InternalCanisterError)`. Returns `Ok(())` and the verdict is read
 /// by polling `email_challenge_status`; `Err` is a call-level rejection
 /// (unknown nonce).
 pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailChallengeError> {
@@ -155,7 +155,7 @@ pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailChalleng
             Ok(())
         }
         Err(e) => {
-            let reason = super::smtp::map_doh_error(e, &mat.registered_domain);
+            let reason = super::smtp::map_doh_error(e);
             finalize_via_doh(nonce, mat, Err(reason), now_secs);
             Ok(())
         }

@@ -222,9 +222,6 @@ pub enum EmailChallengeError {
     NonceUnknown,
     /// A pending challenge existed but its 30-minute TTL has lapsed.
     NonceExpired,
-    /// The DoH path was requested but no `DohConfig` is set, so the
-    /// canister doesn't accept email from this registered domain.
-    DomainNotAllowlisted(String),
     /// DoH path: `crate::doh::fetch_txt` couldn't reach quorum or
     /// reported a transport failure. The inner [`DohFailureReason`]
     /// names the specific cause.
@@ -285,7 +282,7 @@ pub enum EmailChallengeError {
 /// user-copyable support blob. Returning the bare discriminant is what
 /// keeps that blob strictly public — variants like
 /// `EmailVerificationFailed(String)`, `InternalCanisterError(String)`,
-/// `DomainNotAllowlisted(String)` and `Unauthorized(Principal)` carry
+/// `DomainNotSupported(String)` and `Unauthorized(Principal)` carry
 /// payloads (domains, principals, free-form internal detail) that must
 /// never leak into it. Mirrors the FE's existing `failureReason()`,
 /// which already treats the variant name as the stable reason.
@@ -294,7 +291,6 @@ pub fn error_code_name(error: &EmailChallengeError) -> &'static str {
         EmailChallengeError::Unauthorized(_) => "Unauthorized",
         EmailChallengeError::NonceUnknown => "NonceUnknown",
         EmailChallengeError::NonceExpired => "NonceExpired",
-        EmailChallengeError::DomainNotAllowlisted(_) => "DomainNotAllowlisted",
         EmailChallengeError::DohFetchFailed(_) => "DohFetchFailed",
         EmailChallengeError::DomainNotSupported(_) => "DomainNotSupported",
         EmailChallengeError::EmailVerificationFailed(_) => "EmailVerificationFailed",

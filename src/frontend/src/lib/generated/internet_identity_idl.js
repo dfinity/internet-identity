@@ -447,7 +447,6 @@ export const idlFactory = ({ IDL }) => {
     'NonceExpired' : IDL.Null,
     'AddressMismatch' : IDL.Null,
     'InvalidEmailAddress' : IDL.Text,
-    'DomainNotAllowlisted' : IDL.Text,
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
   });

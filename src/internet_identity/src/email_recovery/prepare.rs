@@ -211,17 +211,19 @@ mod tests {
             100,
             test_auth_key(),
         ));
-        assert!(matches!(
+        assert_eq!(
             result,
-            Err(EmailChallengeError::DomainNotAllowlisted(_))
-        ));
+            Err(EmailChallengeError::InternalCanisterError(
+                "DoH is not configured".into()
+            ))
+        );
     }
 
     #[test]
     fn flag_off_drops_proof_and_takes_doh_path() {
         // Flag off (the deploy default): a present `dns_proof` is ignored
         // and the DoH gate decides. With no DoH config set it rejects with
-        // DomainNotAllowlisted — never reaching the DNSSEC verifier (which,
+        // InternalCanisterError — never reaching the DNSSEC verifier (which,
         // on this bogus bundle, would fail differently).
         crate::email_inbound::pending::reset_for_tests();
         set_dnssec_flag(false);
@@ -233,8 +235,10 @@ mod tests {
             test_auth_key(),
         ));
         match result {
-            Err(EmailChallengeError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
-            other => panic!("expected DomainNotAllowlisted, got {other:?}"),
+            Err(EmailChallengeError::InternalCanisterError(msg)) => {
+                assert_eq!(msg, "DoH is not configured")
+            }
+            other => panic!("expected InternalCanisterError, got {other:?}"),
         }
     }
 

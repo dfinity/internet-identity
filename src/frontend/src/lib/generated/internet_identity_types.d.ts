@@ -841,7 +841,6 @@ export type EmailChallengeError = { 'EmailVerificationFailed' : string } |
      */
     'InvalidEmailAddress' : string
   } |
-  { 'DomainNotAllowlisted' : string } |
   { 'SubjectNotSigned' : null } |
   { 'AddressAlreadyRegistered' : null };
 /**

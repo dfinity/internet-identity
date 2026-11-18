@@ -748,7 +748,6 @@ type EmailChallengeError = variant {
     Unauthorized : principal;
     NonceUnknown;
     NonceExpired;
-    DomainNotAllowlisted : text;
     DohFetchFailed : DohFailureReason;
     DomainNotSupported : text;
     EmailVerificationFailed : text;

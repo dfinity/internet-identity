@@ -226,8 +226,10 @@ fn prepare_add_rejects_every_domain_without_doh_config() {
         .expect("call failed")
         .expect_err("expected failure without a DoH config");
     match err {
-        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, TEST_DOMAIN),
-        other => panic!("expected DomainNotAllowlisted, got {other:?}"),
+        EmailChallengeError::InternalCanisterError(msg) => {
+            assert_eq!(msg, "DoH is not configured")
+        }
+        other => panic!("expected InternalCanisterError, got {other:?}"),
     }
 }
 
@@ -641,7 +643,7 @@ fn register_with_dnssec_disabled_and_doh_unconfigured_fails() {
     // Setup (register) flow with the DNSSEC path disabled: even when the
     // caller supplies a DNSSEC proof, the canister drops it and falls
     // through to the DoH path. No DoH config is set, so the call fails
-    // with `DomainNotAllowlisted`.
+    // with `InternalCanisterError`.
     let env = env();
     let canister_id = setup_canister_without_doh(&env);
     let (id, p) = fresh_identity(&env, canister_id);
@@ -665,8 +667,10 @@ fn register_with_dnssec_disabled_and_doh_unconfigured_fails() {
         .expect("call failed")
         .expect_err("expected rejection");
     match err {
-        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, "example.com"),
-        other => panic!("expected DomainNotAllowlisted(example.com), got {other:?}"),
+        EmailChallengeError::InternalCanisterError(msg) => {
+            assert_eq!(msg, "DoH is not configured")
+        }
+        other => panic!("expected InternalCanisterError, got {other:?}"),
     }
 }
 
@@ -674,7 +678,7 @@ fn register_with_dnssec_disabled_and_doh_unconfigured_fails() {
 fn recovery_with_dnssec_disabled_and_doh_unconfigured_fails() {
     // Recovery (prepare_delegation) flow, same scenario: DNSSEC disabled +
     // a supplied proof that gets dropped + no DoH config →
-    // `DomainNotAllowlisted`. The DoH config gate runs before any
+    // `InternalCanisterError`. The DoH config gate runs before any
     // address→anchor resolution, so an unbound address still surfaces the
     // rejection.
     let env = env();
@@ -702,8 +706,10 @@ fn recovery_with_dnssec_disabled_and_doh_unconfigured_fails() {
         .expect("call failed")
         .expect_err("expected rejection");
     match err {
-        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, "example.com"),
-        other => panic!("expected DomainNotAllowlisted(example.com), got {other:?}"),
+        EmailChallengeError::InternalCanisterError(msg) => {
+            assert_eq!(msg, "DoH is not configured")
+        }
+        other => panic!("expected InternalCanisterError, got {other:?}"),
     }
 }
 
@@ -1084,16 +1090,17 @@ fn dnssec_path_doh_fallback_rejects_without_doh_config() {
         "expected Ok(()) accept, got {result:?}",
     );
 
-    // The pending entry is now terminally Failed — the user sees the
-    // unsupported-domain view instead of polling until Expired.
+    // The pending entry is now terminally Failed instead of polling
+    // until Expired.
     let status =
         api::email_challenge_status(&env, canister_id, &nonce).expect("status call failed");
     assert!(
         matches!(
             status,
-            EmailChallengeStatus::Failed(EmailChallengeError::DomainNotAllowlisted(_))
+            EmailChallengeStatus::Failed(EmailChallengeError::InternalCanisterError(ref msg))
+                if msg == "DoH is not configured"
         ),
-        "expected Failed(DomainNotAllowlisted), got {status:?}",
+        "expected Failed(InternalCanisterError), got {status:?}",
     );
 }
 

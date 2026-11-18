@@ -189,10 +189,10 @@ describe("runEmailRecoveryPoll", () => {
     expect(h.statusFn).toHaveBeenCalledTimes(1);
   });
 
-  it("routes a DomainNotAllowlisted canister Err from resolveViaDoh to the unsupported view", async () => {
+  it("routes a DomainNotSupported canister Err from resolveViaDoh to the unsupported view", async () => {
     const h = harness([RESOLVING], {
       resolveViaDoh: vi.fn((): Promise<void> =>
-        Promise.reject(canisterErr({ DomainNotAllowlisted: DOMAIN })),
+        Promise.reject(canisterErr({ DomainNotSupported: DOMAIN })),
       ),
     });
     await run(h.deps);

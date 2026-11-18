@@ -56,8 +56,7 @@ pub(crate) async fn prepare_common(
     // - DoH path: the default, for any domain. With the flag off any
     //   supplied proof is ignored; `smtp_request` resolves the DKIM TXT via
     //   `crate::doh::fetch_txt` at email arrival.
-    // - No `DohConfig` set on the DoH path → reject; the FE surfaces a
-    //   "we can't accept email from this domain" error.
+    // - No `DohConfig` set on the DoH path → reject: the path is disabled.
     let (cached_root_dnskey, cached_zones, cached_dmarc_txt) = match dns_proof {
         Some(proof) if super::dnssec_email_recovery_enabled() => {
             let extracted = verify_dnssec_skeleton(proof, &registered_domain, now_secs)?;
@@ -70,7 +69,9 @@ pub(crate) async fn prepare_common(
         _ => {
             let is_doh_configured = state::persistent_state(|p| p.doh_config.is_some());
             if !is_doh_configured {
-                return Err(EmailChallengeError::DomainNotAllowlisted(registered_domain));
+                return Err(EmailChallengeError::InternalCanisterError(
+                    super::DOH_NOT_CONFIGURED_ERROR.to_string(),
+                ));
             }
             (None, crate::dnssec::ZoneKeysMap::new(), None)
         }

@@ -166,10 +166,7 @@
       void runPoll(challenge.nonce, domain, sessionIdentity);
     } catch (e) {
       if (isCanisterError<EmailChallengeError>(e)) {
-        if (
-          e.type === "DomainNotAllowlisted" ||
-          e.type === "DomainNotSupported"
-        ) {
+        if (e.type === "DomainNotSupported") {
           recoverWithEmailFunnel.trigger(
             RecoverWithEmailEvents.UnsupportedDomain,
             { reason: e.type },
