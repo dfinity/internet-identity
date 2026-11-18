@@ -16,7 +16,7 @@ use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::Anchor;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, PublicKey, SameDeviceLinkStatus, Timestamp,
+    AnchorNumber, ApplicationNumber, BrowserId, PublicKey, SameDeviceLinkStatus, Timestamp,
 };
 
 /// How long a one-shot key stays claimable: long enough to switch to Safari and sign in
@@ -26,24 +26,32 @@ const PENDING_SAME_DEVICE_LINK_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 /// Why a claim was refused.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ClaimRefusal {
-    /// No other entry of the identity awaits the key, or its time is up.
+    /// No other entry of the identity awaits the key, its time is up, or the signature is
+    /// not the key's over this claim.
     NoPendingLink,
-    /// The signature is not the key's over this claim.
-    InvalidSignature,
     StorageError(String),
 }
 
-/// Whether `browser_id`'s entry of `anchor` is linked already, or whether another entry
-/// of the identity may deliver notifications at `now_ns`.
+/// Whether `browser_id`'s entry of `anchor` is linked to an entry the identity still has,
+/// or whether another entry of the identity may deliver notifications at `now_ns`.
+/// `NoOtherPath` whatever the entries hold where the identity has not allowed the app
+/// numbered `application_number` to notify it, so an app is told nothing about the
+/// identity's other devices without that consent.
 pub(crate) fn status(
     anchor: &Anchor,
     browser_id: BrowserId,
+    application_number: ApplicationNumber,
     now_ns: Timestamp,
 ) -> SameDeviceLinkStatus {
-    let is_linked = anchor
-        .browser(browser_id)
-        .is_some_and(|browser| browser.same_device_browser_id.is_some());
-    if is_linked {
+    let is_allowed = storage_borrow(|storage| {
+        storage
+            .anchor_application_config(anchor.anchor_number(), application_number)
+            .is_some_and(|config| config.notifications_allowed())
+    });
+    if !is_allowed {
+        return SameDeviceLinkStatus::NoOtherPath;
+    }
+    if anchor.same_device_browser_of(browser_id).is_some() {
         return SameDeviceLinkStatus::Linked;
     }
     let is_other_path = storage_borrow(|storage| {
@@ -75,7 +83,7 @@ pub(crate) fn prepare(
         browser_id,
         link_public_key,
         now_ns.saturating_add(PENDING_SAME_DEVICE_LINK_LIFETIME_NS),
-    );
+    )?;
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
 }
 
@@ -100,7 +108,7 @@ pub(crate) fn claim(
         claimer_principal.as_slice(),
     );
     if !is_signed {
-        return Err(ClaimRefusal::InvalidSignature);
+        return Err(ClaimRefusal::NoPendingLink);
     }
     anchor.link_same_device(linking, claimer);
     storage_borrow_mut(|storage| storage.write(anchor))

@@ -2149,7 +2149,8 @@ type RemoveUnansweredPwaWebPushSubscriptionsError = variant {
 };
 
 // Whether the calling installed web app's browser entry shares its device with another
-// way this identity is notified.
+// way this identity is notified. NoOtherPath wherever the identity has not allowed the
+// app to notify it.
 type SameDeviceLinkStatus = variant {
     // This entry is already linked to another entry of the identity.
     Linked;
@@ -2188,9 +2189,9 @@ type ClaimSameDeviceLinkRequest = record {
 type ClaimSameDeviceLinkError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
-    // No other entry of this identity awaits that key, or its 30 minutes are up.
+    // No other entry of this identity awaits that key, its 30 minutes are up, or the
+    // signature is not that key's over this claim.
     NoPendingLink;
-    InvalidSignature;
     InternalCanisterError : text;
 };
 

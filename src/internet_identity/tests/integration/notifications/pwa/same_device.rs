@@ -282,7 +282,7 @@ fn should_refuse_a_claim_signed_for_another_caller() {
     )
     .expect("claim rejected");
 
-    assert_eq!(refused, Err(ClaimSameDeviceLinkError::InvalidSignature));
+    assert_eq!(refused, Err(ClaimSameDeviceLinkError::NoPendingLink));
     assert_eq!(
         link_status(&env, &phone),
         SameDeviceLinkStatus::OtherPathMayDeliver
@@ -297,7 +297,7 @@ fn should_refuse_a_claim_signed_by_another_key() {
 
     assert_eq!(
         claim(&env, &phone, safari(), &BrowserKey::new(41)),
-        Err(ClaimSameDeviceLinkError::InvalidSignature)
+        Err(ClaimSameDeviceLinkError::NoPendingLink)
     );
 }
 
@@ -313,6 +313,37 @@ fn should_refuse_a_claim_once_its_thirty_minutes_are_up() {
         claim(&env, &phone, safari(), &link_key()),
         Err(ClaimSameDeviceLinkError::NoPendingLink)
     );
+}
+
+#[test]
+fn should_accept_a_claim_a_second_before_its_thirty_minutes_are_up() {
+    let env = env();
+    let phone = phone(&env);
+    prepare_link(&env, &phone);
+
+    env.advance_time(Duration::from_secs(30 * 60 - 1));
+
+    assert_eq!(claim(&env, &phone, safari(), &link_key()), Ok(()));
+}
+
+#[test]
+fn should_tell_an_app_the_identity_has_not_allowed_nothing_about_its_other_devices(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(link_status(&env, &phone), SameDeviceLinkStatus::Linked);
+
+    revoke_consent(
+        &env,
+        phone.canister_id,
+        principal_1(),
+        phone.anchor,
+        APP.into(),
+    )?
+    .expect("revoke refused");
+
+    assert_eq!(link_status(&env, &phone), SameDeviceLinkStatus::NoOtherPath);
+    Ok(())
 }
 
 #[test]

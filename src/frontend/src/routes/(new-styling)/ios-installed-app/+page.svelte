@@ -84,6 +84,18 @@
       </div>
     {:else}
       <div class="flex min-w-0 flex-col items-stretch">
+        <FeaturedIcon size="lg" class="mb-4 self-start">
+          <CircleAlertIcon class="size-6" aria-hidden="true" />
+        </FeaturedIcon>
+        <h1 class="text-text-primary mb-3 text-2xl font-medium">
+          {$t`Couldn't link the app`}
+        </h1>
+        <p class="text-text-tertiary mb-7 text-base">
+          <Trans>
+            Something went wrong while linking. Check your connection and try
+            again.
+          </Trans>
+        </p>
         <button class="btn btn-primary btn-xl" onclick={() => void claim()}>
           {$t`Try again`}
         </button>

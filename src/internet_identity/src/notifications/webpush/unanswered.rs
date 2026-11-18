@@ -31,17 +31,20 @@ pub(crate) fn count_push(
 }
 
 /// Clears the count and the outstanding probe of the subscription `registration` names: a
-/// notification was fetched through it.
-pub(crate) fn reset(registration: RegistrationId) -> Result<(), String> {
+/// notification was fetched through it. Bookkeeping beside the removal that calls it, so
+/// a failure is logged rather than undoing an answer the caller already acted on.
+pub(crate) fn reset(registration: RegistrationId) {
     let Some(mut registered) = rotation::read(registration) else {
-        return Ok(());
+        return;
     };
     if registered.unanswered_pushes.is_none() && registered.probe_sent_at_ns.is_none() {
-        return Ok(());
+        return;
     }
     registered.unanswered_pushes = None;
     registered.probe_sent_at_ns = None;
-    rotation::write(registration, registered)
+    if let Err(err) = rotation::write(registration, registered) {
+        ic_cdk::println!("ERROR: Failed to reset a subscription's unanswered pushes: {err}");
+    }
 }
 
 /// How long a probe through a subscription stands unanswered before another may be sent
@@ -58,18 +61,17 @@ pub(crate) fn is_probe_outstanding(registered: &ReadySubscription, now_ns: Times
 }
 
 /// Records that a probe was submitted at `now_ns` through the subscription
-/// `registration` names, where it still posts to `endpoint`.
-pub(crate) fn mark_probed(
-    registration: RegistrationId,
-    endpoint: &str,
-    now_ns: Timestamp,
-) -> Result<(), String> {
+/// `registration` names, where it still posts to `endpoint`. The probe is already on its
+/// way, so a failure is logged: it costs only a second probe if one is asked for.
+pub(crate) fn mark_probed(registration: RegistrationId, endpoint: &str, now_ns: Timestamp) {
     let Some(mut registered) = rotation::read(registration) else {
-        return Ok(());
+        return;
     };
     if registered.endpoint.as_str() != endpoint {
-        return Ok(());
+        return;
     }
     registered.probe_sent_at_ns = Some(now_ns);
-    rotation::write(registration, registered)
+    if let Err(err) = rotation::write(registration, registered) {
+        ic_cdk::println!("ERROR: Failed to record a probe on its subscription: {err}");
+    }
 }

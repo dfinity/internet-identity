@@ -594,4 +594,19 @@ mod tests {
             5_000,
         ));
     }
+
+    /// The same vector `claimLink.test.ts` pins for the page that signs the claim, so
+    /// both sides agree on one byte string.
+    #[test]
+    fn the_same_device_link_message_is_the_domain_the_anchor_and_the_length_prefixed_claimer() {
+        assert_eq!(
+            same_device_link_message(10_000, &[1, 2, 3]).map(hex::encode),
+            Some("69692d73616d652d6465766963652d6c696e6b000000000000271003010203".to_string())
+        );
+    }
+
+    #[test]
+    fn a_claimer_longer_than_a_byte_can_count_has_no_message() {
+        assert_eq!(same_device_link_message(10_000, &[0; 256]), None);
+    }
 }

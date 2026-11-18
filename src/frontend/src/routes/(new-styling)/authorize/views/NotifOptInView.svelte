@@ -34,6 +34,7 @@
   import {
     IcpAlertsEvents,
     icpAlertsFunnel,
+    type NotificationsSource,
   } from "$lib/utils/analytics/icpAlertsFunnel";
 
   interface Props {
@@ -92,9 +93,11 @@
     }
   };
   const funnel = $derived(funnelOf(device));
+  /** Repair-mode screens are counted apart from the ones an app asked for. */
+  const source: NotificationsSource = isRepair ? "repair" : "authorize";
   onMount(() => {
     const started = funnel;
-    started?.init({ source: "authorize" });
+    started?.init({ source });
     // A new request remounts this view without `done()`, and the funnel's session listener must not outlive it.
     return () => started?.close();
   });
@@ -157,6 +160,7 @@
       origin,
       actor,
       consented,
+      source,
     });
     granting = started.granted;
     // Either way: a mint that failed closes the tab it opened, and sign-in still settles.

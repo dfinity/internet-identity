@@ -13,6 +13,8 @@ import {
   resolveOptIn,
 } from "$lib/utils/notifications/notificationState";
 import { waitForStore } from "$lib/utils/utils";
+import { claimScreen } from "$lib/stores/pendingScreen.store";
+import { handleError } from "$lib/components/utils/error";
 
 /**
  * Checks, once the identity has signed in to `origin`, that this device still receives
@@ -34,11 +36,25 @@ export const repairNotificationPath = async ({
   if (!get(PUSH_NOTIFICATIONS)) {
     return;
   }
+  // Held only once a path is past its limit, which is when the check takes long enough
+  // to show; released when the check, and the screen it may open, has settled.
+  let releaseScreen: (() => void) | undefined;
+  // A switch to another identity ends a check that was about this one.
+  const switched = new AbortController();
+  const stopWatching = authenticationStore.subscribe((current) => {
+    if (current !== undefined && current.identityNumber !== identityNumber) {
+      switched.abort(new IdentitySwitchedError());
+    }
+  });
   try {
     const outcome = await checkNotificationPath({
       identityNumber,
       origin,
       actor,
+      onPastLimit: () => {
+        releaseScreen ??= claimScreen();
+      },
+      signal: switched.signal,
     });
     switch (outcome.kind) {
       case "working":
@@ -53,10 +69,25 @@ export const repairNotificationPath = async ({
         return;
     }
   } catch (error) {
-    // Logged and not shown: the sign-in goes on, and the next one checks again.
+    if (error instanceof IdentitySwitchedError) {
+      return;
+    }
+    // Shown, not thrown: the sign-in goes on, and the next one checks again.
     console.error(error);
+    handleError(error);
+  } finally {
+    stopWatching();
+    releaseScreen?.();
   }
 };
+
+/** Ends a check about an identity the user has switched away from. */
+class IdentitySwitchedError extends Error {
+  constructor() {
+    super("the identity being checked is no longer the one signed in");
+    this.name = "IdentitySwitchedError";
+  }
+}
 
 /** The allow screen, opened by the check rather than by the app. */
 const askToRepair = async ({

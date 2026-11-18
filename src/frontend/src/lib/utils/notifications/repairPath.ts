@@ -37,16 +37,25 @@ export type PathCheckOutcome =
 /** Whether a probe was answered, or the path had nothing on it to probe. */
 type ProbeAnswer = "answered" | "unanswered" | "nothing-on-path";
 
+/** The outcome where nothing is left for the user to do. */
 const working: PathCheckOutcome = { kind: "working" };
 
+/** Checks the path that delivers `origin`'s notifications to this device for the identity
+ *  `identityNumber` names, signing as it with `actor`. Calls `onPastLimit` once a path is
+ *  past its limit, before anything is probed, and stops with `signal`'s reason once it
+ *  is aborted. */
 export const checkNotificationPath = async ({
   identityNumber,
   origin,
   actor,
+  onPastLimit,
+  signal,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
+  onPastLimit: () => void;
+  signal: AbortSignal;
 }): Promise<PathCheckOutcome> => {
   const consented = await actor.notification_consent_granted({
     anchor_number: identityNumber,
@@ -73,7 +82,8 @@ export const checkNotificationPath = async ({
     installedApps,
   );
   if (isPastLimit(installedAppsStatus)) {
-    const answer = await probe(browser, identityNumber, installedApps);
+    onPastLimit();
+    const answer = await probe(browser, identityNumber, installedApps, signal);
     if (answer === "answered") {
       return working;
     }
@@ -85,7 +95,7 @@ export const checkNotificationPath = async ({
       .then(throwCanisterError);
     // This browser's own path carries the app's notifications from here on, whatever its count says.
     return afterOwnPath(
-      await probe(browser, identityNumber, thisBrowser),
+      await probe(browser, identityNumber, thisBrowser, signal),
       identityNumber,
     );
   }
@@ -98,8 +108,9 @@ export const checkNotificationPath = async ({
   if (!isPastLimit(thisBrowserStatus)) {
     return working;
   }
+  onPastLimit();
   return afterOwnPath(
-    await probe(browser, identityNumber, thisBrowser),
+    await probe(browser, identityNumber, thisBrowser, signal),
     identityNumber,
   );
 };
@@ -159,11 +170,12 @@ const isAnswered = (status: NotificationPathStatus): boolean =>
   );
 
 /** Sends the probe and waits up to {@link PROBE_WAIT_MS} for every subscription on the
- *  path to fetch it. */
+ *  path to fetch it, or until `signal` is aborted. */
 const probe = async (
   browser: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
   path: NotificationPath,
+  signal: AbortSignal,
 ): Promise<ProbeAnswer> => {
   try {
     await browser
@@ -181,6 +193,7 @@ const probe = async (
   const deadline = Date.now() + PROBE_WAIT_MS;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    signal.throwIfAborted();
     if (isAnswered(await pathStatus(browser, identityNumber, path))) {
       return "answered";
     }

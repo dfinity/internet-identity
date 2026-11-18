@@ -43,16 +43,20 @@ impl DevicePath {
     pub(crate) fn resolve(path: NotificationPath) -> Result<Self, String> {
         match path {
             NotificationPath::ThisBrowser => Ok(DevicePath::ThisBrowser),
-            NotificationPath::InstalledApps(origin) => {
-                let origin = ApplicationOrigin::try_from(origin.as_str())?;
-                Ok(DevicePath::InstalledApps {
-                    application_number: storage_borrow(|storage| {
-                        storage.lookup_application_number_with_origin(&origin.as_str().to_string())
-                    }),
-                })
-            }
+            NotificationPath::InstalledApps(origin) => Ok(DevicePath::InstalledApps {
+                application_number: application_number_of(&origin)?,
+            }),
         }
     }
+}
+
+/// The number the app at `origin` is stored under. `None` for an app nobody has signed in
+/// to; an error for a string that is not an origin.
+pub(crate) fn application_number_of(origin: &str) -> Result<Option<ApplicationNumber>, String> {
+    let origin = ApplicationOrigin::try_from(origin)?;
+    Ok(storage_borrow(|storage| {
+        storage.lookup_application_number_with_origin(&origin.as_str().to_string())
+    }))
 }
 
 /// Why a probe was not sent.
@@ -62,8 +66,6 @@ pub(crate) enum ProbeRefusal {
     NotReachable,
     /// The identity's share of the backlog for its own notifications is full.
     BacklogFull,
-    /// The probe could not be recorded on its subscription.
-    StorageError(String),
 }
 
 /// One subscription on a path that can deliver now.
@@ -97,6 +99,9 @@ pub(crate) fn path_status(
 
 /// Sends Internet Identity's own notification about `identity` through every
 /// subscription on `path` for `browser_id` of `anchor` that has no probe outstanding.
+///
+/// Every subscription is tried: one the backlog refused leaves the others probed, so the
+/// refusal is answered only where none of them was.
 pub(crate) fn probe(
     anchor: &Anchor,
     browser_id: BrowserId,
@@ -108,8 +113,16 @@ pub(crate) fn probe(
     if on_path.is_empty() {
         return Err(ProbeRefusal::NotReachable);
     }
+    let mut num_refused = 0usize;
+    let num_on_path = on_path.len();
     for one in on_path {
-        probe_one(anchor.anchor_number(), one, identity, now_ns)?;
+        if let Err(refusal) = probe_one(anchor.anchor_number(), one, identity, now_ns) {
+            ic_cdk::println!("ERROR: A probe was not sent: {refusal:?}");
+            num_refused = num_refused.saturating_add(1);
+        }
+    }
+    if num_refused == num_on_path {
+        return Err(ProbeRefusal::BacklogFull);
     }
     Ok(())
 }
@@ -165,21 +178,24 @@ fn probe_one(
     if !is_admitted {
         return Err(ProbeRefusal::BacklogFull);
     }
-    unanswered::mark_probed(one.registration, one.subscription.endpoint.as_str(), now_ns)
-        .map_err(ProbeRefusal::StorageError)
+    unanswered::mark_probed(one.registration, one.subscription.endpoint.as_str(), now_ns);
+    Ok(())
 }
 
-/// Removes the installed web app subscriptions on `path` for `browser_id`'s entry of
-/// `anchor`, where they can deliver now and still have unanswered pushes. One that
-/// answered its probe is kept.
+/// Removes the installed web app subscriptions of the app numbered `application_number`
+/// on `browser_id`'s entry of `anchor` and on the entries linked to it, where they can
+/// deliver now and still have unanswered pushes. One that answered its probe is kept.
+/// `None` for an app nobody has signed in to, which has none.
 ///
-/// `path` is [`DevicePath::InstalledApps`]; any other removes nothing.
+/// Every one is tried, so a failure to remove one leaves the others removed; failures
+/// are logged.
 pub(crate) fn remove_unanswered_installed_apps(
     anchor: &Anchor,
     browser_id: BrowserId,
-    path: DevicePath,
+    application_number: Option<ApplicationNumber>,
     now_ns: Timestamp,
-) -> Result<(), String> {
+) {
+    let path = DevicePath::InstalledApps { application_number };
     for on_path in path_subscriptions(anchor, browser_id, path, now_ns) {
         if on_path.subscription.unanswered_pushes.is_none() {
             continue;
@@ -187,9 +203,10 @@ pub(crate) fn remove_unanswered_installed_apps(
         let RegistrationId::Pwa(holder) = on_path.registration else {
             continue;
         };
-        pwa_subscription::write(holder, None, None)?;
+        if let Err(err) = pwa_subscription::write(holder, None, None) {
+            ic_cdk::println!("ERROR: Failed to remove an unanswered installed app: {err}");
+        }
     }
-    Ok(())
 }
 
 /// The subscriptions on `path` for `browser_id` of `anchor` that can deliver now.

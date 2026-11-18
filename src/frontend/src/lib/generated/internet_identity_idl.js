@@ -474,7 +474,6 @@ export const idlFactory = ({ IDL }) => {
   const ClaimSameDeviceLinkError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
-    'InvalidSignature' : IDL.Null,
     'NoPendingLink' : IDL.Null,
   });
   const AccountInfo = IDL.Record({

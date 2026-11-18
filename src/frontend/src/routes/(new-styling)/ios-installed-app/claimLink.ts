@@ -31,8 +31,12 @@ const SAME_DEVICE_LINK_SIGNATURE_DOMAIN = new TextEncoder().encode(
 /** The bytes of the anchor number in the signed claim. */
 const ANCHOR_NUMBER_BYTES = 8;
 
+/** Whether the claim linked the installed app's entry to this Safari's, or no identity
+ *  this Safari holds a key for had the link waiting. */
 export type LinkOutcome = "linked" | "not-linked";
 
+/** The fragment the installed app opens this page with: `key`, its one-shot link key as
+ *  base64url. */
 const LinkFragmentSchema = z.object({ key: z.string() });
 
 /** The one-shot key the fragment carries as `key`, or `undefined` where it carries none
@@ -56,7 +60,7 @@ export const linkKeyOf = (hash: string): Uint8Array | undefined => {
 /** Must match `same_device_link_message` in `browser_key.rs` byte for byte: the domain,
  *  the anchor number as a big-endian `u64`, the claimer's length as one byte, then the
  *  claimer's principal. */
-const claimMessage = (
+export const claimMessage = (
   identityNumber: bigint,
   claimer: Uint8Array,
 ): Uint8Array<ArrayBuffer> => {
@@ -119,7 +123,6 @@ export const claimSameDeviceLink = async (
         // Another identity, or a key this one has no use for: the next may hold it.
         case "NoPendingLink":
         case "InvalidBrowserKey":
-        case "InvalidSignature":
           continue;
         case "InternalCanisterError":
           throw error;

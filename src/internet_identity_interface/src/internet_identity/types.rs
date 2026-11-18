@@ -1375,24 +1375,28 @@ pub enum NotificationPath {
     InstalledApps(FrontendHostname),
 }
 
+/// Which path to the calling browser's device to read, for the identity it signs for.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetNotificationPathStatusRequest {
     pub anchor_number: AnchorNumber,
     pub path: NotificationPath,
 }
 
+/// The subscriptions on one path that can deliver now.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationPathStatus {
     /// One per subscription on the path that can deliver now. Empty where none can.
     pub subscriptions: Vec<SubscriptionDeliveryStatus>,
 }
 
+/// One subscription on a path, and the pushes posted through it that nothing fetched since.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SubscriptionDeliveryStatus {
     /// `None` where every push posted through it has been fetched since.
     pub unanswered_pushes: Option<UnansweredPushes>,
 }
 
+/// Why `get_notification_path_status` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum GetNotificationPathStatusError {
     /// The caller signs with no key this identity is signed in from.
@@ -1400,12 +1404,14 @@ pub enum GetNotificationPathStatusError {
     InternalCanisterError(String),
 }
 
+/// Which path to the calling browser's device to probe, for the identity it signs for.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct ProbeNotificationPathRequest {
     pub anchor_number: AnchorNumber,
     pub path: NotificationPath,
 }
 
+/// Why `probe_notification_path` sent nothing.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum ProbeNotificationPathError {
     /// The caller signs with no key this identity is signed in from.
@@ -1415,12 +1421,14 @@ pub enum ProbeNotificationPathError {
     InternalCanisterError(String),
 }
 
+/// Whose installed web apps to remove where they did not answer: the app at `origin`, for the identity `anchor_number` names.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct RemoveUnansweredPwaWebPushSubscriptionsRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
 }
 
+/// Why `remove_unanswered_pwa_webpush_subscriptions` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum RemoveUnansweredPwaWebPushSubscriptionsError {
     /// The caller signs with no key this identity is signed in from.
@@ -1440,6 +1448,7 @@ pub enum SameDeviceLinkStatus {
     NoOtherPath,
 }
 
+/// Why `app_get_same_device_link_status` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppGetSameDeviceLinkStatusError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -1447,12 +1456,14 @@ pub enum AppGetSameDeviceLinkStatusError {
     InternalCanisterError(String),
 }
 
+/// The one-shot key an installed web app registers for its browser entry's same-device link.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppPrepareSameDeviceLinkRequest {
     /// A one-shot P-256 public key, DER-encoded SPKI as WebCrypto exports it.
     pub link_public_key: PublicKey,
 }
 
+/// Why `app_prepare_same_device_link` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppPrepareSameDeviceLinkError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -1460,6 +1471,7 @@ pub enum AppPrepareSameDeviceLinkError {
     InternalCanisterError(String),
 }
 
+/// A claim of the same-device link the key `link_public_key` was registered for, by a browser of the identity `anchor_number` names.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct ClaimSameDeviceLinkRequest {
     pub anchor_number: AnchorNumber,
@@ -1468,16 +1480,18 @@ pub struct ClaimSameDeviceLinkRequest {
     pub signature: ByteBuf,
 }
 
+/// Why `claim_same_device_link` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum ClaimSameDeviceLinkError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
-    /// No other entry of this identity awaits that key, or its time is up.
+    /// No other entry of this identity awaits that key, its time is up, or the signature
+    /// is not that key's over this claim.
     NoPendingLink,
-    InvalidSignature,
     InternalCanisterError(String),
 }
 
+/// Why `app_probe_pwa_webpush_subscription` sent nothing.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppProbePwaWebPushSubscriptionError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.

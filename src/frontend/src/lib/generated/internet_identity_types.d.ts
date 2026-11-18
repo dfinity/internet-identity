@@ -735,10 +735,10 @@ export type ClaimSameDeviceLinkError = {
     'InvalidBrowserKey' : null
   } |
   { 'InternalCanisterError' : string } |
-  { 'InvalidSignature' : null } |
   {
     /**
-     * No other entry of this identity awaits that key, or its 30 minutes are up.
+     * No other entry of this identity awaits that key, its 30 minutes are up, or the
+     * signature is not that key's over this claim.
      */
     'NoPendingLink' : null
   };
@@ -2585,7 +2585,8 @@ export interface Rrsig {
 export type Salt = Uint8Array | number[];
 /**
  * Whether the calling installed web app's browser entry shares its device with another
- * way this identity is notified.
+ * way this identity is notified. NoOtherPath wherever the identity has not allowed the
+ * app to notify it.
  */
 export type SameDeviceLinkStatus = {
     /**

@@ -1253,20 +1253,30 @@ impl Anchor {
     }
 
     /// Registers `link_public_key` on `browser_id`'s entry, replacing any earlier one, for
-    /// another entry of this identity to claim until `expires_at_ns`.
+    /// another entry of this identity to claim until `expires_at_ns`. An error where this
+    /// identity has no such entry.
     pub fn start_same_device_link(
         &mut self,
         browser_id: BrowserId,
         link_public_key: PublicKey,
         expires_at_ns: Timestamp,
-    ) {
+    ) -> Result<(), String> {
         let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
-            return;
+            return Err(format!("no browser entry {browser_id}"));
         };
         browser.pending_same_device_link = Some(PendingSameDeviceLink {
             link_public_key,
             expires_at_ns,
         });
+        Ok(())
+    }
+
+    /// The entry `browser_id`'s entry is linked to as sharing its device, while this
+    /// identity still has it.
+    pub fn same_device_browser_of(&self, browser_id: BrowserId) -> Option<BrowserId> {
+        self.browser(browser_id)?
+            .same_device_browser_id
+            .filter(|linked| self.browser(*linked).is_some())
     }
 
     /// The entry of this anchor other than `claimer`, whose pending same-device link holds
@@ -1761,6 +1771,16 @@ impl Anchor {
                     dropped.push(self.browsers.remove(index).id);
                 }
                 None => break,
+            }
+        }
+        // A link names the entry it shares a device with, and an evicted entry is no
+        // device any more: browser ids are never reused, but nothing should point at one.
+        for browser in self.browsers.iter_mut() {
+            if browser
+                .same_device_browser_id
+                .is_some_and(|linked| dropped.contains(&linked))
+            {
+                browser.same_device_browser_id = None;
             }
         }
 

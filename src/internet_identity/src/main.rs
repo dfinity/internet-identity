@@ -850,7 +850,6 @@ fn claim_same_device_link(
     )
     .map_err(|refusal| match refusal {
         notifications::same_device_link::ClaimRefusal::NoPendingLink => NoPendingLink,
-        notifications::same_device_link::ClaimRefusal::InvalidSignature => InvalidSignature,
         notifications::same_device_link::ClaimRefusal::StorageError(err) => {
             InternalCanisterError(err)
         }
@@ -911,7 +910,6 @@ fn probe_notification_path(
         notifications::repair::ProbeRefusal::BacklogFull => {
             InternalCanisterError("too many notifications waiting for this identity".to_string())
         }
-        notifications::repair::ProbeRefusal::StorageError(err) => InternalCanisterError(err),
     })
 }
 
@@ -930,11 +928,16 @@ fn remove_unanswered_pwa_webpush_subscriptions(
     enabled_or(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
-    let path = notifications::repair::DevicePath::resolve(NotificationPath::InstalledApps(origin))
-        .map_err(InternalCanisterError)?;
+    let application_number =
+        notifications::repair::application_number_of(&origin).map_err(InternalCanisterError)?;
 
-    notifications::repair::remove_unanswered_installed_apps(&anchor, browser_id, path, time())
-        .map_err(InternalCanisterError)
+    notifications::repair::remove_unanswered_installed_apps(
+        &anchor,
+        browser_id,
+        application_number,
+        time(),
+    );
+    Ok(())
 }
 
 /// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
@@ -1157,9 +1160,8 @@ fn browser_remove_notification(
         now_ns,
     )
     .map_err(RemoveNotificationError::InternalCanisterError)?;
-    notifications::webpush::unanswered::reset(rotation::RegistrationId::of_key(anchor_number, key))
-        .map(|()| RemoveNotificationResponse {})
-        .map_err(RemoveNotificationError::InternalCanisterError)
+    notifications::webpush::unanswered::reset(rotation::RegistrationId::of_key(anchor_number, key));
+    Ok(RemoveNotificationResponse {})
 }
 
 #[update]
@@ -1400,9 +1402,8 @@ fn app_remove_pwa_notification(
         now,
     )
     .map_err(InternalCanisterError)?;
-    notifications::webpush::unanswered::reset(rotation::RegistrationId::Pwa(holder))
-        .map(|()| RemoveNotificationResponse {})
-        .map_err(InternalCanisterError)
+    notifications::webpush::unanswered::reset(rotation::RegistrationId::Pwa(holder));
+    Ok(RemoveNotificationResponse {})
 }
 
 /// Sends Internet Identity's own notification to the calling session's installed web app,
@@ -1430,7 +1431,6 @@ fn app_probe_pwa_webpush_subscription() -> Result<(), AppProbePwaWebPushSubscrip
         notifications::repair::ProbeRefusal::BacklogFull => {
             InternalCanisterError("too many notifications waiting for this identity".to_string())
         }
-        notifications::repair::ProbeRefusal::StorageError(err) => InternalCanisterError(err),
     })
 }
 
@@ -1444,12 +1444,14 @@ fn app_get_same_device_link_status() -> Result<SameDeviceLinkStatus, AppGetSameD
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
+    let holder = pwa_subscription::holder_of(&session).map_err(InternalCanisterError)?;
     let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
         .map_err(|err| InternalCanisterError(format!("{err}")))?;
 
     Ok(notifications::same_device_link::status(
         &anchor,
         session.browser_id,
+        holder.application_number,
         now,
     ))
 }
