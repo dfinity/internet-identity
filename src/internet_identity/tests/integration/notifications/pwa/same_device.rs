@@ -748,17 +748,32 @@ fn should_record_no_probe_on_a_registration_replaced_while_it_was_posted() {
     assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     // The probe is posted, and the installed app subscribes again before the push service
     // answers.
+    let mut is_posted = false;
     for _ in 0..40 {
-        if !env.get_canister_http().is_empty() {
-            break;
-        }
         env.advance_time(std::time::Duration::from_millis(250));
         env.tick();
+        for request in env.get_canister_http() {
+            if request.http_method == CanisterHttpMethod::POST {
+                is_posted = true;
+                continue;
+            }
+            // Whatever the dispatch asks before it posts is answered as it would be.
+            env.mock_canister_http_response(MockCanisterHttpResponse {
+                subnet_id: request.subnet_id,
+                request_id: request.request_id,
+                response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                    status: 200,
+                    headers: vec![],
+                    body: vec![],
+                }),
+                additional_responses: vec![],
+            });
+        }
+        if is_posted {
+            break;
+        }
     }
-    assert!(
-        !env.get_canister_http().is_empty(),
-        "the probe was never posted"
-    );
+    assert!(is_posted, "the probe was never posted");
     subscribe_pwa_webpush(
         &env,
         phone.canister_id,
