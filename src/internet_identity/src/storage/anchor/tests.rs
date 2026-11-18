@@ -2531,7 +2531,7 @@ mod browser_tests {
     /// Signs in from enough new browsers, each used later than the last, to evict the
     /// least recently used entry.
     fn evict_the_oldest(anchor: &mut Anchor) -> Vec<BrowserId> {
-        let mut evicted = Vec::new();
+        let mut evicted_browser_ids = Vec::new();
         for seed in 10..=40u8 {
             let (_, dropped) = anchor
                 .resolve_browser(
@@ -2541,12 +2541,12 @@ mod browser_tests {
                     10_000 + u64::from(seed),
                 )
                 .unwrap();
-            evicted.extend(dropped);
-            if !evicted.is_empty() {
+            evicted_browser_ids.extend(dropped);
+            if !evicted_browser_ids.is_empty() {
                 break;
             }
         }
-        evicted
+        evicted_browser_ids
     }
 
     #[test]

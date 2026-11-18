@@ -26,9 +26,16 @@ const PENDING_SAME_DEVICE_LINK_LIFETIME_NS: u64 = 30 * 60 * 1_000_000_000;
 /// Why a claim was refused.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ClaimRefusal {
-    /// No other entry of the identity awaits the key, its time is up, or the signature is
-    /// not the key's over this claim.
+    /// No other entry of the identity awaits the key, or its time is up.
     NoPendingLink,
+    /// The claiming entry already points at another entry.
+    ClaimerAlreadyLinked,
+    /// The entry that registered the key is already pointed at by another entry.
+    BrowserAlreadyLinked,
+    /// The claiming entry holds an installed web app subscription of its own.
+    ClaimerHasInstalledApp,
+    /// The signature is not the key's over this claim.
+    InvalidSignature,
     StorageError(String),
 }
 
@@ -55,10 +62,9 @@ pub(crate) fn status(
         return SameDeviceLinkStatus::Linked;
     }
     let is_other_path = storage_borrow(|storage| {
-        anchor
-            .browsers()
-            .iter()
-            .any(|other| other.id != browser_id && dispatch::can_wake(storage, other, now_ns))
+        anchor.browsers().iter().any(|other_browser| {
+            other_browser.id != browser_id && dispatch::can_wake(storage, other_browser, now_ns)
+        })
     });
     if is_other_path {
         return SameDeviceLinkStatus::OtherPathMayDeliver;
@@ -105,21 +111,27 @@ pub(crate) fn claim(
     signature: &[u8],
     now_ns: Timestamp,
 ) -> Result<(), ClaimRefusal> {
-    let linking = anchor
+    let linking_browser_id = anchor
         .browser_awaiting_same_device_link(link_public_key, claimer, now_ns)
         .ok_or(ClaimRefusal::NoPendingLink)?;
     let is_claimer_linked = anchor
         .browser(claimer)
         .is_some_and(|browser| browser.same_device_browser_id.is_some());
+    if is_claimer_linked {
+        return Err(ClaimRefusal::ClaimerAlreadyLinked);
+    }
     let is_linking_pointed_at = anchor
         .browsers()
         .iter()
-        .any(|browser| browser.same_device_browser_id == Some(linking));
+        .any(|browser| browser.same_device_browser_id == Some(linking_browser_id));
+    if is_linking_pointed_at {
+        return Err(ClaimRefusal::BrowserAlreadyLinked);
+    }
     let is_claimer_installed_app = storage_borrow(|storage| {
         storage.holds_pwa_webpush_subscription(anchor.anchor_number(), claimer)
     });
-    if is_claimer_linked || is_linking_pointed_at || is_claimer_installed_app {
-        return Err(ClaimRefusal::NoPendingLink);
+    if is_claimer_installed_app {
+        return Err(ClaimRefusal::ClaimerHasInstalledApp);
     }
     let is_signed = browser_key::verify_same_device_link_claim(
         link_public_key,
@@ -128,9 +140,9 @@ pub(crate) fn claim(
         claimer_principal.as_slice(),
     );
     if !is_signed {
-        return Err(ClaimRefusal::NoPendingLink);
+        return Err(ClaimRefusal::InvalidSignature);
     }
-    anchor.link_same_device(linking, claimer);
+    anchor.link_same_device(linking_browser_id, claimer);
     storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| ClaimRefusal::StorageError(format!("{err}")))
 }

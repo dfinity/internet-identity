@@ -734,11 +734,16 @@ export type ClaimSameDeviceLinkError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string } |
   {
     /**
-     * No other entry of this identity awaits that key, its 30 minutes are up, or the
-     * signature is not that key's over this claim.
+     * Also what the text names when an entry is already linked, the caller holds an
+     * installed web app of its own, or the signature is not that key's over this claim.
+     */
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * No other entry of this identity awaits that key, or its 30 minutes are up.
      */
     'NoPendingLink' : null
   };
@@ -2871,20 +2876,26 @@ export type StreamingStrategy = {
 export type Sub = string;
 export interface SubscriptionDeliveryStatus {
   /**
-   * Null where every push posted through it has been fetched since.
+   * Null where the notification of every push posted through it has been removed since.
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
   /**
+   * Whether that probe, unanswered, has been out 10 seconds by the canister's clock, the
+   * least time it is given to be answered before remove_unanswered_pwa_webpush_subscriptions
+   * removes its subscription. False where no probe is outstanding.
+   */
+  'has_probe_had_its_answer_time' : boolean,
+  /**
    * When the push service last accepted Internet Identity's own notification, sent
-   * through it to check it. Null once a notification has been fetched through it
-   * since: that is the answer.
+   * through it to check it. Null once a notification pushed through it has been
+   * removed since: that is the answer.
    */
   'probe_sent_at_ns' : [] | [Timestamp],
 }
 export type Timestamp = bigint;
 export type Token = {};
 /**
- * Pushes posted through one subscription that nothing has fetched since.
+ * Pushes posted through one subscription whose notifications nothing has removed since.
  */
 export interface UnansweredPushes {
   'first_sent_at_ns' : Timestamp,
@@ -2968,13 +2979,13 @@ export interface WebAuthnCredential {
 export interface WebPushSubscriptionStatus {
   'endpoint' : string,
   /**
-   * Null where every push posted through it has been fetched since.
+   * Null where the notification of every push posted through it has been removed since.
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
   /**
    * When the push service last accepted Internet Identity's own notification, sent
-   * through it to check it. Null once a notification has been fetched through it
-   * since: that is the answer.
+   * through it to check it. Null once a notification pushed through it has been
+   * removed since: that is the answer.
    */
   'probe_sent_at_ns' : [] | [Timestamp],
 }
@@ -3061,8 +3072,8 @@ export interface _SERVICE {
       { 'Err' : AppPrepareSameDeviceLinkError }
   >,
   /**
-   * Sends Internet Identity's own notification to the session's installed web app, whose
-   * fetch resets its unanswered pushes.
+   * Sends Internet Identity's own notification to the session's installed web app.
+   * Removing it with app_remove_pwa_notification resets its unanswered pushes.
    */
   'app_probe_pwa_webpush_subscription' : ActorMethod<
     [],
@@ -3924,7 +3935,8 @@ export interface _SERVICE {
   >,
   /**
    * Sends Internet Identity's own notification through every subscription on the path
-   * that can deliver now. A fetch through one resets its unanswered pushes.
+   * that can deliver now. Removing a notification pushed through one resets its
+   * unanswered pushes.
    */
   'probe_notification_path' : ActorMethod<
     [ProbeNotificationPathRequest],
@@ -3938,7 +3950,7 @@ export interface _SERVICE {
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
    * Removes that app's installed web app subscriptions on the entries linked to the
-   * caller's that can deliver now and have a probe nobody fetched in the 10 seconds
+   * caller's that can deliver now and have a probe nobody removed in the 10 seconds
    * after the push service accepted it.
    */
   'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<

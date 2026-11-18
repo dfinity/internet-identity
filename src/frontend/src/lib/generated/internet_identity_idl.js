@@ -820,6 +820,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const SubscriptionDeliveryStatus = IDL.Record({
     'unanswered_pushes' : IDL.Opt(UnansweredPushes),
+    'has_probe_had_its_answer_time' : IDL.Bool,
     'probe_sent_at_ns' : IDL.Opt(Timestamp),
   });
   const NotificationPathStatus = IDL.Record({

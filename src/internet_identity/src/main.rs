@@ -43,6 +43,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
+use notifications::same_device_link::ClaimRefusal;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::pwa_subscription;
@@ -533,15 +534,11 @@ fn prepare_notification_app_link(
         enabled: true,
     }) = anchor.notification_app(browser_id)
     {
-        // A repair probe through the app that had its window and was never fetched is the
+        // A repair probe through the app that had its window and was never removed is the
         // same evidence as an enable probe nobody answered.
-        let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .is_some_and(|app| {
-                app.is_subscribed()
-                    && !app.probe_went_unanswered(now)
-                    && !app.repair_probe_went_unanswered(now)
-            });
-        if still_answering {
+        let is_app_delivering = state::storage_borrow(|storage| storage.notification_app(app_id))
+            .is_some_and(|app| app.is_still_delivering(now));
+        if is_app_delivering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
         }
     }
@@ -855,10 +852,20 @@ fn claim_same_device_link(
         time(),
     )
     .map_err(|refusal| match refusal {
-        notifications::same_device_link::ClaimRefusal::NoPendingLink => NoPendingLink,
-        notifications::same_device_link::ClaimRefusal::StorageError(err) => {
-            InternalCanisterError(err)
+        ClaimRefusal::NoPendingLink => NoPendingLink,
+        ClaimRefusal::ClaimerAlreadyLinked => {
+            InternalCanisterError("this browser is already linked to another".to_string())
         }
+        ClaimRefusal::BrowserAlreadyLinked => InternalCanisterError(
+            "the browser that registered the key is already linked to".to_string(),
+        ),
+        ClaimRefusal::ClaimerHasInstalledApp => InternalCanisterError(
+            "this browser holds an installed web app subscription of its own".to_string(),
+        ),
+        ClaimRefusal::InvalidSignature => {
+            InternalCanisterError("the signature is not the link key's over this claim".to_string())
+        }
+        ClaimRefusal::StorageError(err) => InternalCanisterError(err),
     })
 }
 
@@ -879,7 +886,7 @@ fn get_notification_path_status(
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
 
-    Ok(notifications::repair::path_status(
+    Ok(notifications::repair::read_path_status(
         &anchor,
         browser_id,
         path,
@@ -904,7 +911,7 @@ fn probe_notification_path(
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
 
-    notifications::repair::probe(
+    notifications::repair::probe_device_path(
         &anchor,
         browser_id,
         path,
@@ -920,7 +927,7 @@ fn probe_notification_path(
 }
 
 /// Removes an app's installed web app subscriptions on the entries linked to the calling
-/// browser's, where a probe through them was never fetched.
+/// browser's, where a probe through them was never removed.
 #[update]
 fn remove_unanswered_pwa_webpush_subscriptions(
     request: RemoveUnansweredPwaWebPushSubscriptionsRequest,
@@ -936,7 +943,7 @@ fn remove_unanswered_pwa_webpush_subscriptions(
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let application_number =
-        notifications::repair::application_number_of(&origin).map_err(InternalCanisterError)?;
+        notifications::repair::lookup_application_number(&origin).map_err(InternalCanisterError)?;
 
     notifications::repair::remove_unanswered_installed_apps(
         &anchor,
@@ -1168,7 +1175,10 @@ fn browser_remove_notification(
         now_ns,
     )
     .map_err(RemoveNotificationError::InternalCanisterError)?;
-    notifications::webpush::unanswered::reset(rotation::RegistrationId::of_key(anchor_number, key));
+    notifications::webpush::unanswered::reset_unanswered_pushes(rotation::RegistrationId::of_key(
+        anchor_number,
+        key,
+    ));
     Ok(RemoveNotificationResponse {})
 }
 
@@ -1413,13 +1423,15 @@ fn app_remove_pwa_notification(
     // Only the account the installed app delivers for answers for its subscription: a
     // session of an account it no longer delivers for may still remove its own entries.
     if pwa_subscription::is_delivering_for(holder, session.account_principal) {
-        notifications::webpush::unanswered::reset(rotation::RegistrationId::Pwa(holder));
+        notifications::webpush::unanswered::reset_unanswered_pushes(rotation::RegistrationId::Pwa(
+            holder,
+        ));
     }
     Ok(RemoveNotificationResponse {})
 }
 
 /// Sends Internet Identity's own notification to the calling session's installed web app,
-/// unless one sent before is still waiting to be fetched.
+/// unless one sent before is still waiting to be removed.
 #[update]
 fn app_probe_pwa_webpush_subscription() -> Result<(), AppProbePwaWebPushSubscriptionError> {
     use AppProbePwaWebPushSubscriptionError::*;

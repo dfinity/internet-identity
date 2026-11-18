@@ -105,11 +105,11 @@ mod tests {
         let mut bytes = Vec::new();
         minicbor::encode(without_counter(), &mut bytes).expect("encoding a subscription");
 
-        let decoded: StorableWebPushSubscription =
+        let decoded_subscription: StorableWebPushSubscription =
             minicbor::decode(&bytes).expect("decoding it as the current shape");
 
         assert_eq!(
-            decoded,
+            decoded_subscription,
             StorableWebPushSubscription::Ready {
                 endpoint: "https://push.example/a".to_string(),
                 created_at_ns: 1,
@@ -146,10 +146,10 @@ mod tests {
         )
         .expect("encoding a subscription");
 
-        let decoded: StorableWebPushSubscriptionWithoutCounter =
+        let decoded_subscription: StorableWebPushSubscriptionWithoutCounter =
             minicbor::decode(&bytes).expect("decoding it as the shape without the counter");
 
-        assert_eq!(decoded, without_counter());
+        assert_eq!(decoded_subscription, without_counter());
     }
 
     fn without_counter() -> StorableWebPushSubscriptionWithoutCounter {

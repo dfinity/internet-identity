@@ -420,9 +420,9 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                 subscriber_key: SubscriberKey::try_from(subscriber_key)?,
                 auth: AuthSecret::try_from(auth)?,
                 last_rotated_ns,
-                unanswered_pushes: unanswered_pushes.map(|stored| UnansweredPushCount {
-                    count: stored.count,
-                    first_sent_at_ns: stored.first_sent_at_ns,
+                unanswered_pushes: unanswered_pushes.map(|stored_count| UnansweredPushCount {
+                    count: stored_count.count,
+                    first_sent_at_ns: stored_count.first_sent_at_ns,
                 }),
                 probe_sent_at_ns,
             })),
@@ -502,10 +502,10 @@ impl From<StorableBrowser> for Browser {
             next_inbox_notification_id: value.next_inbox_notification_id.unwrap_or_default(),
             notification_app: value.notification_app.map(NotificationAppRef::from),
             same_device_browser_id: value.same_device_browser_id,
-            pending_same_device_link: value.pending_same_device_link.map(|pending| {
+            pending_same_device_link: value.pending_same_device_link.map(|pending_link| {
                 PendingSameDeviceLink {
-                    link_public_key: ByteBuf::from(pending.link_public_key),
-                    expires_at_ns: pending.expires_at_ns,
+                    link_public_key: ByteBuf::from(pending_link.link_public_key),
+                    expires_at_ns: pending_link.expires_at_ns,
                 }
             }),
         }
@@ -528,10 +528,10 @@ impl From<Browser> for StorableBrowser {
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
             next_inbox_notification_id: Some(value.next_inbox_notification_id),
             same_device_browser_id: value.same_device_browser_id,
-            pending_same_device_link: value.pending_same_device_link.map(|pending| {
+            pending_same_device_link: value.pending_same_device_link.map(|pending_link| {
                 StorablePendingSameDeviceLink {
-                    link_public_key: pending.link_public_key.into_vec(),
-                    expires_at_ns: pending.expires_at_ns,
+                    link_public_key: pending_link.link_public_key.into_vec(),
+                    expires_at_ns: pending_link.expires_at_ns,
                 }
             }),
             inbox: (!value.notifications.is_empty()).then(|| {
@@ -1244,7 +1244,11 @@ impl Anchor {
         link_principal: Principal,
         expires_at_ns: Timestamp,
     ) {
-        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
             return;
         };
         browser.notification_app = Some(NotificationAppRef::Pending {
@@ -1262,7 +1266,11 @@ impl Anchor {
         link_public_key: PublicKey,
         expires_at_ns: Timestamp,
     ) -> Result<(), String> {
-        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
             return Err(format!("no browser entry {browser_id}"));
         };
         browser.pending_same_device_link = Some(PendingSameDeviceLink {
@@ -1275,9 +1283,10 @@ impl Anchor {
     /// The entry `browser_id`'s entry is linked to as sharing its device, while this
     /// identity still has it.
     pub fn same_device_browser_of(&self, browser_id: BrowserId) -> Option<BrowserId> {
-        self.browser(browser_id)?
+        let browser = self.browser(browser_id)?;
+        browser
             .same_device_browser_id
-            .filter(|linked| self.browser(*linked).is_some())
+            .filter(|linked_browser_id| self.browser(*linked_browser_id).is_some())
     }
 
     /// The entry of this anchor other than `claimer`, whose pending same-device link holds
@@ -1295,9 +1304,9 @@ impl Anchor {
                     && browser
                         .pending_same_device_link
                         .as_ref()
-                        .is_some_and(|pending| {
-                            pending.link_public_key == *link_public_key
-                                && pending.expires_at_ns > now_ns
+                        .is_some_and(|pending_link| {
+                            pending_link.link_public_key == *link_public_key
+                                && pending_link.expires_at_ns > now_ns
                         })
             })
             .map(|browser| browser.id)
@@ -1306,7 +1315,11 @@ impl Anchor {
     /// Links `browser_id`'s entry to `same_device_browser_id`'s as sharing its device,
     /// spending the pending link that authorized it.
     pub fn link_same_device(&mut self, browser_id: BrowserId, same_device_browser_id: BrowserId) {
-        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
             return;
         };
         browser.same_device_browser_id = Some(same_device_browser_id);
@@ -1474,7 +1487,10 @@ impl Anchor {
     /// An install still running is left alone: it is not a route yet, and a browser whose
     /// install never completes must keep the address it has.
     pub fn leave_notification_app(&mut self, browser_id: BrowserId) -> Option<NotificationAppId> {
-        let browser = self.browsers.iter_mut().find(|b| b.id == browser_id)?;
+        let browser = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)?;
         let NotificationAppRef::Linked { app_id, .. } = browser.notification_app? else {
             return None;
         };
@@ -1779,7 +1795,7 @@ impl Anchor {
         for browser in self.browsers.iter_mut() {
             if browser
                 .same_device_browser_id
-                .is_some_and(|linked| dropped.contains(&linked))
+                .is_some_and(|linked_browser_id| dropped.contains(&linked_browser_id))
             {
                 browser.same_device_browser_id = None;
             }

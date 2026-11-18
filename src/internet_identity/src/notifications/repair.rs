@@ -2,7 +2,7 @@
 //! work.
 //!
 //! Nothing tells Internet Identity that a Home Screen app was deleted or a subscription
-//! broke, so each subscription counts the pushes nobody fetched (see
+//! broke, so each subscription counts the pushes whose notifications nobody removed (see
 //! [`crate::notifications::webpush::unanswered`]). A browser reads those counts for one
 //! path, probes the path with Internet Identity's own notification where they are past
 //! the limit, and removes an installed web app that does not answer, so its app's
@@ -52,17 +52,20 @@ impl DevicePath {
             NotificationPath::InstalledApps(InstalledAppsPath {
                 origin,
                 account_principal,
-            }) => Ok(DevicePath::InstalledApps {
-                application_number: application_number_of(&origin)?,
-                account_principal,
-            }),
+            }) => {
+                let application_number = lookup_application_number(&origin)?;
+                Ok(DevicePath::InstalledApps {
+                    application_number,
+                    account_principal,
+                })
+            }
         }
     }
 }
 
 /// The number the app at `origin` is stored under. `None` for an app nobody has signed in
 /// to; an error for a string that is not an origin.
-pub(crate) fn application_number_of(origin: &str) -> Result<Option<ApplicationNumber>, String> {
+pub(crate) fn lookup_application_number(origin: &str) -> Result<Option<ApplicationNumber>, String> {
     let origin = ApplicationOrigin::try_from(origin)?;
     Ok(storage_borrow(|storage| {
         storage.lookup_application_number_with_origin(&origin.as_str().to_string())
@@ -89,9 +92,25 @@ struct PathSubscription {
     wake_up_path: IdentityWakeUpPath,
 }
 
+impl PathSubscription {
+    /// Whether this is the installed web app of the app numbered `application_number`
+    /// that delivers for the account `account_principal` names.
+    fn is_installed_app_for(
+        &self,
+        application_number: ApplicationNumber,
+        account_principal: Principal,
+    ) -> bool {
+        self.wake_up_path
+            == IdentityWakeUpPath::InstalledApp {
+                application_number,
+                account_principal,
+            }
+    }
+}
+
 /// The subscriptions on `path`, for `browser_id` of `anchor`, and their unanswered
 /// pushes as at `now_ns`.
-pub(crate) fn path_status(
+pub(crate) fn read_path_status(
     anchor: &Anchor,
     browser_id: BrowserId,
     path: DevicePath,
@@ -100,9 +119,16 @@ pub(crate) fn path_status(
     NotificationPathStatus {
         subscriptions: path_subscriptions(anchor, browser_id, path, now_ns)
             .iter()
-            .map(|on_path| SubscriptionDeliveryStatus {
-                unanswered_pushes: webpush::unanswered_pushes_of(&on_path.subscription, now_ns),
-                probe_sent_at_ns: on_path.subscription.probe_sent_at_ns,
+            .map(|path_subscription| {
+                let subscription = &path_subscription.subscription;
+                SubscriptionDeliveryStatus {
+                    unanswered_pushes: webpush::unanswered_pushes_of(subscription, now_ns),
+                    probe_sent_at_ns: subscription.probe_sent_at_ns,
+                    has_probe_had_its_answer_time: unanswered::has_probe_had_its_answer_time(
+                        subscription,
+                        now_ns,
+                    ),
+                }
             })
             .collect(),
     }
@@ -113,26 +139,28 @@ pub(crate) fn path_status(
 ///
 /// Every subscription is tried: one the backlog refused leaves the others probed, so the
 /// refusal is answered only where none of them was.
-pub(crate) fn probe(
+pub(crate) fn probe_device_path(
     anchor: &Anchor,
     browser_id: BrowserId,
     path: DevicePath,
     identity: &IdentityForNotification,
     now_ns: Timestamp,
 ) -> Result<(), ProbeRefusal> {
-    let on_path = path_subscriptions(anchor, browser_id, path, now_ns);
-    if on_path.is_empty() {
+    let path_subscriptions = path_subscriptions(anchor, browser_id, path, now_ns);
+    if path_subscriptions.is_empty() {
         return Err(ProbeRefusal::NotReachable);
     }
     let mut num_refused = 0usize;
-    let num_on_path = on_path.len();
-    for one in on_path {
-        if let Err(refusal) = probe_one(anchor.anchor_number(), one, identity, now_ns) {
+    let num_path_subscriptions = path_subscriptions.len();
+    for path_subscription in path_subscriptions {
+        if let Err(refusal) =
+            probe_path_subscription(anchor.anchor_number(), path_subscription, identity, now_ns)
+        {
             ic_cdk::println!("ERROR: A probe was not sent: {refusal:?}");
             num_refused = num_refused.saturating_add(1);
         }
     }
-    if num_refused == num_on_path {
+    if num_refused == num_path_subscriptions {
         return Err(ProbeRefusal::BacklogFull);
     }
     Ok(())
@@ -151,41 +179,37 @@ pub(crate) fn probe_installed_app(
     let browser = anchor
         .browser(holder.browser_id)
         .ok_or(ProbeRefusal::NotReachable)?;
-    let Some(one) = installed_app_on_path(
+    let Some(path_subscription) = installed_app_on_path(
         browser,
         holder.anchor_number,
         holder.application_number,
         now_ns,
-    )
-    .filter(|one| {
-        one.wake_up_path
-            == IdentityWakeUpPath::InstalledApp {
-                application_number: holder.application_number,
-                account_principal,
-            }
-    }) else {
+    ) else {
         return Err(ProbeRefusal::NotReachable);
     };
-    probe_one(holder.anchor_number, one, identity, now_ns)
+    if !path_subscription.is_installed_app_for(holder.application_number, account_principal) {
+        return Err(ProbeRefusal::NotReachable);
+    }
+    probe_path_subscription(holder.anchor_number, path_subscription, identity, now_ns)
 }
 
-/// Submits a probe through `one`, unless one is outstanding. It is recorded there only
-/// once the push service accepts it: one still waiting for its pass, or refused, reached
-/// no device and is no evidence that nothing answers.
-fn probe_one(
+/// Submits a probe through `path_subscription`, unless one is outstanding there. It is
+/// recorded there only once the push service accepts it: one still waiting for its pass,
+/// or refused, reached no device and is no evidence that nothing answers.
+fn probe_path_subscription(
     anchor_number: AnchorNumber,
-    one: PathSubscription,
+    path_subscription: PathSubscription,
     identity: &IdentityForNotification,
     now_ns: Timestamp,
 ) -> Result<(), ProbeRefusal> {
-    if unanswered::is_probe_outstanding(&one.subscription, now_ns) {
+    if unanswered::is_probe_outstanding(&path_subscription.subscription, now_ns) {
         return Ok(());
     }
     let is_admitted = dispatch::probe_path(
         anchor_number,
-        one.browser_id,
+        path_subscription.browser_id,
         identity.clone(),
-        one.wake_up_path,
+        path_subscription.wake_up_path,
         now_ns,
     );
     if !is_admitted {
@@ -197,7 +221,7 @@ fn probe_one(
 /// Removes the installed web app subscriptions of the app numbered `application_number`
 /// on the entries of `anchor` linked to `browser_id`'s that deliver for the account
 /// `account_principal` names, where they can deliver now and a probe through them was
-/// never fetched in [`unanswered::MIN_PROBE_ANSWER_TIME_NS`]. One that answered its probe,
+/// never removed in [`unanswered::MIN_PROBE_ANSWER_TIME_NS`]. One that answered its probe,
 /// or whose probe is younger than that, is kept. `None` for an app nobody has signed in
 /// to, which has none.
 ///
@@ -214,14 +238,14 @@ pub(crate) fn remove_unanswered_installed_apps(
         application_number,
         account_principal,
     };
-    for on_path in path_subscriptions(anchor, browser_id, path, now_ns) {
-        // Only a probe nobody fetched, in the time it takes to answer one, is evidence: a
+    for path_subscription in path_subscriptions(anchor, browser_id, path, now_ns) {
+        // Only a probe nobody removed, in the time it takes to answer one, is evidence: a
         // count raised again by an ordinary push after the installed app answered its
         // probe is not, and neither is a probe the push service accepted a moment ago.
-        if !unanswered::has_probe_had_its_answer_time(&on_path.subscription, now_ns) {
+        if !unanswered::has_probe_had_its_answer_time(&path_subscription.subscription, now_ns) {
             continue;
         }
-        let RegistrationId::Pwa(holder) = on_path.registration else {
+        let RegistrationId::Pwa(holder) = path_subscription.registration else {
             continue;
         };
         if let Err(err) = pwa_subscription::write_pwa_subscription(holder, None, None) {
@@ -252,25 +276,22 @@ fn path_subscriptions(
             application_number: Some(application_number),
             account_principal,
         } => {
-            let mut on_path = Vec::new();
+            let mut path_subscriptions = Vec::new();
             for entry in same_device_entries(anchor, browser) {
-                on_path.extend(
+                path_subscriptions.extend(
                     installed_app_on_path(
                         entry,
                         anchor.anchor_number(),
                         application_number,
                         now_ns,
                     )
-                    .filter(|one| {
-                        one.wake_up_path
-                            == IdentityWakeUpPath::InstalledApp {
-                                application_number,
-                                account_principal,
-                            }
+                    .filter(|path_subscription| {
+                        path_subscription
+                            .is_installed_app_for(application_number, account_principal)
                     }),
                 );
             }
-            on_path
+            path_subscriptions
         }
     }
 }
@@ -333,6 +354,9 @@ fn same_device_entries<'a>(anchor: &'a Anchor, browser: &'a Browser) -> Vec<&'a 
     anchor
         .browsers()
         .iter()
-        .filter(|other| other.id != browser.id && other.same_device_browser_id == Some(browser.id))
+        .filter(|other_browser| {
+            other_browser.id != browser.id
+                && other_browser.same_device_browser_id == Some(browser.id)
+        })
         .collect()
 }

@@ -298,17 +298,17 @@ pub(crate) fn find_pwa_notification(
     inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
 ) -> AppGetPwaNotificationResponse {
-    let none = AppGetPwaNotificationResponse {
+    let empty_response = AppGetPwaNotificationResponse {
         notification: None,
         event: None,
     };
     let Ok(anchor) = storage_borrow(|storage| storage.read(holder.anchor_number)) else {
-        return none;
+        return empty_response;
     };
     let Some(entry) = pwa_entry(&anchor, holder, account_principal, inbox_notification_id)
         .filter(|entry| entry.expires_at_ns > now_ns)
     else {
-        return none;
+        return empty_response;
     };
     match entry.kind {
         InboxNotificationKind::InstalledAppProbe { .. } => AppGetPwaNotificationResponse {
@@ -323,9 +323,9 @@ pub(crate) fn find_pwa_notification(
                     inbox_notification_id,
                     now_ns,
                 )
-                .map(|shown| PwaNotification {
-                    canister_id: shown.canister_id,
-                    id: shown.id,
+                .map(|shown_notification| PwaNotification {
+                    canister_id: shown_notification.canister_id,
+                    id: shown_notification.id,
                 }),
                 event: None,
             }

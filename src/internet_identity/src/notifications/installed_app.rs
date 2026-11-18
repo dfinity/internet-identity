@@ -67,12 +67,14 @@ impl NotificationApp {
     }
 
     /// Whether a repair probe through this record's subscription had its window and was
-    /// never fetched, which says the app is gone as surely as an unanswered enable probe.
+    /// never removed, which says the app is gone as surely as an unanswered enable probe.
     pub fn repair_probe_went_unanswered(&self, now_ns: Timestamp) -> bool {
         self.webpush_subscription
             .as_ref()
             .and_then(WebPushSubscription::ready)
-            .is_some_and(|ready| unanswered::is_probe_unanswered(ready, now_ns))
+            .is_some_and(|ready_subscription| {
+                unanswered::is_probe_unanswered(ready_subscription, now_ns)
+            })
     }
 
     /// Whether this record holds an address a wake-up can go to. A registration part-way
@@ -84,6 +86,14 @@ impl NotificationApp {
             .as_ref()
             .and_then(WebPushSubscription::ready)
             .is_some()
+    }
+
+    /// Whether this record is subscribed and neither its enable probe nor a repair probe
+    /// through it went unanswered by `now_ns`: what an app still delivering looks like.
+    pub fn is_still_delivering(&self, now_ns: Timestamp) -> bool {
+        self.is_subscribed()
+            && !self.probe_went_unanswered(now_ns)
+            && !self.repair_probe_went_unanswered(now_ns)
     }
 }
 

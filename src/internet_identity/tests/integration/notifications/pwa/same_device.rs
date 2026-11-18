@@ -24,11 +24,11 @@ use internet_identity_interface::internet_identity::types::{
 const SAFARI_BROWSER_ID: BrowserId = 0;
 const HOUR_NS: u64 = 60 * MINUTE_NS;
 
-/// The key calls from the entry [`install_signed_in`] signs in from are signed with.
 /// How long a probe has to be answered before its silence is evidence: the canister's
 /// `MIN_PROBE_ANSWER_TIME_NS`, written out.
 const PROBE_ANSWER_TIME: std::time::Duration = std::time::Duration::from_secs(10);
 
+/// The key calls from the entry [`install_signed_in`] signs in from are signed with.
 fn safari() -> Principal {
     BrowserKey::new(1).successor().principal()
 }
@@ -293,7 +293,12 @@ fn should_refuse_a_claim_signed_for_another_caller() {
     )
     .expect("claim rejected");
 
-    assert_eq!(refused, Err(ClaimSameDeviceLinkError::NoPendingLink));
+    assert_eq!(
+        refused,
+        Err(ClaimSameDeviceLinkError::InternalCanisterError(
+            "the signature is not the link key's over this claim".to_string()
+        ))
+    );
     assert_eq!(
         link_status(&env, &phone),
         SameDeviceLinkStatus::OtherPathMayDeliver
@@ -308,7 +313,9 @@ fn should_refuse_a_claim_signed_by_another_key() {
 
     assert_eq!(
         claim(&env, &phone, safari(), &BrowserKey::new(41)),
-        Err(ClaimSameDeviceLinkError::NoPendingLink)
+        Err(ClaimSameDeviceLinkError::InternalCanisterError(
+            "the signature is not the link key's over this claim".to_string()
+        ))
     );
 }
 
@@ -739,6 +746,46 @@ fn should_keep_an_installed_app_whose_probe_is_younger_than_its_answer_time() {
     );
 }
 
+/// Whether each subscription on `phone`'s installed apps path has had its probe's answer
+/// time, as the canister reports it.
+fn has_had_answer_time(env: &PocketIc, phone: &Phone) -> Vec<bool> {
+    path_status(env, phone, installed_apps(phone))
+        .subscriptions
+        .iter()
+        .map(|subscription| subscription.has_probe_had_its_answer_time)
+        .collect()
+}
+
+/// Moves `env`'s clock to `at_ns` and runs a round there.
+fn advance_to(env: &PocketIc, at_ns: u64) {
+    let now_ns = env.get_time().as_nanos_since_unix_epoch();
+    env.advance_time(Duration::from_nanos(at_ns - now_ns));
+    env.tick();
+}
+
+/// The canister, not the browser's clock, says when a probe has had its 10 seconds.
+#[test]
+fn should_report_a_probe_has_had_its_answer_time_once_ten_seconds_have_passed() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(has_had_answer_time(&env, &phone), vec![false]);
+    assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
+    answer_outcalls(&env, 201);
+    assert_eq!(has_had_answer_time(&env, &phone), vec![false]);
+    let sent_at_ns = path_status(&env, &phone, installed_apps(&phone))
+        .subscriptions
+        .first()
+        .and_then(|subscription| subscription.probe_sent_at_ns)
+        .expect("no probe recorded");
+
+    // A query reads the time of the last executed round, so each step is ticked in.
+    advance_to(&env, sent_at_ns + 9_999_000_000);
+    assert_eq!(has_had_answer_time(&env, &phone), vec![false]);
+
+    advance_to(&env, sent_at_ns + 10_000_000_000);
+    assert_eq!(has_had_answer_time(&env, &phone), vec![true]);
+}
+
 /// A push service's answer belongs to the registration it was posted to: one made since
 /// at the same endpoint was never sent the probe, so the answer records nothing on it.
 #[test]
@@ -900,7 +947,9 @@ fn should_refuse_a_claim_from_an_entry_already_linked() {
     let installed_app_browser = BrowserKey::new(5).successor().principal();
     assert_eq!(
         claim_with(&env, &phone, installed_app_browser, &BrowserKey::new(42)),
-        Err(ClaimSameDeviceLinkError::NoPendingLink)
+        Err(ClaimSameDeviceLinkError::InternalCanisterError(
+            "this browser is already linked to another".to_string()
+        ))
     );
 }
 
@@ -915,7 +964,9 @@ fn should_refuse_a_claim_of_a_key_whose_entry_is_pointed_at() {
 
     assert_eq!(
         claim_with(&env, &phone, third_browser, &BrowserKey::new(42)),
-        Err(ClaimSameDeviceLinkError::NoPendingLink)
+        Err(ClaimSameDeviceLinkError::InternalCanisterError(
+            "the browser that registered the key is already linked to".to_string()
+        ))
     );
 }
 
@@ -930,7 +981,9 @@ fn should_refuse_a_claim_from_an_entry_holding_an_installed_app_of_its_own() {
     let installed_app_browser = BrowserKey::new(5).successor().principal();
     assert_eq!(
         claim_with(&env, &phone, installed_app_browser, &BrowserKey::new(42)),
-        Err(ClaimSameDeviceLinkError::NoPendingLink)
+        Err(ClaimSameDeviceLinkError::InternalCanisterError(
+            "this browser holds an installed web app subscription of its own".to_string()
+        ))
     );
 }
 

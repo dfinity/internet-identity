@@ -1351,15 +1351,16 @@ pub struct WebPushSubscriptionStatus {
     /// The relay endpoint this browser is registered with. Compared against the one the
     /// browser holds: a registration naming any other endpoint is stale.
     pub endpoint: String,
-    /// `None` where every push posted through it has been fetched since.
+    /// `None` where the notification of every push posted through it has been removed
+    /// since.
     pub unanswered_pushes: Option<UnansweredPushes>,
     /// When the push service last accepted Internet Identity's own notification, sent
-    /// through it to check it. `None` once a notification has been fetched through it
+    /// through it to check it. `None` once a notification pushed through it has been removed
     /// since: that is the answer.
     pub probe_sent_at_ns: Option<Timestamp>,
 }
 
-/// Pushes posted through one subscription that nothing has fetched since.
+/// Pushes posted through one subscription whose notifications nothing has removed since.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct UnansweredPushes {
     pub count: u32,
@@ -1402,15 +1403,21 @@ pub struct NotificationPathStatus {
     pub subscriptions: Vec<SubscriptionDeliveryStatus>,
 }
 
-/// One subscription on a path, and the pushes posted through it that nothing fetched since.
+/// One subscription on a path, and the pushes posted through it whose notifications
+/// nothing removed since.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SubscriptionDeliveryStatus {
-    /// `None` where every push posted through it has been fetched since.
+    /// `None` where the notification of every push posted through it has been removed
+    /// since.
     pub unanswered_pushes: Option<UnansweredPushes>,
     /// When the push service last accepted Internet Identity's own notification, sent
-    /// through it to check it. `None` once a notification has been fetched through it
-    /// since: that is the answer.
+    /// through it to check it. `None` once a notification pushed through it has been
+    /// removed since: that is the answer.
     pub probe_sent_at_ns: Option<Timestamp>,
+    /// Whether that probe, unanswered, has been out 10 seconds by the canister's clock,
+    /// the least time it is given to be answered before its subscription may be removed.
+    /// `false` where no probe is outstanding.
+    pub has_probe_had_its_answer_time: bool,
 }
 
 /// Why `get_notification_path_status` refused.
@@ -1504,9 +1511,10 @@ pub struct ClaimSameDeviceLinkRequest {
 pub enum ClaimSameDeviceLinkError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
-    /// No other entry of this identity awaits that key, its time is up, or the signature
-    /// is not that key's over this claim.
+    /// No other entry of this identity awaits that key, or its time is up.
     NoPendingLink,
+    /// Also what the text names when an entry is already linked, the caller holds an
+    /// installed web app of its own, or the signature is not that key's over this claim.
     InternalCanisterError(String),
 }
 
