@@ -135,7 +135,7 @@ fn start_pwa_subscription(
     sender_seed: [u8; 32],
     now_ns: Timestamp,
 ) -> Result<(), PreparePwaSubscriptionError> {
-    if !is_allowed(holder) {
+    if !is_notifications_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
     let pending_transport = PendingTransport {
@@ -147,7 +147,8 @@ fn start_pwa_subscription(
         subscription: WebPushSubscription::Pending(pending_transport),
         account_principal,
     };
-    write(holder, Some(subscription), None).map_err(PreparePwaSubscriptionError::Internal)
+    write_pwa_subscription(holder, Some(subscription), None)
+        .map_err(PreparePwaSubscriptionError::Internal)
 }
 
 /// Registers `holder`'s browser entry for Web Push for the account `account_principal`
@@ -166,10 +167,10 @@ pub fn set_pwa_subscription(
     let Some(request) = request else {
         return remove_pwa_subscription(holder, account_principal);
     };
-    if !is_allowed(holder) {
+    if !is_notifications_allowed(holder) {
         return Err(SetPwaSubscriptionError::NotificationsNotAllowed);
     }
-    let Some(pending_transport) = read(holder)
+    let Some(pending_transport) = read_pwa_subscription(holder)
         .and_then(|held_subscription| held_subscription.subscription.pending().cloned())
     else {
         return Err(SetPwaSubscriptionError::TransportKeyExpired);
@@ -180,7 +181,7 @@ pub fn set_pwa_subscription(
         transport_key,
         sealed_auth,
     } = request;
-    let ready_subscription = subscription::spend_pending(
+    let ready_subscription = subscription::spend_pending_transport(
         &pending_transport,
         &transport_key,
         &sealed_auth,
@@ -204,7 +205,8 @@ pub fn set_pwa_subscription(
         subscription,
         account_principal,
     };
-    write(holder, Some(subscription), displaced_holder).map_err(SetPwaSubscriptionError::Internal)
+    write_pwa_subscription(holder, Some(subscription), displaced_holder)
+        .map_err(SetPwaSubscriptionError::Internal)
 }
 
 /// Empties `holder`'s browser entry where it delivers for `account_principal`'s account.
@@ -213,14 +215,14 @@ fn remove_pwa_subscription(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
 ) -> Result<(), SetPwaSubscriptionError> {
-    match read(holder) {
+    match read_pwa_subscription(holder) {
         Some(held_subscription) if held_subscription.account_principal != account_principal => {
             return Ok(())
         }
         Some(_) => {}
         None => return Ok(()),
     }
-    write(holder, None, None).map_err(SetPwaSubscriptionError::Internal)
+    write_pwa_subscription(holder, None, None).map_err(SetPwaSubscriptionError::Internal)
 }
 
 /// The other slot that holds `endpoint` now, which a subscription for `holder` at that
@@ -237,7 +239,7 @@ fn find_endpoint_holder(
     if indexed_holder == holder {
         return None;
     }
-    let held_subscription = read(indexed_holder)?;
+    let held_subscription = read_pwa_subscription(indexed_holder)?;
     let ready_subscription = held_subscription.subscription.into_ready()?;
     if ready_subscription.endpoint != *endpoint {
         return None;
@@ -253,7 +255,7 @@ fn check_takeover(
     endpoint_holder: PwaSubscriptionHolder,
     ready_subscription: &ReadySubscription,
 ) -> Result<(), SetPwaSubscriptionError> {
-    let Some(held_subscription) = read(endpoint_holder)
+    let Some(held_subscription) = read_pwa_subscription(endpoint_holder)
         .and_then(|held_subscription| held_subscription.subscription.into_ready())
     else {
         return Ok(());
@@ -283,7 +285,7 @@ pub(crate) fn clear_gone_pwa_subscription(
     holder: PwaSubscriptionHolder,
     endpoint: &str,
 ) -> Result<(), String> {
-    let Some(held_subscription) = read(holder) else {
+    let Some(held_subscription) = read_pwa_subscription(holder) else {
         return Ok(());
     };
     let Some(registered_subscription) = held_subscription.subscription.into_ready() else {
@@ -292,7 +294,7 @@ pub(crate) fn clear_gone_pwa_subscription(
     if registered_subscription.endpoint.as_str() != endpoint {
         return Ok(());
     }
-    write(holder, None, None)
+    write_pwa_subscription(holder, None, None)
 }
 
 /// The endpoint `holder`'s browser entry is subscribed at, where it is ready and delivers
@@ -301,7 +303,7 @@ pub fn read_pwa_subscription_status(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
 ) -> Option<WebPushSubscriptionStatus> {
-    let held_subscription = read(holder)?;
+    let held_subscription = read_pwa_subscription(holder)?;
     if held_subscription.account_principal != account_principal {
         return None;
     }
@@ -311,16 +313,16 @@ pub fn read_pwa_subscription_status(
 }
 
 /// What `holder`'s browser entry holds, and the account it delivers for.
-pub(crate) fn read(holder: PwaSubscriptionHolder) -> Option<PwaSubscription> {
-    storage_borrow(|storage| {
+pub(crate) fn read_pwa_subscription(holder: PwaSubscriptionHolder) -> Option<PwaSubscription> {
+    let config = storage_borrow(|storage| {
         storage.anchor_application_config(holder.anchor_number, holder.application_number)
-    })?
-    .pwa_webpush_subscription(holder.browser_id)
+    })?;
+    config.pwa_webpush_subscription(holder.browser_id)
 }
 
 /// Puts `subscription` on `holder`'s browser entry, or with `None` empties it, after
 /// emptying `displaced_holder`'s where one is given.
-pub(crate) fn write(
+pub(crate) fn write_pwa_subscription(
     holder: PwaSubscriptionHolder,
     subscription: Option<PwaSubscription>,
     displaced_holder: Option<PwaSubscriptionHolder>,
@@ -331,7 +333,7 @@ pub(crate) fn write(
     .map_err(|err| format!("{err}"))
 }
 
-fn is_allowed(holder: PwaSubscriptionHolder) -> bool {
+fn is_notifications_allowed(holder: PwaSubscriptionHolder) -> bool {
     storage_borrow(|storage| {
         storage.anchor_application_config(holder.anchor_number, holder.application_number)
     })
@@ -364,7 +366,7 @@ pub fn prepare_pwa_subscription(
     let holder = resolve_pwa_holder(session).map_err(PreparePwaSubscriptionError::Internal)?;
     // Before the pool is asked, so an app without consent is told so rather than to come
     // back.
-    if !is_allowed(holder) {
+    if !is_notifications_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
     let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {

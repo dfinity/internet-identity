@@ -15,8 +15,9 @@ use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{
     Anchor, InboxNotification, InboxNotificationKind, WebPushSubscription,
 };
-use crate::storage::PwaSubscriptionHolder;
+use crate::storage::{PwaSubscriptionHolder, Storage};
 use candid::Principal;
+use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, InboxNotificationId, NotShownReason, NotificationToShow,
     PwaNotification, Timestamp,
@@ -59,40 +60,8 @@ pub(crate) fn remove_after_failed_wake_up(
         let Ok(mut anchor) = storage.read(anchor_number) else {
             return;
         };
-        let posted_to = match target {
-            DeliveryTarget::Browser => anchor
-                .webpush_subscription(browser_id)
-                .and_then(WebPushSubscription::ready)
-                .map(|registered| registered.endpoint.as_str().to_string()),
-            // Read through the storage already borrowed here.
-            DeliveryTarget::Pwa { .. } => target
-                .pwa_holder(anchor_number, browser_id)
-                .and_then(|holder| {
-                    storage
-                        .anchor_application_config(holder.anchor_number, holder.application_number)?
-                        .pwa_webpush_subscription(holder.browser_id)
-                })
-                .and_then(|held| held.subscription.into_ready())
-                .map(|registered| registered.endpoint.into_string()),
-            DeliveryTarget::App(app_id) => {
-                // The app's address stands for this entry only while the entry still
-                // points at it. A switch to another record, or an install started, makes
-                // the queue somebody else's, and a late failure from the old address
-                // would drop a notification this entry can still show.
-                let Some(browser) = anchor.browser(browser_id) else {
-                    return;
-                };
-                if !browser.is_pointing_at(app_id) {
-                    return;
-                }
-                storage
-                    .notification_app(app_id)
-                    .and_then(|app| app.webpush_subscription)
-                    .and_then(WebPushSubscription::into_ready)
-                    .map(|registered| registered.endpoint.into_string())
-            }
-        };
-        if posted_to.is_none_or(|registered| registered != endpoint) {
+        let posted_to = read_posted_endpoint(storage, &anchor, browser_id, target);
+        if posted_to.is_none_or(|posted_endpoint| posted_endpoint != endpoint) {
             return;
         }
         let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) else {
@@ -108,6 +77,46 @@ pub(crate) fn remove_after_failed_wake_up(
             ic_cdk::println!("Failed to drop a notification whose wake-up failed: {err}");
         }
     });
+}
+
+/// The endpoint `anchor`'s browser `browser_id` is registered at through `target`, read
+/// through the registration `target` names, or `None` where it has none ready.
+fn read_posted_endpoint<M: Memory + Clone>(
+    storage: &Storage<M>,
+    anchor: &Anchor,
+    browser_id: BrowserId,
+    target: DeliveryTarget,
+) -> Option<String> {
+    match target {
+        DeliveryTarget::Browser => anchor
+            .webpush_subscription(browser_id)
+            .and_then(WebPushSubscription::ready)
+            .map(|registered_subscription| registered_subscription.endpoint.as_str().to_string()),
+        DeliveryTarget::Pwa { .. } => target
+            .pwa_holder(anchor.anchor_number(), browser_id)
+            .and_then(|holder| {
+                let config = storage
+                    .anchor_application_config(holder.anchor_number, holder.application_number)?;
+                config.pwa_webpush_subscription(holder.browser_id)
+            })
+            .and_then(|held_subscription| held_subscription.subscription.into_ready())
+            .map(|registered_subscription| registered_subscription.endpoint.into_string()),
+        DeliveryTarget::App(app_id) => {
+            // The app's address stands for this entry only while the entry still
+            // points at it. A switch to another record, or an install started, makes
+            // the queue somebody else's, and a late failure from the old address
+            // would drop a notification this entry can still show.
+            let browser = anchor.browser(browser_id)?;
+            if !browser.is_pointing_at(app_id) {
+                return None;
+            }
+            storage
+                .notification_app(app_id)
+                .and_then(|app| app.webpush_subscription)
+                .and_then(WebPushSubscription::into_ready)
+                .map(|registered_subscription| registered_subscription.endpoint.into_string())
+        }
+    }
 }
 
 /// Drop what an app deposited in every browser's inbox, so consent granted again later

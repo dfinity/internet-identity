@@ -8170,7 +8170,7 @@ fn an_identity_notification_is_queued_without_an_application() {
         reloaded
             .notifications_for_browser(0)
             .first()
-            .and_then(|one| match &one.kind {
+            .and_then(|entry| match &entry.kind {
                 InboxNotificationKind::Identity { event } => Some(event.clone()),
                 InboxNotificationKind::App { .. } => None,
             }),

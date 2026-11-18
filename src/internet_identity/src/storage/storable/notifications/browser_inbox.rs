@@ -39,7 +39,8 @@ impl<'b, C> Decode<'b, C> for StorableInbox {
                 Some(0) => break,
                 Some(count) => num_remaining_entries = Some(count.saturating_sub(1)),
                 None => {
-                    if decoder.datatype()? == Type::Break {
+                    let datatype = decoder.datatype()?;
+                    if datatype == Type::Break {
                         decoder.skip()?;
                         break;
                     }

@@ -374,7 +374,7 @@ mod tests {
         assert_eq!(
             queued(NOW_NS)
                 .iter()
-                .map(|pending| pending.recipient)
+                .map(|pending_notification| pending_notification.recipient)
                 .collect::<Vec<_>>(),
             vec![principal]
         );

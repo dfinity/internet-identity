@@ -267,7 +267,9 @@ pub(crate) fn ensure_public_key() {
         match fetched {
             Ok(key) => {
                 LAST_FETCH_FAILURE.with(|failure| failure.replace(None));
-                crate::state::persistent_state_mut(|p| p.vapid_public_key = Some(key));
+                crate::state::persistent_state_mut(|persistent_state| {
+                    persistent_state.vapid_public_key = Some(key)
+                });
             }
             // Not retried here: the key is derived from public inputs, so the one
             // documented failure is the subnet not holding `key_1` over secp256r1, which

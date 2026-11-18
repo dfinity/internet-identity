@@ -107,7 +107,7 @@ pub fn set_subscription(
         .and_then(WebPushSubscription::pending)
         .ok_or(SetWebPushSubscriptionError::TransportKeyExpired)?
         .clone();
-    let ready = spend_pending(
+    let ready = spend_pending_transport(
         &pending,
         &browser_transport_key,
         &sealed_auth,
@@ -125,7 +125,7 @@ pub fn set_subscription(
 ///
 /// The registration is new from here: its age starts at `now_ns`. The browser's inbox is
 /// not the registration's and stays as it is.
-pub(super) fn spend_pending(
+pub(super) fn spend_pending_transport(
     pending: &PendingTransport,
     browser_transport_key: &SubscriberKey,
     sealed_auth: &SealedAuth,
@@ -318,7 +318,7 @@ fn set_app_subscription(
         .as_ref()
         .and_then(WebPushSubscription::pending)
         .ok_or(SetWebPushSubscriptionError::TransportKeyExpired)?;
-    let ready = spend_pending(
+    let ready = spend_pending_transport(
         pending,
         &browser_transport_key,
         &sealed_auth,
