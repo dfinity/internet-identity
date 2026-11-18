@@ -287,8 +287,11 @@
   // on the same line. (Overlay scrollbars take no room.) The thumb shows only
   // while the page rests in the pager (SETTLED): mid-swipe it would ride the
   // seam between two pages across the canvas.
+  // On a phone a page keeps to the edge (--ii-edge) less the 10px a tile's
+  // plate reaches past its logo, so the logos stand on the edge and the
+  // pages' own content steps in by those 10px to stand there too.
   const PAGE =
-    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 pt-[calc(var(--header-h)+0.75rem)] pb-32 scroll-pt-[calc(var(--header-h)+0.75rem)] [scrollbar-color:transparent_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:px-6";
+    "flex w-full shrink-0 snap-start snap-always flex-col overflow-y-auto overscroll-y-contain px-2 @max-lg/canvas:px-[calc(var(--ii-edge)-0.625rem)] pt-[calc(var(--header-h)+0.75rem)] pb-32 scroll-pt-[calc(var(--header-h)+0.75rem)] [scrollbar-color:transparent_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:px-6";
   /** A page at rest: its thumb fades in. It hides at once when a swipe
    *  starts, as the transition is only here. */
   const SETTLED =
@@ -299,16 +302,20 @@
   // Columns follow the canvas the way Apple's home screens do: four on a
   // phone, five on a tablet, seven on a desktop (the Mac's Applications
   // grid). Recent and All apps share them, so they line up tile for tile.
+  // On a phone the four spread across the canvas, the first logo on the
+  // start edge and the last on the end one; a narrow phone narrows them.
   const GRID =
-    "grid grid-cols-[repeat(4,5.25rem)] gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2 @2xl:grid-cols-[repeat(5,7rem)] @4xl:grid-cols-[repeat(7,7rem)]";
+    "grid grid-cols-[repeat(4,minmax(0,5.25rem))] justify-between gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2 @2xl:grid-cols-[repeat(5,7rem)] @4xl:grid-cols-[repeat(7,7rem)]";
   // A heading starts at the edge of the first logo, like a shelf title on
   // iOS. The 4rem logo sits centered in its column, so the inset is half of
-  // what the column leaves: (5.25rem − 4rem) / 2, then (7rem − 4rem) / 2.
-  const INSET = "ps-2.5 @lg:ps-6";
+  // what the column leaves: (7rem − 4rem) / 2. On a phone the head is as
+  // wide as the logos reach, so it needs none.
+  const INSET = "@lg:ps-6";
   /** The grid's own width at each size, so the greeting and the tabs above
-   *  the pages line up with the apps: columns and gaps of GRID. */
+   *  the pages line up with the apps: columns and gaps of GRID. On a phone,
+   *  from edge to edge, where the first and the last logo stand. */
   const GRID_WIDTH =
-    "w-[21.75rem] @lg:w-[29.5rem] @2xl:w-[37rem] @4xl:w-[52rem] max-w-full";
+    "w-[calc(100%-2*var(--ii-edge))] @lg:w-[29.5rem] @2xl:w-[37rem] @4xl:w-[52rem] max-w-full";
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
@@ -1288,7 +1295,7 @@
   <!-- No apps yet: a calm panel that says what will be here, with the one
        action inside it. -->
   <div
-    class="border-border-tertiary flex w-[min(36rem,calc(100vw-2rem))] flex-col items-center gap-2 rounded-3xl border bg-(--ii-hover) px-6 py-9 text-center"
+    class="border-border-tertiary mx-2.5 flex flex-col items-center gap-2 rounded-3xl border bg-(--ii-hover) px-6 py-9 text-center @lg:mx-0 @lg:w-[min(36rem,calc(100vw-2rem))]"
   >
     <p class="text-text-primary text-base font-semibold">No apps yet</p>
     <p class="text-text-tertiary max-w-xs text-sm text-pretty">
@@ -1306,7 +1313,9 @@
   </div>
   <!-- A short Explore, in rows: suggestions that are plainly not the user's
        yet, each with Add, and the way to all of them last. -->
-  <section class="mt-10 flex w-[min(36rem,calc(100vw-2rem))] flex-col gap-2">
+  <section
+    class="mx-2.5 mt-10 flex flex-col gap-2 @lg:mx-0 @lg:w-[min(36rem,calc(100vw-2rem))]"
+  >
     <h2 class="text-text-tertiary ps-4 text-sm font-medium">
       Suggested for you
     </h2>
@@ -1568,15 +1577,18 @@
   </div>
 {/snippet}
 
+<!-- --ii-edge: a phone's margin, the same on both sides, which the logo,
+     the identity, the greeting, the cards, the tabs, the apps and the pages'
+     content all stand on; plates (hover, a lifted pill) reach past it. -->
 <div
-  class="concept ii-surface-1 text-text-primary min-h-dvh md:flex md:h-dvh md:p-2"
+  class="concept ii-surface-1 text-text-primary min-h-dvh [--ii-edge:--spacing(4)] md:flex md:h-dvh md:p-2"
 >
   <!-- The canvas: the apps, in a frame on the page. It doesn't scroll: the
        header stays put and each page scrolls on its own under it. -->
   <Elevated
     offset={2}
     as="main"
-    class="@container flex h-dvh min-w-0 flex-1 flex-col overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none md:h-auto md:min-h-0 md:rounded-[1.25rem]"
+    class="@container/canvas flex h-dvh min-w-0 flex-1 flex-col overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none md:h-auto md:min-h-0 md:rounded-[1.25rem]"
   >
     <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
     <h1 class="sr-only">Apps</h1>
@@ -1590,7 +1602,7 @@
       class="pointer-events-none relative z-10 flex shrink-0 flex-col"
     >
       <div
-        class="grid grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr] md:px-5"
+        class="grid grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr] md:px-5 @max-lg/canvas:px-(--ii-edge)"
       >
         <!-- The logo is the way home: it goes back to the first page. Its hover
              is a layer over the pill's own colour (`ii-hover`), so the pill
@@ -1604,6 +1616,9 @@
             pill,
             PILL_MOTION,
             "ii-hover focus-visible:outline-focus-ring my-3 flex h-10 items-center gap-3 justify-self-start px-4 focus-visible:outline-2 focus-visible:outline-offset-2",
+            // On a phone the glyph stands on the edge; the pill reaches 10px
+            // past it once lifted.
+            "@max-lg/canvas:-ms-2.5 @max-lg/canvas:px-[9px]",
           ]}
         >
           <Logo class="text-fg-primary h-4" />
@@ -1617,6 +1632,8 @@
             // A phone's controls share one pill; on desktop the account, or
             // Close, has its own.
             !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
+            // The avatar on the end edge, the pill 10px past it.
+            phoneHead && "@max-lg/canvas:-me-2.5 @max-lg/canvas:pe-1.5",
           ]}
         >
           <!-- Phone only, beside the island or the dock: on desktop, and on a
@@ -1796,7 +1813,7 @@
              on My apps, as over a list on iOS (Done while apps are arranged). -->
         <div
           class={[
-            "flex items-center justify-between gap-3 pe-2.5 @lg:pe-6",
+            "flex items-center justify-between gap-3 @lg:pe-6",
             INSET,
             switchingPage &&
               "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
@@ -1811,7 +1828,7 @@
             class={[
               pill,
               PILL_MOTION,
-              "relative -ms-1 flex h-10 items-center p-1",
+              "relative -ms-[5px] flex h-10 items-center p-1",
             ]}
           >
             <!-- The selected tab sits on a thumb, as in a segmented control, so it
@@ -1858,14 +1875,14 @@
               class={[
                 pill,
                 PILL_MOTION,
-                "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-3.5 h-10 px-3.5 text-sm font-medium focus-visible:outline-2",
+                "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-3.5 h-10 px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]",
               ]}
             >
               <!-- Both words share one cell, so the pill keeps the wider
                    one's width and doesn't shift as Edit turns into Done; the
                    word in use fades in over the other. -->
               <span
-                class="grid justify-items-center *:col-start-1 *:row-start-1"
+                class="grid justify-items-center *:col-start-1 *:row-start-1 @max-lg/canvas:justify-items-end"
               >
                 <span
                   aria-hidden={managing}
@@ -1912,7 +1929,9 @@
           aria-labelledby="tab-mine"
           class={[PAGE, settled[0] && SETTLED]}
         >
-          <div class="mx-auto flex w-fit max-w-full flex-col">
+          <div
+            class="mx-auto flex w-fit max-w-full flex-col @max-lg/canvas:w-full"
+          >
             <!-- Phone: an incident put away unanswered heads the apps. -->
             {#if !isDesktop.current && incident !== undefined && !managing}
               <div
@@ -1920,7 +1939,7 @@
                   duration: reduced ? 0 : 260,
                   easing: quintOut,
                 }}
-                class="-mx-1.5 w-0 min-w-[calc(100%+0.75rem)] pb-8 @lg:-mx-2 @lg:min-w-[calc(100%+1rem)]"
+                class="mx-2.5 pb-8 @lg:-mx-2 @lg:w-0 @lg:min-w-[calc(100%+1rem)]"
               >
                 <IncidentBanner
                   {incident}
@@ -1949,7 +1968,7 @@
                   <div class="min-h-0 overflow-hidden">
                     <label
                       class={[
-                        "bg-bg-primary border-border-tertiary mx-1.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 @lg:mx-2",
+                        "bg-bg-primary border-border-tertiary mx-2.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 @lg:mx-2",
                         managing
                           ? "scale-100 opacity-100 delay-50 duration-200 ease-(--ii-ease-out)"
                           : "scale-[0.98] opacity-0 duration-120 ease-out",
@@ -2275,7 +2294,7 @@
   {#if isDesktop.current || (phoneHead && islandView === undefined)}
     <div
       transition:fade={{ duration: reduced ? 0 : 150 }}
-      class="fixed start-[25px] bottom-[calc(1rem+env(safe-area-inset-bottom))] z-10 sm:start-[33px] md:start-4 md:bottom-4"
+      class="fixed start-[calc(var(--ii-edge)-0.5rem)] bottom-[calc(1rem+env(safe-area-inset-bottom))] z-10 min-[32rem]:start-[25px] sm:start-[33px] md:start-4 md:bottom-4"
     >
       {@render conceptControls(false)}
     </div>

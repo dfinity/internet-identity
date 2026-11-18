@@ -26,7 +26,11 @@
   const searching = $derived(query.trim() !== "");
 </script>
 
-<div class="mx-auto flex w-full max-w-5xl flex-col gap-8 px-2">
+<!-- On a phone the page keeps 10px short of the edge, for the apps' plates;
+     the content steps in by those 10px, so it stands on the edge too. -->
+<div
+  class="mx-auto flex w-full max-w-5xl flex-col gap-8 px-2 @max-lg/canvas:px-2.5"
+>
   <AppSearch bind:query {isAdded} {onAdd} {onAddLink} limit={Infinity} />
 
   {#if !searching}

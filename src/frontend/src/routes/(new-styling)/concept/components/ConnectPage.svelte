@@ -421,7 +421,11 @@
   </li>
 {/snippet}
 
-<div class="mx-auto flex w-full max-w-5xl flex-col gap-8 px-2">
+<!-- On a phone the page keeps 10px short of the edge, for the apps' plates;
+     the content steps in by those 10px, so it stands on the edge too. -->
+<div
+  class="mx-auto flex w-full max-w-5xl flex-col gap-8 px-2 @max-lg/canvas:px-2.5"
+>
   <header class="flex flex-col gap-1">
     <h2
       class="text-text-primary text-2xl leading-8 font-semibold tracking-tight"
