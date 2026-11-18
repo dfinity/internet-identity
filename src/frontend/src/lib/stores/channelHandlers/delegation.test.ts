@@ -56,6 +56,7 @@ vi.mock("$lib/stores/channelHandlers/notificationRepair", () => ({
 import { handleDelegationRequest } from "./delegation";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { authorizedStore } from "$lib/stores/authorization.store";
+import { authorizeAddedIdentity } from "../../../routes/(new-styling)/authorize/addIdentity";
 
 // Both are mocked as plain writables above; only their real types are in scope here.
 const signedIn = authenticationStore as unknown as Writable<unknown>;
@@ -142,6 +143,23 @@ describe("an identity change while notifications are checked", () => {
     notificationCheck.outcomes = ["identity-changed", "done"];
     // The user switches and authorizes again while the check runs.
     notificationCheck.onIdentityChanged = authorizedNow;
+
+    const { sent, numMinted } = await runRequest();
+
+    expect(numMinted).toBe(2);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ id: 1, result: {} });
+  });
+
+  it("answers the app for an identity added from the header", async () => {
+    notificationCheck.outcomes = ["identity-changed", "done"];
+    // The user adds an identity from the header while the check runs, which authorizes
+    // it as the layout's Add identity does.
+    notificationCheck.onIdentityChanged = () =>
+      void authorizeAddedIdentity(() => {
+        authorizedNow();
+        return Promise.resolve();
+      });
 
     const { sent, numMinted } = await runRequest();
 

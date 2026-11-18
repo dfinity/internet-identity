@@ -40,6 +40,7 @@
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
+  import { authorizeAddedIdentity } from "./addIdentity";
 
   const { children }: LayoutProps = $props();
 
@@ -360,8 +361,14 @@
               }}
             >
               <AuthWizard
-                onSignIn={handleSignIn}
-                onSignUp={handleSignUp}
+                onSignIn={async (identityNumber) => {
+                  await handleSignIn(identityNumber);
+                  await authorizeAddedIdentity(authorizeDefault);
+                }}
+                onSignUp={async (identityNumber) => {
+                  await handleSignUp(identityNumber);
+                  await authorizeAddedIdentity(authorizeDefault);
+                }}
                 onError={(error) => {
                   isAuthDialogOpen = false;
                   isAuthenticating = false;
