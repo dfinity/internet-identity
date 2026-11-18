@@ -314,12 +314,12 @@
   // start edge and the last on the end one; a narrow phone narrows them.
   const GRID =
     "grid grid-cols-[repeat(4,minmax(0,5.25rem))] justify-between gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2 @2xl:grid-cols-[repeat(5,7rem)] @4xl:grid-cols-[repeat(7,7rem)]";
-  // A heading starts at the first logo, like a shelf title on iOS. The 4rem
-  // logo sits centered in its column, (7rem − 4rem) / 2 = 1.5rem in, but its
-  // 16px corner takes its edge in, so a word on that line looks to stand
-  // out past it: the heading steps in by half the corner more, 2rem. On a
-  // phone the head is as wide as the logos reach, so it needs none.
-  const INSET = "@lg:ps-8";
+  // A heading starts at the edge of the first logo, like a shelf title on
+  // iOS, and the tabs' thumb stands on that edge too: one line down the
+  // canvas. The 4rem logo sits centered in its column, so the inset is half
+  // of what the column leaves: (7rem − 4rem) / 2. On a phone the head is as
+  // wide as the logos reach, so it needs none.
+  const INSET = "@lg:ps-6";
   /** The grid's own width at each size, so the greeting and the tabs above
    *  the pages line up with the apps: columns and gaps of GRID. On a phone,
    *  from edge to edge, where the first and the last logo stand. */
@@ -1296,11 +1296,9 @@
   <!-- The pages. Over the grid they're a pill in the header (see `pill`); on
        a phone they're the tab bar, floating over the blur at the bottom,
        always lifted since content always runs under it, and a step larger
-       for a thumb. In the header the first tab's word stands on the
-       greeting's line, as Edit's word does on the other side, and the thumb
-       reaches past it by the tab's padding: otherwise My apps, unselected,
-       starts 14px in from the name and the apps. A phone's canvas keeps the
-       thumb on the edge, with no room past it for the lifted pill. -->
+       for a thumb. In the header the first tab's thumb stands on the
+       greeting's line, the logos' edge, and the pill reaches past it by its
+       border and padding (5px). -->
   <div
     role="tablist"
     aria-label="Apps"
@@ -1310,7 +1308,7 @@
       "relative flex items-center p-1",
       atBottom
         ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6)"
-        : [pill, PILL_MOTION, "-ms-[5px] h-10 @lg:-ms-[19px]"],
+        : [pill, PILL_MOTION, "-ms-[5px] h-10"],
     ]}
   >
     <!-- The selected tab sits on a thumb, as in a segmented control, so it
