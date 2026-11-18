@@ -280,25 +280,25 @@
   // On a phone the four spread across the canvas, the first logo on the
   // start edge and the last on the end one; a narrow phone narrows them.
   const GRID =
-    "grid grid-cols-[repeat(4,minmax(0,5.25rem))] justify-between gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2 @2xl:grid-cols-[repeat(5,7rem)] @4xl:grid-cols-[repeat(7,7rem)]";
+    "grid grid-cols-[repeat(4,minmax(0,5.25rem))] justify-between gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2 @2xl:grid-cols-[repeat(5,7rem)] @4xl:grid-cols-[repeat(7,var(--ii-tile))]";
   // A heading starts at the edge of the first logo, like a shelf title on
   // iOS, and the tabs' thumb stands on that edge too: one line down the
   // canvas. The 4rem logo sits centered in its column, so the inset is half
   // of what the column leaves: (7rem − 4rem) / 2. On a phone the head is as
   // wide as the logos reach, so it needs none.
-  const INSET = "@lg:ps-6";
+  const INSET = "@lg:ps-[calc((var(--ii-tile)-var(--ii-logo))/2)]";
   /** The grid's own width at each size, so the greeting and the tabs above
    *  the pages line up with the apps: columns and gaps of GRID. On a phone,
    *  from edge to edge, where the first and the last logo stand. */
   const GRID_WIDTH =
-    "w-[calc(100%-2*var(--ii-edge))] @lg:w-[29.5rem] @2xl:w-[37rem] @4xl:w-[52rem] max-w-full";
+    "w-[calc(100%-2*var(--ii-edge))] @lg:w-[29.5rem] @2xl:w-[37rem] @4xl:w-[calc(7*var(--ii-tile)+3rem)] max-w-full";
   /** How far the logos reach: the grid less the 1.5rem each end column
    *  leaves beside its logo (INSET). Explore and Connect keep to it, so they
    *  start on the line the greeting, the tabs and the logos share, and end
    *  where the last logo does. On a phone the logos stand on the canvas's
    *  edges, and so do the pages' contents. */
   const LOGO_SPAN =
-    "w-full @lg:w-[26.5rem] @2xl:w-[34rem] @4xl:w-[49rem] max-w-full";
+    "w-full @lg:w-[26.5rem] @2xl:w-[34rem] @4xl:w-[calc(6*var(--ii-tile)+3rem+var(--ii-logo))] max-w-full";
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
@@ -1196,7 +1196,7 @@
       INSET,
       inPage
         ? "pb-6 text-lg"
-        : "pt-3 pb-5 text-xl md:pt-[clamp(1rem,8vh,5rem)] md:pb-6",
+        : "pt-3 pb-5 text-xl md:pt-[clamp(1rem,8vh,5rem)] md:pb-6 @6xl/canvas:text-2xl @6xl/canvas:leading-8 @[88rem]/canvas:text-[1.75rem] @[88rem]/canvas:leading-9",
     ]}
   >
     <span class="shrink-0">{greeting},</span>
@@ -1367,7 +1367,7 @@
     class="ii-hover focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 outline-none focus-visible:ring-2"
   >
     <span
-      class="border-border-primary text-fg-tertiary grid size-16 place-items-center rounded-2xl border-[1.5px] border-dashed"
+      class="border-border-primary text-fg-tertiary grid size-(--ii-logo) place-items-center rounded-2xl border-[1.5px] border-dashed"
     >
       <span class={["grid", ADD_FADE, managing && "opacity-0"]}>
         <PlusIcon class="size-6" aria-hidden="true" />
@@ -1375,7 +1375,7 @@
     </span>
     <span
       class={[
-        "text-text-tertiary text-xs leading-tight",
+        "text-text-tertiary text-(length:--ii-tile-label) leading-tight",
         ADD_FADE,
         managing && "opacity-0",
       ]}

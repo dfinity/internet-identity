@@ -171,9 +171,11 @@
       ? "reverse"
       : undefined}
   >
+    <!-- The logo takes the canvas's size for it (--ii-logo), which grows on
+         a wide canvas, over the 64px AppLogo draws a tile at. -->
     <span
       class={[
-        "block rounded-2xl outline-offset-[3px] transition-[outline-color] duration-150",
+        "block rounded-2xl outline-offset-[3px] transition-[outline-color] duration-150 *:size-(--ii-logo)!",
         current ? "outline-fg-primary outline-2" : "outline-transparent",
       ]}
     >
@@ -197,7 +199,7 @@
     {/if}
   </span>
   <span
-    class="text-text-secondary line-clamp-2 w-full text-center text-xs leading-tight text-balance break-words"
+    class="text-text-secondary line-clamp-2 w-full text-center text-(length:--ii-tile-label) leading-tight text-balance break-words"
   >
     {name}
   </span>
@@ -268,7 +270,7 @@
     <span
       aria-hidden="true"
       class={[
-        "pointer-events-none absolute start-[calc(50%-2rem)] top-4 size-16",
+        "pointer-events-none absolute start-[calc(50%-var(--ii-logo)/2)] top-4 size-(--ii-logo)",
         mode === "select" && "jiggle",
       ]}
       style:animation-delay={mode === "select"
@@ -316,7 +318,7 @@
         .join(", ")}
       aria-expanded={current}
       class={[
-        "corner focus-visible:ring-focus-ring absolute end-[calc(50%-2.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4",
+        "corner focus-visible:ring-focus-ring absolute end-[calc(50%-var(--ii-logo)/2-0.3125rem)] top-[11px] flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-tile-backdrop) outline-none before:absolute before:-inset-[13px] focus-visible:ring-4",
         muted
           ? "bg-(--ii-muted) text-white"
           : "bg-bg-brand-solid text-text-primary-inversed",

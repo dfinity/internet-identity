@@ -89,6 +89,32 @@
 
   /* Emil Kowalski's strong ease-out, for things that enter or settle. */
   --ii-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* An app tile's column, its logo and its name, which the grid, the
+     greeting and the tabs over it line up with. */
+  --ii-tile: 7rem;
+  --ii-logo: 4rem;
+  --ii-tile-label: 0.75rem;
+}
+
+/* A wide canvas shows the apps larger, not more of them (Thomas): past
+   seven columns, more would only shrink each one in the space, so the
+   tiles, their logos and names grow in steps instead, up to a 1920px
+   window. Inside the canvas only: a container query reaches its
+   descendants, so each takes the values itself. */
+@container canvas (min-width: 72rem) {
+  * {
+    --ii-tile: 8rem;
+    --ii-logo: 4.75rem;
+    --ii-tile-label: 0.8125rem;
+  }
+}
+@container canvas (min-width: 88rem) {
+  * {
+    --ii-tile: 9rem;
+    --ii-logo: 5.5rem;
+    --ii-tile-label: 0.875rem;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

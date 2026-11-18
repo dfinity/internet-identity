@@ -417,7 +417,7 @@
       <!-- The same dashed frame as the tile that adds an app, which turns
            into the first of these while apps are arranged. -->
       <span
-        class="border-border-primary size-16 rounded-2xl border-[1.5px] border-dashed"
+        class="border-border-primary size-(--ii-logo) rounded-2xl border-[1.5px] border-dashed"
       ></span>
     </li>
   {/each}
