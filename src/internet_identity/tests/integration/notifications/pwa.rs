@@ -27,6 +27,8 @@ use internet_identity_interface::internet_identity::types::{
 use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
 use std::time::Duration;
 
+mod same_device;
+
 /// An app whose sender list names [`app_sender`].
 const APP: &str = "https://listed-app.example";
 /// A second app whose sender list names [`app_sender`].
