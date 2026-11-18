@@ -660,6 +660,22 @@ pub fn lookup_device_key(
     .map(|(x,)| x)
 }
 
+/// Hidden, temporary endpoint: `(shared_passkey_pubkeys, is_done)` for the secondary passkey
+/// pubkey holders backfill.
+pub fn secondary_passkey_pubkey_holders_backfill_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<(u64, bool), RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "secondary_passkey_pubkey_holders_backfill_status",
+        (),
+    )
+}
+
 pub fn prepare_attributes(
     env: &PocketIc,
     canister_id: CanisterId,
