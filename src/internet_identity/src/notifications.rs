@@ -101,7 +101,7 @@ pub fn consent_granted(anchor_number: AnchorNumber, origin: &ApplicationOrigin) 
 fn write_notifications_decision(
     anchor_number: AnchorNumber,
     origin: &ApplicationOrigin,
-    allowed: bool,
+    is_notifications_allowed: bool,
     now_ns: Timestamp,
 ) -> Result<(), StorageError> {
     // The storage index keys by the owned spelling; this is the one place the folded
@@ -111,19 +111,19 @@ fn write_notifications_decision(
         let mut config = storage
             .read_anchor_application_config(anchor_number, origin)
             .unwrap_or_default();
-        let unchanged = match config.notifications {
-            Some(decision) => decision.allowed == allowed,
-            None => !allowed,
+        let is_decision_unchanged = match config.notifications {
+            Some(decision) => decision.allowed == is_notifications_allowed,
+            None => !is_notifications_allowed,
         };
-        if unchanged {
+        if is_decision_unchanged {
             return Ok(());
         }
         config.notifications = Some(PermissionDecision {
-            allowed,
+            allowed: is_notifications_allowed,
             changed_at_ns: now_ns,
         });
         // An installed app delivers only what the identity allows.
-        if !allowed {
+        if !is_notifications_allowed {
             config.clear_pwa_webpush_subscriptions();
         }
         storage.write_anchor_application_config(anchor_number, origin, config, now_ns)
