@@ -18,6 +18,10 @@
     editing: boolean;
     /** Moves the item at `from` to `to`; the grid follows the new order. */
     onMove: (from: number, to: number) => void;
+    /** Items that keep their place at the end, like the tile that adds an
+     *  app: they can't be picked up, and nothing is dropped past them. They
+     *  stay in the grid while rearranging, so it keeps its rows. */
+    pinned?: (item: T) => boolean;
     tile: Snippet<[item: T, index: number]>;
     class?: string;
   }
@@ -27,9 +31,13 @@
     key,
     editing,
     onMove,
+    pinned = () => false,
     tile,
     class: className,
   }: Props = $props();
+
+  /** How many items can move: the pinned ones close the list. */
+  const movable = $derived(items.filter((item) => !pinned(item)).length);
 
   interface Point {
     x: number;
@@ -275,8 +283,9 @@
     if (cell < 0) {
       return;
     }
-    // A free cell means the end of the grid: tiles never leave a gap.
-    const to = Math.min(cell, items.length - 1);
+    // A free or pinned cell means the end of the grid: tiles never leave a
+    // gap, and never pass what's pinned.
+    const to = Math.min(cell, movable - 1);
     const from = indexOf(drag.key);
     if (to !== from) {
       onMove(from, to);
@@ -373,7 +382,11 @@
         easing: quintOut,
       }}
       data-dragging={drag?.key === key(item) ? "" : undefined}
-      onpointerdown={(event) => onPointerDown(event, key(item))}
+      onpointerdown={(event) => {
+        if (!pinned(item)) {
+          onPointerDown(event, key(item));
+        }
+      }}
       class={[
         "relative",
         drag?.key === key(item) && [
@@ -401,8 +414,10 @@
       out:fade={{ duration: reduced ? 0 : 100 }}
       class="flex justify-center pt-4"
     >
+      <!-- The same dashed frame as the tile that adds an app, which turns
+           into the first of these while apps are arranged. -->
       <span
-        class="border-border-secondary size-16 rounded-2xl border-2 border-dashed"
+        class="border-border-primary size-16 rounded-2xl border-[1.5px] border-dashed"
       ></span>
     </li>
   {/each}

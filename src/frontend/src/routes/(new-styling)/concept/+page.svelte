@@ -267,12 +267,13 @@
 
   // One grid, in the order apps were added (or arranged): a newly used app
   // goes to the end, so nothing moves by itself.
-  /** The tile after the last app, which adds one. */
+  /** The tile after the last app, which adds one. It stays while apps are
+   *  arranged, as the first free cell, so the grid keeps its rows. */
   const ADD_TILE = { origin: "add-app" } as const;
   type GridItem = ConceptApp | typeof ADD_TILE;
-  const gridItems = $derived.by<GridItem[]>(() =>
-    managing ? current.apps : [...current.apps, ADD_TILE],
-  );
+  const gridItems = $derived<GridItem[]>([...current.apps, ADD_TILE]);
+  /** How the Add tile's plus and label leave and come back: a fade only. */
+  const ADD_FADE = "transition-opacity duration-150 ease-out";
   const featured = $derived(
     featuredApps.filter(
       ({ origin }) => !current.apps.some((app) => app.origin === origin),
@@ -1255,10 +1256,13 @@
 
 {#snippet addTile()}
   <!-- After the last app, the way to add one by hand: a search over the
-       curated apps that also takes a link. -->
+       curated apps that also takes a link. While apps are arranged it stays
+       where it is as the first free cell: the plus and the label fade, the
+       dashed frame stays, and the free cells after it fill out its row. -->
   <button
     type="button"
     onclick={(event) => (addAnchor = event.currentTarget)}
+    inert={managing}
     aria-haspopup="dialog"
     aria-expanded={addAnchor !== undefined}
     class="ii-hover focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 outline-none focus-visible:ring-2"
@@ -1266,9 +1270,19 @@
     <span
       class="border-border-primary text-fg-tertiary grid size-16 place-items-center rounded-2xl border-[1.5px] border-dashed"
     >
-      <PlusIcon class="size-6" aria-hidden="true" />
+      <span class={["grid", ADD_FADE, managing && "opacity-0"]}>
+        <PlusIcon class="size-6" aria-hidden="true" />
+      </span>
     </span>
-    <span class="text-text-tertiary text-xs leading-tight">Add app</span>
+    <span
+      class={[
+        "text-text-tertiary text-xs leading-tight",
+        ADD_FADE,
+        managing && "opacity-0",
+      ]}
+    >
+      Add app
+    </span>
   </button>
 {/snippet}
 
@@ -1914,6 +1928,7 @@
                   key={(item) => item.origin}
                   editing={managing}
                   onMove={moveApp}
+                  pinned={(item) => !("name" in item)}
                   class={GRID}
                 >
                   {#snippet tile(item, index)}
