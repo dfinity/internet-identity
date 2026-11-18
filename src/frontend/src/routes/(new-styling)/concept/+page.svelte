@@ -236,26 +236,28 @@
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
-  // The account on top is the concept's main layout; the other two stay in
-  // the concept menu to compare against.
+  // The panel beside the canvas is the concept's main layout: on desktop it
+  // stays open, so the identity's state is always in view and there's no
+  // closed state to signal through. The other two stay in the concept menu
+  // to compare against.
   const LAYOUTS: { value: Layout; label: string; icon: Component }[] = [
+    { value: "panel", label: "Panel on the side", icon: PanelRightIcon },
     {
       value: "top",
       label: "Account on top, widgets below",
       icon: PanelTopIcon,
     },
     { value: "island", label: "Island at the bottom", icon: PanelBottomIcon },
-    { value: "panel", label: "Panel on the side", icon: PanelRightIcon },
   ];
-  // A new key, so a layout picked before the account moved up doesn't stand
-  // in for the main one.
-  const LAYOUT_KEY = "ii-concept-layout-v2";
+  // A new key, so a layout picked before the panel became the main one
+  // doesn't stand in for it.
+  const LAYOUT_KEY = "ii-concept-layout-v3";
   // `?layout=island` in the address picks a layout too, so a link can show one.
   const readLayout = (): Layout => {
     const asked =
       new URLSearchParams(location.search).get("layout") ??
       localStorage.getItem(LAYOUT_KEY);
-    return LAYOUTS.find(({ value }) => value === asked)?.value ?? "top";
+    return LAYOUTS.find(({ value }) => value === asked)?.value ?? "panel";
   };
   let layout = $state<Layout>(readLayout());
   const isDesktop = new MediaQuery("min-width: 768px");
