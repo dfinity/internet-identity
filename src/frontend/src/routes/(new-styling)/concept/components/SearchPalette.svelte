@@ -2,8 +2,8 @@
   /**
    * What the search shows: in the palette over the page on desktop, and over
    * the whole screen on a phone. Before a letter is typed it already has
-   * something to offer: Explore's shelves to browse, the apps used last, one
-   * app it features, and a few to try. From the first letter it lists what
+   * something to offer: Explore's shelves to browse, the apps used last, and
+   * a few to try. From the first letter it lists what
    * matches instead: yours first, to open, then the rest, to add, and a
    * pasted link as an app of its own. A shelf picked from the chips narrows
    * the list to it, and stands in the field as a token (HeaderSearch).
@@ -23,7 +23,6 @@
   import {
     exploreFeed,
     type ConceptApp,
-    type ExploreBannerItem,
     type ExploreShelfItem,
     type FeaturedApp,
   } from "../mockData";
@@ -71,20 +70,16 @@
   const SHELVES = exploreFeed.filter(
     (item): item is ExploreShelfItem => item.kind === "shelf",
   );
-  const BANNERS = exploreFeed.filter(
-    (item): item is ExploreBannerItem => item.kind === "banner",
-  );
 
   type Entry =
     | { kind: "chip"; id: string; shelf: ExploreShelfItem }
     | { kind: "tile"; id: string; app: ConceptApp }
-    | { kind: "banner"; id: string; banner: ExploreBannerItem }
     | { kind: "app"; id: string; app: FeaturedApp }
     | { kind: "link"; id: string; app: FeaturedApp };
   interface Group {
     id: string;
     title?: string;
-    layout: "chips" | "tiles" | "banner" | "rows";
+    layout: "chips" | "tiles" | "rows";
     entries: Entry[];
   }
 
@@ -118,9 +113,6 @@
         .filter((app) => app.lastUsedMillis > 0)
         .sort((a, b) => b.lastUsedMillis - a.lastUsedMillis)
         .slice(0, 6);
-      // The first banner whose app isn't yours yet, or the first.
-      const banner =
-        BANNERS.find(({ app }) => !isAdded(app.origin)) ?? BANNERS[0];
       return [
         {
           id: "browse",
@@ -142,28 +134,10 @@
           })),
         },
         {
-          id: "featured",
-          title: "Featured",
-          layout: "banner",
-          entries:
-            banner === undefined
-              ? []
-              : [
-                  {
-                    kind: "banner",
-                    id: `featured:${banner.app.origin}`,
-                    banner,
-                  },
-                ],
-        },
-        {
           id: "suggested",
           title: "Suggested",
           layout: "rows",
-          entries: suggested
-            .filter(({ origin }) => origin !== banner?.app.origin)
-            .slice(0, 3)
-            .map(asRow),
+          entries: suggested.slice(0, 3).map(asRow),
         },
       ].filter(({ entries }) => entries.length > 0) as Group[];
     }
@@ -246,11 +220,7 @@
 
   const added = (entry: Entry) =>
     entry.kind === "tile" ||
-    (entry.kind === "banner"
-      ? isAdded(entry.banner.app.origin)
-      : entry.kind === "chip"
-        ? false
-        : isAdded(entry.app.origin));
+    (entry.kind !== "chip" && isAdded(entry.app.origin));
   /** What Enter (or a click) does on the entry, as its button says. */
   const verbOf = (entry: Entry) =>
     entry.kind === "chip" ? "Show" : added(entry) ? "Open" : "Add";
@@ -264,7 +234,7 @@
       onShelf(entry.shelf);
       return;
     }
-    const app = entry.kind === "banner" ? entry.banner.app : entry.app;
+    const app = entry.app;
     if (added(entry)) {
       open(app);
     } else if (entry.kind === "link") {
@@ -362,19 +332,12 @@
     }
     const box = element.getBoundingClientRect();
     const frame = content.getBoundingClientRect();
-    // The banner has a colour of its own, so the highlight rings it.
-    const ring = element.dataset.shape === "banner" ? 4 : 0;
     mark = {
-      x: box.left - frame.left - ring,
-      y: box.top - frame.top - ring,
-      w: box.width + 2 * ring,
-      h: box.height + 2 * ring,
-      radius:
-        element.dataset.shape === "pill"
-          ? "9999px"
-          : element.dataset.shape === "banner"
-            ? "1.5rem"
-            : "1rem",
+      x: box.left - frame.left,
+      y: box.top - frame.top,
+      w: box.width,
+      h: box.height,
+      radius: element.dataset.shape === "pill" ? "9999px" : "1rem",
       glide: previous !== undefined,
     };
   });
@@ -427,56 +390,6 @@
         {entry.app.name}
       </span>
     </button>
-  {:else if entry.kind === "banner"}
-    {@const { banner } = entry}
-    <!-- Explore's banner, a size down: what it's for, the headline, and the
-         app's own icon as the art, on its flat colour. -->
-    <button
-      {...common}
-      type="button"
-      data-shape="banner"
-      style:background={banner.background}
-      aria-label={`${banner.title} ${banner.app.name}. ${verbOf(entry)}`}
-      class={[
-        "relative grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 overflow-hidden rounded-[1.25rem] py-4 ps-5 pe-4 text-start",
-        banner.dark ? "text-white" : "text-neutral-950",
-      ]}
-    >
-      <span class="flex min-w-0 flex-col">
-        <span
-          class="text-[11px] font-semibold tracking-[0.08em] uppercase opacity-70"
-        >
-          {banner.eyebrow}
-        </span>
-        <span
-          class="mt-1 text-lg leading-6 font-semibold tracking-tight text-balance"
-        >
-          {banner.title}
-        </span>
-        <span class="mt-3 flex items-center gap-3">
-          <span class="truncate text-sm font-semibold">{banner.app.name}</span>
-          <span
-            aria-hidden="true"
-            class={[
-              "rounded-full px-3.5 py-1 text-sm font-semibold",
-              banner.dark
-                ? "bg-white text-neutral-950"
-                : "bg-neutral-950 text-white",
-            ]}
-          >
-            {verbOf(entry)}
-          </span>
-        </span>
-      </span>
-      <img
-        src={banner.app.logo}
-        alt=""
-        class={[
-          "size-20 rounded-[22%] ring-1",
-          banner.dark ? "ring-white/10" : "ring-black/5",
-        ]}
-      />
-    </button>
   {:else}
     {@const app = entry.app}
     <button
@@ -521,7 +434,7 @@
     <div bind:this={content} class="relative">
       <!-- The highlight: one surface under the entries, gliding to the one
            the keys or the pointer are on, and changing its shape on the way
-           (a pill for a chip, a ring round the banner). -->
+           (a pill for a chip). -->
       {#if mark !== undefined}
         <span
           aria-hidden="true"
@@ -564,12 +477,6 @@
                 group.layout === "chips" ? "gap-1.5 py-1" : "gap-0.5",
               ]}
             >
-              {#each group.entries as entry (entry.id)}
-                {@render entryView(entry)}
-              {/each}
-            </div>
-          {:else if group.layout === "banner"}
-            <div class="p-1">
               {#each group.entries as entry (entry.id)}
                 {@render entryView(entry)}
               {/each}
