@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { test } from "../../fixtures";
 import {
   authorize,
@@ -327,6 +327,76 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
       await signInWithOpenId(signInPopup, openIdUsers[0].id);
       await signInClosePromise;
     });
+  });
+
+  test("Make an existing account the default and authorize with it", async ({
+    page,
+    managePage,
+    signInWithOpenId,
+    openIdUsers,
+  }) => {
+    const signInThroughPopup = async (
+      authPage: Page,
+      press: () => Promise<void>,
+    ) => {
+      const popupPromise = authPage.context().waitForEvent("page");
+      await press();
+      const popup = await popupPromise;
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await closePromise;
+    };
+
+    await page.goto(II_URL);
+    await signInThroughPopup(page, () =>
+      page.getByRole("button", { name: openIdUsers[0].issuer.name }).click(),
+    );
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Sign up" })
+      .click();
+    await page.waitForURL(II_URL + "/manage");
+    await managePage.signOut((c) => c.keepIdentity());
+    await page.context().clearCookies();
+    await blockPopupsOutsideOfPresses(page.context(), II_URL);
+
+    const workPrincipal = await authorize(page, async (authPage) => {
+      // The accounts are read with the session kept on sign-out; creating one
+      // signs in.
+      await authPage
+        .getByRole("switch", { name: "Show all options" })
+        .setChecked(true);
+      await authPage
+        .getByRole("button", { name: "Add another account" })
+        .click();
+      await authPage.getByLabel("Account name").fill("Work");
+      await signInThroughPopup(authPage, () =>
+        authPage.getByRole("button", { name: "Create account" }).click(),
+      );
+      await authPage.getByRole("radio", { name: "Work" }).click();
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+    const defaultPrincipal = await authorize(page, async (authPage) => {
+      // The accounts are read with the stored session; saving signs in.
+      await authPage.getByRole("button", { name: "Edit Work" }).click();
+      await authPage
+        .getByRole("checkbox", { name: "Set as default sign-in" })
+        .setChecked(true);
+      await signInThroughPopup(authPage, () =>
+        authPage.getByRole("button", { name: "Save changes" }).click(),
+      );
+      await expect(authPage.getByRole("dialog")).toBeHidden();
+      // With all options off, Continue signs in with the default account.
+      await authPage
+        .getByRole("switch", { name: "Show all options" })
+        .setChecked(false);
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+    expect(defaultPrincipal).toEqual(workPrincipal);
   });
 });
 

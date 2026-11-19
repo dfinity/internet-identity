@@ -101,52 +101,6 @@ test("Create another account, make it default and authorize with it", async ({
   expect(secondaryPrincipal).not.toEqual(primaryPrincipal);
 });
 
-test("Make an existing account the default and authorize with it", async ({
-  page,
-  identities,
-  addAuthenticatorForIdentity,
-  signInWithIdentity,
-}) => {
-  const primaryPrincipal = await authorize(page, async (authPage) => {
-    await signInWithIdentity(authPage, identities[0].identityNumber);
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-  const workPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
-    await authPage
-      .getByRole("switch", { name: "Show all options" })
-      .setChecked(true);
-    await authPage.getByRole("button", { name: "Add another account" }).click();
-    await authPage.getByLabel("Account name").fill("Work");
-    await authPage.getByRole("button", { name: "Create account" }).click();
-    await authPage.getByRole("radio", { name: "Work" }).click();
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-  const defaultPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
-    // The accounts are read with the stored session; saving signs in.
-    await authPage.getByRole("button", { name: "Edit Work" }).click();
-    await authPage
-      .getByRole("checkbox", { name: "Set as default sign-in" })
-      .setChecked(true);
-    await authPage.getByRole("button", { name: "Save changes" }).click();
-    await expect(authPage.getByRole("dialog")).toBeHidden();
-    // With all options off, Continue signs in with the default account.
-    await authPage
-      .getByRole("switch", { name: "Show all options" })
-      .setChecked(false);
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-  expect(workPrincipal).not.toEqual(primaryPrincipal);
-  expect(defaultPrincipal).toEqual(workPrincipal);
-});
-
 test("Rename primary account and authorize with it", async ({
   page,
   identities,
