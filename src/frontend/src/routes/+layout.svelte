@@ -2,6 +2,7 @@
   import { isRedirectingToPrimaryOrigin } from "$lib/utils/primaryOrigin";
   import { onMount } from "svelte";
   import { page } from "$app/state";
+  import { t } from "$lib/stores/locale.store";
 
   const { children } = $props();
 
@@ -49,4 +50,22 @@
   {/if}
 </svelte:head>
 
-{@render children()}
+<!-- Without a boundary an uncaught render or effect error tears the whole app
+     down, leaving an empty page; this keeps the error readable instead. -->
+<svelte:boundary onerror={(error) => console.error(error)}>
+  {@render children()}
+
+  {#snippet failed(error, reset)}
+    <div class="flex flex-col gap-4 p-6">
+      <h1 class="text-fg-primary text-xl font-semibold">
+        {$t`Something went wrong`}
+      </h1>
+      <pre
+        class="text-fg-secondary overflow-auto text-xs whitespace-pre-wrap">{error instanceof
+        Error
+          ? `${error.name}: ${error.message}\n${error.stack ?? ""}`
+          : String(error)}</pre>
+      <button class="btn btn-primary" onclick={reset}>{$t`Try again`}</button>
+    </div>
+  {/snippet}
+</svelte:boundary>
