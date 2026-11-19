@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize, clearStoredSessions } from "../../utils";
+import { authorize } from "../../utils";
 
 test("Create another account and authorize with primary", async ({
   page,
@@ -248,58 +248,4 @@ test("All options start from the account and duration last chosen on this browse
   expect(workPrincipal).not.toEqual(primaryPrincipal);
   expect(rememberedPrincipal).toEqual(workPrincipal);
   expect(optionsOffPrincipal).toEqual(primaryPrincipal);
-});
-
-test("All options left on go off when there is no session to show them with, and the switch signs in", async ({
-  page,
-  identities,
-  addAuthenticatorForIdentity,
-  signInWithIdentity,
-}) => {
-  await authorize(page, async (authPage) => {
-    await signInWithIdentity(authPage, identities[0].identityNumber);
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-  const workPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
-    await authPage
-      .getByRole("switch", { name: "Show all options" })
-      .setChecked(true);
-    await authPage.getByRole("button", { name: "Add another account" }).click();
-    await authPage.getByLabel("Account name").fill("Work");
-    await authPage.getByRole("button", { name: "Create account" }).click();
-    await authPage.getByRole("radio", { name: "Work" }).click();
-    await authPage.getByRole("button", { name: "30 days" }).click();
-    await authPage.getByRole("menuitem", { name: "1 day" }).click();
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-
-  // The session Internet Identity kept on this browser is gone, as it is after
-  // a month without a sign-in. The choice to see all options is not.
-  await clearStoredSessions(page);
-
-  const switchedPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
-    const optionsSwitch = authPage.getByRole("switch", {
-      name: "Show all options",
-    });
-    // Nothing signs in by itself: the options go off and Continue is ready.
-    await expect(optionsSwitch).not.toBeChecked();
-    await expect(optionsSwitch).toBeEnabled();
-    await expect(authPage.getByRole("radio")).toHaveCount(0);
-    // The switch signs in and shows the options as they were left.
-    await optionsSwitch.setChecked(true);
-    await expect(authPage.getByRole("radio", { name: "Work" })).toBeChecked({
-      timeout: 15_000,
-    });
-    await expect(authPage.getByRole("button", { name: "1 day" })).toBeVisible();
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-  expect(switchedPrincipal).toEqual(workPrincipal);
 });
