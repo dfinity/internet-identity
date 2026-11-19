@@ -2316,17 +2316,12 @@
         <!-- Concept only, to try both themes: it keeps to the panel's foot, at
              the bottom of the window while the panel is short, and after the
              last card once it is long. Two glyphs on a track, the one in use
-             raised, as a footer's theme switch is on Vercel's pages. -->
-        <div class="mt-auto flex shrink-0 items-center gap-3 ps-4 pt-6">
-          <span
-            id="concept-theme-label"
-            class="text-text-tertiary flex-1 text-[13px] leading-[18px] font-medium"
-          >
-            Theme
-          </span>
+             raised, as a footer's theme switch is on Vercel's pages. The
+             switch alone, without a caption: its glyphs say what it does. -->
+        <div class="mt-auto flex shrink-0 justify-end pt-6">
           <div
             role="radiogroup"
-            aria-labelledby="concept-theme-label"
+            aria-label="Theme"
             class="flex rounded-full bg-(--ii-hover) p-0.5"
           >
             {#each THEMES as option (option.value)}
