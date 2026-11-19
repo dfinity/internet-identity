@@ -13,7 +13,7 @@
 //!   dispatches by `PendingKind`.
 //! - The DKIM-leaf submission path in [`submit_leaf`].
 //! - The shared `prepare_common` core in [`prepare`] — input
-//!   validation, path picking (DNSSEC skeleton vs. DoH allowlist), and
+//!   validation, path picking (DNSSEC skeleton vs. DoH), and
 //!   nonce issuing. Both flow-specific `prepare_add` wrappers (recovery
 //!   and verified-email) call this directly.
 //!
@@ -93,6 +93,10 @@ pub fn dnssec_email_recovery_enabled() -> bool {
 /// in the wizard so a phisher who hands the user a different-looking
 /// string (no `II-Recovery-`, truncated, etc.) is immediately obvious.
 pub const NONCE_PREFIX: &str = "II-Recovery-";
+
+/// Detail of the `InternalCanisterError` returned for a DoH-path challenge
+/// while no `DohConfig` is set, i.e. the DoH path is disabled.
+pub const DOH_NOT_CONFIGURED_ERROR: &str = "DoH is not configured";
 
 /// Like [`NONCE_PREFIX`] but for the **verified-email** wizard.
 /// Differs from `NONCE_PREFIX` by a single token so an inbound

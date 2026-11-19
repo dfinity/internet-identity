@@ -142,9 +142,7 @@
     // eventual email's `DKIM-Signature: s=` tag, so we walk that
     // leaf later (after polling sees `NeedDkimLeaf`). If the chain
     // assembly yields nothing (no DNSSEC) we still let the canister
-    // try the DoH path; only when *neither* domain config applies
-    // does the user get a "DomainNotAllowlisted" error back, which
-    // we translate into the unsupported-domain view.
+    // try the DoH path.
     let dnsProof: DnsProofBundle | undefined;
     try {
       dnsProof = await assembleSkeleton(domain, true);
@@ -166,16 +164,12 @@
       stage = { kind: "sending", challenge, address, path };
       void runPoll(challenge.nonce, domain, address);
     } catch (e) {
-      // `DomainNotAllowlisted` / `DomainNotSupported` at prepare
-      // time means we've got neither DNSSEC nor an allowlist entry
-      // — route to the dedicated unsupported view so the user gets
+      // `DomainNotSupported` at prepare time means the domain
+      // can't be verified — route to the dedicated unsupported view so the user gets
       // the technical "why + how to fix" treatment instead of an
       // opaque inline error string.
       if (isCanisterError<EmailChallengeError>(e)) {
-        if (
-          e.type === "DomainNotAllowlisted" ||
-          e.type === "DomainNotSupported"
-        ) {
+        if (e.type === "DomainNotSupported") {
           setupEmailRecoveryFunnel.trigger(
             SetupEmailRecoveryEvents.UnsupportedDomain,
             { reason: e.type },

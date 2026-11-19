@@ -660,12 +660,12 @@ mod tests {
         insert_with_eviction("n1".into(), challenge("a@x.com", 100), 100);
         assert_eq!(diagnostics_of("n1", 200).unwrap().reason_code, "Pending");
         with_mut("n1", 200, |c| {
-            c.status = PendingStatus::Failed(EmailChallengeError::DomainNotAllowlisted(
+            c.status = PendingStatus::Failed(EmailChallengeError::DomainNotSupported(
                 "secret-domain.example".into(),
             ));
         });
         let code = diagnostics_of("n1", 200).unwrap().reason_code;
-        assert_eq!(code, "Failed:DomainNotAllowlisted");
+        assert_eq!(code, "Failed:DomainNotSupported");
         assert!(!code.contains("secret-domain"));
     }
 

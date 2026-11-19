@@ -38,7 +38,7 @@ import { walkSkeletonChain, walkDkimResolution } from "./chain";
  * Which DNS-verification path the canister takes when the email
  * arrives. Set by the wizards at `prepare_*` time based on whether
  * `assembleSkeleton` returned a signed bundle (`dnssec`) or fell
- * through to the canister's DoH allowlist (`doh`). Surfaced through
+ * through to the canister's DoH path (`doh`). Surfaced through
  * to `SendConfirmationEmail` so the trust-story tooltip on the
  * `From` row can show the right wording.
  */
@@ -50,11 +50,11 @@ export type Path = "dnssec" | "doh";
  * the zone publishes one.
  *
  * Returns `undefined` if the chain isn't fully signed up to root.
- * The canister-side prepare path then falls through to its DoH
- * allowlist, which is the intended fallback for unsigned mainstream
- * mailbox providers (Gmail, Outlook, iCloud, Yahoo, live.com — the
- * last one's apex is signed but its DKIM CNAMEs into unsigned
- * territory; see design doc §7.6).
+ * The canister-side prepare path then falls through to DoH, which
+ * is the intended fallback for unsigned mainstream mailbox providers
+ * (Gmail, Outlook, iCloud, Yahoo, live.com: the last one's apex is
+ * signed but its DKIM CNAMEs into unsigned territory; see design doc
+ * §7.6).
  */
 export function assembleSkeleton(
   domain: string,

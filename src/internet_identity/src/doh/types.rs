@@ -72,9 +72,6 @@ pub const DEFAULT_CACHE_AGE_SECS: u64 = 3600;
 /// shape is for diagnostics and tests.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DohError {
-    /// The queried registered domain isn't on `allowed_domains`. The
-    /// verifier will not go to the internet for arbitrary domains.
-    DomainNotAllowed,
     /// Every provider's outcall failed (network error / non-200 / etc).
     /// "Every" means all of `PROVIDERS.len()` — currently five.
     AllProvidersFailed,
@@ -104,7 +101,7 @@ pub enum DohError {
     /// caller-visible failure rather than a quietly-different lookup.
     InvalidName(String),
     /// The FQDN doesn't sit inside the registered domain that the
-    /// caller passed for the allowlist check. Usually a caller bug;
+    /// caller passed. Usually a caller bug;
     /// we fail closed rather than make an outcall for an unrelated
     /// name.
     NameOutsideRegisteredDomain {
