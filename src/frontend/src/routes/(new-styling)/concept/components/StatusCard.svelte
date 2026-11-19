@@ -11,6 +11,7 @@
     XIcon,
   } from "@lucide/svelte";
   import { prefersReducedMotion } from "svelte/motion";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { CardKind, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
   import Glyphs, { type Glyph } from "./Glyphs.svelte";
@@ -85,6 +86,39 @@
       (now ? closeButton : openButton)?.focus({ preventScroll: true });
     }
   });
+
+  // What each glyph is, on hover. The glyphs lie over the card's one button
+  // and let the pointer through to it, so the whole card stays one target;
+  // the button finds which of them the pointer is on, the topmost where two
+  // overlap, and the product's tooltip stands over that one. Only for a
+  // mouse: a tap opens the card, and the open card names every item.
+  let summary = $state<HTMLElement>();
+  let hovered = $state<{ glyph: Glyph; anchor: HTMLElement }>();
+  const hover = (event: PointerEvent) => {
+    if (event.pointerType !== "mouse" || summary === undefined) {
+      hovered = undefined;
+      return;
+    }
+    const chips = Array.from(
+      summary.querySelectorAll<HTMLElement>("[data-glyph]"),
+    ).reverse();
+    const anchor = chips.find((chip) => {
+      const box = chip.getBoundingClientRect();
+      const radius = box.width / 2;
+      return (
+        Math.hypot(
+          event.clientX - (box.left + radius),
+          event.clientY - (box.top + radius),
+        ) <= radius
+      );
+    });
+    if (anchor === hovered?.anchor) return;
+    const glyph = glyphs.find(({ id }) => id === anchor?.dataset.glyph);
+    hovered =
+      anchor !== undefined && glyph !== undefined
+        ? { glyph, anchor }
+        : undefined;
+  };
 </script>
 
 <!-- One large target per section: the whole card leads to its section,
@@ -97,7 +131,12 @@
     <button
       bind:this={openButton}
       type="button"
-      onclick={onOpen}
+      onclick={() => {
+        hovered = undefined;
+        onOpen();
+      }}
+      onpointermove={hover}
+      onpointerleave={() => (hovered = undefined)}
       aria-label={`${title}: ${sentence}`}
       aria-expanded="false"
       aria-controls={contentId}
@@ -169,6 +208,7 @@
   <div class={["relative", !open && "pointer-events-none"]}>
     {#if !open || morphing}
       <div
+        bind:this={summary}
         data-layer="summary"
         aria-hidden="true"
         class={[
@@ -186,6 +226,14 @@
              info about no item has it before the sentence instead. -->
         {#if glyphs.length > 0}
           <Glyphs {glyphs} {tone} />
+          {#if hovered !== undefined && !open}
+            <Tooltip
+              label={hovered.glyph.label}
+              description={hovered.glyph.note}
+              anchor={hovered.anchor}
+              manual
+            />
+          {/if}
         {/if}
         <span
           class={[

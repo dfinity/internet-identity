@@ -1593,7 +1593,7 @@
       morphing={morphing === card.kind}
       onOpen={() => openCard(card.kind)}
       onClose={closeSection}
-      glyphs={glyphsOf(card, current.scenario, browsers)}
+      glyphs={glyphsOf(card, current.scenario, browsers, signedInWith.title)}
     >
       {@render sectionOf(card.kind as Section, "card")}
     </StatusCard>

@@ -103,7 +103,7 @@
       scenario,
       browsers,
       card,
-      glyphs: glyphsOf(card, scenario, browsers),
+      glyphs: glyphsOf(card, scenario, browsers, signedInWith.title),
     };
   };
 

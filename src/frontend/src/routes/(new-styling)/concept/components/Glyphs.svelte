@@ -6,6 +6,10 @@
     id: string;
     icon?: Component;
     src?: string;
+    /** What it is, said on hover: "Recovery phrase", "Firefox on Windows". */
+    label: string;
+    /** Where it stands, under the label: "Not set up", "New sign-in". */
+    note?: string;
     /** Not there yet (a way back in not set up, a way in to add): a dashed
      *  outline, as an empty row in the section has it. */
     empty?: boolean;
@@ -47,7 +51,8 @@
      shadow's ring parts each from the one under it. What isn't there yet
      lies flat instead, a dashed slot in the card itself, side by side with
      the next rather than under it, so raised means set up and dashed means
-     missing. Decorative: the message beside them says what they show. -->
+     missing. Decorative: the message beside them says what they show, and
+     each one's label (`data-glyph`) shows on hover (StatusCard). -->
 <span
   aria-hidden="true"
   style:--ii-glyph-surface={`var(--ii-surface-${level})`}
@@ -56,6 +61,7 @@
   {#each glyphs as glyph, index (glyph.id)}
     {@const Icon = glyph.icon}
     <span
+      data-glyph={glyph.id}
       class={[
         "relative grid size-7 place-items-center rounded-full",
         glyph.empty === true

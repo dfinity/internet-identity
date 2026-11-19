@@ -7,7 +7,10 @@ import {
   UserRoundIcon,
 } from "@lucide/svelte";
 import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
-import { brandIconOf } from "../manage/(authenticated)/devices/browsers";
+import {
+  brandIconOf,
+  nameOf,
+} from "../manage/(authenticated)/devices/browsers";
 import type { Glyph } from "./components/Glyphs.svelte";
 import type { MockBrowser } from "./mockData";
 import {
@@ -16,51 +19,105 @@ import {
   isOn,
   phraseStatus,
   type CardStatus,
+  type MethodStatus,
   type Scenario,
 } from "./status";
+
+/** A way back in's tooltip, as its row in the section says where it
+ *  stands. */
+const RECOVERY_NOTE: Record<MethodStatus, string> = {
+  off: "Not set up",
+  on: "Set up",
+  inUse: "You're signed in with it now",
+  new: "Reset 2 hours ago",
+};
 
 /**
  * What a card's message is about, as icons beside it: neutral, what's inside
  * (the ways in, the ways back in, the browsers); otherwise only the item it's
  * about, marked, as Thomas asked ("New sign-in" with the browser's icon, "3
- * browsers" with theirs). What isn't there yet is dashed.
+ * browsers" with theirs). What isn't there yet is dashed. Each says on hover
+ * what it is and where it stands, in the words its row uses in the section.
  */
 export const glyphsOf = (
   card: CardStatus,
   scenario: Scenario,
   browsers: MockBrowser[],
+  /** What this browser signed in with: the first way in. */
+  signedInWith: string,
 ): Glyph[] => {
   const neutral = card.tone === "neutral";
   if (card.kind === "access") {
+    const yubikey: Glyph = {
+      id: "yubikey",
+      icon: KeyRoundIcon,
+      label: "YubiKey",
+      note:
+        scenario.access === "unused"
+          ? "Last used 8 months ago"
+          : "Security key",
+    };
     if (card.tone === "warning") {
-      return [{ id: "add", icon: PlusIcon, empty: true }];
+      return [
+        {
+          id: "add",
+          icon: PlusIcon,
+          empty: true,
+          label: "Another way to sign in",
+          note: "Not added yet",
+        },
+      ];
     }
     if (!neutral) {
-      return [{ id: "yubikey", icon: KeyRoundIcon, marked: true }];
+      return [{ ...yubikey, marked: true }];
     }
+    const local = scenario.access === "oneLocal";
+    const current: Glyph = {
+      id: "current",
+      icon: PasskeyIcon,
+      label: local ? "Windows Hello" : signedInWith,
+      note: local ? "Passkey on this device only" : "In use now",
+    };
     return accessCount(scenario.access) === 1
-      ? [{ id: "current", icon: PasskeyIcon }]
+      ? [current]
       : [
-          { id: "current", icon: PasskeyIcon },
-          { id: "yubikey", icon: KeyRoundIcon },
-          { id: "google", icon: UserRoundIcon },
+          current,
+          yubikey,
+          {
+            id: "google",
+            icon: UserRoundIcon,
+            label: "Google",
+            note: "t•••@gmail.com",
+          },
         ];
   }
   if (card.kind === "recovery") {
     const phrase = phraseStatus(scenario.recovery);
     const email = emailStatus(scenario.recovery);
+    const phraseGlyph: Glyph = {
+      id: "phrase",
+      icon: BookOpenIcon,
+      label: "Recovery phrase",
+      note: RECOVERY_NOTE[phrase],
+    };
+    const emailGlyph: Glyph = {
+      id: "email",
+      icon: MailIcon,
+      label: "Recovery email",
+      note: RECOVERY_NOTE[email],
+    };
     if (!isOn(phrase) && !isOn(email)) {
       return [
-        { id: "phrase", icon: BookOpenIcon, empty: true },
-        { id: "email", icon: MailIcon, empty: true },
+        { ...phraseGlyph, empty: true },
+        { ...emailGlyph, empty: true },
       ];
     }
     if (!neutral) {
-      return [{ id: "phrase", icon: BookOpenIcon, marked: true }];
+      return [{ ...phraseGlyph, marked: true }];
     }
     return [
-      ...(isOn(phrase) ? [{ id: "phrase", icon: BookOpenIcon }] : []),
-      ...(isOn(email) ? [{ id: "email", icon: MailIcon }] : []),
+      ...(isOn(phrase) ? [phraseGlyph] : []),
+      ...(isOn(email) ? [emailGlyph] : []),
     ];
   }
   const shown = neutral
@@ -71,5 +128,12 @@ export const glyphsOf = (
     src: brandIconOf(browser.description),
     icon: MonitorSmartphoneIcon,
     marked: !neutral,
+    label: nameOf(browser.description),
+    note:
+      browser.isCurrent === true
+        ? "This browser"
+        : browser.isNew === true
+          ? "New sign-in"
+          : "Signed in",
   }));
 };
