@@ -163,7 +163,11 @@
   <!-- While managing, the logo rocks the way icons do in a home screen's edit
        mode, each on its own beat, so the grid reads as one you can rearrange. -->
   <span
-    class={["relative", mode === "select" && "jiggle"]}
+    class={[
+      "relative",
+      mode === "open" && "lift",
+      mode === "select" && "jiggle",
+    ]}
     style:animation-delay={mode === "select"
       ? `-${(index * 97) % 260}ms`
       : undefined}
@@ -215,7 +219,7 @@
       label={name}
       onHold={onManage}
     >
-      {#snippet trigger(menu, menuOpen)}
+      {#snippet trigger(menu)}
         <a
           {...menu}
           data-tile-link
@@ -232,9 +236,8 @@
             .filter(Boolean)
             .join(", ")}
           class={[
+            // No plate behind it: hovered, the logo grows instead (`.lift`).
             "focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 outline-none focus-visible:ring-2",
-            // The tile stays lit while its menu is open, so it's clear whose it is.
-            menuOpen === true ? "ii-selected" : "ii-hover",
             PRESS,
           ]}
         >
@@ -376,17 +379,37 @@
   @media (hover: hover) {
     .tile:hover {
       --cue: 1;
+      --lift: 1;
     }
   }
   .tile:has(:focus-visible) {
     --cue: 1;
+    --lift: 1;
+  }
+  /* The tile has no plate: hovered or focused, its logo grows by 6%, and it
+     stays grown while the tile's menu is open, so it's clear whose it is.
+     --lift is 1 meanwhile. The corner rides on the logo's corner, which
+     moves 3% of the logo out each way. */
+  .tile:has([data-tile-link][aria-expanded="true"]) {
+    --lift: 1;
+  }
+  .lift {
+    scale: calc(1 + 0.06 * var(--lift, 0));
+    transition: scale 220ms var(--ii-ease-out);
   }
   .corner {
+    translate: calc(var(--ii-logo) * 0.03 * var(--lift, 0))
+      calc(var(--ii-logo) * -0.03 * var(--lift, 0));
     transition:
       opacity 150ms ease-out,
-      scale 220ms var(--ii-ease-out),
       color 200ms ease-out,
-      background-color 200ms ease-out;
+      background-color 200ms ease-out,
+      scale 220ms var(--ii-ease-out),
+      translate 220ms var(--ii-ease-out);
+  }
+  .corner:dir(rtl) {
+    translate: calc(var(--ii-logo) * -0.03 * var(--lift, 0))
+      calc(var(--ii-logo) * -0.03 * var(--lift, 0));
   }
   .corner-bare {
     opacity: var(--cue, 0);
@@ -422,7 +445,8 @@
     transition-delay:
       var(--mark-delay, 0ms), var(--mark-delay, 0ms), 0ms, 0ms, 0ms;
   }
-  /* Reduced motion: they only fade, all at once. */
+  /* Reduced motion: they only fade, all at once; the logo and the corner on
+     it take their hovered size and place at once, without moving there. */
   @media (prefers-reduced-motion: reduce) {
     .corner,
     .corner[data-away],
@@ -430,6 +454,12 @@
     .mark[data-shown] {
       scale: 1;
       transition-delay: 0ms;
+    }
+    .lift {
+      transition: none;
+    }
+    .corner {
+      transition-property: opacity, color, background-color;
     }
   }
   @media (hover: hover) {

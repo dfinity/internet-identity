@@ -1369,10 +1369,12 @@
     inert={managing}
     aria-haspopup="dialog"
     aria-expanded={addAnchor !== undefined}
-    class="ii-hover focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 outline-none focus-visible:ring-2"
+    class="group focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 transition-[scale] duration-160 ease-out outline-none focus-visible:ring-2 active:scale-[0.97] motion-reduce:active:scale-100"
   >
+    <!-- Like an app's tile, no plate: hovered, focused or with its search
+         open, the frame grows by 6%. -->
     <span
-      class="border-border-primary text-fg-tertiary grid size-(--ii-logo) place-items-center rounded-2xl border-[1.5px] border-dashed"
+      class="border-border-primary text-fg-tertiary grid size-(--ii-logo) place-items-center rounded-2xl border-[1.5px] border-dashed transition-[scale] duration-220 ease-(--ii-ease-out) group-hover:scale-106 group-focus-visible:scale-106 group-aria-expanded:scale-106 motion-reduce:transition-none"
     >
       <span class={["grid", ADD_FADE, managing && "opacity-0"]}>
         <PlusIcon class="size-6" aria-hidden="true" />
