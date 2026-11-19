@@ -52,7 +52,13 @@ export interface AppDeviceState {
   enabled: boolean;
 }
 
-export type DeviceNotificationState = BrowserDeviceState | AppDeviceState;
+/** The app that asked is installed on this device and subscribes for itself, so only its consent is asked for here. */
+export interface InstalledAppDeviceState {
+  source: "installed-app";
+}
+
+export type DeviceNotificationState =
+  BrowserDeviceState | AppDeviceState | InstalledAppDeviceState;
 
 /**
  * This browser's push state, or `undefined` where it could not be read.
@@ -133,10 +139,16 @@ const isRegisteredHere = async (
 };
 
 /** A permission reset to "default" leaves the rows in place, so a registration alone is not delivery. */
-const deliversHere = (state: DeviceNotificationState): boolean =>
-  state.source === "app"
-    ? state.subscribed && state.enabled
-    : state.permission === "granted" && state.registered;
+const deliversHere = (state: DeviceNotificationState): boolean => {
+  switch (state.source) {
+    case "app":
+      return state.subscribed && state.enabled;
+    case "browser":
+      return state.permission === "granted" && state.registered;
+    case "installed-app":
+      return true;
+  }
+};
 
 /** iOS delivers web push only to a Home Screen app, so the browser's own permission and subscription say nothing. */
 export const notificationsNeedInstallHere = (): boolean => {
@@ -188,16 +200,31 @@ export const resolveOptIn = async ({
   origin,
   actor,
   browser,
+  isInstalledApp,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
   browser: Promise<BrowserPushState | undefined>;
+  /** The app that asked is installed on this device and subscribes for itself. */
+  isInstalledApp: boolean;
 }): Promise<OptInResolution> => {
   // Started rather than awaited: the consent and this device's state need nothing from each other.
   const consent = actor
     .notification_consent_granted({ anchor_number: identityNumber, origin })
     .catch(() => false);
+
+  if (isInstalledApp) {
+    const consented = await consent;
+    return consented
+      ? { screen: "skip", granted: true }
+      : {
+          screen: "enable",
+          state: { source: "installed-app" },
+          consented,
+          installFirst: false,
+        };
+  }
 
   // Asked first: where delivery is the app's, this browser's own permission and subscription are beside the point.
   if (notificationsNeedInstallHere()) {
@@ -289,15 +316,22 @@ export const readGranted = async ({
   identityNumber,
   origin,
   actor,
+  isInstalledApp,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
+  /** The app that asked is installed on this device and subscribes for itself. */
+  isInstalledApp: boolean;
 }): Promise<boolean> => {
   // Started rather than awaited: the consent query has nothing to learn from what this device says.
   const consent = actor
     .notification_consent_granted({ anchor_number: identityNumber, origin })
     .catch(() => false);
+
+  if (isInstalledApp) {
+    return consent;
+  }
 
   // Asked the same way the resolution asks it, or an app told yes on one screen would be told no on the next.
   if (notificationsNeedInstallHere()) {

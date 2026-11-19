@@ -3,11 +3,14 @@
 //!
 //! Design constraints (from the team Slack writeup + design doc §7.6):
 //!
-//! - **Allowlist-gated.** Outcalls happen only for domains explicitly
-//!   listed in the deploy/upgrade-arg `DohConfig.allowed_domains`. The
-//!   verifier never goes to the internet for an arbitrary domain.
+//! - **Config-gated, open to any domain.** Outcalls happen only while the
+//!   deploy/upgrade arg has set a `DohConfig`, for any registered domain.
+//! - **Reserved capacity.** Lookups for a domain in
+//!   `DohConfig.reserved_domains` and lookups for every other domain take
+//!   their outcall slot from separate budgets ([`OutcallBudget`]), so a
+//!   burst of lookups for arbitrary domains can't starve the reserved ones.
 //! - **Lazy.** No background polling. The cache is populated on
-//!   demand the first time a real `smtp_request` arrives for a listed
+//!   demand the first time a real `smtp_request` arrives for a
 //!   domain.
 //! - **Quorum across independent operators.** Every cache miss fires
 //!   parallel outcalls to five providers across four jurisdictions
@@ -45,7 +48,7 @@ mod types;
 
 use std::cell::RefCell;
 
-use cache::{new_doh_cache, DohCache};
+use cache::{new_doh_cache, DohCache, DohLookup, OutcallBudget};
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
 
@@ -65,32 +68,61 @@ thread_local! {
     /// re-fetches.
     static DOH_CACHE: RefCell<DohCache> = RefCell::new(new_doh_cache(doh_fill));
 
-    /// Caps how many DoH lookups fan out at once. Each lookup fans out to all
-    /// five providers, so a burst of distinct lookups opens a lot of
-    /// connections at once; this keeps that in check. The 90s reclaim frees a
-    /// slot whose fill never reported back; keep it above the ~60s outcall
-    /// timeout so a still-live fill is never reclaimed early. See
-    /// [`crate::concurrency`].
-    static OUTCALL_LIMIT: RefCell<ConcurrencyLimiter> = RefCell::new(
-        ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 10, max_age_secs: 90 }),
+    /// Caps how many lookups for [`OutcallBudget::Reserved`] domains fan out
+    /// at once. See [`RESERVED_MAX_CONCURRENT_LOOKUPS`].
+    static RESERVED_OUTCALL_LIMIT: RefCell<ConcurrencyLimiter> = RefCell::new(
+        ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: RESERVED_MAX_CONCURRENT_LOOKUPS,
+            max_age_secs: OUTCALL_SLOT_MAX_AGE_SECS,
+        }),
+    );
+
+    /// Caps how many lookups for [`OutcallBudget::Shared`] domains fan out at
+    /// once. See [`SHARED_MAX_CONCURRENT_LOOKUPS`].
+    static SHARED_OUTCALL_LIMIT: RefCell<ConcurrencyLimiter> = RefCell::new(
+        ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: SHARED_MAX_CONCURRENT_LOOKUPS,
+            max_age_secs: OUTCALL_SLOT_MAX_AGE_SECS,
+        }),
     );
 }
 
-/// The cache's shared fill for one FQDN: the five-provider fan-out reduced to
-/// a single cacheable verdict. A TXT record and a definitive `NoAnswer` are
+/// Lookups for reserved domains that may fan out at once. Each lookup fans
+/// out to all five providers, so a burst of distinct lookups opens a lot of
+/// connections at once; this keeps that in check for the domains that carry
+/// most of the traffic.
+const RESERVED_MAX_CONCURRENT_LOOKUPS: usize = 10;
+
+/// Lookups for all other domains that may fan out at once. Smaller than
+/// [`RESERVED_MAX_CONCURRENT_LOOKUPS`]: anyone can trigger a lookup for an
+/// arbitrary domain, and these domains carry little of the traffic.
+const SHARED_MAX_CONCURRENT_LOOKUPS: usize = 5;
+
+/// Age after which an outcall slot whose fill never reported back is
+/// reclaimed. Above the ~60s outcall timeout so a still-live fill is never
+/// reclaimed early. See [`crate::concurrency`].
+const OUTCALL_SLOT_MAX_AGE_SECS: u64 = 90;
+
+/// The cache's shared fill for one [`DohLookup`]: the five-provider fan-out
+/// reduced to a single cacheable verdict. A TXT record and a definitive `NoAnswer` are
 /// both cacheable *answers* (shared, served for the TTL); only transient
 /// failures stay `Err`, which is what the cache debounces. The query is
 /// rebuilt from the key here; the caller ([`fetch_txt`]) already validated
 /// the name before the value was ever requested.
-async fn doh_fill(name: String) -> FillOutcome<DohRecord, DohError> {
-    let query = match build_txt_query(&name) {
+async fn doh_fill(lookup: DohLookup) -> FillOutcome<DohRecord, DohError> {
+    let query = match build_txt_query(&lookup.name) {
         Ok(q) => q,
         Err(e) => return FillOutcome::Failed(DohError::InvalidName(format!("{e:?}"))),
     };
-    // Take an outcall slot for the whole five-provider fan-out. No slot → don't
-    // fan out at all: abandon the fill so the cache records nothing (no backoff)
-    // and the next poll retries once capacity frees.
-    let Some(_permit) = crate::concurrency::acquire(&OUTCALL_LIMIT) else {
+    // Take an outcall slot from the lookup's budget for the whole
+    // five-provider fan-out. No slot → don't fan out at all: abandon the fill
+    // so the cache records nothing (no backoff) and the next poll retries once
+    // capacity frees.
+    let limiter = match lookup.budget {
+        OutcallBudget::Reserved => &RESERVED_OUTCALL_LIMIT,
+        OutcallBudget::Shared => &SHARED_OUTCALL_LIMIT,
+    };
+    let Some(_permit) = crate::concurrency::acquire(limiter) else {
         return FillOutcome::Abandoned;
     };
     let outcomes = fetch_all(&query).await;
@@ -190,31 +222,23 @@ fn status_to_outcome(status: u16, body: Vec<u8>) -> Outcome {
 /// caller's own deadline ends it.
 ///
 /// `Err` is reserved for the synchronous gate — the lookup is rejected before
-/// the cache is touched (no outcall): `NotConfigured`, `DomainNotAllowed`,
+/// the cache is touched (no outcall): `NotConfigured`,
 /// `NameOutsideRegisteredDomain`, `InvalidName`.
 ///
 /// `name` is the full FQDN (e.g., `selector1._domainkey.gmail.com`);
-/// `registered_domain` (e.g., `gmail.com`) is what the allowlist gate
-/// checks. The caller — the DKIM/DMARC code — already extracts the
+/// `registered_domain` (e.g., `gmail.com`) picks the outcall budget: the
+/// reserved one when it is listed in `DohConfig.reserved_domains`, the shared
+/// one otherwise. The caller — the DKIM/DMARC code — already extracts the
 /// registered domain when validating From-header alignment, so we
 /// don't re-implement that here.
 pub fn fetch_txt(name: &str, registered_domain: &str) -> Result<Cached<DohRecord>, DohError> {
     let config =
         crate::state::persistent_state(|p| p.doh_config.clone()).ok_or(DohError::NotConfigured)?;
-    if !config
-        .allowed_domains
-        .iter()
-        .any(|d| d.eq_ignore_ascii_case(registered_domain))
-    {
-        return Err(DohError::DomainNotAllowed);
-    }
-    // Defence-in-depth: the allowlist gate above only checks the
-    // registered_domain the caller hands us — but `name` is what we'd
-    // actually query. A caller bug or future regression that decoupled
-    // the two could pass an allowlisted registered_domain alongside a
-    // completely unrelated name (e.g., `evil.com`) and we'd happily
-    // outcall for it. Insist that `name` sits inside `registered_domain`
-    // with a label-anchored suffix match.
+    // The budget is chosen from `registered_domain`, but `name` is what we
+    // query: a caller that decoupled the two could pass a reserved
+    // registered_domain alongside an unrelated name (e.g., `evil.com`) and
+    // spend reserved capacity on it. Insist that `name` sits inside
+    // `registered_domain` with a label-anchored suffix match.
     if !name_within_domain(name, registered_domain) {
         return Err(DohError::NameOutsideRegisteredDomain {
             name: name.to_string(),
@@ -227,11 +251,28 @@ pub fn fetch_txt(name: &str, registered_domain: &str) -> Result<Cached<DohRecord
         return Err(DohError::InvalidName(format!("{e:?}")));
     }
 
+    let is_reserved = config
+        .reserved_domains
+        .iter()
+        .flatten()
+        .any(|d| d.eq_ignore_ascii_case(registered_domain));
+    let budget = if is_reserved {
+        OutcallBudget::Reserved
+    } else {
+        OutcallBudget::Shared
+    };
+
     // Dedup-aware read via the single-flight cache. The first arrival for a
     // cold or stale name spawns the five-provider fan-out and gets `Pending`;
     // concurrent arrivals see it in flight and also get `Pending` (no second
     // fan-out). A `Ready` answer is served straight from the cache.
-    Ok(get(&DOH_CACHE, name.to_string()))
+    Ok(get(
+        &DOH_CACHE,
+        DohLookup {
+            name: name.to_string(),
+            budget,
+        },
+    ))
 }
 
 /// Snapshot of the DoH cache state, for the canister metrics endpoint. See
@@ -460,13 +501,19 @@ mod tests {
         Ok(Cached::Ready(DohRecord::Txt(bytes.to_vec())))
     }
 
-    fn install_config(domains: &[&str], max_age: Option<u64>) {
+    fn install_config(reserved_domains: &[&str], max_age: Option<u64>) {
         persistent_state_mut(|p: &mut PersistentState| {
             p.doh_config = Some(DohConfig {
-                allowed_domains: domains.iter().map(|d| (*d).to_string()).collect(),
+                reserved_domains: Some(reserved_domains.iter().map(|d| (*d).to_string()).collect()),
                 max_cache_age_secs: max_age,
             });
         });
+    }
+
+    /// Hold every slot of `limiter`, so the next fill drawing from it finds
+    /// no capacity. The slots free when the returned permits drop.
+    fn exhaust(limiter: crate::concurrency::Limiter) -> Vec<crate::concurrency::Permit> {
+        std::iter::from_fn(|| crate::concurrency::acquire(limiter)).collect()
     }
 
     fn clear_config() {
@@ -514,20 +561,87 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unallowed_domain() {
+    fn resolves_a_domain_that_is_not_reserved() {
         install_config(&["gmail.com"], None);
         reset_cache();
-        let r = fetch("selector._domainkey.evil.com", "evil.com");
-        assert_eq!(r, Err(DohError::DomainNotAllowed));
+        set_mock(&agreeing_dkim());
+        let r = fetch("selector._domainkey.example.com", "example.com");
+        assert_eq!(r, ready_txt(b"v=DKIM1; k=rsa; p=..."));
+        assert_eq!(call_count(), 1);
     }
 
     #[test]
-    fn allowlist_match_is_case_insensitive() {
+    fn resolves_any_domain_when_no_domain_is_reserved() {
+        persistent_state_mut(|p: &mut PersistentState| {
+            p.doh_config = Some(DohConfig {
+                reserved_domains: None,
+                max_cache_age_secs: None,
+            });
+        });
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        let r = fetch("selector._domainkey.example.com", "example.com");
+        assert_eq!(r, ready_txt(b"v=DKIM1; k=rsa; p=..."));
+    }
+
+    #[test]
+    fn a_full_shared_budget_holds_back_other_domains_but_not_reserved_ones() {
+        install_config(&["gmail.com"], None);
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        let shared_permits = exhaust(&SHARED_OUTCALL_LIMIT);
+        assert_eq!(shared_permits.len(), 5);
+
+        let other = fetch("selector._domainkey.example.com", "example.com");
+        assert_eq!(other, Ok(Cached::Pending));
+        assert_eq!(call_count(), 0, "no shared slot, so no fan-out");
+
+        let reserved = fetch("selector._domainkey.gmail.com", "gmail.com");
+        assert_eq!(reserved, ready_txt(b"v=DKIM1; k=rsa; p=..."));
+        assert_eq!(call_count(), 1);
+
+        drop(shared_permits);
+        let other = fetch("selector._domainkey.example.com", "example.com");
+        assert_eq!(other, ready_txt(b"v=DKIM1; k=rsa; p=..."));
+        assert_eq!(call_count(), 2);
+    }
+
+    #[test]
+    fn a_full_reserved_budget_holds_back_reserved_domains_but_not_other_ones() {
+        install_config(&["gmail.com"], None);
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        let reserved_permits = exhaust(&RESERVED_OUTCALL_LIMIT);
+        assert_eq!(reserved_permits.len(), 10);
+
+        let reserved = fetch("selector._domainkey.gmail.com", "gmail.com");
+        assert_eq!(reserved, Ok(Cached::Pending));
+        assert_eq!(call_count(), 0, "no reserved slot, so no fan-out");
+
+        let other = fetch("selector._domainkey.example.com", "example.com");
+        assert_eq!(other, ready_txt(b"v=DKIM1; k=rsa; p=..."));
+        assert_eq!(call_count(), 1);
+    }
+
+    #[test]
+    fn reserved_domain_match_is_case_insensitive() {
         install_config(&["GMAIL.com"], None);
         reset_cache();
         set_mock(&agreeing_dkim());
+        let _shared_permits = exhaust(&SHARED_OUTCALL_LIMIT);
         let r = fetch("selector._domainkey.gmail.com", "gmail.com");
         assert_eq!(r, ready_txt(b"v=DKIM1; k=rsa; p=..."));
+    }
+
+    #[test]
+    fn a_look_alike_of_a_reserved_domain_draws_from_the_shared_budget() {
+        install_config(&["example.com"], None);
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        let _shared_permits = exhaust(&SHARED_OUTCALL_LIMIT);
+        let r = fetch("selector._domainkey.evil-example.com", "evil-example.com");
+        assert_eq!(r, Ok(Cached::Pending));
+        assert_eq!(call_count(), 0);
     }
 
     #[test]
@@ -672,8 +786,8 @@ mod tests {
     fn rejects_name_outside_registered_domain() {
         install_config(&["gmail.com"], None);
         reset_cache();
-        // Allowlisted registered_domain, but `name` doesn't sit inside
-        // it — should fail closed without an outcall.
+        // Reserved registered_domain, but `name` doesn't sit inside it —
+        // should fail closed without an outcall.
         let r = fetch("selector._domainkey.evil.com", "gmail.com");
         match r {
             Err(DohError::NameOutsideRegisteredDomain {

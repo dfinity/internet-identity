@@ -135,12 +135,24 @@ pub fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Ve
 
 /// The path to the state machine binary to run the tests with
 pub fn env() -> PocketIc {
-    const POCKET_IC: &str = "../../pocket-ic";
-    let config = ExtendedSubnetConfigSet {
+    env_with_subnets(ExtendedSubnetConfigSet {
         ii: Some(SubnetSpec::default()),
         nns: Some(SubnetSpec::default()),
         ..ExtendedSubnetConfigSet::default()
-    };
+    })
+}
+
+/// An environment with one application subnet and nothing else, so no threshold signing
+/// key: a canister installed there is refused every key it asks for.
+pub fn env_without_signing_keys() -> PocketIc {
+    env_with_subnets(ExtendedSubnetConfigSet {
+        application: vec![SubnetSpec::default()],
+        ..ExtendedSubnetConfigSet::default()
+    })
+}
+
+fn env_with_subnets(config: ExtendedSubnetConfigSet) -> PocketIc {
+    const POCKET_IC: &str = "../../pocket-ic";
 
     // If there is a file named pocket-ic-port, the test will reuse that pocket IC instance.
     // This is necessary because we use nextest in CI which does not work with PocketIC being started
@@ -401,6 +413,7 @@ const P256_SPKI_HEADER: [u8; 26] = [
 const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
+const SAME_DEVICE_LINK_SIGNATURE_DOMAIN: &[u8] = b"ii-same-device-link";
 
 impl BrowserKey {
     pub fn new(seed: u8) -> Self {
@@ -457,6 +470,24 @@ impl BrowserKey {
         message.extend_from_slice(&offering_anchor_number.to_be_bytes());
         message.extend_from_slice(&claiming_anchor_number.to_be_bytes());
         message.extend_from_slice(&expires_at_ns.to_be_bytes());
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
+    }
+
+    /// The claim the browser signing as `claimer` makes with this one-shot key to link the
+    /// entry that registered it to its own, as sharing its device.
+    pub fn sign_same_device_link_claim(
+        &self,
+        anchor_number: AnchorNumber,
+        claimer: Principal,
+    ) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let claimer = claimer.as_slice();
+        let mut message = SAME_DEVICE_LINK_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(&anchor_number.to_be_bytes());
+        message.push(u8::try_from(claimer.len()).expect("a principal is under 256 bytes"));
+        message.extend_from_slice(claimer);
         let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
         ByteBuf::from(signature.to_bytes().to_vec())
     }

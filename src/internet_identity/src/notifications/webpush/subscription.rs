@@ -1,23 +1,21 @@
 //! What a browser registered for Web Push, held on its entry in the identity's browser
 //! registry.
 
+use super::pwa_subscription;
 use super::validation::{PushEndpoint, SealedAuth, SubscriberKey};
 use super::{payload, seed_pool, transport};
 use crate::authz_utils::NotificationKey;
-use crate::notifications::delivery_metrics::{self, Path, Reason};
 use crate::notifications::dispatch::{self, DeliveryTarget};
 use crate::notifications::installed_app::NotificationAppRef;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId};
 use crate::state;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{
-    Anchor, InboxNotification, PendingTransport, ReadySubscription, WebPushSubscription,
-};
-use crate::storage::Storage;
+use crate::storage::anchor::{Anchor, PendingTransport, ReadySubscription, WebPushSubscription};
+use crate::storage::{PwaSubscriptionHolder, Storage};
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, PrepareWebPushSubscriptionError, RemoveWebPushSubscriptionError,
-    SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
+    SetWebPushSubscriptionError, Timestamp, UnansweredPushes, WebPushSubscriptionStatus,
 };
 
 /// Records the key a fetch just minted, against the registration that will spend it.
@@ -44,9 +42,9 @@ pub fn start_subscription(
         .map_err(|err| PrepareWebPushSubscriptionError::InternalCanisterError(format!("{err}"))),
         NotificationKey::Browser(browser_id) => {
             let anchor = state::anchor(anchor_number);
-            // This writes the entry's registration and empties its inbox, so it is
-            // refused on the same ground `set_subscription` is: a browser the identity
-            // signed out of stays signed out, whoever asks.
+            // This writes the entry's registration, so it is refused on the same ground
+            // `set_subscription` is: a browser the identity signed out of stays signed
+            // out, whoever asks.
             if anchor
                 .browser(browser_id)
                 .is_none_or(|browser| browser.session_count == 0)
@@ -109,7 +107,7 @@ pub fn set_subscription(
         .and_then(WebPushSubscription::pending)
         .ok_or(SetWebPushSubscriptionError::TransportKeyExpired)?
         .clone();
-    let ready = spend_pending(
+    let ready = spend_pending_transport(
         &pending,
         &browser_transport_key,
         &sealed_auth,
@@ -125,9 +123,9 @@ pub fn set_subscription(
 /// Opens `auth`, derives what the subscription will be sealed with, and answers the
 /// registration to write.
 ///
-/// The age and the queue follow the address: a browser re-registering where it already
-/// was keeps both, which is why the fetch kept what it was replacing.
-fn spend_pending(
+/// The registration is new from here: its age starts at `now_ns`. The browser's inbox is
+/// not the registration's and stays as it is.
+pub(super) fn spend_pending_transport(
     pending: &PendingTransport,
     browser_transport_key: &SubscriberKey,
     sealed_auth: &SealedAuth,
@@ -152,6 +150,8 @@ fn spend_pending(
         subscriber_key,
         auth,
         last_rotated_ns: now_ns,
+        unanswered_pushes: None,
+        probe_sent_at_ns: None,
     })
 }
 
@@ -170,32 +170,10 @@ pub fn remove_subscription(
 fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Result<(), String> {
     let mut anchor =
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
-    let (path, cleared_notifications) = take_inbox(&mut anchor, browser_id);
     // The reference stays, because it is which app this browser has rather than whether
     // it is routing.
     anchor.disable_notification_app(browser_id);
-    write_subscription(anchor, browser_id, None)?;
-    delivery_metrics::count_removed_entries(
-        anchor_number,
-        &cleared_notifications,
-        path,
-        Reason::SubscriptionReplaced,
-    );
-    Ok(())
-}
-
-/// Empties the browser's inbox, answering it with the way it was reached.
-fn take_inbox(anchor: &mut Anchor, browser_id: BrowserId) -> (Path, Vec<InboxNotification>) {
-    let path = storage_borrow(|storage| {
-        anchor
-            .browser(browser_id)
-            .map_or(Path::Other, |browser| dispatch::path_of(storage, browser))
-    });
-    let cleared_notifications = anchor
-        .notifications_for_browser_mut(browser_id)
-        .map(std::mem::take)
-        .unwrap_or_default();
-    (path, cleared_notifications)
+    write_subscription(anchor, browser_id, None)
 }
 
 /// `target` says who held the posted endpoint, rather than whoever the entry points at by
@@ -220,6 +198,16 @@ pub(crate) fn clear_gone_subscription(
                 return Ok(());
             }
             write_subscription(anchor, browser_id, None)
+        }
+        DeliveryTarget::Pwa { application_number } => {
+            pwa_subscription::clear_gone_pwa_subscription(
+                PwaSubscriptionHolder {
+                    anchor_number,
+                    application_number,
+                    browser_id,
+                },
+                endpoint,
+            )
         }
         DeliveryTarget::App(app_id) => {
             let gone = storage_borrow(|storage| {
@@ -275,6 +263,7 @@ pub(crate) fn delivering_subscription<M: Memory + Clone>(
 pub fn subscription_status(
     anchor_number: AnchorNumber,
     key: NotificationKey,
+    now_ns: Timestamp,
 ) -> Option<WebPushSubscriptionStatus> {
     let subscription = match key {
         NotificationKey::App(app_id) => {
@@ -288,33 +277,42 @@ pub fn subscription_status(
     // nothing, which is what a caller deciding whether to register needs to hear.
     subscription
         .and_then(WebPushSubscription::into_ready)
-        .map(|registered| WebPushSubscriptionStatus {
-            endpoint: registered.endpoint.as_str().to_string(),
+        .map(|registered_subscription| status_of(&registered_subscription, now_ns))
+}
+
+/// What a caller is told about `ready` at `now_ns`: where it posts to, and the pushes
+/// posted through it that nothing has fetched since.
+pub(crate) fn status_of(ready: &ReadySubscription, now_ns: Timestamp) -> WebPushSubscriptionStatus {
+    WebPushSubscriptionStatus {
+        endpoint: ready.endpoint.as_str().to_string(),
+        unanswered_pushes: unanswered_pushes_of(ready, now_ns),
+        probe_sent_at_ns: ready.probe_sent_at_ns,
+    }
+}
+
+/// The pushes posted through `ready` that nothing has fetched since, as at `now_ns`.
+pub(crate) fn unanswered_pushes_of(
+    ready: &ReadySubscription,
+    now_ns: Timestamp,
+) -> Option<UnansweredPushes> {
+    ready
+        .unanswered_pushes
+        .map(|unanswered_push_count| UnansweredPushes {
+            count: unanswered_push_count.count,
+            first_sent_at_ns: unanswered_push_count.first_sent_at_ns,
+            is_past_limit: unanswered_push_count.is_past_limit(now_ns),
         })
 }
 
-/// Writes what this browser registered, and empties the inbox the old address leaves.
-///
-/// An inbox holds wake-ups already posted to one address. Every write here takes that
-/// address away: a prepare replaces the registration with a pending one, a subscribe
-/// spends that pending one, and signing out drops it. None can still show what was
-/// announced before, and entries nothing will show would fill the inbox against what
-/// arrives next.
+/// Writes what this browser registered. The inbox stays as it is: its entries leave when
+/// they are collected or removed, expire, or are pushed out of a full inbox.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    let (path, cleared_notifications) = take_inbox(&mut anchor, browser_id);
-    let anchor_number = anchor.anchor_number();
     let left = anchor.set_webpush_subscription(browser_id, subscription);
     storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
-    delivery_metrics::count_removed_entries(
-        anchor_number,
-        &cleared_notifications,
-        path,
-        Reason::SubscriptionReplaced,
-    );
     // Read after the write, so the reference this browser just dropped is already gone:
     // a record the last browser left behind is one nothing can reach again.
     if let Some(app_id) = left {
@@ -345,7 +343,7 @@ fn set_app_subscription(
         .as_ref()
         .and_then(WebPushSubscription::pending)
         .ok_or(SetWebPushSubscriptionError::TransportKeyExpired)?;
-    let ready = spend_pending(
+    let ready = spend_pending_transport(
         pending,
         &browser_transport_key,
         &sealed_auth,
@@ -402,10 +400,10 @@ mod tests {
         assert!(stored_subscription(anchor_number, browsers[0]).is_none());
     }
 
-    /// A different address is a different registration, so what was announced to the old
-    /// one goes with it.
+    /// A worker reads only the entry its push named, so what waits in the inbox is kept
+    /// when the browser registers a different address.
     #[test]
-    fn moving_address_drops_what_was_queued_for_the_old_one() {
+    fn moving_address_keeps_what_was_queued() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         try_subscribe(anchor_number, browsers[0], ENDPOINT, 500).expect("the first subscribe");
@@ -415,7 +413,7 @@ mod tests {
 
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.created_at_ns, 9_000);
-        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
     }
 
     /// The key a fetch left is good for minutes, not forever.
@@ -486,7 +484,7 @@ mod tests {
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> Option<WebPushSubscriptionStatus> {
-        subscription_status(anchor_number, NotificationKey::Browser(browser_id))
+        subscription_status(anchor_number, NotificationKey::Browser(browser_id), 0)
     }
 
     fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
@@ -496,12 +494,12 @@ mod tests {
             .expect("a registered browser")
             .push(crate::storage::anchor::InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: crate::storage::anchor::InboxNotificationKind::App {
+                    account_principal: candid::Principal::from_slice(&[9; 10]),
+                },
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
-                event: None,
             });
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
@@ -636,7 +634,7 @@ mod tests {
     }
 
     #[test]
-    fn removing_a_registration_takes_its_browser_inbox_with_it() {
+    fn removing_a_registration_leaves_its_browser_inbox() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(2);
         for browser in &browsers {
@@ -646,13 +644,14 @@ mod tests {
 
         remove(anchor_number, browsers[0]);
 
-        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
         assert_eq!(queued(anchor_number, browsers[1]), 1);
     }
 
-    /// Wake-ups for what was queued went to the old endpoint, so none reach the new one.
+    /// A push service rotating the endpoint leaves the inbox as it is: each entry is still
+    /// collected by the wake-up that named it.
     #[test]
-    fn a_rotated_endpoint_leaves_the_old_browser_inbox_behind() {
+    fn a_rotated_endpoint_keeps_the_browser_inbox() {
         setup();
         let (anchor_number, browsers) = anchor_with_browsers(1);
         subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
@@ -660,7 +659,7 @@ mod tests {
 
         subscribe(anchor_number, browsers[0], ROTATED, 2_000);
 
-        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
     }
 
     #[test]
@@ -673,6 +672,8 @@ mod tests {
             status(anchor_number, browsers[0]),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
+                unanswered_pushes: None,
+                probe_sent_at_ns: None,
             })
         );
 
@@ -716,7 +717,7 @@ mod tests {
         sign_browser_out(anchor_number, browsers[0]);
 
         // Both halves refuse. The fetch matters as much as the subscribe: it writes the
-        // entry's registration and empties its inbox before any address is involved.
+        // entry's registration before any address is involved.
         assert_eq!(
             start_subscription(
                 NotificationKey::Browser(browsers[0]),
@@ -750,14 +751,16 @@ mod tests {
             app(app_id)
                 .webpush_subscription
                 .and_then(WebPushSubscription::into_ready)
-                .map(|s| s.endpoint.into_string()),
+                .map(|subscription| subscription.endpoint.into_string()),
             Some(ENDPOINT.to_string())
         );
         assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
         assert_eq!(
-            subscription_status(anchor_number, app_authorization(app_id)),
+            subscription_status(anchor_number, app_authorization(app_id), 0),
             Some(WebPushSubscriptionStatus {
                 endpoint: ENDPOINT.to_string(),
+                unanswered_pushes: None,
+                probe_sent_at_ns: None,
             })
         );
         // The browser is answered about its own entry, which the app's write left alone.
@@ -797,7 +800,8 @@ mod tests {
 
         for anchor_number in [first, second] {
             assert_eq!(
-                subscription_status(anchor_number, app_authorization(app_id)).map(|s| s.endpoint),
+                subscription_status(anchor_number, app_authorization(app_id), 0)
+                    .map(|subscription| subscription.endpoint),
                 Some(ENDPOINT.to_string()),
                 "every identity pointing at the app reads its one registration"
             );

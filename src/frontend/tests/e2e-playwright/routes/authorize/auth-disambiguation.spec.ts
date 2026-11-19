@@ -1,6 +1,12 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize, addVirtualAuthenticator, II_URL } from "../../utils";
+import {
+  authorize,
+  addVirtualAuthenticator,
+  blockPopupsOutsideOfPresses,
+  II_URL,
+  refuseFirstPopup,
+} from "../../utils";
 import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 
 const DEFAULT_USER_NAME = "John Doe";
@@ -205,33 +211,39 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
     },
   });
 
+  // A returning OpenID identity: signed up, then signed out with the identity
+  // and its stored session kept on this browser.
+  test.beforeEach(
+    async ({ page, managePage, signInWithOpenIdPopup, openIdUsers }) => {
+      await page.goto(II_URL);
+      await signInWithOpenIdPopup(
+        page,
+        () =>
+          page
+            .getByRole("button", { name: openIdUsers[0].issuer.name })
+            .click(),
+        openIdUsers[0].id,
+      );
+      // Fresh OIDC user on the homepage surfaces IdentityNotConnectedDialog —
+      // confirm sign-up to land on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+      await page.waitForURL(II_URL + "/manage");
+      await managePage.signOut((c) => c.keepIdentity());
+      await page.context().clearCookies();
+    },
+  );
+
   test("OIDC sign-in with known identity proceeds without disambiguation dialog", async ({
     page,
-    managePage,
-    signInWithOpenId,
+    signInWithOpenIdPopup,
     openIdUsers,
   }) => {
-    // Register the user first
-    await page.goto(II_URL);
-    const signUpPopupPromise = page.context().waitForEvent("page");
-    await page
-      .getByRole("button", { name: openIdUsers[0].issuer.name })
-      .click();
-    const signUpPopup = await signUpPopupPromise;
-    const signUpClosePromise = signUpPopup.waitForEvent("close", {
-      timeout: 15_000,
-    });
-    await signInWithOpenId(signUpPopup, openIdUsers[0].id);
-    await signUpClosePromise;
-    // Fresh OIDC user on the homepage surfaces IdentityNotConnectedDialog —
-    // confirm sign-up to land on /manage.
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Sign up" })
-      .click();
-    await page.waitForURL(II_URL + "/manage");
-    await managePage.signOut((c) => c.keepIdentity());
-    await page.context().clearCookies();
+    // Continue below has to open the OIDC popup before it awaits a stored
+    // session or the canister, or no popup ever arrives.
+    await blockPopupsOutsideOfPresses(page.context(), II_URL);
 
     // Sign in via /authorize — known (iss, sub) goes straight to ContinueView.
     // keepIdentity() left the last-used entry in localStorage, so the picker
@@ -248,17 +260,91 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
         authPage.getByRole("heading", { name: "Already connected" }),
       ).toBeHidden();
 
-      const signInPopupPromise = authPage.context().waitForEvent("page");
+      await signInWithOpenIdPopup(
+        authPage,
+        () =>
+          authPage
+            .getByRole("button", { name: "Continue", exact: true })
+            .click(),
+        openIdUsers[0].id,
+      );
+    });
+  });
+
+  test("A pop-up the browser refuses is reported as blocked, and Continue works on the next press", async ({
+    page,
+    signInWithOpenIdPopup,
+    openIdUsers,
+  }) => {
+    await refuseFirstPopup(page.context(), II_URL);
+
+    await authorize(page, async (authPage) => {
+      const continueButton = authPage.getByRole("button", {
+        name: "Continue",
+        exact: true,
+      });
+      await continueButton.click();
+      await expect(authPage.getByText("Pop-up blocked")).toBeVisible();
+      await expect(continueButton).toBeEnabled();
+
+      await signInWithOpenIdPopup(
+        authPage,
+        () => continueButton.click(),
+        openIdUsers[0].id,
+      );
+    });
+  });
+
+  test("Make an existing account the default and authorize with it", async ({
+    page,
+    signInWithOpenIdPopup,
+    openIdUsers,
+  }) => {
+    await blockPopupsOutsideOfPresses(page.context(), II_URL);
+
+    const workPrincipal = await authorize(page, async (authPage) => {
+      // The accounts are read with the session kept on sign-out; creating one
+      // signs in.
+      await authPage
+        .getByRole("switch", { name: "Show all options" })
+        .setChecked(true);
+      await authPage
+        .getByRole("button", { name: "Add another account" })
+        .click();
+      await authPage.getByLabel("Account name").fill("Work");
+      await signInWithOpenIdPopup(
+        authPage,
+        () => authPage.getByRole("button", { name: "Create account" }).click(),
+        openIdUsers[0].id,
+      );
+      await authPage.getByRole("radio", { name: "Work" }).click();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
-      const signInPopup = await signInPopupPromise;
-      const signInClosePromise = signInPopup.waitForEvent("close", {
-        timeout: 15_000,
-      });
-      await signInWithOpenId(signInPopup, openIdUsers[0].id);
-      await signInClosePromise;
     });
+    // The provider keeps the sign-in above in a cookie and would skip its form.
+    await page.context().clearCookies();
+    const defaultPrincipal = await authorize(page, async (authPage) => {
+      // The accounts are read with the stored session; saving signs in.
+      await authPage.getByRole("button", { name: "Edit Work" }).click();
+      await authPage
+        .getByRole("checkbox", { name: "Set as default sign-in" })
+        .setChecked(true);
+      await signInWithOpenIdPopup(
+        authPage,
+        () => authPage.getByRole("button", { name: "Save changes" }).click(),
+        openIdUsers[0].id,
+      );
+      await expect(authPage.getByRole("dialog")).toBeHidden();
+      // With all options off, Continue signs in with the default account.
+      await authPage
+        .getByRole("switch", { name: "Show all options" })
+        .setChecked(false);
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+    expect(defaultPrincipal).toEqual(workPrincipal);
   });
 });
 

@@ -5,9 +5,9 @@ import type {
 
 /**
  * The `Failed` reasons that can actually reach the failed view. The
- * poll loop intercepts `DomainNotAllowlisted` / `DomainNotSupported`
- * first and routes them to the dedicated unsupported-domain view, so
- * they never need a friendly string here. `InvalidEmailAddress` and
+ * poll loop intercepts `DomainNotSupported` first and routes it to the
+ * dedicated unsupported-domain view, so it never needs a friendly
+ * string here. `InvalidEmailAddress` and
  * `LimitReached` are prepare-time variants that the wizard catches
  * before polling — they shouldn't reach this surface either, but they
  * stay in the union for type-safety: a defensive friendly string
@@ -15,7 +15,7 @@ import type {
  */
 export type FailedReason = Exclude<
   EmailChallengeError,
-  { DomainNotAllowlisted: string } | { DomainNotSupported: string }
+  { DomainNotSupported: string }
 >;
 
 /**

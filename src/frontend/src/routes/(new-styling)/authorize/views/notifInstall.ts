@@ -1,6 +1,7 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { allowApp } from "$lib/utils/notifications/enableNotifications";
+import type { NotificationsSource } from "$lib/utils/analytics/icpAlertsFunnel";
 import {
   openPendingInstallTab,
   installUrlOrNone,
@@ -23,12 +24,15 @@ export const startAppInstall = ({
   origin,
   actor,
   consented,
+  source,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
   /** Whether this app already holds consent from this identity. */
   consented: boolean;
+  /** Which screen offered the install, carried in its URL for the funnel. */
+  source: NotificationsSource;
 }): StartedInstall => {
   const tab = openPendingInstallTab();
 
@@ -38,7 +42,7 @@ export const startAppInstall = ({
   // Nothing awaits this until sign-in settles, and an unattached rejection in between is an unhandled rejection.
   void granted.catch(() => undefined);
 
-  const url = installUrlOrNone(identityNumber, "authorize");
+  const url = installUrlOrNone(identityNumber, source);
   void url.then(tab.point);
 
   return { granted, url, tabOpened: tab.opened };

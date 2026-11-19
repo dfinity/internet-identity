@@ -119,4 +119,16 @@ describe("reported url", () => {
       { url: `${window.location.origin}/ios-icp-alerts` },
     );
   });
+
+  it("never reports the same-device link page's fragment, which holds its link key", () => {
+    window.history.replaceState(null, "", "/ios-installed-app#key=secret");
+    initAnalytics({
+      Plausible: { ...ENABLED_CONFIG.Plausible, hash_mode: [true] },
+    } as unknown as AnalyticsConfig);
+    analytics.pageView();
+
+    expect(trackPageview).toHaveBeenCalledWith({
+      url: `${window.location.origin}/ios-installed-app`,
+    });
+  });
 });

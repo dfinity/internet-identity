@@ -1277,7 +1277,9 @@ mod browser_tests {
     use crate::notifications::installed_app::{
         NotificationApp, NotificationAppId, NotificationAppRef,
     };
-    use crate::storage::anchor::{BrowserError, InboxNotification, MAX_BROWSERS};
+    use crate::storage::anchor::{
+        BrowserError, InboxNotification, InboxNotificationKind, MAX_BROWSERS,
+    };
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, BrowserId, FormFactor, NotificationAppInfo,
         NotificationAppStatus, OperatingSystem, PublicKey,
@@ -1591,7 +1593,7 @@ mod browser_tests {
     }
 
     #[test]
-    fn taking_an_app_off_an_entry_drops_what_it_had_waiting() {
+    fn taking_an_app_off_an_entry_keeps_what_it_has_waiting() {
         let mut anchor = anchor();
         let (first, _) = anchor
             .resolve_browser(
@@ -1615,21 +1617,71 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
-                event: None,
             });
 
         anchor.point_at_notification_app(second, 7);
 
-        assert!(anchor.notifications_for_browser(first).is_empty());
+        assert_eq!(anchor.notifications_for_browser(first).len(), 1);
+    }
+
+    /// A browser entry still carrying the retired inbox, key 11, reads with that inbox
+    /// skipped, so as an empty one, and is written back without it.
+    #[test]
+    fn a_browser_stored_with_the_retired_inbox_reads_as_empty_and_is_rewritten_without_it() {
+        use crate::storage::anchor::Browser;
+        use crate::storage::storable::browser::StorableBrowser;
+
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome on a Mac"),
+                1_000,
+            )
+            .unwrap();
+        let browser = anchor.browser(id).expect("a listed browser").clone();
+        let mut current_bytes = Vec::new();
+        minicbor::encode(StorableBrowser::from(browser), &mut current_bytes).expect("encoding it");
+
+        // The same map with one entry more: key 11, holding one entry in the shape it had,
+        // an app's notification for an account by number.
+        let header = *current_bytes.first().expect("a map header");
+        assert!(
+            (0xa0..0xb7).contains(&header),
+            "a map of fewer than 23 keys"
+        );
+        let mut retired_bytes = vec![header + 1];
+        retired_bytes.extend_from_slice(current_bytes.get(1..).expect("the map's entries"));
+        let mut encoder = minicbor::Encoder::new(&mut retired_bytes);
+        encoder.u8(11).unwrap().array(1).unwrap().map(6).unwrap();
+        encoder.u8(0).unwrap().u64(1).unwrap();
+        encoder.u8(6).unwrap().u64(0).unwrap();
+        encoder.u8(1).unwrap().bytes(&[7; 10]).unwrap();
+        encoder.u8(2).unwrap().u64(1).unwrap();
+        encoder.u8(3).unwrap().u64(u64::MAX).unwrap();
+        encoder.u8(4).unwrap().u64(3).unwrap();
+
+        let decoded_browser = Browser::from(
+            minicbor::decode::<StorableBrowser>(&retired_bytes)
+                .expect("decoding the retired shape"),
+        );
+        assert!(decoded_browser.notifications.is_empty());
+
+        let mut rewritten_bytes = Vec::new();
+        minicbor::encode(StorableBrowser::from(decoded_browser), &mut rewritten_bytes)
+            .expect("encoding it");
+        assert_eq!(rewritten_bytes, current_bytes);
     }
 
     #[test]
-    fn repointing_a_browser_drops_what_the_old_app_was_sent() {
+    fn repointing_a_browser_keeps_what_is_waiting() {
         let mut anchor = anchor();
         let (id, _) = anchor
             .resolve_browser(
@@ -1645,12 +1697,12 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
-                event: None,
             });
 
         anchor.point_at_notification_app(id, 7);
@@ -1658,7 +1710,7 @@ mod browser_tests {
 
         anchor.point_at_notification_app(id, 8);
 
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     /// A reference naming a record that is gone is no app this identity has. The record
@@ -2347,7 +2399,7 @@ mod browser_tests {
     /// A browser has one route: pointing at a record takes the address it registered for
     /// itself, and what that address was sent goes with it.
     #[test]
-    fn pointing_at_an_app_takes_the_browsers_own_address_and_what_it_was_sent() {
+    fn pointing_at_an_app_takes_the_browsers_own_address() {
         let (mut anchor, id) = anchor_with_browser();
         anchor
             .set_webpush_subscription(id, Some(subscription_at("https://push.example/one", 1_000)));
@@ -2356,18 +2408,18 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
-                event: None,
             });
 
         anchor.point_at_notification_app(id, 7);
 
         assert!(anchor.webpush_subscription(id).is_none());
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     /// The other half of one route per browser: registering an address of its own is how
@@ -2387,11 +2439,11 @@ mod browser_tests {
         assert!(anchor.notification_app(id).is_some());
     }
 
-    /// Switching delivery off empties the queue: nothing drains it while it is off and
-    /// nothing joins it, so what is left would only be shown in place of whatever causes
-    /// the first wake-up after switching back on.
+    /// A worker reads only the entry its push named, so an entry waiting when delivery is
+    /// switched off is never shown in place of another, and the inbox is shared with the
+    /// entry's installed web apps.
     #[test]
-    fn switching_delivery_off_clears_what_was_queued() {
+    fn switching_delivery_off_keeps_what_was_queued() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.point_at_notification_app(id, 7);
         anchor
@@ -2399,23 +2451,23 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
-                event: None,
             });
 
         anchor.disable_notification_app(id);
 
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     /// An install that has not completed is a route of its own: what was posted while
     /// the entry pointed at the app before it is unreadable by the app that finishes.
     #[test]
-    fn finishing_an_install_over_an_old_app_drops_what_that_app_was_sent() {
+    fn finishing_an_install_over_an_old_app_keeps_what_is_waiting() {
         let (mut anchor, id) = anchor_with_browser();
         anchor.point_at_notification_app(id, 7);
         anchor
@@ -2423,18 +2475,18 @@ mod browser_tests {
             .expect("a listed browser")
             .push(InboxNotification {
                 inbox_notification_id: 0,
-                application_number: Some(1),
+                kind: InboxNotificationKind::App {
+                    account_principal: Principal::from_slice(&[9; 10]),
+                },
                 sender: Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
-                account_number: None,
-                event: None,
             });
         anchor.start_notification_app_link(id, link_principal(1), u64::MAX);
 
         anchor.point_at_notification_app(id, 8);
 
-        assert!(anchor.notifications_for_browser(id).is_empty());
+        assert_eq!(anchor.notifications_for_browser(id).len(), 1);
     }
 
     #[test]
@@ -2459,5 +2511,76 @@ mod browser_tests {
                 enabled: true
             })
         );
+    }
+
+    /// Two entries of one identity, the second linked to the first as sharing its device.
+    fn linked_pair() -> (Anchor, BrowserId, BrowserId) {
+        let (mut anchor, safari) = anchor_with_browser();
+        let (installed_app, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Installed app on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.link_same_device(installed_app, safari);
+        (anchor, safari, installed_app)
+    }
+
+    /// Signs in from enough new browsers, each used later than the last, to evict the
+    /// least recently used entry.
+    fn evict_the_oldest(anchor: &mut Anchor) -> Vec<BrowserId> {
+        let mut evicted_browser_ids = Vec::new();
+        for seed in 10..=40u8 {
+            let (_, dropped) = anchor
+                .resolve_browser(
+                    browser_key(seed),
+                    successor_key(seed),
+                    description("Chrome on a Mac"),
+                    10_000 + u64::from(seed),
+                )
+                .unwrap();
+            evicted_browser_ids.extend(dropped);
+            if !evicted_browser_ids.is_empty() {
+                break;
+            }
+        }
+        evicted_browser_ids
+    }
+
+    #[test]
+    fn a_link_names_its_entry_while_the_identity_has_it() {
+        let (anchor, safari, installed_app) = linked_pair();
+
+        assert_eq!(anchor.same_device_browser_of(installed_app), Some(safari));
+    }
+
+    #[test]
+    fn evicting_an_entry_clears_every_link_to_it() {
+        let (mut anchor, safari, installed_app) = linked_pair();
+        // The installed app is used again, so Safari's is the entry to go.
+        anchor.stamp_browser_use(installed_app, 5_000);
+
+        assert_eq!(evict_the_oldest(&mut anchor), vec![safari]);
+
+        assert_eq!(anchor.same_device_browser_of(installed_app), None);
+        assert_eq!(
+            anchor
+                .browser(installed_app)
+                .and_then(|browser| browser.same_device_browser_id),
+            None
+        );
+    }
+
+    #[test]
+    fn a_link_to_an_entry_the_identity_no_longer_has_names_nothing() {
+        let (mut anchor, safari, installed_app) = linked_pair();
+        anchor.stamp_browser_use(installed_app, 5_000);
+        evict_the_oldest(&mut anchor);
+        // Put the stale pointer back, as a rollback could leave it.
+        anchor.link_same_device(installed_app, safari);
+
+        assert_eq!(anchor.same_device_browser_of(installed_app), None);
     }
 }

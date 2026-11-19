@@ -6,6 +6,7 @@ import {
   ECDSAKeyIdentity,
 } from "@icp-sdk/core/identity";
 import {
+  retryFor,
   throwCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
@@ -33,9 +34,11 @@ export const mintSessionDelegation = async ({
     .prepare_session_delegation(identityNumber, sessionKey, [])
     .then(throwCanisterError);
 
-  const signedDelegation = await actor
-    .get_session_delegation(identityNumber, sessionKey, expiration)
-    .then(throwCanisterError);
+  const signedDelegation = await retryFor(8, () =>
+    actor
+      .get_session_delegation(identityNumber, sessionKey, expiration)
+      .then(throwCanisterError),
+  );
 
   const transformedDelegation = transformSignedDelegation(signedDelegation);
   const chain = DelegationChain.fromDelegations(
