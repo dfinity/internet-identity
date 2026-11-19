@@ -11,6 +11,7 @@
     XIcon,
   } from "@lucide/svelte";
   import { prefersReducedMotion } from "svelte/motion";
+  import { MediaQuery } from "svelte/reactivity";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { CardKind, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
@@ -68,6 +69,13 @@
   );
 
   const reduced = $derived(prefersReducedMotion.current);
+
+  /** Where there's the height for it, a card takes its room (Thomas): a
+   *  larger icon, the title under it, a larger sentence, more air. The three
+   *  cards and the identity over them then take about 690px of the window;
+   *  in a lower one they keep to the compact row, title beside the icon. */
+  const tall = new MediaQuery("min-height: 44rem");
+  const large = $derived(tall.current);
   const contentId = $props.id();
 
   // The control pressed leaves as the card grows or shrinks, so focus moves
@@ -149,14 +157,23 @@
       class="ii-hover focus-visible:ring-focus-ring absolute inset-0 rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-inset"
     ></button>
   {/if}
+  <!-- Large: the icon and the chevron (or Close) on one line, the title on
+       the next. Compact: all three on one line. The 16px sides stay either
+       way, the identity's and the rows' own edge. -->
   <div
     aria-hidden={!open}
-    class="pointer-events-none relative flex items-center gap-3 px-4 pt-3.5"
+    class={[
+      "pointer-events-none relative px-4",
+      large
+        ? "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center pt-5"
+        : "flex items-center gap-3 pt-3.5",
+    ]}
   >
     <span
       aria-hidden="true"
       class={[
-        "grid size-9 shrink-0 place-items-center rounded-[0.625rem] transition-colors duration-200 *:col-start-1 *:row-start-1",
+        "grid shrink-0 place-items-center transition-colors duration-200 *:col-start-1 *:row-start-1",
+        large ? "size-11 rounded-xl" : "size-9 rounded-[0.625rem]",
         {
           risk: "text-fg-error-primary bg-(--ii-error-tint)",
           warning: "text-fg-warning-primary bg-(--ii-warning-tint)",
@@ -169,21 +186,34 @@
           in:swapIn={{ reduced }}
           out:swapOut={{ reduced }}
         >
-          <CheckIcon class="size-4.5" strokeWidth={2.5} />
+          <CheckIcon
+            class={large ? "size-5.5" : "size-4.5"}
+            strokeWidth={2.5}
+          />
         </span>
       {:else}
         <span in:swapIn={{ reduced }} out:swapOut={{ reduced }}>
-          <Icon class="size-4.5" />
+          <Icon class={large ? "size-5.5" : "size-4.5"} />
         </span>
       {/if}
     </span>
-    <h3 class="text-text-primary min-w-0 flex-1 text-sm font-semibold">
+    <h3
+      class={[
+        "text-text-primary min-w-0 font-semibold",
+        large
+          ? "col-span-full row-start-2 mt-3.5 text-[1.0625rem] leading-6 tracking-[-0.01em]"
+          : "flex-1 text-sm",
+      ]}
+    >
       {title}
     </h3>
     <!-- The chevron and Close share one cell at the card's end, so the
          chevron turns into Close where it stood. -->
     <span
-      class="-me-2.5 grid size-9 shrink-0 place-items-center *:col-start-1 *:row-start-1"
+      class={[
+        "-me-2.5 grid size-9 shrink-0 place-items-center *:col-start-1 *:row-start-1",
+        large && "col-start-3 row-start-1",
+      ]}
     >
       {#if open}
         <button
@@ -218,7 +248,8 @@
         data-layer="summary"
         aria-hidden="true"
         class={[
-          "pointer-events-none flex min-h-7 items-center gap-2.5 px-4 pt-2.5 pb-4",
+          "pointer-events-none flex min-h-7 items-center gap-2.5 px-4",
+          large ? "pt-2 pb-5" : "pt-2.5 pb-4",
           open && "absolute inset-x-0 top-0",
         ]}
       >
@@ -242,7 +273,8 @@
         {/if}
         <span
           class={[
-            "flex min-w-0 items-center gap-1.5 text-[13px] leading-[18px] text-pretty",
+            "flex min-w-0 items-center gap-1.5 text-pretty",
+            large ? "text-sm" : "text-[13px] leading-[18px]",
             {
               risk: "text-text-error-primary",
               warning: "text-text-primary",
