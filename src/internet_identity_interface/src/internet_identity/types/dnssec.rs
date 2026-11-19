@@ -38,10 +38,11 @@ pub struct DnssecRootAnchor {
 //
 // Mirrors the canister-side types in `crate::dnssec::types` (which are kept
 // CandidType-free so the verifier can stay focused on cryptographic checks).
-// `From<>` impls on the canister side convert at the API boundary.
+// `TryFrom<>` impls on the canister side admit these at the API boundary; a
+// name that is not a valid `DnsName` is rejected there.
 //
-// All names are wire-format (length-prefixed labels). Canonicalisation per
-// RFC 4034 §6.2 happens inside the verifier.
+// Names are wire-format (length-prefixed labels); the canister lower-cases
+// them on admission (RFC 4034 §6.2).
 // =========================================================================
 
 /// One signed RRset — RDATA collection plus the RRSIG that authenticates
