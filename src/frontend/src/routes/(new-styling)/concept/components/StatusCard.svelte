@@ -13,7 +13,6 @@
   import { prefersReducedMotion } from "svelte/motion";
   import type { CardKind, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
-  import { useSurface } from "./Elevated.svelte";
   import Glyphs, { type Glyph } from "./Glyphs.svelte";
 
   interface Props {
@@ -67,9 +66,6 @@
     }[kind],
   );
 
-  // The card's own surface, which it sits in (an Elevated), so the preview's
-  // overlapping circles cut themselves out of it at whatever level it is.
-  const cardSurface = `var(--ii-surface-${useSurface()})`;
   const reduced = $derived(prefersReducedMotion.current);
   const contentId = $props.id();
 
@@ -96,10 +92,7 @@
      nothing inside it is a button of its own: one button lies under the
      whole card. Open, the section's own buttons are there, and Close stands
      where the chevron was. The tinted icon and the sentence carry the tone. -->
-<div
-  style:--ii-card-surface={cardSurface}
-  class="relative flex flex-col rounded-[inherit]"
->
+<div class="relative flex flex-col rounded-[inherit]">
   {#if !open}
     <button
       bind:this={openButton}

@@ -17,6 +17,7 @@
 
 <script lang="ts">
   import type { Tone } from "../status";
+  import { useSurface } from "./Elevated.svelte";
 
   interface Props {
     glyphs: Glyph[];
@@ -33,22 +34,34 @@
     info: "bg-fg-primary",
     neutral: "",
   };
+
+  // One step above the card they lie on, as anything raised off a surface
+  // is in the ladder (surfaces.css): lighter in dark, the same white in
+  // light, where the shadow alone lifts them. The shadow stays a small one
+  // whatever the level, for a 28px coin.
+  const level = Math.min(useSurface() + 1, 8);
 </script>
 
-<!-- Overlapping circles, each cut out of the card it stands on
-     (--ii-card-surface, StatusCard's own surface); bg-secondary keeps them
-     apart from it in light, where a raised card is white. Decorative: the
-     message beside them says what they show. -->
-<span aria-hidden="true" class="flex shrink-0 items-center">
+<!-- Overlapping coins, each a step above the card (StatusCard), with a small
+     shadow, so they read as things that are there and that overlap; the
+     shadow's ring parts each from the one under it. What isn't there yet
+     lies flat instead, a dashed slot in the card itself, side by side with
+     the next rather than under it, so raised means set up and dashed means
+     missing. Decorative: the message beside them says what they show. -->
+<span
+  aria-hidden="true"
+  style:--ii-glyph-surface={`var(--ii-surface-${level})`}
+  class="flex shrink-0 items-center"
+>
   {#each glyphs as glyph, index (glyph.id)}
     {@const Icon = glyph.icon}
     <span
       class={[
-        "relative grid size-7 place-items-center rounded-full ring-2 ring-(color:--ii-card-surface)",
+        "relative grid size-7 place-items-center rounded-full",
         glyph.empty === true
-          ? "border-border-secondary text-fg-quaternary border border-dashed bg-(--ii-card-surface)"
-          : "bg-bg-secondary text-fg-tertiary",
-        index > 0 && "-ms-2",
+          ? "border-border-secondary text-fg-quaternary border border-dashed"
+          : "text-fg-tertiary bg-(--ii-glyph-surface) shadow-(--ii-shadow-3)",
+        index > 0 && (glyph.empty === true ? "ms-1" : "-ms-2"),
       ]}
     >
       {#if glyph.src !== undefined}
@@ -59,7 +72,7 @@
       {#if glyph.marked === true && tone !== "neutral"}
         <span
           class={[
-            "absolute -end-0.5 -top-0.5 size-2 rounded-full ring-2 ring-(color:--ii-card-surface)",
+            "absolute -end-0.5 -top-0.5 size-2 rounded-full ring-2 ring-(color:--ii-glyph-surface)",
             DOT[tone],
           ]}
         ></span>
