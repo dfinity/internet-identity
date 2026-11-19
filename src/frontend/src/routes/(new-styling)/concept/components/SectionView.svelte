@@ -462,7 +462,14 @@
 {/snippet}
 
 {#snippet row(item: Row)}
-  <li class="flex items-center gap-3 px-4 py-3.5">
+  <!-- On a grown card the rows lie on a layer 8px in from its edge, so they
+       step in by 8px to keep their icons on the card's 16px line. -->
+  <li
+    class={[
+      "flex items-center gap-3 py-3.5",
+      variant === "card" ? "px-2" : "px-4",
+    ]}
+  >
     <span
       aria-hidden="true"
       class={[
@@ -523,7 +530,7 @@
           item.action.variant === "primary"
             ? "btn-primary"
             : item.action.variant === "tertiary"
-              ? "btn-tertiary -me-3"
+              ? ["btn-tertiary", variant === "card" ? "-me-2" : "-me-3"]
               : "btn-secondary",
           item.action.variant === "danger" && "btn-danger",
         ]}
@@ -537,7 +544,14 @@
 <!-- The rows lie on the grown card itself, or, on a page, on a card of their
      own. -->
 {#snippet rows(items: Row[])}
-  <ul class="ii-rows flex flex-col [--ii-rows-inset:4rem]">
+  <ul
+    class={[
+      "ii-rows flex flex-col",
+      variant === "card"
+        ? "[--ii-rows-inset:3.5rem]"
+        : "[--ii-rows-inset:4rem]",
+    ]}
+  >
     {#each items as item (item.id)}
       {@render row(item)}
     {/each}
@@ -574,18 +588,26 @@
 {/snippet}
 
 {#if variant === "card"}
-  <!-- Under the card's title, where its status sentence was. -->
+  <!-- Under the card's title, where its status sentence was. The rows lie
+       on a layer of their own, a step up from the card (Misha's turn on
+       Thomas's nit: the card's icon and title read as the card's, what's
+       on the layer as its contents). It keeps 8px from the card's edges,
+       its corners concentric with the card's. -->
   <div class="flex flex-col pt-2.5">
     <p class="text-text-tertiary px-4 text-[13px] leading-[18px]">
       {@render lead()}
     </p>
-    <div class="flex flex-col pt-1">
+    <Elevated
+      offset={1}
+      shadowLevel={3}
+      class="mx-2 mt-3 flex flex-col overflow-hidden rounded-lg"
+    >
       {@render body()}
-    </div>
+    </Elevated>
     {#if section === "access"}
-      <div class="px-4 pt-1 pb-4">{@render addMethod()}</div>
+      <div class="px-2 pt-2 pb-2">{@render addMethod()}</div>
     {:else}
-      <div class="h-1"></div>
+      <div class="h-2"></div>
     {/if}
   </div>
 {:else}
