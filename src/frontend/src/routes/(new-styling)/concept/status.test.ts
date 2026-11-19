@@ -3,8 +3,11 @@ import {
   aiAccessOn,
   cliAccessOn,
   deriveStatus,
+  emailStatus,
   incidentOf,
   needsAttention,
+  phraseStatus,
+  recoveryOf,
   withAiAccess,
   withCliAccess,
   type Scenario,
@@ -81,6 +84,10 @@ describe("deriveStatus", () => {
       "phraseReset",
       "phraseOnly",
       "emailOnly",
+      "unverified",
+      "unverifiedWithEmail",
+      "emailPending",
+      "emailPendingWithPhrase",
       "calm",
     ] as const;
     const access = ["one", "oneLocal", "unused", "calm"] as const;
@@ -96,6 +103,29 @@ describe("deriveStatus", () => {
           ).toBeLessThanOrEqual(1);
         }
       }
+    }
+  });
+
+  it("urges checking the phrase only while it's the one way back", () => {
+    expect(derive({ recovery: "unverified" }).recovery).toEqual({
+      tone: "warning",
+      sentence: "Recovery phrase not verified yet",
+    });
+    expect(derive({ recovery: "unverifiedWithEmail" }).recovery).toEqual({
+      tone: "info",
+      sentence: "Recovery phrase not verified yet",
+    });
+  });
+
+  it("tells an email waiting for its code as info", () => {
+    for (const recovery of [
+      "emailPending",
+      "emailPendingWithPhrase",
+    ] as const) {
+      expect(derive({ recovery }).recovery).toEqual({
+        tone: "info",
+        sentence: "Waiting for your email",
+      });
     }
   });
 
@@ -256,6 +286,35 @@ describe("switching AI and CLI access", () => {
         expect(ai !== undefined && aiAccessOn(ai)).toBe(on);
         expect(cli !== undefined && cliAccessOn(cli)).toBe(on);
       }
+    }
+  });
+});
+
+describe("recoveryOf", () => {
+  it("adds both ways up to the state they make", () => {
+    expect(recoveryOf("on", "on")).toBe("calm");
+    expect(recoveryOf("on", "off")).toBe("phraseOnly");
+    expect(recoveryOf("off", "on")).toBe("emailOnly");
+    expect(recoveryOf("off", "off")).toBe("none");
+    expect(recoveryOf("unchecked", "off")).toBe("unverified");
+    expect(recoveryOf("unchecked", "on")).toBe("unverifiedWithEmail");
+    expect(recoveryOf("off", "pending")).toBe("emailPending");
+    expect(recoveryOf("on", "pending")).toBe("emailPendingWithPhrase");
+  });
+
+  it("reads back what each state's ways say", () => {
+    const states = [
+      "none",
+      "phraseOnly",
+      "emailOnly",
+      "unverified",
+      "unverifiedWithEmail",
+      "emailPending",
+      "emailPendingWithPhrase",
+      "calm",
+    ] as const;
+    for (const state of states) {
+      expect(recoveryOf(phraseStatus(state), emailStatus(state))).toBe(state);
     }
   });
 });

@@ -90,6 +90,9 @@
      *  row's own line says it after a dot, as a browser's "New sign-in"
      *  does, where a word by the title would say it twice. */
     cue?: { label: string; tone: Tone; dot?: boolean };
+    /** Keeps its own line under the cue, where the card's sentence would
+     *  only repeat the title ("Recovery phrase" / "…not verified yet"). */
+    keepMeta?: boolean;
     /** Not set up yet. */
     empty?: boolean;
     action?: {
@@ -123,7 +126,11 @@
             ? { row: "phrase", label: "In use" }
             : scenario.recovery === "phraseReset"
               ? { row: "phrase", label: "Changed" }
-              : undefined;
+              : phraseStatus(scenario.recovery) === "unchecked"
+                ? { row: "phrase", label: "Not verified" }
+                : emailStatus(scenario.recovery) === "pending"
+                  ? { row: "email", label: "Pending" }
+                  : undefined;
         case "devices":
           return browsers.some(({ isNew }) => isNew === true)
             ? { row: "firefox", label: "New" }
@@ -155,7 +162,7 @@
       row.id === subject.row
         ? {
             ...row,
-            meta: dot ? row.meta : card.sentence,
+            meta: dot || row.keepMeta === true ? row.meta : card.sentence,
             badge: undefined,
             cue: { label: subject.label, tone: card.tone, dot },
           }
@@ -240,9 +247,12 @@
         on: "t•••@gmail.com",
       },
     ];
+    // Only a first way, or the step the card urges, asks loudly.
     const loud = ways.every((way) => way.status === "off")
       ? ways[0]
-      : undefined;
+      : card?.tone === "warning"
+        ? ways.find((way) => way.status === "unchecked")
+        : undefined;
     return ways.map((way): Row => {
       const { status } = way;
       return {
@@ -251,10 +261,13 @@
         title: way.title,
         meta: {
           off: way.off,
+          unchecked: "Written down, not checked yet",
+          pending: "Code sent to t•••@gmail.com",
           inUse: "You're signed in with it now",
           new: "Reset 2 hours ago",
           on: way.on,
         }[status],
+        keepMeta: status === "unchecked" || status === "pending",
         badge:
           status === "inUse"
             ? { label: "In use", color: "success" }
@@ -263,7 +276,14 @@
               : undefined,
         empty: status === "off",
         action: {
-          label: status === "off" ? "Set up" : "Manage",
+          label: {
+            off: "Set up",
+            unchecked: "Verify",
+            pending: "Enter code",
+            on: "Manage",
+            inUse: "Manage",
+            new: "Manage",
+          }[status],
           variant: way === loud ? "primary" : undefined,
           onclick: () => onRecovery(way.id),
         },

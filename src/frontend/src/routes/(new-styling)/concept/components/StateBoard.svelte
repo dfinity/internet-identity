@@ -60,6 +60,18 @@
         { label: "Set-up email", scenario: { recovery: "emailOnly" } },
         { label: "Set-up both", scenario: {} },
         {
+          label: "Phrase not verified",
+          scenario: { recovery: "unverified" },
+        },
+        {
+          label: "Phrase not verified, email set up",
+          scenario: { recovery: "unverifiedWithEmail" },
+        },
+        {
+          label: "Email pending",
+          scenario: { recovery: "emailPending" },
+        },
+        {
           label: "You're signed in through recovery",
           scenario: { recovery: "usedPhrase" },
         },

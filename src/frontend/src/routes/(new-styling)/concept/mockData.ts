@@ -473,6 +473,33 @@ export const scenarioPresets: { label: string; scenario: Scenario }[] = [
     },
   },
   {
+    label: "Recovery phrase not verified",
+    scenario: {
+      recovery: "unverified",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Phrase not verified, email set up",
+    scenario: {
+      recovery: "unverifiedWithEmail",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Recovery email waiting for its code",
+    scenario: {
+      recovery: "emailPending",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
     label: "No recovery, one synced passkey",
     scenario: {
       recovery: "none",

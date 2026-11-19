@@ -27,6 +27,8 @@ import {
  *  stands. */
 const RECOVERY_NOTE: Record<MethodStatus, string> = {
   off: "Not set up",
+  unchecked: "Not verified yet",
+  pending: "Waiting for the code",
   on: "Set up",
   inUse: "You're signed in with it now",
   new: "Reset 2 hours ago",
@@ -106,14 +108,21 @@ export const glyphsOf = (
       label: "Recovery email",
       note: RECOVERY_NOTE[email],
     };
+    // A message about one way back in carries that way alone, marked.
+    const about =
+      email === "pending"
+        ? emailGlyph
+        : isOn(phrase) || phrase === "unchecked"
+          ? phraseGlyph
+          : undefined;
+    if (!neutral && about !== undefined) {
+      return [{ ...about, marked: true }];
+    }
     if (!isOn(phrase) && !isOn(email)) {
       return [
         { ...phraseGlyph, empty: true },
         { ...emailGlyph, empty: true },
       ];
-    }
-    if (!neutral) {
-      return [{ ...phraseGlyph, marked: true }];
     }
     return [
       ...(isOn(phrase) ? [phraseGlyph] : []),

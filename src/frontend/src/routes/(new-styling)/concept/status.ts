@@ -16,26 +16,83 @@
 /** Thomas's list. `calm`: both the phrase and the email. One of the two is
  *  enough, so `phraseOnly` and `emailOnly` are calm too and never ask for
  *  the other. `usedPhrase`: signed in through recovery. `phraseReset`: the
- *  phrase was changed from another browser. */
+ *  phrase was changed from another browser.
+ *
+ *  Two that wait on the user (Thomas, 19 Nov): `unverified`, a phrase
+ *  written down but never checked, so it may have been written down wrong,
+ *  and `emailPending`, an address whose code hasn't come back. Each has a
+ *  `…WithEmail` / `…WithPhrase` twin where the other way already works. */
 export type RecoveryState =
-  "none" | "usedPhrase" | "phraseReset" | "phraseOnly" | "emailOnly" | "calm";
-/** Where each way back in stands, as its row says it. */
-export type MethodStatus = "off" | "on" | "inUse" | "new";
+  | "none"
+  | "usedPhrase"
+  | "phraseReset"
+  | "phraseOnly"
+  | "emailOnly"
+  | "unverified"
+  | "unverifiedWithEmail"
+  | "emailPending"
+  | "emailPendingWithPhrase"
+  | "calm";
+/** Where each way back in stands, as its row says it. `unchecked`: a phrase
+ *  written down and never checked. `pending`: an email waiting for its code. */
+export type MethodStatus =
+  "off" | "unchecked" | "pending" | "on" | "inUse" | "new";
 
-export const phraseStatus = (state: RecoveryState): MethodStatus =>
-  state === "none" || state === "emailOnly"
-    ? "off"
-    : state === "usedPhrase"
-      ? "inUse"
-      : state === "phraseReset"
-        ? "new"
-        : "on";
+export const phraseStatus = (state: RecoveryState): MethodStatus => {
+  switch (state) {
+    case "none":
+    case "emailOnly":
+    case "emailPending":
+      return "off";
+    case "unverified":
+    case "unverifiedWithEmail":
+      return "unchecked";
+    case "usedPhrase":
+      return "inUse";
+    case "phraseReset":
+      return "new";
+    default:
+      return "on";
+  }
+};
 
-export const emailStatus = (state: RecoveryState): MethodStatus =>
-  state === "none" || state === "phraseOnly" ? "off" : "on";
+export const emailStatus = (state: RecoveryState): MethodStatus => {
+  switch (state) {
+    case "none":
+    case "phraseOnly":
+    case "unverified":
+      return "off";
+    case "emailPending":
+    case "emailPendingWithPhrase":
+      return "pending";
+    default:
+      return "on";
+  }
+};
 
+/** A way that gets the user back in today. An unchecked phrase and a pending
+ *  email don't count yet: either may not work. */
 export const isOn = (status: MethodStatus) =>
   status === "on" || status === "inUse" || status === "new";
+
+/** The state both ways add up to, once one of them changes. A pair the
+ *  concept has no state for keeps the step still to take: an unchecked
+ *  phrase over a pending email. */
+export const recoveryOf = (
+  phrase: MethodStatus,
+  email: MethodStatus,
+): RecoveryState => {
+  if (phrase === "unchecked") {
+    return isOn(email) ? "unverifiedWithEmail" : "unverified";
+  }
+  if (email === "pending") {
+    return isOn(phrase) ? "emailPendingWithPhrase" : "emailPending";
+  }
+  if (isOn(phrase)) {
+    return isOn(email) ? "calm" : "phraseOnly";
+  }
+  return isOn(email) ? "emailOnly" : "none";
+};
 
 /** `one`: a single passkey that syncs (a password manager's). `oneLocal`: a
  *  single passkey kept on this device alone (Windows Hello, a security key),
@@ -184,6 +241,23 @@ const recoverySaid = ({ scenario }: StatusInput): Said => {
         sentence: "Recovery phrase was changed",
         ask: "Review the phrase change",
         news: true,
+      };
+    case "unverified":
+    case "unverifiedWithEmail":
+      // A phrase written down wrong fails only when it's needed. Loud while
+      // it's the one way back; with a working email it's a step to take,
+      // not a risk, and one way is enough (Thomas).
+      return {
+        tone: scenario.recovery === "unverified" ? "warning" : "info",
+        sentence: "Recovery phrase not verified yet",
+        ask: "Verify your recovery phrase",
+      };
+    case "emailPending":
+    case "emailPendingWithPhrase":
+      return {
+        tone: "info",
+        sentence: "Waiting for your email",
+        ask: "Confirm your recovery email",
       };
     case "phraseOnly":
       return { tone: "neutral", sentence: "Recovery phrase set up" };
@@ -341,6 +415,9 @@ export const leadActionOf = (
 ): LeadAction => {
   if (tone === "risk") {
     return { label: "Review" };
+  }
+  if (kind === "recovery" && phraseStatus(scenario.recovery) === "unchecked") {
+    return { label: "Verify" };
   }
   if (kind === "recovery" && scenario.recovery === "none") {
     return {

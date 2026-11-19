@@ -3,6 +3,8 @@
     emailStatus,
     isOn,
     phraseStatus,
+    recoveryOf,
+    type MethodStatus,
     type RecoveryState,
   } from "../status";
 
@@ -177,6 +179,10 @@
     const status = statuses[picked];
     if (status === "off") {
       go("save");
+    } else if (status === "unchecked" || status === "pending") {
+      // Written down but never checked, or sent and never confirmed: only
+      // the last step is left.
+      go("check");
     } else {
       go("manage");
     }
@@ -186,38 +192,36 @@
   // svelte-ignore state_referenced_locally
   if (focus !== undefined) open(focus);
 
-  const emailOn = () => isOn(statuses.email);
-  const phraseOn = () => isOn(statuses.phrase);
+  /** Where recovery stands once one way is set to `status`, the other kept. */
+  const withWay = (
+    which: RecoveryMethod,
+    status: MethodStatus,
+  ): RecoveryState =>
+    which === "phrase"
+      ? recoveryOf(status, statuses.email)
+      : recoveryOf(statuses.phrase, status);
 
   /** Recovery is on with this way now: the scenario moves on at once, so the
    *  row in the hub already says so when the user goes back to it. */
   const finish = () => {
-    if (method === "phrase" && !rechecking) {
-      onChange(
-        { recovery: emailOn() ? "calm" : "phraseOnly" },
-        "Recovery phrase is on",
-      );
+    if (
+      method === "phrase" &&
+      (!rechecking || statuses.phrase === "unchecked")
+    ) {
+      onChange({ recovery: withWay("phrase", "on") }, "Recovery phrase is on");
     } else if (method === "email") {
-      onChange(
-        { recovery: phraseOn() ? "calm" : "emailOnly" },
-        "Recovery email is on",
-      );
+      onChange({ recovery: withWay("email", "on") }, "Recovery email is on");
     }
     go("done");
   };
 
   const turnOff = (which: RecoveryMethod) => {
-    if (which === "phrase") {
-      onChange(
-        { recovery: emailOn() ? "emailOnly" : "none" },
-        "Recovery phrase turned off",
-      );
-    } else {
-      onChange(
-        { recovery: phraseOn() ? "phraseOnly" : "none" },
-        "Recovery email turned off",
-      );
-    }
+    onChange(
+      { recovery: withWay(which, "off") },
+      which === "phrase"
+        ? "Recovery phrase turned off"
+        : "Recovery email turned off",
+    );
     home();
   };
 
@@ -258,6 +262,9 @@
     const status = statuses[which];
     const row = ROWS.find(({ value }) => value === which);
     if (status === "off") return { meta: row?.off ?? "" };
+    if (status === "unchecked")
+      return { meta: "Written down, not checked yet" };
+    if (status === "pending") return { meta: `Code sent to t•••@gmail.com` };
     if (status === "inUse")
       return { meta: "You're signed in with it now", badge: "In use" };
     if (status === "new") return { meta: "Reset 2 hours ago", badge: "On" };
@@ -449,6 +456,19 @@
               "You're covered",
               `If you lose your passkeys, your ${isOn(statuses.phrase) ? "recovery phrase" : "recovery email"} gets you back in to ${identityName}.`,
             )}
+          {:else if statuses.phrase === "unchecked"}
+            <!-- Written down, never checked: it may not work when needed. -->
+            {@render context(
+              ListChecksIcon,
+              "Check your recovery phrase",
+              `It's written down but hasn't been checked. A word copied wrong only shows when you need it to get back in to ${identityName}.`,
+            )}
+          {:else if statuses.email === "pending"}
+            {@render context(
+              MailIcon,
+              "Confirm your recovery email",
+              "Enter the code we sent to turn it on. Until then it can't get you back in.",
+            )}
           {:else}
             {@render context(
               BriefcaseMedicalIcon,
@@ -498,17 +518,24 @@
                       {line.meta}
                     </span>
                   </span>
-                  {#if status === "off"}
+                  {#if status === "off" || status === "unchecked" || status === "pending"}
                     <span
                       aria-hidden="true"
                       class={[
                         "btn btn-sm shrink-0 rounded-full font-medium",
-                        status === "off" && onCount === 0
+                        onCount === 0 &&
+                        (status !== "off" ||
+                          (statuses.phrase !== "unchecked" &&
+                            statuses.email !== "pending"))
                           ? "btn-primary"
                           : "btn-secondary",
                       ]}
                     >
-                      Set up
+                      {status === "off"
+                        ? "Set up"
+                        : status === "unchecked"
+                          ? "Verify"
+                          : "Enter code"}
                     </span>
                   {:else}
                     <ChevronRightIcon
