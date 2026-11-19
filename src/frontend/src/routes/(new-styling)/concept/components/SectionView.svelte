@@ -31,6 +31,7 @@
     cliAccessOn,
     emailStatus,
     phraseStatus,
+    throughRecovery,
     withAiAccess,
     withCliAccess,
     type CardStatus,
@@ -124,13 +125,15 @@
         case "recovery":
           return scenario.recovery === "usedPhrase"
             ? { row: "phrase", label: "In use" }
-            : scenario.recovery === "phraseReset"
-              ? { row: "phrase", label: "Changed" }
-              : phraseStatus(scenario.recovery) === "unchecked"
-                ? { row: "phrase", label: "Not verified" }
-                : emailStatus(scenario.recovery) === "pending"
-                  ? { row: "email", label: "Pending" }
-                  : undefined;
+            : scenario.recovery === "usedEmail"
+              ? { row: "email", label: "In use" }
+              : scenario.recovery === "phraseReset"
+                ? { row: "phrase", label: "Changed" }
+                : phraseStatus(scenario.recovery) === "unchecked"
+                  ? { row: "phrase", label: "Not verified" }
+                  : emailStatus(scenario.recovery) === "pending"
+                    ? { row: "email", label: "Pending" }
+                    : undefined;
         case "devices":
           return browsers.some(({ isNew }) => isNew === true)
             ? { row: "firefox", label: "New" }
@@ -185,13 +188,12 @@
         title: local ? "Windows Hello" : signedInWith.title,
         meta: local
           ? "Passkey on this device only · In use now"
-          : scenario.recovery === "usedPhrase"
+          : throughRecovery(scenario.recovery)
             ? signedInWith.meta
             : `${signedInWith.meta} · In use now`,
-        badge:
-          scenario.recovery === "usedPhrase"
-            ? undefined
-            : { label: "Active", color: "success" },
+        badge: throughRecovery(scenario.recovery)
+          ? undefined
+          : { label: "Active", color: "success" },
       },
     ];
     if (accessCount(scenario.access) > 1) {
@@ -267,7 +269,8 @@
           new: "Reset 2 hours ago",
           on: way.on,
         }[status],
-        keepMeta: status === "unchecked" || status === "pending",
+        keepMeta:
+          status === "unchecked" || status === "pending" || status === "inUse",
         badge:
           status === "inUse"
             ? { label: "In use", color: "success" }

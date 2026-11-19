@@ -81,6 +81,7 @@ describe("deriveStatus", () => {
     const recovery = [
       "none",
       "usedPhrase",
+      "usedEmail",
       "phraseReset",
       "phraseOnly",
       "emailOnly",
@@ -129,20 +130,19 @@ describe("deriveStatus", () => {
     }
   });
 
-  it("urges a new way in while signed in with the recovery phrase", () => {
-    const cards = derive({
-      recovery: "usedPhrase",
-      integrations: "cliConfirm",
-    });
-    expect(cards.recovery).toEqual({
-      tone: "info",
-      sentence: "Signed in with your recovery phrase",
-    });
-    expect(cards.access).toEqual({
-      tone: "warning",
-      sentence: "Add a way to sign in",
-    });
-    expect(cards.integrations.tone).toBe("info");
+  it("urges a new way in while signed in through recovery", () => {
+    for (const recovery of ["usedPhrase", "usedEmail"] as const) {
+      const cards = derive({ recovery, integrations: "cliConfirm" });
+      expect(cards.recovery).toEqual({
+        tone: "info",
+        sentence: "Signed in through recovery",
+      });
+      expect(cards.access).toEqual({
+        tone: "warning",
+        sentence: "Add a way to sign in",
+      });
+      expect(cards.integrations.tone).toBe("info");
+    }
   });
 
   it("flags a phrase change from a new browser as a risk on both cards", () => {

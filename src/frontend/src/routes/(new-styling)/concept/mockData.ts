@@ -527,6 +527,15 @@ export const scenarioPresets: { label: string; scenario: Scenario }[] = [
     },
   },
   {
+    label: "Signed in with recovery email",
+    scenario: {
+      recovery: "usedEmail",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
     label: "Phrase changed from a new browser",
     scenario: {
       recovery: "phraseReset",

@@ -110,7 +110,7 @@ export const glyphsOf = (
     };
     // A message about one way back in carries that way alone, marked.
     const about =
-      email === "pending"
+      email === "pending" || email === "inUse"
         ? emailGlyph
         : isOn(phrase) || phrase === "unchecked"
           ? phraseGlyph

@@ -72,8 +72,12 @@
           scenario: { recovery: "emailPending" },
         },
         {
-          label: "You're signed in through recovery",
+          label: "You're signed in through recovery, with the phrase",
           scenario: { recovery: "usedPhrase" },
+        },
+        {
+          label: "You're signed in through recovery, with the email",
+          scenario: { recovery: "usedEmail" },
         },
         {
           label: "Recovery was changed by new browser",

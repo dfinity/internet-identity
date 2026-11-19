@@ -15,7 +15,8 @@
 
 /** Thomas's list. `calm`: both the phrase and the email. One of the two is
  *  enough, so `phraseOnly` and `emailOnly` are calm too and never ask for
- *  the other. `usedPhrase`: signed in through recovery. `phraseReset`: the
+ *  the other. `usedPhrase`, `usedEmail`: signed in through recovery, one
+ *  state to the user whichever way it was (Thomas). `phraseReset`: the
  *  phrase was changed from another browser.
  *
  *  Two that wait on the user (Thomas, 19 Nov): `unverified`, a phrase
@@ -25,6 +26,7 @@
 export type RecoveryState =
   | "none"
   | "usedPhrase"
+  | "usedEmail"
   | "phraseReset"
   | "phraseOnly"
   | "emailOnly"
@@ -65,6 +67,8 @@ export const emailStatus = (state: RecoveryState): MethodStatus => {
     case "emailPending":
     case "emailPendingWithPhrase":
       return "pending";
+    case "usedEmail":
+      return "inUse";
     default:
       return "on";
   }
@@ -72,6 +76,10 @@ export const emailStatus = (state: RecoveryState): MethodStatus => {
 
 /** A way that gets the user back in today. An unchecked phrase and a pending
  *  email don't count yet: either may not work. */
+/** Signed in through recovery, by the phrase or by the email. */
+export const throughRecovery = (state: RecoveryState): boolean =>
+  state === "usedPhrase" || state === "usedEmail";
+
 export const isOn = (status: MethodStatus) =>
   status === "on" || status === "inUse" || status === "new";
 
@@ -234,7 +242,9 @@ const recoverySaid = ({ scenario }: StatusInput): Said => {
           }
         : { tone: "info", sentence: "Not set up yet", ask: "Set up recovery" };
     case "usedPhrase":
-      return { tone: "info", sentence: "Signed in with your recovery phrase" };
+    case "usedEmail":
+      // Which way it was matters little (Thomas): the glyph beside it says.
+      return { tone: "info", sentence: "Signed in through recovery" };
     case "phraseReset":
       return {
         tone: "info",
@@ -337,9 +347,9 @@ export const deriveStatus = (input: StatusInput): CardStatus[] => {
   // 1. One situation, told once, by the card that can resolve it.
   const newBrowserLive =
     scenario.devices === "newBrowser" && !signedOut.has("firefox");
-  if (scenario.recovery === "usedPhrase") {
-    // In with the phrase, the passkey is most likely gone: Access urges a
-    // new way in, so next time doesn't take the phrase again.
+  if (throughRecovery(scenario.recovery)) {
+    // In through recovery, the passkey is most likely gone: Access urges a
+    // new way in, so next time doesn't take recovery again.
     said.access = {
       tone: "warning",
       sentence: "Add a way to sign in",
@@ -360,12 +370,11 @@ export const deriveStatus = (input: StatusInput): CardStatus[] => {
 
   // 2. During an ongoing situation or a risk, only the cards resolving it stay loud.
   const risks = CARD_ORDER.filter((kind) => said[kind].tone === "risk");
-  const focus: CardKind[] | undefined =
-    scenario.recovery === "usedPhrase"
-      ? ["access", "recovery", ...risks]
-      : risks.length > 0
-        ? risks
-        : undefined;
+  const focus: CardKind[] | undefined = throughRecovery(scenario.recovery)
+    ? ["access", "recovery", ...risks]
+    : risks.length > 0
+      ? risks
+      : undefined;
   if (focus !== undefined) {
     for (const kind of CARD_ORDER) {
       if (!focus.includes(kind) && said[kind].tone === "warning") {
