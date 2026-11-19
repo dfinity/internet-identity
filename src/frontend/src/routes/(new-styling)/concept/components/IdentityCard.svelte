@@ -88,7 +88,10 @@
      nothing floats over the panel. No line parts the name from what opens
      under it: the list hangs from it. -->
 <Elevated as="ul" offset={1} class="flex flex-col overflow-hidden rounded-2xl">
-  <li class="relative flex items-center gap-3 px-3 py-2.5">
+  <!-- On the cards' own lines (Thomas): the avatar stands on their 16px
+       edge at their icons' 36px, so the name starts where their titles and
+       their rows' names do. -->
+  <li class="relative flex items-center gap-3 px-4 py-2.5">
     <button
       type="button"
       onclick={() => (switching = !switching)}
@@ -105,7 +108,7 @@
       aria-haspopup="true"
       aria-expanded={colourAnchor !== undefined}
       title="Change colour"
-      class="focus-visible:outline-focus-ring relative shrink-0 rounded-full transition-[scale] duration-160 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.96] motion-reduce:active:scale-100"
+      class="focus-visible:outline-focus-ring relative shrink-0 rounded-full transition-[scale] duration-160 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.96] motion-reduce:active:scale-100 [&>div>div]:size-9"
     >
       <IdentityAvatar {identity} palette={paletteOf?.(identity)} size="sm" />
     </button>
