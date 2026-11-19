@@ -12,7 +12,7 @@ paths:
 
 ## Where coverage goes
 
-- `test/integration-over-mocks` Behaviour is proven by PocketIC integration tests (canister) and Playwright e2e tests (frontend and full flows), not by mocked unit tests. Don't add mock-heavy unit tests for behaviour those suites cover, and never mock the module under test.
+- `test/integration-over-mocks` Behaviour is proven by PocketIC integration tests (canister) and Playwright e2e tests (frontend and full flows), not by mocked unit tests, and never mock the module under test. Don't write component tests: never mount a Svelte component in a unit test. Logic too involved to cover in e2e moves out of the component into plain functions (`fe/logic-in-flows`), and those get unit tests.
 - `test/unit-test-pure-functions` Unit- or property-test non-trivial pure functions: parsers, validators, codecs, bit manipulation, limits, including the negative cases.
 - `test/endpoint-authorization-tests` Every new endpoint gets candid-level integration tests covering who may call it: the owner, another identity, the anonymous principal, and the feature disabled.
 - `test/init-arg-config-tests` Every new init-arg field gets a config test (`tests/integration/config/`): set at install, changed and unset on upgrade.

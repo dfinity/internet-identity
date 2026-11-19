@@ -41,7 +41,7 @@ paths:
 ## Lifecycle and async
 
 - `fe/clean-up-async` Clean up every timer, RAF, observer, listener, poll loop and in-flight request in the `$effect` cleanup or `onDestroy`, and on dialog close. Use `AbortController` and honour the signal in every await.
-- `fe/reset-in-finally` Reset loading and submitting flags in `finally`. Disable a control while its write runs, and ignore stale async results.
+- `fe/reset-in-finally` Reset loading and submitting flags in `finally`. Disable a control while its write runs, and ignore stale async results through the `AbortController` signal of `fe/clean-up-async`, never a hand-rolled counter, epoch or token.
 - `fe/reload-after-write` Page data comes from SvelteKit loaders, and a write is followed by `invalidate`/`invalidateAll()` to reload it. Choose per case between a progress indicator and an optimistic update:
   - Progress indicator: typical for dialog submissions. Disable the control and show a spinner until the write settles (see the async callback rule under Svelte).
   - Optimistic update: for something that should feel instant, like a toggle. Assign the next state to the `$derived` that reads the loader data, run the write, then invalidate. When the loader data comes back, the `$derived` recomputes from it: on success it matches, on failure it rolls back on its own. Don't write rollback code. Still show the error.
