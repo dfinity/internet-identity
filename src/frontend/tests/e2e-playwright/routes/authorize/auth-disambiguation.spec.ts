@@ -268,6 +268,66 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
       await signInClosePromise;
     });
   });
+
+  test("A pop-up the browser refuses is reported as blocked, and Continue works on the next press", async ({
+    page,
+    managePage,
+    signInWithOpenId,
+    openIdUsers,
+  }) => {
+    await page.goto(II_URL);
+    const signUpPopupPromise = page.context().waitForEvent("page");
+    await page
+      .getByRole("button", { name: openIdUsers[0].issuer.name })
+      .click();
+    const signUpPopup = await signUpPopupPromise;
+    const signUpClosePromise = signUpPopup.waitForEvent("close", {
+      timeout: 15_000,
+    });
+    await signInWithOpenId(signUpPopup, openIdUsers[0].id);
+    await signUpClosePromise;
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Sign up" })
+      .click();
+    await page.waitForURL(II_URL + "/manage");
+    await managePage.signOut((c) => c.keepIdentity());
+    await page.context().clearCookies();
+    // The browser refuses the first pop-up II asks for, and only that one.
+    await page.context().addInitScript((origin) => {
+      if (window.location.origin !== origin) {
+        return;
+      }
+      const open = window.open.bind(window);
+      let isRefused = false;
+      window.open = (...args) => {
+        if (!isRefused) {
+          isRefused = true;
+          return null;
+        }
+        return open(...args);
+      };
+    }, II_URL);
+
+    await authorize(page, async (authPage) => {
+      const continueButton = authPage.getByRole("button", {
+        name: "Continue",
+        exact: true,
+      });
+      await continueButton.click();
+      await expect(authPage.getByText("Pop-up blocked")).toBeVisible();
+      await expect(continueButton).toBeEnabled();
+
+      const signInPopupPromise = authPage.context().waitForEvent("page");
+      await continueButton.click();
+      const signInPopup = await signInPopupPromise;
+      const signInClosePromise = signInPopup.waitForEvent("close", {
+        timeout: 15_000,
+      });
+      await signInWithOpenId(signInPopup, openIdUsers[0].id);
+      await signInClosePromise;
+    });
+  });
 });
 
 // IdentityAlreadyLinkedDialog — OIDC sign-up where provider is already linked

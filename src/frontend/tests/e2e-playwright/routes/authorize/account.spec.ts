@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize } from "../../utils";
+import { authorize, II_URL } from "../../utils";
 
 test("Create another account and authorize with primary", async ({
   page,
@@ -248,4 +248,85 @@ test("All options start from the account and duration last chosen on this browse
   expect(workPrincipal).not.toEqual(primaryPrincipal);
   expect(rememberedPrincipal).toEqual(workPrincipal);
   expect(optionsOffPrincipal).toEqual(primaryPrincipal);
+});
+
+test("All options left on wait for Continue when showing them takes a sign-in", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
+}) => {
+  await authorize(page, async (authPage) => {
+    await signInWithIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
+  const workPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("switch", { name: "Show all options" })
+      .setChecked(true);
+    await authPage.getByRole("button", { name: "Add another account" }).click();
+    await authPage.getByLabel("Account name").fill("Work");
+    await authPage.getByRole("button", { name: "Create account" }).click();
+    await authPage.getByRole("radio", { name: "Work" }).click();
+    await authPage.getByRole("button", { name: "30 days" }).click();
+    await authPage.getByRole("menuitem", { name: "1 day" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
+
+  // The session Internet Identity kept on this browser is gone, as it is after
+  // a month without a sign-in. The choice to see all options is not.
+  const iiPage = await page.context().newPage();
+  await iiPage.goto(II_URL);
+  await iiPage.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open("ii-session-delegations");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const database = request.result;
+          if (!database.objectStoreNames.contains("keys")) {
+            database.close();
+            resolve();
+            return;
+          }
+          const transaction = database.transaction("keys", "readwrite");
+          transaction.objectStore("keys").clear();
+          transaction.oncomplete = () => {
+            database.close();
+            resolve();
+          };
+          transaction.onerror = () => reject(transaction.error);
+        };
+      }),
+  );
+  await iiPage.close();
+
+  const waitedPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    const continueButton = authPage.getByRole("button", {
+      name: "Continue",
+      exact: true,
+    });
+    // Nothing signs in by itself: the option is on, Continue is ready, and
+    // the accounts are not there yet.
+    await expect(
+      authPage.getByRole("switch", { name: "Show all options" }),
+    ).toBeChecked();
+    await expect(continueButton).toBeEnabled();
+    await expect(authPage.getByRole("radio")).toHaveCount(0);
+    // The first press signs in and shows the options as they were left.
+    await continueButton.click();
+    await expect(authPage.getByRole("radio", { name: "Work" })).toBeChecked({
+      timeout: 15_000,
+    });
+    await expect(authPage.getByRole("button", { name: "1 day" })).toBeVisible();
+    // The second continues with them.
+    await continueButton.click();
+  });
+  expect(waitedPrincipal).toEqual(workPrincipal);
 });
