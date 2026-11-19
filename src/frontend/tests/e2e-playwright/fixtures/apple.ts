@@ -44,11 +44,6 @@ export type FakeAppleConfig = {
   sheet?: boolean;
   /** Answer each authorization as if the user canceled Apple's sheet. */
   cancel?: boolean;
-  /**
-   * Never answer: a canceled sheet can end without any message from Apple,
-   * leaving the page that opened the popup only its focus coming back.
-   */
-  silentCancel?: boolean;
 };
 
 export type FakeApple = {
@@ -177,10 +172,6 @@ const installFakeApple = async (
           error: "user_cancelled_authorize",
         }),
       );
-      return;
-    }
-    if (config.silentCancel === true) {
-      await route.fulfill(html(""));
       return;
     }
     await sendToProvider(route, authorization);
