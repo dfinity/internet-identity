@@ -79,6 +79,8 @@
   } from "./mockData";
   import {
     morph,
+    pageArrive,
+    pageLeave,
     shellIn,
     shellOut,
     spotsOf,
@@ -834,16 +836,78 @@
       ? activePage
       : Math.round(Math.abs(pager.scrollLeft) / pager.clientWidth);
 
+  // A tab doesn't carry the pages across the canvas, past any between: the
+  // page in view steps aside and fades, the pager moves under it unseen, and
+  // the tab's own page arrives with a short shift from its side (pageLeave,
+  // pageArrive). A swipe still moves them whole, under the finger.
+  /** A tab's switch while its old page leaves: another tab picked meanwhile
+   *  only changes where it lands. */
+  let tabSwitch: { from: number; to: number } | undefined;
+  /** The switch's animations, to cut short. */
+  let pageMotion: Animation[] = [];
+
   const goToPage = (index: number) => {
-    if (index !== pageInView()) {
-      headingTo = index;
-    }
     activePage = index;
-    pageRefs[index]?.scrollIntoView({
-      behavior: reduced ? "instant" : "smooth",
-      block: "nearest",
-      inline: "start",
+    if (tabSwitch !== undefined) {
+      tabSwitch.to = index;
+      headingTo = index;
+      return;
+    }
+    const from = pageInView();
+    const leaving = pageRefs[from];
+    if (index === from || leaving === undefined) {
+      // On it already, or mid-swipe onto it: it settles where it is.
+      pageRefs[index]?.scrollIntoView({
+        behavior: reduced ? "instant" : "smooth",
+        block: "nearest",
+        inline: "start",
+      });
+      return;
+    }
+    headingTo = index;
+    tabSwitch = { from, to: index };
+    // An arrival still under way leaves from where it got to: the leave
+    // starts from what's on screen, so the arrival can go at once.
+    const leave = pageLeave(leaving.children, {
+      direction: Math.sign(index - from) * readingDirection(),
+      reduced,
     });
+    for (const animation of pageMotion) animation.cancel();
+    pageMotion = leave;
+    void Promise.all(leave.map((animation) => animation.finished)).then(
+      landPage,
+      () => {},
+    );
+  };
+
+  /** The old page is out of sight: the pager jumps to the tab's page, and it
+   *  comes in. */
+  const landPage = () => {
+    if (tabSwitch === undefined) return;
+    const { from, to } = tabSwitch;
+    tabSwitch = undefined;
+    const page = pageRefs[to];
+    if (to === from) {
+      // Picked again before it was gone: the pager never moved.
+      headingTo = undefined;
+    } else {
+      page?.scrollIntoView({
+        behavior: "instant",
+        block: "nearest",
+        inline: "start",
+      });
+    }
+    const held = pageMotion;
+    pageMotion =
+      page === undefined
+        ? []
+        : pageArrive(page.children, {
+            direction: Math.sign(to - from) * readingDirection(),
+            reduced,
+          });
+    // Let go only now, in the same frame: the old page is out of view, or
+    // (picked again) under its own arrival.
+    for (const animation of held) animation.cancel();
   };
 
   const onTabKeydown = (event: KeyboardEvent) => {

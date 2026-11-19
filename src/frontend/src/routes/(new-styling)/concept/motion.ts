@@ -256,6 +256,46 @@ export const hop = (
 /** The concept's `--ii-ease-out`, for animations run from script. */
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 
+/** A tab's page leaving: its content steps 8px away from the side the next
+ *  page lies on and fades, 120ms. It holds there, out of sight, so the pager
+ *  can move under it unseen. It leaves from where it stands, read off the
+ *  screen: an arrival cut short leaves from where it got to (an implied first
+ *  keyframe would start it back at full strength). */
+export const pageLeave = (
+  content: ArrayLike<Element>,
+  { direction, reduced = false }: ShiftParams,
+): Animation[] =>
+  Array.from(content, (node) => {
+    const { opacity, translate } = getComputedStyle(node);
+    return node.animate(
+      reduced
+        ? [{ opacity }, { opacity: 0 }]
+        : [
+            { opacity, translate },
+            { opacity: 0, translate: `${-8 * direction}px 0` },
+          ],
+      { duration: reduced ? 100 : 120, easing: EASE_OUT, fill: "forwards" },
+    );
+  });
+
+/** The tab's own page arriving: 16px in from its side as it fades in, over
+ *  240ms, a panel view's shift held a little longer as it fills the canvas. */
+export const pageArrive = (
+  content: ArrayLike<Element>,
+  { direction, reduced = false }: ShiftParams,
+): Animation[] =>
+  Array.from(content, (node) =>
+    node.animate(
+      reduced
+        ? [{ opacity: 0 }, { opacity: 1 }]
+        : [
+            { opacity: 0, translate: `${16 * direction}px 0` },
+            { opacity: 1, translate: "0 0" },
+          ],
+      { duration: reduced ? 150 : 240, easing: EASE_OUT },
+    ),
+  );
+
 /** Where an item of a list stood, against the list (its offset parent). */
 export interface Spot {
   top: number;
