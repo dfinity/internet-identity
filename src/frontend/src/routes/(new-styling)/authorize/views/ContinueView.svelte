@@ -453,12 +453,15 @@
         return;
       }
       isMultipleAccountsEnabled = false;
+      // Whatever the stored session failed on, expiry included, the next press
+      // signs in instead.
+      storedSessionActor = null;
       if (
         isCanisterError<SessionDelegationError>(error) &&
         error.type === "Unauthorized"
       ) {
-        storedSessionActor = null;
         void purgeSession(identityNumber);
+        return;
       }
       handleError(error);
     }
