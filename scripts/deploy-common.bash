@@ -1234,7 +1234,7 @@ encode_install_arg_bin() {
     fi
     if ! command -v ic-wasm >/dev/null 2>&1; then
         echo "Error: \`ic-wasm\` not on PATH. Run \`./scripts/bootstrap\` (or" >&2
-        echo "       \`cargo install ic-wasm --version 0.8.5\`) to install it." >&2
+        echo "       \`cargo install ic-wasm --version 0.8.5 --locked\`) to install it." >&2
         return 1
     fi
     ensure_pinned_didc || return 1
