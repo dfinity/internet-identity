@@ -10,7 +10,7 @@
  * out, it is mostly gone in the first few frames.
  */
 import { quintOut } from "svelte/easing";
-import { crossfade, type TransitionConfig } from "svelte/transition";
+import type { TransitionConfig } from "svelte/transition";
 
 interface SwapParams {
   reduced?: boolean;
@@ -296,6 +296,17 @@ export const pageArrive = (
     ),
   );
 
+/**
+ * How much the screen magnifies an element's own pixels: the panel is scaled
+ * whole on a large screen (`--ii-ui`). A move measured on the screen
+ * (getBoundingClientRect) is given back in the element's own pixels, which
+ * the scale multiplies again, so it is divided by this first.
+ */
+const scaleOf = (element: Element): number =>
+  element instanceof HTMLElement && element.offsetWidth > 0
+    ? element.getBoundingClientRect().width / element.offsetWidth
+    : 1;
+
 /** Where an item of a list stood, against the list (its offset parent). */
 export interface Spot {
   top: number;
@@ -361,6 +372,8 @@ export const morph = async ({
     list.querySelectorAll<HTMLElement>(":scope > [data-morph]"),
   ).filter((one) => one !== item);
   // Measured mid-flight too, so a reversal starts from where things are.
+  // On the screen, then in the list's own pixels (`scaleOf`).
+  const scale = scaleOf(list);
   const first = box.getBoundingClientRect();
   const shown = new Map(
     others.map((one) => [one, Number(getComputedStyle(one).opacity)]),
@@ -387,7 +400,7 @@ export const morph = async ({
   if (!opening) {
     // Its slot is already the small card's, so the items after it stand
     // where they'll be while it shrinks back down over them.
-    item.style.height = `${last.height}px`;
+    item.style.height = `${last.height / scale}px`;
   }
 
   const layers = {
@@ -440,10 +453,10 @@ export const morph = async ({
     : box.animate(
         [
           {
-            transform: `translateY(${first.top - last.top}px)`,
-            height: `${first.height}px`,
+            transform: `translateY(${(first.top - last.top) / scale}px)`,
+            height: `${first.height / scale}px`,
           },
-          { transform: "none", height: `${last.height}px` },
+          { transform: "none", height: `${last.height / scale}px` },
         ],
         { duration, easing: EASE_OUT },
       );
@@ -471,20 +484,54 @@ export const still = (): TransitionConfig => ({ duration: 0 });
 
 /** Avatars travelling between where they wait and where they're listed, as
  *  an identity's stack opens into its list (Thomas): 320ms, easing out, and
- *  under reduced motion only a fade. One with nowhere to travel fades. */
+ *  under reduced motion only a fade. One with nowhere to travel fades.
+ *  svelte/transition's `crossfade`, but the distance is in the avatar's own
+ *  pixels (`scaleOf` its row), so it lands right in a scaled panel too. */
 export const travel = (): Travel => {
   const reduced = () =>
     typeof matchMedia === "function" &&
     matchMedia("(prefers-reduced-motion: reduce)").matches;
-  return crossfade({
-    duration: () => (reduced() ? 0 : 320),
-    easing: quintOut,
-    fallback: () => ({
-      duration: reduced() ? 0 : 160,
+  const fly = (from: Element, node: Element): TransitionConfig => {
+    const start = from.getBoundingClientRect();
+    const end = node.getBoundingClientRect();
+    const scale = scaleOf(node.parentElement ?? node);
+    const dx = (start.left - end.left) / scale;
+    const dy = (start.top - end.top) / scale;
+    const dw = start.width / end.width;
+    const dh = start.height / end.height;
+    const style = getComputedStyle(node);
+    const transform = style.transform === "none" ? "" : style.transform;
+    const opacity = Number(style.opacity);
+    return {
+      duration: reduced() ? 0 : 320,
       easing: quintOut,
-      css: (t) => `opacity: ${t}`,
-    }),
-  }) as Travel;
+      css: (t, u) =>
+        `opacity: ${t * opacity}; transform-origin: top left; transform: ${transform} translate(${u * dx}px, ${u * dy}px) scale(${t + (1 - t) * dw}, ${t + (1 - t) * dh});`,
+    };
+  };
+  const fade = (): TransitionConfig => ({
+    duration: reduced() ? 0 : 160,
+    easing: quintOut,
+    css: (t) => `opacity: ${t}`,
+  });
+  // Each end waits for the other under the same key, as crossfade's do.
+  const end =
+    (mine: Map<unknown, Element>, theirs: Map<unknown, Element>) =>
+    (node: Element, { key }: { key: unknown }) => {
+      mine.set(key, node);
+      return () => {
+        const other = theirs.get(key);
+        if (other !== undefined) {
+          theirs.delete(key);
+          return fly(other, node);
+        }
+        mine.delete(key);
+        return fade();
+      };
+    };
+  const sending = new Map<unknown, Element>();
+  const receiving = new Map<unknown, Element>();
+  return [end(sending, receiving), end(receiving, sending)];
 };
 
 /** Opens a block as svelte's `slide` does, by its height, but without

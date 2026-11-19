@@ -354,6 +354,27 @@
    *  short of the edge, where the logos stand. */
   const HEAD_ROW =
     "shrink-0 pb-5 md:pb-10 @6xl/canvas:pb-11 @[88rem]/canvas:pb-12 @max-lg/canvas:px-2.5";
+  // On a large screen the controls and the panel grow with the apps
+  // (Thomas): the grid already shows its tiles larger as the canvas widens,
+  // and controls of a laptop's size, pinned to the window's edges, would
+  // read as apart from it. From a 1600px window they're a tenth larger and
+  // stand 32px in; from 2200px, a quarter larger and 64px in. --ii-ui and
+  // --ii-ui-inset carry it to the header; the panel is scaled whole.
+  const wide = new MediaQuery("min-width: 100rem");
+  const wider = new MediaQuery("min-width: 137.5rem");
+  const uiScale = $derived(wider.current ? 1.25 : wide.current ? 1.1 : 1);
+  const uiInset = $derived(
+    wider.current ? "4rem" : wide.current ? "2rem" : "1.25rem",
+  );
+  /** The panel's content height, unscaled, for the room the scaled panel
+   *  takes in its scroller. */
+  let panelHeight = $state(0);
+  /** The panel's width: its 360px of cards and the 24px from the canvas,
+   *  both scaled, and from the window edge 4px less than the logo stands
+   *  in from the other one. 400px at the usual size. */
+  const panelWidth = $derived(
+    `calc(${24 * uiScale}rem + ${uiInset} - 0.25rem)`,
+  );
   /** Wide enough that the panel beside the canvas still leaves the apps their
    *  room, so news may open it on arrival. Narrower, only a risk does. */
   const roomy = new MediaQuery("min-width: 1024px");
@@ -1365,7 +1386,7 @@
       atBottom
         ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6) p-1"
         : [
-            "pointer-events-auto h-10 rounded-full border border-transparent bg-(--ii-shelf) p-[3px]",
+            "pointer-events-auto h-[calc(2.5rem*var(--ii-ui))] rounded-full border border-transparent bg-(--ii-shelf) p-[3px]",
             headerLifted && "ii-elevation-6",
             PILL_MOTION,
           ],
@@ -1406,8 +1427,10 @@
         tabindex={activePage === index ? 0 : -1}
         onclick={() => goToPage(index)}
         class={[
-          "focus-visible:outline-focus-ring relative rounded-full text-sm font-semibold whitespace-nowrap transition-colors duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
-          atBottom ? "h-10 px-4" : "h-8 px-3.5",
+          "focus-visible:outline-focus-ring relative rounded-full font-semibold whitespace-nowrap transition-colors duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
+          atBottom
+            ? "h-10 px-4 text-sm"
+            : "h-[calc(2.5rem*var(--ii-ui)-0.5rem)] px-[calc(0.875rem*var(--ii-ui))] text-[length:calc(0.875rem*var(--ii-ui))] leading-5",
           activePage === index
             ? "text-text-primary"
             : "text-text-tertiary hover:text-text-secondary",
@@ -1841,6 +1864,8 @@
      content all stand on; plates (hover, a lifted pill) reach past it. -->
 <div
   class="concept ii-surface-3 text-text-primary min-h-dvh [--ii-edge:--spacing(4)] md:flex md:h-dvh md:p-2"
+  style:--ii-ui={uiScale}
+  style:--ii-ui-inset={uiInset}
 >
   <!-- The canvas: the apps. It doesn't scroll: the header stays put and each
        page scrolls on its own under it. -->
@@ -1867,7 +1892,7 @@
            puts the tabs on a row of their own under them, still centred. -->
       <div
         class={[
-          "grid items-center gap-x-1 px-4 sm:px-6 md:gap-x-4 md:px-5 @max-lg/canvas:px-(--ii-edge)",
+          "grid items-center gap-x-1 px-4 sm:px-6 md:gap-x-4 md:px-(--ii-ui-inset) @max-lg/canvas:px-(--ii-edge)",
           phoneHead
             ? "grid-cols-[1fr_auto]"
             : "grid-cols-[1fr_auto] @[36rem]/canvas:grid-cols-[1fr_auto_1fr]",
@@ -1884,14 +1909,18 @@
           class={[
             pill,
             PILL_MOTION,
-            "ii-hover focus-visible:outline-focus-ring my-3 flex h-10 items-center gap-3 justify-self-start px-4 focus-visible:outline-2 focus-visible:outline-offset-2",
+            "ii-hover focus-visible:outline-focus-ring my-[calc(0.75rem*var(--ii-ui))] flex h-[calc(2.5rem*var(--ii-ui))] items-center gap-[calc(0.75rem*var(--ii-ui))] justify-self-start px-[calc(1rem*var(--ii-ui))] focus-visible:outline-2 focus-visible:outline-offset-2",
             // On a phone the glyph stands on the edge; the pill reaches 10px
             // past it once lifted.
             "@max-lg/canvas:-ms-2.5 @max-lg/canvas:px-[9px]",
           ]}
         >
-          <Logo class="text-fg-primary h-4" />
-          <span class="text-text-primary text-base font-semibold"> id.ai </span>
+          <Logo class="text-fg-primary h-[calc(1rem*var(--ii-ui))]" />
+          <span
+            class="text-text-primary text-[length:calc(1rem*var(--ii-ui))] leading-6 font-semibold"
+          >
+            id.ai
+          </span>
         </button>
         {#if !phoneHead}
           <div
@@ -1955,7 +1984,7 @@
                 class={[
                   pill,
                   PILL_MOTION,
-                  "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
+                  "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-[calc(2.5rem*var(--ii-ui))] place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
                 ]}
               >
                 <ArrowRightToLineIcon
@@ -2308,18 +2337,20 @@
        opens and closes; the canvas gives it the room. -->
   <div
     class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none max-md:hidden"
-    style:width={panelVisible ? "25rem" : "0rem"}
+    style:width={panelVisible ? panelWidth : "0rem"}
   >
     <aside
       bind:this={aside}
       aria-label="Identity"
       inert={!panelVisible}
+      style:width={panelWidth}
       class={[
-        // 24px of air on both sides: from the canvas frame (8px gap + 16px)
-        // and from the window edge (8px page padding + 16px). The first card
-        // starts 21px down, on the top of the canvas header's pills (8px page
-        // padding, the frame's 1px, then 12px).
-        "flex h-full w-[25rem] flex-col overflow-y-auto overscroll-contain ps-6 pe-4 pt-[13px] pb-4",
+        // 24px of air from the canvas (8px gap + 16px), and from the window
+        // edge 4px less than the logo stands in from the other one (8px page
+        // padding + 16px). The first card starts on the top of the canvas
+        // header's pills (8px page padding, 1px, then 12px). On a large
+        // screen all of it grows with the controls (--ii-ui).
+        "flex h-full flex-col overflow-y-auto overscroll-contain ps-[calc(1.5rem*var(--ii-ui))] pe-[calc(var(--ii-ui-inset)-0.25rem)] pt-[calc(0.75rem*var(--ii-ui)+1px)] pb-4",
         "transition-[opacity,translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
         !panelVisible && "translate-x-4 opacity-0 rtl:-translate-x-4",
       ]}
@@ -2328,10 +2359,26 @@
         <!-- The panel lies on the same ground as the apps (3), so its cards
              stand a step above it (4), the way a phone's head cards stand on
              its canvas. All it holds counts as standing on 3. -->
-        <div class="shrink-0">
-          <SurfaceLevel level={3}>
-            {@render panel(false)}
-          </SurfaceLevel>
+        <!-- On a large screen the panel is scaled whole, as one picture of
+             itself, so every card, row and glyph keeps its proportions; the
+             room around it takes the scaled height, so the panel still
+             scrolls to its end. What opens over it (a tooltip, the colour
+             row) is in the top layer, which the scale leaves alone. -->
+        <div
+          class="shrink-0"
+          style:height={uiScale === 1
+            ? undefined
+            : `${panelHeight * uiScale}px`}
+        >
+          <div
+            bind:clientHeight={panelHeight}
+            class="w-[22.5rem] origin-top-left rtl:origin-top-right"
+            style:scale={uiScale === 1 ? undefined : uiScale}
+          >
+            <SurfaceLevel level={3}>
+              {@render panel(false)}
+            </SurfaceLevel>
+          </div>
         </div>
         <!-- Concept only, to try both themes: it keeps to the panel's foot, at
              the bottom of the window while the panel is short, and after the

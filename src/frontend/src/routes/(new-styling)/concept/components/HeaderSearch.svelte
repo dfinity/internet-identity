@@ -269,14 +269,15 @@
     compact
       ? "text-fg-secondary size-8 hover:bg-(--ii-hover) active:bg-(--ii-selected)"
       : [
-          "ii-hover text-fg-secondary hover:text-fg-primary pointer-events-auto size-10 border border-transparent focus-visible:outline-offset-2",
+          // As large as the header's other controls (--ii-ui, the page's).
+          "ii-hover text-fg-secondary hover:text-fg-primary pointer-events-auto size-[calc(2.5rem*var(--ii-ui,1))] border border-transparent focus-visible:outline-offset-2",
           lifted ? "ii-elevation-6 bg-(--ii-surface-6)" : "bg-(--ii-shelf)",
         ],
     className,
   ]}
 >
   <SearchIcon
-    class={compact ? "size-4" : "size-[1.125rem]"}
+    class={compact ? "size-4" : "size-[calc(1.125rem*var(--ii-ui,1))]"}
     aria-hidden="true"
   />
 </button>
