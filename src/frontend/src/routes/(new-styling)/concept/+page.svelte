@@ -1256,14 +1256,17 @@
 
 {#snippet greetingLine(inPage: boolean)}
   <!-- On a phone, at the top of the page, it's a step smaller, so a long name
-       keeps to the line, and closer to the logo than to the cards under it. -->
+       keeps to the line, and closer to the logo than to the cards under it.
+       Over the grid it's the canvas's title: it grows with the grid (28px from
+       seven columns, then with the tiles), and stands well apart from the
+       tabs, which belong to the apps under them. -->
   <p
     class={[
       "text-text-primary flex min-w-0 items-center gap-x-2 leading-7 font-semibold tracking-tight",
       INSET,
       inPage
         ? "pb-6 text-lg"
-        : "pt-3 pb-5 text-xl md:pt-[clamp(1rem,8vh,5rem)] md:pb-6 @6xl/canvas:text-2xl @6xl/canvas:leading-8 @[88rem]/canvas:text-[1.75rem] @[88rem]/canvas:leading-9",
+        : "pt-3 pb-5 text-xl md:pt-[clamp(1rem,8vh,5rem)] md:pb-10 md:text-2xl md:leading-8 @4xl/canvas:text-[1.75rem] @4xl/canvas:leading-9 @6xl/canvas:pb-11 @6xl/canvas:text-[2rem] @6xl/canvas:leading-10 @[88rem]/canvas:pb-12 @[88rem]/canvas:text-[2.25rem] @[88rem]/canvas:leading-11",
     ]}
   >
     <span class="shrink-0">{greeting},</span>
