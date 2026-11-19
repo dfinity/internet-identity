@@ -20,12 +20,9 @@
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import { formatRelative } from "$lib/stores/locale.store";
-  import GroupHeading from "../../manage/(authenticated)/devices/components/GroupHeading.svelte";
   import {
     brandIconOf,
-    brandNameOf,
-    kindOf,
-    platformWordOf,
+    nameOf,
   } from "../../manage/(authenticated)/devices/browsers";
   import type { MockBrowser, MockIdentity } from "../mockData";
   import {
@@ -89,8 +86,10 @@
     meta: string;
     badge?: { label: string; color?: "surface" | "success" };
     /** The card's message is about this row: its word for it ("New",
-     *  "Changed"), in the card's style. */
-    cue?: { label: string; tone: Tone };
+     *  "Changed"), in the card's style. `dot`: no word by the title; the
+     *  row's own line says it after a dot, as a browser's "New sign-in"
+     *  does, where a word by the title would say it twice. */
+    cue?: { label: string; tone: Tone; dot?: boolean };
     /** Not set up yet. */
     empty?: boolean;
     action?: {
@@ -145,16 +144,19 @@
   );
 
   /** The row the message is about comes first and says the card's own
-   *  sentence, with its cue in place of a badge. */
+   *  sentence, with its cue in place of a badge. A browser's row already
+   *  names it ("Firefox on Windows"), so it says the rest, "New sign-in",
+   *  with when, after the cue's dot. */
   const withSubject = (rows: Row[]): Row[] => {
     if (subject === undefined || card === undefined) return rows;
+    const dot = section === "devices";
     const marked = rows.map((row): Row =>
       row.id === subject.row
         ? {
             ...row,
-            meta: card.sentence,
+            meta: dot ? row.meta : card.sentence,
             badge: undefined,
-            cue: { label: subject.label, tone: card.tone },
+            cue: { label: subject.label, tone: card.tone, dot },
           }
         : row,
     );
@@ -356,44 +358,41 @@
     return rows;
   });
 
-  const deviceGroups = $derived.by(() => {
-    const groups: { platform: string; browsers: MockBrowser[] }[] = [];
-    // The browser the message is about leads, with its platform's group.
-    const ordered = [
-      ...browsers.filter(({ id }) => id === subject?.row),
-      ...browsers.filter(({ id }) => id !== subject?.row),
-    ];
-    for (const browser of ordered) {
-      const platform = platformWordOf(browser.description);
-      const group = groups.find((g) => g.platform === platform);
-      if (group === undefined) {
-        groups.push({ platform, browsers: [browser] });
-      } else {
-        group.browsers.push(browser);
-      }
-    }
-    return groups;
-  });
-
-  const browserRow = (browser: MockBrowser): Row => {
-    const icon = brandIconOf(browser.description);
-    const isCurrent = browser.isCurrent === true;
-    const isNew = browser.isNew === true;
-    return {
-      id: browser.id,
-      icon: icon !== undefined ? { src: icon } : MonitorSmartphoneIcon,
-      title: brandNameOf(browser.description),
-      meta: isCurrent
-        ? "Right now"
-        : isNew
-          ? `First seen ${$formatRelative(new Date(browser.lastUsedMillis), { style: "long" })}`
-          : `Last used ${$formatRelative(new Date(browser.lastUsedMillis), { style: "long" })}`,
-      badge: isCurrent ? { label: "This browser" } : undefined,
-      action: isCurrent
-        ? undefined
-        : { label: "Sign out", onclick: () => onSignOut(browser.id) },
-    };
-  };
+  /** One row a browser, named whole ("Firefox on Windows"), with no
+   *  platform headings: this browser first, then the most recently used.
+   *  The one the card's message is about goes above them all. */
+  const browserRows = $derived(
+    [...browsers]
+      .sort((one, other) =>
+        one.isCurrent === other.isCurrent
+          ? other.lastUsedMillis - one.lastUsedMillis
+          : one.isCurrent === true
+            ? -1
+            : 1,
+      )
+      .map((browser): Row => {
+        const icon = brandIconOf(browser.description);
+        const isCurrent = browser.isCurrent === true;
+        const when = $formatRelative(new Date(browser.lastUsedMillis), {
+          style: "long",
+        });
+        return {
+          id: browser.id,
+          icon: icon !== undefined ? { src: icon } : MonitorSmartphoneIcon,
+          title: nameOf(browser.description),
+          // "Active now" only where it's true: the page is read here. Another
+          // browser's last use is known to five minutes at best.
+          meta: isCurrent
+            ? "This browser · Active now"
+            : browser.isNew === true
+              ? `New sign-in · ${when}`
+              : `Last used ${when}`,
+          action: isCurrent
+            ? undefined
+            : { label: "Sign out", onclick: () => onSignOut(browser.id) },
+        };
+      }),
+  );
 
   /** A cue's pill, as recovery's dialog draws a way back in: the style's
    *  own tint for a warning or a risk, the plain pill with the text's own
@@ -455,7 +454,7 @@
     <span class="flex min-w-0 flex-1 flex-col gap-0.5">
       <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <span class="text-text-primary text-sm font-medium">{item.title}</span>
-        {#if item.cue !== undefined}
+        {#if item.cue !== undefined && item.cue.dot !== true}
           <span
             class={[
               "inline-flex items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-medium",
@@ -476,9 +475,14 @@
       <span
         class={[
           "text-[13px] leading-[18px] text-pretty",
+          item.cue?.dot === true && "flex items-start gap-1.5",
           SAID[item.cue?.tone ?? "neutral"],
         ]}
       >
+        {#if item.cue?.dot === true}
+          <!-- On the first line's middle, where a narrow sheet wraps it. -->
+          <span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-current"></span>
+        {/if}
         {item.meta}
       </span>
     </span>
@@ -509,26 +513,17 @@
 {/snippet}
 
 {#snippet body()}
-  {#if section === "devices"}
-    {#each deviceGroups as group (group.platform)}
-      <GroupHeading
-        kind={kindOf(group.browsers[0].description)}
-        platform={group.platform}
-        count={group.browsers.length}
-      />
-      {@render rows(withSubject(group.browsers.map(browserRow)))}
-    {/each}
-  {:else}
-    {@render rows(
-      withSubject(
-        section === "access"
-          ? accessRows
-          : section === "recovery"
-            ? recoveryRows
+  {@render rows(
+    withSubject(
+      section === "access"
+        ? accessRows
+        : section === "recovery"
+          ? recoveryRows
+          : section === "devices"
+            ? browserRows
             : integrationRows,
-      ),
-    )}
-  {/if}
+    ),
+  )}
 {/snippet}
 
 {#snippet addMethod()}
@@ -552,7 +547,7 @@
     <p class="text-text-tertiary px-4 text-[13px] leading-[18px]">
       {@render lead()}
     </p>
-    <div class={["flex flex-col", section !== "devices" && "pt-1"]}>
+    <div class="flex flex-col pt-1">
       {@render body()}
     </div>
     {#if section === "access"}
@@ -585,9 +580,6 @@
     </header>
     <Elevated offset={1} class="flex flex-col overflow-hidden rounded-2xl">
       {@render body()}
-      {#if section === "devices"}
-        <div class="h-1"></div>
-      {/if}
     </Elevated>
     {#if section === "access"}
       {@render addMethod()}
