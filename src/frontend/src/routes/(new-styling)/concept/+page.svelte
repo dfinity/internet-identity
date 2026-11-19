@@ -1790,18 +1790,22 @@
   </div>
 {/snippet}
 
-<!-- --ii-edge: a phone's margin, the same on both sides, which the logo,
+<!-- One surface, as on a phone (Thomas): the page is the canvas's own level,
+     and the canvas has no frame on it, so the apps and the panel beside them
+     lie on one ground and only the panel's cards stand up from it. The page
+     keeps its 8px padding, so everything stands where it did in the frame.
+     --ii-edge: a phone's margin, the same on both sides, which the logo,
      the identity, the greeting, the cards, the tabs, the apps and the pages'
      content all stand on; plates (hover, a lifted pill) reach past it. -->
 <div
-  class="concept ii-surface-1 text-text-primary min-h-dvh [--ii-edge:--spacing(4)] md:flex md:h-dvh md:p-2"
+  class="concept ii-surface-3 text-text-primary min-h-dvh [--ii-edge:--spacing(4)] md:flex md:h-dvh md:p-2"
 >
-  <!-- The canvas: the apps, in a frame on the page. It doesn't scroll: the
-       header stays put and each page scrolls on its own under it. -->
+  <!-- The canvas: the apps. It doesn't scroll: the header stays put and each
+       page scrolls on its own under it. -->
   <Elevated
     offset={2}
     as="main"
-    class="@container/canvas flex h-dvh min-w-0 flex-1 flex-col overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none md:h-auto md:min-h-0 md:rounded-[1.25rem]"
+    class="@container/canvas flex h-dvh min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 shadow-none md:h-auto md:min-h-0"
   >
     <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
     <h1 class="sr-only">Apps</h1>
@@ -2275,11 +2279,11 @@
       ]}
     >
       {#if isDesktop.current}
-        <!-- The panel lies on the page, but its cards stand level with the
-             canvas (3): a step lower, beside it, they read as sunk into the
-             page. So all it holds counts as standing on 2. -->
+        <!-- The panel lies on the same ground as the apps (3), so its cards
+             stand a step above it (4), the way a phone's head cards stand on
+             its canvas. All it holds counts as standing on 3. -->
         <div class="shrink-0">
-          <SurfaceLevel level={2}>
+          <SurfaceLevel level={3}>
             {@render panel(false)}
           </SurfaceLevel>
         </div>
