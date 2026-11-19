@@ -22,9 +22,10 @@
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
+  import AppleConnectingView from "$lib/components/views/AppleConnectingView.svelte";
+  import { callWhenAppleSheetIsCanceled } from "$lib/utils/appleSheet";
   import SsoConnectErrorView from "./views/SsoConnectErrorView.svelte";
   import SsoConnectingView from "$lib/components/views/SsoConnectingView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
@@ -100,9 +101,6 @@
   // The redirect to Apple is waiting behind the native Sign in with Apple
   // sheet, which keeps this page on screen.
   let isBehindAppleSheet = $state(false);
-  // iOS tells this page nothing when the sheet is canceled, so a way back to
-  // the app shows up after a moment.
-  let canReturnToApp = $state(false);
   let ssoInitError = $state<{ cause: unknown }>();
   // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
   // Holds everything the dialog needs to run one normal (primary-client)
@@ -278,48 +276,9 @@
       isAppleSignInSheetBrowser(navigator.userAgent)
     ) {
       isBehindAppleSheet = true;
-      closeWhenAppleSheetIsCanceled();
-      setTimeout(() => (canReturnToApp = true), 10_000);
+      callWhenAppleSheetIsCanceled(returnToApp);
     }
     window.location.assign(next);
-  };
-
-  /**
-   * Canceling the sheet can drop the redirect without telling this page: the
-   * window only gets its focus back. A completed sheet gives focus back too,
-   * but the redirect then goes on and `beforeunload` follows within
-   * milliseconds, so focus that stays without one is a cancel.
-   *
-   * A cancel can also let the redirect go on towards Apple's web page, which
-   * fires `beforeunload` as well. A completed sheet replaces this page with
-   * Apple's reply within moments, so a page still here seconds after the
-   * sheet closed is a cancel either way.
-   */
-  const closeWhenAppleSheetIsCanceled = () => {
-    let sheetOpened = false;
-    let leaving = false;
-    let returned = false;
-    const returnOnce = () => {
-      if (returned) {
-        return;
-      }
-      returned = true;
-      returnToApp();
-    };
-    window.addEventListener("blur", () => (sheetOpened = true));
-    window.addEventListener("beforeunload", () => (leaving = true));
-    window.addEventListener("focus", () => {
-      if (!sheetOpened) {
-        return;
-      }
-      setTimeout(() => {
-        if (leaving) {
-          return;
-        }
-        returnOnce();
-      }, 500);
-      setTimeout(returnOnce, 5000);
-    });
   };
 
   /**
@@ -705,20 +664,7 @@
 {#if data.flow === "openid-init"}
   <!-- OpenID init — onMount redirects to the provider; only Apple's native sheet keeps this page on screen. -->
   {#if isBehindAppleSheet}
-    <div
-      role="status"
-      class="flex flex-col items-center gap-3 px-8 text-center"
-    >
-      <ProgressRing class="size-8" />
-      <p class="text-text-primary text-base font-medium">
-        {$t`Connecting to Apple`}
-      </p>
-      {#if canReturnToApp}
-        <button class="btn btn-secondary mt-3" onclick={returnToApp}>
-          {$t`Return to app`}
-        </button>
-      {/if}
-    </div>
+    <AppleConnectingView onReturnToApp={returnToApp} />
   {/if}
 {:else if data.flow === "sso-init"}
   {#if ssoInitError !== undefined}
