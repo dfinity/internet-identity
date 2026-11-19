@@ -291,21 +291,15 @@
   const GRID =
     "grid grid-cols-[repeat(4,minmax(0,5.25rem))] justify-between gap-x-1 gap-y-1 @lg:grid-cols-[repeat(4,7rem)] @lg:gap-x-2 @2xl:grid-cols-[repeat(5,7rem)] @4xl:grid-cols-[repeat(7,var(--ii-tile))]";
   // A heading starts at the edge of the first logo, like a shelf title on
-  // iOS, and the tabs' thumb stands on that edge too: one line down the
-  // canvas. The 4rem logo sits centered in its column, so the inset is half
-  // of what the column leaves: (7rem − 4rem) / 2. On a phone the head is as
-  // wide as the logos reach, so it needs none.
+  // iOS: one line down the canvas. The 4rem logo sits centered in its
+  // column, so the inset is half of what the column leaves: (7rem − 4rem) /
+  // 2. On a phone the head is as wide as the logos reach, so it needs none.
   const INSET = "@lg:ps-[calc((var(--ii-tile)-var(--ii-logo))/2)]";
-  /** The grid's own width at each size, so the greeting and the tabs above
-   *  the pages line up with the apps: columns and gaps of GRID. On a phone,
-   *  from edge to edge, where the first and the last logo stand. */
-  const GRID_WIDTH =
-    "w-[calc(100%-2*var(--ii-edge))] @lg:w-[29.5rem] @2xl:w-[37rem] @4xl:w-[calc(7*var(--ii-tile)+3rem)] max-w-full";
   /** How far the logos reach: the grid less the 1.5rem each end column
    *  leaves beside its logo (INSET). Explore and Connect keep to it, so they
-   *  start on the line the greeting, the tabs and the logos share, and end
-   *  where the last logo does. On a phone the logos stand on the canvas's
-   *  edges, and so do the pages' contents. */
+   *  start on the line the greeting and the logos share, and end where the
+   *  last logo does. On a phone the logos stand on the canvas's edges, and
+   *  so do the pages' contents. */
   const LOGO_SPAN =
     "w-full @lg:w-[26.5rem] @2xl:w-[34rem] @4xl:w-[calc(6*var(--ii-tile)+3rem+var(--ii-logo))] max-w-full";
   // --- Layout: the concept compares three ---
@@ -339,12 +333,18 @@
   /** A phone in the main layout: the panel is the head of the canvas, above
    *  the tabs, so the identity's state is there without a tap. */
   const phoneHead = $derived(!isDesktop.current && layout === "panel");
-  /** Explore and Connect start 32px under the tabs (the page's 12px and
-   *  20 more), about where My apps' first logos stand (the page's 12px and
-   *  a tile's 16px over its logo): a card's hard edge right under the tabs
-   *  read as part of them. A phone's tabs are at the bottom, and its pages
-   *  start under their own title instead. */
-  const UNDER_TABS = $derived(phoneHead ? "" : "pt-5");
+  /** Over the grid, each page opens with the greeting, under the header
+   *  (where the tabs are), as far down as the greeting stood when it was
+   *  the header's: 8vh, between 16 and 80px, from the header's row. The
+   *  page's own 12px are part of it. A phone in the main layout has its
+   *  head in the page instead (pageHead). */
+  const PAGE_TOP =
+    "h-0 shrink-0 md:h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)]";
+  /** The greeting's row, over a page: the room under it grows with the
+   *  greeting. On a narrow canvas it steps in by the 10px the page keeps
+   *  short of the edge, where the logos stand. */
+  const HEAD_ROW =
+    "shrink-0 pb-5 md:pb-10 @6xl/canvas:pb-11 @[88rem]/canvas:pb-12 @max-lg/canvas:px-2.5";
   /** Wide enough that the panel beside the canvas still leaves the apps their
    *  room, so news may open it on arrival. Narrower, only a risk does. */
   const roomy = new MediaQuery("min-width: 1024px");
@@ -781,15 +781,15 @@
       : undefined,
   );
 
-  // Over the pages, the canvas says whose it is (the greeting), then the
-  // pages themselves (the tabs), lined up with the grid. As a page scrolls,
-  // the greeting goes up with it and out of sight, and the tabs follow until
-  // they stop under the logo: the pages stay a tap away however far down.
+  // The tabs stand in the header, centred over the apps, and stay there as
+  // a page scrolls under them, as a phone's tab bar stays at the bottom.
+  // Each page opens with the greeting, which scrolls away with it.
   /** Each page's scroll, which moves the head while that page is shown. */
   const pageScroll = $state(PAGES.map(() => 0));
-  /** The greeting's height in the header: how far the head goes up before
-   *  the tabs stop. */
-  let greetingHeight = $state(0);
+  /** The header, and each page's greeting row over the grid: the header
+   *  lifts once the greeting has gone up under it. */
+  let headerElement = $state<HTMLElement>();
+  const pageHeads = $state<HTMLElement[]>([]);
   // On a phone the head (the greeting and the cards) is the top of each page
   // instead, and the tabs are the tab bar at the bottom: a touch anywhere on
   // the head scrolls the page, as on any phone screen, and the cards go up
@@ -797,28 +797,29 @@
   const pageHeadHeights = $state(PAGES.map(() => 0));
   /** How far the head goes before it's out of sight. */
   const headHeight = $derived(
-    phoneHead ? (pageHeadHeights[activePage] ?? 0) : greetingHeight,
+    phoneHead ? (pageHeadHeights[activePage] ?? 0) : 0,
   );
   const headLift = $derived(Math.min(pageScroll[activePage] ?? 0, headHeight));
   /** The head has gone up out of sight. */
   const headCollapsed = $derived(headHeight > 0 && headLift >= headHeight - 2);
-  /** A page switch brings that page's head along, so it moves, not jumps. */
-  let switchingPage = $state(false);
-  $effect(() => {
-    void activePage;
-    switchingPage = true;
-    const timer = setTimeout(() => (switchingPage = false), 320);
-    return () => clearTimeout(timer);
-  });
   // The header's controls are pills in the canvas's own colour, so at rest
-  // they don't show. Once a page's content runs under the tabs they lift off
+  // they don't show. Once a page's content runs under them they lift off
   // the canvas, as the dock's pills sit over it, and keep the header readable
-  // over whatever runs under it. The content reaches them once the greeting
-  // in the header is gone (a phone's is in the page) and the 0.75rem PAGE
-  // keeps under them is passed.
-  const headerLifted = $derived(
-    (pageScroll[activePage] ?? 0) > (phoneHead ? 0 : greetingHeight) + 12,
-  );
+  // over whatever runs under it. Over the grid that's once the greeting has
+  // gone up under the header; on a phone, past the 0.75rem PAGE keeps under
+  // it. Read again as the page scrolls.
+  const headerLifted = $derived.by(() => {
+    const scrolled = pageScroll[activePage] ?? 0;
+    if (phoneHead) return scrolled > 12;
+    const head = pageHeads[activePage];
+    if (scrolled === 0 || head === undefined || headerElement === undefined) {
+      return false;
+    }
+    return (
+      head.getBoundingClientRect().top <
+      headerElement.getBoundingClientRect().bottom
+    );
+  });
   /** The pages scroll on their own; the pager hears them while capturing. */
   const onPageScroll = (event: Event) => {
     const index = pageRefs.indexOf(event.target as HTMLElement);
@@ -1274,16 +1275,15 @@
 {#snippet greetingLine(inPage: boolean)}
   <!-- On a phone, at the top of the page, it's a step smaller, so a long name
        keeps to the line, and closer to the logo than to the cards under it.
-       Over the grid it's the canvas's title: it grows with the grid (28px from
-       seven columns, then with the tiles), and stands well apart from the
-       tabs, which belong to the apps under them. -->
+       Over the grid it's the page's title: it grows with the grid (28px from
+       seven columns, then with the tiles), and its row (HEAD_ROW) keeps it
+       well apart from what's under it. -->
   <p
     class={[
       "text-text-primary flex min-w-0 items-center gap-x-2 leading-7 font-semibold tracking-tight",
-      INSET,
       inPage
-        ? "pb-6 text-lg"
-        : "pt-3 pb-5 text-xl md:pt-[clamp(1rem,8vh,5rem)] md:pb-10 md:text-2xl md:leading-8 @4xl/canvas:text-[1.75rem] @4xl/canvas:leading-9 @6xl/canvas:pb-11 @6xl/canvas:text-[2rem] @6xl/canvas:leading-10 @[88rem]/canvas:pb-12 @[88rem]/canvas:text-[2.25rem] @[88rem]/canvas:leading-11",
+        ? ["pb-6 text-lg", INSET]
+        : "text-xl md:text-2xl md:leading-8 @4xl/canvas:text-[1.75rem] @4xl/canvas:leading-9 @6xl/canvas:text-[2rem] @6xl/canvas:leading-10 @[88rem]/canvas:text-[2.25rem] @[88rem]/canvas:leading-11",
     ]}
   >
     <span class="shrink-0">{greeting},</span>
@@ -1294,6 +1294,14 @@
     ></span>
     <span class="min-w-0 truncate">{identityName}</span>
   </p>
+{/snippet}
+
+{#snippet pageGreeting(index: number)}
+  <!-- Explore and Connect open with the greeting too, as it's true of every
+       page; their content keeps to the logos' span, so it needs no inset. -->
+  <div bind:this={pageHeads[index]} class={["flex", HEAD_ROW]}>
+    {@render greetingLine(false)}
+  </div>
 {/snippet}
 
 {#snippet pageHead(index: number)}
@@ -1330,14 +1338,13 @@
 {/snippet}
 
 {#snippet pageTabs(atBottom: boolean)}
-  <!-- The pages. Over the grid they're a segmented control in the header: a
-       track in the shelf's grey, the colour the canvas groups things in,
-       solid so it stays whole when content runs under it and the pill lifts
-       (see `pill`). On a phone they're the tab bar, floating over the blur at
-       the bottom, always lifted since content always runs under it, and a
-       step larger for a thumb. In the header the first tab's thumb stands on
-       the greeting's line, the logos' edge, and the track reaches past it by
-       its border and padding (4px). -->
+  <!-- The pages. Over the grid they're a segmented control in the header,
+       centred over the apps: a track in the shelf's grey, the colour the
+       canvas groups things in, solid so it stays whole when content runs
+       under it and the pill lifts (see `pill`). On a phone they're the tab
+       bar, floating over the blur at the bottom, always lifted since content
+       always runs under it, and a step larger for a thumb. Either way they
+       stay put however far a page scrolls. -->
   {@const padding = atBottom ? 4 : 3}
   <div
     role="tablist"
@@ -1349,7 +1356,7 @@
       atBottom
         ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6) p-1"
         : [
-            "pointer-events-auto -ms-1 h-10 rounded-full border border-transparent bg-(--ii-shelf) p-[3px]",
+            "pointer-events-auto h-10 rounded-full border border-transparent bg-(--ii-shelf) p-[3px]",
             headerLifted && "ii-elevation-6",
             PILL_MOTION,
           ],
@@ -1841,11 +1848,21 @@
          is a pill (see `pill`); between them the pages show through. From
          `md` the inset is 20px, where the account's pill ends. -->
     <header
+      bind:this={headerElement}
       bind:clientHeight={headerHeight}
       class="pointer-events-none relative z-10 flex shrink-0 flex-col"
     >
+      <!-- Over the grid, three columns: the logo, the tabs, the controls.
+           The outer two share what's left, so the tabs stand on the canvas's
+           middle, over the apps. A canvas too narrow for the three in a row
+           puts the tabs on a row of their own under them, still centred. -->
       <div
-        class="grid grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-4 md:px-5 @max-lg/canvas:px-(--ii-edge)"
+        class={[
+          "grid items-center gap-x-1 px-4 sm:px-6 md:gap-x-4 md:px-5 @max-lg/canvas:px-(--ii-edge)",
+          phoneHead
+            ? "grid-cols-[1fr_auto]"
+            : "grid-cols-[1fr_auto] @[36rem]/canvas:grid-cols-[1fr_auto_1fr]",
+        ]}
       >
         <!-- The logo is the way home: it goes back to the first page. Its hover
              is a layer over the pill's own colour (`ii-hover`), so the pill
@@ -1867,12 +1884,22 @@
           <Logo class="text-fg-primary h-4" />
           <span class="text-text-primary text-base font-semibold"> id.ai </span>
         </button>
+        {#if !phoneHead}
+          <div
+            class="col-span-2 row-start-2 mb-3 justify-self-center @[36rem]/canvas:col-span-1 @[36rem]/canvas:col-start-2 @[36rem]/canvas:row-start-1 @[36rem]/canvas:mb-0"
+          >
+            {@render pageTabs(false)}
+          </div>
+        {/if}
         <!-- Desktop: search's glyph in the canvas's top corner, on every
              page and however far it's scrolled, so an app is found from
              wherever you are (⌘K too). Its pill ends where the account's
              would, 20px in. -->
         <div
-          class="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-2"
+          class={[
+            "col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-2",
+            !phoneHead && "@[36rem]/canvas:col-start-3",
+          ]}
         >
           {#if isDesktop.current}
             <HeaderSearch
@@ -2045,63 +2072,6 @@
           </div>
         </div>
       </div>
-      <!-- The greeting and the tabs share the grid's width, so the name, the
-           first tab and the first app start on one line, and Edit ends where
-           the last column does. -->
-      <div class={["mx-auto flex flex-col", GRID_WIDTH]}>
-        <!-- The canvas says whose it is before anything else, the way a
-             person would: the name, with a dot in the identity's colour
-             before it. It stays on every page, since it's true of all of
-             them. The name is said here only; the panel's card is for
-             switching, and how it signed in is Access's to say. A phone has
-             it at the top of each page instead (pageHead). -->
-        {#if !phoneHead}
-          <div bind:clientHeight={greetingHeight} class="overflow-hidden">
-            <div
-              class={[
-                switchingPage &&
-                  "transition-[translate,opacity] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
-              ]}
-              style:translate={`0 ${-headLift}px`}
-              style:opacity={greetingHeight > 0
-                ? 1 - headLift / greetingHeight
-                : 1}
-            >
-              {@render greetingLine(false)}
-            </div>
-          </div>
-          <!-- The pages, right above what they show, with Edit across from
-               them on My apps, as over a list on iOS (Done while apps are
-               arranged). Edit's pill reaches past the last logo by 4px, as
-               the tabs' track does past the first, so the two frame the
-               row, and the setting card under them spans the same width. -->
-          <div
-            class={[
-              "flex items-center justify-between gap-3 @lg:pe-[calc((var(--ii-tile)-var(--ii-logo))/2)]",
-              INSET,
-              switchingPage &&
-                "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
-            ]}
-            style:translate={`0 ${-headLift}px`}
-          >
-            {@render pageTabs(false)}
-            {#if activePage === 0 && current.apps.length > 0}
-              <button
-                type="button"
-                onclick={managing ? stopManaging : startManaging}
-                in:fade={{ duration: reduced ? 0 : 150 }}
-                class={[
-                  pill,
-                  PILL_MOTION,
-                  "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-1 h-10 px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]",
-                ]}
-              >
-                {@render editWords("@max-lg/canvas:justify-items-end")}
-              </button>
-            {/if}
-          </div>
-        {/if}
-      </div>
     </header>
 
     <!-- Pulled up by the header's height, so the pages run on under it. -->
@@ -2126,10 +2096,41 @@
         >
           {#if phoneHead}
             {@render pageHead(0)}
+          {:else}
+            <div aria-hidden="true" class={PAGE_TOP}></div>
           {/if}
           <div
             class="mx-auto flex w-fit max-w-full flex-col @max-lg/canvas:w-full"
           >
+            <!-- The page says whose apps these are before anything else, the
+                 way a person would: the name, with a dot in the identity's
+                 colour before it. The name is said here only; the panel's
+                 card is for switching. Across from it, Edit (Done while apps
+                 are arranged), as over a list on iOS. The row is as wide as
+                 the grid (w-0 min-w-full), the name starting on the first
+                 logo's edge and Edit's pill reaching 4px past the last one,
+                 as the setting card under it does. -->
+            {#if !phoneHead}
+              <div
+                bind:this={pageHeads[0]}
+                class={[
+                  "flex w-0 min-w-full items-center justify-between gap-3 @lg:pe-[calc((var(--ii-tile)-var(--ii-logo))/2)]",
+                  INSET,
+                  HEAD_ROW,
+                ]}
+              >
+                {@render greetingLine(false)}
+                {#if current.apps.length > 0}
+                  <button
+                    type="button"
+                    onclick={managing ? stopManaging : startManaging}
+                    class="ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-1 h-10 shrink-0 rounded-full border border-transparent px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]"
+                  >
+                    {@render editWords("@max-lg/canvas:justify-items-end")}
+                  </button>
+                {/if}
+              </div>
+            {/if}
             <!-- Phone: an incident put away unanswered heads the apps. -->
             {#if !isDesktop.current && incident !== undefined && !managing}
               <div
@@ -2242,11 +2243,16 @@
         >
           {#if phoneHead}
             {@render pageHead(1)}
+          {:else}
+            <div aria-hidden="true" class={PAGE_TOP}></div>
           {/if}
           <!-- Explore reads like the App Store: a banner, a shelf, another
                banner, more shelves. The featured shelf keeps to apps this
                identity doesn't use yet, and steps aside when there are none. -->
-          <div class={["mx-auto", LOGO_SPAN, UNDER_TABS]}>
+          <div class={["mx-auto", LOGO_SPAN]}>
+            {#if !phoneHead}
+              {@render pageGreeting(1)}
+            {/if}
             <ExplorePage {featured} {isAdded} onAdd={(app) => addApp(app)} />
           </div>
         </div>
@@ -2262,8 +2268,13 @@
         >
           {#if phoneHead}
             {@render pageHead(2)}
+          {:else}
+            <div aria-hidden="true" class={PAGE_TOP}></div>
           {/if}
-          <div class={["mx-auto", LOGO_SPAN, UNDER_TABS]}>
+          <div class={["mx-auto", LOGO_SPAN]}>
+            {#if !phoneHead}
+              {@render pageGreeting(2)}
+            {/if}
             <ConnectPage
               integrations={current.scenario.integrations}
               apps={current.apps}
