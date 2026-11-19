@@ -288,6 +288,8 @@ mod interface_conversions {
     use super::{DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset};
     use internet_identity_interface::internet_identity::types as i_types;
 
+    // disallowed-types: removed by A2.1
+    #[allow(clippy::disallowed_types)]
     impl From<i_types::SignedRRset> for SignedRRset {
         fn from(v: i_types::SignedRRset) -> Self {
             SignedRRset {
@@ -300,6 +302,8 @@ mod interface_conversions {
         }
     }
 
+    // disallowed-types: removed by A2.1
+    #[allow(clippy::disallowed_types)]
     impl From<i_types::Rrsig> for Rrsig {
         fn from(v: i_types::Rrsig) -> Self {
             Rrsig {
@@ -316,6 +320,8 @@ mod interface_conversions {
         }
     }
 
+    // disallowed-types: removed by A2.1
+    #[allow(clippy::disallowed_types)]
     impl From<i_types::DelegationLink> for DelegationLink {
         fn from(v: i_types::DelegationLink) -> Self {
             DelegationLink {
@@ -325,6 +331,8 @@ mod interface_conversions {
         }
     }
 
+    // disallowed-types: removed by A2.1
+    #[allow(clippy::disallowed_types)]
     impl From<i_types::DelegationChain> for DelegationChain {
         fn from(v: i_types::DelegationChain) -> Self {
             DelegationChain {
@@ -333,6 +341,8 @@ mod interface_conversions {
         }
     }
 
+    // disallowed-types: removed by A2.1
+    #[allow(clippy::disallowed_types)]
     impl From<i_types::DnsProofBundle> for DnsProofBundle {
         fn from(v: i_types::DnsProofBundle) -> Self {
             DnsProofBundle {

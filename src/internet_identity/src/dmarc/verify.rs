@@ -18,6 +18,8 @@ use super::parse::parse_dmarc_txt;
 use super::types::{DmarcOutcome, DmarcRecord, EmailVerificationStatus};
 use crate::dkim::verify_dkim;
 use crate::dkim::{DkimVerifyResult, VerificationFailReason};
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::smtp::SmtpRequest;
 
 /// Verify an `SmtpRequest` end-to-end: DKIM signature + DMARC alignment.
@@ -33,6 +35,8 @@ use internet_identity_interface::internet_identity::types::smtp::SmtpRequest;
 ///   record. When `None`, the verifier still requires DKIM `d=` to
 ///   match the From-header domain exactly.
 /// - `now_secs` — current Unix time (passed in so tests can pin it).
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 pub fn verify_email(
     email: &SmtpRequest,
     dkim_txt: &str,
@@ -136,11 +140,15 @@ fn compute_outcome(dkim_domain: &str, from_domain: &str, dmarc_txt: Option<&str>
 #[cfg(test)]
 mod tests {
     use super::*;
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     use internet_identity_interface::internet_identity::types::smtp::{
         SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage,
     };
     use serde_bytes::ByteBuf;
 
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn empty_message_with_from(from_value: &str) -> SmtpRequest {
         SmtpRequest {
             envelope: Some(SmtpEnvelope {

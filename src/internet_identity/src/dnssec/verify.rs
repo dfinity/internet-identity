@@ -36,6 +36,8 @@ use super::types::{
     VerifiedRecord, ZoneKeysMap,
 };
 use super::wire::{DNSKEY_RDATA_HEADER_LEN, DS_DIGEST_TYPE_SHA256, DS_RDATA_HEADER_LEN};
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::DnssecRootAnchor;
 
 /// Byte offset of the Algorithm field within DNSKEY RDATA
@@ -76,6 +78,8 @@ pub const MAX_CNAME_HOPS: usize = 4;
 /// type. Returns the validated zone-keys map (so callers can cache
 /// it for follow-up submissions) alongside the final verified
 /// record.
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 pub fn verify_bundle_with_clock(
     bundle: &DnsProofBundle,
     trust_anchors: &[DnssecRootAnchor],
@@ -92,6 +96,8 @@ pub fn verify_bundle_with_clock(
 }
 
 /// Production wrapper that reads `now` from the IC system API.
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 pub fn verify_bundle(
     bundle: &DnsProofBundle,
     trust_anchors: &[DnssecRootAnchor],
@@ -116,6 +122,8 @@ pub fn verify_bundle(
 /// under it on a follow-up submission — the cached RRSIG may have
 /// fallen out of its inception / expiration window if the pending
 /// challenge has been sitting around.
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 pub fn verify_root_dnskey_with_clock(
     root_dnskey: &SignedRRset,
     trust_anchors: &[DnssecRootAnchor],
@@ -299,6 +307,8 @@ fn current_time_secs() -> u64 {
 /// wins" strategy risks short-circuiting onto the inactive anchor
 /// and never trying the active one. We therefore attempt every
 /// matching candidate before reporting failure.
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 fn verify_root_dnskey(
     root_dnskey: &SignedRRset,
     trust_anchors: &[DnssecRootAnchor],
@@ -345,6 +355,8 @@ fn verify_root_dnskey(
 /// RFC 4034 §5.1. We synthesise the DS-RDATA bytes from the anchor
 /// fields and reuse `ds_matches_dnskey` so there is a single
 /// implementation of the DS-vs-DNSKEY digest comparison.
+// disallowed-types: removed by A3
+#[allow(clippy::disallowed_types)]
 fn anchor_matches_dnskey(
     anchor: &DnssecRootAnchor,
     owner_name: &[u8],
@@ -803,6 +815,8 @@ mod tests {
     }
 
     #[test]
+    // disallowed-types: removed by A3
+    #[allow(clippy::disallowed_types)]
     fn rejects_wrong_trust_anchor() {
         /// IANA DNSSEC algorithm for RSA-SHA256 (RFC 5702). We
         /// match a real anchor's algorithm so the early pre-filter

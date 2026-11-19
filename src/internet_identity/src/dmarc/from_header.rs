@@ -21,6 +21,8 @@
 //! RFC 2047 encoded-words, address lists, group syntax — is refused
 //! rather than interpreted.
 
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::smtp::SmtpMessage;
 
 const FROM_HEADER: &str = "From";
@@ -34,6 +36,8 @@ const FROM_HEADER: &str = "From";
 ///   / has trailing list syntax / uses RFC 5322 group syntax
 ///   (`name:addrs;`),
 /// - a domain that's empty after `@`.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 pub fn extract_from_domain(message: &SmtpMessage) -> Result<String, String> {
     let mut iter = message
         .headers
@@ -190,9 +194,13 @@ fn validate_addr_spec(addr: &str, in_angle_brackets: bool) -> Result<(), String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     use internet_identity_interface::internet_identity::types::smtp::SmtpHeader;
     use serde_bytes::ByteBuf;
 
+    // disallowed-types: removed by B3b-2
+    #[allow(clippy::disallowed_types)]
     fn message_with(from_values: &[&str]) -> SmtpMessage {
         let mut headers: Vec<SmtpHeader> = vec![SmtpHeader {
             name: "Subject".into(),

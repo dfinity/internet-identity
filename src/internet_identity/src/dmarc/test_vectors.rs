@@ -9,6 +9,8 @@
 use super::types::{AlignmentMode, DmarcOutcome, DmarcPolicy, EmailVerificationStatus};
 use super::verify::verify_email;
 use crate::dkim::VerificationFailReason;
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest,
 };
@@ -31,6 +33,8 @@ fn frozen_now() -> u64 {
 /// `pub use` from there (it's in `#[cfg(test)]`), so the implementation
 /// is duplicated. Both copies parse the same way; the duplication is
 /// contained to test code.
+// disallowed-types: removed by B3b-2
+#[allow(clippy::disallowed_types)]
 fn parse_eml(raw: &[u8]) -> SmtpRequest {
     let mut header_end = 0;
     while header_end + 4 <= raw.len() {
