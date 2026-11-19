@@ -135,12 +135,24 @@ pub fn get_wasm_path(env_var: String, default_path: &path::PathBuf) -> Option<Ve
 
 /// The path to the state machine binary to run the tests with
 pub fn env() -> PocketIc {
-    const POCKET_IC: &str = "../../pocket-ic";
-    let config = ExtendedSubnetConfigSet {
+    env_with_subnets(ExtendedSubnetConfigSet {
         ii: Some(SubnetSpec::default()),
         nns: Some(SubnetSpec::default()),
         ..ExtendedSubnetConfigSet::default()
-    };
+    })
+}
+
+/// An environment with one application subnet and nothing else, so no threshold signing
+/// key: a canister installed there is refused every key it asks for.
+pub fn env_without_signing_keys() -> PocketIc {
+    env_with_subnets(ExtendedSubnetConfigSet {
+        application: vec![SubnetSpec::default()],
+        ..ExtendedSubnetConfigSet::default()
+    })
+}
+
+fn env_with_subnets(config: ExtendedSubnetConfigSet) -> PocketIc {
+    const POCKET_IC: &str = "../../pocket-ic";
 
     // If there is a file named pocket-ic-port, the test will reuse that pocket IC instance.
     // This is necessary because we use nextest in CI which does not work with PocketIC being started

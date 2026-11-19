@@ -28,6 +28,8 @@ use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanis
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 
+mod pwa;
+
 const ORIGIN: &str = "https://some-dapp.com";
 const GATEWAY: &str = "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app";
 const UNREACHED: &str = "https://never-visited.example";

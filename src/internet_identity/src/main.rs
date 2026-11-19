@@ -45,6 +45,8 @@ use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
+use notifications::webpush::pwa_subscription;
+use notifications::webpush::vapid_key::VapidPublicKey;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
 use notifications::{
     admit_batch, delivery_metrics, enabled_or, fetchable_origin, TooManyNotifications,
@@ -346,10 +348,12 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 /// An update call, because a query reply is signed by one replica. One that answered with
 /// a VAPID key of its own choosing would bind the subscription to it permanently, and the
 /// browser has nothing to check the answer against.
+///
+/// `Pending` where the VAPID key is not held yet or the seeds the transport key is derived
+/// from are not pooled yet. Asking puts the missing one in flight, so a caller coming back
+/// finds it.
 #[update]
-async fn prepare_webpush_subscription(
-    anchor_number: AnchorNumber,
-) -> PrepareWebPushSubscriptionResult {
+fn prepare_webpush_subscription(anchor_number: AnchorNumber) -> PrepareWebPushSubscriptionResult {
     if let Err(err) = enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError) {
         return PrepareWebPushSubscriptionResult::Err(err);
     }
@@ -359,11 +363,12 @@ async fn prepare_webpush_subscription(
         );
     };
 
-    let vapid_public_key = match notifications::webpush::vapid_key::held_public_key().await {
-        Ok(key) => key,
-        Err(err) => {
+    let vapid_public_key = match notifications::webpush::vapid_key::read_or_fetch_public_key() {
+        VapidPublicKey::Held(key) => key,
+        VapidPublicKey::Fetching => return PrepareWebPushSubscriptionResult::Pending,
+        VapidPublicKey::Unavailable(reason) => {
             return PrepareWebPushSubscriptionResult::Err(
-                PrepareWebPushSubscriptionError::InternalCanisterError(err),
+                PrepareWebPushSubscriptionError::InternalCanisterError(reason),
             )
         }
     };
@@ -882,7 +887,9 @@ fn link_notification_app(
 }
 
 /// The browser this key is delivered through: the one that signed the call, or the one
-/// whose wake-ups route through the app that did, delivery switched on.
+/// whose wake-ups route through the app that did, delivery switched on. `None` where the
+/// identity signed that browser out: it stays signed out, whoever asks, until it signs in
+/// again, and what its inbox holds is readable again then.
 ///
 /// Read here rather than carried out of the authorization, so what a call acts on is what
 /// is stored when it acts rather than what was stored when it was let in.
@@ -895,6 +902,9 @@ fn delivering_browser(
         NotificationKey::Browser(browser_id) => Some(browser_id),
         NotificationKey::App(app_id) => anchor.browser_delivering_through(app_id),
     }?;
+    anchor
+        .browser(browser_id)
+        .filter(|browser| browser.session_count > 0)?;
     Some((anchor, browser_id))
 }
 
@@ -1129,6 +1139,150 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
 
     notifications::revoke_consent(anchor_number, &origin, now)
         .map_err(|err| InternalCanisterError(format!("{err}")))
+}
+
+// ---- Notifications: called by an app's installed web app ----
+
+/// The keys an installed web app subscribes with, for the calling session's identity, app
+/// and browser entry. An update call for the reason `prepare_webpush_subscription` is one,
+/// and `Pending` on the same grounds.
+#[update]
+fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionResult {
+    use AppPreparePwaWebPushSubscriptionError::*;
+
+    let now = time();
+    let Ok(session) = check_app_authorization(now) else {
+        return AppPreparePwaWebPushSubscriptionResult::Err(NoSuchSession);
+    };
+    if let Err(err) = enabled_or(InternalCanisterError) {
+        return AppPreparePwaWebPushSubscriptionResult::Err(err);
+    }
+    let vapid_public_key = match notifications::webpush::vapid_key::read_or_fetch_public_key() {
+        VapidPublicKey::Held(key) => key,
+        VapidPublicKey::Fetching => return AppPreparePwaWebPushSubscriptionResult::Pending,
+        VapidPublicKey::Unavailable(reason) => {
+            return AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+        }
+    };
+    match pwa_subscription::prepare_pwa_subscription(&session, vapid_public_key, now) {
+        Ok(pwa_subscription::PreparedPwaSubscription::Keys(keys)) => {
+            AppPreparePwaWebPushSubscriptionResult::Ok(keys)
+        }
+        Ok(pwa_subscription::PreparedPwaSubscription::Pending) => {
+            AppPreparePwaWebPushSubscriptionResult::Pending
+        }
+        Err(pwa_subscription::PreparePwaSubscriptionError::NotificationsNotAllowed) => {
+            AppPreparePwaWebPushSubscriptionResult::Err(NotificationsNotAllowed)
+        }
+        Err(pwa_subscription::PreparePwaSubscriptionError::Internal(reason)) => {
+            AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+        }
+    }
+}
+
+/// Sets or, with `None`, removes the installed web app subscription of the calling
+/// session's identity, app, browser entry and account.
+#[update]
+fn app_set_pwa_webpush_subscription(
+    request: AppSetPwaWebPushSubscriptionRequest,
+) -> Result<(), AppSetPwaWebPushSubscriptionError> {
+    use AppSetPwaWebPushSubscriptionError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let AppSetPwaWebPushSubscriptionRequest { subscription } = request;
+    let subscription = subscription
+        .map(pwa_subscription::ValidatedPwaWebPushSubscription::try_from)
+        .transpose()
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+
+    pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
+        .map_err(|err| match err {
+            pwa_subscription::SetPwaSubscriptionError::NotificationsNotAllowed => {
+                NotificationsNotAllowed
+            }
+            pwa_subscription::SetPwaSubscriptionError::TransportKeyExpired => TransportKeyExpired,
+            pwa_subscription::SetPwaSubscriptionError::EndpointInUse => EndpointInUse,
+            pwa_subscription::SetPwaSubscriptionError::Internal(reason) => {
+                InternalCanisterError(reason)
+            }
+        })
+}
+
+/// The endpoint the calling session's browser entry is subscribed at for the session's
+/// account. `None` where nothing is subscribed, where the subscription awaits its
+/// `app_set_pwa_webpush_subscription`, or where it delivers for another account. An
+/// `Option` inside the `Result` because nothing subscribed is an answer the app acts on,
+/// while the error is only ever a refused caller.
+#[query]
+fn app_get_pwa_webpush_subscription_status(
+) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
+    use AppGetPwaWebPushSubscriptionStatusError::*;
+
+    let session = check_app_authorization(time()).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+
+    Ok(pwa_subscription::read_pwa_subscription_status(
+        holder,
+        session.account_principal,
+    ))
+}
+
+/// The notification a wake-up named, where it is the calling session's app's, to its
+/// account, in its browser entry's inbox.
+#[query]
+fn app_get_pwa_notification(
+    request: AppGetPwaNotificationRequest,
+) -> Result<AppGetPwaNotificationResponse, AppGetPwaNotificationError> {
+    use AppGetPwaNotificationError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let AppGetPwaNotificationRequest {
+        inbox_notification_id,
+    } = request;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+
+    Ok(AppGetPwaNotificationResponse {
+        notification: notifications::browser_inbox::find_pwa_notification(
+            holder,
+            session.account_principal,
+            inbox_notification_id,
+            now,
+        ),
+    })
+}
+
+/// Removes the notification a wake-up named, on the terms `app_get_pwa_notification`
+/// reads it.
+#[update]
+fn app_remove_pwa_notification(
+    request: AppRemovePwaNotificationRequest,
+) -> Result<RemoveNotificationResponse, AppRemovePwaNotificationError> {
+    use AppRemovePwaNotificationError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let AppRemovePwaNotificationRequest {
+        inbox_notification_id,
+        not_shown,
+    } = request;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+
+    notifications::browser_inbox::remove_pwa_collected(
+        holder,
+        session.account_principal,
+        inbox_notification_id,
+        not_shown,
+        now,
+    )
+    .map(|()| RemoveNotificationResponse {})
+    .map_err(InternalCanisterError)
 }
 
 // ---- Notifications: called by an app's backend ----

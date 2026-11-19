@@ -9,7 +9,7 @@ use crate::state::{self, storage_borrow};
 use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, ApplicationNumber, NotAccepted, NotAcceptedReason, Notification,
+    AnchorNumber, ApplicationNumber, NotAccepted, NotAcceptedReason, Notification,
     SendNotificationResponse, Timestamp, Urgency,
 };
 use std::collections::BTreeMap;
@@ -41,12 +41,10 @@ pub fn submit(
             Ok(Resolved {
                 anchor_number,
                 application_number,
-                account_number,
             }) => reachable.push(PendingNotification {
                 recipient,
                 anchor_number,
                 application_number,
-                account_number,
                 sender,
                 notification_id: id,
                 urgency: urgency.unwrap_or(Urgency::Normal),
@@ -176,17 +174,18 @@ impl Refusal {
     }
 }
 
-/// Where a recipient principal points: its identity, the app, and its account there.
+/// Where a recipient principal points: its identity and the app. The principal itself
+/// names the account there, however it is numbered.
 #[derive(Clone)]
 struct Resolved {
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
-    account_number: Option<AccountNumber>,
 }
 
 /// What a principal names at `origin`. No such recipient when it names none
 /// there, or when none of its browsers was used within [`BROWSER_GONE_AFTER_NS`]. No
-/// channel when it has not allowed the app, or no browser can be woken now.
+/// channel when it has not allowed the app, or no browser or installed web app of the
+/// app can be woken now.
 fn resolve_recipient(
     recipient: Principal,
     origin: &ApplicationOrigin,
@@ -214,18 +213,22 @@ fn resolve_recipient(
         let consented = storage
             .read_anchor_application_config(account.anchor_number, origin)
             .is_some_and(|config| config.notifications_allowed());
-        if !consented
-            || !anchor
-                .browsers()
-                .iter()
-                .any(|browser| dispatch::can_wake(storage, browser, now_ns))
-        {
+        let pwa_route = dispatch::PwaRoute::read(
+            storage,
+            account.anchor_number,
+            application_number,
+            recipient,
+        );
+        let can_wake_any = anchor.browsers().iter().any(|browser| {
+            dispatch::can_wake(storage, browser, now_ns)
+                || dispatch::can_wake_installed_app(browser, &pwa_route, now_ns)
+        });
+        if !consented || !can_wake_any {
             return Err(Refusal::NoChannel);
         }
         Ok(Resolved {
             anchor_number: account.anchor_number,
             application_number,
-            account_number: account.account_number,
         })
     })
 }
@@ -334,7 +337,6 @@ mod tests {
                     storage.lookup_application_number_with_origin(&APP.to_string())
                 })
                 .expect("signing in stores the application"),
-                account_number: None,
                 sender: sender(),
                 notification_id: 7,
                 urgency: Urgency::Normal,
@@ -372,9 +374,9 @@ mod tests {
         assert_eq!(
             queued(NOW_NS)
                 .iter()
-                .map(|pending| pending.account_number)
+                .map(|pending_notification| pending_notification.recipient)
                 .collect::<Vec<_>>(),
-            vec![account_number]
+            vec![principal]
         );
     }
 

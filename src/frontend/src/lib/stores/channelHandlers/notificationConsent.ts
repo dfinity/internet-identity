@@ -49,6 +49,8 @@ let ceremoniesRun = 0;
 
 const NotificationConsentParamsCodec = z.object({
   icrc95DerivationOrigin: z.optional(OriginSchema),
+  /** The app asks from its installed web app, which subscribes for itself. */
+  installedApp: z.optional(z.boolean()),
 });
 
 /**
@@ -189,6 +191,7 @@ const answerConsent = async (
 
     const granted = await runConsentCeremony(
       effectiveOrigin,
+      params.installedApp === true,
       browser,
       probedAt,
       releaseScreen,
@@ -221,6 +224,7 @@ const answerConsent = async (
  */
 const runConsentCeremony = async (
   effectiveOrigin: string,
+  isInstalledApp: boolean,
   probedBrowser: Promise<BrowserPushState | undefined>,
   probedAt: number,
   releaseScreen: () => void,
@@ -232,7 +236,12 @@ const runConsentCeremony = async (
 
   authorizationStore.setRequestOrigin(effectiveOrigin);
   try {
-    return await askUntilSettled(effectiveOrigin, browser, releaseScreen);
+    return await askUntilSettled(
+      effectiveOrigin,
+      isInstalledApp,
+      browser,
+      releaseScreen,
+    );
   } finally {
     // Whatever came of it, a ceremony that has run is one that may have subscribed
     // this browser, so every probe taken before now is suspect.
@@ -243,6 +252,7 @@ const runConsentCeremony = async (
 /** Opens the screen for each identity the user settles on, until one answers. */
 const askUntilSettled = async (
   effectiveOrigin: string,
+  isInstalledApp: boolean,
   browser: Promise<BrowserPushState | undefined>,
   /** Called as soon as this request will put nothing more on screen, which is
    *  before the answer is read back: the redirect is what belongs on screen for
@@ -274,6 +284,7 @@ const askUntilSettled = async (
       origin: effectiveOrigin,
       actor: authenticated.actor,
       browser,
+      isInstalledApp,
     });
     if (resolution.screen === "skip") {
       releaseScreen();
@@ -326,6 +337,7 @@ const askUntilSettled = async (
       identityNumber: authenticated.identityNumber,
       origin: effectiveOrigin,
       actor: authenticated.actor,
+      isInstalledApp,
     });
   }
 };
