@@ -437,17 +437,24 @@
     isMultipleAccountsEnabled = true;
     selectedTtlSeconds = rememberedTtlSeconds();
     try {
-      let actor = storedSessionActor;
-      if (actor === null || actor === undefined) {
-        if (!$isAuthenticatedStore) {
-          await authLastUsedFlow.authenticate(
-            $lastUsedIdentitiesStore.selected!,
-            effectiveOrigin,
-          );
-        }
-        actor = $authenticationStore!.actor;
+      if (storedSessionActor !== null && storedSessionActor !== undefined) {
+        await loadAccountsViaActor(storedSessionActor, identityNumber, signal);
+        return;
       }
-      await loadAccountsViaActor(actor, identityNumber, signal);
+      if (!$isAuthenticatedStore) {
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.selected!,
+          effectiveOrigin,
+        );
+      }
+      // Read with the identity that signed in, which the provider's account
+      // picker can make another one than the selected identity.
+      const authenticated = $authenticationStore!;
+      await loadAccountsViaActor(
+        authenticated.actor,
+        authenticated.identityNumber,
+        signal,
+      );
     } catch (error) {
       if (signal.aborted) {
         return;
