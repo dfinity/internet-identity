@@ -58,6 +58,7 @@
   import IncidentBanner from "./components/IncidentBanner.svelte";
   import IncidentCard from "./components/IncidentCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
+  import ManageHints from "./components/ManageHints.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
   import Sheet from "./components/Sheet.svelte";
@@ -1715,12 +1716,16 @@
         onRemove={() => askRemove(selectedApps)}
       />
     {:else}
-      <PanelHeader
-        title="Manage apps"
-        lead="Select apps to change their permissions or remove them."
-        backLabel="Done"
-        onBack={stopManaging}
-      />
+      <!-- Nothing picked yet: the panel says what can be done here. -->
+      <div class="flex flex-col gap-4">
+        <PanelHeader
+          title="Manage apps"
+          lead="Select apps to change their permissions or remove them."
+          backLabel="Done"
+          onBack={stopManaging}
+        />
+        <ManageHints />
+      </div>
     {/if}
   {:else if openedApp !== undefined}
     {@const app = openedApp}
