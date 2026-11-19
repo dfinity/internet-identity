@@ -413,12 +413,11 @@ pub struct InternetIdentityInit {
     /// previously-stored value across an upgrade, `Some(None)` clears it,
     /// `Some(Some(c))` sets it to `c`.
     pub dnssec_config: Option<Option<DnssecConfig>>,
-    /// DoH (DNS-over-HTTPS) fallback configuration. Allowlists the
-    /// domains for which the canister may fetch DKIM / DMARC TXT
-    /// records via HTTP outcalls (covers the consumer-mailbox
-    /// providers whose DNS zones aren't DNSSEC-signed — see
-    /// `docs/ongoing/email-recovery.md` §7.6). Same set/clear pattern
-    /// as `dnssec_config`.
+    /// DoH (DNS-over-HTTPS) configuration. While set, the canister
+    /// fetches DKIM / DMARC TXT records via HTTP outcalls for any email
+    /// domain without a DNSSEC chain, with a separate outcall budget for
+    /// `reserved_domains` (see `docs/ongoing/email-recovery.md` §7.6).
+    /// Same set/clear pattern as `dnssec_config`.
     pub doh_config: Option<Option<DohConfig>>,
     /// URL of the official MCP connector the deployment ships, if any.
     ///

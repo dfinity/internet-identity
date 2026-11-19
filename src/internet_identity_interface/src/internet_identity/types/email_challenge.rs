@@ -79,7 +79,7 @@ pub struct EmailChallenge {
 /// - Otherwise, when a `DohConfig` is set (deploy-arg), resolve the
 ///   DKIM TXT via `crate::doh::fetch_txt` at `smtp_request` time.
 /// - If neither path applies, prepare fails with
-///   `DomainNotSupported`.
+///   `InternalCanisterError`.
 ///
 /// The skeleton chain deliberately omits the DKIM leaf: the DKIM
 /// selector is published by the sender's mail provider and is only
@@ -88,10 +88,9 @@ pub struct EmailChallenge {
 /// remaining leaf after the email is delivered and submits it via
 /// `email_challenge_submit_dkim_leaf` — see design doc §8.4.
 ///
-/// The frontend deliberately doesn't need to know which domains are
-/// on the DoH allowlist — that's operator config, not user-visible
-/// state. It just calls prepare and reads back any `Domain*` error
-/// to render an actionable message.
+/// The frontend doesn't need to know which domains are reserved for
+/// the DoH outcall budget: that's operator config, not user-visible
+/// state.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct EmailChallengeDnsInput {
     /// Lowercased canonical form: `lowercase(local-part) + "@" +
@@ -189,7 +188,7 @@ pub struct EmailChallengeResolveViaDohArg {
     /// The challenge nonce from `email_recovery_credential_prepare_add`
     /// (or `email_recovery_prepare_delegation` for recovery). The method
     /// carries no leaf data; the canister resolves the DKIM key over its
-    /// own allowlist-gated DoH path. The FE calls it repeatedly while the
+    /// own DoH path. The FE calls it repeatedly while the
     /// status is `ResolvingDoh`.
     pub nonce: String,
 }
@@ -359,7 +358,7 @@ pub enum EmailChallengeStatus {
 
 /// Which trust path the canister used (or will use) to verify the
 /// challenge email. Decided at prepare time: a supplied DNSSEC skeleton
-/// bundle → `Dnssec`; otherwise the DoH allowlist → `Doh`. Public — the
+/// bundle → `Dnssec`; otherwise `Doh`. Public — the
 /// FE already chose the branch and the deploy config is public, so
 /// surfacing it leaks nothing.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
