@@ -54,9 +54,9 @@
 //!   answer (above), never debounced. For a domain already in cache,
 //!   stale-serving covers the gap so the debounce never delays recovery;
 //!   it only throttles the background re-fetch.
-//! - **LRU cap ([`DOH_MAX_ENTRIES`]).** The key space is already
-//!   allowlist-bounded, so this is generous headroom plus a hard memory
-//!   bound that favours recently-seen domains.
+//! - **LRU cap ([`DOH_MAX_ENTRIES`]).** Any domain can be looked up, so
+//!   this is the hard memory bound; it favours recently-seen domains, and
+//!   an evicted entry is simply fetched again on its next lookup.
 
 use std::future::Future;
 
@@ -72,10 +72,29 @@ pub enum DohRecord {
     NoAnswer,
 }
 
-/// DoH cache: FQDN → [`DohRecord`], with concurrent-fetch dedup. Fills may
-/// fail transiently with [`DohError`]; a definitive `NoAnswer` is a cached
-/// answer, not a failure (see the module docs).
-pub type DohCache = SingleFlightCache<String, DohRecord, DohError>;
+/// The outcall budget a DoH lookup draws from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OutcallBudget {
+    /// For names inside a registered domain listed in
+    /// `DohConfig.reserved_domains`.
+    Reserved,
+    /// For names inside any other registered domain.
+    Shared,
+}
+
+/// One DoH lookup: the FQDN to query and the outcall budget its fill draws
+/// from. The cache key, so the fill knows its budget without reading the
+/// config.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DohLookup {
+    pub name: String,
+    pub budget: OutcallBudget,
+}
+
+/// DoH cache: [`DohLookup`] → [`DohRecord`], with concurrent-fetch dedup.
+/// Fills may fail transiently with [`DohError`]; a definitive `NoAnswer` is a
+/// cached answer, not a failure (see the module docs).
+pub type DohCache = SingleFlightCache<DohLookup, DohRecord, DohError>;
 
 /// Serve a cached answer up to 30 min past its TTL while refreshing
 /// (stale-while-revalidate / stale-if-error). Matches the 30-min challenge
@@ -100,13 +119,13 @@ pub const DOH_MAX_ENTRIES: usize = 256;
 pub const DOH_ABANDON_FILL_AFTER_SECS: u64 = 120;
 
 /// Construct the DoH cache around its shared `fill` (the five-provider
-/// fan-out for one FQDN, defined in the parent module where the outcall
+/// fan-out for one [`DohLookup`], defined in the parent module where the outcall
 /// plumbing lives). The freshness window (`fresh_for`) is the deploy arg
 /// `max_cache_age_secs` (default 1 h when unset; the operator-chosen value is
 /// used verbatim), read here so the cache owns all its policy. Config only
 /// changes on upgrade, which wipes this heap cache, so the value is stable for
 /// the cache's lifetime.
-pub fn new_doh_cache<Fut>(fill: impl Fn(String) -> Fut + 'static) -> DohCache
+pub fn new_doh_cache<Fut>(fill: impl Fn(DohLookup) -> Fut + 'static) -> DohCache
 where
     Fut: Future<Output = FillOutcome<DohRecord, DohError>> + 'static,
 {

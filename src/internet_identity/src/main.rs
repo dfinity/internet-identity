@@ -3354,7 +3354,7 @@ mod email_challenge_api {
     }
 
     /// Anonymous. Resolves the DKIM key over the canister's own
-    /// allowlist-gated DoH path, reusing the partial-verification record
+    /// DoH path, reusing the partial-verification record
     /// stashed at email-arrival time, then runs the same DMARC alignment +
     /// binding. Used for the pure-DoH (Gmail) case and as the fallback for
     /// the DNSSEC path when the FE can't walk a fully-signed resolution
@@ -3365,8 +3365,8 @@ mod email_challenge_api {
     /// reports `ResolvingDoh`. Each call reads the DoH cache: a cache miss
     /// spawns the fetch and returns `Ok(())` with the status left at
     /// `ResolvingDoh` (poll again); a cache hit verifies and stamps the
-    /// terminal verdict. Idempotent — completing more than once is a no-op. A
-    /// domain the operator hasn't enabled lands as `DomainNotAllowlisted`.
+    /// terminal verdict. Idempotent — completing more than once is a no-op. With
+    /// no DoH configuration set, it lands as `InternalCanisterError`.
     ///
     /// Anonymous for the same reason as `email_challenge_submit_dkim_leaf`:
     /// the 64-bit nonce is the only authentication, and the call is a no-op
@@ -3446,7 +3446,7 @@ mod email_recovery_api {
 
     /// Authenticated. Validates the caller owns `identity_number`,
     /// validates the DNS input shape (DNSSEC bundle if supplied,
-    /// otherwise DoH allowlist gate), and issues a fresh nonce. The
+    /// otherwise DoH), and issues a fresh nonce. The
     /// nonce is stored alongside the claimed address + selector +
     /// anchor in the heap pending-challenge map; an inbound email
     /// with that nonce in `Subject:` completes the binding via
@@ -3484,7 +3484,7 @@ mod email_recovery_api {
 
     /// Anonymous. The FE-side counterpart of `prepare_add` for the
     /// recovery flow: validates the same DNSSEC skeleton chain or
-    /// DoH allowlist, parks a pending challenge bound to the
+    /// DoH path, parks a pending challenge bound to the
     /// FE-supplied `session_key`, and returns the nonce +
     /// `recover@id.ai` recipient. The anchor isn't resolved here —
     /// that happens at submit-leaf (or DoH-path smtp_request) time
