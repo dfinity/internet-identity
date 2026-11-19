@@ -35,7 +35,7 @@
   } from "$lib/utils/recoveryPhrase";
   import { HttpAgent } from "@icp-sdk/core/agent";
   import { anonymousActor, anonymousAgent } from "$lib/globals";
-  import { throwCanisterError } from "$lib/utils/utils";
+  import { retryFor, throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
@@ -120,7 +120,11 @@
   };
 
   const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
-    anonymousActor.email_recovery_get_delegation(args).then(throwCanisterError);
+    retryFor(8, () =>
+      anonymousActor
+        .email_recovery_get_delegation(args)
+        .then(throwCanisterError),
+    );
 
   /**
    * Bridge the wizard's "I have a SignedDelegation" output back into

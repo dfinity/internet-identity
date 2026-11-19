@@ -266,6 +266,11 @@ describe("actorForIdentity — IDB resolution", () => {
     const { mintSession, actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
 
+    // Minting reads the delegation through `retryFor`, which waits on a timer:
+    // only the clock stays fake.
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     await mintSession({ identityNumber: IDENTITY_NUMBER, actor: mintActor });
 
     const result = await actorForIdentity(IDENTITY_NUMBER);

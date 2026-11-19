@@ -10,6 +10,7 @@ import type { Authenticated } from "$lib/stores/authentication.store";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import {
+  retryFor,
   throwTextCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
@@ -200,14 +201,16 @@ export const mcpAuthorize = async ({
 
   // `get` recovers the seed from `user_key` (the value `prepare` returned), so
   // it needs neither the consent params nor a deterministic re-derivation.
-  const signed = await actor
-    .get_mcp_registration_delegation(
-      identityNumber,
-      browserKey,
-      user_key,
-      expiration,
-    )
-    .then(throwTextCanisterError);
+  const signed = await retryFor(8, () =>
+    actor
+      .get_mcp_registration_delegation(
+        identityNumber,
+        browserKey,
+        user_key,
+        expiration,
+      )
+      .then(throwTextCanisterError),
+  );
 
   // Hop 1, canister-signed: `P_reg -> Y`. `user_key` is `P_reg`'s DER public
   // key, so the server's eventual `mcp_register_v2` call is seen by the
