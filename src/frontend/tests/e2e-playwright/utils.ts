@@ -172,6 +172,11 @@ export const clearStoredSessions = async (page: Page): Promise<void> => {
       () =>
         new Promise<void>((resolve, reject) => {
           const request = indexedDB.open("ii-session-delegations");
+          // On a fresh browser this creates the database, which II's store
+          // expects to hold `keys`.
+          request.onupgradeneeded = () => {
+            request.result.createObjectStore("keys");
+          };
           request.onerror = () => reject(request.error);
           request.onsuccess = () => {
             const database = request.result;
