@@ -59,6 +59,7 @@
     findConfig,
     isAppleSignInSheetBrowser,
     isOpenIdCancelError,
+    PopupBlockedError,
     selectAuthScopes,
   } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
@@ -201,6 +202,11 @@
     } catch (e) {
       ssoNormalLoginBusy = false;
       if (isOpenIdCancelError(e)) {
+        return;
+      }
+      if (e instanceof PopupBlockedError) {
+        // Stays on the dialog, whose button can still open the pop-up.
+        handleError(e);
         return;
       }
       ssoNormalLogin = undefined;

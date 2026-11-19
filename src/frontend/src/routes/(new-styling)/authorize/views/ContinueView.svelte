@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack, type Snippet } from "svelte";
+  import type { Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import {
     CheckIcon,
@@ -271,6 +271,12 @@
   const selectedIdentityNumber = $derived(
     $lastUsedIdentitiesStore.selected!.identityNumber,
   );
+  // Read from IndexedDB when the identity is selected (`undefined` until then,
+  // `null` when there is none), so a press knows whether it needs a sign-in
+  // without awaiting: Safari blocks a pop-up opened after an `await`.
+  let storedSessionActor = $state.raw<ActorSubclass<_SERVICE> | null>();
+  // Aborted when another identity is selected or the screen is taken down.
+  let identityController = new AbortController();
   // Re-initialize the flow and re-hydrate per-identity state when the
   // identity changes. Read the persisted values into locals so the
   // effect's only reactive dependency is `selectedIdentityNumber` -- if
@@ -278,18 +284,21 @@
   // user's own toggle/selector click would re-trigger this effect and
   // overwrite the new value back from stale localStorage.
   $effect(() => {
-    authLastUsedFlow.init([selectedIdentityNumber]);
-    const hydrated = readToggle(selectedIdentityNumber);
-    isMultipleAccountsEnabled = hydrated;
-    accessLevel = accessLevelStore.getPreference(
-      "continue",
-      selectedIdentityNumber,
-    );
+    const identityNumber = selectedIdentityNumber;
+    authLastUsedFlow.init([identityNumber]);
+    const isRemembered = readToggle(identityNumber);
+    isMultipleAccountsEnabled = isRemembered;
+    accessLevel = accessLevelStore.getPreference("continue", identityNumber);
     defaultAccountNumber = null;
     selectedAccountNumber = null;
-    if (hydrated) {
-      void handleEnableMultipleAccounts();
-    }
+    accounts = undefined;
+    storedSessionActor = undefined;
+    const controller = new AbortController();
+    identityController = controller;
+    void readStoredSession(identityNumber, isRemembered, controller.signal);
+    return () => {
+      controller.abort();
+    };
   });
 
   // Persist the toggle whenever it (or the identity) changes.
@@ -301,27 +310,7 @@
     rememberAccessLevel();
     isAuthenticatingDefault = true;
     try {
-      if (defaultAccountNumber === null) {
-        const sessionActor = await actorForIdentity(selectedIdentityNumber);
-        if (sessionActor !== undefined) {
-          try {
-            const account = await sessionActor
-              .get_default_account(selectedIdentityNumber, effectiveOrigin)
-              .then(throwCanisterError);
-            defaultAccountNumber = account.account_number[0];
-          } catch (err) {
-            if (
-              isCanisterError<SessionDelegationError>(err) &&
-              err.type === "Unauthorized"
-            ) {
-              void purgeSession(selectedIdentityNumber);
-            } else {
-              throw err;
-            }
-          }
-        }
-      }
-
+      // Nothing may be awaited before the sign-in, see `storedSessionActor`.
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.selected!,
@@ -380,6 +369,7 @@
   const loadAccountsViaActor = async (
     actor: ActorSubclass<_SERVICE>,
     identityNumber: bigint,
+    signal: AbortSignal,
   ) => {
     const values = await Promise.all([
       actor
@@ -389,6 +379,9 @@
         .get_default_account(identityNumber, effectiveOrigin)
         .then(throwCanisterError),
     ]);
+    if (signal.aborted) {
+      return;
+    }
     accounts = values[0].sort((a, b) => {
       const aVal = a.last_used[0] ?? BigInt(-1);
       const bVal = b.last_used[0] ?? BigInt(-1);
@@ -397,38 +390,86 @@
     defaultAccountNumber = values[1].account_number[0];
   };
 
-  const handleEnableMultipleAccounts = async () => {
-    // Untracked: this runs inside the identity effect, which must not rerun
-    // when Continue saves the options.
-    selectedTtlSeconds = untrack(rememberedTtlSeconds);
+  // Restores all options left on from an earlier visit when the stored session
+  // can read the accounts, and switches them off otherwise: without a press no
+  // sign-in may start.
+  const readStoredSession = async (
+    identityNumber: bigint,
+    isRemembered: boolean,
+    signal: AbortSignal,
+  ) => {
+    const actor = await actorForIdentity(identityNumber);
+    if (signal.aborted) {
+      return;
+    }
+    storedSessionActor = actor ?? null;
+    if (!isRemembered) {
+      return;
+    }
+    if (actor === undefined) {
+      isMultipleAccountsEnabled = false;
+      return;
+    }
+    selectedTtlSeconds = rememberedTtlSeconds();
     try {
-      const sessionActor = await actorForIdentity(selectedIdentityNumber);
-      if (sessionActor !== undefined) {
-        try {
-          await loadAccountsViaActor(sessionActor, selectedIdentityNumber);
-          return;
-        } catch (err) {
-          if (
-            isCanisterError<SessionDelegationError>(err) &&
-            err.type === "Unauthorized"
-          ) {
-            void purgeSession(selectedIdentityNumber);
-          } else {
-            throw err;
-          }
-        }
+      await loadAccountsViaActor(actor, identityNumber, signal);
+    } catch (error) {
+      if (signal.aborted) {
+        return;
       }
-
+      isMultipleAccountsEnabled = false;
+      if (
+        isCanisterError<SessionDelegationError>(error) &&
+        error.type === "Unauthorized"
+      ) {
+        storedSessionActor = null;
+        void purgeSession(identityNumber);
+        return;
+      }
+      handleError(error);
+    }
+  };
+  const handleEnableMultipleAccounts = async () => {
+    const identityNumber = selectedIdentityNumber;
+    const signal = identityController.signal;
+    // Set before the switch reports its change, so that a sign-in failing
+    // within the click (a refused pop-up) can still switch it back off.
+    isMultipleAccountsEnabled = true;
+    selectedTtlSeconds = rememberedTtlSeconds();
+    try {
+      if (storedSessionActor !== null && storedSessionActor !== undefined) {
+        await loadAccountsViaActor(storedSessionActor, identityNumber, signal);
+        return;
+      }
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.selected!,
           effectiveOrigin,
         );
       }
-      const { identityNumber, actor } = $authenticationStore!;
-      await loadAccountsViaActor(actor, identityNumber);
+      // Read with the identity that signed in, which the provider's account
+      // picker can make another one than the selected identity.
+      const authenticated = $authenticationStore!;
+      await loadAccountsViaActor(
+        authenticated.actor,
+        authenticated.identityNumber,
+        signal,
+      );
     } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
       isMultipleAccountsEnabled = false;
+      // Whatever the stored session failed on, expiry included, the next press
+      // signs in instead.
+      storedSessionActor = null;
+      if (
+        isCanisterError<SessionDelegationError>(error) &&
+        error.type === "Unauthorized"
+      ) {
+        void purgeSession(identityNumber);
+        return;
+      }
       handleError(error);
     }
   };
@@ -500,17 +541,24 @@
         account.isDefaultSignIn &&
         defaultAccountNumber !== accounts[index].account_number[0];
 
+      if (!nameChanged && !defaultChanged) {
+        return;
+      }
+      // Renaming an account and changing the default both take a sign-in: a
+      // stored session only reads. It starts before anything is awaited, see
+      // `storedSessionActor`.
+      if (!$isAuthenticatedStore) {
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.selected!,
+          effectiveOrigin,
+        );
+      }
+      const authenticated = $authenticationStore;
+      if (authenticated === undefined) {
+        return;
+      }
+
       if (nameChanged) {
-        if (!$isAuthenticatedStore) {
-          await authLastUsedFlow.authenticate(
-            $lastUsedIdentitiesStore.selected!,
-            effectiveOrigin,
-          );
-        }
-        const authenticated = $authenticationStore;
-        if (authenticated === undefined) {
-          return;
-        }
         accounts[index] = await authenticated.actor
           .update_account(
             authenticated.identityNumber,
@@ -526,40 +574,6 @@
       }
 
       if (defaultChanged) {
-        const sessionActor = await actorForIdentity(selectedIdentityNumber);
-        if (sessionActor !== undefined) {
-          try {
-            accounts[index] = await sessionActor
-              .set_default_account(
-                selectedIdentityNumber,
-                effectiveOrigin,
-                accounts[index].account_number,
-              )
-              .then(throwCanisterError);
-            defaultAccountNumber = accounts[index].account_number[0];
-            return;
-          } catch (err) {
-            if (
-              isCanisterError<SessionDelegationError>(err) &&
-              err.type === "Unauthorized"
-            ) {
-              void purgeSession(selectedIdentityNumber);
-            } else {
-              throw err;
-            }
-          }
-        }
-
-        if (!$isAuthenticatedStore) {
-          await authLastUsedFlow.authenticate(
-            $lastUsedIdentitiesStore.selected!,
-            effectiveOrigin,
-          );
-        }
-        const authenticated = $authenticationStore;
-        if (authenticated === undefined) {
-          return;
-        }
         accounts[index] = await authenticated.actor
           .set_default_account(
             authenticated.identityNumber,
@@ -763,7 +777,7 @@
         : handleEnableMultipleAccounts}
       label={$t`Show all options`}
       size="sm"
-      disabled={isAuthenticatingDefault}
+      disabled={isAuthenticatingDefault || storedSessionActor === undefined}
     />
     <Tooltip
       label={$t`All options`}
