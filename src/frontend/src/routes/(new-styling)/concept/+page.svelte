@@ -345,10 +345,10 @@
    *  a little above the middle, where the eye puts it. It stays there
    *  whatever is under it, so a new row or Edit's card doesn't move it,
    *  until the rows would no longer fit: then the room over it gives way,
-   *  down to PAGE_TOP's, and only then the page scrolls. The canvas is the
-   *  window less the page's 8px above and below. */
+   *  down to PAGE_TOP's, and only then the page scrolls. The third is of
+   *  the window less the page's 8px above and below, from those 8px. */
   const MINE_TOP =
-    "h-0 shrink-0 md:h-auto md:min-h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)] md:shrink md:basis-[calc((100dvh-1rem)/3-var(--header-h)-0.75rem)]";
+    "h-0 shrink-0 md:h-auto md:min-h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)] md:shrink md:basis-[calc((100dvh-1rem)/3+0.5rem-var(--header-h)-0.75rem)]";
   /** The greeting's row, over a page: the room under it grows with the
    *  greeting. On a narrow canvas it steps in by the 10px the page keeps
    *  short of the edge, where the logos stand. */
@@ -1868,11 +1868,13 @@
   style:--ii-ui-inset={uiInset}
 >
   <!-- The canvas: the apps. It doesn't scroll: the header stays put and each
-       page scrolls on its own under it. -->
+       page scrolls on its own under it. On desktop it reaches up over the
+       page's 8px to the window's top edge (the header keeps them as its own
+       padding), so what scrolls away isn't cut off 8px short of it. -->
   <Elevated
     offset={2}
     as="main"
-    class="@container/canvas flex h-dvh min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 shadow-none md:h-auto md:min-h-0"
+    class="@container/canvas flex h-dvh min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 shadow-none md:-mt-2 md:h-auto md:min-h-0"
   >
     <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
     <h1 class="sr-only">Apps</h1>
@@ -1884,7 +1886,7 @@
     <header
       bind:this={headerElement}
       bind:clientHeight={headerHeight}
-      class="pointer-events-none relative z-10 flex shrink-0 flex-col"
+      class="pointer-events-none relative z-10 flex shrink-0 flex-col md:pt-2"
     >
       <!-- Over the grid, three columns: the logo, the tabs, the controls.
            The outer two share what's left, so the tabs stand on the canvas's
@@ -2325,11 +2327,10 @@
       <!-- Content comes up from under the island through a blur that deepens
            into the canvas. A page keeps clear of it at rest (PAGE's pb-32). -->
       <ProgressiveBlur side="bottom" fade class="h-24" />
-      <!-- Phone: the head's cards go up under the logo whole, so they leave
-             through a blur too, rather than at the screen's edge. -->
-      {#if phoneHead}
-        <ProgressiveBlur side="top" fade class="h-(--header-h)" />
-      {/if}
+      <!-- What scrolls up leaves under the header through a blur too, rather
+           than at the window's edge: a phone's head cards, and over the grid
+           whatever passes under the logo, the tabs and search. -->
+      <ProgressiveBlur side="top" fade class="h-(--header-h)" />
     </div>
   </Elevated>
 
