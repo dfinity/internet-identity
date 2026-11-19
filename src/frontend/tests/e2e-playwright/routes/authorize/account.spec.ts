@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize, II_URL } from "../../utils";
+import { authorize, clearStoredSessions } from "../../utils";
 
 test("Create another account and authorize with primary", async ({
   page,
@@ -280,31 +280,7 @@ test("All options left on go off when there is no session to show them with, and
 
   // The session Internet Identity kept on this browser is gone, as it is after
   // a month without a sign-in. The choice to see all options is not.
-  const iiPage = await page.context().newPage();
-  await iiPage.goto(II_URL);
-  await iiPage.evaluate(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open("ii-session-delegations");
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          const database = request.result;
-          if (!database.objectStoreNames.contains("keys")) {
-            database.close();
-            resolve();
-            return;
-          }
-          const transaction = database.transaction("keys", "readwrite");
-          transaction.objectStore("keys").clear();
-          transaction.oncomplete = () => {
-            database.close();
-            resolve();
-          };
-          transaction.onerror = () => reject(transaction.error);
-        };
-      }),
-  );
-  await iiPage.close();
+  await clearStoredSessions(page);
 
   const switchedPrincipal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);

@@ -131,6 +131,52 @@ export const blockPopupsOutsideOfPresses = async (
 };
 
 /**
+ * Makes `window.open` on `origin` return `null` the first time it is called, the
+ * way a browser that blocks the pop-up answers, and open windows after that.
+ *
+ * Takes effect in the documents the context loads after the call.
+ * @param context The browser context II's windows open in.
+ * @param origin The origin to refuse the first pop-up on.
+ */
+export const refuseFirstPopup = async (
+  context: BrowserContext,
+  origin: string,
+): Promise<void> => {
+  await context.addInitScript((refusedOrigin) => {
+    if (window.location.origin !== refusedOrigin) {
+      return;
+    }
+    const open = window.open.bind(window);
+    let isRefused = false;
+    window.open = (...args) => {
+      if (isRefused) {
+        return open(...args);
+      }
+      isRefused = true;
+      return null;
+    };
+  }, origin);
+};
+
+/**
+ * Clears II's IndexedDB on this browser, which holds the stored sessions, as if
+ * they had expired. What is kept in localStorage, such as the last used
+ * identities and their options, stays.
+ * @param page Any page of the browser context.
+ */
+export const clearStoredSessions = async (page: Page): Promise<void> => {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("Storage.clearDataForOrigin", {
+      origin: II_URL,
+      storageTypes: "indexeddb",
+    });
+  } finally {
+    await cdp.detach();
+  }
+};
+
+/**
  * Installs the page's clock, anchored at the real time and still ticking.
  *
  * Before the page is navigated, so every timer it creates is one a scenario can
