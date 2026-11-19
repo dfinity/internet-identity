@@ -174,7 +174,9 @@ Common options:
   --doh-reserved-domains <a,b,...>
                             Override the default DoH reserved domains (only
                             used with --update-email-recovery-init). Empty
-                            reserves no domain.
+                            reserves no domain; DoH stays on. To switch DoH
+                            off, put doh_config = opt null; in a
+                            --be-extra-args-file without this flag.
   --openid-configs-file <path>
                             Set the backend openid_configs init arg from a
                             Candid-text file holding an opt vec OpenIdConfig
@@ -193,7 +195,9 @@ Common options:
                             backend_origin / related_origins (prompts),
                             openid_configs (--openid-configs-file), and
                             dnssec_config / doh_config
-                            (--update-email-recovery-init).
+                            (--update-email-recovery-init; without that flag
+                            the file may set them, e.g. doh_config = opt null;
+                            switches DoH off).
                             Encoding is type-checked against the deployed wasm.
   -h, --help                Show this help
 EOF
@@ -796,10 +800,16 @@ EXTRA
             echo "Error: failed to read --be-extra-args-file (or it is now empty): $BE_EXTRA_ARGS_FILE" >&2
             return 1
         fi
+        # `dnssec_config` and `doh_config` are the script's only with
+        # --update-email-recovery-init; without it the file may set them, e.g.
+        # `doh_config = opt null;` to switch the DoH path off.
+        local -a managed_fields=(backend_canister_id backend_origin related_origins
+                                 mcp_official_url openid_configs)
+        if [ "$UPDATE_EMAIL_RECOVERY_INIT" = true ]; then
+            managed_fields+=(dnssec_config doh_config)
+        fi
         local managed
-        for managed in backend_canister_id backend_origin related_origins \
-                       mcp_official_url \
-                       openid_configs dnssec_config doh_config; do
+        for managed in "${managed_fields[@]}"; do
             # Match the field name only as a record-field key: at a line start
             # (ignoring leading whitespace) and followed by `=`. This avoids
             # false positives on the same word appearing inside a value string.
@@ -810,7 +820,7 @@ EXTRA
                 echo "       staging selection (-sa/-sb/-sc/-sd / --staging); backend_origin," >&2
                 echo "       related_origins and mcp_official_url from the prompts; openid_configs from" >&2
                 echo "       --openid-configs-file; dnssec_config / doh_config from" >&2
-                echo "       --update-email-recovery-init." >&2
+                echo "       --update-email-recovery-init (drop that flag to set them here)." >&2
                 return 1
             fi
         done
