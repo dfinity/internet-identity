@@ -13,6 +13,7 @@
   import { prefersReducedMotion } from "svelte/motion";
   import { MediaQuery } from "svelte/reactivity";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import { TALL_PANEL } from "../panel";
   import type { CardKind, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
   import Glyphs, { type Glyph } from "./Glyphs.svelte";
@@ -71,10 +72,9 @@
   const reduced = $derived(prefersReducedMotion.current);
 
   /** Where there's the height for it, a card takes its room (Thomas): a
-   *  larger icon, the title under it, a larger sentence, more air. The three
-   *  cards and the identity over them then take about 690px of the window;
-   *  in a lower one they keep to the compact row, title beside the icon. */
-  const tall = new MediaQuery("min-height: 44rem");
+   *  larger icon, the title under it, a larger sentence, more air. In a
+   *  lower window it keeps to the compact row, title beside the icon. */
+  const tall = new MediaQuery(TALL_PANEL);
   const large = $derived(tall.current);
   const contentId = $props.id();
 

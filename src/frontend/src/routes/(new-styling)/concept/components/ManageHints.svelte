@@ -15,6 +15,15 @@
   import type { Component } from "svelte";
   import Elevated from "./Elevated.svelte";
 
+  interface Props {
+    /** `card`: a layer inside the Manage apps card, 8px in from its edges,
+     *  its rows stepping in to keep their icons on the card's 16px line.
+     *  `page`: a card of its own, as in a phone's sheet. */
+    variant?: "page" | "card";
+  }
+
+  const { variant = "page" }: Props = $props();
+
   const HINTS: { icon: Component; title: string; detail: string }[] = [
     {
       icon: MousePointerClickIcon,
@@ -45,7 +54,15 @@
   const CELL = "flex flex-col items-center gap-2 rounded-xl px-2 pt-2.5 pb-2";
 </script>
 
-<Elevated offset={1} as="section" class="overflow-hidden rounded-2xl">
+<Elevated
+  offset={1}
+  shadowLevel={variant === "card" ? 3 : undefined}
+  as="section"
+  class={[
+    "overflow-hidden",
+    variant === "card" ? "mx-2 mt-3 mb-2 rounded-lg" : "rounded-2xl",
+  ]}
+>
   <h3 class="sr-only">How to manage apps</h3>
 
   <div
@@ -101,9 +118,21 @@
     </span>
   </div>
 
-  <ul class="ii-rows [--ii-rows-inset:4rem]">
+  <ul
+    class={[
+      "ii-rows",
+      variant === "card"
+        ? "[--ii-rows-inset:3.5rem]"
+        : "[--ii-rows-inset:4rem]",
+    ]}
+  >
     {#each HINTS as hint (hint.title)}
-      <li class="flex items-center gap-3 px-4 py-3.5">
+      <li
+        class={[
+          "flex items-center gap-3 py-3.5",
+          variant === "card" ? "px-2" : "px-4",
+        ]}
+      >
         <span
           aria-hidden="true"
           class="text-fg-secondary flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--ii-selected)"

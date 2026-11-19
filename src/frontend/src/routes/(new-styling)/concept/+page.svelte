@@ -60,6 +60,7 @@
   import IncidentCard from "./components/IncidentCard.svelte";
   import Island, { type IslandView } from "./components/Island.svelte";
   import ManageHints from "./components/ManageHints.svelte";
+  import PanelCard from "./components/PanelCard.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
   import Sheet from "./components/Sheet.svelte";
@@ -1711,11 +1712,16 @@
 {/snippet}
 
 {#snippet panelBody(inSheet: boolean)}
+  <!-- Beside the canvas an app's options, and managing apps, are one card
+       with Close, as an open section is (Thomas: the accordion, applied to
+       them too); a phone's sheet keeps them as views with Back or Done. -->
+  {@const variant = inSheet ? "page" : "card"}
   {#if managing}
     {#if selectedApps.length === 1}
       {@const app = selectedApps[0]}
       <AppView
         {app}
+        {variant}
         history={current.keepHistory}
         backLabel="Done"
         onExit={stopManaging}
@@ -1725,12 +1731,13 @@
     {:else if selectedApps.length > 1}
       <BulkView
         apps={selectedApps}
+        {variant}
         onExit={stopManaging}
         onSetNotifications={(allowed) =>
           setNotifications(selectedApps, allowed)}
         onRemove={() => askRemove(selectedApps)}
       />
-    {:else}
+    {:else if inSheet}
       <!-- Nothing picked yet: the panel says what can be done here. -->
       <div class="flex flex-col gap-4">
         <PanelHeader
@@ -1741,11 +1748,30 @@
         />
         <ManageHints />
       </div>
+    {:else}
+      <PanelCard title={TITLES.apps} closeLabel="Done" onClose={stopManaging}>
+        {#snippet icon(large: boolean)}
+          <span
+            aria-hidden="true"
+            class={[
+              "text-fg-secondary grid shrink-0 place-items-center bg-(--ii-selected)",
+              large ? "size-11 rounded-xl" : "size-9 rounded-[0.625rem]",
+            ]}
+          >
+            <Grid2x2CheckIcon class={large ? "size-5.5" : "size-4.5"} />
+          </span>
+        {/snippet}
+        {#snippet lead()}
+          Select apps to change their permissions or remove them.
+        {/snippet}
+        <ManageHints variant="card" />
+      </PanelCard>
     {/if}
   {:else if openedApp !== undefined}
     {@const app = openedApp}
     <AppView
       {app}
+      {variant}
       history={current.keepHistory}
       onExit={closeAppDetails}
       onToggleNotifications={(allowed) => setNotifications([app], allowed)}
