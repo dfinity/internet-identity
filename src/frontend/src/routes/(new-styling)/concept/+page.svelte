@@ -1156,6 +1156,14 @@
   };
   const isAdded = (origin: string) =>
     current.apps.some((app) => app.origin === origin);
+  /** An app opened from the search counts as used, as a tap on its tile. */
+  const openedFromSearch = ({ origin }: FeaturedApp) => {
+    const app = current.apps.find((one) => one.origin === origin);
+    if (app !== undefined) {
+      readAll(app);
+      markUsed(app);
+    }
+  };
   /** A site that isn't in the curated list, added by its address. */
   const addLink = (host: string) =>
     addApp({
@@ -1829,21 +1837,22 @@
           <Logo class="text-fg-primary h-4" />
           <span class="text-text-primary text-base font-semibold"> id.ai </span>
         </button>
-        <!-- Desktop: search in the canvas's top corner, on every page and
-             however far it's scrolled, so an app is found from wherever you
-             are. It ends where the account's pill would, 20px in, and the
-             list it opens hangs from that end. -->
+        <!-- Desktop: search's glyph in the canvas's top corner, on every
+             page and however far it's scrolled, so an app is found from
+             wherever you are (⌘K too). Its pill ends where the account's
+             would, 20px in. -->
         <div
           class="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-2"
         >
           {#if isDesktop.current}
             <HeaderSearch
+              apps={current.apps}
               {isAdded}
               onAdd={(app) => addApp(app)}
               onAddLink={addLink}
-              suggestions={featured.slice(0, 4)}
+              onOpen={openedFromSearch}
+              suggested={featured}
               lifted={headerLifted}
-              class="w-full max-w-80 min-w-0"
             />
           {/if}
           <div
@@ -1965,10 +1974,12 @@
                  sections' icons come and go before it. -->
               <HeaderSearch
                 compact
+                apps={current.apps}
                 {isAdded}
                 onAdd={(app) => addApp(app)}
                 onAddLink={addLink}
-                suggestions={featured}
+                onOpen={openedFromSearch}
+                suggested={featured}
                 class={!phoneHead ? "order-first" : undefined}
               />
             {/if}

@@ -1,186 +1,294 @@
 <script lang="ts">
   /**
-   * Finding an app from any page, so search isn't a part of Explore only.
-   * On desktop it's a field in the canvas's top corner, always in view: a
-   * focus opens what it finds under it, over the page, and the page stays
-   * where it was. On a phone the header has room for its glyph only: a tap
-   * opens the search over the whole screen, the field where the header was
-   * and the keyboard up at once, as a phone's search does; Cancel puts it
-   * away. Both list the same rows as the "Add app" popover (SearchResults).
+   * Finding an app from any page: a search glyph in the header, and ⌘K on
+   * desktop, so search isn't a part of Explore only.
+   *
+   * On desktop it opens a palette over the page, after beUI's Command
+   * Palette (https://beui.dev/components/blocks/command-palette, MIT): the
+   * page blurs behind it, and the panel stands a little above the middle,
+   * so it grows down as it lists. It comes in from a step smaller and a
+   * little higher, and leaves faster than it came. On a phone the glyph
+   * opens the same search over the whole screen, the field where the header
+   * was and the keyboard up at once, as a phone's search does; Cancel puts
+   * it away. What it lists is SearchPalette's.
    */
   import { flushSync } from "svelte";
   import { SearchIcon, XIcon } from "@lucide/svelte";
-  import { cubicOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
-  import { scale } from "svelte/transition";
   import type { ClassValue } from "svelte/elements";
-  import type { FeaturedApp } from "../mockData";
-  import SearchResults from "./SearchResults.svelte";
+  import type { ConceptApp, ExploreShelfItem, FeaturedApp } from "../mockData";
+  import SearchPalette from "./SearchPalette.svelte";
   import SurfaceLevel from "./SurfaceLevel.svelte";
 
   interface Props {
+    apps: ConceptApp[];
     isAdded: (origin: string) => boolean;
     onAdd: (app: FeaturedApp) => void;
-    onAddLink?: (host: string) => void;
-    /** Offered while the field is empty. */
-    suggestions?: FeaturedApp[];
-    /** A phone's header: the glyph, which opens the search over the page. */
+    onAddLink: (host: string) => void;
+    /** An app was opened from the search. */
+    onOpen: (app: FeaturedApp) => void;
+    /** Featured apps the identity doesn't use yet. */
+    suggested: FeaturedApp[];
+    /** A phone: the search opens over the whole screen. */
     compact?: boolean;
-    /** Content runs under the header: the field lifts off it, as the
-     *  header's tabs do. */
+    /** Content runs under the header: the glyph's pill lifts off it, as the
+     *  header's other pills do. */
     lifted?: boolean;
     class?: ClassValue;
   }
 
   const {
+    apps,
     isAdded,
     onAdd,
     onAddLink,
-    suggestions = [],
+    onOpen,
+    suggested,
     compact = false,
     lifted = false,
     class: className,
   }: Props = $props();
 
-  const LABEL = "Search apps or paste a link";
+  const PLACEHOLDER = "Search apps or paste a link";
   const reduced = $derived(prefersReducedMotion.current);
+  /** Emil Kowalski's strong ease-out, as --ii-ease-out. */
+  const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 
   let query = $state("");
+  let shelf = $state<ExploreShelfItem>();
   let open = $state(false);
-  let root = $state<HTMLElement>();
-  let input = $state<HTMLInputElement>();
+  let closing = false;
   let dialog = $state<HTMLDialogElement>();
-  let results = $state<HTMLElement>();
+  let input = $state<HTMLInputElement>();
+  let scrim = $state<HTMLElement>();
+  let panel = $state<HTMLElement>();
+  let palette = $state<ReturnType<typeof SearchPalette>>();
+  const uid = $props.id();
+  const listId = `${uid}-list`;
+  let activeOptionId = $state<string>();
 
-  /** Desktop: something to show under the field, found or offered. */
-  const listing = $derived(
-    open && (query.trim() !== "" || suggestions.length > 0),
-  );
-
-  const clear = () => {
+  // Opened within the press itself, so a phone brings its keyboard up with
+  // it: a focus from a timer or after a frame would leave it down.
+  const show = () => {
+    if (open) return;
     query = "";
-    input?.focus();
-  };
-
-  // --- Desktop: the field in the corner ---
-
-  // Focus stays in the field while the list is open: a press on the list
-  // doesn't take it (onmousedown below), and a Tab into the rows keeps it
-  // inside. Focus going anywhere else closes the list.
-  const onFocusOut = (event: FocusEvent) => {
-    if (
-      !(event.relatedTarget instanceof Node) ||
-      root?.contains(event.relatedTarget) !== true
-    ) {
-      open = false;
-    }
-  };
-  /** Escape closes the list first, then empties the field, then leaves it. */
-  const onKeydown = (event: KeyboardEvent) => {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    if (listing) {
-      open = false;
-      input?.focus();
-    } else if (query !== "") {
-      query = "";
-    } else {
-      input?.blur();
-    }
-  };
-
-  // --- Phone: the search over the screen ---
-
-  // Opened within the tap itself, so iOS brings the keyboard up with it: a
-  // focus from a timer or after a frame would leave it down.
-  const openOver = () => {
+    shelf = undefined;
     open = true;
     flushSync();
     dialog?.showModal();
     input?.focus();
-    if (!reduced) {
+    if (reduced) return;
+    if (compact) {
       dialog?.animate([{ opacity: 0 }, { opacity: 1 }], {
         duration: 160,
         easing: "ease-out",
       });
-      results?.animate(
-        [{ transform: "translateY(8px)" }, { transform: "translateY(0)" }],
-        { duration: 240, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
-      );
+      return;
     }
+    scrim?.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 180,
+      easing: EASE_OUT,
+    });
+    panel?.animate(
+      [
+        { opacity: 0, transform: "translateY(-8px) scale(0.97)" },
+        { opacity: 1, transform: "none" },
+      ],
+      { duration: 260, easing: EASE_OUT },
+    );
   };
-  const closeOver = async () => {
-    if (dialog === undefined || !dialog.open) return;
+
+  const hide = async () => {
+    if (dialog === undefined || !dialog.open || closing) return;
+    closing = true;
     input?.blur();
     if (!reduced) {
-      await dialog.animate([{ opacity: 1 }, { opacity: 0 }], {
-        duration: 120,
-        easing: "ease-in",
-        fill: "forwards",
-      }).finished;
+      const leaving = compact
+        ? [
+            dialog.animate([{ opacity: 1 }, { opacity: 0 }], {
+              duration: 120,
+              easing: "ease-in",
+              fill: "forwards",
+            }),
+          ]
+        : [
+            scrim?.animate([{ opacity: 1 }, { opacity: 0 }], {
+              duration: 120,
+              easing: EASE_OUT,
+              fill: "forwards",
+            }),
+            panel?.animate(
+              [
+                { opacity: 1, transform: "none" },
+                { opacity: 0, transform: "translateY(-8px) scale(0.97)" },
+              ],
+              { duration: 120, easing: EASE_OUT, fill: "forwards" },
+            ),
+          ];
+      await Promise.all(leaving.map((animation) => animation?.finished));
     }
     dialog.close();
     open = false;
+    closing = false;
+  };
+
+  /** Escape takes back one step at a time: the shelf, then what's typed,
+   *  then the search itself. */
+  const back = () => {
+    if (shelf !== undefined) {
+      shelf = undefined;
+    } else if (query !== "") {
+      query = "";
+    } else {
+      void hide();
+    }
+  };
+
+  const onKeydown = (event: KeyboardEvent) => {
+    if (event.isComposing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      back();
+    } else if (
+      event.key === "Backspace" &&
+      query === "" &&
+      shelf !== undefined
+    ) {
+      event.preventDefault();
+      shelf = undefined;
+    } else if (palette?.keydown(event) === true) {
+      event.preventDefault();
+    }
+  };
+
+  const pickShelf = (one: ExploreShelfItem) => {
+    shelf = one;
+    query = "";
+    input?.focus();
+  };
+  const openApp = (app: FeaturedApp) => {
+    onOpen(app);
+    void hide();
+  };
+
+  // ⌘K (Ctrl+K elsewhere) opens it from any page, and closes it again.
+  const onWindowKeydown = (event: KeyboardEvent) => {
+    if (
+      !compact &&
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLowerCase() === "k"
+    ) {
+      event.preventDefault();
+      if (open) {
+        void hide();
+      } else {
+        show();
+      }
+    }
   };
 </script>
 
+<svelte:window onkeydown={onWindowKeydown} />
+
 {#snippet field(big: boolean)}
+  <!-- A shelf picked from the chips stands at the field's start as a token,
+       and Backspace in an empty field takes it out. -->
   <SearchIcon
-    class="text-fg-tertiary pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2"
+    class={["text-fg-tertiary shrink-0", big ? "size-5" : "size-4"]}
     aria-hidden="true"
   />
-  <!-- A pill in the shelf's grey, as the tabs' track is, so it shows on the
-       canvas at rest; focus darkens a hairline instead of adding a ring. A
-       phone's is a step larger, 16px, so iOS doesn't zoom in on it. -->
+  {#if shelf !== undefined}
+    <span
+      class="text-text-primary flex h-7 shrink-0 items-center gap-0.5 rounded-full bg-(--ii-selected) ps-3 pe-1 text-sm font-medium"
+    >
+      {shelf.title}
+      <button
+        type="button"
+        onclick={() => {
+          shelf = undefined;
+          input?.focus();
+        }}
+        aria-label={`Show all apps, not only ${shelf.title}`}
+        class="text-fg-tertiary hover:text-fg-secondary grid size-5 place-items-center rounded-full"
+      >
+        <XIcon class="size-3.5" aria-hidden="true" />
+      </button>
+    </span>
+  {/if}
   <input
     bind:this={input}
     bind:value={query}
-    onkeydown={compact ? undefined : onKeydown}
+    onkeydown={onKeydown}
     type="search"
-    placeholder={LABEL}
-    aria-label={LABEL}
+    role="combobox"
+    aria-expanded="true"
+    aria-controls={listId}
+    aria-activedescendant={activeOptionId}
+    aria-autocomplete="list"
+    placeholder={shelf !== undefined ? `Search ${shelf.title}` : PLACEHOLDER}
+    aria-label={PLACEHOLDER}
     autocomplete="off"
     autocapitalize="off"
     spellcheck="false"
     enterkeyhint="search"
     class={[
-      "text-text-primary placeholder:text-text-placeholder focus:border-fg-quaternary h-10 w-full min-w-0 appearance-none rounded-full border border-transparent bg-(--ii-shelf) ps-10 pe-10 transition-[border-color,box-shadow] duration-200 ease-out outline-none focus:ring-0 motion-reduce:transition-none [&::-webkit-search-cancel-button]:appearance-none",
-      big ? "text-base" : "text-sm",
-      lifted && "ii-elevation-6",
+      "text-text-primary placeholder:text-text-placeholder h-full min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 outline-none focus:ring-0 [&::-webkit-search-cancel-button]:appearance-none",
+      // 16px everywhere a keyboard comes up, so iOS doesn't zoom in.
+      big ? "text-[17px]" : "text-base",
     ]}
   />
-  {#if query !== ""}
-    <button
-      type="button"
-      onclick={clear}
-      aria-label="Clear search"
-      class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring absolute end-1.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full transition-colors duration-150 ease-out outline-none hover:bg-(--ii-hover) focus-visible:outline-2 motion-reduce:transition-none"
-    >
-      <XIcon class="size-4" aria-hidden="true" />
-    </button>
-  {/if}
 {/snippet}
 
+{#snippet body(footer: boolean)}
+  <SearchPalette
+    bind:this={palette}
+    {listId}
+    onActive={(id) => (activeOptionId = id)}
+    {query}
+    {shelf}
+    onShelf={pickShelf}
+    {apps}
+    {isAdded}
+    {onAdd}
+    {onAddLink}
+    onOpen={openApp}
+    {suggested}
+    {footer}
+  />
+{/snippet}
+
+<button
+  type="button"
+  onclick={show}
+  aria-label="Search apps"
+  aria-haspopup="dialog"
+  aria-keyshortcuts={compact ? undefined : "Meta+K Control+K"}
+  title={compact ? undefined : "Search apps  ⌘K"}
+  class={[
+    "focus-visible:outline-focus-ring grid shrink-0 place-items-center rounded-full transition-[background-color,box-shadow,color] duration-200 ease-out focus-visible:outline-2 motion-reduce:transition-none",
+    compact
+      ? "text-fg-secondary size-8 hover:bg-(--ii-hover) active:bg-(--ii-selected)"
+      : [
+          "ii-hover text-fg-secondary hover:text-fg-primary pointer-events-auto size-10 border border-transparent focus-visible:outline-offset-2",
+          lifted ? "ii-elevation-6 bg-(--ii-surface-6)" : "bg-(--ii-shelf)",
+        ],
+    className,
+  ]}
+>
+  <SearchIcon
+    class={compact ? "size-4" : "size-[1.125rem]"}
+    aria-hidden="true"
+  />
+</button>
+
 {#if compact}
-  <button
-    type="button"
-    onclick={openOver}
-    aria-label="Search apps"
-    aria-haspopup="dialog"
-    class={[
-      "text-fg-secondary focus-visible:outline-focus-ring grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)",
-      className,
-    ]}
-  >
-    <SearchIcon class="size-4" aria-hidden="true" />
-  </button>
-  <!-- In the top layer, over the tab bar and everything else on the page. -->
+  <!-- Phone: over the whole screen, in the top layer, over the tab bar. -->
   <dialog
     bind:this={dialog}
     aria-label="Search apps"
     oncancel={(event) => {
       event.preventDefault();
-      void closeOver();
+      back();
     }}
     class="text-text-primary fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col bg-(--ii-surface-3) p-0 backdrop:bg-transparent open:flex"
   >
@@ -188,79 +296,71 @@
       <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
       <!-- Where the header's row was, as tall, on the same edge. -->
       <div class="flex shrink-0 items-center gap-1 px-(--ii-edge) py-3">
-        <div class="relative min-w-0 flex-1">
-          {@render field(true)}
+        <div
+          class="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-(--ii-shelf) ps-3.5 pe-3"
+        >
+          {@render field(false)}
         </div>
         <button
           type="button"
-          onclick={() => void closeOver()}
+          onclick={() => void hide()}
           class="text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-2 h-10 shrink-0 rounded-full px-2 text-base font-medium transition-colors duration-150 focus-visible:outline-2"
         >
           Cancel
         </button>
       </div>
       <div
-        bind:this={results}
-        class="@container/search flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-(--ii-edge) pt-2 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+        class="flex min-h-0 flex-1 flex-col px-2 pb-[env(safe-area-inset-bottom)]"
       >
-        <SearchResults
-          {query}
-          {isAdded}
-          {onAdd}
-          {onAddLink}
-          {suggestions}
-          limit={Infinity}
-          flush
-        />
+        {@render body(false)}
       </div>
     {/if}
   </dialog>
 {:else}
-  <!-- Escape from a row comes up here: it goes back to the field. -->
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div
-    bind:this={root}
-    role="search"
-    onfocusin={() => (open = true)}
-    onfocusout={onFocusOut}
-    onkeydown={(event) => {
-      if (event.key === "Escape" && event.target !== input) {
-        event.preventDefault();
-        open = false;
-        input?.focus();
-      }
+  <!-- Desktop: the palette, in the top layer over everything. The dialog
+       itself is a bare frame; the blur behind and the panel are its own, so
+       each comes and goes on its own timing. -->
+  <dialog
+    bind:this={dialog}
+    aria-label="Search apps"
+    oncancel={(event) => {
+      event.preventDefault();
+      back();
     }}
-    class={["pointer-events-auto relative", className]}
+    class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-transparent"
   >
-    {@render field(false)}
-    {#if listing}
-      <!-- Over the page, from the field's end: as wide as the "Add app"
-           popover, painted as a popup is (two levels over the canvas). A
-           press on it keeps the focus in the field, so the list stays. -->
+    {#if open}
+      <button
+        bind:this={scrim}
+        type="button"
+        tabindex="-1"
+        aria-label="Close search"
+        onclick={() => void hide()}
+        class="absolute inset-0 cursor-default bg-black/5 [backdrop-filter:blur(12px)_saturate(140%)] [-webkit-backdrop-filter:blur(12px)_saturate(140%)] dark:bg-black/25"
+      ></button>
+      <!-- A little above the middle, so the panel grows down as it lists. -->
       <div
-        role="presentation"
-        onmousedown={(event) => event.preventDefault()}
-        transition:scale={{
-          start: 0.97,
-          duration: reduced ? 0 : 160,
-          easing: cubicOut,
-        }}
-        class="absolute end-0 top-full z-10 mt-2 w-[min(26rem,calc(100cqw-2.5rem))] origin-top-right overflow-hidden rounded-3xl bg-(--ii-surface-5) shadow-(--ii-shadow-3) rtl:origin-top-left"
+        class="pointer-events-none absolute inset-x-4 top-[18vh] bottom-4 flex items-start justify-center"
       >
-        <SurfaceLevel level={5}>
-          <div
-            class="@container/search flex max-h-[min(32rem,calc(100dvh-7rem))] flex-col gap-3 overflow-y-auto overscroll-contain px-2 pt-3 pb-2"
-          >
-            <SearchResults
-              {query}
-              {isAdded}
-              {onAdd}
-              {onAddLink}
-              {suggestions}
-            />
-          </div>
-        </SurfaceLevel>
+        <!-- Floating over the page: five levels above it, as the surface
+             ladder has it, with the corners its rows' 16px and its 8px
+             padding make. -->
+        <div
+          bind:this={panel}
+          class="ii-surface-6 ii-elevation-6 pointer-events-auto flex max-h-full w-full max-w-xl origin-top flex-col overflow-hidden rounded-3xl will-change-transform"
+        >
+          <SurfaceLevel level={6}>
+            <div
+              class="border-border-tertiary flex h-14 shrink-0 items-center gap-3 border-b px-5"
+            >
+              {@render field(true)}
+            </div>
+            <div class="flex max-h-[min(34rem,60vh)] min-h-0 flex-col">
+              {@render body(true)}
+            </div>
+          </SurfaceLevel>
+        </div>
       </div>
     {/if}
-  </div>
+  </dialog>
 {/if}
