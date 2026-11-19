@@ -1,10 +1,11 @@
 <script lang="ts">
   import {
+    ArrowLeftIcon,
     ArrowUpRightIcon,
     BellIcon,
     BotIcon,
-    ExternalLinkIcon,
-    LinkIcon,
+    CheckIcon,
+    CopyIcon,
     MonitorSmartphoneIcon,
   } from "@lucide/svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
@@ -13,7 +14,6 @@
   import AppLogo from "../../manage/(authenticated)/applications/components/AppLogo.svelte";
   import type { ConceptApp } from "../mockData";
   import Elevated from "./Elevated.svelte";
-  import PanelHeader from "./PanelHeader.svelte";
 
   interface Props {
     app: ConceptApp;
@@ -44,13 +44,30 @@
   }: Props = $props();
 
   const host = $derived(new URL(app.url).host);
-  const switchId = $props.id();
+  // The domain (its last two labels) never shortens; what's before it may.
+  const hostEnd = $derived(
+    host.split(".").length > 2 ? `.${host.split(".").slice(-2).join(".")}` : "",
+  );
+  const hostStart = $derived(
+    hostEnd === "" ? host : host.slice(0, -hostEnd.length),
+  );
+  const nameId = $props.id();
+  const switchId = `${nameId}-notifications`;
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(app.url).then(
-      () => toaster.success({ title: "Link copied", duration: 2500 }),
-      () => toaster.create({ title: "Couldn't copy the link", duration: 3000 }),
-    );
+  /** The link was just copied, so its button says so for a moment. */
+  let copied = $state(false);
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(app.url);
+    } catch {
+      toaster.create({ title: "Couldn't copy the link", duration: 3000 });
+      return;
+    }
+    copied = true;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => (copied = false), 1600);
   };
 
   const ROW = "flex items-center gap-3 px-4 py-3.5";
@@ -58,19 +75,67 @@
     "text-fg-secondary flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--ii-selected)";
 </script>
 
+<!-- Read top to bottom: what the app is, the way into it, then its settings.
+     A phone's sheet keeps the same order. -->
 <div class="flex flex-col gap-4">
-  <PanelHeader title={app.name} lead={host} {backLabel} onBack={onExit} />
+  <!-- The identity's line above already says whose app this is. -->
+  <button
+    type="button"
+    onclick={onExit}
+    class="btn btn-tertiary btn-sm text-text-secondary hover:text-text-primary -ms-2 self-start px-2 font-medium"
+  >
+    <ArrowLeftIcon class="size-4 rtl:-scale-x-100" aria-hidden="true" />
+    {backLabel}
+  </button>
 
-  <!-- What the app is, and the way into it. -->
-  <Elevated offset={2} as="section" class="flex flex-col gap-4 rounded-2xl p-4">
+  <!-- What the app is, and the one way into it. -->
+  <Elevated
+    offset={2}
+    as="section"
+    aria-labelledby={nameId}
+    class="flex flex-col gap-4 rounded-2xl p-4"
+  >
     <div class="flex items-center gap-3.5">
-      <AppLogo logo={app.logo} size="lg" />
-      <p
-        class="text-text-secondary line-clamp-3 min-w-0 flex-1 text-[13px] leading-[18px]"
-      >
-        {app.oneLiner ?? `Signed in with Internet Identity at ${host}.`}
-      </p>
+      <!-- The same plate as its tile in the grid. -->
+      <AppLogo logo={app.logo} size="tile" />
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <h2
+          id={nameId}
+          class="text-text-primary truncate text-lg leading-6 font-semibold tracking-tight"
+        >
+          {app.name}
+        </h2>
+        <!-- A canister's address is long: where it doesn't fit, its middle
+             gives way, so the domain and the copy button stay in view. -->
+        <p
+          class="text-text-tertiary flex min-w-0 items-center text-[13px] leading-[18px]"
+          title={host}
+        >
+          <span class="truncate">{hostStart}</span>
+          <span class="shrink-0">{hostEnd}</span>
+          <button
+            type="button"
+            onclick={copyLink}
+            aria-label="Copy link"
+            class="text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring -my-1.5 ms-0.5 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors duration-150 outline-none hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
+          >
+            {#if copied}
+              <CheckIcon
+                class="text-fg-success-primary size-3.5"
+                aria-hidden="true"
+              />
+            {:else}
+              <CopyIcon class="size-3.5" aria-hidden="true" />
+            {/if}
+          </button>
+        </p>
+      </div>
     </div>
+    {#if app.oneLiner !== undefined}
+      <p class="text-text-secondary line-clamp-3 text-sm text-pretty">
+        {app.oneLiner}
+      </p>
+    {/if}
     <a
       href={app.url}
       target="_blank"
@@ -79,17 +144,18 @@
       class="btn btn-primary w-full font-medium"
     >
       Open {app.name}
-      <ExternalLinkIcon class="size-4" />
+      <ArrowUpRightIcon class="size-4" aria-hidden="true" />
     </a>
   </Elevated>
 
-  <!-- What the app sent: each one goes to its own place in the app. -->
-  <section class="flex flex-col gap-2">
-    <div class="flex items-baseline justify-between ps-4 pe-1">
-      <h3 class="text-text-tertiary text-[13px] leading-[18px] font-medium">
-        Latest
-      </h3>
-      {#if app.unread.length > 0}
+  <!-- What the app sent, only while there's something to read: each one
+       goes to its own place in the app. -->
+  {#if app.unread.length > 0}
+    <section class="flex flex-col gap-2">
+      <div class="flex items-baseline justify-between ps-4 pe-1">
+        <h3 class="text-text-tertiary text-[13px] leading-[18px] font-medium">
+          Latest
+        </h3>
         <button
           type="button"
           onclick={onReadAll}
@@ -97,59 +163,54 @@
         >
           Mark all read
         </button>
-      {/if}
-    </div>
-    <Elevated
-      offset={1}
-      as="ul"
-      class="ii-rows flex flex-col overflow-hidden rounded-2xl"
-    >
-      {#each app.unread as notification (notification.id)}
-        <li>
-          <a
-            href={app.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onclick={() => onRead?.(notification.id)}
-            class="ii-hover group/n focus-visible:ring-focus-ring grid grid-cols-[0.375rem_minmax(0,1fr)_1rem] items-start gap-x-2.5 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset"
-          >
-            <span
-              aria-hidden="true"
-              class="bg-fg-primary mt-1.5 size-1.5 rounded-full"
-            ></span>
-            <span class="flex min-w-0 flex-col gap-0.5">
-              <span class="flex items-baseline gap-2">
-                <span
-                  class="text-text-primary min-w-0 flex-1 truncate text-sm font-medium"
-                >
-                  {notification.title}
+      </div>
+      <Elevated
+        offset={1}
+        as="ul"
+        class="ii-rows flex flex-col overflow-hidden rounded-2xl"
+      >
+        {#each app.unread as notification (notification.id)}
+          <li>
+            <a
+              href={app.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onclick={() => onRead?.(notification.id)}
+              class="ii-hover group/n focus-visible:ring-focus-ring grid grid-cols-[0.375rem_minmax(0,1fr)_1rem] items-start gap-x-2.5 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset"
+            >
+              <span
+                aria-hidden="true"
+                class="bg-fg-primary mt-1.5 size-1.5 rounded-full"
+              ></span>
+              <span class="flex min-w-0 flex-col gap-0.5">
+                <span class="flex items-baseline gap-2">
+                  <span
+                    class="text-text-primary min-w-0 flex-1 truncate text-sm font-medium"
+                  >
+                    {notification.title}
+                  </span>
+                  <span class="text-text-tertiary shrink-0 text-xs">
+                    {$formatRelative(new Date(notification.sentMillis), {
+                      style: "short",
+                    })}
+                  </span>
                 </span>
-                <span class="text-text-tertiary shrink-0 text-xs">
-                  {$formatRelative(new Date(notification.sentMillis), {
-                    style: "short",
-                  })}
+                <span class="text-text-tertiary line-clamp-2 text-xs">
+                  {notification.body}
                 </span>
               </span>
-              <span class="text-text-tertiary line-clamp-2 text-xs">
-                {notification.body}
-              </span>
-            </span>
-            <ArrowUpRightIcon
-              aria-hidden="true"
-              class="text-fg-quaternary mt-0.5 size-4 opacity-0 transition-opacity duration-150 group-hover/n:opacity-100 group-focus-visible/n:opacity-100"
-            />
-          </a>
-        </li>
-      {:else}
-        <li class="text-text-tertiary px-4 py-3.5 text-center text-[13px]">
-          {app.notificationsAllowed
-            ? `Nothing new from ${app.name}.`
-            : `Notifications are off for ${app.name}.`}
-        </li>
-      {/each}
-    </Elevated>
-  </section>
+              <ArrowUpRightIcon
+                aria-hidden="true"
+                class="text-fg-quaternary mt-0.5 size-4 opacity-0 transition-opacity duration-150 group-hover/n:opacity-100 group-focus-visible/n:opacity-100"
+              />
+            </a>
+          </li>
+        {/each}
+      </Elevated>
+    </section>
+  {/if}
 
+  <!-- Its settings. The switch says on or off itself. -->
   <Elevated
     offset={1}
     as="ul"
@@ -159,13 +220,11 @@
       <span aria-hidden="true" class={ICON}>
         <BellIcon class="size-4.5" />
       </span>
-      <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span id={switchId} class="text-text-primary text-sm font-medium">
-          Notifications
-        </span>
-        <span class="text-text-tertiary text-[13px] leading-[18px]">
-          {app.notificationsAllowed ? "On" : "Off"}
-        </span>
+      <span
+        id={switchId}
+        class="text-text-primary min-w-0 flex-1 text-sm font-medium"
+      >
+        Notifications
       </span>
       <Toggle
         checked={app.notificationsAllowed}
@@ -208,33 +267,21 @@
         </span>
       </li>
     {/if}
-    <li>
-      <button
-        type="button"
-        onclick={copyLink}
-        class={[
-          ROW,
-          "ii-hover focus-visible:ring-focus-ring w-full text-start outline-none focus-visible:ring-2 focus-visible:ring-inset",
-        ]}
-      >
-        <span aria-hidden="true" class={ICON}>
-          <LinkIcon class="size-4.5" />
-        </span>
-        <span class="text-text-primary text-sm font-medium">Copy link</span>
-      </button>
-    </li>
   </Elevated>
 
-  <div class="flex flex-col items-center gap-1 pt-1">
+  <!-- Apart from the settings, with what it does. -->
+  <div class="flex flex-col items-start px-4 pt-1">
     <button
       type="button"
       onclick={onRemove}
-      class="btn btn-tertiary btn-danger btn-sm font-medium"
+      class="btn btn-tertiary btn-danger btn-sm -ms-3 font-medium"
     >
       Remove app
     </button>
-    <span class="text-text-tertiary text-[13px] leading-[18px]">
-      Signs you out. It stays in Explore.
-    </span>
+    <p class="text-text-tertiary text-[13px] leading-[18px]">
+      Signs you out. The app stays in Explore.
+    </p>
   </div>
+
+  <span class="sr-only" aria-live="polite">{copied ? "Link copied" : ""}</span>
 </div>

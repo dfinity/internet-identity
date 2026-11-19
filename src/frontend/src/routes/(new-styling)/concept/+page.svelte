@@ -1715,7 +1715,6 @@
     <AppView
       {app}
       history={current.keepHistory}
-      backLabel={identityName}
       onExit={closeAppDetails}
       onToggleNotifications={(allowed) => setNotifications([app], allowed)}
       onRemove={() => askRemove([app])}
