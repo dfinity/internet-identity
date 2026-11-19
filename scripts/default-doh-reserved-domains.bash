@@ -160,52 +160,6 @@ readonly DEFAULT_DOH_RESERVED_DOMAINS=(
     love.com
     wow.com
     ygm.com
-    # Verizon (hosted by AOL)
-    verizon.net
-    # AT&T (hosted by Yahoo)
-    att.net
-    sbcglobal.net
-    bellsouth.net
-    pacbell.net
-    swbell.net
-    ameritech.net
-    flash.net
-    prodigy.net
-    nvbell.net
-    wans.net
-    snet.net
-    currently.com
-    # Frontier (hosted by Yahoo)
-    frontier.com
-    frontiernet.net
-    # Cox (hosted by Yahoo)
-    cox.net
-    # Comcast
-    comcast.net
-    # EarthLink
-    earthlink.net
-    mindspring.com
-    # Optimum
-    optonline.net
-    optimum.net
-    # Rogers / Shaw
-    rogers.com
-    shaw.ca
-    # Bell
-    bell.net
-    sympatico.ca
-    # TELUS
-    telus.net
-    # Telstra
-    bigpond.com
-    bigpond.net.au
-    telstra.com
-    # Optus
-    optusnet.com.au
-    # iiNet
-    iinet.net.au
-    # Spark
-    xtra.co.nz
     # GMX
     gmx.de
     gmx.net
@@ -234,95 +188,6 @@ readonly DEFAULT_DOH_RESERVED_DOMAINS=(
     europe.com
     engineer.com
     asia.com
-    # Deutsche Telekom
-    t-online.de
-    magenta.de
-    # freenet
-    freenet.de
-    # Vodafone Germany
-    vodafonemail.de
-    arcor.de
-    # BT
-    btinternet.com
-    btopenworld.com
-    talk21.com
-    # Sky
-    sky.com
-    # Virgin Media
-    virginmedia.com
-    ntlworld.com
-    blueyonder.co.uk
-    virgin.net
-    # TalkTalk
-    talktalk.net
-    tiscali.co.uk
-    # Orange
-    orange.fr
-    wanadoo.fr
-    # Free
-    free.fr
-    # La Poste
-    laposte.net
-    # Bouygues Telecom
-    bbox.fr
-    # Italiaonline
-    libero.it
-    virgilio.it
-    iol.it
-    inwind.it
-    blu.it
-    # TIM
-    tim.it
-    alice.it
-    tin.it
-    # Tiscali Italy
-    tiscali.it
-    # Fastweb
-    fastwebnet.it
-    # Movistar
-    telefonica.net
-    movistar.es
-    # Ziggo
-    ziggo.nl
-    home.nl
-    # KPN
-    kpnmail.nl
-    planet.nl
-    hetnet.nl
-    xs4all.nl
-    # Telenet
-    telenet.be
-    # Proximus
-    proximus.be
-    skynet.be
-    # Swisscom
-    bluewin.ch
-    # Seznam
-    seznam.cz
-    email.cz
-    post.cz
-    # Centrum
-    centrum.cz
-    atlas.cz
-    volny.cz
-    # WP / o2
-    wp.pl
-    o2.pl
-    tlen.pl
-    # Interia
-    interia.pl
-    interia.eu
-    # Onet
-    onet.pl
-    op.pl
-    vp.pl
-    poczta.onet.pl
-    # Gazeta.pl
-    gazeta.pl
-    # Freemail (Hungary)
-    freemail.hu
-    # ABV (Bulgaria)
-    abv.bg
     # Mail.ru
     mail.ru
     inbox.ru
@@ -335,14 +200,6 @@ readonly DEFAULT_DOH_RESERVED_DOMAINS=(
     ya.ru
     yandex.by
     yandex.kz
-    # Rambler
-    rambler.ru
-    lenta.ru
-    myrambler.ru
-    autorambler.ru
-    ro.ru
-    # ukr.net
-    ukr.net
     # NetEase
     163.com
     126.com
@@ -354,59 +211,17 @@ readonly DEFAULT_DOH_RESERVED_DOMAINS=(
     qq.com
     foxmail.com
     vip.qq.com
-    # Sina
-    sina.com
-    sina.cn
-    # Sohu
-    sohu.com
-    # Alibaba
-    aliyun.com
-    # China Mobile
-    139.com
     # Naver
     naver.com
-    # Kakao / Daum
-    daum.net
-    hanmail.net
-    kakao.com
-    # NTT docomo
-    docomo.ne.jp
-    # KDDI au
-    au.com
-    ezweb.ne.jp
-    # SoftBank
-    softbank.ne.jp
-    i.softbank.jp
-    # BIGLOBE
-    biglobe.ne.jp
-    # OCN
-    ocn.ne.jp
-    # Rediff
-    rediffmail.com
-    # UOL
-    uol.com.br
-    bol.com.br
     # Zoho
     zoho.com
     zohomail.com
     zohomail.in
     zohomail.eu
     zohomail.com.au
-    # Fastmail
-    fastmail.com
-    fastmail.fm
-    # HEY
-    hey.com
     # Proton
     proton.me
     protonmail.com
     protonmail.ch
     pm.me
-    # Tuta
-    tuta.com
-    tutanota.com
-    tutanota.de
-    tutamail.com
-    tuta.io
-    keemail.me
 )
