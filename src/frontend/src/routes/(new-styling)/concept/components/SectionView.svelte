@@ -94,7 +94,8 @@
     empty?: boolean;
     action?: {
       label: string;
-      variant?: "primary" | "secondary" | "danger";
+      /** `tertiary`: no frame, its text ending where the row's lines do. */
+      variant?: "primary" | "secondary" | "tertiary" | "danger";
       onclick: () => void;
     };
   }
@@ -389,7 +390,11 @@
               : `Last used ${when}`,
           action: isCurrent
             ? undefined
-            : { label: "Sign out", onclick: () => onSignOut(browser.id) },
+            : {
+                label: "Sign out",
+                variant: "tertiary",
+                onclick: () => onSignOut(browser.id),
+              },
         };
       }),
   );
@@ -492,7 +497,11 @@
         onclick={item.action.onclick}
         class={[
           "btn btn-sm shrink-0 font-medium",
-          item.action.variant === "primary" ? "btn-primary" : "btn-secondary",
+          item.action.variant === "primary"
+            ? "btn-primary"
+            : item.action.variant === "tertiary"
+              ? "btn-tertiary -me-3"
+              : "btn-secondary",
           item.action.variant === "danger" && "btn-danger",
         ]}
       >
