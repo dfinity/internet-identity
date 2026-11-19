@@ -173,22 +173,11 @@
   let isMultipleAccountsEnabled = $state(
     readToggle($lastUsedIdentitiesStore.selected!.identityNumber),
   );
-  // All options are on, and showing them takes a sign-in: there is no session
-  // to load the accounts with, or none the canister accepts. A sign-in only
-  // ever starts inside a press, so they wait for the next press of Continue.
-  let isSignInNeededForOptions = $state(false);
-  // Counted up when another identity is selected, when the options are
-  // switched off and when this screen is taken down. What was started for the
-  // options before that neither switches them off nor has them wait for a
-  // sign-in when it ends. A failure of what a press started is still reported.
-  let optionsEpoch = 0;
   // Clear old accounts data when user toggles switch off
   $effect(() => {
     if (!isMultipleAccountsEnabled) {
       accounts = undefined;
       selectedAccountNumber = null;
-      isSignInNeededForOptions = false;
-      optionsEpoch++;
     }
   });
 
@@ -245,20 +234,10 @@
         account.account_number[0] === isEditAccountDialogVisibleForNumber,
     ),
   );
-  // The options are on with no accounts to show yet. Either they wait for a
-  // sign-in, which the next press of Continue starts, or the account list
-  // loads: Continue looks unchanged then, but does nothing until it has.
-  // Neither holds with the accounts on the screen, whichever of them and of
-  // the need for a sign-in the screen learned of last: a press continues.
-  const isWaitingForSignIn = $derived(
-    isMultipleAccountsEnabled &&
-      accounts === undefined &&
-      isSignInNeededForOptions,
-  );
+  // Continue looks unchanged while the account list loads, but does nothing
+  // until it has.
   const isLoadingAccounts = $derived(
-    isMultipleAccountsEnabled &&
-      accounts === undefined &&
-      !isSignInNeededForOptions,
+    isMultipleAccountsEnabled && accounts === undefined,
   );
   const isAccountLimitReached = $derived(
     accounts !== undefined && accounts.length >= 5,
@@ -299,16 +278,19 @@
   // an OpenID or SSO identity. `undefined` while the lookup is in flight too,
   // which the handlers treat like having no session: they sign in.
   let sessionActor: ActorSubclass<_SERVICE> | undefined;
-  const lookUpSessionActor = (identityNumber: bigint): Promise<void> =>
+  // Resolves to whether the identity is still the selected one, in which case
+  // `sessionActor` now holds what the lookup found.
+  const lookUpSessionActor = (identityNumber: bigint): Promise<boolean> =>
     actorForIdentity(identityNumber).then((actor) => {
       // The identity may have been switched while IndexedDB was read.
       if (selectedIdentityNumber !== identityNumber) {
-        return;
+        return false;
       }
       // While signed in as this identity the lookup answers with the actor of
       // that sign-in. The handlers read that one from the store; kept here it
       // would outlive the sign-in it belongs to.
       sessionActor = actor === $authenticationStore?.actor ? undefined : actor;
+      return true;
     });
   // Re-initialize the flow and re-hydrate per-identity state when the
   // identity changes. Read the persisted values into locals so the
@@ -324,22 +306,12 @@
     accessLevel = accessLevelStore.getPreference("continue", identityNumber);
     defaultAccountNumber = null;
     selectedAccountNumber = null;
-    // Those of the identity selected before, when there was one.
-    accounts = undefined;
-    isSignInNeededForOptions = false;
     sessionActor = undefined;
-    const epoch = ++optionsEpoch;
-    void lookUpSessionActor(identityNumber).then(() => {
-      // Still this screen and this identity, with the options as they were
-      // found: neither switched off, nor switched back on by a press that
-      // loads them itself.
-      if (hydrated && epoch === optionsEpoch) {
-        void restoreMultipleAccounts(epoch);
+    void lookUpSessionActor(identityNumber).then((isSelected) => {
+      if (isSelected && hydrated && isMultipleAccountsEnabled) {
+        void handleEnableMultipleAccounts();
       }
     });
-    return () => {
-      optionsEpoch++;
-    };
   });
 
   // Persist the toggle whenever it (or the identity) changes.
@@ -352,6 +324,8 @@
     isAuthenticatingDefault = true;
     try {
       // Nothing may be awaited before the sign-in, see `sessionActor`.
+      // Continuing takes a sign-in either way, so the default account is read
+      // with it afterwards instead of with the stored session beforehand.
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.selected!,
@@ -411,7 +385,6 @@
     actor: ActorSubclass<_SERVICE>,
     identityNumber: bigint,
   ) => {
-    const selectedIdentityNumberWhenAsked = selectedIdentityNumber;
     const values = await Promise.all([
       actor
         .get_accounts(identityNumber, effectiveOrigin)
@@ -420,11 +393,6 @@
         .get_default_account(identityNumber, effectiveOrigin)
         .then(throwCanisterError),
     ]);
-    // Another identity was selected while the canister answered: its screen
-    // is not this answer's to fill.
-    if (selectedIdentityNumber !== selectedIdentityNumberWhenAsked) {
-      return;
-    }
     accounts = values[0].sort((a, b) => {
       const aVal = a.last_used[0] ?? BigInt(-1);
       const bVal = b.last_used[0] ?? BigInt(-1);
@@ -433,84 +401,7 @@
     defaultAccountNumber = values[1].account_number[0];
   };
 
-  // What `actorForIdentity` resolves to, read rather than awaited, so that
-  // nothing is awaited before a sign-in when there is no actor to load the
-  // accounts with.
-  const actorToReadWith = (): ActorSubclass<_SERVICE> | undefined => {
-    const authenticated = $authenticationStore;
-    return authenticated?.identityNumber === selectedIdentityNumber
-      ? authenticated.actor
-      : sessionActor;
-  };
-  // Resolves to whether the accounts were loaded; `false` when the canister
-  // no longer accepts the stored session, and they take a sign-in instead.
-  const loadAccountsWithoutSignIn = async (
-    readActor: ActorSubclass<_SERVICE>,
-  ): Promise<boolean> => {
-    // Another identity may be selected by the time the canister has answered.
-    const identityNumber = selectedIdentityNumber;
-    try {
-      await loadAccountsViaActor(readActor, identityNumber);
-      return true;
-    } catch (error) {
-      // Not read with again, whatever went wrong: the next press signs in
-      // right away, unless a session is found to read with once more.
-      if (readActor === sessionActor) {
-        sessionActor = undefined;
-      }
-      if (
-        isCanisterError<SessionDelegationError>(error) &&
-        error.type === "Unauthorized"
-      ) {
-        void purgeSession(identityNumber);
-        return false;
-      }
-      // The lookup drops a session that expired while this screen was open,
-      // and finds again one the request just did not reach.
-      void lookUpSessionActor(identityNumber);
-      throw error;
-    }
-  };
-  // Only ever called from a press, before anything is awaited: this is what
-  // may start a sign-in.
-  const signInAndLoadAccounts = async () => {
-    if (!$isAuthenticatedStore) {
-      await authLastUsedFlow.authenticate(
-        $lastUsedIdentitiesStore.selected!,
-        effectiveOrigin,
-      );
-    }
-    const { identityNumber, actor } = $authenticationStore!;
-    await loadAccountsViaActor(actor, identityNumber);
-  };
-
-  // All options were on from an earlier visit: shows them again when that
-  // takes no sign-in. Nothing was pressed, so none is started from here.
-  const restoreMultipleAccounts = async (epoch: number) => {
-    selectedTtlSeconds = rememberedTtlSeconds();
-    try {
-      const readActor = actorToReadWith();
-      if (
-        readActor !== undefined &&
-        (await loadAccountsWithoutSignIn(readActor))
-      ) {
-        return;
-      }
-      if (epoch === optionsEpoch) {
-        isSignInNeededForOptions = true;
-      }
-    } catch (error) {
-      // A failure that arrives after the screen has moved on (see
-      // `optionsEpoch`) is not this screen's to report, or to act on.
-      if (epoch !== optionsEpoch) {
-        return;
-      }
-      isMultipleAccountsEnabled = false;
-      handleError(error);
-    }
-  };
   const handleEnableMultipleAccounts = async () => {
-    const epoch = optionsEpoch;
     // On already, as far as this component goes. The switch only reports its
     // change once the click has been handled, and a sign-in that fails within
     // the click (a refused pop-up) is handled before that: switching the
@@ -518,61 +409,50 @@
     isMultipleAccountsEnabled = true;
     selectedTtlSeconds = rememberedTtlSeconds();
     try {
-      const readActor = actorToReadWith();
-      if (readActor === undefined) {
-        await signInAndLoadAccounts();
-      } else if (
-        !(await loadAccountsWithoutSignIn(readActor)) &&
-        epoch === optionsEpoch
-      ) {
-        // The canister refuses the stored session, and the press was spent
-        // on asking it: a sign-in started now would not be part of it. The
-        // options wait for a press of Continue instead, as they do when the
-        // screen comes up without a session.
-        isSignInNeededForOptions = true;
+      // What `actorForIdentity` resolves to, read rather than awaited, so that
+      // nothing is awaited before the sign-in below when there is no actor to
+      // load the accounts with.
+      const authenticated = $authenticationStore;
+      const readActor =
+        authenticated?.identityNumber === selectedIdentityNumber
+          ? authenticated.actor
+          : sessionActor;
+      if (readActor !== undefined) {
+        try {
+          await loadAccountsViaActor(readActor, selectedIdentityNumber);
+          return;
+        } catch (err) {
+          // Not read with again, whatever went wrong: the next press signs in
+          // right away, unless a session is found to read with once more.
+          if (readActor === sessionActor) {
+            sessionActor = undefined;
+          }
+          if (
+            isCanisterError<SessionDelegationError>(err) &&
+            err.type === "Unauthorized"
+          ) {
+            void purgeSession(selectedIdentityNumber);
+          } else {
+            // The lookup drops a session that expired while this screen was
+            // open, and finds again one the request just did not reach.
+            void lookUpSessionActor(selectedIdentityNumber);
+            throw err;
+          }
+        }
       }
+
+      if (!$isAuthenticatedStore) {
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.selected!,
+          effectiveOrigin,
+        );
+      }
+      const { identityNumber, actor } = $authenticationStore!;
+      await loadAccountsViaActor(actor, identityNumber);
     } catch (error) {
-      // The option that goes back off is the one that was pressed, not that
-      // of an identity selected since.
-      if (epoch === optionsEpoch) {
-        isMultipleAccountsEnabled = false;
-      }
+      isMultipleAccountsEnabled = false;
       handleError(error);
     }
-  };
-  // Continue, pressed while the options wait for a sign-in (see
-  // `isWaitingForSignIn`): signs in and shows them, for the next press to
-  // continue with what is chosen there.
-  const handleSignInForOptions = async () => {
-    const epoch = optionsEpoch;
-    isSignInNeededForOptions = false;
-    isAuthenticatingDefault = true;
-    try {
-      await signInAndLoadAccounts();
-    } catch (error) {
-      // Back to where the press started, so that it can be repeated, unless
-      // the screen has moved on to another identity.
-      if (epoch === optionsEpoch) {
-        isSignInNeededForOptions = true;
-      }
-      handleError(error);
-    } finally {
-      isAuthenticatingDefault = false;
-    }
-  };
-  const handleContinue = (): void => {
-    if (!isMultipleAccountsEnabled) {
-      void handleContinueDefault();
-      return;
-    }
-    if (isWaitingForSignIn) {
-      void handleSignInForOptions();
-      return;
-    }
-    if (isLoadingAccounts) {
-      return;
-    }
-    void handleContinueAs(chosenAccountNumber);
   };
   const handleCreateAccount = async (account: {
     name: string;
@@ -848,7 +728,16 @@
   <div class="pb-6">
     <button
       class="btn btn-primary btn-xl w-full"
-      onclick={handleContinue}
+      onclick={() => {
+        if (!isMultipleAccountsEnabled) {
+          void handleContinueDefault();
+          return;
+        }
+        if (isLoadingAccounts) {
+          return;
+        }
+        void handleContinueAs(chosenAccountNumber);
+      }}
       disabled={isAuthenticatingDefault || mustChooseAccess}
       aria-disabled={isLoadingAccounts}
     >

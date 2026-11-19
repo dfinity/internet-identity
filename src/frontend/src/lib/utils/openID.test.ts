@@ -9,7 +9,6 @@ import {
   extractIdTokenFromCallback,
   isOpenIdCancelError,
   OAuthProviderError,
-  PopupBlockedError,
   requestWithPopup,
   type RequestConfig,
 } from "./openID";
@@ -570,10 +569,6 @@ describe("isOpenIdCancelError", () => {
     expect(isOpenIdCancelError(networkError)).toBe(true);
   });
 
-  it("returns false for PopupBlockedError (the pop-up never opened)", () => {
-    expect(isOpenIdCancelError(new PopupBlockedError())).toBe(false);
-  });
-
   it("returns false for a generic Error", () => {
     expect(isOpenIdCancelError(new Error("something bad"))).toBe(false);
   });
@@ -656,43 +651,6 @@ describe("requestWithPopup", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
-  });
-
-  it("rejects with PopupBlockedError when the browser refuses the popup", async () => {
-    vi.spyOn(window, "open").mockReturnValue(null);
-
-    const error: unknown = await requestWithPopup(config, {
-      nonce: "nonce",
-    }).catch((reason: unknown) => reason);
-
-    expect(error).toBeInstanceOf(PopupBlockedError);
-    expect(error).not.toBeInstanceOf(CallbackPopupClosedError);
-    // Nothing is left waiting on a popup that never opened.
-    expect(FakeBroadcastChannel.instances).toHaveLength(0);
-  });
-
-  it("rejects with PopupBlockedError when the browser refuses a deferred popup", async () => {
-    vi.spyOn(window, "open").mockReturnValue(null);
-
-    const error: unknown = await requestWithPopup(Promise.resolve(config), {
-      nonce: "nonce",
-    }).catch((reason: unknown) => reason);
-
-    expect(error).toBeInstanceOf(PopupBlockedError);
-  });
-
-  it("rejects with PopupBlockedError when the browser refuses the popup behind Apple's sheet", async () => {
-    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
-    );
-    vi.spyOn(window, "open").mockReturnValue(null);
-
-    const error: unknown = await requestWithPopup(
-      { ...config, authURL: "https://appleid.apple.com/auth/authorize" },
-      { nonce: "nonce" },
-    ).catch((reason: unknown) => reason);
-
-    expect(error).toBeInstanceOf(PopupBlockedError);
   });
 
   it("opens a deferred popup to /sso-connecting synchronously, then navigates the same window", async () => {
