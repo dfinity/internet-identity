@@ -25,10 +25,8 @@
 //!    pipeline. See `docs/ongoing/email-recovery.md` §8.4 / §8.5 for
 //!    the rationale (no selector probing — the selector is
 //!    authoritative from the email itself).
-//! 2. **DoH allowlist** — when no bundle is supplied, the canister
-//!    checks the registered domain against `DohConfig.allowed_domains`
-//!    (deploy-arg). Used for the major consumer mailbox providers
-//!    (Gmail, Outlook, iCloud, …) that don't publish DNSSEC. The
+//! 2. **DoH** — when no bundle is supplied and a `DohConfig` is set
+//!    (deploy-arg), for any email domain. The
 //!    DKIM TXT is resolved via a 3-of-5 DoH quorum
 //!    (`crate::doh::fetch_txt`) at `smtp_request` time, and
 //!    verification finishes inside that one call — no `submit_leaf`
@@ -78,11 +76,10 @@ pub struct EmailChallenge {
 ///   skeleton chain synchronously, cache the deepest-zone DNSKEY
 ///   for later leaf admission, and (if the FE included a DMARC
 ///   leaf in the bundle) cache the DMARC policy bytes.
-/// - Otherwise, check the registered domain against
-///   `DohConfig.allowed_domains` (deploy-arg) and resolve the DKIM
-///   TXT via `crate::doh::fetch_txt` at `smtp_request` time.
+/// - Otherwise, when a `DohConfig` is set (deploy-arg), resolve the
+///   DKIM TXT via `crate::doh::fetch_txt` at `smtp_request` time.
 /// - If neither path applies, prepare fails with
-///   `DomainNotSupported`.
+///   `InternalCanisterError`.
 ///
 /// The skeleton chain deliberately omits the DKIM leaf: the DKIM
 /// selector is published by the sender's mail provider and is only
@@ -91,10 +88,9 @@ pub struct EmailChallenge {
 /// remaining leaf after the email is delivered and submits it via
 /// `email_challenge_submit_dkim_leaf` — see design doc §8.4.
 ///
-/// The frontend deliberately doesn't need to know which domains are
-/// on the DoH allowlist — that's operator config, not user-visible
-/// state. It just calls prepare and reads back any `Domain*` error
-/// to render an actionable message.
+/// The frontend doesn't need to know which domains are reserved for
+/// the DoH outcall budget: that's operator config, not user-visible
+/// state.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct EmailChallengeDnsInput {
     /// Lowercased canonical form: `lowercase(local-part) + "@" +
@@ -120,9 +116,8 @@ pub struct EmailChallengeDnsInput {
     ///    and verified) so `submit_dkim_leaf` doesn't need to
     ///    fetch them via DoH.
     ///
-    /// When absent, the canister falls back to the DoH-allowlist
-    /// path (the registered domain must be in
-    /// `DohConfig.allowed_domains`). The FE doesn't need to know
+    /// When absent, the canister falls back to the DoH path (a
+    /// `DohConfig` must be set). The FE doesn't need to know
     /// which path the canister chose; it just submits whatever it
     /// could gather and reads back the typed error variants.
     pub dns_proof: Option<DnsProofBundle>,
@@ -193,7 +188,7 @@ pub struct EmailChallengeResolveViaDohArg {
     /// The challenge nonce from `email_recovery_credential_prepare_add`
     /// (or `email_recovery_prepare_delegation` for recovery). The method
     /// carries no leaf data; the canister resolves the DKIM key over its
-    /// own allowlist-gated DoH path. The FE calls it repeatedly while the
+    /// own DoH path. The FE calls it repeatedly while the
     /// status is `ResolvingDoh`.
     pub nonce: String,
 }
@@ -226,9 +221,6 @@ pub enum EmailChallengeError {
     NonceUnknown,
     /// A pending challenge existed but its 30-minute TTL has lapsed.
     NonceExpired,
-    /// The DoH path was requested but the registered domain isn't on
-    /// the allowlist (`DohConfig.allowed_domains`).
-    DomainNotAllowlisted(String),
     /// DoH path: `crate::doh::fetch_txt` couldn't reach quorum or
     /// reported a transport failure. The inner [`DohFailureReason`]
     /// names the specific cause.
@@ -289,7 +281,7 @@ pub enum EmailChallengeError {
 /// user-copyable support blob. Returning the bare discriminant is what
 /// keeps that blob strictly public — variants like
 /// `EmailVerificationFailed(String)`, `InternalCanisterError(String)`,
-/// `DomainNotAllowlisted(String)` and `Unauthorized(Principal)` carry
+/// `DomainNotSupported(String)` and `Unauthorized(Principal)` carry
 /// payloads (domains, principals, free-form internal detail) that must
 /// never leak into it. Mirrors the FE's existing `failureReason()`,
 /// which already treats the variant name as the stable reason.
@@ -298,7 +290,6 @@ pub fn error_code_name(error: &EmailChallengeError) -> &'static str {
         EmailChallengeError::Unauthorized(_) => "Unauthorized",
         EmailChallengeError::NonceUnknown => "NonceUnknown",
         EmailChallengeError::NonceExpired => "NonceExpired",
-        EmailChallengeError::DomainNotAllowlisted(_) => "DomainNotAllowlisted",
         EmailChallengeError::DohFetchFailed(_) => "DohFetchFailed",
         EmailChallengeError::DomainNotSupported(_) => "DomainNotSupported",
         EmailChallengeError::EmailVerificationFailed(_) => "EmailVerificationFailed",
@@ -367,7 +358,7 @@ pub enum EmailChallengeStatus {
 
 /// Which trust path the canister used (or will use) to verify the
 /// challenge email. Decided at prepare time: a supplied DNSSEC skeleton
-/// bundle → `Dnssec`; otherwise the DoH allowlist → `Doh`. Public — the
+/// bundle → `Dnssec`; otherwise `Doh`. Public — the
 /// FE already chose the branch and the deploy config is public, so
 /// surfacing it leaks nothing.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]

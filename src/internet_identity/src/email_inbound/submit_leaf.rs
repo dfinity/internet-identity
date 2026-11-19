@@ -42,7 +42,7 @@
 //! 5. Binds the credential and flips status to `Succeeded`.
 //!
 //! `resolve_via_doh` (the DoH path) skips steps 2–3 and reads the
-//! DKIM/DMARC TXT records from the canister's allowlist-gated DoH cache,
+//! DKIM/DMARC TXT records from the canister's DoH cache,
 //! then runs the same steps 4–5 once they're [`Ready`](crate::single_flight_cache::Cached).
 //! See [`resolve_dkim_and_dmarc`].
 //!
@@ -106,7 +106,7 @@ pub async fn submit_dkim_leaf(
 /// walk a fully-signed DNSSEC resolution because the DKIM record CNAMEs
 /// into an unsigned zone (`outlook.com` -> `outbound.protection.outlook.com`,
 /// `live.com`, …). It carries no leaf data: the canister resolves the DKIM
-/// key over its own allowlist-gated DoH cache, reusing the
+/// key over its own DoH cache, reusing the
 /// `partial_verification` crypto material `smtp_request` stashed.
 ///
 /// **Polled, idempotent, accept-only.** The FE calls this repeatedly while
@@ -118,8 +118,8 @@ pub async fn submit_dkim_leaf(
 /// - cache [`Ready`](Cached::Ready) — the key is in hand; verify against the
 ///   stashed partial and stamp the terminal verdict.
 ///
-/// A domain the operator hasn't enabled lands as
-/// `Failed(DomainNotAllowlisted)`. Returns `Ok(())` and the verdict is read
+/// With the DoH path disabled (no `DohConfig`) it lands as
+/// `Failed(InternalCanisterError)`. Returns `Ok(())` and the verdict is read
 /// by polling `email_challenge_status`; `Err` is a call-level rejection
 /// (unknown nonce).
 pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailChallengeError> {
@@ -155,7 +155,7 @@ pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailChalleng
             Ok(())
         }
         Err(e) => {
-            let reason = super::smtp::map_doh_error(e, &mat.registered_domain);
+            let reason = super::smtp::map_doh_error(e);
             finalize_via_doh(nonce, mat, Err(reason), now_secs);
             Ok(())
         }
@@ -177,8 +177,8 @@ pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailChalleng
 ///
 /// All DNS names come from canister-pinned state (`selector` from the
 /// email's `s=`, `signing_domain` from its `d=`, `registered_domain` from
-/// the claimed address), never the FE, and the fetch is allowlist-gated on
-/// `registered_domain`.
+/// the claimed address), never the FE, and the fetch's outcall budget is
+/// picked from `registered_domain`.
 fn resolve_dkim_and_dmarc(
     dkim_fqdn: &str,
     dmarc_fqdn: &str,

@@ -41,7 +41,7 @@
 //!
 //! - **DoH path** (no DNSSEC chain cached at prepare time): `status` →
 //!   `ResolvingDoh`. The FE drives `email_challenge_resolve_via_doh`, which
-//!   resolves the DKIM key (and DMARC) over the canister's allowlist-gated
+//!   resolves the DKIM key (and DMARC) over the canister's
 //!   DoH cache and finishes off the stashed partial.
 //!
 //! - **DNSSEC path** (skeleton chain cached at prepare time): `status` →
@@ -359,7 +359,7 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // - DNSSEC path → `NeedDkimLeaf { selector }`: the FE walks the signed
     //   DNSSEC resolution and calls `email_challenge_submit_dkim_leaf`.
     // - DoH path → `ResolvingDoh`: the FE drives `email_challenge_resolve_via_doh`,
-    //   which resolves the key over the canister's allowlist-gated DoH cache.
+    //   which resolves the key over the canister's DoH cache.
     //
     // The completion (signature check + bind/stamp) runs later, off the
     // partial, in whichever of those methods the FE calls — so it's the same
@@ -714,10 +714,9 @@ pub(super) fn extract_from_address(
 }
 
 /// Translate an internal `DohError` into the `EmailChallengeError` the FE
-/// polls, grouped into the buckets the FE acts on: config misses
-/// (`DomainNotAllowed` / `NotConfigured`) → `DomainNotAllowlisted`; a
-/// quorum "no record" (`NoAnswer`) → `EmailVerificationFailed` (signed
-/// selector gone); caller bugs (`InvalidName` /
+/// polls, grouped into the buckets the FE acts on: a quorum "no record"
+/// (`NoAnswer`) → `EmailVerificationFailed` (signed selector gone); the
+/// DoH path disabled (`NotConfigured`) and caller bugs (`InvalidName` /
 /// `NameOutsideRegisteredDomain`) → `InternalCanisterError`; everything
 /// else transient → `DohFetchFailed` ("try again").
 ///
@@ -730,11 +729,11 @@ pub(super) fn extract_from_address(
 ///
 /// `pub(super)` so the DNSSEC-path DoH fallback in `submit_leaf.rs`
 /// (empty `hops`) maps its own `fetch_txt` errors identically.
-pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailChallengeError {
+pub(super) fn map_doh_error(err: crate::doh::DohError) -> EmailChallengeError {
     use crate::doh::DohError;
     match err {
-        DohError::DomainNotAllowed | DohError::NotConfigured => {
-            EmailChallengeError::DomainNotAllowlisted(domain.to_string())
+        DohError::NotConfigured => {
+            EmailChallengeError::InternalCanisterError(super::DOH_NOT_CONFIGURED_ERROR.to_string())
         }
         DohError::AllProvidersFailed => {
             EmailChallengeError::DohFetchFailed(DohFailureReason::AllProvidersFailed)
@@ -1026,7 +1025,7 @@ mod tests {
         // (`dohSubReason` in `shared/errors.ts`). Keep the variant set in
         // sync with that FE switch.
         let reason = |e: DohError| -> DohFailureReason {
-            match map_doh_error(e, "example.com") {
+            match map_doh_error(e) {
                 EmailChallengeError::DohFetchFailed(r) => r,
                 other => panic!("expected DohFetchFailed, got {other:?}"),
             }
@@ -1054,13 +1053,13 @@ mod tests {
         // variants — already segmentable by variant name, no token
         // needed.
         assert!(matches!(
-            map_doh_error(DohError::NoAnswer, "example.com"),
+            map_doh_error(DohError::NoAnswer),
             EmailChallengeError::EmailVerificationFailed(_)
         ));
-        assert!(matches!(
-            map_doh_error(DohError::DomainNotAllowed, "example.com"),
-            EmailChallengeError::DomainNotAllowlisted(_)
-        ));
+        assert_eq!(
+            map_doh_error(DohError::NotConfigured),
+            EmailChallengeError::InternalCanisterError("DoH is not configured".into())
+        );
     }
 
     #[test]

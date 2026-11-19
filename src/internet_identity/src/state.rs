@@ -163,9 +163,10 @@ pub struct PersistentState {
     /// in later PRs and by any future feature that needs DNSSEC-verified
     /// DNS — see `docs/ongoing/email-recovery.md` §7.5.
     pub dnssec_config: Option<DnssecConfig>,
-    /// DoH (DNS-over-HTTPS) fallback config. Allowlists domains for
-    /// which the canister may fetch DKIM/DMARC TXT records via HTTP
-    /// outcalls when no DNSSEC chain is available — see
+    /// DoH (DNS-over-HTTPS) config. While set, the canister fetches
+    /// DKIM/DMARC TXT records via HTTP outcalls for any domain without
+    /// a DNSSEC chain, with a separate outcall budget for
+    /// `reserved_domains`. See
     /// `docs/ongoing/email-recovery.md` §7.6.
     pub doh_config: Option<DohConfig>,
     pub mcp_official_url: Option<String>,

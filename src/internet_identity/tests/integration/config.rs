@@ -4,6 +4,7 @@ mod assigned_user_number_range;
 mod backend_origin;
 mod canister_creation_cycles_cost;
 mod captcha_config;
+mod doh_config;
 mod enable_dapps_explorer;
 mod is_production;
 mod new_flow_origins;

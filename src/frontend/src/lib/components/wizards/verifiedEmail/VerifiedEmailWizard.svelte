@@ -109,10 +109,7 @@
       void runPoll(challenge.nonce, domain, address);
     } catch (e) {
       if (isCanisterError<EmailChallengeError>(e)) {
-        if (
-          e.type === "DomainNotAllowlisted" ||
-          e.type === "DomainNotSupported"
-        ) {
+        if (e.type === "DomainNotSupported") {
           setupVerifiedEmailFunnel.trigger(
             SetupVerifiedEmailEvents.UnsupportedDomain,
             { reason: e.type },
