@@ -253,10 +253,9 @@ const parseAppleReply = (data: unknown) => {
 };
 
 /**
- * How long after the sheet gives the window its focus back Apple's reply may
- * still arrive. A canceled sheet can end without any reply: the window only
- * gets its focus back. A completed sheet gives focus back too, with Apple's
- * reply right behind it.
+ * How long after this window gets its focus back, with the popup closed,
+ * Apple's reply may still arrive: a reply posted just before the popup closed
+ * can still be on its way.
  */
 const APPLE_REPLY_AFTER_FOCUS_MS = 1000;
 
@@ -328,7 +327,13 @@ const requestWithAppleSheet = (redirectURL: URL): Promise<string> => {
       }
       resolve(id_token);
     };
+    // The popup tells a canceled sheet apart itself and closes, so focus coming
+    // back here is a cancel only once it has: the user may just have switched
+    // back to this window while the popup loads.
     const onFocus = () => {
+      if (!popup.closed) {
+        return;
+      }
       clearTimeout(canceledTimer);
       canceledTimer = setTimeout(() => {
         finish();
