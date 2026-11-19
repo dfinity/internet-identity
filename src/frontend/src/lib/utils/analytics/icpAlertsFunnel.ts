@@ -8,7 +8,8 @@ import { Funnel } from "./Funnel";
  * The flow crosses three documents, and Plausible tells visitors apart by IP and user
  * agent rather than by anything stored, so only the first two are reliably one visitor:
  *
- * 1. The page that offers it (`source = authorize | settings`):
+ * 1. The page that offers it (`source = authorize | repair | settings`; `repair` is the
+ *    allow screen a sign-in opens because this device stopped receiving notifications):
  *
  *    start-icp-alerts
  *      [icp-alerts--skipped]
@@ -61,8 +62,9 @@ export const icpAlertsFunnel = new Funnel<typeof IcpAlertsEvents>(
   true,
 );
 
-/** Where an install was offered. */
-export type NotificationsSource = "authorize" | "settings";
+/** Where an install was offered: the allow screen an app asked for, the one a sign-in
+ *  opened because this device stopped receiving the app's notifications, or settings. */
+export type NotificationsSource = "authorize" | "repair" | "settings";
 
 const FROM_PARAM = "from";
 
@@ -77,6 +79,7 @@ export const installSourceOf = (
   const from = new URLSearchParams(params.replace(/^[#?]/, "")).get(FROM_PARAM);
   switch (from) {
     case "authorize":
+    case "repair":
     case "settings":
       return from;
     default:

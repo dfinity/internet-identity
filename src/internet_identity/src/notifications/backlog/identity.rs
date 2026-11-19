@@ -9,8 +9,10 @@
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
 use crate::SECOND_NS;
+use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, NotificationEvent, NotificationId, Timestamp, Urgency,
+    AnchorNumber, ApplicationNumber, BrowserId, NotificationEvent, NotificationId, Timestamp,
+    Urgency,
 };
 
 /// One of Internet Identity's own wake-ups, waiting for a pass to post it.
@@ -28,8 +30,24 @@ pub(crate) struct PendingIdentityNotification {
     /// What the destinations are given to show, written onto their entries when the pass
     /// expands this.
     pub(crate) event: NotificationEvent,
+    /// Which of each destination's addresses this goes to.
+    pub(crate) path: IdentityWakeUpPath,
     pub(crate) urgency: Urgency,
     pub(crate) expires_at_ns: Option<Timestamp>,
+}
+
+/// Which address of a destination one of Internet Identity's own wake-ups goes to.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum IdentityWakeUpPath {
+    /// Where the destination's wake-ups go: its own subscription, or the app it routes
+    /// through.
+    Routed,
+    /// The destination's installed web app of the app numbered `application_number`, for
+    /// the account `account_principal` names, which is the only party that reads it.
+    InstalledApp {
+        application_number: ApplicationNumber,
+        account_principal: Principal,
+    },
 }
 
 impl QueueItem for PendingIdentityNotification {

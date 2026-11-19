@@ -123,7 +123,7 @@ const run = async ({
   if (settle) {
     void (async () => {
       await waitForStore(notificationConsentStore);
-      notificationConsentStore.settle();
+      notificationConsentStore.settle(get(notificationConsentStore));
     })();
   }
   await running;
@@ -220,7 +220,7 @@ describe("handleNotificationConsentRequest", () => {
       context?.identityNumber === BigInt(20_000) ? context : undefined,
     );
     expect(reopened.identityNumber).toBe(BigInt(20_000));
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await running;
 
     // Read for the identity the user ended on, not the one the screen opened for.
@@ -229,6 +229,7 @@ describe("handleNotificationConsentRequest", () => {
       identityNumber: BigInt(20_000),
       origin: ORIGIN,
       actor: { notification_consent_granted: switchedStatus },
+      isInstalledApp: false,
     });
     expect(sent[0].result).toEqual({ granted: true });
   });
@@ -322,7 +323,7 @@ describe("handleNotificationConsentRequest", () => {
 
     await waitForStore(notificationConsentStore);
     order.push("screen reopened");
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await consent;
 
     expect(order).toEqual(["sign-in, screen closed", "screen reopened"]);
@@ -404,7 +405,7 @@ describe("handleNotificationConsentRequest", () => {
     await waitForStore(notificationConsentStore);
     expect(get(pendingScreenStore)).toBe(true);
 
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await running;
 
     expect(get(pendingScreenStore)).toBe(false);
@@ -433,7 +434,7 @@ describe("handleNotificationConsentRequest", () => {
     } as unknown as JsonRequest);
 
     await waitForStore(notificationConsentStore);
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await vi.waitFor(() => expect(readGranted).toHaveBeenCalled());
 
     expect(get(pendingScreenStore)).toBe(false);
@@ -489,13 +490,13 @@ describe("handleNotificationConsentRequest", () => {
 
     // The first holds the queue. It reused its own probe, taken a moment earlier.
     await waitForStore(notificationConsentStore);
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await first;
     expect(readBrowserPushState).toHaveBeenCalledTimes(2);
 
     // The second's turn, with its probe now predating a ceremony.
     await waitForStore(notificationConsentStore);
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await second;
     expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });
@@ -508,7 +509,28 @@ describe("handleNotificationConsentRequest", () => {
       identityNumber: BigInt(10_000),
       origin: ORIGIN,
       actor: { notification_consent_granted: consentStatus },
+      isInstalledApp: false,
     });
+  });
+
+  it("asks and reports for an installed app where the request says it comes from one", async () => {
+    const { sent } = await run({ params: { installedApp: true } });
+    expect(sent[0].result).toEqual({ granted: true });
+    expect(resolveOptIn).toHaveBeenCalledWith(
+      expect.objectContaining({ isInstalledApp: true }),
+    );
+    expect(readGranted).toHaveBeenCalledWith(
+      expect.objectContaining({ isInstalledApp: true }),
+    );
+  });
+
+  it("refuses an installed app flag that is not a boolean", async () => {
+    const { sent } = await run({
+      params: { installedApp: "yes" },
+      settle: false,
+    });
+    expect(sent[0].error).toBeDefined();
+    expect(resolveOptIn).not.toHaveBeenCalled();
   });
 
   it("accepts a request that carries no params", async () => {

@@ -7,7 +7,7 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::SECOND_NS;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, ApplicationNumber, NotificationId, Timestamp, Urgency,
+    AnchorNumber, ApplicationNumber, NotificationId, Timestamp, Urgency,
 };
 
 /// One device wake-up request per notification, without notification content.
@@ -17,10 +17,8 @@ pub(crate) struct PendingNotification {
     pub(crate) recipient: Principal,
     /// The identity behind `recipient`, whose browsers are woken.
     pub(crate) anchor_number: AnchorNumber,
-    /// II's number for the app's origin, which the service worker is told.
+    /// II's number for the app's origin. Kept inside II: the service worker is told the origin.
     pub(crate) application_number: ApplicationNumber,
-    /// The account at the app `recipient` is. `None` is the unreserved default account.
-    pub(crate) account_number: Option<AccountNumber>,
     /// The app canister that sent it, which the service worker fetches it from.
     pub(crate) sender: Principal,
     /// App-chosen ID, unique per recipient within the app.
@@ -127,7 +125,6 @@ mod tests {
             recipient: principal(anchor_number),
             anchor_number,
             application_number: 1,
-            account_number: None,
             sender: principal(u64::MAX),
             notification_id,
             urgency: Urgency::Normal,

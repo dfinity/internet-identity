@@ -10,7 +10,7 @@ import { watchProbe } from "$lib/utils/notifications/watchProbe";
  *  answer is the app's own: one interval would call a live app dead whenever the worker
  *  is slow to wake, and a cold mint on a phone takes about as long as one. An app that
  *  answers inside the window ends the wait there, so this is a ceiling, not a delay. */
-const PROBE_WAIT_MS = 2 * POLL_INTERVAL_MS;
+export const PROBE_WAIT_MS = 2 * POLL_INTERVAL_MS;
 
 /**
  * Switches delivery on, and answers whether the app this browser points at took it.

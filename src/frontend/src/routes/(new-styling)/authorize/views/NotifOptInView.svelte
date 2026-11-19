@@ -8,6 +8,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import { startAppInstall } from "./notifInstall";
+  import { stopRepairChecks } from "./stopRepairChecks";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import {
     turnOnNotifications,
@@ -34,6 +35,7 @@
   import {
     IcpAlertsEvents,
     icpAlertsFunnel,
+    type NotificationsSource,
   } from "$lib/utils/analytics/icpAlertsFunnel";
 
   interface Props {
@@ -52,6 +54,9 @@
     consented: boolean;
     /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
     installFirst: boolean;
+    /** Opened because this device stopped receiving the app's notifications: skipping
+     *  then stops the checks on this device, and leaves the app's consent as it is. */
+    isRepair: boolean;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
@@ -65,30 +70,56 @@
     device,
     consented,
     installFirst,
+    isRepair,
     onDone,
   }: Props = $props();
 
-  /** Which story this device is in follows from where its notifications arrive. */
-  const funnel = $derived(
-    device.source === "app" || installFirst
-      ? icpAlertsFunnel
-      : browserNotificationsFunnel,
-  );
+  /**
+   * Which story this device is in follows from where its notifications arrive.
+   *
+   * None for an installed web app: it subscribes in its own page, after this screen, so
+   * this screen records only the consent, and either funnel would count a device step
+   * that never happens here.
+   */
+  const funnelOf = (
+    deviceState: DeviceNotificationState,
+  ): typeof icpAlertsFunnel | typeof browserNotificationsFunnel | undefined => {
+    switch (deviceState.source) {
+      case "app":
+        return icpAlertsFunnel;
+      case "browser":
+        return installFirst ? icpAlertsFunnel : browserNotificationsFunnel;
+      case "installed-app":
+        return undefined;
+    }
+  };
+  const funnel = $derived(funnelOf(device));
+  /** Repair-mode screens are counted apart from the ones an app asked for. */
+  const source: NotificationsSource = isRepair ? "repair" : "authorize";
   onMount(() => {
     const started = funnel;
-    started.init({ source: "authorize" });
+    started?.init({ source });
     // A new request remounts this view without `done()`, and the funnel's session listener must not outlive it.
-    return () => started.close();
+    return () => started?.close();
   });
 
-  const skip = () => {
-    funnel.trigger(BrowserNotificationsEvents.Skipped);
+  const skip = async () => {
+    funnel?.trigger(BrowserNotificationsEvents.Skipped);
+    if (isRepair) {
+      busy = true;
+      await stopRepairChecks({
+        identityNumber,
+        actor,
+        onFailure: reportFailure,
+      });
+      busy = false;
+    }
     done();
   };
 
   /** Hands sign-in back, which is where this screen's funnel ends. */
   const done = () => {
-    funnel.close();
+    funnel?.close();
     onDone();
   };
 
@@ -123,6 +154,7 @@
       origin,
       actor,
       consented,
+      source,
     });
     granting = started.granted;
     // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
@@ -157,7 +189,7 @@
    * message is shown as it came, which makes a screenshot enough to act on.
    */
   const reportFailure = (error: unknown) => {
-    funnel.trigger(BrowserNotificationsEvents.Failed, {
+    funnel?.trigger(BrowserNotificationsEvents.Failed, {
       reason: isCanisterError(error) ? "canister-error" : "browser-error",
     });
     if (isCanisterError(error)) {
@@ -190,15 +222,15 @@
   const enabledBy = (result: EnableNotificationsResult): boolean => {
     switch (result.status) {
       case "enabled":
-        funnel.trigger(BrowserNotificationsEvents.Enabled);
+        funnel?.trigger(BrowserNotificationsEvents.Enabled);
         return true;
       case "denied":
-        funnel.trigger(BrowserNotificationsEvents.PermissionDenied);
+        funnel?.trigger(BrowserNotificationsEvents.PermissionDenied);
         recordFailure("permission-denied");
         variant = "blocked";
         return false;
       case "unanswered":
-        funnel.trigger(BrowserNotificationsEvents.Failed, {
+        funnel?.trigger(BrowserNotificationsEvents.Failed, {
           reason: "unanswered",
         });
         // Nothing was read about this device's app, so the reason is shown and Allow stays in front of the user.
@@ -212,7 +244,7 @@
         needsInstall = true;
         return false;
       case "dismissed":
-        funnel.trigger(BrowserNotificationsEvents.PermissionDismissed);
+        funnel?.trigger(BrowserNotificationsEvents.PermissionDismissed);
         // The permission is still `default`, so the prompt can be raised again.
         // Stay where the user is, with Allow still in front of them.
         return false;
@@ -296,14 +328,14 @@
     {origin}
     {busy}
     onEnable={() => {
-      funnel.trigger(BrowserNotificationsEvents.EnablePressed);
+      funnel?.trigger(BrowserNotificationsEvents.EnablePressed);
       if (needsInstall) {
         startInstall();
         return;
       }
       void runEnable(device);
     }}
-    onSkip={skip}
+    onSkip={() => void skip()}
   />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
@@ -322,7 +354,11 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button class="btn btn-tertiary btn-xl" onclick={skip} disabled={busy}>
+      <button
+        class="btn btn-tertiary btn-xl"
+        onclick={() => void skip()}
+        disabled={busy}
+      >
         {$t`Not now`}
       </button>
     </div>

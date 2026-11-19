@@ -101,6 +101,7 @@ use ic_stable_structures::{
 };
 use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
+use sha2::{Digest, Sha256};
 
 use crate::browser_key::VerifiedBrowserKeys;
 use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
@@ -114,7 +115,8 @@ use crate::storage::account::{
     AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
 use crate::storage::anchor::{
-    Anchor, BrowserError, InboxNotification, WebPushSubscription, MAX_BROWSERS,
+    Anchor, BrowserError, InboxNotification, InboxNotificationKind, ReadySubscription,
+    WebPushSubscription, MAX_BROWSERS,
 };
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -122,13 +124,17 @@ use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::account_key::StorableAccountKey;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::accounts_counter::StorableAccountsCounter;
-use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
+use crate::storage::storable::anchor_application_config::{
+    AnchorApplicationConfig, PwaSubscription, StorablePwaSubscription,
+};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::notification_app::{
     StorableNotificationApp, StorableNotificationAppId, StorableNotificationAppRef,
 };
+use crate::storage::storable::notifications::webpush::pwa_subscription_holder::StorablePwaSubscriptionHolder;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -226,6 +232,9 @@ const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
 const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 39u8;
+/// The installed web app subscription that holds each push endpoint, by the endpoint's
+/// SHA-256: what an endpoint is looked up by when another subscription takes it over.
+const LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX: u8 = 40u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -328,6 +337,10 @@ const NEXT_NOTIFICATION_APP_ID_MEMORY_ID: MemoryId =
 /// Monotonic allocator for Internet Identity's own notification ids.
 const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID: MemoryId =
     MemoryId::new(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX);
+
+/// Which installed app entry holds a push endpoint, by the endpoint's SHA-256.
+const LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -475,6 +488,10 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the identity notification id allocator.
     next_identity_notification_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_identity_notification_id_memory: StableCell<NotificationId, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the installed app endpoint lookup.
+    lookup_pwa_webpush_subscription_with_endpoint_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_pwa_webpush_subscription_with_endpoint_memory:
+        StableBTreeMap<[u8; 32], StorablePwaSubscriptionHolder, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -624,6 +641,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(NEXT_NOTIFICATION_APP_ID_MEMORY_ID);
         let next_identity_notification_id_memory =
             memory_manager.get(NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_ID);
+        let lookup_pwa_webpush_subscription_with_endpoint_memory =
+            memory_manager.get(LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -731,6 +750,12 @@ impl<M: Memory + Clone> Storage<M> {
                 0,
             )
             .expect("next_identity_notification_id_memory"),
+            lookup_pwa_webpush_subscription_with_endpoint_memory_wrapper: MemoryWrapper::new(
+                lookup_pwa_webpush_subscription_with_endpoint_memory.clone(),
+            ),
+            lookup_pwa_webpush_subscription_with_endpoint_memory: StableBTreeMap::init(
+                lookup_pwa_webpush_subscription_with_endpoint_memory,
+            ),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -1599,74 +1624,13 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::NotificationAppNotFound { app_id })?;
         // The record is read back only to keep its own fields.
         let mut app = NotificationApp::from(stored);
-        // What is waiting survives only a rewrite of the same address, which is what a
-        // rotation refresh does. A subscribe cannot reach it: that passes through a
-        // pending registration, which has no address to compare. Anything else leaves
-        // entries announced to an address nothing listens on, and a full inbox posts no
-        // wake-up for what arrives after them.
-        let same_address = matches!(
-            (
-                app.webpush_subscription
-                    .as_ref()
-                    .and_then(WebPushSubscription::ready),
-                subscription.as_ref().and_then(WebPushSubscription::ready),
-            ),
-            (Some(registered), Some(replacing)) if registered.endpoint == replacing.endpoint
-        );
         app.webpush_subscription = subscription;
         if let Some(now) = used_at_ns {
             app.last_used_ns = now;
         }
         self.notification_app_memory
             .insert(app_id, StorableNotificationApp::from(app));
-        if !same_address {
-            self.clear_queues_routed_through(app_id);
-        }
         Ok(())
-    }
-
-    /// Drops what every browser routing through `app_id` had waiting.
-    /// Left in place, entries nobody can show would suppress every wake-up until they expire.
-    fn clear_queues_routed_through(&mut self, app_id: NotificationAppId) {
-        for anchor_number in self.anchors_with_notification_app(app_id) {
-            let Ok(mut anchor) = self.read(anchor_number) else {
-                ic_cdk::println!(
-                    "Failed to read anchor {anchor_number} to clear what app {app_id} queued"
-                );
-                continue;
-            };
-            // Every entry pointing at the record, not only those it delivered for:
-            // Internet Identity's own go to the app's address whatever the entry
-            // registered for itself, so they die with that address even where the rest
-            // of the queue does not.
-            let pointing: Vec<BrowserId> = anchor
-                .browsers()
-                .iter()
-                .filter(|browser| browser.is_pointing_at(app_id))
-                .map(|browser| browser.id)
-                .collect();
-            let mut cleared_notifications: Vec<InboxNotification> = Vec::new();
-            for browser_id in pointing {
-                if let Some(inbox) = anchor.notifications_for_browser_mut(browser_id) {
-                    cleared_notifications.append(inbox);
-                }
-            }
-            if cleared_notifications.is_empty() {
-                continue;
-            }
-            if let Err(err) = self.write(anchor) {
-                ic_cdk::println!(
-                    "Failed to clear what app {app_id} queued on anchor {anchor_number}: {err}"
-                );
-                continue;
-            }
-            delivery_metrics::count_removed_entries(
-                anchor_number,
-                &cleared_notifications,
-                delivery_metrics::Path::App,
-                delivery_metrics::Reason::SubscriptionReplaced,
-            );
-        }
     }
 
     /// Stamps that the app `app_id` names has just called, which is the only evidence
@@ -1746,8 +1710,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// Drops every reference to `app_id`, and with it what that record's address was
-    /// carrying for the entries it delivered to.
+    /// Drops every reference to `app_id`.
     ///
     /// `Err` where an anchor could not be read or written, naming the first that failed.
     /// Every other anchor is still attempted, so a failure here is a partial one and the
@@ -1970,16 +1933,6 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key.clone().into())
     }
 
-    /// The origin of an app II still holds.
-    pub fn lookup_origin_with_application_number(
-        &self,
-        application_number: ApplicationNumber,
-    ) -> Option<FrontendHostname> {
-        self.stable_application_memory
-            .get(&application_number)
-            .map(|application| application.origin)
-    }
-
     pub fn lookup_application_number_with_origin(
         &self,
         origin: &FrontendHostname,
@@ -2199,14 +2152,17 @@ impl<M: Memory + Clone> Storage<M> {
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
         let given_up = self.browsers_given_up(&anchor)?;
+        let anchor_number = anchor.anchor_number();
         let validated = self.validate_account_state(
-            anchor.anchor_number(),
+            anchor_number,
             anchor.session_count,
             &given_up,
             now,
             writes,
         )?;
-        Ok(self.apply_account_state(anchor, validated))
+        let account_state = self.apply_account_state(anchor, validated);
+        self.remove_pwa_webpush_subscriptions_of_browsers(anchor_number, &given_up);
+        Ok(account_state)
     }
 
     /// Browsers this write gives up, whose sessions have to go with them.
@@ -3098,13 +3054,12 @@ impl<M: Memory + Clone> Storage<M> {
                 }
                 ListWrite::Removed => {
                     self.stable_account_reference_list_memory.remove(&key);
-                    self.stable_anchor_application_config_memory.remove(&key);
+                    self.store_anchor_application_config(key, None);
                 }
             }
 
             if let Some(config) = config {
-                self.stable_anchor_application_config_memory
-                    .insert(key, config);
+                self.store_anchor_application_config(key, Some(config));
             }
 
             written.insert(origin, result);
@@ -3262,7 +3217,7 @@ impl<M: Memory + Clone> Storage<M> {
                 .anchor_application_config(anchor_number, application_number)
                 .map(AnchorApplicationConfig::forgotten);
             writes.insert(origin.clone(), Some((account_references, config)));
-            forgotten.insert(application_number);
+            forgotten.insert(origin.clone());
         }
         if writes.is_empty() {
             return Ok(());
@@ -3272,10 +3227,16 @@ impl<M: Memory + Clone> Storage<M> {
             anchor.browsers().iter().map(|browser| browser.id).collect();
         for browser_id in browser_ids {
             if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
-                queue.retain(|queued| {
-                    queued
-                        .application_number
-                        .is_none_or(|number| !forgotten.contains(&number))
+                // An app's entry whose account no longer resolves is gone too.
+                queue.retain(|queued_notification| match queued_notification.kind {
+                    InboxNotificationKind::App { account_principal }
+                    | InboxNotificationKind::InstalledAppProbe { account_principal } => self
+                        .lookup_account_with_principal(account_principal)
+                        .is_some_and(|account| {
+                            account.anchor_number == anchor_number
+                                && !forgotten.contains(&account.origin)
+                        }),
+                    InboxNotificationKind::Identity { .. } => true,
                 });
             }
         }
@@ -3284,7 +3245,9 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    fn anchor_application_config(
+    /// The config `anchor_number` holds for the app numbered `application_number`, which
+    /// holds its notification decision and its installed web app subscriptions.
+    pub fn anchor_application_config(
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -3307,9 +3270,242 @@ impl<M: Memory + Clone> Storage<M> {
         let key = (anchor_number, application_number);
         if let Some(mut config) = self.stable_anchor_application_config_memory.get(&key) {
             config.last_notified_at_ns = Some(now);
-            self.stable_anchor_application_config_memory
-                .insert(key, config);
+            self.store_anchor_application_config(key, Some(config));
         }
+    }
+
+    /// The one writer of the config map, so the endpoint lookup follows every insert and
+    /// remove.
+    fn store_anchor_application_config(
+        &mut self,
+        key: (AnchorNumber, ApplicationNumber),
+        config: Option<AnchorApplicationConfig>,
+    ) {
+        let previous_config = match &config {
+            Some(config) => self
+                .stable_anchor_application_config_memory
+                .insert(key, config.clone()),
+            None => self.stable_anchor_application_config_memory.remove(&key),
+        };
+        let (anchor_number, application_number) = key;
+        self.sync_pwa_webpush_subscription_with_endpoint_index(
+            anchor_number,
+            application_number,
+            previous_config
+                .as_ref()
+                .and_then(|config| config.pwa_webpush_subscriptions.as_ref()),
+            config
+                .as_ref()
+                .and_then(|config| config.pwa_webpush_subscriptions.as_ref()),
+        );
+    }
+
+    /// Adds the endpoints `current_subscriptions` holds that `previous_subscriptions` did
+    /// not, and removes the ones it dropped where the lookup still names this row.
+    fn sync_pwa_webpush_subscription_with_endpoint_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        previous_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+        current_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+    ) {
+        let previous_holders = collect_pwa_subscription_holders(
+            anchor_number,
+            application_number,
+            previous_subscriptions,
+        );
+        let current_holders = collect_pwa_subscription_holders(
+            anchor_number,
+            application_number,
+            current_subscriptions,
+        );
+
+        for (endpoint_hash, holder) in previous_holders.difference(&current_holders) {
+            let Some(indexed_holder) = self
+                .lookup_pwa_webpush_subscription_with_endpoint_memory
+                .get(endpoint_hash)
+            else {
+                continue;
+            };
+            // Another row took this endpoint over, and the entry is that row's now.
+            if indexed_holder != *holder {
+                continue;
+            }
+            self.lookup_pwa_webpush_subscription_with_endpoint_memory
+                .remove(endpoint_hash);
+        }
+
+        for (endpoint_hash, holder) in current_holders.difference(&previous_holders) {
+            if let Some(indexed_holder) = self
+                .lookup_pwa_webpush_subscription_with_endpoint_memory
+                .get(endpoint_hash)
+            {
+                if indexed_holder == *holder {
+                    continue;
+                }
+                // An entry whose slot no longer holds the endpoint, which a config written
+                // by a release that does not know the slots leaves behind, is replaced.
+                if self.holds_pwa_endpoint(indexed_holder, endpoint_hash) {
+                    ic_cdk::println!(
+                        "ERROR: an installed app endpoint is held by two subscriptions; the \
+                         lookup keeps {indexed_holder:?} rather than {holder:?}"
+                    );
+                    continue;
+                }
+            }
+            self.lookup_pwa_webpush_subscription_with_endpoint_memory
+                .insert(*endpoint_hash, *holder);
+        }
+    }
+
+    /// Whether `holder`'s browser entry holds a subscribed endpoint hashing to
+    /// `endpoint_hash`.
+    fn holds_pwa_endpoint(
+        &self,
+        holder: StorablePwaSubscriptionHolder,
+        endpoint_hash: &[u8; 32],
+    ) -> bool {
+        let Some(config) =
+            self.anchor_application_config(holder.anchor_number, holder.application_number)
+        else {
+            return false;
+        };
+        let Some(mut subscriptions) = config.pwa_webpush_subscriptions else {
+            return false;
+        };
+        let Some(held_subscription) = subscriptions.remove(&holder.browser_id) else {
+            return false;
+        };
+        match held_subscription.subscription {
+            StorableWebPushSubscription::Ready { endpoint, .. } => {
+                hash_endpoint(&endpoint) == *endpoint_hash
+            }
+            StorableWebPushSubscription::Pending { .. } => false,
+        }
+    }
+
+    /// The installed app subscription holding `endpoint`, if any.
+    pub fn lookup_pwa_webpush_subscription_with_endpoint(
+        &self,
+        endpoint: &str,
+    ) -> Option<PwaSubscriptionHolder> {
+        self.lookup_pwa_webpush_subscription_with_endpoint_memory
+            .get(&hash_endpoint(endpoint))
+            .map(PwaSubscriptionHolder::from)
+    }
+
+    /// Puts `subscription` in `holder`'s slot, or with `None` empties it, after emptying
+    /// `displaced_holder`'s slot where one is given. Both configs must exist: a config is
+    /// started only by the account state write, so a missing one is refused, before
+    /// anything is written.
+    pub fn write_pwa_webpush_subscription(
+        &mut self,
+        holder: PwaSubscriptionHolder,
+        subscription: Option<PwaSubscription>,
+        displaced_holder: Option<PwaSubscriptionHolder>,
+    ) -> Result<(), StorageError> {
+        let config_key = (holder.anchor_number, holder.application_number);
+        let mut config = self.pwa_subscription_config(holder)?;
+        // Both configs are read before either is written. A displaced slot on the same
+        // config is emptied on that one copy, so the write below carries both changes.
+        let mut displaced_config = None;
+        if let Some(displaced_holder) = displaced_holder {
+            let displaced_config_key = (
+                displaced_holder.anchor_number,
+                displaced_holder.application_number,
+            );
+            if displaced_config_key == config_key {
+                config.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
+            } else {
+                let mut config_of_displaced = self.pwa_subscription_config(displaced_holder)?;
+                config_of_displaced.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
+                displaced_config = Some((displaced_config_key, config_of_displaced));
+            }
+        }
+
+        config.set_pwa_webpush_subscription(holder.browser_id, subscription);
+        if let Some((displaced_config_key, config_of_displaced)) = displaced_config {
+            self.store_anchor_application_config(displaced_config_key, Some(config_of_displaced));
+        }
+        self.store_anchor_application_config(config_key, Some(config));
+        Ok(())
+    }
+
+    /// Writes the keying material a dispatch pass refreshed for `holder`'s browser entry,
+    /// for the account it delivers for. A browser entry that holds nothing any more is left
+    /// empty.
+    pub fn refresh_pwa_webpush_subscription(
+        &mut self,
+        holder: PwaSubscriptionHolder,
+        subscription: ReadySubscription,
+    ) -> Result<(), StorageError> {
+        let mut config = self.pwa_subscription_config(holder)?;
+        let Some(held_subscription) = config.pwa_webpush_subscription(holder.browser_id) else {
+            return Ok(());
+        };
+        let subscription = WebPushSubscription::Ready(subscription);
+        let account_principal = held_subscription.account_principal;
+        config.set_pwa_webpush_subscription(
+            holder.browser_id,
+            Some(PwaSubscription {
+                subscription,
+                account_principal,
+            }),
+        );
+        self.store_anchor_application_config(
+            (holder.anchor_number, holder.application_number),
+            Some(config),
+        );
+        Ok(())
+    }
+
+    /// The config holding `holder`'s slot.
+    fn pwa_subscription_config(
+        &self,
+        holder: PwaSubscriptionHolder,
+    ) -> Result<AnchorApplicationConfig, StorageError> {
+        self.anchor_application_config(holder.anchor_number, holder.application_number)
+            .ok_or(StorageError::ApplicationConfigNotFound {
+                anchor_number: holder.anchor_number,
+            })
+    }
+
+    /// Empties every installed app subscription slot of `browser_ids` on every config the
+    /// identity holds.
+    fn remove_pwa_webpush_subscriptions_of_browsers(
+        &mut self,
+        anchor_number: AnchorNumber,
+        browser_ids: &BTreeSet<BrowserId>,
+    ) {
+        if browser_ids.is_empty() {
+            return;
+        }
+        let configs: Vec<((AnchorNumber, ApplicationNumber), AnchorApplicationConfig)> = self
+            .stable_anchor_application_config_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter(|(_, config)| config.pwa_webpush_subscriptions.is_some())
+            .collect();
+        for (key, mut config) in configs {
+            if config.remove_pwa_webpush_subscriptions_of_browsers(browser_ids) {
+                self.store_anchor_application_config(key, Some(config));
+            }
+        }
+    }
+
+    /// Whether `browser_id`'s entry of `anchor_number` holds an installed web app
+    /// subscription for any app.
+    pub fn holds_pwa_webpush_subscription(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> bool {
+        self.stable_anchor_application_config_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .any(|(_, config)| config.pwa_webpush_subscription(browser_id).is_some())
     }
 
     /// What this identity has configured for the app at `origin`, or `None` where it has
@@ -3691,18 +3887,12 @@ impl<M: Memory + Clone> Storage<M> {
         // After the refusals above, so a ceremony that cannot happen registers nothing —
         // the record reaches storage only through the write at the end.
         // Read before the registry may give a browser up, which takes its inbox with it.
-        let inboxes_at_risk: Vec<(BrowserId, delivery_metrics::Path, Vec<InboxNotification>)> =
+        let inboxes_at_risk: Vec<(BrowserId, Vec<InboxNotification>)> =
             if anchor.browsers().len() >= MAX_BROWSERS {
                 anchor
                     .browsers()
                     .iter()
-                    .map(|browser| {
-                        (
-                            browser.id,
-                            crate::notifications::dispatch::path_of(self, browser),
-                            browser.notifications.clone(),
-                        )
-                    })
+                    .map(|browser| (browser.id, browser.notifications.clone()))
                     .collect()
             } else {
                 Vec::new()
@@ -3792,12 +3982,12 @@ impl<M: Memory + Clone> Storage<M> {
         // the sessions of every browser the registry gave up, the account reference list
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, now_ns, state)?;
-        for (browser_id, path, inbox) in &inboxes_at_risk {
+        for (browser_id, inbox) in &inboxes_at_risk {
             if evicted_browsers.contains(browser_id) {
                 delivery_metrics::count_removed_entries(
                     anchor_number,
+                    *browser_id,
                     inbox,
-                    *path,
                     delivery_metrics::Reason::BrowserEvicted,
                 );
             }
@@ -3827,6 +4017,20 @@ impl<M: Memory + Clone> Storage<M> {
             .find(|session| session.session_id == key.session_id)
     }
 
+    /// The sessions the identity holds at `account_number` of `application_number`.
+    pub fn read_account_sessions(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    ) -> Vec<Session> {
+        self.account_references(anchor_number, application_number)
+            .into_iter()
+            .find(|reference| reference.account_number == account_number)
+            .map(|reference| reference.sessions)
+            .unwrap_or_default()
+    }
+
     /// Signs one browser out of everything, in a single message.
     pub fn revoke_browser_sessions(
         &mut self,
@@ -3839,18 +4043,9 @@ impl<M: Memory + Clone> Storage<M> {
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
         let mut anchor = self.read(anchor_number)?;
-        let path = anchor
-            .browser(browser_id)
-            .map_or(delivery_metrics::Path::Other, |browser| {
-                crate::notifications::dispatch::path_of(self, browser)
-            });
         // A browser the identity signed out of must stop being notified for it. The entry
-        // itself stays, and so does the app it points at.
+        // itself stays, and so do the app it points at and what its inbox holds.
         anchor.set_webpush_subscription(browser_id, None);
-        let cleared_notifications = anchor
-            .notifications_for_browser_mut(browser_id)
-            .map(std::mem::take)
-            .unwrap_or_default();
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -3870,11 +4065,9 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         self.write_account_state(anchor, now, state)?;
-        delivery_metrics::count_removed_entries(
+        self.remove_pwa_webpush_subscriptions_of_browsers(
             anchor_number,
-            &cleared_notifications,
-            path,
-            delivery_metrics::Reason::BrowserSignedOut,
+            &BTreeSet::from([browser_id]),
         );
 
         Ok(revoked)
@@ -4010,6 +4203,13 @@ impl<M: Memory + Clone> Storage<M> {
             account_number: account.account_number,
             session_id: handle.session_id,
         })
+    }
+
+    /// The principal of the account the session `principal` signs as is at.
+    pub fn lookup_session_account_principal(&self, principal: Principal) -> Option<Principal> {
+        self.lookup_session_with_principal_memory
+            .get(&principal)
+            .map(|handle| handle.account_principal())
     }
 
     /// The account a principal a dapp sees was derived for, as an address.
@@ -4721,6 +4921,11 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "next_identity_notification_id".to_string(),
                 self.next_identity_notification_id_memory_wrapper.size(),
+            ),
+            (
+                "lookup_pwa_webpush_subscription_with_endpoint".to_string(),
+                self.lookup_pwa_webpush_subscription_with_endpoint_memory_wrapper
+                    .size(),
             ),
             (
                 "lookup_session_with_principal".to_string(),
@@ -5549,4 +5754,54 @@ mod allocate_anchor_safe_tests {
             );
         }
     }
+}
+
+/// Where an installed app subscription is held: the identity, the application whose config
+/// holds it, and the browser entry it is on there.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct PwaSubscriptionHolder {
+    pub anchor_number: AnchorNumber,
+    pub application_number: ApplicationNumber,
+    pub browser_id: BrowserId,
+}
+
+impl From<StorablePwaSubscriptionHolder> for PwaSubscriptionHolder {
+    fn from(value: StorablePwaSubscriptionHolder) -> Self {
+        Self {
+            anchor_number: value.anchor_number,
+            application_number: value.application_number,
+            browser_id: value.browser_id,
+        }
+    }
+}
+
+/// What the endpoint lookup is keyed by: an endpoint is up to 512 bytes, its hash 32.
+fn hash_endpoint(endpoint: &str) -> [u8; 32] {
+    Sha256::digest(endpoint.as_bytes()).into()
+}
+
+/// The lookup entries `subscriptions` implies: one per subscribed endpoint. A subscription
+/// waiting on its subscribe has no endpoint yet.
+fn collect_pwa_subscription_holders(
+    anchor_number: AnchorNumber,
+    application_number: ApplicationNumber,
+    subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+) -> BTreeSet<([u8; 32], StorablePwaSubscriptionHolder)> {
+    let mut holders = BTreeSet::new();
+    for (browser_id, held_subscription) in subscriptions.into_iter().flatten() {
+        let endpoint = match &held_subscription.subscription {
+            StorableWebPushSubscription::Ready { endpoint, .. } => endpoint,
+            StorableWebPushSubscription::Pending { .. } => continue,
+        };
+        let browser_id = *browser_id;
+        holders.insert((
+            hash_endpoint(endpoint),
+            StorablePwaSubscriptionHolder {
+                anchor_number,
+                application_number,
+                browser_id,
+            },
+        ));
+    }
+    holders
 }
