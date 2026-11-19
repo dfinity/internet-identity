@@ -211,9 +211,15 @@
       }
     }
 
-    // The page's sign-in stays with the identity that made it: kept, it would
-    // act for the identity selected next. That one signs in when it's used.
-    if ($authenticationStore?.identityNumber === identityNumber) {
+    // Before the app is authorized, the page's sign-in would act for the
+    // identity selected next, so it goes with the removed identity; that one
+    // signs in when it's used. Once authorized, the consent screens finish
+    // with the sign-in the app was authorized with.
+    if (
+      $authenticationStore?.identityNumber === identityNumber &&
+      $authorizedStore === undefined &&
+      flow !== "openid-resume"
+    ) {
       authenticationStore.reset();
       sessionStore.reset();
     }

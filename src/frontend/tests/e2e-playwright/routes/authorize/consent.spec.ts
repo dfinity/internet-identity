@@ -518,6 +518,42 @@ test.describe("Authorize — explicit consent UI", () => {
       await expect(consent.row(`${providerName} name:`)).toBeVisible();
       await consent.continue();
     });
+
+    test("should finish consent after the signed-in identity is removed from this device", async ({
+      attributeConsentView,
+      authorizePage,
+      identities,
+      signInWithIdentity,
+    }) => {
+      const iiPage = authorizePage.page;
+      const consent = attributeConsentView(iiPage);
+      await signInWithIdentity(iiPage, identities[0].identityNumber);
+      await iiPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await consent.waitForVisible();
+
+      // The app is authorized as this identity already; removing it from the
+      // device list must not take the sign-in the consent finishes with.
+      await iiPage.getByRole("button", { name: "Switch identity" }).click();
+      await iiPage.getByRole("button", { name: "Edit" }).click();
+      const dialog = iiPage.getByRole("dialog");
+      await expect(
+        dialog.getByRole("heading", { name: "Identities on this device" }),
+      ).toBeVisible();
+      await dialog
+        .getByRole("listitem")
+        .filter({ hasText: identities[0].name })
+        .getByRole("button", { name: "Remove" })
+        .click();
+      await expect(
+        dialog.getByRole("heading", { name: "Remove from this device" }),
+      ).toBeVisible();
+      await dialog.getByRole("button", { name: "Remove" }).click();
+      await expect(dialog).toBeHidden();
+
+      await consent.continue();
+    });
   });
 
   test.describe("with linked SSO credential", () => {
