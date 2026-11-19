@@ -75,16 +75,19 @@
     "ii-hover text-text-primary flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring";
 </script>
 
-<!-- Whose panel this is: the identity, large, with its name, and across from
-     it the other identities as small overlapping avatars, the way X shows
-     the accounts you can switch to. The card does one thing (Thomas): a tap
-     anywhere on it opens it on every identity and its settings, and closes
-     it again. Only the avatar is a control of its own, for the colour: a tap
-     opens the row of colours under it, the way Thomas sketched it. Open, the
-     card pushes the panel down, so nothing floats over the panel. No line
-     parts the name from what opens under it: the list hangs from it. -->
+<!-- Whose panel this is: the identity with its name, and across from it the
+     other identities as smaller overlapping avatars, the way X shows the
+     accounts you can switch to. One compact line, the same over every view
+     of the panel (the overview, a section, an app's details, managing apps),
+     so the head of the panel never changes as what's under it does. The
+     card does one thing (Thomas): a tap anywhere on it opens it on every
+     identity and its settings, and closes it again. Only the avatar is a
+     control of its own, for the colour: a tap opens the row of colours under
+     it, the way Thomas sketched it. Open, the card pushes the panel down, so
+     nothing floats over the panel. No line parts the name from what opens
+     under it: the list hangs from it. -->
 <Elevated as="ul" offset={1} class="flex flex-col overflow-hidden rounded-2xl">
-  <li class="relative flex items-center gap-3 py-4 ps-4 pe-3">
+  <li class="relative flex items-center gap-3 px-3 py-2.5">
     <button
       type="button"
       onclick={() => (switching = !switching)}
@@ -103,7 +106,7 @@
       title="Change colour"
       class="focus-visible:outline-focus-ring relative shrink-0 rounded-full transition-[scale] duration-160 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.96] motion-reduce:active:scale-100"
     >
-      <IdentityAvatar {identity} palette={paletteOf?.(identity)} size="lg" />
+      <IdentityAvatar {identity} palette={paletteOf?.(identity)} size="sm" />
     </button>
     {#if colourAnchor !== undefined}
       <ColourStrip
@@ -115,7 +118,7 @@
       />
     {/if}
     <span
-      class="text-text-primary pointer-events-none relative min-w-0 flex-1 truncate text-base leading-6 font-semibold"
+      class="text-text-primary pointer-events-none relative min-w-0 flex-1 truncate text-sm font-semibold"
     >
       {nameOf(identity)}
     </span>

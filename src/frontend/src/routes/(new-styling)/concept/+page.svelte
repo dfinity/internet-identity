@@ -413,9 +413,6 @@
         ? `details:${openedApp.origin}`
         : (sectionPage ?? "overview"),
   );
-  /** Views that keep the identity's line on top, past the overview: an
-   *  app's details and managing apps. A section names itself. */
-  const nested = $derived(viewKey !== "overview" && sectionPage === undefined);
   let navDirection = $state(1);
   const readingDirection = () =>
     document.documentElement.dir === "rtl" ? -1 : 1;
@@ -1578,30 +1575,31 @@
 
 {#snippet overview(inSheet: boolean)}
   <div class="flex flex-col gap-5">
-    <!-- The sheet on a phone needs a title, which keeps clear of its Close;
-         beside the canvas the identity card heads the panel itself. -->
+    <!-- The sheet on a phone needs a title, which keeps clear of its Close,
+         and the identity over the cards; beside the canvas the identity
+         heads the whole panel instead (see `panel`). -->
     {#if inSheet}
       <h2
         class="text-text-primary flex h-12 items-center pe-10 text-base font-semibold"
       >
         Identity
       </h2>
+      <div class="mb-1">
+        {@render identityItem()}
+      </div>
     {/if}
-    <!-- The identity, then three independent cards, each a large target that
-         leads to its section: the title, where it stands, and what's inside.
-         On desktop a card grows into its section in place: it rises to just
-         under the identity as it opens, and the other two fade where they
-         stand (held there out of the flow, then gone), so the section has
-         the panel to itself until Close shrinks it back into its slot. The
-         identity stays on top all along, so it's always clear whose access,
-         recovery or devices these are. The cards stand apart, each one a
-         thing of its own, and the identity a step further from them. -->
+    <!-- Three independent cards, each a large target that leads to its
+         section: the title, where it stands, and what's inside. On desktop a
+         card grows into its section in place: it rises to the top of the
+         list, just under the identity, as it opens, and the other two fade
+         where they stand (held there out of the flow, then gone), so the
+         section has the panel to itself until Close shrinks it back into its
+         slot. The cards stand apart, each one a thing of its own. -->
     <div bind:this={morphList} class="relative flex flex-col">
-      {@render overviewItem("identity", "")}
       {#each accountCards as card, index (card.kind)}
         {@render overviewItem(
           card.kind,
-          grown === card.kind || index === 0 ? "mt-6" : "mt-4",
+          grown === card.kind || index === 0 ? "" : "mt-4",
           card,
         )}
       {/each}
@@ -1609,29 +1607,23 @@
   </div>
 {/snippet}
 
-{#snippet overviewItem(id: string, space: string, card?: CardStatus)}
-  <!-- The identity isn't a card that steps away: it stays in the flow. -->
-  {@const stepsAway = card !== undefined && grown !== undefined && grown !== id}
-  {@const at = stepsAway ? heldAt(id) : undefined}
+{#snippet overviewItem(id: string, space: string, card: CardStatus)}
+  {@const at = heldAt(id)}
   <div
     data-morph={id}
-    data-morph-stays={card === undefined ? "" : undefined}
-    inert={stepsAway}
+    inert={grown !== undefined && grown !== id}
     style:top={at !== undefined ? `${at.top}px` : undefined}
     style:left={at !== undefined ? `${at.left}px` : undefined}
     style:width={at !== undefined ? `${at.width}px` : undefined}
     class={[
       space,
       (grown === id || morphing === id) && "relative z-1",
-      stepsAway &&
+      grown !== undefined &&
+        grown !== id &&
         (at !== undefined ? "pointer-events-none absolute" : "hidden"),
     ]}
   >
-    {#if card === undefined}
-      {@render identityItem()}
-    {:else}
-      {@render statusCard(card)}
-    {/if}
+    {@render statusCard(card)}
   </div>
 {/snippet}
 
@@ -1750,60 +1742,26 @@
 {/snippet}
 
 {#snippet panel(inSheet: boolean)}
-  <!-- Views stack in one cell, so the old one fades while the new one arrives.
-       Past the overview, in an app's details and while apps are managed, the
-       identity card folds into one line at the top, so it's always clear
-       whose apps these are. The line is part of that move: it comes in with
-       the first of those views and leaves with the last, alongside the view,
-       instead of growing above the views and pushing both down. Between them
-       it stays put, and only the view under it changes. A section heads
-       itself, with its title and Close. A phone's sheet doesn't repeat the
-       name (Thomas): the page behind it already says whose it is. -->
+  <!-- Beside the canvas the identity heads the panel, one compact card over
+       every view (the overview, a section, an app's details, managing apps),
+       so the head never changes and it's always clear whose these are; only
+       the view under it does. Views stack in one cell, so the old one fades
+       while the new one arrives. A phone's sheet doesn't repeat the name
+       (Thomas): the page behind it already says whose it is, and only its
+       overview shows the identity, over its cards. -->
+  {#if !inSheet}
+    <div class="mb-6">
+      {@render identityItem()}
+    </div>
+  {/if}
   <div class="grid">
-    {#key nested && !inSheet ? "nested" : viewKey}
+    {#key viewKey}
       <div
         class="col-start-1 row-start-1 min-w-0"
         in:viewIn={{ direction: navDirection * readingDirection(), reduced }}
         out:viewOut={{ reduced }}
       >
-        {#if !nested || inSheet}
-          {@render panelBody(inSheet)}
-        {:else}
-          <div>
-            <Elevated
-              offset={1}
-              as="header"
-              class="mb-4 flex items-center gap-3 rounded-2xl px-3 py-2.5"
-            >
-              <IdentityAvatar
-                {identity}
-                palette={identityPaletteOverride}
-                size="sm"
-              />
-              <!-- The identity card, folded: its name only, as the card says
-                   it (how it signed in is Access's to say). -->
-              <p
-                class="text-text-primary min-w-0 flex-1 truncate text-sm font-semibold"
-              >
-                {identityName}
-              </p>
-            </Elevated>
-          </div>
-          <div class="grid">
-            {#key viewKey}
-              <div
-                class="col-start-1 row-start-1 min-w-0"
-                in:viewIn={{
-                  direction: navDirection * readingDirection(),
-                  reduced,
-                }}
-                out:viewOut={{ reduced }}
-              >
-                {@render panelBody(inSheet)}
-              </div>
-            {/key}
-          </div>
-        {/if}
+        {@render panelBody(inSheet)}
       </div>
     {/key}
   </div>

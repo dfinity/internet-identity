@@ -72,9 +72,9 @@
   {#if others.length === 0}
     <span
       aria-hidden="true"
-      class="border-border-secondary text-fg-tertiary grid size-7 place-items-center rounded-full border border-dashed"
+      class="border-border-secondary text-fg-tertiary grid size-6 place-items-center rounded-full border border-dashed"
     >
-      <PlusIcon class="size-3.5" />
+      <PlusIcon class="size-3" />
     </span>
   {:else}
     {#each others.slice(0, PREVIEW) as other, index (other.identityNumber)}
@@ -86,8 +86,8 @@
       <span
         aria-hidden="true"
         class={[
-          "relative grid size-7 place-items-center rounded-full text-xs leading-none font-semibold ring-2 ring-(color:--ii-stack-cut) outline-1 -outline-offset-1 outline-black/8 dark:outline-white/12",
-          index > 0 && "-ms-2",
+          "relative grid size-6 place-items-center rounded-full text-[0.6875rem] leading-none font-semibold ring-2 ring-(color:--ii-stack-cut) outline-1 -outline-offset-1 outline-black/8 dark:outline-white/12",
+          index > 0 && "-ms-1.5",
         ]}
         style:background-color={palette.background}
         style:color={palette.foreground}
@@ -96,14 +96,14 @@
         {#if initial !== undefined}
           {initial}
         {:else}
-          <UserIcon class="size-3.5" />
+          <UserIcon class="size-3" />
         {/if}
       </span>
     {/each}
     {#if others.length > PREVIEW}
       <span
         aria-hidden="true"
-        class="bg-bg-secondary text-text-tertiary relative -ms-2 grid h-7 min-w-7 place-items-center rounded-full px-1 text-xs leading-none font-medium tabular-nums ring-2 ring-(color:--ii-stack-cut)"
+        class="bg-bg-secondary text-text-tertiary relative -ms-1.5 grid h-6 min-w-6 place-items-center rounded-full px-1 text-[0.6875rem] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-stack-cut)"
       >
         +{others.length - PREVIEW}
       </span>

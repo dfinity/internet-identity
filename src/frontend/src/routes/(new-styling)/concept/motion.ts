@@ -357,12 +357,8 @@ export const morph = async ({
     await change();
     return true;
   }
-  // What stays in its place (`[data-morph-stays]`, the identity over the
-  // cards) neither fades nor moves.
   const others = Array.from(
-    list.querySelectorAll<HTMLElement>(
-      ":scope > [data-morph]:not([data-morph-stays])",
-    ),
+    list.querySelectorAll<HTMLElement>(":scope > [data-morph]"),
   ).filter((one) => one !== item);
   // Measured mid-flight too, so a reversal starts from where things are.
   const first = box.getBoundingClientRect();
