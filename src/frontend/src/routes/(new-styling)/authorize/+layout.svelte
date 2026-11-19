@@ -208,6 +208,13 @@
       }
     }
 
+    // The page's sign-in stays with the identity that made it: kept, it would
+    // act for the identity selected next. That one signs in when it's used.
+    if ($authenticationStore?.identityNumber === identityNumber) {
+      authenticationStore.reset();
+      sessionStore.reset();
+    }
+
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
