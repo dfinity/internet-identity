@@ -159,20 +159,39 @@ export const refuseFirstPopup = async (
 };
 
 /**
- * Clears II's IndexedDB on this browser, which holds the stored sessions, as if
- * they had expired. What is kept in localStorage, such as the last used
- * identities and their options, stays.
+ * Deletes the sessions II stored on this browser, as if they had expired. The
+ * rest of II's data on the browser stays: the last used identities and their
+ * options, the browser's keys and the apps' sessions.
  * @param page Any page of the browser context.
  */
 export const clearStoredSessions = async (page: Page): Promise<void> => {
-  const cdp = await page.context().newCDPSession(page);
+  const iiPage = await page.context().newPage();
   try {
-    await cdp.send("Storage.clearDataForOrigin", {
-      origin: II_URL,
-      storageTypes: "indexeddb",
-    });
+    await iiPage.goto(II_URL);
+    await iiPage.evaluate(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open("ii-session-delegations");
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const database = request.result;
+            if (!database.objectStoreNames.contains("keys")) {
+              database.close();
+              resolve();
+              return;
+            }
+            const transaction = database.transaction("keys", "readwrite");
+            transaction.objectStore("keys").clear();
+            transaction.oncomplete = () => {
+              database.close();
+              resolve();
+            };
+            transaction.onerror = () => reject(transaction.error);
+          };
+        }),
+    );
   } finally {
-    await cdp.detach();
+    await iiPage.close();
   }
 };
 
