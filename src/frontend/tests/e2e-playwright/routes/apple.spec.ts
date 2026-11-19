@@ -158,11 +158,14 @@ test.describe("Sign in with Apple", () => {
         await fakeApple?.cancelSheet(popup);
         await closePromise;
 
+        // The opener notices the closed popup by polling, after a grace period
+        // for a reply still in flight: here no focus event reaches it, which
+        // in a browser speeds that up.
         await expect(
           page.getByRole("tooltip", {
             name: "Interaction canceled. Please try again.",
           }),
-        ).toBeVisible();
+        ).toBeVisible({ timeout: 15_000 });
         await expect(appleButton).toBeEnabled();
         expect(fakeApple?.authorizeRequests).toHaveLength(1);
         await expect(page).toHaveURL(II_URL + "/");
@@ -186,10 +189,16 @@ test.describe("Sign in with Apple", () => {
           }, encodeURIComponent(target));
           const popup = await popupPromise;
           // The page sends itself on only once it has rendered, after this
-          // listener is in place.
+          // listener is in place. Only where the popup navigates counts: the
+          // page's own start fetches from the backend's origin.
           const requestedOrigins: string[] = [];
           popup.on("request", (request) => {
-            requestedOrigins.push(new URL(request.url()).origin);
+            if (
+              request.isNavigationRequest() &&
+              request.frame() === popup.mainFrame()
+            ) {
+              requestedOrigins.push(new URL(request.url()).origin);
+            }
           });
 
           await expect.poll(() => popup.isClosed()).toBe(true);
