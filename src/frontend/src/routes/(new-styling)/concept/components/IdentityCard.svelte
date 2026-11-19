@@ -6,15 +6,14 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { ChevronDownIcon, HouseIcon, LogOutIcon } from "@lucide/svelte";
-  import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
-  import { slide } from "svelte/transition";
   import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import {
     identityInitial,
     type IdentityPalette,
   } from "$lib/utils/identityColors";
+  import { grow, travel } from "../motion";
   import ColourStrip from "./ColourStrip.svelte";
   import Elevated, { useSurface } from "./Elevated.svelte";
   import IdentityList from "./IdentityList.svelte";
@@ -67,6 +66,10 @@
   const nameOf = (one: LastUsedIdentity): string =>
     one.name ?? `${one.identityNumber}`;
 
+  /** Each other identity's avatar travels from the stack to its row in the
+   *  list as the card opens, and back as it closes (Thomas). */
+  const avatars = travel();
+
   // The card is one step above what it stands on (Elevated, below), and the
   // avatars across from the name cut themselves out of it.
   const cardSurface = `var(--ii-surface-${Math.min(useSurface() + 1, 8)})`;
@@ -81,8 +84,8 @@
      to. One compact card, the same over every view
      of the panel (the overview, a section, an app's details, managing apps),
      so the head of the panel never changes as what's under it does. The
-     card does one thing (Thomas): a tap anywhere on it opens it on every
-     identity and its settings, and closes it again. Only the avatar is a
+     card does one thing (Thomas): a tap anywhere on it opens it on the other
+     identities and its settings, and closes it again. Only the avatar is a
      control of its own, for the colour: a tap opens the row of colours under
      it, the way Thomas sketched it. Open, the card pushes the panel down, so
      nothing floats over the panel. No line parts the name from what opens
@@ -130,7 +133,16 @@
       </span>
     </span>
     <span class="pointer-events-none relative flex items-center gap-1">
-      <IdentityStack {others} {paletteOf} backdrop={cardSurface} />
+      <!-- Open, the list below shows the others, so the stack leaves for
+           it: each identity is on screen once. -->
+      {#if !switching}
+        <IdentityStack
+          {others}
+          {paletteOf}
+          backdrop={cardSurface}
+          travel={avatars}
+        />
+      {/if}
       <ChevronDownIcon
         aria-hidden="true"
         class={[
@@ -148,12 +160,13 @@
     </li>
   {/if}
   {#if switching}
+    <!-- The head above stays the current identity and is the list's first
+         row, so the list holds only the others (Thomas: each identity once).
+         It opens without clipping, so the avatars can come down into it;
+         the card clips instead. -->
     <li
       id={SWITCH_LIST_ID}
-      transition:slide={{
-        duration: prefersReducedMotion.current ? 0 : 240,
-        easing: quintOut,
-      }}
+      transition:grow={{ reduced: prefersReducedMotion.current }}
     >
       <IdentityList
         id={`${SWITCH_LIST_ID}-identities`}
@@ -163,18 +176,21 @@
         {onSwitch}
         {onAdd}
         {paletteOf}
+        withCurrent={false}
+        size="md"
+        travel={avatars}
       />
       <!-- The identity's settings under its list, as the phone's menu has
            them; the colour is the avatar's own. -->
       <ul
         aria-label="Settings"
-        class="ii-rows border-border-tertiary flex flex-col border-t py-1 [--ii-rows-inset:3.75rem]"
+        class="ii-rows border-border-tertiary flex flex-col border-t py-1 [--ii-rows-inset:4rem]"
       >
         <li>
           <button type="button" onclick={onStartPage} class={ROW}>
             <span
               aria-hidden="true"
-              class="text-fg-tertiary grid size-8 shrink-0 place-items-center"
+              class="text-fg-tertiary grid size-9 shrink-0 place-items-center"
             >
               <HouseIcon class="size-4" />
             </span>
@@ -185,7 +201,7 @@
           <button type="button" onclick={onSignOut} class={ROW}>
             <span
               aria-hidden="true"
-              class="text-fg-tertiary grid size-8 shrink-0 place-items-center"
+              class="text-fg-tertiary grid size-9 shrink-0 place-items-center"
             >
               <LogOutIcon class="size-4 rtl:-scale-x-100" />
             </span>

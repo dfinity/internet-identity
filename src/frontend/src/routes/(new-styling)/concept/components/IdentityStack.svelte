@@ -1,5 +1,6 @@
 <script lang="ts">
   import { PlusIcon, UserIcon } from "@lucide/svelte";
+  import { still, type Travel } from "../motion";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import {
     identityInitial,
@@ -10,6 +11,9 @@
   interface Props {
     /** The device's other identities, to switch to. */
     others: LastUsedIdentity[];
+    /** A crossfade pair (svelte/transition) the list's rows share: an avatar
+     *  leaves the stack for its row as the list opens, and comes back. */
+    travel?: Travel;
     /** Whether the list it opens is showing. */
     expanded?: boolean;
     /** The list's id, for `aria-controls`. */
@@ -25,12 +29,16 @@
 
   const {
     others,
+    travel,
     expanded = false,
     controls,
     onToggle,
     paletteOf,
     backdrop,
   }: Props = $props();
+
+  // svelte-ignore state_referenced_locally
+  const [travelOut, travelIn] = travel ?? [still, still];
 
   /** The first few show; the rest are a count. */
   const PREVIEW = 3;
@@ -92,6 +100,8 @@
         style:background-color={palette.background}
         style:color={palette.foreground}
         style:z-index={PREVIEW - index}
+        in:travelIn|global={{ key: other.identityNumber }}
+        out:travelOut|global={{ key: other.identityNumber }}
       >
         {#if initial !== undefined}
           {initial}

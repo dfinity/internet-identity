@@ -10,7 +10,7 @@
  * out, it is mostly gone in the first few frames.
  */
 import { quintOut } from "svelte/easing";
-import type { TransitionConfig } from "svelte/transition";
+import { crossfade, type TransitionConfig } from "svelte/transition";
 
 interface SwapParams {
   reduced?: boolean;
@@ -456,4 +456,48 @@ export const morph = async ({
   }
   item.style.height = "";
   return true;
+};
+
+/** A crossfade pair (svelte/transition's `crossfade`): `[send, receive]`.
+ *  Something that leaves one place with `send` and arrives in another with
+ *  `receive`, under the same key, travels between them. */
+export type Travel = [
+  (node: Element, params: { key: unknown }) => () => TransitionConfig,
+  (node: Element, params: { key: unknown }) => () => TransitionConfig,
+];
+
+/** Where nothing travels: a transition that does nothing. */
+export const still = (): TransitionConfig => ({ duration: 0 });
+
+/** Avatars travelling between where they wait and where they're listed, as
+ *  an identity's stack opens into its list (Thomas): 320ms, easing out, and
+ *  under reduced motion only a fade. One with nowhere to travel fades. */
+export const travel = (): Travel => {
+  const reduced = () =>
+    typeof matchMedia === "function" &&
+    matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return crossfade({
+    duration: () => (reduced() ? 0 : 320),
+    easing: quintOut,
+    fallback: (node) => ({
+      duration: reduced() ? 0 : 160,
+      easing: quintOut,
+      css: (t) => `opacity: ${t}`,
+    }),
+  }) as Travel;
+};
+
+/** Opens a block as svelte's `slide` does, by its height, but without
+ *  clipping it: what lies inside may arrive from outside it (an avatar from
+ *  the head above), and the card around it does the clipping. */
+export const grow = (
+  node: HTMLElement,
+  { reduced = false }: { reduced?: boolean } = {},
+): TransitionConfig => {
+  const height = node.offsetHeight;
+  return {
+    duration: reduced ? 0 : 320,
+    easing: quintOut,
+    css: (t) => `height: ${t * height}px`,
+  };
 };
