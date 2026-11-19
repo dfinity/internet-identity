@@ -290,7 +290,7 @@
       event.preventDefault();
       back();
     }}
-    class="text-text-primary fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col bg-(--ii-surface-3) p-0 backdrop:bg-transparent open:flex"
+    class="text-text-primary pointer-events-auto fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col bg-(--ii-surface-3) p-0 backdrop:bg-transparent open:flex"
   >
     {#if open}
       <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
@@ -317,7 +317,10 @@
     {/if}
   </dialog>
 {:else}
-  <!-- Desktop: the palette, in the top layer over everything. The dialog
+  <!-- Desktop: the palette, in the top layer over everything. It renders
+       inside the header, which lets the pages take the pointer through it,
+       so it takes the pointer back (pointer-events inherits even into the
+       top layer): a press anywhere on the blur closes it. The dialog
        itself is a bare frame; the blur behind and the panel are its own, so
        each comes and goes on its own timing. -->
   <dialog
@@ -327,7 +330,7 @@
       event.preventDefault();
       back();
     }}
-    class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-transparent"
+    class="pointer-events-auto fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-transparent"
   >
     {#if open}
       <button
