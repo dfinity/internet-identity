@@ -5,7 +5,7 @@ import { Funnel } from "./Funnel";
  *
  * Square brackets [] indicate optional events.
  *
- * start-browser-notifications       (with `source = authorize | settings`)
+ * start-browser-notifications       (with `source = authorize | repair | settings`)
  *   [browser-notifications--skipped]
  *   browser-notifications--enable-pressed
  *     browser-notifications--enabled

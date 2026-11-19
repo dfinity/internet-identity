@@ -5,16 +5,17 @@
 
 use crate::admission_queue::{Admission, Taken};
 use crate::notifications::backlog::app::PendingNotification;
-use crate::notifications::backlog::identity::PendingIdentityNotification;
+use crate::notifications::backlog::identity::{IdentityWakeUpPath, PendingIdentityNotification};
 use crate::notifications::browser_inbox;
 use crate::notifications::delivery_metrics::{self, Labels, Path, PlannedPush, Reason};
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, NotificationAppRef};
 use crate::notifications::webpush::rotation;
+use crate::notifications::webpush::unanswered;
 use crate::notifications::webpush::{
     clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId, SubscriberKey,
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
-use crate::state::{self, storage_borrow_mut};
+use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::Session;
 use crate::storage::anchor::{
     Browser, InboxNotification, InboxNotificationKind, ReadySubscription, WebPushSubscription,
@@ -28,8 +29,8 @@ use base64::Engine;
 use candid::Principal;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, ApplicationNumber, BrowserId, InboxNotificationId, NotificationEvent,
-    NotificationId, Timestamp, Urgency,
+    AnchorNumber, ApplicationNumber, BrowserId, IdentityForNotification, InboxNotificationId,
+    NotificationEvent, NotificationId, Timestamp, Urgency,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
@@ -261,6 +262,10 @@ pub(crate) struct Delivery {
     /// The `p256dh` of the registration at `endpoint` when the pass planned this, which a
     /// refresh checks the registration still has.
     pub(crate) subscriber_key: SubscriberKey,
+    /// When the registration at `endpoint` was made, which a re-subscribe at the same
+    /// endpoint, for another account included, replaces: what an answer to this wake-up
+    /// may be counted against.
+    pub(crate) registered_at_ns: Timestamp,
     /// The sealed payload naming the entry above. `None` only where sealing failed, and
     /// such a wake-up is dropped rather than posted.
     pub(crate) body: Option<Vec<u8>>,
@@ -384,11 +389,11 @@ fn seal_and_post(mut deliveries: Vec<Delivery>, pass_bytes: &[u8; 32], now_ns: T
     let superseded_indices = seal_pass(&mut deliveries, pass_bytes, now_ns);
     for (index, delivery) in deliveries.into_iter().enumerate() {
         if superseded_indices.contains(&index) {
-            settle(&delivery, PostOutcome::Superseded);
+            settle(&delivery, PostOutcome::Superseded, now_ns);
             continue;
         }
         if delivery.body.is_none() {
-            settle(&delivery, PostOutcome::Unsealed);
+            settle(&delivery, PostOutcome::Unsealed, now_ns);
             continue;
         }
         outcalls::spawn_post(delivery);
@@ -448,6 +453,57 @@ pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Del
     })
 }
 
+/// The kind of inbox entry `pending` deposits, and the installed web app route it wakes
+/// through where `pending.path` names one rather than each entry's own route.
+fn resolve_identity_wake_up<M: Memory + Clone>(
+    storage: &Storage<M>,
+    pending: &PendingIdentityNotification,
+) -> (InboxNotificationKind, Option<PwaRoute>) {
+    match pending.path {
+        IdentityWakeUpPath::Routed => (
+            InboxNotificationKind::Identity {
+                event: pending.event.clone(),
+            },
+            None,
+        ),
+        IdentityWakeUpPath::InstalledApp {
+            application_number,
+            account_principal,
+        } => {
+            let pwa_route = PwaRoute::read(
+                storage,
+                pending.anchor_number,
+                application_number,
+                account_principal,
+            );
+            (
+                InboxNotificationKind::InstalledAppProbe { account_principal },
+                Some(pwa_route),
+            )
+        }
+    }
+}
+
+/// Where `browser` is woken for an identity notification: through the installed web app
+/// `pwa_route` describes where one is given, and otherwise at the address
+/// [`wake_up_address`] gives.
+fn find_identity_wake_up_address<M: Memory + Clone>(
+    storage: &Storage<M>,
+    browser: &Browser,
+    pwa_route: Option<&PwaRoute>,
+    now_ns: Timestamp,
+) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    match pwa_route {
+        None => {
+            let app = routed_app(storage, browser);
+            let (subscription, relay_origin, target) =
+                wake_up_address(browser, app.as_ref(), now_ns)?;
+            Some((subscription.clone(), relay_origin, target))
+        }
+        Some(route) => find_pwa_wake_up_address(browser, route, now_ns),
+    }
+}
+
 /// One wake-up per entry the item names, at the address its kind reaches that entry by.
 /// An absent destination is every entry of the identity.
 /// Answers whether this notification is still waiting on something that is coming: the
@@ -474,6 +530,7 @@ fn fan_out_to_destinations(
             None => anchor.browsers().iter().map(|browser| browser.id).collect(),
         };
         let expires_at_ns = now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS);
+        let (kind, pwa_route) = resolve_identity_wake_up(storage, pending);
         let queued_entry = InboxNotification {
             // Named by `deposit`, which is what draws from the inbox's own run of ids.
             inbox_notification_id: 0,
@@ -481,9 +538,7 @@ fn fan_out_to_destinations(
             sender: crate::storage::canister_id(),
             notification_id: pending.notification_id,
             expires_at_ns,
-            kind: InboxNotificationKind::Identity {
-                event: pending.event.clone(),
-            },
+            kind,
         };
         let mut planned = Vec::new();
         for browser_id in destinations {
@@ -494,9 +549,8 @@ fn fan_out_to_destinations(
             else {
                 continue;
             };
-            let app = routed_app(storage, browser);
             let Some((subscription, relay_origin, target)) =
-                wake_up_address(browser, app.as_ref(), now_ns)
+                find_identity_wake_up_address(storage, browser, pwa_route.as_ref(), now_ns)
             else {
                 continue;
             };
@@ -511,8 +565,9 @@ fn fan_out_to_destinations(
                     notification: None,
                     endpoint: subscription.endpoint.as_str().to_string(),
                     subscriber_key: subscription.subscriber_key.clone(),
+                    registered_at_ns: subscription.created_at_ns,
                     body: None,
-                    sealing: rotation::SealingKeys::from(subscription),
+                    sealing: rotation::SealingKeys::from(&subscription),
                     // Filled in below, once every relay this reaches has one.
                     jwt: String::new(),
                     urgency: pending.urgency.clone(),
@@ -645,20 +700,13 @@ fn fan_out_to_browsers(
         );
         // The sealing keys travel with each wake-up: the deposit that names its entry
         // happens below, after this borrow of the browsers has ended.
-        let woken: Vec<(String, Delivery)> = anchor
-            .browsers()
+        let browsers = anchor.browsers();
+        let woken: Vec<(String, Delivery)> = browsers
             .iter()
             .zip(apps.iter())
             .filter_map(|(browser, app)| {
                 let (subscription, relay_origin, target) =
-                    match find_pwa_wake_up_address(browser, &pwa_route, now_ns) {
-                        Some(installed_app) => installed_app,
-                        None => {
-                            let (subscription, relay_origin, target) =
-                                wake_up_address(browser, app.as_ref(), now_ns)?;
-                            (subscription.clone(), relay_origin, target)
-                        }
-                    };
+                    app_wake_up_address(browsers, browser, app.as_ref(), &pwa_route, now_ns)?;
                 Some((
                     relay_origin,
                     Delivery {
@@ -669,6 +717,7 @@ fn fan_out_to_browsers(
                         notification: None,
                         endpoint: subscription.endpoint.as_str().to_string(),
                         subscriber_key: subscription.subscriber_key.clone(),
+                        registered_at_ns: subscription.created_at_ns,
                         body: None,
                         sealing: rotation::SealingKeys::from(&subscription),
                         // Filled in below, once every relay this reaches has one.
@@ -860,6 +909,7 @@ pub(crate) fn notify_identity(
                 destination: Some(vec![browser_id]),
                 notification_id,
                 event,
+                path: IdentityWakeUpPath::Routed,
                 urgency: Urgency::Normal,
                 expires_at_ns: Some(now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS)),
             },
@@ -876,6 +926,74 @@ pub(crate) fn notify_identity(
         }
         Some(notification_id)
     })
+}
+
+/// Submits Internet Identity's own notification for `browser_id` of `anchor_number`,
+/// through `path`, to check that the device behind that address receives it. Answers
+/// whether it was admitted; nothing is submitted where the address cannot be woken now.
+///
+/// Unlike [`notify_identity`], this records nothing on a Home Screen app's record:
+/// removing the notification resets the subscription's unanswered pushes, which is the
+/// answer.
+pub(crate) fn probe_path(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    identity: IdentityForNotification,
+    path: IdentityWakeUpPath,
+    now_ns: Timestamp,
+) -> bool {
+    if !notifications_enabled() {
+        return false;
+    }
+    let notification_id = storage_borrow_mut(|storage| storage.allocate_identity_notification_id());
+    submit_identity_wake_up(
+        PendingIdentityNotification {
+            anchor_number,
+            destination: Some(vec![browser_id]),
+            notification_id,
+            event: NotificationEvent::NotificationsOn(identity),
+            path,
+            urgency: Urgency::Normal,
+            expires_at_ns: Some(now_ns.saturating_add(IDENTITY_NOTIFICATION_TTL_NS)),
+        },
+        now_ns,
+    )
+}
+
+/// The subscription `browser` is woken at right now, the way [`wake_up_address`] finds
+/// it, and which registration it is.
+pub(crate) fn routed_subscription<M: Memory + Clone>(
+    storage: &Storage<M>,
+    browser: &Browser,
+    now_ns: Timestamp,
+) -> Option<(ReadySubscription, DeliveryTarget)> {
+    let app = routed_app(storage, browser);
+    let (subscription, _, target) = wake_up_address(browser, app.as_ref(), now_ns)?;
+    Some((subscription.clone(), target))
+}
+
+/// The subscription `browser`'s installed web app of the app numbered
+/// `application_number` can be woken at right now, and the principal of the account it
+/// delivers for. `None` where it holds none, or the account has no session on `browser`
+/// live past [`PWA_SESSION_MARGIN_NS`].
+pub(crate) fn installed_app_subscription<M: Memory + Clone>(
+    storage: &Storage<M>,
+    anchor_number: AnchorNumber,
+    application_number: ApplicationNumber,
+    browser: &Browser,
+    now_ns: Timestamp,
+) -> Option<(ReadySubscription, Principal)> {
+    let config = storage.anchor_application_config(anchor_number, application_number)?;
+    let held_subscription = config.pwa_webpush_subscription(browser.id)?;
+    let account_principal = held_subscription.account_principal;
+    let route = PwaRoute::read(
+        storage,
+        anchor_number,
+        application_number,
+        account_principal,
+    );
+    let (subscription, _, _) = find_pwa_wake_up_address(browser, &route, now_ns)?;
+    Some((subscription, account_principal))
 }
 
 /// Puts one of Internet Identity's own wake-ups in the backlog, answering whether it was
@@ -1006,13 +1124,45 @@ impl PwaRoute {
     }
 }
 
-/// Whether the entry's installed web app could be woken for `route` right now.
-pub(crate) fn can_wake_installed_app(
+/// Whether `browser`, one of the identity's `browsers`, could be woken right now for the
+/// app notification `route` describes.
+pub(crate) fn can_wake_for_app<M: Memory + Clone>(
+    storage: &Storage<M>,
+    browsers: &[Browser],
     browser: &Browser,
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> bool {
-    find_pwa_wake_up_address(browser, route, now_ns).is_some()
+    let app = routed_app(storage, browser);
+    app_wake_up_address(browsers, browser, app.as_ref(), route, now_ns).is_some()
+}
+
+/// Where `browser`, one of the identity's `browsers`, is woken for the app notification
+/// `route` describes. Nowhere where an installed web app on an entry linked to `browser`
+/// as sharing its device can deliver it: that one is woken instead, so the device is
+/// notified once, whatever `browser` registered of its own. Otherwise its own installed
+/// web app for that app, where that can deliver it, and else the address
+/// [`wake_up_address`] gives.
+fn app_wake_up_address(
+    browsers: &[Browser],
+    browser: &Browser,
+    app: Option<&NotificationApp>,
+    route: &PwaRoute,
+    now_ns: Timestamp,
+) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    let is_delivered_on_same_device = browsers.iter().any(|other_browser| {
+        other_browser.id != browser.id
+            && other_browser.same_device_browser_id == Some(browser.id)
+            && find_pwa_wake_up_address(other_browser, route, now_ns).is_some()
+    });
+    if is_delivered_on_same_device {
+        return None;
+    }
+    if let Some(installed_app) = find_pwa_wake_up_address(browser, route, now_ns) {
+        return Some(installed_app);
+    }
+    let (subscription, relay_origin, target) = wake_up_address(browser, app, now_ns)?;
+    Some((subscription.clone(), relay_origin, target))
 }
 
 /// The entry's installed web app for this app, where it subscribed for the recipient
@@ -1090,10 +1240,22 @@ pub(crate) fn can_wake<M: Memory + Clone>(
     wake_up_address(browser, app.as_ref(), now_ns).is_some()
 }
 
+/// Whether `notification` is Internet Identity's own check that a path still delivers:
+/// the notification a browser's own path is probed with, or an installed app's probe.
+fn is_probe(notification: &InboxNotification) -> bool {
+    match &notification.kind {
+        InboxNotificationKind::Identity {
+            event: NotificationEvent::NotificationsOn(_),
+        }
+        | InboxNotificationKind::InstalledAppProbe { .. } => true,
+        InboxNotificationKind::App { .. } => false,
+    }
+}
+
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
 /// way: a failed post removes the entry it announced, since no wake-up is coming for it,
 /// and a relay that lost the subscription also takes the registration with it.
-pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
+pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestamp) {
     record_post_outcome(outcome);
     if let (Some(notification), Some(loss)) = (delivery.notification.as_ref(), outcome.loss()) {
         delivery_metrics::count_push_outcome(
@@ -1105,8 +1267,9 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
         );
     }
     match outcome {
+        PostOutcome::Sent => count_accepted_push(delivery, now_ns),
         // Nothing was posted, and the entry stays for whatever wakes this browser next.
-        PostOutcome::Sent | PostOutcome::Superseded => {}
+        PostOutcome::Superseded => {}
         PostOutcome::Gone => drop_gone_subscription(delivery),
         PostOutcome::RateLimited
         | PostOutcome::RelayError
@@ -1114,6 +1277,49 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
         | PostOutcome::Rejected
         | PostOutcome::NoCapacity
         | PostOutcome::Unsealed => drop_failed_wake_up(delivery),
+    }
+}
+
+/// Settles a `delivery` the push service accepted at `now_ns`: it counts as unanswered
+/// on its subscription, and a probe is recorded there, while what it announced is still
+/// waiting. A worker that took the entry before the push service's answer arrived has
+/// already answered.
+fn count_accepted_push(delivery: &Delivery, now_ns: Timestamp) {
+    let Some(notification) = delivery.notification.as_ref() else {
+        return;
+    };
+    let is_waiting =
+        storage_borrow(|storage| storage.read(delivery.anchor_number)).is_ok_and(|anchor| {
+            anchor
+                .notifications_for_browser(delivery.browser_id)
+                .contains(notification)
+        });
+    if !is_waiting {
+        return;
+    }
+    let registration = rotation::Destination {
+        anchor_number: delivery.anchor_number,
+        browser_id: delivery.browser_id,
+        target: delivery.target,
+    }
+    .registration();
+    if let Err(err) = unanswered::count_unanswered_push(
+        registration,
+        &delivery.endpoint,
+        delivery.registered_at_ns,
+        now_ns,
+    ) {
+        ic_cdk::println!("ERROR: Failed to count a push posted through a subscription: {err}");
+    }
+    // A probe is evidence only once the push service has taken it: one still
+    // waiting for its pass, or refused, reached no device.
+    if is_probe(notification) {
+        unanswered::mark_probed(
+            registration,
+            &delivery.endpoint,
+            delivery.registered_at_ns,
+            now_ns,
+        );
     }
 }
 
@@ -1458,13 +1664,13 @@ mod outcalls {
             &KNOWN_WAKEUP_OUTCALL_LIMIT
         };
         let Some(permit) = crate::concurrency::acquire(limit) else {
-            settle(&delivery, PostOutcome::NoCapacity);
+            settle(&delivery, PostOutcome::NoCapacity, ic_cdk::api::time());
             return;
         };
         ic_cdk::spawn(async move {
             let _permit = permit;
             let outcome = post_wake_up(&delivery).await;
-            settle(&delivery, outcome);
+            settle(&delivery, outcome, ic_cdk::api::time());
         });
     }
 
@@ -2212,7 +2418,7 @@ mod tests {
         submit(recipient, 7, 10 * SECOND_NS);
         let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
 
-        settle(&delivery, PostOutcome::Sent);
+        settle(&delivery, PostOutcome::Sent, 0);
 
         assert_eq!(queued(recipient, browsers[0]), vec![7]);
     }
@@ -2226,7 +2432,7 @@ mod tests {
         let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
         let entry = delivery.notification.clone().expect("an announced entry");
 
-        settle(&delivery, PostOutcome::Superseded);
+        settle(&delivery, PostOutcome::Superseded, 0);
         // The entry is still in the inbox, for the next wake-up's worker to collect.
         assert_eq!(queued(recipient, browsers[0]), vec![7]);
         delivery_metrics::count_collected(recipient, browsers[0], &entry, 2 * SECOND_NS);
@@ -2238,6 +2444,61 @@ mod tests {
         assert_eq!(
             delivery_metrics::push_loss_count_for_testing("seal_failed"),
             0
+        );
+    }
+
+    #[test]
+    fn a_sent_wake_up_counts_as_unanswered_while_its_entry_waits() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+
+        settle(&delivery, PostOutcome::Sent, 2 * SECOND_NS);
+
+        assert_eq!(
+            stored_subscription(recipient, browsers[0])
+                .and_then(|ready_subscription| ready_subscription.unanswered_pushes)
+                .map(|unanswered_pushes| unanswered_pushes.count),
+            Some(1)
+        );
+    }
+
+    /// A wake-up for the registration that held the endpoint before is no push to the one
+    /// that holds it now, though the endpoint is the same.
+    #[test]
+    fn a_push_to_a_registration_replaced_at_the_same_endpoint_is_not_counted() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+        subscribe(recipient, browsers[0], RELAY, 3 * SECOND_NS);
+
+        settle(&delivery, PostOutcome::Sent, 4 * SECOND_NS);
+
+        assert_eq!(
+            stored_subscription(recipient, browsers[0])
+                .and_then(|ready_subscription| ready_subscription.unanswered_pushes),
+            None
+        );
+    }
+
+    /// The push service may answer after the worker has already taken the entry, and the
+    /// taking is the answer.
+    #[test]
+    fn a_push_answered_before_the_push_service_replied_is_not_counted() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+        take_oldest(recipient, browsers[0]);
+
+        settle(&delivery, PostOutcome::Sent, 2 * SECOND_NS);
+
+        assert_eq!(
+            stored_subscription(recipient, browsers[0])
+                .and_then(|ready_subscription| ready_subscription.unanswered_pushes),
+            None
         );
     }
 
@@ -2254,7 +2515,7 @@ mod tests {
             submit(recipient, 8, 10 * SECOND_NS);
             let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
-            settle(&deliveries[1], outcome);
+            settle(&deliveries[1], outcome, 0);
 
             assert_eq!(queued(recipient, browsers[0]), vec![7], "{outcome:?}");
             assert!(stored_subscription(recipient, browsers[0]).is_some());
@@ -2268,7 +2529,7 @@ mod tests {
         submit(recipient, 7, 10 * SECOND_NS);
         let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
-        settle(&deliveries[0], PostOutcome::Gone);
+        settle(&deliveries[0], PostOutcome::Gone, 0);
 
         assert!(stored_subscription(recipient, browsers[0]).is_none());
         assert!(queued(recipient, browsers[0]).is_empty());
@@ -2287,7 +2548,7 @@ mod tests {
         assert_eq!(delivery.endpoint, APP_RELAY);
         subscribe(recipient, browsers[0], RELAY, SECOND_NS);
 
-        settle(&delivery, PostOutcome::Gone);
+        settle(&delivery, PostOutcome::Gone, 0);
 
         assert_eq!(stored_app(app), None);
         assert!(stored_subscription(recipient, browsers[0]).is_some());
@@ -2304,7 +2565,7 @@ mod tests {
         let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
         route_through_an_app(recipient, browsers[0], 8, Some(OTHER_APP_RELAY));
 
-        settle(&delivery, PostOutcome::Gone);
+        settle(&delivery, PostOutcome::Gone, 0);
 
         assert_eq!(stored_app(app), None);
         assert_eq!(anchor(other).notification_app(other_browsers[0]), None);
@@ -2491,7 +2752,7 @@ mod tests {
         assert!(deliveries.iter().all(|delivery| delivery.body.is_none()));
         assert_eq!(stored_subscription(recipient, browsers[0]), replacement);
         for delivery in &deliveries {
-            settle(delivery, PostOutcome::Superseded);
+            settle(delivery, PostOutcome::Superseded, 0);
         }
         assert_eq!(queued(recipient, browsers[0]), vec![7]);
     }
@@ -2504,7 +2765,7 @@ mod tests {
         let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
         subscribe(recipient, browsers[0], ROTATED, SECOND_NS);
 
-        settle(&delivery, PostOutcome::Gone);
+        settle(&delivery, PostOutcome::Gone, 0);
 
         assert_eq!(
             stored_subscription(recipient, browsers[0])
@@ -2523,7 +2784,7 @@ mod tests {
         let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
         take_oldest(recipient, browsers[0]);
 
-        settle(&deliveries[0], PostOutcome::RelayError);
+        settle(&deliveries[0], PostOutcome::RelayError, 0);
 
         // 8 and 9 were each named by a wake-up of their own, so the failure of the one
         // that named 7 says nothing about them.
@@ -2539,7 +2800,7 @@ mod tests {
         let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
         take_oldest(recipient, browsers[0]);
 
-        settle(&deliveries[0], PostOutcome::RelayError);
+        settle(&deliveries[0], PostOutcome::RelayError, 0);
 
         assert_eq!(queued(recipient, browsers[0]), vec![8]);
     }
@@ -2554,7 +2815,7 @@ mod tests {
         submit(recipient, 8, 10 * SECOND_NS);
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
-        settle(&delivery, PostOutcome::RelayError);
+        settle(&delivery, PostOutcome::RelayError, 0);
 
         assert_eq!(queued(recipient, browsers[0]), vec![7, 8]);
     }

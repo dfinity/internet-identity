@@ -43,9 +43,11 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
+use notifications::same_device_link::ClaimRefusal;
 use notifications::senders::Senders;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::pwa_subscription;
+use notifications::webpush::rotation;
 use notifications::webpush::vapid_key::VapidPublicKey;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
 use notifications::{
@@ -472,7 +474,7 @@ fn get_webpush_subscription_status(
         return None;
     };
 
-    notifications::webpush::subscription_status(anchor_number, key)
+    notifications::webpush::subscription_status(anchor_number, key, time())
 }
 
 /// Authorized by the identity rather than by the browser, so a browser that is lost or
@@ -532,9 +534,11 @@ fn prepare_notification_app_link(
         enabled: true,
     }) = anchor.notification_app(browser_id)
     {
-        let still_answering = state::storage_borrow(|storage| storage.notification_app(app_id))
-            .is_some_and(|app| app.is_subscribed() && !app.probe_went_unanswered(now));
-        if still_answering {
+        // A repair probe through the app that had its window and was never removed is the
+        // same evidence as an enable probe nobody answered.
+        let is_app_delivering = state::storage_borrow(|storage| storage.notification_app(app_id))
+            .is_some_and(|app| app.is_still_delivering(now));
+        if is_app_delivering {
             return Err(PrepareNotificationAppLinkError::AppAlreadyDelivering);
         }
     }
@@ -821,6 +825,136 @@ fn claim_notification_app(
     Ok(())
 }
 
+/// Links the entry that registered `link_public_key` to the calling browser's entry as
+/// sharing its device. Authorized by the browser key, and by the one-shot key's signature
+/// over the claim, which binds it to the caller.
+#[update]
+fn claim_same_device_link(
+    request: ClaimSameDeviceLinkRequest,
+) -> Result<(), ClaimSameDeviceLinkError> {
+    use ClaimSameDeviceLinkError::*;
+
+    let ClaimSameDeviceLinkRequest {
+        anchor_number,
+        link_public_key,
+        signature,
+    } = request;
+    enabled_or(InternalCanisterError)?;
+    let (anchor, browser_id) =
+        check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
+
+    notifications::same_device_link::claim(
+        anchor,
+        browser_id,
+        caller(),
+        &link_public_key,
+        &signature,
+        time(),
+    )
+    .map_err(|refusal| match refusal {
+        ClaimRefusal::NoPendingLink => NoPendingLink,
+        ClaimRefusal::ClaimerAlreadyLinked => {
+            InternalCanisterError("this browser is already linked to another".to_string())
+        }
+        ClaimRefusal::BrowserAlreadyLinked => InternalCanisterError(
+            "the browser that registered the key is already linked to".to_string(),
+        ),
+        ClaimRefusal::ClaimerHasInstalledApp => InternalCanisterError(
+            "this browser holds an installed web app subscription of its own".to_string(),
+        ),
+        ClaimRefusal::InvalidSignature => {
+            InternalCanisterError("the signature is not the link key's over this claim".to_string())
+        }
+        ClaimRefusal::StorageError(err) => InternalCanisterError(err),
+    })
+}
+
+/// The subscriptions on a path to the calling browser's device that can deliver now, and
+/// their unanswered pushes.
+#[query]
+fn get_notification_path_status(
+    request: GetNotificationPathStatusRequest,
+) -> Result<NotificationPathStatus, GetNotificationPathStatusError> {
+    use GetNotificationPathStatusError::*;
+
+    let GetNotificationPathStatusRequest {
+        anchor_number,
+        path,
+    } = request;
+    enabled_or(InternalCanisterError)?;
+    let (anchor, browser_id) =
+        check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
+    let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
+
+    Ok(notifications::repair::read_path_status(
+        &anchor,
+        browser_id,
+        path,
+        time(),
+    ))
+}
+
+/// Sends Internet Identity's own notification through every subscription on a path to
+/// the calling browser's device, except one whose last probe is still waiting.
+#[update]
+fn probe_notification_path(
+    request: ProbeNotificationPathRequest,
+) -> Result<(), ProbeNotificationPathError> {
+    use ProbeNotificationPathError::*;
+
+    let ProbeNotificationPathRequest {
+        anchor_number,
+        path,
+    } = request;
+    enabled_or(InternalCanisterError)?;
+    let (anchor, browser_id) =
+        check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
+    let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
+
+    notifications::repair::probe_device_path(
+        &anchor,
+        browser_id,
+        path,
+        &identity_for_notification(&anchor),
+        time(),
+    )
+    .map_err(|refusal| match refusal {
+        notifications::repair::ProbeRefusal::NotReachable => NotReachable,
+        notifications::repair::ProbeRefusal::BacklogFull => {
+            InternalCanisterError("too many notifications waiting for this identity".to_string())
+        }
+    })
+}
+
+/// Removes an app's installed web app subscriptions on the entries linked to the calling
+/// browser's, where a probe through them was never removed.
+#[update]
+fn remove_unanswered_pwa_webpush_subscriptions(
+    request: RemoveUnansweredPwaWebPushSubscriptionsRequest,
+) -> Result<(), RemoveUnansweredPwaWebPushSubscriptionsError> {
+    use RemoveUnansweredPwaWebPushSubscriptionsError::*;
+
+    let RemoveUnansweredPwaWebPushSubscriptionsRequest {
+        anchor_number,
+        origin,
+        account_principal,
+    } = request;
+    enabled_or(InternalCanisterError)?;
+    let (anchor, browser_id) =
+        check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
+    let application_number =
+        notifications::repair::lookup_application_number(&origin).map_err(InternalCanisterError)?;
+
+    notifications::repair::remove_unanswered_installed_apps(
+        &anchor,
+        browser_id,
+        application_number,
+        account_principal,
+        time(),
+    );
+    Ok(())
+}
+
 /// Authorized as the app, which is in no anchor's browser list. Empty wherever there is
 /// nobody to deliver for, and those cases cannot be told apart.
 #[query]
@@ -1040,8 +1174,12 @@ fn browser_remove_notification(
         not_shown,
         now_ns,
     )
-    .map(|()| RemoveNotificationResponse {})
-    .map_err(RemoveNotificationError::InternalCanisterError)
+    .map_err(RemoveNotificationError::InternalCanisterError)?;
+    notifications::webpush::unanswered::reset_unanswered_pushes(rotation::RegistrationId::of_key(
+        anchor_number,
+        key,
+    ));
+    Ok(RemoveNotificationResponse {})
 }
 
 #[update]
@@ -1221,13 +1359,15 @@ fn app_get_pwa_webpush_subscription_status(
 ) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
     use AppGetPwaWebPushSubscriptionStatusError::*;
 
-    let session = check_app_authorization(time()).map_err(|_| NoSuchSession)?;
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
     let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
 
     Ok(pwa_subscription::read_pwa_subscription_status(
         holder,
         session.account_principal,
+        now,
     ))
 }
 
@@ -1247,14 +1387,12 @@ fn app_get_pwa_notification(
     } = request;
     let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
 
-    Ok(AppGetPwaNotificationResponse {
-        notification: notifications::browser_inbox::find_pwa_notification(
-            holder,
-            session.account_principal,
-            inbox_notification_id,
-            now,
-        ),
-    })
+    Ok(notifications::browser_inbox::find_pwa_notification(
+        holder,
+        session.account_principal,
+        inbox_notification_id,
+        now,
+    ))
 }
 
 /// Removes the notification a wake-up named, on the terms `app_get_pwa_notification`
@@ -1281,7 +1419,86 @@ fn app_remove_pwa_notification(
         not_shown,
         now,
     )
-    .map(|()| RemoveNotificationResponse {})
+    .map_err(InternalCanisterError)?;
+    // Only the account the installed app delivers for answers for its subscription: a
+    // session of an account it no longer delivers for may still remove its own entries.
+    if pwa_subscription::is_delivering_for(holder, session.account_principal) {
+        notifications::webpush::unanswered::reset_unanswered_pushes(rotation::RegistrationId::Pwa(
+            holder,
+        ));
+    }
+    Ok(RemoveNotificationResponse {})
+}
+
+/// Sends Internet Identity's own notification to the calling session's installed web app,
+/// unless one sent before is still waiting to be removed.
+#[update]
+fn app_probe_pwa_webpush_subscription() -> Result<(), AppProbePwaWebPushSubscriptionError> {
+    use AppProbePwaWebPushSubscriptionError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
+        .map_err(|err| InternalCanisterError(format!("{err}")))?;
+
+    notifications::repair::probe_installed_app(
+        &anchor,
+        holder,
+        session.account_principal,
+        &identity_for_notification(&anchor),
+        now,
+    )
+    .map_err(|refusal| match refusal {
+        notifications::repair::ProbeRefusal::NotReachable => NotReachable,
+        notifications::repair::ProbeRefusal::BacklogFull => {
+            InternalCanisterError("too many notifications waiting for this identity".to_string())
+        }
+    })
+}
+
+/// Whether the calling session's browser entry is linked to another entry of its identity
+/// as sharing its device, or whether another entry may deliver notifications.
+#[query]
+fn app_get_same_device_link_status() -> Result<SameDeviceLinkStatus, AppGetSameDeviceLinkStatusError>
+{
+    use AppGetSameDeviceLinkStatusError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
+        .map_err(|err| InternalCanisterError(format!("{err}")))?;
+
+    Ok(notifications::same_device_link::status(
+        &anchor,
+        session.browser_id,
+        holder.application_number,
+        now,
+    ))
+}
+
+/// Registers the one-shot key another entry of the calling session's identity claims the
+/// same-device link with.
+#[update]
+fn app_prepare_same_device_link(
+    request: AppPrepareSameDeviceLinkRequest,
+) -> Result<(), AppPrepareSameDeviceLinkError> {
+    use AppPrepareSameDeviceLinkError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let AppPrepareSameDeviceLinkRequest { link_public_key } = request;
+
+    notifications::same_device_link::prepare(
+        session.anchor_number,
+        session.browser_id,
+        link_public_key,
+        now,
+    )
     .map_err(InternalCanisterError)
 }
 

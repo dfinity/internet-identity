@@ -27,6 +27,8 @@ use internet_identity_interface::internet_identity::types::{
 use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
 use std::time::Duration;
 
+mod same_device;
+
 /// An app whose sender list names [`app_sender`].
 const APP: &str = "https://listed-app.example";
 /// A second app whose sender list names [`app_sender`].
@@ -191,7 +193,7 @@ fn second_identity_at(
 /// Answers every outcall for [`OUTCALL_ROUNDS`] rounds: a sender list with
 /// [`app_sender`], `push_status` to every push, and any other `GET`, a relay probe, with
 /// `200`. Answers the URLs pushed to.
-fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
+pub(super) fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
     let mut pushed_urls = Vec::new();
     for _ in 0..OUTCALL_ROUNDS {
         env.advance_time(Duration::from_millis(ROUND_MILLIS));
@@ -818,7 +820,9 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
     assert_eq!(
         pwa_status(&env, canister_id, first_session),
         Some(WebPushSubscriptionStatus {
-            endpoint: PWA_ENDPOINT.to_string()
+            endpoint: PWA_ENDPOINT.to_string(),
+            unanswered_pushes: None,
+            probe_sent_at_ns: None,
         })
     );
 
@@ -856,7 +860,9 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
     assert_eq!(
         pwa_status(&env, canister_id, other_session),
         Some(WebPushSubscriptionStatus {
-            endpoint: PWA_ENDPOINT.to_string()
+            endpoint: PWA_ENDPOINT.to_string(),
+            unanswered_pushes: None,
+            probe_sent_at_ns: None,
         })
     );
 

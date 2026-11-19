@@ -1351,6 +1351,181 @@ pub struct WebPushSubscriptionStatus {
     /// The relay endpoint this browser is registered with. Compared against the one the
     /// browser holds: a registration naming any other endpoint is stale.
     pub endpoint: String,
+    /// `None` where the notification of every push posted through it has been removed
+    /// since.
+    pub unanswered_pushes: Option<UnansweredPushes>,
+    /// When the push service last accepted Internet Identity's own notification, sent
+    /// through it to check it. `None` once a notification pushed through it has been removed
+    /// since: that is the answer.
+    pub probe_sent_at_ns: Option<Timestamp>,
+}
+
+/// Pushes posted through one subscription whose notifications nothing has removed since.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct UnansweredPushes {
+    pub count: u32,
+    pub first_sent_at_ns: Timestamp,
+    /// At least 3 of them, the first sent at least an hour ago: worth a probe.
+    pub is_past_limit: bool,
+}
+
+/// A way an identity's notifications reach the calling browser's device.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationPath {
+    /// Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
+    /// routes through.
+    ThisBrowser,
+    /// That app's installed web apps on the entries linked to this browser entry as
+    /// sharing its device, that deliver for one account. An installed app that shares
+    /// this browser entry itself checks its own path, and is not on this one.
+    InstalledApps(InstalledAppsPath),
+}
+
+/// An app's installed web apps that deliver for one account at it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct InstalledAppsPath {
+    pub origin: FrontendHostname,
+    /// The account at that app whose installed web apps these are.
+    pub account_principal: Principal,
+}
+
+/// Which path to the calling browser's device to read, for the identity it signs for.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationPathStatusRequest {
+    pub anchor_number: AnchorNumber,
+    pub path: NotificationPath,
+}
+
+/// The subscriptions on one path that can deliver now.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationPathStatus {
+    /// One per subscription on the path that can deliver now. Empty where none can.
+    pub subscriptions: Vec<SubscriptionDeliveryStatus>,
+}
+
+/// One subscription on a path, and the pushes posted through it whose notifications
+/// nothing removed since.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SubscriptionDeliveryStatus {
+    /// `None` where the notification of every push posted through it has been removed
+    /// since.
+    pub unanswered_pushes: Option<UnansweredPushes>,
+    /// When the push service last accepted Internet Identity's own notification, sent
+    /// through it to check it. `None` once a notification pushed through it has been
+    /// removed since: that is the answer.
+    pub probe_sent_at_ns: Option<Timestamp>,
+    /// Whether that probe, unanswered, has been out 10 seconds by the canister's clock,
+    /// the least time it is given to be answered before its subscription may be removed.
+    /// `false` where no probe is outstanding.
+    pub has_probe_had_its_answer_time: bool,
+}
+
+/// Why `get_notification_path_status` refused.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum GetNotificationPathStatusError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    InternalCanisterError(String),
+}
+
+/// Which path to the calling browser's device to probe, for the identity it signs for.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ProbeNotificationPathRequest {
+    pub anchor_number: AnchorNumber,
+    pub path: NotificationPath,
+}
+
+/// Why `probe_notification_path` sent nothing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ProbeNotificationPathError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// Nothing on the path can be woken now.
+    NotReachable,
+    InternalCanisterError(String),
+}
+
+/// Whose installed web apps to remove where they did not answer: the app at `origin`, for the identity `anchor_number` names.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveUnansweredPwaWebPushSubscriptionsRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    /// The account at that app whose installed web apps to remove.
+    pub account_principal: Principal,
+}
+
+/// Why `remove_unanswered_pwa_webpush_subscriptions` refused.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RemoveUnansweredPwaWebPushSubscriptionsError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    InternalCanisterError(String),
+}
+
+/// Whether the calling installed web app's browser entry shares its device with another
+/// way its identity is notified.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SameDeviceLinkStatus {
+    /// This entry is already linked to another entry of the identity.
+    Linked,
+    /// Another signed-in entry of the identity may deliver this app's notifications:
+    /// through ICP Alerts it has switched on, or through its own subscription.
+    OtherPathMayDeliver,
+    NoOtherPath,
+}
+
+/// Why `app_get_same_device_link_status` refused.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppGetSameDeviceLinkStatusError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+/// The one-shot key an installed web app registers for its browser entry's same-device link.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPrepareSameDeviceLinkRequest {
+    /// A one-shot P-256 public key, DER-encoded SPKI as WebCrypto exports it.
+    pub link_public_key: PublicKey,
+}
+
+/// Why `app_prepare_same_device_link` refused.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppPrepareSameDeviceLinkError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+/// A claim of the same-device link the key `link_public_key` was registered for, by a browser of the identity `anchor_number` names.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ClaimSameDeviceLinkRequest {
+    pub anchor_number: AnchorNumber,
+    pub link_public_key: PublicKey,
+    /// By the one-shot key, over the claim message `browser_key` defines.
+    pub signature: ByteBuf,
+}
+
+/// Why `claim_same_device_link` refused.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ClaimSameDeviceLinkError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// No other entry of this identity awaits that key, or its time is up.
+    NoPendingLink,
+    /// Also what the text names when an entry is already linked, the caller holds an
+    /// installed web app of its own, or the signature is not that key's over this claim.
+    InternalCanisterError(String),
+}
+
+/// Why `app_probe_pwa_webpush_subscription` sent nothing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppProbePwaWebPushSubscriptionError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    /// The session's installed web app has no subscription that can be woken now.
+    NotReachable,
+    InternalCanisterError(String),
 }
 
 /// Scoped to `(origin, recipient)`: the same id sent to two recipients is two
@@ -1664,10 +1839,19 @@ pub struct AppGetPwaNotificationRequest {
     pub inbox_notification_id: InboxNotificationId,
 }
 
-/// `None` where the named entry is gone, or is not this app's for this session.
+/// Both `None` where the named entry is gone, or is not this app's for this session.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppGetPwaNotificationResponse {
     pub notification: Option<PwaNotification>,
+    /// Set where Internet Identity sent this itself, and what it has to say.
+    pub event: Option<PwaNotificationEvent>,
+}
+
+/// Something Internet Identity tells an installed web app's user.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PwaNotificationEvent {
+    /// This installed web app receives notifications.
+    NotificationsOn,
 }
 
 /// Which notification an installed web app fetches the content of, and from which canister.

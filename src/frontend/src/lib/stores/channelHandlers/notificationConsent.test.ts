@@ -123,7 +123,7 @@ const run = async ({
   if (settle) {
     void (async () => {
       await waitForStore(notificationConsentStore);
-      notificationConsentStore.settle();
+      notificationConsentStore.settle(get(notificationConsentStore));
     })();
   }
   await running;
@@ -220,7 +220,7 @@ describe("handleNotificationConsentRequest", () => {
       context?.identityNumber === BigInt(20_000) ? context : undefined,
     );
     expect(reopened.identityNumber).toBe(BigInt(20_000));
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await running;
 
     // Read for the identity the user ended on, not the one the screen opened for.
@@ -323,7 +323,7 @@ describe("handleNotificationConsentRequest", () => {
 
     await waitForStore(notificationConsentStore);
     order.push("screen reopened");
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await consent;
 
     expect(order).toEqual(["sign-in, screen closed", "screen reopened"]);
@@ -405,7 +405,7 @@ describe("handleNotificationConsentRequest", () => {
     await waitForStore(notificationConsentStore);
     expect(get(pendingScreenStore)).toBe(true);
 
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await running;
 
     expect(get(pendingScreenStore)).toBe(false);
@@ -434,7 +434,7 @@ describe("handleNotificationConsentRequest", () => {
     } as unknown as JsonRequest);
 
     await waitForStore(notificationConsentStore);
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await vi.waitFor(() => expect(readGranted).toHaveBeenCalled());
 
     expect(get(pendingScreenStore)).toBe(false);
@@ -490,13 +490,13 @@ describe("handleNotificationConsentRequest", () => {
 
     // The first holds the queue. It reused its own probe, taken a moment earlier.
     await waitForStore(notificationConsentStore);
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await first;
     expect(readBrowserPushState).toHaveBeenCalledTimes(2);
 
     // The second's turn, with its probe now predating a ceremony.
     await waitForStore(notificationConsentStore);
-    notificationConsentStore.settle();
+    notificationConsentStore.settle(get(notificationConsentStore));
     await second;
     expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });

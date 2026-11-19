@@ -10,6 +10,8 @@ pub mod delegation;
 pub(crate) mod delivery_metrics;
 pub(crate) mod dispatch;
 pub mod installed_app;
+pub(crate) mod repair;
+pub(crate) mod same_device_link;
 pub mod senders;
 pub mod submission;
 pub(crate) mod validation;

@@ -2512,4 +2512,75 @@ mod browser_tests {
             })
         );
     }
+
+    /// Two entries of one identity, the second linked to the first as sharing its device.
+    fn linked_pair() -> (Anchor, BrowserId, BrowserId) {
+        let (mut anchor, safari) = anchor_with_browser();
+        let (installed_app, _) = anchor
+            .resolve_browser(
+                browser_key(2),
+                successor_key(2),
+                description("Installed app on iPhone"),
+                2_000,
+            )
+            .unwrap();
+        anchor.link_same_device(installed_app, safari);
+        (anchor, safari, installed_app)
+    }
+
+    /// Signs in from enough new browsers, each used later than the last, to evict the
+    /// least recently used entry.
+    fn evict_the_oldest(anchor: &mut Anchor) -> Vec<BrowserId> {
+        let mut evicted_browser_ids = Vec::new();
+        for seed in 10..=40u8 {
+            let (_, dropped) = anchor
+                .resolve_browser(
+                    browser_key(seed),
+                    successor_key(seed),
+                    description("Chrome on a Mac"),
+                    10_000 + u64::from(seed),
+                )
+                .unwrap();
+            evicted_browser_ids.extend(dropped);
+            if !evicted_browser_ids.is_empty() {
+                break;
+            }
+        }
+        evicted_browser_ids
+    }
+
+    #[test]
+    fn a_link_names_its_entry_while_the_identity_has_it() {
+        let (anchor, safari, installed_app) = linked_pair();
+
+        assert_eq!(anchor.same_device_browser_of(installed_app), Some(safari));
+    }
+
+    #[test]
+    fn evicting_an_entry_clears_every_link_to_it() {
+        let (mut anchor, safari, installed_app) = linked_pair();
+        // The installed app is used again, so Safari's is the entry to go.
+        anchor.stamp_browser_use(installed_app, 5_000);
+
+        assert_eq!(evict_the_oldest(&mut anchor), vec![safari]);
+
+        assert_eq!(anchor.same_device_browser_of(installed_app), None);
+        assert_eq!(
+            anchor
+                .browser(installed_app)
+                .and_then(|browser| browser.same_device_browser_id),
+            None
+        );
+    }
+
+    #[test]
+    fn a_link_to_an_entry_the_identity_no_longer_has_names_nothing() {
+        let (mut anchor, safari, installed_app) = linked_pair();
+        anchor.stamp_browser_use(installed_app, 5_000);
+        evict_the_oldest(&mut anchor);
+        // Put the stale pointer back, as a rollback could leave it.
+        anchor.link_same_device(installed_app, safari);
+
+        assert_eq!(anchor.same_device_browser_of(installed_app), None);
+    }
 }

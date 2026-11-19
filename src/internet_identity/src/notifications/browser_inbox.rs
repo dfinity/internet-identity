@@ -19,8 +19,8 @@ use crate::storage::{PwaSubscriptionHolder, Storage};
 use candid::Principal;
 use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, InboxNotificationId, NotShownReason, NotificationToShow,
-    PwaNotification, Timestamp,
+    AnchorNumber, AppGetPwaNotificationResponse, BrowserId, InboxNotificationId, NotShownReason,
+    NotificationToShow, PwaNotification, PwaNotificationEvent, Timestamp,
 };
 
 /// Most entries one inbox holds. A new one past it replaces the oldest.
@@ -129,7 +129,8 @@ pub(crate) fn remove_app_entries(anchor_number: AnchorNumber, origin: &Applicati
         };
         // The app's entries, and those whose account no longer resolves, which are gone.
         let is_removed = |entry: &InboxNotification| match entry.kind {
-            InboxNotificationKind::App { account_principal } => storage
+            InboxNotificationKind::App { account_principal }
+            | InboxNotificationKind::InstalledAppProbe { account_principal } => storage
                 .lookup_account_with_principal(account_principal)
                 .is_none_or(|account| {
                     account.anchor_number != anchor_number || account.origin == *origin
@@ -196,6 +197,8 @@ pub(crate) fn notification_named(
                 event,
             });
         }
+        // The installed web app's to read, never this worker's.
+        InboxNotificationKind::InstalledAppProbe { .. } => return None,
     };
     storage_borrow(|storage| {
         // The app and the account as it is numbered now, which naming the default account
@@ -222,7 +225,30 @@ pub(crate) fn notification_named(
 ///
 /// The id names one entry of one inbox, so nothing else is needed to tell it from an
 /// expired entry, or from another application's notification carrying the same sender id.
+///
+/// An entry for an installed web app is left to that app's session.
 pub(crate) fn remove_collected(
+    anchor: Anchor,
+    browser_id: BrowserId,
+    inbox_notification_id: InboxNotificationId,
+    not_shown: Option<NotShownReason>,
+    now_ns: Timestamp,
+) -> Result<(), String> {
+    let is_installed_app_probe = anchor
+        .notifications_for_browser(browser_id)
+        .iter()
+        .find(|entry| entry.inbox_notification_id == inbox_notification_id)
+        .is_some_and(|entry| matches!(entry.kind, InboxNotificationKind::InstalledAppProbe { .. }));
+    if is_installed_app_probe {
+        return Ok(());
+    }
+    remove_entry(anchor, browser_id, inbox_notification_id, not_shown, now_ns)
+}
+
+/// Removes the entry `inbox_notification_id` names from `browser_id`'s inbox, counting it
+/// collected unless `not_shown` names why it was not shown or it expired first. One
+/// already gone is no error.
+fn remove_entry(
     mut anchor: Anchor,
     browser_id: BrowserId,
     inbox_notification_id: InboxNotificationId,
@@ -263,22 +289,48 @@ pub(crate) fn remove_collected(
 }
 
 /// [`notification_named`] for an installed web app: only an entry of `holder`'s app for
-/// the account `account_principal` names, in its browser entry's inbox, and only what the
-/// app fetches the content with.
+/// the account `account_principal` names, in its browser entry's inbox. For an app's
+/// notification, only what the app fetches the content with; for a probe, what Internet
+/// Identity has to say. Both `None` where there is no such entry, or it expired.
 pub(crate) fn find_pwa_notification(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
     inbox_notification_id: InboxNotificationId,
     now_ns: Timestamp,
-) -> Option<PwaNotification> {
-    let anchor = storage_borrow(|storage| storage.read(holder.anchor_number)).ok()?;
-    if !holds_pwa_entry(&anchor, holder, account_principal, inbox_notification_id) {
-        return None;
+) -> AppGetPwaNotificationResponse {
+    let empty_response = AppGetPwaNotificationResponse {
+        notification: None,
+        event: None,
+    };
+    let Ok(anchor) = storage_borrow(|storage| storage.read(holder.anchor_number)) else {
+        return empty_response;
+    };
+    let Some(entry) = pwa_entry(&anchor, holder, account_principal, inbox_notification_id)
+        .filter(|entry| entry.expires_at_ns > now_ns)
+    else {
+        return empty_response;
+    };
+    match entry.kind {
+        InboxNotificationKind::InstalledAppProbe { .. } => AppGetPwaNotificationResponse {
+            notification: None,
+            event: Some(PwaNotificationEvent::NotificationsOn),
+        },
+        InboxNotificationKind::App { .. } | InboxNotificationKind::Identity { .. } => {
+            AppGetPwaNotificationResponse {
+                notification: notification_named(
+                    &anchor,
+                    holder.browser_id,
+                    inbox_notification_id,
+                    now_ns,
+                )
+                .map(|shown_notification| PwaNotification {
+                    canister_id: shown_notification.canister_id,
+                    id: shown_notification.id,
+                }),
+                event: None,
+            }
+        }
     }
-    let NotificationToShow {
-        canister_id, id, ..
-    } = notification_named(&anchor, holder.browser_id, inbox_notification_id, now_ns)?;
-    Some(PwaNotification { canister_id, id })
 }
 
 /// [`remove_collected`] for an installed web app: only an entry of `holder`'s app for the
@@ -293,10 +345,10 @@ pub(crate) fn remove_pwa_collected(
 ) -> Result<(), String> {
     let anchor = storage_borrow(|storage| storage.read(holder.anchor_number))
         .map_err(|err| format!("{err}"))?;
-    if !holds_pwa_entry(&anchor, holder, account_principal, inbox_notification_id) {
+    if pwa_entry(&anchor, holder, account_principal, inbox_notification_id).is_none() {
         return Ok(());
     }
-    remove_collected(
+    remove_entry(
         anchor,
         holder.browser_id,
         inbox_notification_id,
@@ -305,20 +357,20 @@ pub(crate) fn remove_pwa_collected(
     )
 }
 
-/// Whether the entry `inbox_notification_id` names in the inbox of `holder`'s browser entry
-/// is a notification to the account `account_principal` names, which is an account at
-/// `holder`'s app.
-fn holds_pwa_entry(
+/// The entry `inbox_notification_id` names in the inbox of `holder`'s browser entry, where
+/// it is for the account `account_principal` names, which is an account at `holder`'s app.
+fn pwa_entry(
     anchor: &Anchor,
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
     inbox_notification_id: InboxNotificationId,
-) -> bool {
+) -> Option<InboxNotification> {
     anchor
         .notifications_for_browser(holder.browser_id)
         .iter()
         .find(|entry| entry.inbox_notification_id == inbox_notification_id)
-        .is_some_and(|entry| entry.account_principal() == Some(account_principal))
+        .filter(|entry| entry.account_principal() == Some(account_principal))
+        .cloned()
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import { startAppInstall } from "./notifInstall";
+  import { stopRepairChecks } from "./stopRepairChecks";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import {
     turnOnNotifications,
@@ -34,6 +35,7 @@
   import {
     IcpAlertsEvents,
     icpAlertsFunnel,
+    type NotificationsSource,
   } from "$lib/utils/analytics/icpAlertsFunnel";
 
   interface Props {
@@ -52,6 +54,9 @@
     consented: boolean;
     /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
     installFirst: boolean;
+    /** Opened because this device stopped receiving the app's notifications: skipping
+     *  then stops the checks on this device, and leaves the app's consent as it is. */
+    isRepair: boolean;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
@@ -65,6 +70,7 @@
     device,
     consented,
     installFirst,
+    isRepair,
     onDone,
   }: Props = $props();
 
@@ -88,15 +94,26 @@
     }
   };
   const funnel = $derived(funnelOf(device));
+  /** Repair-mode screens are counted apart from the ones an app asked for. */
+  const source: NotificationsSource = isRepair ? "repair" : "authorize";
   onMount(() => {
     const started = funnel;
-    started?.init({ source: "authorize" });
+    started?.init({ source });
     // A new request remounts this view without `done()`, and the funnel's session listener must not outlive it.
     return () => started?.close();
   });
 
-  const skip = () => {
+  const skip = async () => {
     funnel?.trigger(BrowserNotificationsEvents.Skipped);
+    if (isRepair) {
+      busy = true;
+      await stopRepairChecks({
+        identityNumber,
+        actor,
+        onFailure: reportFailure,
+      });
+      busy = false;
+    }
     done();
   };
 
@@ -137,6 +154,7 @@
       origin,
       actor,
       consented,
+      source,
     });
     granting = started.granted;
     // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
@@ -317,7 +335,7 @@
       }
       void runEnable(device);
     }}
-    onSkip={skip}
+    onSkip={() => void skip()}
   />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
@@ -336,7 +354,11 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button class="btn btn-tertiary btn-xl" onclick={skip} disabled={busy}>
+      <button
+        class="btn btn-tertiary btn-xl"
+        onclick={() => void skip()}
+        disabled={busy}
+      >
         {$t`Not now`}
       </button>
     </div>

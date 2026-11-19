@@ -19,6 +19,10 @@ const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 /// Prefix for the token a browser signs to let another identity point at its Home Screen app.
 const NOTIFICATION_APP_CLAIM_SIGNATURE_DOMAIN: &[u8] = b"ii-notification-app-claim";
 
+/// Prefix for the claim a browser makes with an installed web app's one-shot key to link
+/// the two entries as sharing a device.
+const SAME_DEVICE_LINK_SIGNATURE_DOMAIN: &[u8] = b"ii-same-device-link";
+
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
 const BROWSER_KEY_SIGNATURE_BYTES: usize = 64;
 
@@ -151,6 +155,41 @@ pub mod test_keys {
         ));
         signature.to_bytes().to_vec()
     }
+}
+
+/// Whether `key` is a DER-encoded P-256 SPKI, the only kind a one-shot link key is.
+pub fn is_p256_public_key(key: &PublicKey) -> bool {
+    verifying_key(key).is_some()
+}
+
+/// Whether `signature` is the one-shot `key`'s over the same-device link claim of
+/// `anchor_number` by the browser signing as `claimer`.
+pub fn verify_same_device_link_claim(
+    key: &PublicKey,
+    signature: &[u8],
+    anchor_number: u64,
+    claimer: &[u8],
+) -> bool {
+    let Some(message) = same_device_link_message(anchor_number, claimer) else {
+        return false;
+    };
+    verify(key, signature, &message)
+}
+
+/// The domain, `anchor_number` as 8 big-endian bytes, the length of `claimer` as one byte,
+/// and `claimer`. `None` for a `claimer` longer than a byte can count, which no principal
+/// is.
+fn same_device_link_message(anchor_number: u64, claimer: &[u8]) -> Option<Vec<u8>> {
+    let anchor = anchor_number.to_be_bytes();
+    let claimer_length = u8::try_from(claimer.len()).ok()?;
+    let mut message = Vec::with_capacity(
+        SAME_DEVICE_LINK_SIGNATURE_DOMAIN.len() + anchor.len() + 1 + claimer.len(),
+    );
+    message.extend_from_slice(SAME_DEVICE_LINK_SIGNATURE_DOMAIN);
+    message.extend_from_slice(&anchor);
+    message.push(claimer_length);
+    message.extend_from_slice(claimer);
+    Some(message)
 }
 
 fn claim_token_message(
@@ -554,5 +593,20 @@ mod tests {
             10_001,
             5_000,
         ));
+    }
+
+    /// The same vector `claimLink.test.ts` pins for the page that signs the claim, so
+    /// both sides agree on one byte string.
+    #[test]
+    fn the_same_device_link_message_is_the_domain_the_anchor_and_the_length_prefixed_claimer() {
+        assert_eq!(
+            same_device_link_message(10_000, &[1, 2, 3]).map(hex::encode),
+            Some("69692d73616d652d6465766963652d6c696e6b000000000000271003010203".to_string())
+        );
+    }
+
+    #[test]
+    fn a_claimer_longer_than_a_byte_can_count_has_no_message() {
+        assert_eq!(same_device_link_message(10_000, &[0; 256]), None);
     }
 }

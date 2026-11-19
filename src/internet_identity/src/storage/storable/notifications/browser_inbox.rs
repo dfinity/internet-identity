@@ -97,6 +97,13 @@ pub enum StorableInboxNotificationKind {
         #[n(0)]
         event: StorableNotificationEvent,
     },
+    /// Internet Identity's own, checking that an app's installed web app receives
+    /// notifications for the account with this principal.
+    #[n(2)]
+    InstalledAppProbe {
+        #[cbor(n(0), with = "minicbor::bytes")]
+        account_principal: Vec<u8>,
+    },
 }
 
 /// Something Internet Identity has to tell the user about their own identity.

@@ -14,6 +14,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use super::payload;
 use super::pwa_subscription;
 use super::validation::{PayloadIkm, PayloadKeyId, SubscriberKey};
+use crate::authz_utils::NotificationKey;
 use crate::notifications::dispatch::DeliveryTarget;
 use crate::notifications::installed_app::NotificationAppId;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
@@ -53,6 +54,20 @@ pub(crate) enum RegistrationId {
         browser_id: BrowserId,
     },
     Pwa(PwaSubscriptionHolder),
+}
+
+impl RegistrationId {
+    /// The subscription a call signed with `key` for `anchor_number` was woken through: the
+    /// calling browser's own, or the record of the app that signed.
+    pub(crate) fn of_key(anchor_number: AnchorNumber, key: NotificationKey) -> Self {
+        match key {
+            NotificationKey::Browser(browser_id) => RegistrationId::Browser {
+                anchor_number,
+                browser_id,
+            },
+            NotificationKey::App(app_id) => RegistrationId::App(app_id),
+        }
+    }
 }
 
 impl Destination {
@@ -205,7 +220,7 @@ pub(crate) fn read_registrations(
 /// The ready subscription `registration_id` names, read through the registration rather
 /// than the route its browser delivers through now. A browser that holds its own and also
 /// points at an app would otherwise be read from one and written to the other.
-fn read_registration(registration_id: RegistrationId) -> Option<ReadySubscription> {
+pub(super) fn read_registration(registration_id: RegistrationId) -> Option<ReadySubscription> {
     match registration_id {
         RegistrationId::App(app_id) => {
             let app = storage_borrow(|storage| storage.notification_app(app_id))?;
@@ -225,7 +240,7 @@ fn read_registration(registration_id: RegistrationId) -> Option<ReadySubscriptio
 }
 
 /// Writes `registered_subscription` to the subscription `registration_id` names.
-fn write_registration(
+pub(super) fn write_registration(
     registration_id: RegistrationId,
     registered_subscription: ReadySubscription,
 ) -> Result<(), String> {

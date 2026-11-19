@@ -43,8 +43,27 @@ pub struct StorableBrowser {
     /// What this identity's service worker has yet to show on this device, oldest first.
     #[n(13)]
     pub inbox: Option<StorableInbox>,
+    /// The entry of this identity that this one shares a device with, set where an
+    /// installed web app on this entry claimed the link from that entry.
+    #[n(14)]
+    pub same_device_browser_id: Option<StorableBrowserId>,
+    /// The one-shot key an installed web app on this entry registered for that claim.
+    #[n(15)]
+    pub pending_same_device_link: Option<StorablePendingSameDeviceLink>,
     // #[n(7)] RETIRED, never reuse: the Web Push registration before a push carried a payload.
     // #[n(9)] RETIRED, never reuse: the inbox before its entries were named.
     // #[n(11)] RETIRED, never reuse: the inbox before its entries named an app's account by
     // principal.
+}
+
+/// A one-shot key another entry of the identity proves possession of to link itself to
+/// this entry as sharing its device, and when it stops being accepted.
+#[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[cbor(map)]
+pub struct StorablePendingSameDeviceLink {
+    /// DER-encoded P-256 SPKI.
+    #[cbor(n(0), with = "minicbor::bytes")]
+    pub link_public_key: Vec<u8>,
+    #[n(1)]
+    pub expires_at_ns: Timestamp,
 }

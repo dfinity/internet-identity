@@ -3229,7 +3229,8 @@ impl<M: Memory + Clone> Storage<M> {
             if let Some(queue) = anchor.notifications_for_browser_mut(browser_id) {
                 // An app's entry whose account no longer resolves is gone too.
                 queue.retain(|queued_notification| match queued_notification.kind {
-                    InboxNotificationKind::App { account_principal } => self
+                    InboxNotificationKind::App { account_principal }
+                    | InboxNotificationKind::InstalledAppProbe { account_principal } => self
                         .lookup_account_with_principal(account_principal)
                         .is_some_and(|account| {
                             account.anchor_number == anchor_number
@@ -3491,6 +3492,20 @@ impl<M: Memory + Clone> Storage<M> {
                 self.store_anchor_application_config(key, Some(config));
             }
         }
+    }
+
+    /// Whether `browser_id`'s entry of `anchor_number` holds an installed web app
+    /// subscription for any app.
+    pub fn holds_pwa_webpush_subscription(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> bool {
+        self.stable_anchor_application_config_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .any(|(_, config)| config.pwa_webpush_subscription(browser_id).is_some())
     }
 
     /// What this identity has configured for the app at `origin`, or `None` where it has

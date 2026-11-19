@@ -219,9 +219,9 @@ fn resolve_recipient(
             application_number,
             recipient,
         );
-        let can_wake_any = anchor.browsers().iter().any(|browser| {
-            dispatch::can_wake(storage, browser, now_ns)
-                || dispatch::can_wake_installed_app(browser, &pwa_route, now_ns)
+        let browsers = anchor.browsers();
+        let can_wake_any = browsers.iter().any(|browser| {
+            dispatch::can_wake_for_app(storage, browsers, browser, &pwa_route, now_ns)
         });
         if !consented || !can_wake_any {
             return Err(Refusal::NoChannel);
