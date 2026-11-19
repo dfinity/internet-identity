@@ -1511,13 +1511,14 @@
          stand (held there out of the flow, then gone), so the section has
          the panel to itself until Close shrinks it back into its slot. The
          identity stays on top all along, so it's always clear whose access,
-         recovery or devices these are. -->
+         recovery or devices these are. The cards stand apart, each one a
+         thing of its own, and the identity a step further from them. -->
     <div bind:this={morphList} class="relative flex flex-col">
       {@render overviewItem("identity", "")}
       {#each accountCards as card, index (card.kind)}
         {@render overviewItem(
           card.kind,
-          grown === card.kind || index === 0 ? "mt-5" : "mt-2.5",
+          grown === card.kind || index === 0 ? "mt-6" : "mt-4",
           card,
         )}
       {/each}
