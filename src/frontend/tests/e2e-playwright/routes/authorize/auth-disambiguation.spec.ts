@@ -322,6 +322,8 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
         .getByRole("button", { name: "Continue", exact: true })
         .click();
     });
+    // The provider keeps the sign-in above in a cookie and would skip its form.
+    await page.context().clearCookies();
     const defaultPrincipal = await authorize(page, async (authPage) => {
       // The accounts are read with the stored session; saving signs in.
       await authPage.getByRole("button", { name: "Edit Work" }).click();
