@@ -80,6 +80,8 @@ pub(crate) fn subscription_at(endpoint: &str, created_at_ns: Timestamp) -> WebPu
         subscriber_key: SubscriberKey::try_from(valid_sec1_point()).expect("a SEC1 P-256 point"),
         auth: AuthSecret::try_from(valid_auth()).expect("16 bytes"),
         last_rotated_ns: created_at_ns,
+        unanswered_pushes: None,
+        probe_sent_at_ns: None,
     })
 }
 

@@ -1,4 +1,4 @@
-import { type Readable, writable } from "svelte/store";
+import { get, type Readable, writable } from "svelte/store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import type { DeviceNotificationState } from "$lib/utils/notifications/notificationState";
@@ -16,6 +16,10 @@ export interface NotificationConsentContext {
   consented: boolean;
   /** Whether answering sends the user to install the Home Screen app, because this browser has no prompt to raise. */
   installFirst: boolean;
+  /** Opened because the way this device receives the app's notifications stopped
+   *  working, rather than because the app asked: declining drops what this device
+   *  registered, so the next sign-in has nothing left to check here. */
+  isRepair: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();
@@ -28,9 +32,14 @@ export const notificationConsentStore = {
     settledInternal.set(undefined);
     contextInternal.set(context);
   },
-  /** The screen is done — granted or not. What was actually recorded is read
-   *  back from the canister rather than reported from here. */
-  settle: (): void => {
+  /** The screen opened for `context` is done — granted or not. What was actually
+   *  recorded is read back from the canister rather than reported from here. A screen
+   *  that answers after another one has replaced it settles nothing: the answer was
+   *  about a question nobody is asking any more. */
+  settle: (context: NotificationConsentContext | undefined): void => {
+    if (context === undefined || get(contextInternal) !== context) {
+      return;
+    }
     settledInternal.set(true);
   },
   clear: (): void => {
