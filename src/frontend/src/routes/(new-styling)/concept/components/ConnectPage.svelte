@@ -27,6 +27,7 @@
   } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
+  import Logo from "$lib/components/ui/Logo.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { formatRelative } from "$lib/stores/locale.store";
@@ -421,25 +422,78 @@
   </li>
 {/snippet}
 
+{#snippet joins()}
+  <!-- Who the access joins, left to right: the assistant, Internet Identity,
+       and the apps it signs in to (the first three of yours). Raised off the
+       panel the way a connector's row is, and decorative: the sentence beside
+       it says the same. -->
+  <div aria-hidden="true" class="flex items-center @max-2xl:order-first">
+    <span
+      class="text-fg-secondary grid size-12 shrink-0 place-items-center rounded-xl bg-(--ii-surface-3) shadow-(--ii-shadow-2)"
+    >
+      <BotIcon class="size-5" />
+    </span>
+    <span class="bg-border-secondary h-px w-5 shrink-0"></span>
+    <span
+      class="grid size-10 shrink-0 place-items-center rounded-full bg-(--ii-surface-3) shadow-(--ii-shadow-2)"
+    >
+      <Logo class="text-fg-primary h-2.5" />
+    </span>
+    <span class="bg-border-secondary h-px w-5 shrink-0"></span>
+    {#if apps.length > 0}
+      <!-- On the white plate a tile gives a logo in My apps, as most logos
+           are drawn for a light page, at three quarters of a tile, each
+           cut out of the panel where it overlaps the one before. -->
+      <span class="flex -space-x-2">
+        {#each apps.slice(0, 3) as app (app.origin)}
+          <span class="block size-12 rounded-xl ring-[3px] ring-(--ii-shelf)">
+            <span class="block origin-top-left scale-75 rtl:origin-top-right">
+              <AppLogo logo={app.logo} size="tile" />
+            </span>
+          </span>
+        {/each}
+      </span>
+    {:else}
+      <span
+        class="text-fg-secondary grid size-12 shrink-0 place-items-center rounded-xl bg-(--ii-surface-3) shadow-(--ii-shadow-2)"
+      >
+        <AppWindowIcon class="size-5" />
+      </span>
+    {/if}
+  </div>
+{/snippet}
+
 <!-- As wide as the logos on My apps reach (the page sets it). On a phone the
      page keeps 10px short of the edge, for the apps' plates; the content
      steps in by those 10px, so it stands on the edge too. -->
 <div class="flex w-full flex-col gap-8 @max-lg/canvas:px-2.5">
-  <header class="flex flex-col gap-1">
-    <h2
-      class="text-text-primary text-2xl leading-8 font-semibold tracking-tight"
-    >
-      Use your apps from AI
-    </h2>
-    <p
-      class="text-text-tertiary max-w-[60ch] text-[15px] leading-6 text-pretty"
-    >
-      Internet Identity signs your assistant in to your apps as you, with only
-      the access you allow, for as long as you allow it.
-    </p>
-  </header>
-
   <div class="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @4xl:grid-cols-6">
+    <!-- The page opens on what it's for, as a panel across the tiles, the
+         way Explore opens on a banner: the promise, and beside it who it
+         joins, your assistant through Internet Identity to your apps. On a
+         phone the picture heads the panel. -->
+    <header
+      class={[
+        "grid items-center gap-6 @2xl:col-span-2 @2xl:grid-cols-[minmax(0,1fr)_auto] @2xl:gap-10 @2xl:p-9 @4xl:col-span-6",
+        TILE,
+      ]}
+    >
+      <div class="flex flex-col gap-2">
+        <h2
+          class="text-text-primary text-2xl leading-8 font-semibold tracking-tight text-balance @2xl:text-[2rem] @2xl:leading-10"
+        >
+          Use your apps from AI
+        </h2>
+        <p
+          class="text-text-tertiary max-w-[52ch] text-[15px] leading-6 text-pretty"
+        >
+          Internet Identity signs your assistant in to your apps as you, with
+          only the access you allow, for as long as you allow it.
+        </p>
+      </div>
+      {@render joins()}
+    </header>
+
     <!-- AI access: the state first, then the connector it trusts. -->
     <section
       aria-labelledby={aiTitleId}
