@@ -92,11 +92,14 @@
   // the button finds which of them the pointer is on, the topmost where two
   // overlap, and the product's tooltip stands over that one. Only for a
   // mouse: a tap opens the card, and the open card names every item.
+  // The tooltip is always there and only hides, keeping the last glyph, so
+  // it fades out still saying it, and nothing reads a glyph that's gone.
   let summary = $state<HTMLElement>();
   let hovered = $state<{ glyph: Glyph; anchor: HTMLElement }>();
+  let hovering = $state(false);
   const hover = (event: PointerEvent) => {
     if (event.pointerType !== "mouse" || summary === undefined) {
-      hovered = undefined;
+      hovering = false;
       return;
     }
     const chips = Array.from(
@@ -112,12 +115,15 @@
         ) <= radius
       );
     });
-    if (anchor === hovered?.anchor) return;
     const glyph = glyphs.find(({ id }) => id === anchor?.dataset.glyph);
-    hovered =
-      anchor !== undefined && glyph !== undefined
-        ? { glyph, anchor }
-        : undefined;
+    hovering = anchor !== undefined && glyph !== undefined;
+    if (
+      anchor !== undefined &&
+      glyph !== undefined &&
+      (anchor !== hovered?.anchor || glyph !== hovered.glyph)
+    ) {
+      hovered = { glyph, anchor };
+    }
   };
 </script>
 
@@ -132,11 +138,11 @@
       bind:this={openButton}
       type="button"
       onclick={() => {
-        hovered = undefined;
+        hovering = false;
         onOpen();
       }}
       onpointermove={hover}
-      onpointerleave={() => (hovered = undefined)}
+      onpointerleave={() => (hovering = false)}
       aria-label={`${title}: ${sentence}`}
       aria-expanded="false"
       aria-controls={contentId}
@@ -226,14 +232,13 @@
              info about no item has it before the sentence instead. -->
         {#if glyphs.length > 0}
           <Glyphs {glyphs} {tone} />
-          {#if hovered !== undefined && !open}
-            <Tooltip
-              label={hovered.glyph.label}
-              description={hovered.glyph.note}
-              anchor={hovered.anchor}
-              manual
-            />
-          {/if}
+          <Tooltip
+            label={hovered?.glyph.label ?? ""}
+            description={hovered?.glyph.note}
+            anchor={hovered?.anchor}
+            hidden={!hovering || open}
+            manual
+          />
         {/if}
         <span
           class={[
