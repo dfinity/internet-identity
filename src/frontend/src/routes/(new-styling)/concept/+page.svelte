@@ -340,6 +340,15 @@
    *  head in the page instead (pageHead). */
   const PAGE_TOP =
     "h-0 shrink-0 md:h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)]";
+  /** My apps' greeting stands a third of the way down the canvas (Thomas:
+   *  the apps and their title in the middle, the controls on the edges),
+   *  a little above the middle, where the eye puts it. It stays there
+   *  whatever is under it, so a new row or Edit's card doesn't move it,
+   *  until the rows would no longer fit: then the room over it gives way,
+   *  down to PAGE_TOP's, and only then the page scrolls. The canvas is the
+   *  window less the page's 8px above and below. */
+  const MINE_TOP =
+    "h-0 shrink-0 md:h-auto md:min-h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)] md:shrink md:basis-[calc((100dvh-1rem)/3-var(--header-h)-0.75rem)]";
   /** The greeting's row, over a page: the room under it grows with the
    *  greeting. On a narrow canvas it steps in by the 10px the page keeps
    *  short of the edge, where the logos stand. */
@@ -2097,7 +2106,7 @@
           {#if phoneHead}
             {@render pageHead(0)}
           {:else}
-            <div aria-hidden="true" class={PAGE_TOP}></div>
+            <div aria-hidden="true" class={MINE_TOP}></div>
           {/if}
           <div
             class="mx-auto flex w-fit max-w-full flex-col @max-lg/canvas:w-full"
