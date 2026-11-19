@@ -28,8 +28,8 @@
     switching?: boolean;
     onSwitch: (identityNumber: bigint) => void;
     onAdd: () => void;
-    /** What this browser signed in with, for the current identity's row in
-     *  the open list. The card itself doesn't say it: Access does. */
+    /** What this browser signed in with, under the name. Access counts the
+     *  ways in ("3 ways to sign in"); this names the one in use (Thomas). */
     signedInWith: string;
     /** The colours the user picked for an identity, over the ones its
      *  number gives. */
@@ -75,9 +75,10 @@
     "ii-hover text-text-primary flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring";
 </script>
 
-<!-- Whose panel this is: the identity with its name, and across from it the
-     other identities as smaller overlapping avatars, the way X shows the
-     accounts you can switch to. One compact line, the same over every view
+<!-- Whose panel this is: the identity with its name and what this browser
+     signed in with under it, and across from it the other identities as
+     smaller overlapping avatars, the way X shows the accounts you can switch
+     to. One compact card, the same over every view
      of the panel (the overview, a section, an app's details, managing apps),
      so the head of the panel never changes as what's under it does. The
      card does one thing (Thomas): a tap anywhere on it opens it on every
@@ -117,10 +118,13 @@
         onClose={() => (colourAnchor = undefined)}
       />
     {/if}
-    <span
-      class="text-text-primary pointer-events-none relative min-w-0 flex-1 truncate text-sm font-semibold"
-    >
-      {nameOf(identity)}
+    <span class="pointer-events-none relative flex min-w-0 flex-1 flex-col">
+      <span class="text-text-primary truncate text-sm font-semibold">
+        {nameOf(identity)}
+      </span>
+      <span class="text-text-tertiary truncate text-[13px] leading-[18px]">
+        {signedInWith}
+      </span>
     </span>
     <span class="pointer-events-none relative flex items-center gap-1">
       <IdentityStack {others} {paletteOf} backdrop={cardSurface} />
