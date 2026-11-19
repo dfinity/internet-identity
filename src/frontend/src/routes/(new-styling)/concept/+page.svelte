@@ -338,6 +338,12 @@
   /** A phone in the main layout: the panel is the head of the canvas, above
    *  the tabs, so the identity's state is there without a tap. */
   const phoneHead = $derived(!isDesktop.current && layout === "panel");
+  /** Explore and Connect start 32px under the tabs (the page's 12px and
+   *  20 more), about where My apps' first logos stand (the page's 12px and
+   *  a tile's 16px over its logo): a card's hard edge right under the tabs
+   *  read as part of them. A phone's tabs are at the bottom, and its pages
+   *  start under their own title instead. */
+  const UNDER_TABS = $derived(phoneHead ? "" : "pt-5");
   /** Wide enough that the panel beside the canvas still leaves the apps their
    *  room, so news may open it on arrival. Narrower, only a risk does. */
   const roomy = new MediaQuery("min-width: 1024px");
@@ -2199,7 +2205,7 @@
           <!-- Explore reads like the App Store: a banner, a shelf, another
                banner, more shelves. The featured shelf keeps to apps this
                identity doesn't use yet, and steps aside when there are none. -->
-          <div class={["mx-auto", LOGO_SPAN]}>
+          <div class={["mx-auto", LOGO_SPAN, UNDER_TABS]}>
             <ExplorePage {featured} {isAdded} onAdd={(app) => addApp(app)} />
           </div>
         </div>
@@ -2216,7 +2222,7 @@
           {#if phoneHead}
             {@render pageHead(2)}
           {/if}
-          <div class={["mx-auto", LOGO_SPAN]}>
+          <div class={["mx-auto", LOGO_SPAN, UNDER_TABS]}>
             <ConnectPage
               integrations={current.scenario.integrations}
               apps={current.apps}
