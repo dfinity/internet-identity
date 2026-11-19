@@ -81,12 +81,9 @@
      anywhere on it opens it on every identity and its settings, and closes
      it again. Only the avatar is a control of its own, for the colour: a tap
      opens the row of colours under it, the way Thomas sketched it. Open, the
-     card pushes the panel down, so nothing floats over the panel. -->
-<Elevated
-  offset={1}
-  as="ul"
-  class="ii-rows flex flex-col overflow-hidden rounded-2xl"
->
+     card pushes the panel down, so nothing floats over the panel. No line
+     parts the name from what opens under it: the list hangs from it. -->
+<Elevated as="ul" offset={1} class="flex flex-col overflow-hidden rounded-2xl">
   <li class="relative flex items-center gap-3 py-4 ps-4 pe-3">
     <button
       type="button"
@@ -135,8 +132,8 @@
   </li>
   {#if alert !== undefined}
     <!-- Its own padding comes with what it says, so with nothing to say it
-         takes no room and draws no line. -->
-    <li class="before:!hidden">
+         takes no room. -->
+    <li>
       {@render alert()}
     </li>
   {/if}
