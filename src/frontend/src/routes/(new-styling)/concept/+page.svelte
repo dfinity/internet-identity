@@ -388,7 +388,7 @@
   );
 
   /** On desktop the three sections open in place: the card grows into its
-   *  section and the rest of the overview steps away. */
+   *  section under the identity, and the other two cards step away. */
   const grown = $derived(
     isDesktop.current &&
       section !== undefined &&
@@ -468,7 +468,8 @@
         section = next;
         await tick();
       },
-      // The grown card starts at the top of the panel, so the panel does.
+      // The grown card starts under the identity, at the top of the panel,
+      // so the panel goes back there.
       settle: () => {
         if (opening && aside !== undefined) {
           aside.scrollTop = 0;
@@ -1505,16 +1506,18 @@
     {/if}
     <!-- The identity, then three independent cards, each a large target that
          leads to its section: the title, where it stands, and what's inside.
-         On desktop a card grows into its section in place: it rises to the
-         top as it opens, and the identity and the other two fade where they
+         On desktop a card grows into its section in place: it rises to just
+         under the identity as it opens, and the other two fade where they
          stand (held there out of the flow, then gone), so the section has
-         the panel to itself until Close shrinks it back into its slot. -->
+         the panel to itself until Close shrinks it back into its slot. The
+         identity stays on top all along, so it's always clear whose access,
+         recovery or devices these are. -->
     <div bind:this={morphList} class="relative flex flex-col">
       {@render overviewItem("identity", "")}
       {#each accountCards as card, index (card.kind)}
         {@render overviewItem(
           card.kind,
-          grown === card.kind ? "" : index === 0 ? "mt-5" : "mt-2.5",
+          grown === card.kind || index === 0 ? "mt-5" : "mt-2.5",
           card,
         )}
       {/each}
@@ -1523,18 +1526,20 @@
 {/snippet}
 
 {#snippet overviewItem(id: string, space: string, card?: CardStatus)}
-  {@const at = heldAt(id)}
+  <!-- The identity isn't a card that steps away: it stays in the flow. -->
+  {@const stepsAway = card !== undefined && grown !== undefined && grown !== id}
+  {@const at = stepsAway ? heldAt(id) : undefined}
   <div
     data-morph={id}
-    inert={grown !== undefined && grown !== id}
+    data-morph-stays={card === undefined ? "" : undefined}
+    inert={stepsAway}
     style:top={at !== undefined ? `${at.top}px` : undefined}
     style:left={at !== undefined ? `${at.left}px` : undefined}
     style:width={at !== undefined ? `${at.width}px` : undefined}
     class={[
       space,
       (grown === id || morphing === id) && "relative z-1",
-      grown !== undefined &&
-        grown !== id &&
+      stepsAway &&
         (at !== undefined ? "pointer-events-none absolute" : "hidden"),
     ]}
   >

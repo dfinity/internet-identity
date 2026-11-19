@@ -286,7 +286,8 @@ interface MorphParams {
    *  `[data-layer="content"]`, the leaving one out of the flow. */
   change: () => Promise<void>;
   /** Called once, as the list is laid out the new way: on an opening, the
-   *  panel goes back to its top, where the grown card now starts. */
+   *  panel goes back to its top, where the identity over the grown card
+   *  is. */
   settle?: () => void;
   reduced: boolean;
 }
@@ -316,8 +317,12 @@ export const morph = async ({
     await change();
     return true;
   }
+  // What stays in its place (`[data-morph-stays]`, the identity over the
+  // cards) neither fades nor moves.
   const others = Array.from(
-    list.querySelectorAll<HTMLElement>(":scope > [data-morph]"),
+    list.querySelectorAll<HTMLElement>(
+      ":scope > [data-morph]:not([data-morph-stays])",
+    ),
   ).filter((one) => one !== item);
   // Measured mid-flight too, so a reversal starts from where things are.
   const first = box.getBoundingClientRect();
