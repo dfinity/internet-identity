@@ -162,6 +162,47 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
+  const InboxNotificationId = IDL.Nat64;
+  const AppGetPwaNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+  });
+  const NotificationId = IDL.Nat64;
+  const PwaNotification = IDL.Record({
+    'id' : NotificationId,
+    'canister_id' : IDL.Principal,
+  });
+  const PwaNotificationEvent = IDL.Variant({ 'NotificationsOn' : IDL.Null });
+  const AppGetPwaNotificationResponse = IDL.Record({
+    'notification' : IDL.Opt(PwaNotification),
+    'event' : IDL.Opt(PwaNotificationEvent),
+  });
+  const AppGetPwaNotificationError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
+  const UnansweredPushes = IDL.Record({
+    'first_sent_at_ns' : Timestamp,
+    'count' : IDL.Nat32,
+    'is_past_limit' : IDL.Bool,
+  });
+  const WebPushSubscriptionStatus = IDL.Record({
+    'endpoint' : IDL.Text,
+    'unanswered_pushes' : IDL.Opt(UnansweredPushes),
+    'probe_sent_at_ns' : IDL.Opt(Timestamp),
+  });
+  const AppGetPwaWebPushSubscriptionStatusError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
+  const SameDeviceLinkStatus = IDL.Variant({
+    'OtherPathMayDeliver' : IDL.Null,
+    'Linked' : IDL.Null,
+    'NoOtherPath' : IDL.Null,
+  });
+  const AppGetSameDeviceLinkStatusError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
   const AppNotificationConsentStatusResponse = IDL.Record({
     'is_granted' : IDL.Bool,
   });
@@ -176,11 +217,44 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : PublicKey,
     'expiration' : Timestamp,
   });
+  const PrepareWebPushSubscriptionResponse = IDL.Record({
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'transport_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const AppPreparePwaWebPushSubscriptionError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+    'NotificationsNotAllowed' : IDL.Null,
+  });
+  const AppPrepareSameDeviceLinkRequest = IDL.Record({
+    'link_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const AppPrepareSameDeviceLinkError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
+  const AppProbePwaWebPushSubscriptionError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+    'NotReachable' : IDL.Null,
+  });
+  const NotShownReason = IDL.Variant({
+    'PayloadUnreachable' : IDL.Null,
+    'PayloadRejected' : IDL.Null,
+  });
+  const AppRemovePwaNotificationRequest = IDL.Record({
+    'inbox_notification_id' : InboxNotificationId,
+    'not_shown' : IDL.Opt(NotShownReason),
+  });
+  const RemoveNotificationResponse = IDL.Record({});
+  const AppRemovePwaNotificationError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
+  });
   const AppRevokeNotificationConsentError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
-  const NotificationId = IDL.Nat64;
   const Urgency = IDL.Variant({
     'Low' : IDL.Null,
     'High' : IDL.Null,
@@ -215,6 +289,22 @@ export const idlFactory = ({ IDL }) => {
     'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
     'InternalCanisterError' : IDL.Text,
     'NoSuchSender' : IDL.Null,
+  });
+  const PwaWebPushSubscription = IDL.Record({
+    'sealed_auth' : IDL.Vec(IDL.Nat8),
+    'endpoint' : IDL.Text,
+    'p256dh' : IDL.Vec(IDL.Nat8),
+    'transport_key' : IDL.Vec(IDL.Nat8),
+  });
+  const AppSetPwaWebPushSubscriptionRequest = IDL.Record({
+    'subscription' : IDL.Opt(PwaWebPushSubscription),
+  });
+  const AppSetPwaWebPushSubscriptionError = IDL.Variant({
+    'EndpointInUse' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'TransportKeyExpired' : IDL.Null,
+    'NoSuchSession' : IDL.Null,
+    'NotificationsNotAllowed' : IDL.Null,
   });
   const AppSsoDomainStatus = IDL.Variant({
     'Available' : IDL.Record({ 'name' : IDL.Opt(IDL.Text) }),
@@ -314,7 +404,6 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
-  const InboxNotificationId = IDL.Nat64;
   const GetNotificationRequest = IDL.Record({
     'inbox_notification_id' : InboxNotificationId,
     'browser_id' : IDL.Nat32,
@@ -342,17 +431,12 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
-  const NotShownReason = IDL.Variant({
-    'PayloadUnreachable' : IDL.Null,
-    'PayloadRejected' : IDL.Null,
-  });
   const RemoveNotificationRequest = IDL.Record({
     'inbox_notification_id' : InboxNotificationId,
     'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
     'not_shown' : IDL.Opt(NotShownReason),
   });
-  const RemoveNotificationResponse = IDL.Record({});
   const RemoveNotificationError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -382,6 +466,16 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'InvalidClaimToken' : IDL.Null,
     'ClaimTokenExpired' : IDL.Null,
+  });
+  const ClaimSameDeviceLinkRequest = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'link_public_key' : IDL.Vec(IDL.Nat8),
+    'anchor_number' : UserNumber,
+  });
+  const ClaimSameDeviceLinkError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NoPendingLink' : IDL.Null,
   });
   const AccountInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
@@ -712,6 +806,30 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
+  const InstalledAppsPath = IDL.Record({
+    'origin' : FrontendHostname,
+    'account_principal' : IDL.Principal,
+  });
+  const NotificationPath = IDL.Variant({
+    'ThisBrowser' : IDL.Null,
+    'InstalledApps' : InstalledAppsPath,
+  });
+  const GetNotificationPathStatusRequest = IDL.Record({
+    'path' : NotificationPath,
+    'anchor_number' : UserNumber,
+  });
+  const SubscriptionDeliveryStatus = IDL.Record({
+    'unanswered_pushes' : IDL.Opt(UnansweredPushes),
+    'has_probe_had_its_answer_time' : IDL.Bool,
+    'probe_sent_at_ns' : IDL.Opt(Timestamp),
+  });
+  const NotificationPathStatus = IDL.Record({
+    'subscriptions' : IDL.Vec(SubscriptionDeliveryStatus),
+  });
+  const GetNotificationPathStatusError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -742,7 +860,6 @@ export const idlFactory = ({ IDL }) => {
   const GetWebPushSubscriptionStatusRequest = IDL.Record({
     'anchor_number' : UserNumber,
   });
-  const WebPushSubscriptionStatus = IDL.Record({ 'endpoint' : IDL.Text });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -1084,10 +1201,6 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'expiration' : Timestamp,
   });
-  const PrepareWebPushSubscriptionResponse = IDL.Record({
-    'vapid_public_key' : IDL.Vec(IDL.Nat8),
-    'transport_public_key' : IDL.Vec(IDL.Nat8),
-  });
   const PrepareWebPushSubscriptionError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -1101,6 +1214,15 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NotReachable' : IDL.Null,
   });
+  const ProbeNotificationPathRequest = IDL.Record({
+    'path' : NotificationPath,
+    'anchor_number' : UserNumber,
+  });
+  const ProbeNotificationPathError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NotReachable' : IDL.Null,
+  });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
     'chars' : IDL.Text,
@@ -1110,6 +1232,15 @@ export const idlFactory = ({ IDL }) => {
     'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
+  });
+  const RemoveUnansweredPwaWebPushSubscriptionsRequest = IDL.Record({
+    'origin' : FrontendHostname,
+    'account_principal' : IDL.Principal,
+    'anchor_number' : UserNumber,
+  });
+  const RemoveUnansweredPwaWebPushSubscriptionsError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
   });
   const RemoveWebPushSubscriptionRequest = IDL.Record({
     'browser_id' : IDL.Nat32,
@@ -1239,6 +1370,36 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
         ['query'],
       ),
+    'app_get_pwa_notification' : IDL.Func(
+        [AppGetPwaNotificationRequest],
+        [
+          IDL.Variant({
+            'Ok' : AppGetPwaNotificationResponse,
+            'Err' : AppGetPwaNotificationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'app_get_pwa_webpush_subscription_status' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Opt(WebPushSubscriptionStatus),
+            'Err' : AppGetPwaWebPushSubscriptionStatusError,
+          }),
+        ],
+        ['query'],
+      ),
+    'app_get_same_device_link_status' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : SameDeviceLinkStatus,
+            'Err' : AppGetSameDeviceLinkStatusError,
+          }),
+        ],
+        ['query'],
+      ),
     'app_notification_consent_status' : IDL.Func(
         [],
         [
@@ -1255,6 +1416,47 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : AppPrepareDelegationResponse,
             'Err' : AppSessionError,
+          }),
+        ],
+        [],
+      ),
+    'app_prepare_pwa_webpush_subscription' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : PrepareWebPushSubscriptionResponse,
+            'Err' : AppPreparePwaWebPushSubscriptionError,
+            'Pending' : IDL.Null,
+          }),
+        ],
+        [],
+      ),
+    'app_prepare_same_device_link' : IDL.Func(
+        [AppPrepareSameDeviceLinkRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AppPrepareSameDeviceLinkError,
+          }),
+        ],
+        [],
+      ),
+    'app_probe_pwa_webpush_subscription' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AppProbePwaWebPushSubscriptionError,
+          }),
+        ],
+        [],
+      ),
+    'app_remove_pwa_notification' : IDL.Func(
+        [AppRemovePwaNotificationRequest],
+        [
+          IDL.Variant({
+            'Ok' : RemoveNotificationResponse,
+            'Err' : AppRemovePwaNotificationError,
           }),
         ],
         [],
@@ -1280,6 +1482,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : SendNotificationResponse,
             'Err' : SendNotificationError,
+          }),
+        ],
+        [],
+      ),
+    'app_set_pwa_webpush_subscription' : IDL.Func(
+        [AppSetPwaWebPushSubscriptionRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AppSetPwaWebPushSubscriptionError,
           }),
         ],
         [],
@@ -1414,6 +1626,11 @@ export const idlFactory = ({ IDL }) => {
     'claim_notification_app' : IDL.Func(
         [ClaimNotificationAppRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ClaimNotificationAppError })],
+        [],
+      ),
+    'claim_same_device_link' : IDL.Func(
+        [ClaimSameDeviceLinkRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ClaimSameDeviceLinkError })],
         [],
       ),
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
@@ -1602,6 +1819,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : GetNotificationDelegationResponse,
             'Err' : NotificationDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'get_notification_path_status' : IDL.Func(
+        [GetNotificationPathStatusRequest],
+        [
+          IDL.Variant({
+            'Ok' : NotificationPathStatus,
+            'Err' : GetNotificationPathStatusError,
           }),
         ],
         ['query'],
@@ -1962,12 +2189,27 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'probe_notification_path' : IDL.Func(
+        [ProbeNotificationPathRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ProbeNotificationPathError })],
+        [],
+      ),
     'register' : IDL.Func(
         [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],
         [],
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
+    'remove_unanswered_pwa_webpush_subscriptions' : IDL.Func(
+        [RemoveUnansweredPwaWebPushSubscriptionsRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : RemoveUnansweredPwaWebPushSubscriptionsError,
+          }),
+        ],
+        [],
+      ),
     'remove_webpush_subscription' : IDL.Func(
         [RemoveWebPushSubscriptionRequest],
         [

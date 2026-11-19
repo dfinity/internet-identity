@@ -217,20 +217,6 @@ const JWT_RETRY_MULTIPLIER: u64 = 2;
 /// carrying it is gone.
 const JWT_ABANDON_FILL_AFTER_SECS: u64 = 60;
 
-/// The key, fetching and keeping it where this deployment has not got one yet.
-///
-/// Awaits the fetch, which only an update call can do: a query uses
-/// [`ensure_public_key`]. Derived from public inputs and the same forever, so the first
-/// caller to need it pays for every later one.
-pub(crate) async fn held_public_key() -> Result<Vec<u8>, String> {
-    if let Some(held) = public_key() {
-        return Ok(held);
-    }
-    let fetched = fetch_public_key().await?;
-    crate::state::persistent_state_mut(|p| p.vapid_public_key = Some(fetched.clone()));
-    Ok(fetched)
-}
-
 /// Our public key, where it has been asked for. A browser cannot subscribe before this
 /// lands, and a push cannot name a key we do not hold.
 pub(crate) fn public_key() -> Option<Vec<u8>> {
@@ -241,6 +227,32 @@ thread_local! {
     /// One fetch at a time, for the same reason a signature has one: the answer is the
     /// same whoever asked, and the key is asked for again on the next pass.
     static FETCHING_PUBLIC_KEY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Why the last fetch failed, until one succeeds.
+    static LAST_FETCH_FAILURE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Our public key, or why a caller cannot have it yet.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum VapidPublicKey {
+    Held(Vec<u8>),
+    /// The first fetch is on its way.
+    Fetching,
+    /// The last fetch failed, for this reason. Another is asked for, but a caller is told
+    /// the failure rather than to come back: a subnet without the key answers the same
+    /// way every time.
+    Unavailable(String),
+}
+
+/// [`public_key`], asking for it where we hold none.
+pub(crate) fn read_or_fetch_public_key() -> VapidPublicKey {
+    if let Some(key) = public_key() {
+        return VapidPublicKey::Held(key);
+    }
+    ensure_public_key();
+    match LAST_FETCH_FAILURE.with(|failure| failure.borrow().clone()) {
+        Some(reason) => VapidPublicKey::Unavailable(reason),
+        None => VapidPublicKey::Fetching,
+    }
 }
 
 /// Asks for the key if we hold none and nobody is asking. Answers nothing either way:
@@ -253,15 +265,24 @@ pub(crate) fn ensure_public_key() {
         let fetched = fetch_public_key().await;
         FETCHING_PUBLIC_KEY.with(|one| one.set(false));
         match fetched {
-            Ok(key) => crate::state::persistent_state_mut(|p| p.vapid_public_key = Some(key)),
-            // Not retried: the key is derived from public inputs, so the one documented
-            // failure is the subnet not holding `key_1` over secp256r1, which no amount
-            // of asking changes. Until it does, no browser can subscribe and
-            // `prepare_webpush_subscription` answers the error this reports.
-            Err(err) => ic_cdk::println!(
-                "ERROR: no VAPID key, so notifications cannot be delivered from this \
-                 subnet: {err}"
-            ),
+            Ok(key) => {
+                LAST_FETCH_FAILURE.with(|failure| failure.replace(None));
+                crate::state::persistent_state_mut(|persistent_state| {
+                    persistent_state.vapid_public_key = Some(key)
+                });
+            }
+            // Not retried here: the key is derived from public inputs, so the one
+            // documented failure is the subnet not holding `key_1` over secp256r1, which
+            // no amount of asking changes. Until it does, no browser can subscribe: the
+            // prepare methods answer with this reason, and this is asked again on the
+            // next one.
+            Err(err) => {
+                ic_cdk::println!(
+                    "ERROR: no VAPID key, so notifications cannot be delivered from this \
+                     subnet: {err}"
+                );
+                LAST_FETCH_FAILURE.with(|failure| failure.replace(Some(err)));
+            }
         }
     });
 }

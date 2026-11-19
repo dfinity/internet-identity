@@ -1,9 +1,68 @@
+use crate::storage::anchor::WebPushSubscription;
 use crate::storage::storable::account_number::StorableAccountNumber;
+use crate::storage::storable::browser_id::StorableBrowserId;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
+use candid::Principal;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
-use internet_identity_interface::internet_identity::types::Timestamp;
+use internet_identity_interface::internet_identity::types::{BrowserId, Timestamp};
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// An installed web app's subscription on one browser entry, and the account it delivers
+/// for: the one whose session subscribed last, by the principal the account keeps when it
+/// is given a number.
+#[derive(Encode, Decode, Clone, Ord, Eq, PartialEq, PartialOrd, Debug)]
+#[cbor(map)]
+pub struct StorablePwaSubscription {
+    #[n(0)]
+    pub subscription: StorableWebPushSubscription,
+    #[cbor(n(1), with = "minicbor::bytes")]
+    pub account_principal: Vec<u8>,
+}
+
+/// [`StorablePwaSubscription`] read back.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PwaSubscription {
+    pub subscription: WebPushSubscription,
+    pub account_principal: Principal,
+}
+
+impl TryFrom<StorablePwaSubscription> for PwaSubscription {
+    type Error = String;
+
+    /// A row this canister wrote, read back: refusing it means the row is not what it
+    /// claims to be.
+    fn try_from(value: StorablePwaSubscription) -> Result<Self, Self::Error> {
+        let StorablePwaSubscription {
+            subscription,
+            account_principal,
+        } = value;
+        let subscription = WebPushSubscription::try_from(subscription)?;
+        let account_principal = Principal::try_from_slice(&account_principal)
+            .map_err(|err| format!("the account principal does not read back: {err}"))?;
+        Ok(Self {
+            subscription,
+            account_principal,
+        })
+    }
+}
+
+impl From<PwaSubscription> for StorablePwaSubscription {
+    fn from(value: PwaSubscription) -> Self {
+        let PwaSubscription {
+            subscription,
+            account_principal,
+        } = value;
+        let subscription = StorableWebPushSubscription::from(subscription);
+        let account_principal = account_principal.as_slice().to_vec();
+        Self {
+            subscription,
+            account_principal,
+        }
+    }
+}
 
 /// What the identity holds for one app. Key 1 is retired and never reused: rows that
 /// carry it decode with it skipped.
@@ -16,6 +75,10 @@ pub struct AnchorApplicationConfig {
     pub last_notified_at_ns: Option<Timestamp>, // None if the app never reached a browser
     #[n(3)]
     pub notifications: Option<PermissionDecision>, // None if the identity never decided
+    /// The app's own installed web app subscriptions, one per browser entry. None if the
+    /// app never subscribed one, or every one it did was removed.
+    #[n(4)]
+    pub pwa_webpush_subscriptions: Option<BTreeMap<StorableBrowserId, StorablePwaSubscription>>,
 }
 
 /// The identity's answer to an app asking for a permission. Switching the permission keeps
@@ -41,6 +104,7 @@ impl AnchorApplicationConfig {
             default_account_number: _,
             last_notified_at_ns: _,
             notifications,
+            pwa_webpush_subscriptions: _,
         } = self;
         notifications.is_some()
     }
@@ -51,13 +115,90 @@ impl AnchorApplicationConfig {
             default_account_number,
             last_notified_at_ns: _,
             notifications: _,
+            pwa_webpush_subscriptions: _,
         } = self;
         Self {
             default_account_number,
             last_notified_at_ns: None,
             notifications: None,
+            pwa_webpush_subscriptions: None,
         }
     }
+
+    /// The installed app subscription on `browser_id`. One that does not read back reads
+    /// as none, which the app recovers from by subscribing again.
+    pub fn pwa_webpush_subscription(&self, browser_id: BrowserId) -> Option<PwaSubscription> {
+        let stored_subscriptions = self.pwa_webpush_subscriptions.as_ref()?;
+        let stored_subscription = stored_subscriptions.get(&browser_id)?;
+        PwaSubscription::try_from(stored_subscription.clone())
+            .inspect_err(|reason| {
+                ic_cdk::println!(
+                    "ERROR: dropped the installed app subscription of browser {browser_id} as unreadable: {reason}"
+                );
+            })
+            .ok()
+    }
+
+    /// Puts `subscription` on `browser_id`, or with `None` empties it.
+    pub fn set_pwa_webpush_subscription(
+        &mut self,
+        browser_id: BrowserId,
+        subscription: Option<PwaSubscription>,
+    ) {
+        put_browser_entry(
+            &mut self.pwa_webpush_subscriptions,
+            browser_id,
+            subscription.map(StorablePwaSubscription::from),
+        );
+    }
+
+    /// Empties every browser entry in `browser_ids`, answering whether any held anything.
+    pub fn remove_pwa_webpush_subscriptions_of_browsers(
+        &mut self,
+        browser_ids: &BTreeSet<StorableBrowserId>,
+    ) -> bool {
+        remove_browser_entries(&mut self.pwa_webpush_subscriptions, browser_ids)
+    }
+
+    /// Empties every browser entry.
+    pub fn clear_pwa_webpush_subscriptions(&mut self) {
+        self.pwa_webpush_subscriptions = None;
+    }
+}
+
+/// Puts `value` on `browser_id` in `entries_by_browser`, or with `None` empties it. A
+/// map holding nothing is stored as `None`.
+fn put_browser_entry<T>(
+    entries_by_browser: &mut Option<BTreeMap<StorableBrowserId, T>>,
+    browser_id: BrowserId,
+    value: Option<T>,
+) {
+    let mut entries = entries_by_browser.take().unwrap_or_default();
+    match value {
+        Some(value) => {
+            entries.insert(browser_id, value);
+        }
+        None => {
+            entries.remove(&browser_id);
+        }
+    }
+    *entries_by_browser = (!entries.is_empty()).then_some(entries);
+}
+
+/// Empties every browser entry in `browser_ids` in `entries_by_browser`, answering
+/// whether any was held.
+fn remove_browser_entries<T>(
+    entries_by_browser: &mut Option<BTreeMap<StorableBrowserId, T>>,
+    browser_ids: &BTreeSet<StorableBrowserId>,
+) -> bool {
+    let Some(mut entries) = entries_by_browser.take() else {
+        return false;
+    };
+    let held_count = entries.len();
+    entries.retain(|browser_id, _| !browser_ids.contains(browser_id));
+    let has_removed = entries.len() != held_count;
+    *entries_by_browser = (!entries.is_empty()).then_some(entries);
+    has_removed
 }
 
 impl Storable for AnchorApplicationConfig {
@@ -87,6 +228,17 @@ mod tests {
                 allowed: false,
                 changed_at_ns: 3,
             }),
+            pwa_webpush_subscriptions: Some(BTreeMap::from([(
+                4,
+                StorablePwaSubscription {
+                    subscription: StorableWebPushSubscription::Pending {
+                        secret_key: vec![1; 32],
+                        sender_seed: vec![2; 32],
+                        minted_at_ns: 6,
+                    },
+                    account_principal: vec![5; 29],
+                },
+            )])),
         };
         assert_eq!(
             AnchorApplicationConfig::from_bytes(config.to_bytes()),
@@ -118,6 +270,17 @@ mod tests {
                 allowed: true,
                 changed_at_ns: 3,
             }),
+            pwa_webpush_subscriptions: Some(BTreeMap::from([(
+                4,
+                StorablePwaSubscription {
+                    subscription: StorableWebPushSubscription::Pending {
+                        secret_key: vec![1; 32],
+                        sender_seed: vec![2; 32],
+                        minted_at_ns: 6,
+                    },
+                    account_principal: vec![5; 29],
+                },
+            )])),
         };
         assert_eq!(
             config.forgotten(),
@@ -125,6 +288,7 @@ mod tests {
                 default_account_number: Some(5),
                 last_notified_at_ns: None,
                 notifications: None,
+                pwa_webpush_subscriptions: None,
             }
         );
     }

@@ -6,14 +6,16 @@ use crate::notifications::webpush::{
 };
 use crate::openid::{Domain, OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
-use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::browser::{StorableBrowser, StorablePendingSameDeviceLink};
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::notification_app::StorableNotificationAppRef;
 use crate::storage::storable::notifications::browser_inbox::{
-    StorableInboxNotification, StorableNotificationEvent,
+    StorableInbox, StorableInboxNotification, StorableInboxNotificationKind,
+    StorableNotificationEvent,
 };
+use crate::storage::storable::notifications::webpush::subscription::StorableUnansweredPushCount;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -116,6 +118,20 @@ pub struct Browser {
     /// The Home Screen app this browser installed or claimed, where it has one. The
     /// reference outlives signing out and turning notifications off.
     pub notification_app: Option<NotificationAppRef>,
+    /// The entry of this identity that this one shares a device with, set where an
+    /// installed web app on this entry claimed the link from that entry.
+    pub same_device_browser_id: Option<BrowserId>,
+    /// The one-shot key an installed web app on this entry registered for that claim.
+    pub pending_same_device_link: Option<PendingSameDeviceLink>,
+}
+
+/// A one-shot key another entry of the identity proves possession of to link itself to
+/// this entry as sharing its device, and when it stops being accepted.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingSameDeviceLink {
+    /// DER-encoded P-256 SPKI.
+    pub link_public_key: PublicKey,
+    pub expires_at_ns: Timestamp,
 }
 
 impl Browser {
@@ -141,29 +157,114 @@ impl Browser {
 pub struct InboxNotification {
     /// Assigned at deposit, unique within its inbox, and what a wake-up names.
     pub inbox_notification_id: InboxNotificationId,
-    /// `None` where Internet Identity sent this itself.
-    pub application_number: Option<ApplicationNumber>,
-    /// The canister that sent it, which the service worker fetches the text from.
+    /// The canister that sent it, which the service worker fetches the text from: the
+    /// app's, or Internet Identity's own.
     pub sender: Principal,
     pub notification_id: NotificationId,
     pub expires_at_ns: Timestamp,
-    /// `None` is the unreserved default account, and always `None` for our own.
-    pub account_number: Option<AccountNumber>,
-    /// Set where Internet Identity sent this itself, and what it has to say.
-    pub event: Option<NotificationEvent>,
+    pub kind: InboxNotificationKind,
+}
+
+/// Who an inbox entry is for.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InboxNotificationKind {
+    /// An app's notification to the account with this principal. The principal names the
+    /// app and the account, and stays the account's when it is given a number.
+    App { account_principal: Principal },
+    /// Internet Identity's own, and what it has to say.
+    Identity { event: NotificationEvent },
+    /// Internet Identity's own, checking that an app's installed web app on this entry
+    /// receives notifications for the account with this principal, which names the app.
+    /// Only that app's session for that account reads it.
+    InstalledAppProbe { account_principal: Principal },
+}
+
+impl InboxNotification {
+    /// The account principal of an entry for an account at an app. `None` for one about
+    /// the identity.
+    pub fn account_principal(&self) -> Option<Principal> {
+        match &self.kind {
+            InboxNotificationKind::App { account_principal }
+            | InboxNotificationKind::InstalledAppProbe { account_principal } => {
+                Some(*account_principal)
+            }
+            InboxNotificationKind::Identity { .. } => None,
+        }
+    }
 }
 
 impl From<InboxNotification> for StorableInboxNotification {
     fn from(value: InboxNotification) -> Self {
+        let InboxNotification {
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
+        } = value;
+        let sender = sender.as_slice().to_vec();
+        let kind = match kind {
+            InboxNotificationKind::App { account_principal } => {
+                let account_principal = account_principal.as_slice().to_vec();
+                StorableInboxNotificationKind::App { account_principal }
+            }
+            InboxNotificationKind::Identity { event } => {
+                let event = StorableNotificationEvent::from(event);
+                StorableInboxNotificationKind::Identity { event }
+            }
+            InboxNotificationKind::InstalledAppProbe { account_principal } => {
+                let account_principal = account_principal.as_slice().to_vec();
+                StorableInboxNotificationKind::InstalledAppProbe { account_principal }
+            }
+        };
         StorableInboxNotification {
-            inbox_notification_id: value.inbox_notification_id,
-            application_number: value.application_number,
-            event: value.event.map(StorableNotificationEvent::from),
-            sender: value.sender.as_slice().to_vec(),
-            notification_id: value.notification_id,
-            expires_at_ns: value.expires_at_ns,
-            account_number: value.account_number,
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
         }
+    }
+}
+
+impl TryFrom<StorableInboxNotification> for InboxNotification {
+    type Error = String;
+
+    /// An entry this canister wrote, read back: a principal that does not read back means
+    /// the entry is not what it claims to be.
+    fn try_from(value: StorableInboxNotification) -> Result<Self, Self::Error> {
+        let principal = |bytes: &[u8]| {
+            Principal::try_from_slice(bytes).map_err(|err| format!("not a principal: {err}"))
+        };
+        let StorableInboxNotification {
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
+        } = value;
+        let sender = principal(&sender)?;
+        let kind = match kind {
+            StorableInboxNotificationKind::App { account_principal } => {
+                let account_principal = principal(&account_principal)?;
+                InboxNotificationKind::App { account_principal }
+            }
+            StorableInboxNotificationKind::Identity { event } => {
+                let event = NotificationEvent::from(event);
+                InboxNotificationKind::Identity { event }
+            }
+            StorableInboxNotificationKind::InstalledAppProbe { account_principal } => {
+                let account_principal = principal(&account_principal)?;
+                InboxNotificationKind::InstalledAppProbe { account_principal }
+            }
+        };
+        Ok(InboxNotification {
+            inbox_notification_id,
+            sender,
+            notification_id,
+            expires_at_ns,
+            kind,
+        })
     }
 }
 
@@ -207,6 +308,52 @@ pub struct ReadySubscription {
     pub auth: AuthSecret,
     /// When `payload_ikm` was last derived.
     pub last_rotated_ns: Timestamp,
+    /// The pushes posted through this subscription since a notification was last fetched
+    /// through it. `None` where there are none.
+    pub unanswered_pushes: Option<UnansweredPushCount>,
+    /// When a push service last accepted Internet Identity's own notification, sent
+    /// through this subscription to check it, where no fetch through it has answered
+    /// that since.
+    pub probe_sent_at_ns: Option<Timestamp>,
+}
+
+/// How many pushes went unanswered through one subscription, and when the first of them
+/// was posted.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UnansweredPushCount {
+    pub count: u32,
+    pub first_sent_at_ns: Timestamp,
+}
+
+/// How many unanswered pushes make a subscription worth probing.
+const UNANSWERED_PUSHES_LIMIT: u32 = 3;
+
+/// How long the first unanswered push must have waited for its subscription to be worth
+/// probing, so that a burst of pushes a device has not caught up with yet is not enough.
+const UNANSWERED_PUSHES_MIN_AGE_NS: u64 = 60 * 60 * 1_000_000_000;
+
+impl UnansweredPushCount {
+    /// The count after one more push posted at `now_ns`, starting from `previous`.
+    pub fn after_push(previous: Option<Self>, now_ns: Timestamp) -> Self {
+        match previous {
+            Some(count) => Self {
+                count: count.count.saturating_add(1),
+                first_sent_at_ns: count.first_sent_at_ns,
+            },
+            None => Self {
+                count: 1,
+                first_sent_at_ns: now_ns,
+            },
+        }
+    }
+
+    /// Whether the subscription is worth a probe at `now_ns`: at least
+    /// [`UNANSWERED_PUSHES_LIMIT`] pushes, the first at least
+    /// [`UNANSWERED_PUSHES_MIN_AGE_NS`] old.
+    pub fn is_past_limit(&self, now_ns: Timestamp) -> bool {
+        self.count >= UNANSWERED_PUSHES_LIMIT
+            && now_ns.saturating_sub(self.first_sent_at_ns) >= UNANSWERED_PUSHES_MIN_AGE_NS
+    }
 }
 
 impl WebPushSubscription {
@@ -263,6 +410,8 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                 subscriber_key,
                 auth,
                 last_rotated_ns,
+                unanswered_pushes,
+                probe_sent_at_ns,
             } => Ok(WebPushSubscription::Ready(ReadySubscription {
                 endpoint: PushEndpoint::try_from(endpoint.as_str())?,
                 created_at_ns,
@@ -271,6 +420,11 @@ impl TryFrom<StorableWebPushSubscription> for WebPushSubscription {
                 subscriber_key: SubscriberKey::try_from(subscriber_key)?,
                 auth: AuthSecret::try_from(auth)?,
                 last_rotated_ns,
+                unanswered_pushes: unanswered_pushes.map(|stored_count| UnansweredPushCount {
+                    count: stored_count.count,
+                    first_sent_at_ns: stored_count.first_sent_at_ns,
+                }),
+                probe_sent_at_ns,
             })),
         }
     }
@@ -292,6 +446,13 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                 subscriber_key: ready.subscriber_key.into_vec(),
                 auth: ready.auth.into_vec(),
                 last_rotated_ns: ready.last_rotated_ns,
+                unanswered_pushes: ready.unanswered_pushes.map(|count| {
+                    StorableUnansweredPushCount {
+                        count: count.count,
+                        first_sent_at_ns: count.first_sent_at_ns,
+                    }
+                }),
+                probe_sent_at_ns: ready.probe_sent_at_ns,
             },
         }
     }
@@ -321,24 +482,32 @@ impl From<StorableBrowser> for Browser {
                     })
                     .ok()
             }),
+            // An entry that does not read back is dropped, as a registration is above.
             notifications: value
-                .notifications
+                .inbox
                 .unwrap_or_default()
+                .0
                 .into_iter()
                 .filter_map(|queued| {
-                    Some(InboxNotification {
-                        inbox_notification_id: queued.inbox_notification_id,
-                        application_number: queued.application_number,
-                        event: queued.event.map(NotificationEvent::from),
-                        sender: Principal::try_from_slice(&queued.sender).ok()?,
-                        notification_id: queued.notification_id,
-                        expires_at_ns: queued.expires_at_ns,
-                        account_number: queued.account_number,
-                    })
+                    InboxNotification::try_from(queued)
+                        .inspect_err(|reason| {
+                            ic_cdk::println!(
+                                "ERROR: dropped an inbox entry of browser {} as unreadable: {reason}",
+                                value.id
+                            );
+                        })
+                        .ok()
                 })
                 .collect(),
             next_inbox_notification_id: value.next_inbox_notification_id.unwrap_or_default(),
             notification_app: value.notification_app.map(NotificationAppRef::from),
+            same_device_browser_id: value.same_device_browser_id,
+            pending_same_device_link: value.pending_same_device_link.map(|pending_link| {
+                PendingSameDeviceLink {
+                    link_public_key: ByteBuf::from(pending_link.link_public_key),
+                    expires_at_ns: pending_link.expires_at_ns,
+                }
+            }),
         }
     }
 }
@@ -358,12 +527,21 @@ impl From<Browser> for StorableBrowser {
                 .map(StorableWebPushSubscription::from),
             notification_app: value.notification_app.map(StorableNotificationAppRef::from),
             next_inbox_notification_id: Some(value.next_inbox_notification_id),
-            notifications: (!value.notifications.is_empty()).then(|| {
-                value
-                    .notifications
-                    .into_iter()
-                    .map(StorableInboxNotification::from)
-                    .collect()
+            same_device_browser_id: value.same_device_browser_id,
+            pending_same_device_link: value.pending_same_device_link.map(|pending_link| {
+                StorablePendingSameDeviceLink {
+                    link_public_key: pending_link.link_public_key.into_vec(),
+                    expires_at_ns: pending_link.expires_at_ns,
+                }
+            }),
+            inbox: (!value.notifications.is_empty()).then(|| {
+                StorableInbox(
+                    value
+                        .notifications
+                        .into_iter()
+                        .map(StorableInboxNotification::from)
+                        .collect(),
+                )
             }),
         }
     }
@@ -1066,13 +1244,86 @@ impl Anchor {
         link_principal: Principal,
         expires_at_ns: Timestamp,
     ) {
-        let Some(browser) = self.browsers.iter_mut().find(|b| b.id == browser_id) else {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
             return;
         };
         browser.notification_app = Some(NotificationAppRef::Pending {
             link_principal,
             expires_at_ns,
         });
+    }
+
+    /// Registers `link_public_key` on `browser_id`'s entry, replacing any earlier one, for
+    /// another entry of this identity to claim until `expires_at_ns`. An error where this
+    /// identity has no such entry.
+    pub fn start_same_device_link(
+        &mut self,
+        browser_id: BrowserId,
+        link_public_key: PublicKey,
+        expires_at_ns: Timestamp,
+    ) -> Result<(), String> {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
+            return Err(format!("no browser entry {browser_id}"));
+        };
+        browser.pending_same_device_link = Some(PendingSameDeviceLink {
+            link_public_key,
+            expires_at_ns,
+        });
+        Ok(())
+    }
+
+    /// The entry `browser_id`'s entry is linked to as sharing its device, while this
+    /// identity still has it.
+    pub fn same_device_browser_of(&self, browser_id: BrowserId) -> Option<BrowserId> {
+        let browser = self.browser(browser_id)?;
+        browser
+            .same_device_browser_id
+            .filter(|linked_browser_id| self.browser(*linked_browser_id).is_some())
+    }
+
+    /// The entry of this anchor other than `claimer`, whose pending same-device link holds
+    /// `link_public_key` and has not expired at `now_ns`.
+    pub fn browser_awaiting_same_device_link(
+        &self,
+        link_public_key: &PublicKey,
+        claimer: BrowserId,
+        now_ns: Timestamp,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| {
+                browser.id != claimer
+                    && browser
+                        .pending_same_device_link
+                        .as_ref()
+                        .is_some_and(|pending_link| {
+                            pending_link.link_public_key == *link_public_key
+                                && pending_link.expires_at_ns > now_ns
+                        })
+            })
+            .map(|browser| browser.id)
+    }
+
+    /// Links `browser_id`'s entry to `same_device_browser_id`'s as sharing its device,
+    /// spending the pending link that authorized it.
+    pub fn link_same_device(&mut self, browser_id: BrowserId, same_device_browser_id: BrowserId) {
+        let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        else {
+            return;
+        };
+        browser.same_device_browser_id = Some(same_device_browser_id);
+        browser.pending_same_device_link = None;
     }
 
     /// The browser of this anchor whose pending install names `caller`, where the slot has
@@ -1139,9 +1390,6 @@ impl Anchor {
                     .is_some_and(|reference| reference.linked_app() == Some(app_id))
             {
                 browser.notification_app = None;
-                // The record's address belongs to the entry being pointed now, and this
-                // one has no address of its own to have been posted at.
-                browser.notifications.clear();
             }
         }
         let Some(browser) = self
@@ -1152,11 +1400,8 @@ impl Anchor {
             return;
         };
         // A browser has one route. Pointing at a record leaves behind whatever address it
-        // registered for itself, and what is waiting goes with it: the entry only reaches
-        // here because the record it points at changed, so everything queued was posted
-        // somewhere this browser no longer reads.
+        // registered for itself.
         browser.webpush_subscription = None;
-        browser.notifications.clear();
         browser.notification_app = Some(NotificationAppRef::Linked { app_id, enabled });
     }
 
@@ -1189,18 +1434,9 @@ impl Anchor {
             return;
         };
         *current = enabled;
-        if enabled {
-            return;
-        }
-        // What is queued was posted to an address this entry has just stopped being
-        // delivered at. Nothing drains it while delivery is off and nothing joins it, so
-        // leaving it would only mean the first wake-up after switching back on shows
-        // something from before the switch-off instead of what caused it.
-        browser.notifications.clear();
     }
 
-    /// Forgets `app_id` on every entry of this identity that points at it, and what the
-    /// record's address was carrying for them.
+    /// Forgets `app_id` on every entry of this identity that points at it.
     ///
     /// The record itself is not this list's to delete: only a caller holding every anchor
     /// can see whether another identity still points at it.
@@ -1210,10 +1446,6 @@ impl Anchor {
                 continue;
             }
             browser.notification_app = None;
-            // Everything waiting went to the record's address, because a browser pointing
-            // at a record has no address of its own, and nothing can read that one once
-            // the record is gone.
-            browser.notifications.clear();
         }
     }
 
@@ -1255,7 +1487,10 @@ impl Anchor {
     /// An install still running is left alone: it is not a route yet, and a browser whose
     /// install never completes must keep the address it has.
     pub fn leave_notification_app(&mut self, browser_id: BrowserId) -> Option<NotificationAppId> {
-        let browser = self.browsers.iter_mut().find(|b| b.id == browser_id)?;
+        let browser = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)?;
         let NotificationAppRef::Linked { app_id, .. } = browser.notification_app? else {
             return None;
         };
@@ -1536,6 +1771,8 @@ impl Anchor {
             webpush_subscription: None,
             notifications: Vec::new(),
             notification_app: None,
+            same_device_browser_id: None,
+            pending_same_device_link: None,
         });
 
         let mut dropped = vec![];
@@ -1551,6 +1788,16 @@ impl Anchor {
                     dropped.push(self.browsers.remove(index).id);
                 }
                 None => break,
+            }
+        }
+        // A link names the entry it shares a device with, and an evicted entry is no
+        // device any more: browser ids are never reused, but nothing should point at one.
+        for browser in self.browsers.iter_mut() {
+            if browser
+                .same_device_browser_id
+                .is_some_and(|linked_browser_id| dropped.contains(&linked_browser_id))
+            {
+                browser.same_device_browser_id = None;
             }
         }
 

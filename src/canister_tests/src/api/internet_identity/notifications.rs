@@ -2,11 +2,15 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AppNotificationConsentStatusError, AppNotificationConsentStatusResponse,
-    AppRevokeNotificationConsentError, BrowserId, ClaimNotificationAppError,
-    ClaimNotificationAppRequest, DisableNotificationAppError, DisableNotificationAppRequest,
-    EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
-    GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
+    AnchorNumber, AppGetPwaNotificationError, AppGetPwaNotificationRequest,
+    AppGetPwaNotificationResponse, AppGetPwaWebPushSubscriptionStatusError,
+    AppNotificationConsentStatusError, AppNotificationConsentStatusResponse,
+    AppPreparePwaWebPushSubscriptionResult, AppRemovePwaNotificationError,
+    AppRemovePwaNotificationRequest, AppRevokeNotificationConsentError,
+    AppSetPwaWebPushSubscriptionError, AppSetPwaWebPushSubscriptionRequest, BrowserId,
+    ClaimNotificationAppError, ClaimNotificationAppRequest, DisableNotificationAppError,
+    DisableNotificationAppRequest, EnableNotificationAppError, EnableNotificationAppRequest,
+    FrontendHostname, GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetNotificationError, GetNotificationRequest,
     GetNotificationResponse, GetWebPushSubscriptionStatusRequest, LinkNotificationAppError,
     LinkNotificationAppRequest, LinkNotificationAppResponse, NotificationAppAnchorsRequest,
@@ -16,11 +20,19 @@ use internet_identity_interface::internet_identity::types::{
     PrepareNotificationAppLinkError, PrepareNotificationAppLinkRequest,
     PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
     PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionResult,
-    ProbeNotificationAppError, ProbeNotificationAppRequest, RemoveNotificationError,
-    RemoveNotificationRequest, RemoveNotificationResponse, RemoveWebPushSubscriptionError,
-    RemoveWebPushSubscriptionRequest, SendNotificationArg, SendNotificationError,
-    SendNotificationResponse, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    WebPushSubscriptionStatus,
+    ProbeNotificationAppError, ProbeNotificationAppRequest, PwaWebPushSubscription,
+    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
+    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SendNotificationArg,
+    SendNotificationError, SendNotificationResponse, SetWebPushSubscriptionError,
+    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+};
+use internet_identity_interface::internet_identity::types::{
+    AppGetSameDeviceLinkStatusError, AppPrepareSameDeviceLinkError,
+    AppPrepareSameDeviceLinkRequest, AppProbePwaWebPushSubscriptionError, ClaimSameDeviceLinkError,
+    ClaimSameDeviceLinkRequest, GetNotificationPathStatusError, GetNotificationPathStatusRequest,
+    NotificationPathStatus, ProbeNotificationPathError, ProbeNotificationPathRequest,
+    RemoveUnansweredPwaWebPushSubscriptionsError, RemoveUnansweredPwaWebPushSubscriptionsRequest,
+    SameDeviceLinkStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -500,6 +512,244 @@ pub fn disable_notification_app(
         RawEffectivePrincipal::None,
         sender,
         "disable_notification_app",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_prepare_pwa_webpush_subscription(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<AppPreparePwaWebPushSubscriptionResult, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_prepare_pwa_webpush_subscription",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+/// The raw call, with the request exactly as the caller built it.
+pub fn app_set_pwa_webpush_subscription(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppSetPwaWebPushSubscriptionRequest,
+) -> Result<Result<(), AppSetPwaWebPushSubscriptionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_set_pwa_webpush_subscription",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+/// A whole installed web app subscribe, as [`subscribe_webpush`] is for a browser: fetch
+/// the keys, seal `auth` to the transport key, and send `endpoint` and `p256dh` with it.
+/// A fetch that is refused sends placeholder keys, so the subscribe sees its own refusal.
+pub fn subscribe_pwa_webpush(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    endpoint: &str,
+    p256dh: ByteBuf,
+    auth: &[u8],
+) -> Result<Result<(), AppSetPwaWebPushSubscriptionError>, RejectResponse> {
+    let mut transport_key = p256dh.clone();
+    let mut sealed_auth = ByteBuf::from(vec![0u8; 32]);
+    for _ in 0..PREPARE_ATTEMPTS {
+        match app_prepare_pwa_webpush_subscription(env, canister_id, sender)? {
+            AppPreparePwaWebPushSubscriptionResult::Ok(keys) => {
+                (transport_key, sealed_auth) = seal_auth(&keys.transport_public_key, auth);
+                break;
+            }
+            AppPreparePwaWebPushSubscriptionResult::Pending => continue,
+            AppPreparePwaWebPushSubscriptionResult::Err(_) => break,
+        }
+    }
+    app_set_pwa_webpush_subscription(
+        env,
+        canister_id,
+        sender,
+        AppSetPwaWebPushSubscriptionRequest {
+            subscription: Some(PwaWebPushSubscription {
+                endpoint: endpoint.to_string(),
+                p256dh,
+                transport_key,
+                sealed_auth,
+            }),
+        },
+    )
+}
+
+pub fn app_get_pwa_webpush_subscription_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<
+    Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError>,
+    RejectResponse,
+> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_get_pwa_webpush_subscription_status",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_get_pwa_notification(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppGetPwaNotificationRequest,
+) -> Result<Result<AppGetPwaNotificationResponse, AppGetPwaNotificationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_get_pwa_notification",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_remove_pwa_notification(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppRemovePwaNotificationRequest,
+) -> Result<Result<RemoveNotificationResponse, AppRemovePwaNotificationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_remove_pwa_notification",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_probe_pwa_webpush_subscription(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<(), AppProbePwaWebPushSubscriptionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_probe_pwa_webpush_subscription",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_get_same_device_link_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<SameDeviceLinkStatus, AppGetSameDeviceLinkStatusError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_get_same_device_link_status",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_prepare_same_device_link(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppPrepareSameDeviceLinkRequest,
+) -> Result<Result<(), AppPrepareSameDeviceLinkError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_prepare_same_device_link",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn claim_same_device_link(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: ClaimSameDeviceLinkRequest,
+) -> Result<Result<(), ClaimSameDeviceLinkError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "claim_same_device_link",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_notification_path_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: GetNotificationPathStatusRequest,
+) -> Result<Result<NotificationPathStatus, GetNotificationPathStatusError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_notification_path_status",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn probe_notification_path(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: ProbeNotificationPathRequest,
+) -> Result<Result<(), ProbeNotificationPathError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "probe_notification_path",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn remove_unanswered_pwa_webpush_subscriptions(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: RemoveUnansweredPwaWebPushSubscriptionsRequest,
+) -> Result<Result<(), RemoveUnansweredPwaWebPushSubscriptionsError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "remove_unanswered_pwa_webpush_subscriptions",
         (request,),
     )
     .map(|(x,)| x)
