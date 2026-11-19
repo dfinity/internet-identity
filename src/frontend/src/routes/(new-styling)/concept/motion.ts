@@ -479,7 +479,7 @@ export const travel = (): Travel => {
   return crossfade({
     duration: () => (reduced() ? 0 : 320),
     easing: quintOut,
-    fallback: (node) => ({
+    fallback: () => ({
       duration: reduced() ? 0 : 160,
       easing: quintOut,
       css: (t) => `opacity: ${t}`,
