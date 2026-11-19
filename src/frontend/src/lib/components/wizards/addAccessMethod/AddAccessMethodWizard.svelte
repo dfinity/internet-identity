@@ -10,7 +10,7 @@
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
-  import { isOpenIdCancelError } from "$lib/utils/openID";
+  import { isOpenIdCancelError, PopupBlockedError } from "$lib/utils/openID";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 
@@ -42,7 +42,7 @@
     try {
       onOpenIdLinked(await addAccessMethodFlow.linkOpenIdAccount(config));
     } catch (error) {
-      if (isOpenIdCancelError(error)) {
+      if (isOpenIdCancelError(error) || error instanceof PopupBlockedError) {
         return "cancelled";
       }
       onError(error); // Propagate unhandled errors to parent component
@@ -52,7 +52,7 @@
     try {
       onOpenIdLinked(await addAccessMethodFlow.linkSsoAccount(ssoResult));
     } catch (error) {
-      if (isOpenIdCancelError(error)) {
+      if (isOpenIdCancelError(error) || error instanceof PopupBlockedError) {
         return "cancelled";
       }
       onError(error);

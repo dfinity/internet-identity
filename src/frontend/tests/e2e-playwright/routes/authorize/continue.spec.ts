@@ -68,6 +68,59 @@ test.describe("multiple identities", () => {
     expect(principal).not.toBe(otherPrincipal);
   });
 
+  test("Authorize with the identity left selected after removing the one that signed in", async ({
+    page,
+    identities,
+    addAuthenticatorForIdentity,
+    signInWithIdentity,
+  }) => {
+    const expectedPrincipal = await authorize(page, async (authPage) => {
+      await signInWithIdentity(authPage, identities[0].identityNumber);
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+    const removedIdentityPrincipal = await authorize(page, async (authPage) => {
+      await signInWithIdentity(authPage, identities[1].identityNumber);
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+    const principal = await authorize(page, async (authPage) => {
+      // The second identity signs in on this page and is then removed from
+      // this device, which selects the first one.
+      await signInWithIdentity(authPage, identities[1].identityNumber);
+      const switchIdentity = authPage.getByRole("button", {
+        name: "Switch identity",
+      });
+      await expect(switchIdentity).toContainText(identities[1].name);
+      await switchIdentity.click();
+      await authPage.getByRole("button", { name: "Edit" }).click();
+      const dialog = authPage.getByRole("dialog");
+      await expect(
+        dialog.getByRole("heading", { name: "Identities on this device" }),
+      ).toBeVisible();
+      await dialog
+        .getByRole("listitem")
+        .filter({ hasText: identities[1].name })
+        .getByRole("button", { name: "Remove" })
+        .click();
+      await expect(
+        dialog.getByRole("heading", { name: "Remove from this device" }),
+      ).toBeVisible();
+      await dialog.getByRole("button", { name: "Remove" }).click();
+      await expect(dialog).toBeHidden();
+      await expect(switchIdentity).toContainText(identities[0].name);
+
+      await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+    expect(principal).toBe(expectedPrincipal);
+    expect(principal).not.toBe(removedIdentityPrincipal);
+  });
+
   test("Multiple accounts state resets when switching identity", async ({
     page,
     identities,

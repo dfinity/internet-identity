@@ -41,7 +41,7 @@ paths:
 ## Lifecycle and async
 
 - `fe/clean-up-async` Clean up every timer, RAF, observer, listener, poll loop and in-flight request in the `$effect` cleanup or `onDestroy`, and on dialog close. Use `AbortController` and honour the signal in every await.
-- `fe/reset-in-finally` Reset loading and submitting flags in `finally`. Disable a control while its write runs, and ignore stale async results.
+- `fe/reset-in-finally` Reset loading and submitting flags in `finally`. Disable a control while its write runs, and ignore stale async results through the `AbortController` signal of `fe/clean-up-async`, never a hand-rolled counter, epoch or token.
 - `fe/reload-after-write` Page data comes from SvelteKit loaders, and a write is followed by `invalidate`/`invalidateAll()` to reload it. Choose per case between a progress indicator and an optimistic update:
   - Progress indicator: typical for dialog submissions. Disable the control and show a spinner until the write settles (see the async callback rule under Svelte).
   - Optimistic update: for something that should feel instant, like a toggle. Assign the next state to the `$derived` that reads the loader data, run the write, then invalidate. When the loader data comes back, the `$derived` recomputes from it: on success it matches, on failure it rolls back on its own. Don't write rollback code. Still show the error.
@@ -56,7 +56,8 @@ paths:
 - `fe/throw-canister-error` Unwrap canister results with `.then(throwCanisterError)` and check with `isCanisterError`; never `"Err" in result` and never fabricate a canister error. Legacy exception: the MCP methods (`get_mcp_registration_delegation` and the other `mcp_*` methods) return `Err : text`, which `throwCanisterError` can't wrap, so they unwrap with `throwTextCanisterError`. New methods return variant errors (`candid/result-variant`), so they never need it.
 - `fe/route-async-errors` Route every async failure to the user-visible path (`handleError` / the flow's `onError`), the way the delegation handler does. `console.error` alone is not handling.
 - `fe/no-silent-catch` `void promise.catch(...)` that drops an error needs a comment saying why; otherwise let it propagate. When the error is unused, write bare `catch { ... }`.
-- `fe/retry-transient-only` Retry only transient failures (network, 408, 429, 5xx).
+- `fe/retry-transient-only` Retry only transient failures (network, 408, 429, 5xx), and a query that reads what an update just changed (`fe/retry-read-after-update`).
+- `fe/retry-read-after-update` A query that reads state an update call just changed goes through `retryFor`, such as a `get_*_delegation` after its `prepare_*`: the query can reach a replica that has not applied the update yet, and answers as if it never happened.
 - `fe/disable-known-failures` Disable an action the UI already knows will fail rather than erroring after the click.
 
 ## TypeScript

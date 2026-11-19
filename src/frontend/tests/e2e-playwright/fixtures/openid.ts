@@ -21,6 +21,15 @@ export const test = base.extend<{
   openIdConfig: OpenIdConfig;
   openIdUsers: OpenIdUser[];
   signInWithOpenId: (page: Page, userId: string) => Promise<void>;
+  /**
+   * Runs `press`, which opens the provider's pop-up, signs in there as
+   * `userId`, and waits for the pop-up to close.
+   */
+  signInWithOpenIdPopup: (
+    opener: Page,
+    press: () => Promise<void>,
+    userId: string,
+  ) => Promise<void>;
 }>({
   openIdConfig: {
     defaultPort: DEFAULT_OPENID_PORT,
@@ -74,6 +83,16 @@ export const test = base.extend<{
         }),
       ).toBeVisible();
       await page.getByRole("button", { name: "Continue" }).click();
+    });
+  },
+  signInWithOpenIdPopup: async ({ signInWithOpenId }, use) => {
+    await use(async (opener, press, userId) => {
+      const popupPromise = opener.context().waitForEvent("page");
+      await press();
+      const popup = await popupPromise;
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, userId);
+      await closePromise;
     });
   },
 });

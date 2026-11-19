@@ -17,6 +17,24 @@ const POPUP_CLOSED_GRACE_MS = 5000;
 export class CallbackPopupClosedError extends Error {}
 
 /**
+ * The browser refused to open the pop-up: `window.open` returned `null`.
+ *
+ * Not a cancel: nothing was shown to the user, so telling them the
+ * interaction was canceled blames them for what they never saw. A browser
+ * opens a pop-up only while it handles a click, and only where the site may
+ * open them, so this is either a sign-in that started too late after the
+ * click (a bug on our side) or pop-ups being blocked for this site.
+ *
+ * `handleError` has a message for it.
+ */
+export class PopupBlockedError extends Error {
+  constructor() {
+    super("The browser blocked the sign-in pop-up");
+    this.name = "PopupBlockedError";
+  }
+}
+
+/**
  * Payload the canister's POST /callback landing page delivers to the
  * frontend — via `BroadcastChannel` in the popup flow, via the
  * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
@@ -107,7 +125,7 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
     `width=${width},height=${height},left=${left},top=${top}`,
   );
   if (redirectWindow === null) {
-    throw new CallbackPopupClosedError();
+    throw new PopupBlockedError();
   }
 
   return new Promise<unknown>((resolve, reject) => {
@@ -284,7 +302,7 @@ const requestWithAppleSheet = (redirectURL: URL): Promise<string> => {
     `width=${width},height=${height},left=${left},top=${top}`,
   );
   if (popup === null) {
-    return Promise.reject(new CallbackPopupClosedError());
+    return Promise.reject(new PopupBlockedError());
   }
   return new Promise((resolve, reject) => {
     let canceledTimer: ReturnType<typeof setTimeout> | undefined;
