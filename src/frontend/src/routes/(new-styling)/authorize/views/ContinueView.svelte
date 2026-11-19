@@ -234,8 +234,8 @@
         account.account_number[0] === isEditAccountDialogVisibleForNumber,
     ),
   );
-  // The options are on and the account list loads: Continue looks unchanged,
-  // but does nothing until it has.
+  // Continue looks unchanged while the account list loads, but does nothing
+  // until it has.
   const isLoadingAccounts = $derived(
     isMultipleAccountsEnabled && accounts === undefined,
   );
@@ -271,15 +271,11 @@
   const selectedIdentityNumber = $derived(
     $lastUsedIdentitiesStore.selected!.identityNumber,
   );
-  // What the accounts of the selected identity are read with without a sign-in:
-  // the stored session, or the sign-in of this page. `undefined` until that is
-  // read from IndexedDB, `null` when there is none. Read when the identity is
-  // selected so that a press already knows whether it needs a sign-in: one
-  // that starts after an `await` is no longer part of the press, and Safari
-  // blocks its pop-up.
+  // Read from IndexedDB when the identity is selected (`undefined` until then,
+  // `null` when there is none), so a press knows whether it needs a sign-in
+  // without awaiting: Safari blocks a pop-up opened after an `await`.
   let storedSessionActor = $state.raw<ActorSubclass<_SERVICE> | null>();
-  // Aborted when another identity is selected and when this screen is taken
-  // down, so that a read started before no longer acts on the screen.
+  // Aborted when another identity is selected or the screen is taken down.
   let identityController = new AbortController();
   // Re-initialize the flow and re-hydrate per-identity state when the
   // identity changes. Read the persisted values into locals so the
@@ -394,9 +390,9 @@
     defaultAccountNumber = values[1].account_number[0];
   };
 
-  // Reads the stored session, and shows all options again when they were on
-  // from an earlier visit and the session can read the accounts. Otherwise
-  // they go off: nothing was pressed, so no sign-in may start from here.
+  // Restores all options left on from an earlier visit when the stored session
+  // can read the accounts, and switches them off otherwise: without a press no
+  // sign-in may start.
   const readStoredSession = async (
     identityNumber: bigint,
     isRemembered: boolean,
@@ -436,10 +432,8 @@
   const handleEnableMultipleAccounts = async () => {
     const identityNumber = selectedIdentityNumber;
     const signal = identityController.signal;
-    // On already, as far as this component goes. The switch only reports its
-    // change once the click has been handled, and a sign-in that fails within
-    // the click (a refused pop-up) is handled before that: switching the
-    // option back off below would then be undone by the report.
+    // Set before the switch reports its change, so that a sign-in failing
+    // within the click (a refused pop-up) can still switch it back off.
     isMultipleAccountsEnabled = true;
     selectedTtlSeconds = rememberedTtlSeconds();
     try {
@@ -463,22 +457,11 @@
         isCanisterError<SessionDelegationError>(error) &&
         error.type === "Unauthorized"
       ) {
-        // The next press signs in instead.
         storedSessionActor = null;
         void purgeSession(identityNumber);
       }
       handleError(error);
     }
-  };
-  const handleContinue = (): void => {
-    if (!isMultipleAccountsEnabled) {
-      void handleContinueDefault();
-      return;
-    }
-    if (isLoadingAccounts) {
-      return;
-    }
-    void handleContinueAs(chosenAccountNumber);
   };
   const handleCreateAccount = async (account: {
     name: string;
@@ -754,7 +737,16 @@
   <div class="pb-6">
     <button
       class="btn btn-primary btn-xl w-full"
-      onclick={handleContinue}
+      onclick={() => {
+        if (!isMultipleAccountsEnabled) {
+          void handleContinueDefault();
+          return;
+        }
+        if (isLoadingAccounts) {
+          return;
+        }
+        void handleContinueAs(chosenAccountNumber);
+      }}
       disabled={isAuthenticatingDefault || mustChooseAccess}
       aria-disabled={isLoadingAccounts}
     >
