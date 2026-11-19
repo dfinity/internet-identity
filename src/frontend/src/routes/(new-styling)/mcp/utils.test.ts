@@ -481,15 +481,30 @@ describe("mcpAuthorize failure paths", () => {
     expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
   });
 
-  it("propagates a get refusal", async () => {
-    const actor = makeActor();
-    actor.get_mcp_registration_delegation.mockResolvedValue({
-      Err: "MCP registration failed: no such delegation.",
-    });
+  it("propagates a get refusal once the retries run out", async () => {
+    vi.useFakeTimers();
+    try {
+      const actor = makeActor();
+      actor.get_mcp_registration_delegation.mockResolvedValue({
+        Err: "MCP registration failed: no such delegation.",
+      });
 
-    await expect(authorize(actor, "read-only")).rejects.toThrow(
-      /no such delegation/,
-    );
+      let outcome: unknown;
+      const settled = authorize(actor, "read-only").then(
+        () => (outcome = "resolved"),
+        (error: unknown) => (outcome = error),
+      );
+      while (outcome === undefined) {
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      await settled;
+
+      expect(outcome).toBeInstanceOf(Error);
+      expect((outcome as Error).message).toMatch(/no such delegation/);
+      expect(actor.get_mcp_registration_delegation).toHaveBeenCalledTimes(8);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
