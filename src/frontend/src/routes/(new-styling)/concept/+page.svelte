@@ -1987,10 +1987,12 @@
           </div>
           <!-- The pages, right above what they show, with Edit across from
                them on My apps, as over a list on iOS (Done while apps are
-               arranged). -->
+               arranged). Edit's pill reaches past the last logo by 4px, as
+               the tabs' track does past the first, so the two frame the
+               row, and the setting card under them spans the same width. -->
           <div
             class={[
-              "flex items-center justify-between gap-3 @lg:pe-6",
+              "flex items-center justify-between gap-3 @lg:pe-[calc((var(--ii-tile)-var(--ii-logo))/2)]",
               INSET,
               switchingPage &&
                 "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
@@ -2006,7 +2008,7 @@
                 class={[
                   pill,
                   PILL_MOTION,
-                  "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-3.5 h-10 px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]",
+                  "ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-1 h-10 px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]",
                 ]}
               >
                 {@render editWords("@max-lg/canvas:justify-items-end")}
@@ -2068,7 +2070,11 @@
                      closes. It stays mounted, inert while hidden, so a quick
                      Edit and Done turn around midway instead of starting
                      over. It is as wide as the grid (w-0 min-w-full): a long
-                     line can't widen the column and shift the grid sideways. -->
+                     line can't widen the column and shift the grid sideways.
+                     Over the grid the card spans what the header row's
+                     controls do: from the tabs' track, 4px past the first
+                     logo, to Done's pill, 4px past the last one. Under the
+                     header it keeps the same room above as below. -->
                 <div
                   inert={!managing}
                   class={[
@@ -2079,7 +2085,7 @@
                   <div class="min-h-0 overflow-hidden">
                     <label
                       class={[
-                        "bg-bg-primary border-border-tertiary mx-2.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 @lg:mx-2",
+                        "bg-bg-primary border-border-tertiary mx-2.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 md:mt-2 @lg:mx-[calc((var(--ii-tile)-var(--ii-logo))/2-var(--spacing))]",
                         managing
                           ? "scale-100 opacity-100 delay-50 duration-200 ease-(--ii-ease-out)"
                           : "scale-[0.98] opacity-0 duration-120 ease-out",
