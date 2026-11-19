@@ -250,7 +250,7 @@ test("All options start from the account and duration last chosen on this browse
   expect(optionsOffPrincipal).toEqual(primaryPrincipal);
 });
 
-test("All options left on wait for Continue when showing them takes a sign-in", async ({
+test("All options left on go off when there is no session to show them with, and the switch signs in", async ({
   page,
   identities,
   addAuthenticatorForIdentity,
@@ -306,27 +306,24 @@ test("All options left on wait for Continue when showing them takes a sign-in", 
   );
   await iiPage.close();
 
-  const waitedPrincipal = await authorize(page, async (authPage) => {
+  const switchedPrincipal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
-    const continueButton = authPage.getByRole("button", {
-      name: "Continue",
-      exact: true,
+    const optionsSwitch = authPage.getByRole("switch", {
+      name: "Show all options",
     });
-    // Nothing signs in by itself: the option is on, Continue is ready, and
-    // the accounts are not there yet.
-    await expect(
-      authPage.getByRole("switch", { name: "Show all options" }),
-    ).toBeChecked();
-    await expect(continueButton).toBeEnabled();
+    // Nothing signs in by itself: the options go off and Continue is ready.
+    await expect(optionsSwitch).not.toBeChecked();
+    await expect(optionsSwitch).toBeEnabled();
     await expect(authPage.getByRole("radio")).toHaveCount(0);
-    // The first press signs in and shows the options as they were left.
-    await continueButton.click();
+    // The switch signs in and shows the options as they were left.
+    await optionsSwitch.setChecked(true);
     await expect(authPage.getByRole("radio", { name: "Work" })).toBeChecked({
       timeout: 15_000,
     });
     await expect(authPage.getByRole("button", { name: "1 day" })).toBeVisible();
-    // The second continues with them.
-    await continueButton.click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
-  expect(waitedPrincipal).toEqual(workPrincipal);
+  expect(switchedPrincipal).toEqual(workPrincipal);
 });
