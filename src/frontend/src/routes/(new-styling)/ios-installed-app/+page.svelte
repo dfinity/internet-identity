@@ -6,7 +6,8 @@
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import { isCanisterError } from "$lib/utils/utils";
+  import type { ClaimSameDeviceLinkError } from "$lib/generated/internet_identity_types";
+  import { isCanisterError, type CanisterError } from "$lib/utils/utils";
   import {
     claimSameDeviceLink,
     linkKeyOf,
@@ -20,6 +21,14 @@
     | { kind: "failed"; reason: string };
 
   let screen = $state<Screen>({ kind: "working" });
+
+  /** A refusal's variant, with the reason the canister gave where it gave one. */
+  const refusalReason = (
+    error: CanisterError<ClaimSameDeviceLinkError>,
+  ): string =>
+    error.type === "InternalCanisterError"
+      ? `${error.type}: ${error.value("InternalCanisterError")}`
+      : String(error.type);
   let linkKey: Uint8Array | undefined;
 
   const claim = async () => {
@@ -31,11 +40,10 @@
       screen = { kind: await claimSameDeviceLink(linkKey) };
     } catch (error) {
       console.error(error);
-      // A canister refusal carries no message, so its variant is the whole reason.
       screen = {
         kind: "failed",
-        reason: isCanisterError(error)
-          ? String(error.type)
+        reason: isCanisterError<ClaimSameDeviceLinkError>(error)
+          ? refusalReason(error)
           : error instanceof Error
             ? error.message
             : String(error),
