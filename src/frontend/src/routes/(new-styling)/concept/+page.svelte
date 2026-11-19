@@ -46,6 +46,7 @@
   import ConnectPage from "./components/ConnectPage.svelte";
   import Elevated from "./components/Elevated.svelte";
   import HeadCard from "./components/HeadCard.svelte";
+  import HeaderSearch from "./components/HeaderSearch.svelte";
   import SurfaceLevel from "./components/SurfaceLevel.svelte";
   import Popup from "./components/Popup.svelte";
   import AppRow from "./components/AppRow.svelte";
@@ -1800,7 +1801,7 @@
       class="pointer-events-none relative z-10 flex shrink-0 flex-col"
     >
       <div
-        class="grid grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[1fr_auto_1fr] md:px-5 @max-lg/canvas:px-(--ii-edge)"
+        class="grid grid-cols-[1fr_auto] items-center gap-x-1 px-4 sm:px-6 md:h-16 md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-4 md:px-5 @max-lg/canvas:px-(--ii-edge)"
       >
         <!-- The logo is the way home: it goes back to the first page. Its hover
              is a layer over the pill's own colour (`ii-hover`), so the pill
@@ -1822,147 +1823,179 @@
           <Logo class="text-fg-primary h-4" />
           <span class="text-text-primary text-base font-semibold"> id.ai </span>
         </button>
+        <!-- Desktop: search in the canvas's top corner, on every page and
+             however far it's scrolled, so an app is found from wherever you
+             are. It ends where the account's pill would, 20px in, and the
+             list it opens hangs from that end. -->
         <div
-          bind:this={controlsPill}
-          class={[
-            "col-start-2 row-start-1 flex items-center gap-1 justify-self-end md:col-start-3",
-            layout === "panel" && "md:hidden",
-            // A phone's controls share one pill; on desktop the account, or
-            // Close, has its own.
-            !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
-            // The avatar on the end edge, the pill 10px past it.
-            phoneHead && "@max-lg/canvas:-me-2.5 @max-lg/canvas:pe-1.5",
-          ]}
+          class="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-2"
         >
-          <!-- Phone only, beside the island or the dock: on desktop, and on a
-               phone in the main layout, it keeps to the bottom-left corner. -->
-          {#if !phoneHead}
-            <div class="flex md:hidden">
-              {@render conceptControls(true)}
-            </div>
+          {#if isDesktop.current}
+            <HeaderSearch
+              {isAdded}
+              onAdd={(app) => addApp(app)}
+              onAddLink={addLink}
+              suggestions={featured.slice(0, 4)}
+              lifted={headerLifted}
+              class="w-full max-w-80 min-w-0"
+            />
           {/if}
-          {#if isDesktop.current && panelVisible}
-            <!-- Desktop, with the panel open: Close stands where the account
+          <div
+            bind:this={controlsPill}
+            class={[
+              "flex shrink-0 items-center gap-1",
+              layout === "panel" && "md:hidden",
+              // A phone's controls share one pill; on desktop the account, or
+              // Close, has its own.
+              !isDesktop.current && [pill, PILL_MOTION, "h-10 px-[3px]"],
+              // The avatar on the end edge, the pill 10px past it.
+              phoneHead && "@max-lg/canvas:-me-2.5 @max-lg/canvas:pe-1.5",
+            ]}
+          >
+            <!-- Phone only, beside the island or the dock: on desktop, and on a
+               phone in the main layout, it keeps to the bottom-left corner. -->
+            {#if !phoneHead}
+              <div class="flex md:hidden">
+                {@render conceptControls(true)}
+              </div>
+            {/if}
+            {#if isDesktop.current && panelVisible}
+              <!-- Desktop, with the panel open: Close stands where the account
                  was, on the canvas, which is what the panel pushed aside. The
                  glyph is an arrow to the edge: the panel goes back to the right
                  edge it came from. The identity itself heads the panel now, so
                  the canvas doesn't name it twice. -->
-            <button
-              bind:this={closeButton}
-              type="button"
-              onclick={() => (panelOpen = false)}
-              title="Close"
-              in:fade={{ duration: reduced ? 0 : 200 }}
-              class={[
-                pill,
-                PILL_MOTION,
-                "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
-              ]}
-            >
-              <ArrowRightToLineIcon
-                class="size-4 rtl:-scale-x-100"
-                aria-hidden="true"
-              />
-              <span class="sr-only">Close identity</span>
-            </button>
-          {:else if layout === "top"}
-            <!-- The account, name then avatar at the edge; it opens the panel
+              <button
+                bind:this={closeButton}
+                type="button"
+                onclick={() => (panelOpen = false)}
+                title="Close"
+                in:fade={{ duration: reduced ? 0 : 200 }}
+                class={[
+                  pill,
+                  PILL_MOTION,
+                  "ii-hover text-fg-tertiary hover:text-fg-secondary focus-visible:outline-focus-ring grid size-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2",
+                ]}
+              >
+                <ArrowRightToLineIcon
+                  class="size-4 rtl:-scale-x-100"
+                  aria-hidden="true"
+                />
+                <span class="sr-only">Close identity</span>
+              </button>
+            {:else if layout === "top"}
+              <!-- The account, name then avatar at the edge; it opens the panel
                  on desktop and the sheet on a phone. On desktop it has a pill of
                  its own; on a phone it shares the controls'. -->
-            <button
-              bind:this={accountButton}
-              type="button"
-              onclick={openAccount}
-              aria-label={`${identityName}. Open identity${accountAttention !== undefined ? ", needs your attention" : ""}`}
-              in:fade={{ duration: reduced ? 0 : 200 }}
-              class={[
-                "ii-hover focus-visible:outline-focus-ring flex min-w-0 items-center gap-2.5 rounded-full ps-3 focus-visible:outline-2 focus-visible:outline-offset-2",
-                isDesktop.current
-                  ? [pill, PILL_MOTION, "h-10 pe-[3px]"]
-                  : "-me-1 py-1 pe-1",
-              ]}
-            >
-              <span
-                class="text-text-primary max-w-28 truncate text-sm font-medium md:max-w-40"
+              <button
+                bind:this={accountButton}
+                type="button"
+                onclick={openAccount}
+                aria-label={`${identityName}. Open identity${accountAttention !== undefined ? ", needs your attention" : ""}`}
+                in:fade={{ duration: reduced ? 0 : 200 }}
+                class={[
+                  "ii-hover focus-visible:outline-focus-ring flex min-w-0 items-center gap-2.5 rounded-full ps-3 focus-visible:outline-2 focus-visible:outline-offset-2",
+                  isDesktop.current
+                    ? [pill, PILL_MOTION, "h-10 pe-[3px]"]
+                    : "-me-1 py-1 pe-1",
+                ]}
               >
-                {identityName}
-              </span>
-              <!-- The dot cuts itself out of the pill the account stands on. -->
-              <span
-                class="relative"
+                <span
+                  class="text-text-primary max-w-28 truncate text-sm font-medium md:max-w-40"
+                >
+                  {identityName}
+                </span>
+                <!-- The dot cuts itself out of the pill the account stands on. -->
+                <span
+                  class="relative"
+                  style:--ii-dot-backdrop={headerLifted
+                    ? "var(--ii-surface-6)"
+                    : "var(--ii-surface-3)"}
+                >
+                  <IdentityAvatar
+                    {identity}
+                    palette={identityPaletteOverride}
+                    size="sm"
+                  />
+                  {#if accountAttention !== undefined}
+                    <AttentionDot tone={accountAttention} />
+                  {/if}
+                </span>
+              </button>
+            {/if}
+            {#if phoneHead && headCollapsed}
+              <!-- Phone, with the head scrolled away: its three sections stay
+                 at the top as icons, each with its dot, a tap away. -->
+              <div
+                transition:fade={{ duration: reduced ? 0 : 160 }}
+                class="flex items-center"
                 style:--ii-dot-backdrop={headerLifted
                   ? "var(--ii-surface-6)"
                   : "var(--ii-surface-3)"}
               >
-                <IdentityAvatar
-                  {identity}
-                  palette={identityPaletteOverride}
-                  size="sm"
-                />
-                {#if accountAttention !== undefined}
-                  <AttentionDot tone={accountAttention} />
-                {/if}
-              </span>
-            </button>
-          {/if}
-          {#if phoneHead && headCollapsed}
-            <!-- Phone, with the head scrolled away: its three sections stay
-                 at the top as icons, each with its dot, a tap away. -->
-            <div
-              transition:fade={{ duration: reduced ? 0 : 160 }}
-              class="flex items-center"
-              style:--ii-dot-backdrop={headerLifted
-                ? "var(--ii-surface-6)"
-                : "var(--ii-surface-3)"}
-            >
-              {#each accountCards as card (card.kind)}
-                {@const Icon = SECTION_ICONS[card.kind]}
-                {@const dot = dotOf(card.tone)}
-                <button
-                  type="button"
-                  onclick={() => openFromHead(card.kind)}
-                  aria-label={`${TITLES[card.kind]}: ${card.sentence}`}
-                  class="text-fg-secondary focus-visible:outline-focus-ring grid size-8 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
-                >
-                  <span class="relative">
-                    <Icon class="size-4" aria-hidden="true" />
-                    {#if dot !== undefined}
-                      <AttentionDot tone={dot} />
-                    {/if}
-                  </span>
-                </button>
-              {/each}
-            </div>
-          {/if}
-          {#if phoneHead}
-            <!-- Phone: the identity at the end of the top row, as an account
+                {#each accountCards as card (card.kind)}
+                  {@const Icon = SECTION_ICONS[card.kind]}
+                  {@const dot = dotOf(card.tone)}
+                  <button
+                    type="button"
+                    onclick={() => openFromHead(card.kind)}
+                    aria-label={`${TITLES[card.kind]}: ${card.sentence}`}
+                    class="text-fg-secondary focus-visible:outline-focus-ring grid size-8 place-items-center rounded-full transition-colors duration-150 hover:bg-(--ii-hover) focus-visible:outline-2 active:bg-(--ii-selected)"
+                  >
+                    <span class="relative">
+                      <Icon class="size-4" aria-hidden="true" />
+                      {#if dot !== undefined}
+                        <AttentionDot tone={dot} />
+                      {/if}
+                    </span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
+            {#if !isDesktop.current}
+              <!-- Phone: search is the header's too, a glyph beside the
+                 identity, and opens over the whole screen. In the main
+                 layout it keeps its place next to the avatar while the
+                 sections' icons come and go before it. -->
+              <HeaderSearch
+                compact
+                {isAdded}
+                onAdd={(app) => addApp(app)}
+                onAddLink={addLink}
+                suggestions={featured}
+                class={!phoneHead ? "order-first" : undefined}
+              />
+            {/if}
+            {#if phoneHead}
+              <!-- Phone: the identity at the end of the top row, as an account
                  sits in an app's corner. The greeting already names it, so
                  the avatar is the way to the others and to its own settings:
                  a tap lists every identity on the device, then the colour,
                  the start page and signing out. -->
-            <IdentityMenu
-              trigger={{
-                content: headAvatar,
-                label: `${identityName}: identities and settings`,
-                class:
-                  "focus-visible:outline-focus-ring grid shrink-0 place-items-center rounded-full p-[3px] transition-[background-color,scale] duration-150 ease-out hover:bg-(--ii-hover) focus-visible:outline-2 active:scale-[0.96] aria-expanded:bg-(--ii-selected) motion-reduce:active:scale-100",
-              }}
-              head={headIdentities}
-              onColour={(button) => (headColourAnchor = button)}
-              onStartPage={showStartPage}
-              onSignOut={() => unavailable("Signing out")}
-            />
-            {#if headColourAnchor !== undefined}
-              <ColourStrip
-                anchor={headColourAnchor}
-                align="end"
-                initial={identityInitial(identity.name)}
-                current={colourIndex}
-                onPick={pickColour}
-                onClose={() => (headColourAnchor = undefined)}
+              <IdentityMenu
+                trigger={{
+                  content: headAvatar,
+                  label: `${identityName}: identities and settings`,
+                  class:
+                    "focus-visible:outline-focus-ring grid shrink-0 place-items-center rounded-full p-[3px] transition-[background-color,scale] duration-150 ease-out hover:bg-(--ii-hover) focus-visible:outline-2 active:scale-[0.96] aria-expanded:bg-(--ii-selected) motion-reduce:active:scale-100",
+                }}
+                head={headIdentities}
+                onColour={(button) => (headColourAnchor = button)}
+                onStartPage={showStartPage}
+                onSignOut={() => unavailable("Signing out")}
               />
+              {#if headColourAnchor !== undefined}
+                <ColourStrip
+                  anchor={headColourAnchor}
+                  align="end"
+                  initial={identityInitial(identity.name)}
+                  current={colourIndex}
+                  onPick={pickColour}
+                  onClose={() => (headColourAnchor = undefined)}
+                />
+              {/if}
             {/if}
-          {/if}
+          </div>
         </div>
       </div>
       <!-- The greeting and the tabs share the grid's width, so the name, the
@@ -2167,12 +2200,7 @@
                banner, more shelves. The featured shelf keeps to apps this
                identity doesn't use yet, and steps aside when there are none. -->
           <div class={["mx-auto", LOGO_SPAN]}>
-            <ExplorePage
-              {featured}
-              {isAdded}
-              onAdd={(app) => addApp(app)}
-              onAddLink={addLink}
-            />
+            <ExplorePage {featured} {isAdded} onAdd={(app) => addApp(app)} />
           </div>
         </div>
 
