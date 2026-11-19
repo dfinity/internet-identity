@@ -2,27 +2,21 @@
   import { IDENTITY_PALETTES } from "$lib/utils/identityColors";
 
   /** The colours an identity can take, by their place in IDENTITY_PALETTES:
-   *  ten of the 21 pairs, once around the hue wheel, light grounds and
-   *  saturated ones mixed, so a row of them reads as ten different colours.
+   *  five of the 21 pairs, once around the hue wheel, three light grounds and
+   *  two saturated ones, so the row reads as five plainly different colours.
    *  They hold the three the mock identities' numbers give. */
   export const COLOUR_CHOICES: readonly number[] = [
     "Golden Hour",
     "Bite Your Tongue",
-    "Diamond Day",
     "Late Gift",
-    "Milo's Big Day",
-    "Robed Witness",
     "Brain Waves",
     "Mr. Business",
-    "Block Party",
-    "Hidden Garden",
   ].map((name) => IDENTITY_PALETTES.findIndex((pair) => pair.name === name));
 </script>
 
 <script lang="ts">
   import { untrack } from "svelte";
   import { UserIcon } from "@lucide/svelte";
-  import { MediaQuery } from "svelte/reactivity";
   import Popup from "./Popup.svelte";
 
   interface Props {
@@ -53,9 +47,6 @@
       ? COLOUR_CHOICES
       : [current, ...COLOUR_CHOICES],
   );
-  /** One row where there's room for it, two on a phone. */
-  const wide = new MediaQuery("min-width: 480px");
-
   let swatches = $state<HTMLButtonElement[]>([]);
 
   // Focus starts on the colour in use, so arrow keys move from there.
@@ -119,7 +110,7 @@
   <div
     role="radiogroup"
     aria-label="Colour"
-    class={["grid gap-1 p-1.5", wide.current ? "grid-flow-col" : "grid-cols-5"]}
+    class="grid grid-flow-col gap-1 p-1.5"
   >
     {#each choices as paletteIndex, index (paletteIndex)}
       {@const pair = IDENTITY_PALETTES[paletteIndex]}
