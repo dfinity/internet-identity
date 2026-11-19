@@ -211,7 +211,7 @@ const joinFullName = (
     : undefined;
 };
 
-const APPLE_ORIGIN = "https://appleid.apple.com";
+export const APPLE_ORIGIN = "https://appleid.apple.com";
 
 /**
  * Apple's reply to a `response_mode=web_message` authorization, which Apple
@@ -266,6 +266,12 @@ const APPLE_REPLY_AFTER_FOCUS_MS = 1000;
  * through /callback doesn't reach this window from there, so `redirectURL`
  * asks Apple for a web_message reply, which Apple posts straight to this
  * window.
+ *
+ * The popup opens on `/apple-connecting`, which sends itself to Apple, rather
+ * than on Apple's URL. Safari answers a `window.open` of Apple's URL only once
+ * the sheet ends, and this page waits in it, frozen. When this page shares its
+ * process with the tab that opened it, Safari terminates that process after
+ * a few seconds, which leaves this page blank (https://bugs.webkit.org/show_bug.cgi?id=332372).
  */
 const requestWithAppleSheet = (redirectURL: URL): Promise<string> => {
   const expectedState = redirectURL.searchParams.get("state");
@@ -274,7 +280,7 @@ const requestWithAppleSheet = (redirectURL: URL): Promise<string> => {
   const left = (window.innerWidth - width) / 2 + window.screenX;
   const top = (window.innerHeight - height) / 2 + window.screenY;
   const popup = window.open(
-    redirectURL.href,
+    `/apple-connecting#${encodeURIComponent(redirectURL.href)}`,
     "_blank",
     `width=${width},height=${height},left=${left},top=${top}`,
   );
