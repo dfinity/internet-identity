@@ -762,13 +762,14 @@
   const pageRefs = $state<HTMLElement[]>([]);
   const tabRefs = $state<HTMLElement[]>([]);
   /** Each tab's width, for the thumb under the selected one. The tabs sit
-   *  edge to edge after the pill's 4px of padding, so a tab starts where the
-   *  ones before it end. */
+   *  edge to edge after the pill's padding, so a tab starts where the ones
+   *  before it end; `start` is from the first tab, the padding added where
+   *  the pill is drawn. */
   const tabWidths = $state(PAGES.map(() => 0));
   const thumb = $derived(
     tabWidths.every((width) => width > 0)
       ? {
-          start: 4 + tabWidths.slice(0, activePage).reduce((a, b) => a + b, 0),
+          start: tabWidths.slice(0, activePage).reduce((a, b) => a + b, 0),
           width: tabWidths[activePage],
         }
       : undefined,
@@ -1312,35 +1313,51 @@
 {/snippet}
 
 {#snippet pageTabs(atBottom: boolean)}
-  <!-- The pages. Over the grid they're a pill in the header (see `pill`); on
-       a phone they're the tab bar, floating over the blur at the bottom,
-       always lifted since content always runs under it, and a step larger
-       for a thumb. In the header the first tab's thumb stands on the
-       greeting's line, the logos' edge, and the pill reaches past it by its
-       border and padding (5px). -->
+  <!-- The pages. Over the grid they're a segmented control in the header: a
+       track in the shelf's grey, the colour the canvas groups things in,
+       solid so it stays whole when content runs under it and the pill lifts
+       (see `pill`). On a phone they're the tab bar, floating over the blur at
+       the bottom, always lifted since content always runs under it, and a
+       step larger for a thumb. In the header the first tab's thumb stands on
+       the greeting's line, the logos' edge, and the track reaches past it by
+       its border and padding (4px). -->
+  {@const padding = atBottom ? 4 : 3}
   <div
     role="tablist"
     aria-label="Apps"
     tabindex="-1"
     onkeydown={onTabKeydown}
     class={[
-      "relative flex items-center p-1",
+      "relative flex items-center",
       atBottom
-        ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6)"
-        : [pill, PILL_MOTION, "-ms-[5px] h-10"],
+        ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6) p-1"
+        : [
+            "pointer-events-auto -ms-1 h-10 rounded-full border border-transparent bg-(--ii-shelf) p-[3px]",
+            headerLifted && "ii-elevation-6",
+            PILL_MOTION,
+          ],
     ]}
   >
     <!-- The selected tab sits on a thumb, as in a segmented control, so it
-         reads by its shape and not only by its darker text. The thumb is the
-         selected overlay, so it shows on the pill at rest, in the canvas's
-         colour, and on the lifted one; it slides to a tab picked or swiped
-         to. Mounted once the tabs are measured, so it doesn't grow in from
-         nothing on load. -->
+         reads by its shape and not only by its darker text. In the header
+         it's raised off the grey track, a surface with a small shadow, as the
+         theme switch's option in use is; 3px of the track show around it, so
+         the two read as one control. White in light; in dark the top level,
+         since the track is already a step up from the canvas and a lower one
+         would barely part from it. The phone's tab bar is already raised,
+         so there the thumb is the selected overlay. It slides to a tab
+         picked or swiped to. Mounted once the tabs are measured, so it
+         doesn't grow in from nothing on load. -->
     {#if thumb !== undefined}
       <span
         aria-hidden="true"
-        class="absolute inset-y-1 rounded-full bg-(--ii-selected) transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none"
-        style:inset-inline-start={`${thumb.start}px`}
+        class={[
+          "absolute rounded-full transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
+          atBottom
+            ? "inset-y-1 bg-(--ii-selected)"
+            : "inset-y-[3px] bg-(--ii-surface-8) shadow-(--ii-shadow-3)",
+        ]}
+        style:inset-inline-start={`${padding + thumb.start}px`}
         style:width={`${thumb.width}px`}
       ></span>
     {/if}
