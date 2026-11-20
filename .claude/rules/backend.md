@@ -99,7 +99,7 @@ The first pass catches dead code that only test code uses; the second lints the 
 
 ## Integration tests (PocketIC)
 
-`be/test-canisters-script` `scripts/test-canisters.sh` prepares everything the integration tests (`cargo test -p internet_identity --test integration ...`) need, at the repository root: the PocketIC server binary `pocket-ic`, the built `internet_identity.wasm.gz` and `archive.wasm.gz`, and the previous release wasms (`internet_identity_previous.wasm.gz`, `archive_previous.wasm.gz`) for the upgrade and rollback tests. Read it before preparing them by hand.
+`be/test-canisters-script` `scripts/test-canisters.sh` prepares everything the integration tests (`cargo test -p internet_identity --test integration ...`) need, at the repository root: the PocketIC server binary `pocket-ic`, the built `internet_identity.wasm.gz` and `archive.wasm.gz`, and the previous release wasms (`internet_identity_previous.wasm.gz`, `archive_previous.wasm.gz`) for the upgrade and rollback tests, plus the pinned `internet_identity_doh_allowlist.wasm.gz` (through `scripts/fetch-doh-allowlist-wasm`) for the DoH allowlist migration tests. Read it before preparing them by hand.
 
 `be/pin-pocket-ic` Download the exact pinned PocketIC server version, never `latest`. The pin lives in `scripts/test-canisters.sh` (`POCKET_IC_SERVER_VERSION`) and `.github/workflows/canister-tests.yml`, and must match the `pocket-ic` client crate in `Cargo.toml`. Bump all of them together. Look the pin up rather than trusting a version quoted anywhere:
 

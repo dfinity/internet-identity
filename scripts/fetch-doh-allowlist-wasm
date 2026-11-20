@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Downloads the production wasm of release-2026-11-13, the last Internet
+# Identity release whose `DohConfig` is an allowlist (`allowed_domains`), to
+# internet_identity_doh_allowlist.wasm.gz at the repository root. The upgrade
+# and rollback tests of the DoH allowlist migration load it as
+# `II_WASM_DOH_ALLOWLIST` (src/canister_tests/src/framework.rs).
+#
+# The download is verified against the release's published sha256, which is
+# also the module hash of the II canister on mainnet while it runs that release.
+# A file already in place is kept only when it has that hash.
+#
+# TEMPORARY: remove this script, its callers and the tests that use the wasm
+# once mainnet runs a release whose `DohConfig` has `reserved_domains`.
+
+set -euo pipefail
+
+RELEASE_TAG="release-2026-11-13"
+WASM_SHA256="5d8b0afded2192e8a4bd26accccd81335633647702c9c33b0cf3d7a1d76b0de7"
+WASM_URL="https://github.com/dfinity/internet-identity/releases/download/${RELEASE_TAG}/internet_identity_production.wasm.gz"
+WASM_PATH="internet_identity_doh_allowlist.wasm.gz"
+
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPTS_DIR/.."
+
+# Prints the sha256 of the file at $1: `sha256sum` on Linux, `shasum` on macOS.
+file_sha256() {
+  local file_path="$1"
+  if command -v sha256sum >/dev/null; then
+    sha256sum "$file_path" | cut -d ' ' -f 1
+  else
+    shasum -a 256 "$file_path" | cut -d ' ' -f 1
+  fi
+}
+
+if [ -f "$WASM_PATH" ] && [ "$(file_sha256 "$WASM_PATH")" = "$WASM_SHA256" ]; then
+  echo "Using $WASM_PATH ($RELEASE_TAG)."
+  exit 0
+fi
+
+download_dir="$(mktemp -d)"
+trap 'rm -rf "$download_dir"' EXIT
+
+echo "Downloading $WASM_PATH ($RELEASE_TAG)."
+curl -sSfL "$WASM_URL" -o "$download_dir/$WASM_PATH"
+downloaded_sha256="$(file_sha256 "$download_dir/$WASM_PATH")"
+if [ "$downloaded_sha256" != "$WASM_SHA256" ]; then
+  echo "Checksum mismatch for $WASM_URL: expected $WASM_SHA256, got $downloaded_sha256" >&2
+  exit 1
+fi
+mv "$download_dir/$WASM_PATH" "$WASM_PATH"
