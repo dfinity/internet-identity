@@ -79,10 +79,6 @@ const EXCEPTIONS: { file: string; line: string; why: string }[] = [
 /** Breaks of the rule known and being fixed, each by its own commit. */
 const PENDING: { file: string; line: string }[] = [
   {
-    file: "./+page.svelte",
-    line: '"bg-bg-primary border-border-tertiary mx-2.5',
-  },
-  {
     file: "./components/SectionView.svelte",
     line: 'info: "border-border-tertiary bg-bg-primary',
   },

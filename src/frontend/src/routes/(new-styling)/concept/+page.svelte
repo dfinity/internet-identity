@@ -45,7 +45,7 @@
   import AppView from "./components/AppView.svelte";
   import BulkView from "./components/BulkView.svelte";
   import ConnectPage from "./components/ConnectPage.svelte";
-  import Elevated from "./components/Elevated.svelte";
+  import Elevated, { CANVAS, surfaceColor } from "./components/Elevated.svelte";
   import HeadCard from "./components/HeadCard.svelte";
   import HeaderSearch from "./components/HeaderSearch.svelte";
   import SurfaceLevel from "./components/SurfaceLevel.svelte";
@@ -2395,9 +2395,13 @@
                     ]}
                   >
                     <div class="min-h-0 overflow-hidden">
+                      <!-- A card a step above the canvas, as anything laid
+                           on it is: in dark lighter than the canvas, not a
+                           hole in it. -->
                       <label
+                        style:background-color={surfaceColor(CANVAS + 1)}
                         class={[
-                          "bg-bg-primary border-border-tertiary mx-2.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 md:mt-2 @lg:mx-[calc((var(--ii-tile)-var(--ii-logo))/2-var(--spacing))]",
+                          "border-border-tertiary mx-2.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 md:mt-2 @lg:mx-[calc((var(--ii-tile)-var(--ii-logo))/2-var(--spacing))]",
                           managing
                             ? "scale-100 opacity-100 delay-50 duration-200 ease-(--ii-ease-out)"
                             : "scale-[0.98] opacity-0 duration-120 ease-out",
