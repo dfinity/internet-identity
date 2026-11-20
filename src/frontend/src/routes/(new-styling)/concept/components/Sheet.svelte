@@ -4,6 +4,7 @@
   import { cubicOut, quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { fade, fly } from "svelte/transition";
+  import { FLOATING, provideSurface } from "./Elevated.svelte";
 
   interface Props {
     onClose: () => void;
@@ -26,6 +27,10 @@
     "aria-label": label,
     children,
   }: Props = $props();
+
+  // A sheet floats over the page, as the island and search do, and what it
+  // holds stands on it: its cards a step above, never below.
+  provideSurface(FLOATING);
 
   let dialog = $state<HTMLDialogElement>();
   let panel = $state<HTMLDivElement>();
@@ -148,7 +153,7 @@
     autofocus
     tabindex="-1"
     class={[
-      "bg-bg-primary_alt absolute inset-x-0 flex flex-col overflow-hidden rounded-t-2xl outline-none",
+      "absolute inset-x-0 flex flex-col overflow-hidden rounded-t-2xl bg-(--ii-floating) outline-none",
       !dragging &&
         "transition-[translate] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
     ]}

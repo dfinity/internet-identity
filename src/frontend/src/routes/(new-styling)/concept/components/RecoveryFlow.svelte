@@ -39,7 +39,7 @@
   import Badge from "$lib/components/ui/Badge.svelte";
   import { swapIn, viewIn, viewOut } from "../motion";
   import type { Scenario } from "../status";
-  import Elevated from "./Elevated.svelte";
+  import Elevated, { FLOATING, surfaceColor } from "./Elevated.svelte";
 
   interface Props {
     /** Where recovery stands now; each way back in reads its own status. */
@@ -284,9 +284,12 @@
     use:arrive
     class="flex gap-3 rounded-2xl bg-(--ii-hover) p-3.5 outline-none"
   >
+    <!-- A step above what holds the flow: a sheet on a phone, which floats;
+         on desktop the product's dialog, which is darker in dark. -->
     <span
       aria-hidden="true"
-      class="text-fg-secondary grid size-9 shrink-0 place-items-center rounded-[0.625rem] bg-(--ii-floating) shadow-(--ii-shadow-2)"
+      class="text-fg-secondary grid size-9 shrink-0 place-items-center rounded-[0.625rem] shadow-(--ii-shadow-2)"
+      style:background-color={surfaceColor(sheet ? FLOATING + 1 : FLOATING)}
     >
       <Icon class="size-4.5" />
     </span>

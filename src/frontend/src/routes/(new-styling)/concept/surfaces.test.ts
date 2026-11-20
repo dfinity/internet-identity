@@ -78,7 +78,6 @@ const EXCEPTIONS: { file: string; line: string; why: string }[] = [
 
 /** Breaks of the rule known and being fixed, each by its own commit. */
 const PENDING: { file: string; line: string }[] = [
-  { file: "./components/Sheet.svelte", line: '"bg-bg-primary_alt absolute' },
   {
     file: "./+page.svelte",
     line: '"bg-bg-primary border-border-tertiary mx-2.5',
