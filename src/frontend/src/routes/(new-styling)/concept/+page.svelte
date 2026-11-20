@@ -1304,9 +1304,7 @@
   <!-- Phone: the panel's three sections as the head's own cards, side by
        side, so how you get in, how you'd get back in and where you're signed
        in are there as the page opens. Each opens its section over the apps. -->
-  <div
-    class="pointer-events-auto grid grid-cols-3 gap-1.5 pb-8 @max-[24rem]/canvas:grid-cols-1"
-  >
+  <div class="pointer-events-auto grid grid-cols-3 gap-1.5 pb-8">
     {#each accountCards as card (card.kind)}
       <HeadCard
         {card}
