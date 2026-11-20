@@ -5,6 +5,13 @@ it with `npm run dev:concept` and open http://127.0.0.1:5174/concept; the
 flask in a corner opens the concept menu (layout, scenario, how fast data
 arrives, a new visit).
 
+The files are in folders by block, the way they'll go to the product:
+`foundation/` (surfaces, motion and loading, the frame), `features/`
+(identity, security, apps, search, explore, connect) and `mock/`, which
+stays the concept's. `+page.svelte` assembles the screen. [README.md](README.md)
+maps the blocks and what each needs from the product; put a new file in
+its block's folder.
+
 Before you change anything here:
 
 1. **Surfaces only go up.** Read [SURFACES.md](SURFACES.md). A surface is
