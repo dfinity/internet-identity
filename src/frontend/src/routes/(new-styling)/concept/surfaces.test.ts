@@ -87,14 +87,6 @@ const PENDING: { file: string; line: string }[] = [
     line: 'neutral: "border-border-tertiary bg-bg-primary',
   },
   {
-    file: "./components/AppTile.svelte",
-    line: ': "border-border-primary bg-bg-primary",',
-  },
-  {
-    file: "./components/ManageHints.svelte",
-    line: '[MARK, "border-border-primary bg-bg-primary"]',
-  },
-  {
     file: "./components/IdentityStack.svelte",
     line: 'class="bg-bg-secondary text-text-tertiary',
   },

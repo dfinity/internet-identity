@@ -290,10 +290,12 @@
           // The unread count's size and place, mirrored to the start corner:
           // 18px, 5px over the logo's edges. The 1.5px ring matches the
           // check's own stroke (3 on lucide's 24-unit grid, drawn at 12px).
+          // Empty, it is the top of the ladder, laid over the logo: in dark
+          // lighter than the canvas, not a hole in it.
           "mark absolute -start-[5px] -top-[5px] flex size-4.5 items-center justify-center rounded-full border-[1.5px]",
           selected
             ? "border-bg-brand-solid bg-bg-brand-solid text-text-primary-inversed"
-            : "border-border-primary bg-bg-primary",
+            : "border-border-primary bg-(--ii-top)",
         ]}
       >
         {#if selected}

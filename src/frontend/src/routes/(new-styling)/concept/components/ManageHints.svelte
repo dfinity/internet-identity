@@ -74,7 +74,7 @@
     <span class={CELL}>
       <span class="relative">
         <span class={["block", LOGO]}></span>
-        <span class={[MARK, "border-border-primary bg-bg-primary"]}></span>
+        <span class={[MARK, "border-border-primary bg-(--ii-top)"]}></span>
       </span>
       <span class={NAME}></span>
     </span>
