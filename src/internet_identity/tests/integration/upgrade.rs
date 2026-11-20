@@ -167,15 +167,15 @@ fn should_report_no_browsers_for_an_anchor_from_the_previous_release() -> Result
     Ok(())
 }
 
-/// `DohConfig` as the previous release declares it in its `.did`: an allowlist
-/// of registered domains instead of `reserved_domains`.
+/// `DohConfig` as `II_WASM_DOH_ALLOWLIST` declares it in its `.did`: an
+/// allowlist of registered domains instead of `reserved_domains`.
 #[derive(CandidType, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct LegacyDohConfig {
     pub(crate) allowed_domains: Vec<String>,
     pub(crate) max_cache_age_secs: Option<u64>,
 }
 
-/// The `doh_config` field of the previous release's `InternetIdentityInit`,
+/// The `doh_config` field of `II_WASM_DOH_ALLOWLIST`'s `InternetIdentityInit`,
 /// encoded as its upgrade arg and decoded from its `config` query; every other
 /// field is optional there, so it is left out.
 #[derive(CandidType, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -183,8 +183,8 @@ pub(crate) struct LegacyDohInit {
     pub(crate) doh_config: Option<Option<LegacyDohConfig>>,
 }
 
-/// Upgrades `canister_id` to the previous release with `doh_config` as its arg.
-pub(crate) fn configure_previous_release_doh(
+/// Upgrades `canister_id` to `II_WASM_DOH_ALLOWLIST` with `doh_config` as its arg.
+pub(crate) fn configure_doh_allowlist_release(
     env: &PocketIc,
     canister_id: Principal,
     doh_config: LegacyDohConfig,
@@ -194,15 +194,15 @@ pub(crate) fn configure_previous_release_doh(
     });
     env.upgrade_canister(
         canister_id,
-        II_WASM_PREVIOUS.clone(),
+        II_WASM_DOH_ALLOWLIST.clone(),
         candid::encode_one(arg).expect("error encoding legacy DoH upgrade arg"),
         None,
     )
-    .expect("upgrade of the previous release with a legacy DoH config failed");
+    .expect("upgrade to the DoH allowlist release with a legacy DoH config failed");
 }
 
-/// Reads `doh_config` from the `config` query in the previous release's shape.
-pub(crate) fn previous_release_doh_config(
+/// Reads `doh_config` from the `config` query in `II_WASM_DOH_ALLOWLIST`'s shape.
+pub(crate) fn doh_allowlist_release_config(
     env: &PocketIc,
     canister_id: Principal,
 ) -> Option<Option<LegacyDohConfig>> {
@@ -212,21 +212,21 @@ pub(crate) fn previous_release_doh_config(
     config.doh_config
 }
 
-/// Verifies that a DoH allowlist stored by the previous release keeps DoH configured
+/// Verifies that a DoH allowlist stored by `II_WASM_DOH_ALLOWLIST` keeps DoH configured
 /// after an upgrade without an arg: no domain is reserved, the cache age survives, and
 /// an address outside the old allowlist is accepted.
 #[test]
 fn should_keep_doh_configured_with_no_reserved_domains_after_upgrading_a_legacy_allowlist() {
     for allowed_domains in [vec!["example.com".to_string()], vec![]] {
         let env = env();
-        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let canister_id = install_ii_canister(&env, II_WASM_DOH_ALLOWLIST.clone());
         let legacy_config = LegacyDohConfig {
             allowed_domains,
             max_cache_age_secs: Some(1234),
         };
-        configure_previous_release_doh(&env, canister_id, legacy_config.clone());
+        configure_doh_allowlist_release(&env, canister_id, legacy_config.clone());
         assert_eq!(
-            previous_release_doh_config(&env, canister_id),
+            doh_allowlist_release_config(&env, canister_id),
             Some(Some(legacy_config))
         );
 
@@ -265,8 +265,8 @@ fn should_keep_doh_configured_with_no_reserved_domains_after_upgrading_a_legacy_
 #[test]
 fn should_reserve_doh_domains_by_upgrade_arg_after_upgrading_a_legacy_allowlist() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-    configure_previous_release_doh(
+    let canister_id = install_ii_canister(&env, II_WASM_DOH_ALLOWLIST.clone());
+    configure_doh_allowlist_release(
         &env,
         canister_id,
         LegacyDohConfig {

@@ -2,7 +2,7 @@
 //! This tests stable memory compatibility and pre / post install hooks.
 
 use crate::upgrade::{
-    configure_previous_release_doh, previous_release_doh_config, LegacyDohConfig,
+    configure_doh_allowlist_release, doh_allowlist_release_config, LegacyDohConfig,
 };
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2::create_account;
@@ -245,9 +245,9 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
     assert_eq!(accounts_between, accounts_after);
 }
 
-/// Verifies that a DoH config with reserved domains doesn't block a rollback: the
-/// previous release, which requires an allowlist, reads it as DoH unconfigured, and an
-/// upgrade arg on the previous release configures DoH again.
+/// Verifies that a DoH config with reserved domains doesn't block a rollback:
+/// `II_WASM_DOH_ALLOWLIST`, which requires an allowlist, reads it as DoH unconfigured,
+/// and an upgrade arg on that release configures DoH again.
 #[test]
 fn should_roll_back_with_reserved_doh_domains_as_unconfigured_doh() {
     let env = env();
@@ -268,18 +268,18 @@ fn should_roll_back_with_reserved_doh_domains_as_unconfigured_doh() {
         Some(Some(doh_config))
     );
 
-    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+    upgrade_ii_canister(&env, canister_id, II_WASM_DOH_ALLOWLIST.clone());
     api::health_check(&env, canister_id);
-    assert_eq!(previous_release_doh_config(&env, canister_id), Some(None));
+    assert_eq!(doh_allowlist_release_config(&env, canister_id), Some(None));
 
     let legacy_config = LegacyDohConfig {
         allowed_domains: vec!["example.com".into()],
         max_cache_age_secs: Some(1234),
     };
-    configure_previous_release_doh(&env, canister_id, legacy_config.clone());
+    configure_doh_allowlist_release(&env, canister_id, legacy_config.clone());
     api::health_check(&env, canister_id);
     assert_eq!(
-        previous_release_doh_config(&env, canister_id),
+        doh_allowlist_release_config(&env, canister_id),
         Some(Some(legacy_config))
     );
 }
