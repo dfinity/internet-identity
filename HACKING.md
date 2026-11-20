@@ -153,6 +153,8 @@ To run the canister tests, run the following command from the root directory:
 
 Some canister tests (upgrade, rollback and a few others) install the wasms of the release currently in production, then upgrade from or roll back to them. CI downloads those wasms from the latest GitHub release (`releases/latest`) as `internet_identity_previous.wasm.gz` and `archive_previous.wasm.gz`; the paths can be overridden with the `II_WASM_PREVIOUS` and `ARCHIVE_WASM_PREVIOUS` environment variables.
 
+The upgrade and rollback tests of the DoH allowlist migration use a pinned older release instead: `release-2026-11-13`, the last one whose `DohConfig` is an allowlist. `scripts/fetch-doh-allowlist-wasm` downloads it as `internet_identity_doh_allowlist.wasm.gz` and checks its hash; the path can be overridden with the `II_WASM_DOH_ALLOWLIST` environment variable.
+
 On a `release-*` tag, CI skips the canister tests when the tagged commit is on `main`: `main`'s own run already tested that commit against the release then in production. Running them on the tag would not work anyway, because the tag's run publishes the new release in parallel, so "latest" becomes the release under test (or one whose assets are still uploading).
 
 Releases are only cut from commits on `main`. There is no hotfix process: a tag on a commit that is not on `main` runs the canister tests, but they still download `releases/latest` while that same run publishes the release, so they can race with it. Supporting hotfixes would need the tests to resolve the release before the tag explicitly, or the `release` job to wait for the tests.

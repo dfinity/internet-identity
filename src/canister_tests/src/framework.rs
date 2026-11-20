@@ -69,6 +69,25 @@ lazy_static! {
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
+    /** The gzipped Wasm module of release-2026-11-13, the last II release whose `DohConfig` is an
+     * allowlist (`allowed_domains`), which the upgrade and rollback tests of the DoH allowlist
+     * migration install. `II_WASM_PREVIOUS` can't stand in for it: every later release stores
+     * `reserved_domains`.
+     * TEMPORARY: remove it, `scripts/fetch-doh-allowlist-wasm` and the tests that use it once
+     * mainnet runs a release whose `DohConfig` has `reserved_domains`. */
+    pub static ref II_WASM_DOH_ALLOWLIST: Vec<u8> = {
+        let def_path = path::PathBuf::from("..").join("..").join("internet_identity_doh_allowlist.wasm.gz");
+        let err = format!("
+        Could not find the Internet Identity Wasm module of release-2026-11-13, the last release with a DoH allowlist.
+
+        I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_DOH_ALLOWLIST (note that I run from {:?}).
+
+        In order to get the Wasm module, please run the following command:
+            ./scripts/fetch-doh-allowlist-wasm
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
+        get_wasm_path("II_WASM_DOH_ALLOWLIST".to_string(), &def_path).expect(&err)
+    };
+
         /** The gzipped Wasm module for the _previous_ archive build, or latest release, which is used when testing
             * upgrades and downgrades */
     pub static ref ARCHIVE_WASM_PREVIOUS: Vec<u8> = {

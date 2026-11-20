@@ -45,6 +45,8 @@ else
   curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o ${PREVIOUS_ARCHIVE_WASM_PATH}
 fi
 
+./scripts/fetch-doh-allowlist-wasm
+
 if [ ! -f "$POCKET_IC_SERVER_PATH" ]; then
   echo "Downloading PocketIC."
   curl -sSL https://github.com/dfinity/pocketic/releases/download/${POCKET_IC_SERVER_VERSION}/pocket-ic-x86_64-${PLATFORM}.gz -o ${POCKET_IC_SERVER_PATH}.gz
