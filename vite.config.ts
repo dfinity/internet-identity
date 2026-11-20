@@ -73,12 +73,15 @@ export default defineConfig(({ command, mode }): UserConfig => {
               // cross-subdomain behaviour has somewhere to happen. All of them
               // are the same canister, so one alternative-origins list serves
               // every one of them.
+              // The long `*.nice-name.com` host is wider than the sign-in panel
+              // and has no hyphen to wrap at, for the authorize layout e2e test.
               hosts: [
                 "nice-name.com",
                 "a.nice-name.com",
                 "b.nice-name.com",
                 "auth.nice-name.com",
                 "denied-app.com",
+                "averyveryverylongappsubdomainwithnohyphenstobreakat.nice-name.com",
               ],
               canisterName: "test_app",
             },
