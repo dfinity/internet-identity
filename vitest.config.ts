@@ -13,6 +13,7 @@ export default defineConfig(({ mode }: UserConfig): UserConfig => ({
     exclude: [
       ...configDefaults.exclude,
       "src/frontend/tests/e2e-playwright/**",
+      "src/frontend/tests/e2e-playwright-chrome-extension/**",
       ...(mode === "test" ? ["src/frontend/tests/e2e/**"] : []),
     ],
     include: [

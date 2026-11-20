@@ -3,9 +3,7 @@ import { CredentialData } from "./credential-devices";
 import { findWebAuthnFlows } from "./findWebAuthnFlows";
 
 vi.mock("$lib/globals", () => ({
-  canisterConfig: {
-    new_flow_origins: [["https://id.ai"]],
-  },
+  getPrimaryOrigin: () => "https://id.ai",
 }));
 
 describe("findWebAuthnFlows", () => {

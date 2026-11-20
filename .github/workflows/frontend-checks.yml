@@ -30,6 +30,10 @@ jobs:
         run: npm run format-check
       - name: Build the frontend
         run: npm run build
+      # Runs after the build: the test of the built service worker is skipped
+      # when the build output is absent.
+      - name: Run unit tests
+        run: npm run test
       - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
         run: npm run generate
