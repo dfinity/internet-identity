@@ -24,7 +24,9 @@
     brandIconOf,
     nameOf,
   } from "../../manage/(authenticated)/devices/browsers";
+  import { MediaQuery } from "svelte/reactivity";
   import type { MockBrowser, MockIdentity } from "../mockData";
+  import { TALL_PANEL } from "../panel";
   import {
     accessCount,
     aiAccessOn,
@@ -54,7 +56,8 @@
     card?: CardStatus;
     signedInWith: MockIdentity["signedInWith"];
     browsers: MockBrowser[];
-    /** Close, at the end of a page's title. */
+    /** Close, at the end of a page's title; on a card, its lead closes it,
+     *  as the card's head does. */
     onClose?: () => void;
     onSignOut: (id: string) => void;
     /** Moves the scenario on, as finishing the step would. */
@@ -79,6 +82,10 @@
     onRecovery,
     onUnavailable,
   }: Props = $props();
+
+  /** As the card around it: a large title where the panel is tall. */
+  const tall = new MediaQuery(TALL_PANEL);
+  const large = $derived(tall.current);
 
   interface Row {
     id: string;
@@ -592,15 +599,28 @@
        on a layer of their own, a step up from the card (Misha's turn on
        Thomas's nit: the card's icon and title read as the card's, what's
        on the layer as its contents). It keeps 8px from the card's edges,
-       its corners concentric with the card's. -->
-  <div class="flex flex-col pt-2.5">
-    <p class="text-text-tertiary px-4 text-[13px] leading-[18px]">
-      {@render lead()}
-    </p>
+       its corners concentric with the card's.
+       The lead stays with the title, closer to it than to the layer
+       (Misha): under a large title it rises to 4px from it, and the layer
+       steps 16px down. It's the head's, so it closes the card as the head
+       does, down to the layer. -->
+  <div class="flex flex-col">
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div
+      onclick={onClose}
+      class={[
+        "cursor-pointer px-4 pb-4 select-none",
+        large ? "pt-1" : "pt-2.5",
+      ]}
+    >
+      <p class="text-text-tertiary text-[13px] leading-[18px]">
+        {@render lead()}
+      </p>
+    </div>
     <Elevated
       offset={1}
       shadowLevel={3}
-      class="mx-2 mt-3 flex flex-col overflow-hidden rounded-lg"
+      class="mx-2 flex flex-col overflow-hidden rounded-lg"
     >
       {@render body()}
     </Elevated>

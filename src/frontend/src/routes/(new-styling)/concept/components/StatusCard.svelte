@@ -159,11 +159,20 @@
   {/if}
   <!-- Large: the icon and the chevron (or Close) on one line, the title on
        the next. Compact: all three on one line. The 16px sides stay either
-       way, the identity's and the rows' own edge. -->
+       way, the identity's and the rows' own edge.
+       Open, the head closes the card, as the card opened it (Misha): a
+       click where you opened it closes it again. Only the pointer says so,
+       no tint; Close stands out still, and is the keyboard's way. -->
   <div
     aria-hidden={!open}
+    onclick={(event) => {
+      if (open && closeButton?.contains(event.target as Node) !== true) {
+        onClose?.();
+      }
+    }}
     class={[
-      "pointer-events-none relative px-4",
+      "relative px-4",
+      open ? "cursor-pointer select-none" : "pointer-events-none",
       large
         ? "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center pt-5"
         : "flex items-center gap-3 pt-3.5",
@@ -208,7 +217,10 @@
       {title}
     </h3>
     <!-- The chevron and Close share one cell at the card's end, so the
-         chevron turns into Close where it stood. -->
+         chevron turns into Close where it stood. Large, Close then rises to
+         the icon's top by its ink (Misha): the X's strokes start 12.75px
+         into its 36px button, so the button's top stands 13px over the
+         icon's, the X's tips a hair over its edge, as points look right. -->
     <span
       class={[
         "-me-2.5 grid size-9 shrink-0 place-items-center *:col-start-1 *:row-start-1",
@@ -224,7 +236,10 @@
           aria-controls={contentId}
           in:swapIn={{ reduced, delay: reduced ? 0 : 60 }}
           out:swapOut={{ reduced }}
-          class="btn btn-tertiary btn-icon btn-sm pointer-events-auto rounded-full"
+          class={[
+            "btn btn-tertiary btn-icon btn-sm pointer-events-auto rounded-full",
+            large && "relative -top-[17px]",
+          ]}
         >
           <XIcon class="size-4.5" aria-hidden="true" />
           <span>Close {title}</span>

@@ -61,10 +61,14 @@
         large && "col-start-3 row-start-1",
       ]}
     >
+      <!-- Large, at the icon's top by its ink, as a section card's Close. -->
       <button
         type="button"
         onclick={onClose}
-        class="btn btn-tertiary btn-icon btn-sm rounded-full"
+        class={[
+          "btn btn-tertiary btn-icon btn-sm rounded-full",
+          large && "relative -top-[17px]",
+        ]}
       >
         <XIcon class="size-4.5" aria-hidden="true" />
         <span>{closeLabel}</span>
@@ -75,7 +79,7 @@
     <div
       class={[
         "text-text-tertiary px-4 text-[13px] leading-[18px]",
-        large ? "pt-2" : "pt-2.5",
+        large ? "pt-1" : "pt-2.5",
       ]}
     >
       {@render lead()}

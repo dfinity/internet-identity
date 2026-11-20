@@ -60,7 +60,7 @@
   as="section"
   class={[
     "overflow-hidden",
-    variant === "card" ? "mx-2 mt-3 mb-2 rounded-lg" : "rounded-2xl",
+    variant === "card" ? "mx-2 mt-4 mb-2 rounded-lg" : "rounded-2xl",
   ]}
 >
   <h3 class="sr-only">How to manage apps</h3>
