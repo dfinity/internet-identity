@@ -345,10 +345,10 @@
    *  a little above the middle, where the eye puts it. It stays there
    *  whatever is under it, so a new row or Edit's card doesn't move it,
    *  until the rows would no longer fit: then the room over it gives way,
-   *  down to PAGE_TOP's, and only then the page scrolls. The third is of
-   *  the window less the page's 8px above and below, from those 8px. */
+   *  down to PAGE_TOP's, and only then the page scrolls. The canvas is the
+   *  window less the page's 8px above and below. */
   const MINE_TOP =
-    "h-0 shrink-0 md:h-auto md:min-h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)] md:shrink md:basis-[calc((100dvh-1rem)/3+0.5rem-var(--header-h)-0.75rem)]";
+    "h-0 shrink-0 md:h-auto md:min-h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)] md:shrink md:basis-[calc((100dvh-1rem)/3-var(--header-h)-0.75rem)]";
   /** The greeting's row, over a page: the room under it grows with the
    *  greeting. On a narrow canvas it steps in by the 10px the page keeps
    *  short of the edge, where the logos stand. */
@@ -1855,26 +1855,24 @@
   </div>
 {/snippet}
 
-<!-- One surface, as on a phone (Thomas): the page is the canvas's own level,
-     and the canvas has no frame on it, so the apps and the panel beside them
-     lie on one ground and only the panel's cards stand up from it. The page
-     keeps its 8px padding, so everything stands where it did in the frame.
+<!-- On a phone the canvas is the whole screen. On desktop the apps are in a
+     frame on the page, and the panel lies on the page beside it, a step
+     lower, so the two read as two zones. The page is the canvas's own colour
+     on a phone, where only an overscroll shows it.
      --ii-edge: a phone's margin, the same on both sides, which the logo,
      the identity, the greeting, the cards, the tabs, the apps and the pages'
      content all stand on; plates (hover, a lifted pill) reach past it. -->
 <div
-  class="concept ii-surface-3 text-text-primary min-h-dvh [--ii-edge:--spacing(4)] md:flex md:h-dvh md:p-2"
+  class="concept ii-surface-3 text-text-primary min-h-dvh [--ii-edge:--spacing(4)] md:flex md:h-dvh md:bg-(--ii-surface-1) md:p-2"
   style:--ii-ui={uiScale}
   style:--ii-ui-inset={uiInset}
 >
-  <!-- The canvas: the apps. It doesn't scroll: the header stays put and each
-       page scrolls on its own under it. On desktop it reaches up over the
-       page's 8px to the window's top edge (the header keeps them as its own
-       padding), so what scrolls away isn't cut off 8px short of it. -->
+  <!-- The canvas: the apps, in a frame on the page. It doesn't scroll: the
+       header stays put and each page scrolls on its own under it. -->
   <Elevated
     offset={2}
     as="main"
-    class="@container/canvas flex h-dvh min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 shadow-none md:-mt-2 md:h-auto md:min-h-0"
+    class="@container/canvas flex h-dvh min-w-0 flex-1 flex-col overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none md:h-auto md:min-h-0 md:rounded-[1.25rem]"
   >
     <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
     <h1 class="sr-only">Apps</h1>
@@ -1886,7 +1884,7 @@
     <header
       bind:this={headerElement}
       bind:clientHeight={headerHeight}
-      class="pointer-events-none relative z-10 flex shrink-0 flex-col md:pt-2"
+      class="pointer-events-none relative z-10 flex shrink-0 flex-col"
     >
       <!-- Over the grid, three columns: the logo, the tabs, the controls.
            The outer two share what's left, so the tabs stand on the canvas's
@@ -2324,11 +2322,15 @@
           </div>
         </div>
       </div>
-      <!-- Content comes up from under the island through a blur that deepens
-           into the canvas. A page keeps clear of it at rest (PAGE's pb-32). -->
-      <ProgressiveBlur side="bottom" fade class="h-24" />
+      <!-- Content comes up from under what floats at the bottom (a phone's
+           tab bar, an island) through a blur that deepens into the canvas.
+           A page keeps clear of it at rest (PAGE's pb-32). Beside the panel
+           nothing floats there, so the frame's edge ends the page plainly. -->
+      {#if !isDesktop.current || layout !== "panel"}
+        <ProgressiveBlur side="bottom" fade class="h-24" />
+      {/if}
       <!-- What scrolls up leaves under the header through a blur too, rather
-           than at the window's edge: a phone's head cards, and over the grid
+           than at the canvas's edge: a phone's head cards, and over the grid
            whatever passes under the logo, the tabs and search. -->
       <ProgressiveBlur side="top" fade class="h-(--header-h)" />
     </div>
@@ -2357,9 +2359,9 @@
       ]}
     >
       {#if isDesktop.current}
-        <!-- The panel lies on the same ground as the apps (3), so its cards
-             stand a step above it (4), the way a phone's head cards stand on
-             its canvas. All it holds counts as standing on 3. -->
+        <!-- The panel lies on the page, but its cards stand level with the
+             canvas (3): a step lower, beside it, they read as sunk into the
+             page. So all it holds counts as standing on 2. -->
         <!-- On a large screen the panel is scaled whole, as one picture of
              itself, so every card, row and glyph keeps its proportions; the
              room around it takes the scaled height, so the panel still
@@ -2376,7 +2378,7 @@
             class="w-[22.5rem] origin-top-left rtl:origin-top-right"
             style:scale={uiScale === 1 ? undefined : uiScale}
           >
-            <SurfaceLevel level={3}>
+            <SurfaceLevel level={2}>
               {@render panel(false)}
             </SurfaceLevel>
           </div>

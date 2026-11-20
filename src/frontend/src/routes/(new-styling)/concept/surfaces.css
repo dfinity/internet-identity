@@ -181,12 +181,17 @@
 
 /*
  * Past the page's edges, where an overscroll bounces, the browser paints the
- * root's background, so it is whatever the page shows at that edge: the
- * canvas's level (3), on a phone full bleed and on desktop the one surface
- * the apps and the panel share.
+ * root's background, so it is whatever the page shows at that edge: on a
+ * phone the canvas itself (level 3, full bleed), from `md` the page around
+ * the canvas's frame.
  */
 :root:has(.concept) {
   background-color: var(--ii-surface-3);
+}
+@media (width >= 48rem) {
+  :root:has(.concept) {
+    background-color: var(--ii-surface-1);
+  }
 }
 
 /*
