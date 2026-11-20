@@ -40,7 +40,7 @@
     type Scenario,
     type Tone,
   } from "../status";
-  import Elevated from "./Elevated.svelte";
+  import Elevated, { surfaceColor, useSurface } from "./Elevated.svelte";
   import type { RecoveryMethod } from "./RecoveryFlow.svelte";
 
   interface Props {
@@ -431,14 +431,17 @@
 
   /** A cue's pill, as recovery's dialog draws a way back in: the style's
    *  own tint for a warning or a risk, the plain pill with the text's own
-   *  dot for info. */
+   *  dot for info, a step above the rows it lies on (an Elevated a step
+   *  above the section), so in dark it never reads as cut out of them. */
   const CUE: Record<Tone, string> = {
     risk: "text-fg-error-primary border-transparent bg-(--ii-error-tint)",
     warning:
       "text-fg-warning-primary border-transparent bg-(--ii-warning-tint)",
-    info: "border-border-tertiary bg-bg-primary text-text-primary",
-    neutral: "border-border-tertiary bg-bg-primary text-text-tertiary",
+    info: "border-border-tertiary bg-(--ii-cue) text-text-primary",
+    neutral: "border-border-tertiary bg-(--ii-cue) text-text-tertiary",
   };
+  // Fixed for the component's life, like the place it renders in.
+  const cueSurface = surfaceColor(useSurface() + 2);
   /** What a message says in each style, on a row or in the lead. */
   const SAID: Record<Tone, string> = {
     risk: "text-text-error-primary",
@@ -498,6 +501,7 @@
         <span class="text-text-primary text-sm font-medium">{item.title}</span>
         {#if item.cue !== undefined && item.cue.dot !== true}
           <span
+            style:--ii-cue={cueSurface}
             class={[
               "inline-flex items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-medium",
               CUE[item.cue.tone],
