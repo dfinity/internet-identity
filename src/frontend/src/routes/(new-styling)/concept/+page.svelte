@@ -333,11 +333,11 @@
   /** A phone in the main layout: the panel is the head of the canvas, above
    *  the tabs, so the identity's state is there without a tap. */
   const phoneHead = $derived(!isDesktop.current && layout === "panel");
-  /** Over the grid, each page opens with the greeting, under the header
-   *  (where the tabs are), as far down as the greeting stood when it was
-   *  the header's: 8vh, between 16 and 80px, from the header's row. The
-   *  page's own 12px are part of it. A phone in the main layout has its
-   *  head in the page instead (pageHead). */
+  /** Over the grid, Explore and Connect open with their title, under the
+   *  header (where the tabs are), as far down as the greeting stood when
+   *  it was the header's: 8vh, between 16 and 80px, from the header's row.
+   *  The page's own 12px are part of it. A phone in the main layout has
+   *  its head in the page instead (pageHead). */
   const PAGE_TOP =
     "h-0 shrink-0 md:h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)]";
   /** My apps' greeting stands a third of the way down the canvas (Thomas:
@@ -354,6 +354,10 @@
    *  short of the edge, where the logos stand. */
   const HEAD_ROW =
     "shrink-0 pb-5 md:pb-10 @6xl/canvas:pb-11 @[88rem]/canvas:pb-12 @max-lg/canvas:px-2.5";
+  /** A page's title over the grid, the greeting or Explore's and Connect's:
+   *  it grows with the grid, 28px from seven columns, then with the tiles. */
+  const PAGE_TITLE =
+    "text-xl md:text-2xl md:leading-8 @4xl/canvas:text-[1.75rem] @4xl/canvas:leading-9 @6xl/canvas:text-[2rem] @6xl/canvas:leading-10 @[88rem]/canvas:text-[2.25rem] @[88rem]/canvas:leading-11";
   // On a large screen the controls and the panel grow with the apps
   // (Thomas): the grid already shows its tiles larger as the canvas widens,
   // and controls of a laptop's size, pinned to the window's edges, would
@@ -790,9 +794,21 @@
     { id: "explore", label: "Explore" },
     { id: "connect", label: "Connect" },
   ] as const;
-  /** A phone's Explore and Connect are headed by their title, where My
-   *  apps has the greeting. */
-  const PAGE_TITLES = ["My apps", "Explore apps", "Connect"] as const;
+  /** Explore and Connect open with their title and, under it, a line on
+   *  what they're for, where My apps has the greeting: the tabs are in the
+   *  header now, so the greeting would only say the same again on every
+   *  page. The same on a phone and over the grid. */
+  const PAGE_INTROS: ({ title: string; line: string } | undefined)[] = [
+    undefined,
+    {
+      title: "Explore apps",
+      line: "Apps you can sign in to with Internet Identity.",
+    },
+    {
+      title: "Use your apps from AI",
+      line: "Your assistant signs in to your apps as you, with only the access you allow.",
+    },
+  ];
   let activePage = $state(0);
   let pager = $state<HTMLElement>();
   const pageRefs = $state<HTMLElement[]>([]);
@@ -813,11 +829,11 @@
 
   // The tabs stand in the header, centred over the apps, and stay there as
   // a page scrolls under them, as a phone's tab bar stays at the bottom.
-  // Each page opens with the greeting, which scrolls away with it.
+  // Each page opens with the greeting or its title, which scrolls away with it.
   /** Each page's scroll, which moves the head while that page is shown. */
   const pageScroll = $state(PAGES.map(() => 0));
-  /** The header, and each page's greeting row over the grid: the header
-   *  lifts once the greeting has gone up under it. */
+  /** The header, and each page's greeting or title row over the grid: the
+   *  header lifts once that row has gone up under it. */
   let headerElement = $state<HTMLElement>();
   const pageHeads = $state<HTMLElement[]>([]);
   // On a phone the head (the greeting and the cards) is the top of each page
@@ -1311,9 +1327,7 @@
   <p
     class={[
       "text-text-primary flex min-w-0 items-center gap-x-2 leading-7 font-semibold tracking-tight",
-      inPage
-        ? ["pb-6 text-lg", INSET]
-        : "text-xl md:text-2xl md:leading-8 @4xl/canvas:text-[1.75rem] @4xl/canvas:leading-9 @6xl/canvas:text-[2rem] @6xl/canvas:leading-10 @[88rem]/canvas:text-[2.25rem] @[88rem]/canvas:leading-11",
+      inPage ? ["pb-6 text-lg", INSET] : PAGE_TITLE,
     ]}
   >
     <span class="shrink-0">{greeting},</span>
@@ -1326,11 +1340,46 @@
   </p>
 {/snippet}
 
-{#snippet pageGreeting(index: number)}
-  <!-- Explore and Connect open with the greeting too, as it's true of every
-       page; their content keeps to the logos' span, so it needs no inset. -->
-  <div bind:this={pageHeads[index]} class={["flex", HEAD_ROW]}>
-    {@render greetingLine(false)}
+{#snippet pageIntro(index: number, inPage: boolean)}
+  <!-- Explore's and Connect's title, where My apps has the greeting, and as
+       large, so a tab changes the words and not the layout; under it, one
+       line on what the page is for, quieter. On a phone a step smaller, as
+       the greeting is there. -->
+  {@const intro = PAGE_INTROS[index]}
+  {#if intro !== undefined}
+    <hgroup
+      class={[
+        "flex min-w-0 flex-col",
+        inPage ? "gap-1" : "gap-1.5 @6xl/canvas:gap-2",
+      ]}
+    >
+      <h2
+        class={[
+          "text-text-primary leading-7 font-semibold tracking-tight text-balance",
+          inPage ? "text-lg" : PAGE_TITLE,
+        ]}
+      >
+        {intro.title}
+      </h2>
+      <p
+        class={[
+          "text-text-tertiary text-pretty",
+          inPage
+            ? "text-sm leading-5"
+            : "text-[15px] leading-6 @6xl/canvas:text-base @[88rem]/canvas:text-lg @[88rem]/canvas:leading-7",
+        ]}
+      >
+        {intro.line}
+      </p>
+    </hgroup>
+  {/if}
+{/snippet}
+
+{#snippet pageIntroRow(index: number)}
+  <!-- Over the grid: the content keeps to the logos' span, so the title needs
+       no inset. -->
+  <div bind:this={pageHeads[index]} class={HEAD_ROW}>
+    {@render pageIntro(index, false)}
   </div>
 {/snippet}
 
@@ -1355,15 +1404,15 @@
       {@render headCards()}
     </div>
   {:else}
-    <h2
+    <div
       inert={index !== activePage}
       class={[
-        "text-text-primary mx-2.5 shrink-0 pb-6 text-lg leading-7 font-semibold tracking-tight @lg:mx-auto @lg:w-[29.5rem] @lg:max-w-full @2xl:w-[37rem]",
+        "mx-2.5 shrink-0 pb-8 @lg:mx-auto @lg:w-[29.5rem] @lg:max-w-full @2xl:w-[37rem]",
         INSET,
       ]}
     >
-      {PAGE_TITLES[index]}
-    </h2>
+      {@render pageIntro(index, true)}
+    </div>
   {/if}
 {/snippet}
 
@@ -2289,7 +2338,7 @@
                identity doesn't use yet, and steps aside when there are none. -->
           <div class={["mx-auto", LOGO_SPAN]}>
             {#if !phoneHead}
-              {@render pageGreeting(1)}
+              {@render pageIntroRow(1)}
             {/if}
             <ExplorePage {featured} {isAdded} onAdd={(app) => addApp(app)} />
           </div>
@@ -2311,7 +2360,7 @@
           {/if}
           <div class={["mx-auto", LOGO_SPAN]}>
             {#if !phoneHead}
-              {@render pageGreeting(2)}
+              {@render pageIntroRow(2)}
             {/if}
             <ConnectPage
               integrations={current.scenario.integrations}
