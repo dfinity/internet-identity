@@ -13,7 +13,7 @@
     identityInitial,
     type IdentityPalette,
   } from "$lib/utils/identityColors";
-  import { grow, travel } from "../motion";
+  import { grow, revealIn, revealOut, travel } from "../motion";
   import ColourStrip from "./ColourStrip.svelte";
   import Elevated, { useSurface } from "./Elevated.svelte";
   import IdentityList from "./IdentityList.svelte";
@@ -163,7 +163,9 @@
     <!-- The head above stays the current identity and is the list's first
          row, so the list holds only the others (Thomas: each identity once).
          It opens without clipping, so the avatars can come down into it;
-         the card clips instead. -->
+         the card clips instead. As it grows, its rows fade in one by one
+         behind its edge, the way a panel card's section fades in as the card
+         grows, while the avatars land whole (`revealIn`). -->
     <li
       id={SWITCH_LIST_ID}
       transition:grow={{ reduced: prefersReducedMotion.current }}
@@ -179,12 +181,19 @@
         withCurrent={false}
         size="md"
         travel={avatars}
+        reveal
       />
       <!-- The identity's settings under its list, as the phone's menu has
-           them; the colour is the avatar's own. -->
+           them; the colour is the avatar's own. They come in after its
+           rows, as one group, their line with them. -->
       <ul
         aria-label="Settings"
-        class="ii-rows border-border-tertiary flex flex-col border-t py-1 [--ii-rows-inset:4rem]"
+        class="ii-rows ii-reveal border-border-tertiary flex flex-col border-t py-1 [--ii-rows-inset:4rem]"
+        in:revealIn={{
+          index: others.length + 1,
+          reduced: prefersReducedMotion.current,
+        }}
+        out:revealOut={{ reduced: prefersReducedMotion.current }}
       >
         <li>
           <button type="button" onclick={onStartPage} class={ROW}>

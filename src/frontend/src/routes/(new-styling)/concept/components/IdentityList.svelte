@@ -4,7 +4,8 @@
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import type { IdentityPalette } from "$lib/utils/identityColors";
   import { getMetadataString } from "$lib/utils/openID";
-  import { still, type Travel } from "../motion";
+  import { prefersReducedMotion } from "svelte/motion";
+  import { revealIn, revealOut, still, type Travel } from "../motion";
 
   interface Props {
     id: string;
@@ -23,6 +24,10 @@
     size?: "sm" | "md";
     /** The crossfade pair the stack shares: each avatar arrives from it. */
     travel?: Travel;
+    /** Its rows fade in one after another as the block it opens in grows,
+     *  and out as it closes (`revealIn`), all but the avatars travelling in:
+     *  where it opens in place, in the identity card. */
+    reveal?: boolean;
   }
 
   const {
@@ -36,10 +41,17 @@
     withCurrent = true,
     size = "sm",
     travel,
+    reveal = false,
   }: Props = $props();
 
   // svelte-ignore state_referenced_locally
   const [travelOut, travelIn] = travel ?? [still, still];
+  // svelte-ignore state_referenced_locally
+  const [rowIn, rowOut]: [typeof revealIn, typeof revealOut] = reveal
+    ? [revealIn, revealOut]
+    : [still, still];
+  /** The others' rows follow the current one's, where it's listed. */
+  const first = $derived(withCurrent ? 1 : 0);
   /** The product's avatar comes at 32px; the panel's cards stand at 36. */
   const AVATAR = $derived(
     size === "md" ? "shrink-0 [&>div>div]:size-9" : "shrink-0",
@@ -78,8 +90,11 @@
   ]}
 >
   {#if withCurrent}
-    <li>
-      <div class={ROW} aria-current="true">
+    <li
+      in:rowIn|global={{ reduced: prefersReducedMotion.current }}
+      out:rowOut|global={{ reduced: prefersReducedMotion.current }}
+    >
+      <div class={["ii-reveal", ROW]} aria-current="true">
         <IdentityAvatar {identity} palette={paletteOf?.(identity)} size="sm" />
         <span class="flex min-w-0 flex-1 flex-col">
           <span class="text-text-primary truncate text-sm font-medium">
@@ -97,8 +112,15 @@
       </div>
     </li>
   {/if}
-  {#each others as other (other.identityNumber)}
-    <li>
+  {#each others as other, index (other.identityNumber)}
+    <!-- The row fades in, its avatar arriving whole from the stack. -->
+    <li
+      in:rowIn|global={{
+        index: first + index,
+        reduced: prefersReducedMotion.current,
+      }}
+      out:rowOut|global={{ reduced: prefersReducedMotion.current }}
+    >
       <button
         type="button"
         onclick={() => onSwitch(other.identityNumber)}
@@ -115,7 +137,7 @@
             size="sm"
           />
         </span>
-        <span class="flex min-w-0 flex-1 flex-col">
+        <span class="ii-reveal flex min-w-0 flex-1 flex-col">
           <span class="text-text-primary truncate text-sm font-medium">
             {nameOf(other)}
           </span>
@@ -126,8 +148,14 @@
       </button>
     </li>
   {/each}
-  <li>
-    <button type="button" onclick={onAdd} class={["ii-hover", ROW]}>
+  <li
+    in:rowIn|global={{
+      index: first + others.length,
+      reduced: prefersReducedMotion.current,
+    }}
+    out:rowOut|global={{ reduced: prefersReducedMotion.current }}
+  >
+    <button type="button" onclick={onAdd} class={["ii-hover ii-reveal", ROW]}>
       <span
         aria-hidden="true"
         class={[

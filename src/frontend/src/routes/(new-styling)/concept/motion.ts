@@ -548,3 +548,41 @@ export const grow = (
     css: (t) => `height: ${t * height}px`,
   };
 };
+
+interface RevealParams {
+  /** Where the row stands in the block, from the top: each waits 30ms more
+   *  than the one above it, up to 150ms more. */
+  index?: number;
+  reduced?: boolean;
+}
+
+/**
+ * A row of a block that grows open (`grow`), arriving the way a panel card's
+ * section does as the card grows (`morph`): a fade over 280ms, 40ms after the
+ * block starts to grow, each row 30ms after the one above, so they come in
+ * down the block behind its edge. Under reduced motion, a 150ms fade at once.
+ *
+ * It fades the row by `--ii-reveal`, not by the row's own opacity: only the
+ * parts marked `ii-reveal` and the row's line fade (surfaces.css), so an
+ * avatar travelling into the row (`travel`) lands at full strength.
+ */
+export const revealIn = (
+  _node: Element,
+  { index = 0, reduced = false }: RevealParams = {},
+): TransitionConfig => ({
+  delay: reduced ? 0 : 40 + Math.min(index * 30, 150),
+  duration: reduced ? 150 : 280,
+  easing: quintOut,
+  css: (t) => `--ii-reveal: ${t}`,
+});
+
+/** And leaving all at once, quicker, 120ms, as a panel card's section does,
+ *  so an avatar travelling back out crosses rows already emptied. */
+export const revealOut = (
+  _node: Element,
+  { reduced = false }: RevealParams = {},
+): TransitionConfig => ({
+  duration: reduced ? 100 : 120,
+  easing: quintOut,
+  css: (t) => `--ii-reveal: ${t}`,
+});

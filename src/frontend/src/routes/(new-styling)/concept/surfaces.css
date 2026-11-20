@@ -206,6 +206,27 @@
   overscroll-behavior: none;
 }
 
+/*
+ * How far a row arriving by `revealIn` (motion.ts) has faded in, inherited
+ * by its parts (`.ii-reveal`, below). Registered as a number so it fades
+ * smoothly between a transition's frames, and whole while nothing runs.
+ */
+@property --ii-reveal {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+/* What such a row fades: its parts marked here, never what travels into it.
+   What lies inside a faded part fades with it, not a second time. Outside
+   the layers, so the base layer's `opacity: 1` on buttons doesn't win. */
+.ii-reveal {
+  opacity: var(--ii-reveal);
+}
+.ii-reveal * {
+  --ii-reveal: 1;
+}
+
 /* In `components` so a Tailwind utility on the same element still wins. */
 @layer components {
   .ii-surface-1 {
@@ -255,6 +276,8 @@
     block-size: 1px;
     background-color: var(--color-border-tertiary);
     pointer-events: none;
+    /* A row fading in by `revealIn` (motion.ts) brings its line with it. */
+    opacity: var(--ii-reveal);
   }
 
   /* A transparent border under the ring keeps the edge in forced-colors mode. */
