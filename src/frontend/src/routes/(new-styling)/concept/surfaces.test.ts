@@ -11,7 +11,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Read from disk: the test run leaves CSS imports empty.
-const ladder = readFileSync(join(__dirname, "surfaces.css"), "utf8");
+const ladder = readFileSync(
+  join(__dirname, "foundation/surfaces/surfaces.css"),
+  "utf8",
+);
 
 const components = import.meta.glob<string>("./**/*.svelte", {
   query: "?raw",
@@ -50,14 +53,14 @@ const RULES: Rule[] = [
 
 /** Where the ladder lives, or what isn't the product: these may break it. */
 const OUTSIDE = new Map<string, string>([
-  ["./components/Elevated.svelte", "it is the ladder"],
-  ["./components/SurfaceLevel.svelte", "it is the ladder"],
+  ["./foundation/surfaces/Elevated.svelte", "it is the ladder"],
+  ["./foundation/surfaces/SurfaceLevel.svelte", "it is the ladder"],
   [
-    "./components/StateBoard.svelte",
+    "./mock/StateBoard.svelte",
     "the concept's review board of card states, not a screen of the product",
   ],
   [
-    "./components/ExploreBuild.svelte",
+    "./features/explore/ExploreBuild.svelte",
     "Caffeine's banner: its own light sky in both themes ([color-scheme:light]), its white and black the brand's",
   ],
 ]);
@@ -65,12 +68,12 @@ const OUTSIDE = new Map<string, string>([
 /** Single lines that break a rule on purpose, each with why. */
 const EXCEPTIONS: { file: string; line: string; why: string }[] = [
   {
-    file: "./components/ExploreBanner.svelte",
+    file: "./features/explore/ExploreBanner.svelte",
     line: 'item.dark ? "bg-white text-neutral-950" : "bg-neutral-950 text-white"',
     why: "a brand banner's button, in the banner's own colours in both themes",
   },
   {
-    file: "./components/SearchOverlay.svelte",
+    file: "./features/search/SearchOverlay.svelte",
     line: "bg-black/5 [backdrop-filter",
     why: "the scrim under search: it dims and blurs the page, it isn't a surface",
   },

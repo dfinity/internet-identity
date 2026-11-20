@@ -1,6 +1,6 @@
 <script lang="ts">
-  import "./surfaces.css";
-  import "./loading.css";
+  import "./foundation/surfaces/surfaces.css";
+  import "./foundation/motion/loading.css";
   import {
     ArrowRightToLineIcon,
     BellOffIcon,
@@ -39,41 +39,48 @@
     type IdentityPalette,
   } from "$lib/utils/identityColors";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-  import ActionDock, { type DockItem } from "./components/ActionDock.svelte";
-  import AppTile from "./components/AppTile.svelte";
-  import AttentionDot from "./components/AttentionDot.svelte";
-  import AppView from "./components/AppView.svelte";
-  import BulkView from "./components/BulkView.svelte";
-  import ConnectPage from "./components/ConnectPage.svelte";
-  import Elevated, { CANVAS, surfaceColor } from "./components/Elevated.svelte";
-  import HeadCard from "./components/HeadCard.svelte";
-  import HeaderSearch from "./components/HeaderSearch.svelte";
-  import SurfaceLevel from "./components/SurfaceLevel.svelte";
-  import Popup from "./components/Popup.svelte";
-  import AppRow from "./components/AppRow.svelte";
-  import ExplorePage from "./components/ExplorePage.svelte";
-  import ColourStrip from "./components/ColourStrip.svelte";
-  import IdentityCard from "./components/IdentityCard.svelte";
-  import IdentityList from "./components/IdentityList.svelte";
-  import IdentityMenu from "./components/IdentityMenu.svelte";
-  import IncidentBanner from "./components/IncidentBanner.svelte";
-  import IncidentCard from "./components/IncidentCard.svelte";
-  import Island, { type IslandView } from "./components/Island.svelte";
-  import ManageHints from "./components/ManageHints.svelte";
-  import PanelCard from "./components/PanelCard.svelte";
-  import PanelHeader from "./components/PanelHeader.svelte";
-  import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
-  import SearchOverlay from "./components/SearchOverlay.svelte";
-  import Sheet from "./components/Sheet.svelte";
+  import ActionDock, {
+    type DockItem,
+  } from "./foundation/frame/ActionDock.svelte";
+  import AppTile from "./features/apps/AppTile.svelte";
+  import AttentionDot from "./foundation/frame/AttentionDot.svelte";
+  import AppView from "./features/apps/AppView.svelte";
+  import BulkView from "./features/apps/BulkView.svelte";
+  import ConnectPage from "./features/connect/ConnectPage.svelte";
+  import Elevated, {
+    CANVAS,
+    surfaceColor,
+  } from "./foundation/surfaces/Elevated.svelte";
+  import HeadCard from "./features/security/HeadCard.svelte";
+  import HeaderSearch from "./features/search/HeaderSearch.svelte";
+  import SurfaceLevel from "./foundation/surfaces/SurfaceLevel.svelte";
+  import Popup from "./foundation/frame/Popup.svelte";
+  import AppRow from "./features/apps/AppRow.svelte";
+  import ExplorePage from "./features/explore/ExplorePage.svelte";
+  import ColourStrip from "./features/identity/ColourStrip.svelte";
+  import IdentityCard from "./features/identity/IdentityCard.svelte";
+  import IdentityList from "./features/identity/IdentityList.svelte";
+  import IdentityMenu from "./features/identity/IdentityMenu.svelte";
+  import IncidentBanner from "./features/security/IncidentBanner.svelte";
+  import IncidentCard from "./features/security/IncidentCard.svelte";
+  import Island, { type IslandView } from "./foundation/frame/Island.svelte";
+  import ManageHints from "./features/apps/ManageHints.svelte";
+  import PanelCard from "./foundation/frame/PanelCard.svelte";
+  import PanelHeader from "./foundation/frame/PanelHeader.svelte";
+  import ProgressiveBlur from "./foundation/motion/ProgressiveBlur.svelte";
+  import SearchOverlay from "./features/search/SearchOverlay.svelte";
+  import Sheet from "./foundation/frame/Sheet.svelte";
   import RecoveryFlow, {
     type RecoveryMethod,
-  } from "./components/RecoveryFlow.svelte";
-  import ReorderGrid from "./components/ReorderGrid.svelte";
-  import SectionView, { type Section } from "./components/SectionView.svelte";
-  import StateBoard from "./components/StateBoard.svelte";
-  import StatusCard from "./components/StatusCard.svelte";
-  import Swap from "./components/Swap.svelte";
-  import { glyphsOf } from "./glyphs";
+  } from "./features/security/RecoveryFlow.svelte";
+  import ReorderGrid from "./features/apps/ReorderGrid.svelte";
+  import SectionView, {
+    type Section,
+  } from "./features/security/SectionView.svelte";
+  import StateBoard from "./mock/StateBoard.svelte";
+  import StatusCard from "./features/security/StatusCard.svelte";
+  import Swap from "./foundation/motion/Swap.svelte";
+  import { glyphsOf } from "./features/security/glyphs";
   import {
     LOAD_SPEEDS,
     LOAD_SPEED_KEY,
@@ -81,7 +88,7 @@
     loadSpeedOf,
     saveLoadSpeed,
     type LoadSpeed,
-  } from "./loading.svelte";
+  } from "./foundation/motion/loading.svelte";
   import {
     browsersFor,
     featuredApps,
@@ -89,7 +96,7 @@
     scenarioPresets,
     type ConceptApp,
     type FeaturedApp,
-  } from "./mockData";
+  } from "./mock/mockData";
   import {
     arrive as arriveIn,
     morph,
@@ -101,8 +108,8 @@
     viewIn,
     viewOut,
     type Spot,
-  } from "./motion";
-  import { ConceptTheme } from "./theme.svelte";
+  } from "./foundation/motion/motion";
+  import { ConceptTheme } from "./mock/theme.svelte";
   import {
     deriveStatus,
     incidentOf,
@@ -115,7 +122,7 @@
     type IncidentAnswer,
     type Scenario,
     type Tone,
-  } from "./status";
+  } from "./features/security/status";
 
   // --- Mock state, one per identity ---
 

@@ -2,7 +2,8 @@
 
 How the concept lays one thing on another. After
 [Fluid Functionalism's Surfaces](https://www.fluidfunctionalism.com/docs/surfaces)
-(MIT); the values are in [`surfaces.css`](surfaces.css).
+(MIT); the values are in
+[`foundation/surfaces/surfaces.css`](foundation/surfaces/surfaces.css).
 
 ## The rule
 
@@ -42,7 +43,7 @@ Four steps don't depend on what lies under them, and have names:
 | `--ii-top` · `TOP`           | 8     | The top: a thumb raised off its track, a mark over a logo                                                                      |
 
 The CSS names are for classes (`bg-(--ii-floating)`); the constants, from
-`Elevated.svelte`, for code.
+[`Elevated.svelte`](foundation/surfaces/Elevated.svelte), for code.
 
 ## How to
 
