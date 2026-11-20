@@ -183,7 +183,7 @@
         current ? "outline-fg-primary outline-2" : "outline-transparent",
       ]}
     >
-      <AppLogo {logo} size="tile" />
+      <AppLogo {logo} size="tile" reveal />
     </span>
     {#if muted}
       <!-- Notifications turned off: the count's circle, in grey and on the

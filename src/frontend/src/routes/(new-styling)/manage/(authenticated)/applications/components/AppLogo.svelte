@@ -5,14 +5,24 @@
     /** A ready `<img src>`, or `undefined` for an app that publishes none. */
     logo?: string;
     size: "card" | "lg" | "tile";
+    /** Shows the logo only once it has loaded, and a tile's only once it is
+     *  known whether it fills the plate, fading it in over 200ms: the plate
+     *  stands empty until then, rather than showing the logo with a margin
+     *  and growing it to the edge a frame later. Off by default, so screens
+     *  that don't ask for it are as they were. */
+    reveal?: boolean;
   }
 
-  const { logo, size }: Props = $props();
+  const { logo, size, reveal = false }: Props = $props();
 
   // A logo that fails to decode falls back to the globe instead of a broken image;
   // keyed by value so a later, valid logo still renders.
   let failedLogo = $state<string>();
   const shown = $derived(logo !== failedLogo ? logo : undefined);
+
+  // Which logo has loaded (and been measured), keyed by value like the rest.
+  let loadedLogo = $state<string>();
+  const hidden = $derived(reveal && shown !== loadedLogo);
 
   // A tile fills edge to edge with a logo drawn as a full square, like an app
   // icon. A mark, a circle or a wordmark would run into the frame, so it keeps
@@ -85,11 +95,18 @@
     <img
       src={shown}
       alt=""
-      class={["size-full", fillsTile ? "object-cover" : "object-contain"]}
+      class={[
+        "size-full",
+        fillsTile ? "object-cover" : "object-contain",
+        reveal &&
+          "transition-opacity duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]",
+        hidden && "opacity-0",
+      ]}
       onload={(event) => {
         if (size === "tile") {
           squareLogo = isSquareArt(event.currentTarget) ? shown : undefined;
         }
+        loadedLogo = shown;
       }}
       onerror={() => (failedLogo = shown)}
     />

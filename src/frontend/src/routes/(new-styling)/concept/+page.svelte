@@ -2480,7 +2480,12 @@
             {#if !phoneHead}
               {@render pageIntroRow(1)}
             {/if}
-            <ExplorePage {featured} {isAdded} onAdd={(app) => addApp(app)} />
+            <!-- Its feed leaves out the apps already added, so it waits for
+                 them; and so its pictures don't take the network from My
+                 apps' logos as the page loads. -->
+            {#if appsLoad.state !== "loading"}
+              <ExplorePage {featured} {isAdded} onAdd={(app) => addApp(app)} />
+            {/if}
           </div>
         </div>
 
@@ -2502,12 +2507,16 @@
             {#if !phoneHead}
               {@render pageIntroRow(2)}
             {/if}
-            <ConnectPage
-              integrations={current.scenario.integrations}
-              apps={current.apps}
-              onResolve={resolve}
-              onUnavailable={unavailable}
-            />
+            <!-- It lists the apps and the account's integrations, so it
+                 waits for both. -->
+            {#if appsLoad.state !== "loading" && known}
+              <ConnectPage
+                integrations={current.scenario.integrations}
+                apps={current.apps}
+                onResolve={resolve}
+                onUnavailable={unavailable}
+              />
+            {/if}
           </div>
         </div>
       </div>
