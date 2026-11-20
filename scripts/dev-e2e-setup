@@ -128,7 +128,7 @@ ensure_prereqs() {
   fi
 
   if ! command -v ic-wasm >/dev/null; then
-    die "Missing ic-wasm. Install with: cargo install ic-wasm --version 0.8.5"
+    die "Missing ic-wasm. Install with: cargo install ic-wasm --version 0.8.5 --locked"
   fi
 
   if ! command -v icp >/dev/null; then
