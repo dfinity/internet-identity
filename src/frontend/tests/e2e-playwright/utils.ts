@@ -3,6 +3,7 @@ import {
   CDPSession,
   ConsoleMessage,
   expect,
+  Locator,
   Page,
 } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
@@ -33,6 +34,11 @@ export const TEST_APP_SIBLING_A_URL = "https://a.nice-name.com";
 export const TEST_APP_SIBLING_B_URL = "https://b.nice-name.com";
 export const TEST_APP_DERIVATION_ORIGIN = "https://auth.nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
+/** The test app at an origin wider than the sign-in panel, whose first label has
+ *  no hyphen, so neither the origin badge nor a line naming the host can wrap
+ *  without help. */
+export const TEST_APP_LONG_ORIGIN_URL =
+  "https://averyveryverylongappsubdomainwithnohyphenstobreakat.nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 
 export type DummyAuthFn = (page: Page) => void;
@@ -313,6 +319,50 @@ export const authorizeWithUrl = async (
   expect(principal).toEqual(Principal.fromText(principal).toText());
 
   return principal;
+};
+
+/**
+ * Serves `metadata` as the app metadata file (`/.well-known/ii-app-metadata`)
+ * of `appOrigin` to every page of `context`, with the CORS header II's
+ * cross-origin fetch of it needs.
+ * @param context The browser context II's windows open in.
+ * @param appOrigin The origin the metadata belongs to, e.g. `TEST_APP_URL`.
+ * @param metadata The JSON document to serve, as an app would publish it.
+ */
+export const serveAppMetadata = async (
+  context: BrowserContext,
+  appOrigin: string,
+  metadata: { name: string },
+): Promise<void> => {
+  const metadataUrl = new URL("/.well-known/ii-app-metadata", appOrigin);
+  await context.route(metadataUrl.href, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify(metadata),
+    }),
+  );
+};
+
+/**
+ * Asserts that the text of the element `locator` points at is fully on screen:
+ * the element lies inside the viewport, uncut by an ancestor that clips it, and
+ * its text stays within the element's width. Text that can't wrap does one of
+ * two things depending on how its element is sized: it widens an element sized
+ * to its content until an ancestor clips it, or it spills out of an element
+ * sized by its container, which no viewport check sees.
+ * @param locator The element whose text must be fully visible.
+ */
+export const expectTextFullyVisible = async (
+  locator: Locator,
+): Promise<void> => {
+  await expect(locator).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(() =>
+      locator.evaluate((element) => element.scrollWidth <= element.clientWidth),
+    )
+    .toBe(true);
 };
 
 /**
