@@ -44,15 +44,25 @@
   // light, where the shadow alone lifts them. The shadow stays a small one
   // whatever the level, for a 28px coin.
   const level = Math.min(useSurface() + 1, 8);
+
+  // A dashed slot has no fill to hide what lies under it, so the one before
+  // it is cut where it lies instead: a hole the size of the slot and 2px
+  // more around its centre, 8px in (the overlap) and 14px past the edge
+  // (its radius), the gap the shadow's ring leaves between two coins. Only
+  // a slot's outline is cut, so its icon stays whole; a coin is cut whole.
+  // A cut rather than the card's colour: the card's tint on hover would
+  // show a filled slot as a disc.
+  const UNDER_EMPTY =
+    "radial-gradient(circle at calc(100% + 6px) 50%, transparent 15.5px, #000 16px)";
 </script>
 
 <!-- Overlapping coins, each a step above the card (StatusCard), with a small
      shadow, so they read as things that are there and that overlap; the
      shadow's ring parts each from the one under it. What isn't there yet
-     lies flat instead, a dashed slot in the card itself, side by side with
-     the next rather than under it, so raised means set up and dashed means
-     missing. Decorative: the message beside them says what they show, and
-     each one's label (`data-glyph`) shows on hover (StatusCard). -->
+     lies flat instead, a dashed slot in the card itself, so raised means set
+     up and dashed means missing; the slots overlap all the same, each over
+     the one before it. Decorative: the message beside them says what they
+     show, and each one's label (`data-glyph`) shows on hover (StatusCard). -->
 <span
   aria-hidden="true"
   style:--ii-glyph-surface={`var(--ii-surface-${level})`}
@@ -60,16 +70,24 @@
 >
   {#each glyphs as glyph, index (glyph.id)}
     {@const Icon = glyph.icon}
+    {@const cut = glyphs[index + 1]?.empty === true ? UNDER_EMPTY : undefined}
     <span
       data-glyph={glyph.id}
+      style:mask-image={glyph.empty === true ? undefined : cut}
       class={[
         "relative grid size-7 place-items-center rounded-full",
         glyph.empty === true
-          ? "border-border-secondary text-fg-quaternary border border-dashed"
+          ? "text-fg-quaternary"
           : "text-fg-tertiary bg-(--ii-glyph-surface) shadow-(--ii-shadow-3)",
-        index > 0 && (glyph.empty === true ? "ms-1" : "-ms-2"),
+        index > 0 && "-ms-2",
       ]}
     >
+      {#if glyph.empty === true}
+        <span
+          style:mask-image={cut}
+          class="border-border-secondary absolute inset-0 rounded-full border border-dashed"
+        ></span>
+      {/if}
       {#if glyph.src !== undefined}
         <img src={glyph.src} alt="" class="size-4" />
       {:else if Icon !== undefined}
