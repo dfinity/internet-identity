@@ -50,7 +50,6 @@
   import SurfaceLevel from "./components/SurfaceLevel.svelte";
   import Popup from "./components/Popup.svelte";
   import AppRow from "./components/AppRow.svelte";
-  import AppSearch from "./components/AppSearch.svelte";
   import ExplorePage from "./components/ExplorePage.svelte";
   import ColourStrip from "./components/ColourStrip.svelte";
   import IdentityCard from "./components/IdentityCard.svelte";
@@ -63,6 +62,7 @@
   import PanelCard from "./components/PanelCard.svelte";
   import PanelHeader from "./components/PanelHeader.svelte";
   import ProgressiveBlur from "./components/ProgressiveBlur.svelte";
+  import SearchOverlay from "./components/SearchOverlay.svelte";
   import Sheet from "./components/Sheet.svelte";
   import RecoveryFlow, {
     type RecoveryMethod,
@@ -404,8 +404,8 @@
   let board = $state(
     new URLSearchParams(location.search).get("board") === "states",
   );
-  /** Where the add-an-app search hangs from, while it's open. */
-  let addAnchor = $state<HTMLElement>();
+  /** The page's one search: the header's glyph, ⌘K and Add app open it. */
+  let search = $state<ReturnType<typeof SearchOverlay>>();
   /** A phone's header controls. The menu hangs from this pill's end, at the
    *  screen's edge: from the flask, mid-pill, it would run off the start. */
   let controlsPill = $state<HTMLElement>();
@@ -1565,22 +1565,21 @@
 {/snippet}
 
 {#snippet addTile()}
-  <!-- After the last app, the way to add one by hand: a search over the
-       curated apps that also takes a link. While apps are arranged it stays
+  <!-- After the last app, the way to add one by hand: the page's search,
+       which also takes a link. While apps are arranged it stays
        where it is as the first free cell: the plus and the label fade, the
        dashed frame stays, and the free cells after it fill out its row. -->
   <button
     type="button"
-    onclick={(event) => (addAnchor = event.currentTarget)}
+    onclick={() => search?.show()}
     inert={managing}
     aria-haspopup="dialog"
-    aria-expanded={addAnchor !== undefined}
     class="group focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 transition-[scale] duration-160 ease-out outline-none focus-visible:ring-2 active:scale-[0.97] motion-reduce:active:scale-100"
   >
-    <!-- Like an app's tile, no plate: hovered, focused or with its search
-         open, the frame grows by 6%. -->
+    <!-- Like an app's tile, no plate: hovered or focused, the frame grows
+         by 6%. -->
     <span
-      class="border-border-primary text-fg-tertiary grid size-(--ii-logo) place-items-center rounded-2xl border-[1.5px] border-dashed transition-[scale] duration-220 ease-(--ii-ease-out) group-hover:scale-106 group-focus-visible:scale-106 group-aria-expanded:scale-106 motion-reduce:transition-none"
+      class="border-border-primary text-fg-tertiary grid size-(--ii-logo) place-items-center rounded-2xl border-[1.5px] border-dashed transition-[scale] duration-220 ease-(--ii-ease-out) group-hover:scale-106 group-focus-visible:scale-106 motion-reduce:transition-none"
     >
       <span class={["grid", ADD_FADE, managing && "opacity-0"]}>
         <PlusIcon class="size-6" aria-hidden="true" />
@@ -1611,7 +1610,8 @@
     </p>
     <button
       type="button"
-      onclick={(event) => (addAnchor = event.currentTarget)}
+      onclick={() => search?.show()}
+      aria-haspopup="dialog"
       class="btn btn-primary btn-sm mt-3 rounded-full"
     >
       <PlusIcon class="size-4" aria-hidden="true" />
@@ -2010,12 +2010,7 @@
         >
           {#if isDesktop.current}
             <HeaderSearch
-              apps={current.apps}
-              {isAdded}
-              onAdd={(app) => addApp(app)}
-              onAddLink={addLink}
-              onOpen={openedFromSearch}
-              suggested={featured}
+              onclick={() => search?.show()}
               lifted={headerLifted}
             />
           {/if}
@@ -2138,12 +2133,7 @@
                  sections' icons come and go before it. -->
               <HeaderSearch
                 compact
-                apps={current.apps}
-                {isAdded}
-                onAdd={(app) => addApp(app)}
-                onAddLink={addLink}
-                onOpen={openedFromSearch}
-                suggested={featured}
+                onclick={() => search?.show()}
                 class={!phoneHead ? "order-first" : undefined}
               />
             {/if}
@@ -2560,59 +2550,21 @@
     <ActionDock items={dockItems} onAction={actFromDock} />
   {/if}
 
-  {#snippet addSearch(inSheet: boolean)}
-    <!-- In a sheet the field and the rows keep to its edge, as the page's
-         do, and the keyboard waits for a tap on the field: brought up on
-         its own it would cover the suggestions, and push the sheet and the
-         page up as it comes. -->
-    <AppSearch
-      autofocus={!inSheet}
-      flush={inSheet}
-      suggestions={featured.slice(0, 4)}
+  <!-- The page's one search, over everything: the header's glyph opens it,
+       ⌘K on desktop, and Add app after the last tile. A new one for a phone
+       or a desktop, as the header's glyph is. -->
+  {#key isDesktop.current}
+    <SearchOverlay
+      bind:this={search}
+      compact={!isDesktop.current}
+      apps={current.apps}
       {isAdded}
       onAdd={(app) => addApp(app)}
       onAddLink={addLink}
+      onOpen={openedFromSearch}
+      suggested={featured}
     />
-    <button
-      type="button"
-      onclick={() => {
-        addAnchor = undefined;
-        goToPage(1);
-      }}
-      class={[
-        "ii-hover text-text-primary focus-visible:ring-focus-ring mt-2 flex items-center gap-2.5 rounded-xl py-2.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset",
-        inSheet ? "-mx-2 px-2" : "px-3",
-      ]}
-    >
-      <CompassIcon class="text-fg-quaternary size-4" aria-hidden="true" />
-      Browse Explore
-    </button>
-  {/snippet}
-
-  {#if addAnchor !== undefined}
-    {#if isDesktop.current}
-      <!-- Rendered here, outside the canvas, but it opens over the canvas. -->
-      <Popup
-        over={3}
-        anchor={addAnchor}
-        onClose={() => (addAnchor = undefined)}
-        direction="down"
-        align="center"
-        distance="0.5rem"
-        class="!w-[min(26rem,calc(100vw-2rem))]"
-      >
-        <div class="flex max-h-[min(32rem,70dvh)] flex-col overflow-y-auto p-3">
-          {@render addSearch(false)}
-        </div>
-      </Popup>
-    {:else}
-      <!-- Phone: a sheet from the bottom, as the sections and the
-           identity's menu are, rather than the product's own sheet. -->
-      <Sheet onClose={() => (addAnchor = undefined)} aria-label="Add an app">
-        {@render addSearch(true)}
-      </Sheet>
-    {/if}
-  {/if}
+  {/key}
 
   {#if recoveryOpen}
     <RecoveryFlow

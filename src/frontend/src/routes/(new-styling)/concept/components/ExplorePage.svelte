@@ -2,7 +2,7 @@
   /**
    * Explore: the feed, read like the App Store: a banner, a shelf, another
    * banner, more shelves. Search isn't here: it's the header's, on every
-   * page (HeaderSearch), so finding an app doesn't mean coming here first.
+   * page (SearchOverlay), so finding an app doesn't mean coming here first.
    */
   import { exploreFeed, type FeaturedApp } from "../mockData";
   import ExploreBanner from "./ExploreBanner.svelte";

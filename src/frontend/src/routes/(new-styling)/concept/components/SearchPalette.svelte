@@ -6,7 +6,7 @@
    * a few to try. From the first letter it lists what
    * matches instead: yours first, to open, then the rest, to add, and a
    * pasted link as an app of its own. A shelf picked from the chips narrows
-   * the list to it, and stands in the field as a token (HeaderSearch).
+   * the list to it, and stands in the field as a token (SearchOverlay).
    *
    * Every row is one action, the one its button names: Open for an app in
    * My apps, Add for the rest. One highlight marks the row the keyboard or
