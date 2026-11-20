@@ -111,9 +111,12 @@
       </span>
     {/each}
     {#if others.length > PREVIEW}
+      <!-- The hover overlay laid over the card's own colour, opaque so the
+           avatar it overlaps doesn't show through: a tint, never a fill
+           darker than the card. -->
       <span
         aria-hidden="true"
-        class="bg-bg-secondary text-text-tertiary relative -ms-1.5 grid h-6 min-w-6 place-items-center rounded-full px-1 text-[0.6875rem] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-stack-cut)"
+        class="text-text-tertiary relative -ms-1.5 grid h-6 min-w-6 place-items-center rounded-full bg-(--ii-stack-cut) bg-[linear-gradient(var(--ii-hover),var(--ii-hover))] px-1 text-[0.6875rem] leading-none font-medium tabular-nums ring-2 ring-(color:--ii-stack-cut)"
       >
         +{others.length - PREVIEW}
       </span>

@@ -77,12 +77,7 @@ const EXCEPTIONS: { file: string; line: string; why: string }[] = [
 ];
 
 /** Breaks of the rule known and being fixed, each by its own commit. */
-const PENDING: { file: string; line: string }[] = [
-  {
-    file: "./components/IdentityStack.svelte",
-    line: 'class="bg-bg-secondary text-text-tertiary',
-  },
-];
+const PENDING: { file: string; line: string }[] = [];
 
 const allowed = (file: string, text: string): boolean =>
   [...EXCEPTIONS, ...PENDING].some(
