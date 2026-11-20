@@ -17,6 +17,7 @@
   import type { CardKind, Tone } from "../status";
   import { swapIn, swapOut } from "../motion";
   import Glyphs, { type Glyph } from "./Glyphs.svelte";
+  import Swap from "./Swap.svelte";
 
   interface Props {
     kind: CardKind;
@@ -38,6 +39,9 @@
      *  the ways back in, the browsers) while the card is neutral, and the
      *  one item it's about otherwise. */
     glyphs?: Glyph[];
+    /** Its data is still on its way: the icon and the title are there, and a
+     *  skeleton stands where its line goes, with no tone yet. */
+    loading?: boolean;
     /** The section itself, shown while the card is open. */
     children?: Snippet;
   }
@@ -46,7 +50,8 @@
     kind,
     title,
     sentence,
-    tone,
+    tone: told,
+    loading = false,
     resolved = false,
     open = false,
     morphing = false,
@@ -70,6 +75,9 @@
   );
 
   const reduced = $derived(prefersReducedMotion.current);
+  /** Neutral until the data lands, so the icon doesn't tint ahead of it; it
+   *  takes its tone then, in the 200ms its colours already change in. */
+  const tone = $derived<Tone>(loading ? "neutral" : told);
 
   /** Where there's the height for it, a card takes its room (Thomas): a
    *  larger icon, the title under it, a larger sentence, more air. In a
@@ -151,7 +159,7 @@
       }}
       onpointermove={hover}
       onpointerleave={() => (hovering = false)}
-      aria-label={`${title}: ${sentence}`}
+      aria-label={loading ? title : `${title}: ${sentence}`}
       aria-expanded="false"
       aria-controls={contentId}
       class="ii-hover focus-visible:ring-focus-ring absolute inset-0 rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-inset"
@@ -275,34 +283,48 @@
              says where the card stands, quietly; info, something to know;
              warning tints the icon amber; risk turns the icon and the
              sentence red. The dot sits on the item the message is about; an
-             info about no item has it before the sentence instead. -->
-        {#if glyphs.length > 0}
-          <Glyphs {glyphs} {tone} />
-          <Tooltip
-            label={hovered?.glyph.label ?? ""}
-            description={hovered?.glyph.note}
-            anchor={hovered?.anchor}
-            hidden={!hovering || open}
-            manual
-          />
-        {/if}
-        <span
-          class={[
-            "flex min-w-0 items-center gap-1.5 text-pretty",
-            large ? "text-sm" : "text-[13px] leading-[18px]",
-            {
-              risk: "text-text-error-primary",
-              warning: "text-text-primary",
-              info: "text-text-primary",
-              neutral: "text-text-tertiary",
-            }[tone],
-          ]}
-        >
-          {#if tone === "info" && !glyphs.some(({ marked }) => marked === true)}
-            <span class="bg-fg-primary size-1.5 shrink-0 rounded-full"></span>
-          {/if}
-          <span class="min-w-0">{sentence}</span>
-        </span>
+             info about no item has it before the sentence instead.
+             Until the data lands, a skeleton of a short line in its place
+             (Swap). -->
+        <Swap status={loading ? "loading" : "ready"} class="min-w-0 flex-1">
+          {#snippet skeleton()}
+            <!-- As tall as the glyphs' row (their 28px coins), so the card
+                 is its loaded height from the start. -->
+            <span class="flex h-7 items-center">
+              <span class="skeleton block h-2.5 w-40 max-w-full"></span>
+            </span>
+          {/snippet}
+          <div class="flex min-w-0 items-center gap-2.5">
+            {#if glyphs.length > 0}
+              <Glyphs {glyphs} {tone} />
+              <Tooltip
+                label={hovered?.glyph.label ?? ""}
+                description={hovered?.glyph.note}
+                anchor={hovered?.anchor}
+                hidden={!hovering || open}
+                manual
+              />
+            {/if}
+            <span
+              class={[
+                "flex min-w-0 items-center gap-1.5 text-pretty",
+                large ? "text-sm" : "text-[13px] leading-[18px]",
+                {
+                  risk: "text-text-error-primary",
+                  warning: "text-text-primary",
+                  info: "text-text-primary",
+                  neutral: "text-text-tertiary",
+                }[tone],
+              ]}
+            >
+              {#if tone === "info" && !glyphs.some(({ marked }) => marked === true)}
+                <span class="bg-fg-primary size-1.5 shrink-0 rounded-full"
+                ></span>
+              {/if}
+              <span class="min-w-0">{sentence}</span>
+            </span>
+          </div>
+        </Swap>
       </div>
     {/if}
     {#if open || morphing}

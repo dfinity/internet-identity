@@ -1,0 +1,49 @@
+/*
+ * How the page loads, after Fluid Functionalism's Reveal
+ * (https://www.fluidfunctionalism.com/docs/reveal, MIT, values from
+ * https://www.fluidfunctionalism.com/r/reveal.json), in the concept's names:
+ *
+ * - What the page knows at once (the frame, the header, the greeting, each
+ *   card's icon and title) is there from the first frame, its blocks fading
+ *   in 60ms apart (`arrive` in motion.ts).
+ * - What waits for data stands in its place as a skeleton as large as it
+ *   (`Swap`), in the same grid cell as the block that replaces it, so nothing
+ *   around them moves when one gives way to the other.
+ * - A skeleton shows only once the wait passes 160ms, so a quick answer
+ *   never flashes one.
+ *
+ * Opacity only, so reduced motion keeps all of it.
+ */
+
+/* The skeleton and its block share one cell. */
+.ii-swap {
+  display: grid;
+}
+.ii-swap > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+/*
+ * The product's skeleton (lib/styles/skeleton.css), its tint and shimmer,
+ * held back 160ms and then faded in over 250ms, Reveal's timing; the shimmer
+ * starts as it has. The product's rule sits outside Tailwind's layers, so a
+ * `rounded-*` utility can't round it: a skeleton takes its corners from
+ * `--ii-skeleton-radius` (a pill by default).
+ */
+@keyframes ii-skeleton-in {
+  from {
+    opacity: 0;
+  }
+}
+.ii-swap .skeleton {
+  border-radius: var(--ii-skeleton-radius, 999px);
+  animation: ii-skeleton-in 250ms ease-in-out 160ms both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ii-swap .skeleton {
+    animation:
+      ii-skeleton-in 250ms ease-in-out 160ms both,
+      skeleton-shimmer 1.8s ease-in-out 410ms infinite;
+  }
+}

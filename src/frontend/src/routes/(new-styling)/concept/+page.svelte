@@ -1,5 +1,6 @@
 <script lang="ts">
   import "./surfaces.css";
+  import "./loading.css";
   import {
     ArrowRightToLineIcon,
     BellOffIcon,
@@ -71,7 +72,16 @@
   import SectionView, { type Section } from "./components/SectionView.svelte";
   import StateBoard from "./components/StateBoard.svelte";
   import StatusCard from "./components/StatusCard.svelte";
+  import Swap from "./components/Swap.svelte";
   import { glyphsOf } from "./glyphs";
+  import {
+    LOAD_SPEEDS,
+    LOAD_SPEED_KEY,
+    Load,
+    loadSpeedOf,
+    saveLoadSpeed,
+    type LoadSpeed,
+  } from "./loading.svelte";
   import {
     browsersFor,
     featuredApps,
@@ -81,6 +91,7 @@
     type FeaturedApp,
   } from "./mockData";
   import {
+    arrive as arriveIn,
     morph,
     pageArrive,
     pageLeave,
@@ -153,6 +164,28 @@
   const signedInWith = $derived(identities[identityIndex].signedInWith);
   const current = $derived(states[identityIndex]);
 
+  // --- Loading: the identity's data comes after the page (loading.svelte.ts) ---
+
+  /** How long it takes, picked in the concept menu; `?load=slow` in the
+   *  address picks it too, so a link can show it. */
+  let loadSpeed = $state<LoadSpeed>(
+    loadSpeedOf(
+      new URLSearchParams(location.search).get("load") ??
+        localStorage.getItem(LOAD_SPEED_KEY),
+    ),
+  );
+  /** The account: how the identity signs in, how it would get back in, where
+   *  it's signed in. The panel's cards tell it; until it lands they have
+   *  their icon and title, and nothing worked out from it shows (a dot, an
+   *  incident, the island, the dock). */
+  const accountLoad = new Load();
+  /** Its apps, which the grid shows. */
+  const appsLoad = new Load();
+  const known = $derived(accountLoad.state === "ready");
+  /** Counts the visits: each loads the data again, and the page's blocks
+   *  arrive again (`arriveIn`). */
+  let visit = $state(0);
+
   /** The app whose details the panel shows: a tile's "⋯" opens them beside
    *  the grid (in the sheet on a phone); the tile itself opens the app. */
   let appOpen = $state<string>();
@@ -192,13 +225,18 @@
       },
     }),
   );
-  const lead = $derived(leadOf(cards));
+  /** The cards as far as the page can tell: none of their tones until the
+   *  account has landed, so nothing is said ahead of it. */
+  const told = $derived(known ? cards : []);
+  const lead = $derived(leadOf(told));
   /** A risk, told as one story the user answers; it speaks for its cards. */
   const incident = $derived(
-    incidentOf({
-      scenario: current.scenario,
-      signedOut: new Set(current.signedOut),
-    }),
+    known
+      ? incidentOf({
+          scenario: current.scenario,
+          signedOut: new Set(current.signedOut),
+        })
+      : undefined,
   );
   const coveredByIncident = (kind: CardKind) =>
     incident?.kinds.includes(kind) === true;
@@ -239,7 +277,7 @@
           : undefined;
   /** What the calm island mentions: something to know, never where a card
    *  merely stands. */
-  const note = $derived(cards.find(({ tone }) => tone === "info"));
+  const note = $derived(told.find(({ tone }) => tone === "info"));
 
   // --- Apps ---
 
@@ -645,7 +683,7 @@
       ? panelVisible
         ? undefined
         : "select"
-      : layout === "island" && !panelVisible
+      : layout === "island" && !panelVisible && known
         ? lead !== undefined
           ? "lead"
           : "calm"
@@ -658,7 +696,7 @@
    *  info that offers a step (something new, a step suggested). */
   const URGENCY: Tone[] = ["risk", "warning", "info"];
   const attention = $derived(
-    cards
+    told
       .filter(
         ({ tone, ask }) =>
           tone === "risk" ||
@@ -701,9 +739,9 @@
   /** The closed account's dot, while something needs the user (as the panel
    *  layout's avatar on a phone has it): red for a risk, amber otherwise. */
   const accountAttention = $derived<"risk" | "action" | undefined>(
-    cards.some(({ tone }) => tone === "risk")
+    told.some(({ tone }) => tone === "risk")
       ? "risk"
-      : needsAttention(cards)
+      : needsAttention(told)
         ? "action"
         : undefined,
   );
@@ -769,7 +807,10 @@
     return (news && roomy.current) || left === "open";
   };
 
-  /** A visit starts: as the page loads, and from the concept menu. */
+  /** A visit starts: as the page loads, and from the concept menu. The
+   *  identity's data is fetched again, each part landing on its own, and
+   *  the panel decides whether to meet the user only once it knows what it
+   *  would say. */
   const arrive = () => {
     incidentDismissed = false;
     section = undefined;
@@ -777,13 +818,33 @@
     switching = false;
     managing = false;
     selected = [];
-    panelOpen = opensOnArrival();
+    visit += 1;
+    const speed =
+      LOAD_SPEEDS.find(({ value }) => value === loadSpeed) ?? LOAD_SPEEDS[0];
+    panelOpen = false;
+    accountLoad.start(speed.account, {
+      onReady: () => (panelOpen = opensOnArrival()),
+    });
+    appsLoad.start(speed.apps, { fails: speed.appsFail });
   };
   arrive();
 
-  // The open panel has shown what it holds now.
+  /** Concept only: how long the data takes; a new visit shows it. */
+  const setLoadSpeed = (speed: LoadSpeed) => {
+    loadSpeed = speed;
+    saveLoadSpeed(speed);
+    arrive();
+  };
+
+  /** The apps that failed, asked for again. */
+  const retryApps = () => {
+    const normal = LOAD_SPEEDS.find(({ value }) => value === "normal");
+    appsLoad.start(normal?.apps ?? 800);
+  };
+
+  // The open panel has shown what it holds now (once there is something).
   $effect(() => {
-    if (!panelVisible) {
+    if (!panelVisible || !known) {
       return;
     }
     const keys = attention.map(seenKeyOf);
@@ -1332,6 +1393,7 @@
         {card}
         title={TITLES[card.kind]}
         icon={SECTION_ICONS[card.kind]}
+        loading={!known}
         onOpen={() => openFromHead(card.kind)}
       />
     {/each}
@@ -1418,6 +1480,7 @@
     <div
       bind:clientHeight={pageHeadHeights[index]}
       inert={index !== activePage}
+      use:arriveIn={{ visit, reduced }}
       class="mx-2.5 shrink-0 @lg:mx-auto @lg:w-[29.5rem] @lg:max-w-full @2xl:w-[37rem]"
     >
       {@render greetingLine(true)}
@@ -1595,6 +1658,50 @@
       Add app
     </span>
   </button>
+{/snippet}
+
+{#snippet tilesSkeleton()}
+  <!-- The apps on their way: as many tiles as this device last saw for the
+       identity (in the concept, as many as it has), each an app tile's size:
+       the logo's plate and one line of its name, in the grid's own columns,
+       so the grid lands where they stood. The product's skeleton tint. -->
+  <ul class={GRID}>
+    {#each { length: current.apps.length + 1 }, index (index)}
+      <li class="flex flex-col items-center gap-2.5 px-1.5 pt-4 pb-3">
+        <span
+          class="skeleton block size-(--ii-logo) [--ii-skeleton-radius:1rem]"
+        ></span>
+        <span
+          class="flex h-[calc(var(--ii-tile-label)*1.25)] w-full items-center justify-center"
+        >
+          <span class="skeleton block h-2.5 w-3/5"></span>
+        </span>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#snippet appsFailed()}
+  <!-- The apps didn't come: said as calmly as "No apps yet" is, in the same
+       panel, with the one way on. -->
+  <div
+    role="alert"
+    class="border-border-tertiary mx-2.5 flex flex-col items-center gap-2 rounded-3xl border bg-(--ii-hover) px-6 py-9 text-center @lg:mx-0 @lg:w-[min(36rem,calc(100vw-2rem))]"
+  >
+    <p class="text-text-primary text-base font-semibold">
+      Your apps didn't load
+    </p>
+    <p class="text-text-tertiary max-w-xs text-sm text-pretty">
+      Check your connection and try again. Signing in to them still works.
+    </p>
+    <button
+      type="button"
+      onclick={retryApps}
+      class="btn btn-secondary btn-sm mt-3 rounded-full"
+    >
+      Try again
+    </button>
+  </div>
 {/snippet}
 
 {#snippet firstApps()}
@@ -1791,6 +1898,7 @@
       title={TITLES[card.kind]}
       sentence={card.sentence}
       tone={card.tone}
+      loading={!known}
       resolved={resolvedKinds.includes(card.kind)}
       open={grown === card.kind}
       morphing={morphing === card.kind}
@@ -2109,7 +2217,7 @@
               >
                 {#each accountCards as card (card.kind)}
                   {@const Icon = SECTION_ICONS[card.kind]}
-                  {@const dot = dotOf(card.tone)}
+                  {@const dot = known ? dotOf(card.tone) : undefined}
                   <button
                     type="button"
                     onclick={() => openFromHead(card.kind)}
@@ -2203,7 +2311,10 @@
                 : `0 0 ${mineTopHeld}px`}
             ></div>
           {/if}
+          <!-- As the page loads its blocks arrive, the title first, 60ms
+               apart (`arriveIn`); on a phone after the head over them. -->
           <div
+            use:arriveIn={{ visit, reduced, delay: phoneHead ? 120 : 0 }}
             class="mx-auto flex w-fit max-w-full flex-col @max-lg/canvas:w-full"
           >
             <!-- The page says whose apps these are before anything else, the
@@ -2224,9 +2335,11 @@
                 ]}
               >
                 {@render greetingLine(false)}
-                {#if current.apps.length > 0}
+                <!-- Only once the apps are there to arrange. -->
+                {#if appsLoad.state === "ready" && current.apps.length > 0}
                   <button
                     type="button"
+                    in:fade={{ duration: reduced ? 150 : 200 }}
                     onclick={managing ? stopManaging : startManaging}
                     class="ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-1 h-10 shrink-0 rounded-full border border-transparent px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]"
                   >
@@ -2251,10 +2364,19 @@
                 />
               </div>
             {/if}
-            {#if current.apps.length > 0}
-              <!-- Named by its tab, right above it. -->
-              <section aria-labelledby="tab-mine" class="flex flex-col">
-                <!-- While apps are arranged, a privacy setting heads the grid.
+            <!-- Until the apps land, their tiles' skeleton in the grid's place
+                 (Swap); then the grid, its tiles one after another. -->
+            <Swap status={appsLoad.state} items=".ii-tiles > li, .ii-tiles ~ *">
+              {#snippet skeleton()}
+                {@render tilesSkeleton()}
+              {/snippet}
+              {#snippet failed()}
+                {@render appsFailed()}
+              {/snippet}
+              {#if current.apps.length > 0}
+                <!-- Named by its tab, right above it. -->
+                <section aria-labelledby="tab-mine" class="flex flex-col">
+                  <!-- While apps are arranged, a privacy setting heads the grid.
                      Its room opens as the grid glides down and the card fades
                      in within it; on Done the card fades first and the room
                      closes. It stays mounted, inert while hidden, so a quick
@@ -2265,76 +2387,77 @@
                      controls do: from the tabs' track, 4px past the first
                      logo, to Done's pill, 4px past the last one. Under the
                      header it keeps the same room above as below. -->
-                <div
-                  inert={!managing}
-                  class={[
-                    "grid w-0 min-w-full transition-[grid-template-rows] duration-250 ease-(--ii-ease-out) motion-reduce:transition-none",
-                    managing ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-                  ]}
-                >
-                  <div class="min-h-0 overflow-hidden">
-                    <label
-                      class={[
-                        "bg-bg-primary border-border-tertiary mx-2.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 md:mt-2 @lg:mx-[calc((var(--ii-tile)-var(--ii-logo))/2-var(--spacing))]",
-                        managing
-                          ? "scale-100 opacity-100 delay-50 duration-200 ease-(--ii-ease-out)"
-                          : "scale-[0.98] opacity-0 duration-120 ease-out",
-                      ]}
-                    >
-                      <!-- A privacy setting, not a list setting: it decides
+                  <div
+                    inert={!managing}
+                    class={[
+                      "grid w-0 min-w-full transition-[grid-template-rows] duration-250 ease-(--ii-ease-out) motion-reduce:transition-none",
+                      managing ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+                    ]}
+                  >
+                    <div class="min-h-0 overflow-hidden">
+                      <label
+                        class={[
+                          "bg-bg-primary border-border-tertiary mx-2.5 mb-5 flex origin-top items-center gap-4 rounded-2xl border px-4 py-3 transition-[opacity,scale] motion-reduce:scale-100 md:mt-2 @lg:mx-[calc((var(--ii-tile)-var(--ii-logo))/2-var(--spacing))]",
+                          managing
+                            ? "scale-100 opacity-100 delay-50 duration-200 ease-(--ii-ease-out)"
+                            : "scale-[0.98] opacity-0 duration-120 ease-out",
+                        ]}
+                      >
+                        <!-- A privacy setting, not a list setting: it decides
                            whether there is any record of where this identity
                            signs in. -->
-                      <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span class="text-text-primary text-sm font-medium">
-                          Remember apps I sign in to
+                        <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span class="text-text-primary text-sm font-medium">
+                            Remember apps I sign in to
+                          </span>
+                          <span
+                            class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
+                          >
+                            {current.keepHistory
+                              ? "An app shows up here once you sign in to it."
+                              : "No record of where you sign in. Only apps you add yourself show up here, and signing in still works everywhere."}
+                          </span>
                         </span>
-                        <span
-                          class="text-text-tertiary text-[13px] leading-[18px] text-pretty"
-                        >
-                          {current.keepHistory
-                            ? "An app shows up here once you sign in to it."
-                            : "No record of where you sign in. Only apps you add yourself show up here, and signing in still works everywhere."}
-                        </span>
-                      </span>
-                      <Toggle
-                        checked={current.keepHistory}
-                        onchange={(event) =>
-                          (current.keepHistory = event.currentTarget.checked)}
-                      />
-                    </label>
+                        <Toggle
+                          checked={current.keepHistory}
+                          onchange={(event) =>
+                            (current.keepHistory = event.currentTarget.checked)}
+                        />
+                      </label>
+                    </div>
                   </div>
-                </div>
-                <ReorderGrid
-                  items={gridItems}
-                  key={(item) => item.origin}
-                  editing={managing}
-                  onMove={moveApp}
-                  pinned={(item) => !("name" in item)}
-                  class={GRID}
-                >
-                  {#snippet tile(item, index)}
-                    {#if "name" in item}
-                      {@render appTile(item, index)}
-                    {:else}
-                      {@render addTile()}
-                    {/if}
-                  {/snippet}
-                </ReorderGrid>
-                {#if phoneHead}
-                  <!-- Phone: the tabs are down in the tab bar, so Edit stands
-                       under the apps, as iOS puts Edit under the widgets. -->
-                  <button
-                    type="button"
-                    onclick={managing ? stopManaging : startManaging}
-                    class="btn btn-secondary btn-sm mt-6 self-center rounded-full px-5"
+                  <ReorderGrid
+                    items={gridItems}
+                    key={(item) => item.origin}
+                    editing={managing}
+                    onMove={moveApp}
+                    pinned={(item) => !("name" in item)}
+                    class={`${GRID} ii-tiles`}
                   >
-                    {@render editWords("")}
-                  </button>
-                {/if}
-              </section>
-            {:else}
-              {@render firstApps()}
-            {/if}
+                    {#snippet tile(item, index)}
+                      {#if "name" in item}
+                        {@render appTile(item, index)}
+                      {:else}
+                        {@render addTile()}
+                      {/if}
+                    {/snippet}
+                  </ReorderGrid>
+                  {#if phoneHead}
+                    <!-- Phone: the tabs are down in the tab bar, so Edit stands
+                       under the apps, as iOS puts Edit under the widgets. -->
+                    <button
+                      type="button"
+                      onclick={managing ? stopManaging : startManaging}
+                      class="btn btn-secondary btn-sm mt-6 self-center rounded-full px-5"
+                    >
+                      {@render editWords("")}
+                    </button>
+                  {/if}
+                </section>
+              {:else}
+                {@render firstApps()}
+              {/if}
+            </Swap>
           </div>
         </div>
 
@@ -2439,8 +2562,11 @@
             ? undefined
             : `${panelHeight * uiScale}px`}
         >
+          <!-- As the page loads, the identity and then the cards arrive, a
+               step after the canvas's title (`arriveIn`). -->
           <div
             bind:clientHeight={panelHeight}
+            use:arriveIn={{ visit, reduced, delay: 60 }}
             class="w-[22.5rem] origin-top-left rtl:origin-top-right"
             style:scale={uiScale === 1 ? undefined : uiScale}
           >
@@ -2771,6 +2897,31 @@
         >
           First visit
         </button>
+        <hr class="border-border-secondary -mx-1.5 my-1.5" />
+        <div
+          aria-hidden="true"
+          class="text-text-tertiary px-3 pt-1.5 pb-1 text-xs"
+        >
+          Data arrives
+        </div>
+        {#each LOAD_SPEEDS as option (option.value)}
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={option.value === loadSpeed}
+            onclick={() => {
+              close();
+              setLoadSpeed(option.value);
+            }}
+            class="btn btn-tertiary justify-start gap-2.5 !px-3 text-start"
+          >
+            <span class="flex-1">{option.label}</span>
+            <CheckIcon
+              class={`text-fg-tertiary size-4 ${option.value === loadSpeed ? "" : "invisible"}`}
+              aria-hidden="true"
+            />
+          </button>
+        {/each}
         <hr class="border-border-secondary -mx-1.5 my-1.5" />
         <button
           type="button"

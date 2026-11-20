@@ -586,3 +586,65 @@ export const revealOut = (
   easing: quintOut,
   css: (t) => `--ii-reveal: ${t}`,
 });
+
+export interface ArriveParams {
+  /** Each waits this much longer than the one before: 60ms between a page's
+   *  blocks, 30ms between a list's rows (Reveal's step for an app, and
+   *  `revealIn`'s), up to seven steps, so a long list isn't kept waiting. */
+  step?: number;
+  /** Before the first. */
+  delay?: number;
+  /** What arrives, by selector within the node: its own children if not
+   *  given, the node itself if nothing matches. */
+  targets?: string;
+  /** Plays nothing as the node mounts, only once `visit` changes. */
+  skip?: boolean;
+  /** A new value plays it again: a new visit. */
+  visit?: number;
+  reduced?: boolean;
+}
+
+/**
+ * The blocks of a page, or the rows of a list, arriving as the page loads,
+ * the way Fluid Functionalism's Reveal has an app's blocks come in
+ * (https://www.fluidfunctionalism.com/docs/reveal): each fades in over
+ * 200ms, a step after the one before. Opacity only, so under reduced motion
+ * they still fade, all at once, over 150ms.
+ *
+ * A Svelte action, run from script and not by a class, so it plays as the
+ * node mounts (and on a new `visit`) and never again on its own: not when a
+ * row moves in the list, nor when one comes or goes later, as a CSS
+ * animation would each time the DOM changed.
+ */
+export const arrive = (node: HTMLElement, params: ArriveParams = {}) => {
+  const play = ({
+    step = 60,
+    delay = 0,
+    targets,
+    reduced = false,
+  }: ArriveParams) => {
+    const found = Array.from(
+      targets === undefined ? node.children : node.querySelectorAll(targets),
+    );
+    (found.length > 0 ? found : [node]).forEach((one, index) =>
+      one.animate([{ opacity: 0 }, { opacity: 1 }], {
+        delay: reduced ? 0 : delay + Math.min(index, 7) * step,
+        duration: reduced ? 150 : 200,
+        easing: EASE_OUT,
+        fill: "backwards",
+      }),
+    );
+  };
+  if (params.skip !== true) {
+    play(params);
+  }
+  let visit = params.visit;
+  return {
+    update(next: ArriveParams) {
+      if (next.visit !== visit) {
+        visit = next.visit;
+        play(next);
+      }
+    },
+  };
+};
