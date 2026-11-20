@@ -5,7 +5,6 @@ import { frontendCanisterConfig } from "$lib/globals";
 // * Some logos are converted to webp
 import dappsJson from "./dapps.json" with { type: "json" };
 
-// This path should point to internet-identity/src/frontend/src/assets/icons/*
 export const iconFiles = import.meta.glob("$lib/icons/*", {
   eager: true,
   query: "?url",
