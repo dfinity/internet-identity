@@ -343,10 +343,12 @@
   /** My apps' greeting stands a third of the way down the canvas (Thomas:
    *  the apps and their title in the middle, the controls on the edges),
    *  a little above the middle, where the eye puts it. It stays there
-   *  whatever is under it, so a new row or Edit's card doesn't move it,
-   *  until the rows would no longer fit: then the room over it gives way,
-   *  down to PAGE_TOP's, and only then the page scrolls. The canvas is the
-   *  window less the page's 8px above and below. */
+   *  whatever is under it, so a new row doesn't move it, until the rows
+   *  would no longer fit: then the room over it gives way, down to
+   *  PAGE_TOP's, and only then the page scrolls. Edit's card never moves
+   *  it: while apps are arranged the room is held (mineTopHeld) and the
+   *  card pushes the grid down. The canvas is the window less the page's
+   *  8px above and below. */
   const MINE_TOP =
     "h-0 shrink-0 md:h-auto md:min-h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)] md:shrink md:basis-[calc((100dvh-1rem)/3-var(--header-h)-0.75rem)]";
   /** The greeting's row, over a page: the room under it grows with the
@@ -561,7 +563,20 @@
     }
   };
 
+  /** The room over My apps' greeting (MINE_TOP), and its height held while
+   *  apps are arranged: Edit's card opens under the greeting and pushes the
+   *  grid down, and the greeting and Done stay where Edit was, so one spot
+   *  turns Edit on and off. Without the hold, a card that no longer fits
+   *  takes its room from over the greeting and lifts it. */
+  let mineTop = $state<HTMLElement>();
+  let mineTopHeld = $state<number>();
+  let mineTopRelease: ReturnType<typeof setTimeout> | undefined;
+
   const startManaging = () => {
+    clearTimeout(mineTopRelease);
+    if (mineTop !== undefined && mineTopHeld === undefined) {
+      mineTopHeld = mineTop.getBoundingClientRect().height;
+    }
     navDirection = 1;
     appOpen = undefined;
     section = undefined;
@@ -581,6 +596,13 @@
   };
 
   const stopManaging = () => {
+    // The hold lets go once the card's room has closed (250ms), so Done
+    // doesn't move the greeting either.
+    clearTimeout(mineTopRelease);
+    mineTopRelease = setTimeout(
+      () => (mineTopHeld = undefined),
+      reduced ? 0 : 300,
+    );
     navDirection = -1;
     managing = false;
     selected = [];
@@ -2182,7 +2204,14 @@
           {#if phoneHead}
             {@render pageHead(0)}
           {:else}
-            <div aria-hidden="true" class={MINE_TOP}></div>
+            <div
+              bind:this={mineTop}
+              aria-hidden="true"
+              class={MINE_TOP}
+              style:flex={mineTopHeld === undefined
+                ? undefined
+                : `0 0 ${mineTopHeld}px`}
+            ></div>
           {/if}
           <div
             class="mx-auto flex w-fit max-w-full flex-col @max-lg/canvas:w-full"
