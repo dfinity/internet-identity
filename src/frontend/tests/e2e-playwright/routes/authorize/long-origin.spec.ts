@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
+import { IdentityWizard } from "../../fixtures/identity";
 import {
   addVirtualAuthenticator,
   authorizeWithUrl,
@@ -37,12 +38,7 @@ test.describe("Authorize screens for an app with a long origin or name", () => {
         await expectTextFullyVisible(authPage.getByText("to continue to"));
 
         await addVirtualAuthenticator(authPage);
-        await createButton.click();
-        await authPage
-          .getByRole("button", { name: "Create with passkey" })
-          .click();
-        await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
-        await authPage.getByRole("button", { name: "Create identity" }).click();
+        await new IdentityWizard(authPage).signUp(DEFAULT_USER_NAME);
         await authPage
           .getByRole("button", { name: "Continue", exact: true })
           .click();
