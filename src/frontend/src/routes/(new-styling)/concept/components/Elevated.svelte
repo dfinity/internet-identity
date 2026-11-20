@@ -10,6 +10,23 @@
   export const provideSurface = (level: number): void => {
     setContext(SURFACE, level);
   };
+
+  // The steps that don't depend on what lies under them (SURFACES.md); in
+  // CSS they're --ii-page, --ii-canvas, --ii-floating and --ii-top.
+  /** The window, under the canvas and beside it on desktop. */
+  export const PAGE = 1;
+  /** The canvas: the apps' frame on desktop, the whole screen on a phone. */
+  export const CANVAS = 3;
+  /** What floats over the page: the header's pills once content runs under
+   *  them, the tab bar, the island, the dock, search, a sheet. */
+  export const FLOATING = 6;
+  /** The top: a thumb raised off its track, a mark over a logo. */
+  export const TOP = 8;
+
+  /** A level's colour, for a style, a ring or a fill that has to match it;
+   *  `surfaceColor(useSurface() + 1)` is one step up from here. */
+  export const surfaceColor = (level: number): string =>
+    `var(--ii-surface-${Math.min(Math.max(Math.round(level), 1), 8)})`;
 </script>
 
 <script lang="ts">

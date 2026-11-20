@@ -12,7 +12,7 @@
 <script lang="ts">
   import type { ComponentProps } from "svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
-  import { provideSurface, useSurface } from "./Elevated.svelte";
+  import { provideSurface, surfaceColor, useSurface } from "./Elevated.svelte";
 
   type Props = ComponentProps<typeof Popover> & {
     /** The level it opens over, for a popup rendered outside that surface,
@@ -34,9 +34,9 @@
      of its own there. -->
 <Popover
   {...rest}
-  style={`--ii-popup-surface: var(--ii-surface-${level});${style ?? ""}`}
+  style={`--ii-popup-surface: ${surfaceColor(level)};${style ?? ""}`}
   class={[
-    "!border-transparent !bg-[var(--ii-popup-surface,var(--ii-surface-3))] !shadow-(--ii-shadow-3)",
+    "!border-transparent !bg-[var(--ii-popup-surface,var(--ii-canvas))] !shadow-(--ii-shadow-3)",
     className,
   ]}
 >

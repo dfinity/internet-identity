@@ -59,6 +59,16 @@
     0 48px 48px -24px var(--ii-shadow-color),
     0 96px 96px -48px var(--ii-shadow-color);
 
+  /* The steps that don't depend on what lies under them, by name, which
+     components use instead of a number (SURFACES.md): the window, the
+     canvas, what floats over the page, and the top. Each follows its level
+     into dark. A step relative to its place is Elevated's, or
+     `surfaceColor(useSurface() + 1)`. */
+  --ii-page: var(--ii-surface-1);
+  --ii-canvas: var(--ii-surface-3);
+  --ii-floating: var(--ii-surface-6);
+  --ii-top: var(--ii-surface-8);
+
   /* Hover and selected are overlays, not colors, so they work on any level. */
   --ii-hover: rgb(0 0 0 / 0.04);
   --ii-selected: rgb(0 0 0 / 0.07);

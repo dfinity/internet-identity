@@ -17,6 +17,7 @@
   import { prefersReducedMotion } from "svelte/motion";
   import type { ConceptApp, ExploreShelfItem, FeaturedApp } from "../mockData";
   import SearchPalette from "./SearchPalette.svelte";
+  import { FLOATING } from "./Elevated.svelte";
   import SurfaceLevel from "./SurfaceLevel.svelte";
 
   interface Props {
@@ -260,7 +261,7 @@
       event.preventDefault();
       back();
     }}
-    class="text-text-primary pointer-events-auto fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col bg-(--ii-surface-3) p-0 backdrop:bg-transparent open:flex"
+    class="text-text-primary pointer-events-auto fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col bg-(--ii-canvas) p-0 backdrop:bg-transparent open:flex"
   >
     {#if open}
       <div class="h-[env(safe-area-inset-top)] shrink-0"></div>
@@ -319,9 +320,9 @@
              padding make. -->
         <div
           bind:this={panel}
-          class="ii-surface-6 ii-elevation-6 pointer-events-auto flex max-h-full w-full max-w-xl origin-top flex-col overflow-hidden rounded-3xl will-change-transform"
+          class="ii-elevation-6 pointer-events-auto flex max-h-full w-full max-w-xl origin-top flex-col overflow-hidden rounded-3xl bg-(--ii-floating) will-change-transform"
         >
-          <SurfaceLevel level={6}>
+          <SurfaceLevel level={FLOATING}>
             <div
               class="border-border-tertiary flex h-14 shrink-0 items-center gap-3 border-b px-5"
             >

@@ -286,7 +286,7 @@
   >
     <span
       aria-hidden="true"
-      class="text-fg-secondary grid size-9 shrink-0 place-items-center rounded-[0.625rem] bg-(--ii-surface-6) shadow-(--ii-shadow-2)"
+      class="text-fg-secondary grid size-9 shrink-0 place-items-center rounded-[0.625rem] bg-(--ii-floating) shadow-(--ii-shadow-2)"
     >
       <Icon class="size-4.5" />
     </span>

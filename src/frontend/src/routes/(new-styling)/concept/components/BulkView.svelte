@@ -3,7 +3,7 @@
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import AppLogo from "../../manage/(authenticated)/applications/components/AppLogo.svelte";
   import type { ConceptApp } from "../mockData";
-  import Elevated, { useSurface } from "./Elevated.svelte";
+  import Elevated, { surfaceColor, useSurface } from "./Elevated.svelte";
   import PanelCard from "./PanelCard.svelte";
   import PanelHeader from "./PanelHeader.svelte";
 
@@ -35,7 +35,7 @@
   // wherever the page view is (the panel, or the phone's sheet), and on the
   // card, the card itself, one step up.
   // svelte-ignore state_referenced_locally
-  const logoSurface = `var(--ii-surface-${Math.min(useSurface() + (variant === "card" ? 1 : 2), 8)})`;
+  const logoSurface = surfaceColor(useSurface() + (variant === "card" ? 1 : 2));
 </script>
 
 {#snippet logos()}

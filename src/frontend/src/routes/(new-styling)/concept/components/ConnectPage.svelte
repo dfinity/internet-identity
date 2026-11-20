@@ -276,8 +276,9 @@
   const ICON_CHIP =
     "text-fg-secondary grid size-11 shrink-0 place-items-center rounded-xl bg-(--ii-selected)";
   const FIELD_LABEL = "text-text-tertiary text-xs font-medium";
-  /** A row raised off its shelf, as the product's connector card is. */
-  const PLATE = "rounded-2xl bg-(--ii-surface-3) shadow-(--ii-shadow-1)";
+  /** A row raised off its shelf, as the product's connector card is: the
+   *  canvas's own level, above the shelf (the canvas tinted). */
+  const PLATE = "rounded-2xl bg-(--ii-canvas) shadow-(--ii-shadow-1)";
   const TEXT_LINK = [
     "text-text-secondary hover:text-text-primary inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium transition-colors duration-150",
     FOCUS,

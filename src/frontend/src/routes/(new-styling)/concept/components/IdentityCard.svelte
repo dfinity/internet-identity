@@ -15,7 +15,7 @@
   } from "$lib/utils/identityColors";
   import { grow, revealIn, revealOut, travel } from "../motion";
   import ColourStrip from "./ColourStrip.svelte";
-  import Elevated, { useSurface } from "./Elevated.svelte";
+  import Elevated, { surfaceColor, useSurface } from "./Elevated.svelte";
   import IdentityList from "./IdentityList.svelte";
   import IdentityStack from "./IdentityStack.svelte";
 
@@ -72,7 +72,7 @@
 
   // The card is one step above what it stands on (Elevated, below), and the
   // avatars across from the name cut themselves out of it.
-  const cardSurface = `var(--ii-surface-${Math.min(useSurface() + 1, 8)})`;
+  const cardSurface = surfaceColor(useSurface() + 1);
 
   const ROW =
     "ii-hover text-text-primary flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring";

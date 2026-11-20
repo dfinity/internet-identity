@@ -21,7 +21,7 @@
 
 <script lang="ts">
   import type { Tone } from "../status";
-  import { useSurface } from "./Elevated.svelte";
+  import { surfaceColor, useSurface } from "./Elevated.svelte";
 
   interface Props {
     glyphs: Glyph[];
@@ -65,7 +65,7 @@
      show, and each one's label (`data-glyph`) shows on hover (StatusCard). -->
 <span
   aria-hidden="true"
-  style:--ii-glyph-surface={`var(--ii-surface-${level})`}
+  style:--ii-glyph-surface={surfaceColor(level)}
   class="flex shrink-0 items-center"
 >
   {#each glyphs as glyph, index (glyph.id)}

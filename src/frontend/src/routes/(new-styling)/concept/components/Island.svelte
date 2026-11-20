@@ -96,7 +96,7 @@
     role="region"
     aria-label={view === "select" ? "Selected apps" : "Identity"}
     aria-live="polite"
-    class="ii-surface-6 ii-elevation-6 pointer-events-auto relative overflow-hidden rounded-[1.75rem]"
+    class="ii-elevation-6 pointer-events-auto relative overflow-hidden rounded-[1.75rem] bg-(--ii-floating)"
     style:width={width.current > 0 ? `${width.current}px` : undefined}
     style:height={height.current > 0 ? `${height.current}px` : undefined}
   >
@@ -187,7 +187,7 @@
                 <span
                   aria-hidden="true"
                   class={[
-                    "absolute -end-0.5 -top-0.5 size-3 rounded-full ring-2 ring-(color:--ii-surface-6)",
+                    "absolute -end-0.5 -top-0.5 size-3 rounded-full ring-2 ring-(color:--ii-floating)",
                     DOT[lead.tone],
                   ]}
                 ></span>

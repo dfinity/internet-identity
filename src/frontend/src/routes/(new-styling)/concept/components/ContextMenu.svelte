@@ -75,7 +75,7 @@
   import type { Snippet } from "svelte";
   import { prefersReducedMotion } from "svelte/motion";
   import { menuIn, menuOut } from "../motion";
-  import { useSurface } from "./Elevated.svelte";
+  import { surfaceColor, useSurface } from "./Elevated.svelte";
 
   interface Props {
     items: ContextMenuEntry[];
@@ -118,7 +118,7 @@
   const menuId = $props.id();
   /** Two steps above what it opens over, on the surface ladder, as a
    *  dropdown is in Fluid Functionalism; its shadow's ring is its edge. */
-  const surface = `var(--ii-surface-${Math.min(useSurface() + 2, 8)})`;
+  const surface = surfaceColor(useSurface() + 2);
   const reduced = $derived(prefersReducedMotion.current);
 
   let open = $state(false);

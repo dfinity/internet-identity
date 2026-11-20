@@ -40,7 +40,7 @@
       : [
           // As large as the header's other controls (--ii-ui, the page's).
           "ii-hover text-fg-secondary hover:text-fg-primary pointer-events-auto size-[calc(2.5rem*var(--ii-ui,1))] border border-transparent focus-visible:outline-offset-2",
-          lifted ? "ii-elevation-6 bg-(--ii-surface-6)" : "bg-(--ii-shelf)",
+          lifted ? "ii-elevation-6 bg-(--ii-floating)" : "bg-(--ii-shelf)",
         ],
     className,
   ]}

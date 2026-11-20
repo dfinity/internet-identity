@@ -15,7 +15,7 @@
 <span
   aria-hidden="true"
   class={[
-    "pointer-events-none absolute -end-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-[color:var(--ii-dot-backdrop,var(--ii-surface-3))]",
+    "pointer-events-none absolute -end-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-[color:var(--ii-dot-backdrop,var(--ii-canvas))]",
     tone === "risk"
       ? "bg-bg-error-solid"
       : tone === "action"

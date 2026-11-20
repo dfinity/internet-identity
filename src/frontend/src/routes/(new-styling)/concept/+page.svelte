@@ -958,7 +958,7 @@
   };
   const pill = $derived([
     "pointer-events-auto rounded-full border border-transparent",
-    headerLifted ? "ii-elevation-6 bg-(--ii-surface-6)" : "bg-(--ii-surface-3)",
+    headerLifted ? "ii-elevation-6 bg-(--ii-floating)" : "bg-(--ii-canvas)",
   ]);
   const PILL_MOTION =
     "transition-[background-color,box-shadow] duration-200 ease-out motion-reduce:transition-none";
@@ -1516,7 +1516,7 @@
     class={[
       "relative flex items-center",
       atBottom
-        ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-surface-6) p-1"
+        ? "ii-elevation-6 pointer-events-auto h-12 rounded-full border border-transparent bg-(--ii-floating) p-1"
         : [
             "pointer-events-auto h-[calc(2.5rem*var(--ii-ui))] rounded-full border border-transparent bg-(--ii-shelf) p-[3px]",
             headerLifted && "ii-elevation-6",
@@ -1541,7 +1541,7 @@
           "absolute rounded-full transition-[inset-inline-start,width] duration-300 ease-(--ii-ease-out) motion-reduce:transition-none",
           atBottom
             ? "inset-y-1 bg-(--ii-selected)"
-            : "inset-y-[3px] bg-(--ii-surface-8) shadow-(--ii-shadow-3)",
+            : "inset-y-[3px] bg-(--ii-top) shadow-(--ii-shadow-3)",
         ]}
         style:inset-inline-start={`${padding + thumb.start}px`}
         style:width={`${thumb.width}px`}
@@ -2040,7 +2040,7 @@
      the identity, the greeting, the cards, the tabs, the apps and the pages'
      content all stand on; plates (hover, a lifted pill) reach past it. -->
 <div
-  class="concept ii-surface-3 text-text-primary min-h-dvh [--ii-edge:--spacing(4)] md:flex md:h-dvh md:bg-(--ii-surface-1) md:p-2"
+  class="concept text-text-primary min-h-dvh bg-(--ii-canvas) [--ii-edge:--spacing(4)] md:flex md:h-dvh md:bg-(--ii-page) md:p-2"
   style:--ii-ui={uiScale}
   style:--ii-ui-inset={uiInset}
 >
@@ -2191,8 +2191,8 @@
                 <span
                   class="relative"
                   style:--ii-dot-backdrop={headerLifted
-                    ? "var(--ii-surface-6)"
-                    : "var(--ii-surface-3)"}
+                    ? "var(--ii-floating)"
+                    : "var(--ii-canvas)"}
                 >
                   <IdentityAvatar
                     {identity}
@@ -2212,8 +2212,8 @@
                 transition:fade={{ duration: reduced ? 0 : 160 }}
                 class="flex items-center"
                 style:--ii-dot-backdrop={headerLifted
-                  ? "var(--ii-surface-6)"
-                  : "var(--ii-surface-3)"}
+                  ? "var(--ii-floating)"
+                  : "var(--ii-canvas)"}
               >
                 {#each accountCards as card (card.kind)}
                   {@const Icon = SECTION_ICONS[card.kind]}
@@ -2607,7 +2607,7 @@
                 class={[
                   "focus-visible:outline-focus-ring grid size-7 place-items-center rounded-full transition-[color,background-color,box-shadow] duration-150 ease-out focus-visible:outline-2 motion-reduce:transition-none",
                   checked
-                    ? "text-fg-primary bg-(--ii-surface-6) shadow-(--ii-shadow-2)"
+                    ? "text-fg-primary bg-(--ii-top) shadow-(--ii-shadow-2)"
                     : "text-fg-quaternary hover:text-fg-tertiary",
                 ]}
               >

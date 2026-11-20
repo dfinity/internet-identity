@@ -6,7 +6,7 @@
    * as strong as the one before it.
    */
   import type { ClassValue } from "svelte/elements";
-  import { useSurface } from "./Elevated.svelte";
+  import { surfaceColor, useSurface } from "./Elevated.svelte";
 
   interface Props {
     /** The edge where the blur is strongest. */
@@ -21,7 +21,7 @@
   const { side, fade = false, class: className }: Props = $props();
 
   // The surface is fixed for a component's life, like the place it renders in.
-  const surface = `var(--ii-surface-${useSurface()})`;
+  const surface = surfaceColor(useSurface());
 
   /** From 0.5px at the inner edge to 64px at the outer one. */
   const LEVELS = [0.5, 1, 2, 4, 8, 16, 32, 64];

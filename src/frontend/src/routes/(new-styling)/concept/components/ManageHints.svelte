@@ -43,8 +43,10 @@
   ];
 
   // A tile's logo, three quarters of the grid's: the same rounding to size.
+  // On the shelf, at the floating step, which stands clear of the shelf (the
+  // canvas tinted) in both themes.
   const TILE = "size-12 rounded-xl";
-  const LOGO = `${TILE} bg-(--ii-surface-6) shadow-(--ii-shadow-2)`;
+  const LOGO = `${TILE} bg-(--ii-floating) shadow-(--ii-shadow-2)`;
   // Where a tile's name would be.
   const NAME = "h-1.5 w-8 rounded-full bg-(--ii-selected)";
   // The grid's selection mark, its place over the logo's corner kept.
@@ -106,10 +108,10 @@
           class="absolute inset-0 -translate-x-4 -translate-y-3.5 scale-108 rtl:translate-x-4"
         >
           <span
-            class={["block bg-(--ii-surface-6) shadow-(--ii-shadow-5)", TILE]}
+            class={["block bg-(--ii-floating) shadow-(--ii-shadow-5)", TILE]}
           ></span>
           <HandGrabIcon
-            class="text-fg-primary absolute -end-2.5 -bottom-2.5 size-6 fill-(--ii-surface-8)"
+            class="text-fg-primary absolute -end-2.5 -bottom-2.5 size-6 fill-(--ii-top)"
             strokeWidth={1.75}
           />
         </span>

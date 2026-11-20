@@ -229,13 +229,14 @@
             "transition-[scale,background-color,box-shadow] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100",
             // A tucked widget is only an edge, so it casts a shorter shadow.
             tucked ? "ii-elevation-2" : "ii-elevation-6",
-            // A utility, not `ii-surface-6`: the reset for buttons outranks
-            // the surface classes, and the widget must not show the page through.
+            // The floating step as a utility, not a class: the reset for
+            // buttons outranks the surface classes, and the widget must not
+            // show the page through.
             item.primary
               ? item.tone === "risk"
                 ? "btn-primary btn-danger"
                 : "btn-primary"
-              : "ii-hover text-text-primary bg-(--ii-surface-6)",
+              : "ii-hover text-text-primary bg-(--ii-floating)",
           ]}
         >
           <span
