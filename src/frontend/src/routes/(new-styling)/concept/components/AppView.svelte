@@ -243,15 +243,15 @@
 
 <!-- Apart from the settings, with what it does. -->
 {#snippet remove()}
-  <div class="flex flex-col items-start px-4">
+  <div class="flex flex-col px-4">
     <button
       type="button"
       onclick={onRemove}
-      class="btn btn-tertiary btn-danger btn-sm -ms-3 font-medium"
+      class="btn btn-tertiary btn-danger btn-sm w-full font-medium"
     >
       Remove app
     </button>
-    <p class="text-text-tertiary text-[13px] leading-[18px]">
+    <p class="text-text-tertiary text-center text-[13px] leading-[18px]">
       Signs you out. The app stays in Explore.
     </p>
   </div>
