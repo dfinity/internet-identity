@@ -43,13 +43,12 @@ readonly IC_NETWORK="ic"
 readonly REPO="dfinity/internet-identity"
 readonly WORKFLOW_FILE="canister-tests.yml"
 
-# Default DoH allowlist for the email-recovery flow — single source
-# of truth in `default-doh-domains.bash`, shared with
-# `make-upgrade-proposal`. See that file for the audit notes.
-# Override per-deploy via `--doh-domains <comma-list>`; empty list
-# disables the DoH path entirely (DNSSEC-only).
-# shellcheck source=default-doh-domains.bash
-source "$(dirname "${BASH_SOURCE[0]}")/default-doh-domains.bash"
+# Default DoH reserved domains for the email flows — single source
+# of truth in `default-doh-reserved-domains.bash`, shared with
+# `make-upgrade-proposal`. Override per-deploy via
+# `--doh-reserved-domains <comma-list>`; empty list reserves no domain.
+# shellcheck source=default-doh-reserved-domains.bash
+source "$(dirname "${BASH_SOURCE[0]}")/default-doh-reserved-domains.bash"
 
 # Source the IANA fetcher so build_be_install_arg can reach it.
 # shellcheck source=fetch-iana-root-anchors.bash
@@ -168,13 +167,16 @@ Common options:
                             install args change.
   --update-email-recovery-init
                             Fetch fresh IANA root anchors + set the curated
-                            DoH allowlist on this upgrade. Without this flag
+                            DoH reserved domains on this upgrade. Without this flag
                             both fields stay opt null (i.e. preserve previous
                             on-chain values), which is what most upgrades
                             want once the canister has been initialized once.
-  --doh-domains <a,b,...>   Override the default DoH allowlist (only used
-                            with --update-email-recovery-init). Empty
-                            disables the DoH path (DNSSEC-only).
+  --doh-reserved-domains <a,b,...>
+                            Override the default DoH reserved domains (only
+                            used with --update-email-recovery-init). Empty
+                            reserves no domain; DoH stays on. To switch DoH
+                            off, put doh_config = opt null; in a
+                            --be-extra-args-file without this flag.
   --openid-configs-file <path>
                             Set the backend openid_configs init arg from a
                             Candid-text file holding an opt vec OpenIdConfig
@@ -193,7 +195,9 @@ Common options:
                             backend_origin / related_origins (prompts),
                             openid_configs (--openid-configs-file), and
                             dnssec_config / doh_config
-                            (--update-email-recovery-init).
+                            (--update-email-recovery-init; without that flag
+                            the file may set them, e.g. doh_config = opt null;
+                            switches DoH off).
                             Encoding is type-checked against the deployed wasm.
   -h, --help                Show this help
 EOF
@@ -215,11 +219,11 @@ parse_common_args() {
     NO_CHECKS=false
     IS_RECONFIGURE=false
     UPDATE_EMAIL_RECOVERY_INIT=false
-    DOH_DOMAINS_ARG=""
-    # Distinguishes "--doh-domains was not passed" (use the curated
-    # default) from "--doh-domains '' was passed" (operator wants the
-    # empty list to disable the DoH path entirely).
-    DOH_DOMAINS_ARG_SET=false
+    DOH_RESERVED_DOMAINS_ARG=""
+    # Distinguishes "--doh-reserved-domains was not passed" (use the
+    # curated default) from "--doh-reserved-domains '' was passed"
+    # (operator wants to reserve no domain).
+    DOH_RESERVED_DOMAINS_ARG_SET=false
     # Path to a Candid-text file holding the backend `openid_configs` value
     # to set on this upgrade. Empty = not passed = leave the field at `null`
     # (preserve the previously stored value).
@@ -336,21 +340,21 @@ parse_common_args() {
                 ;;
             --update-email-recovery-init)
                 # Opt in to fetching IANA anchors + setting the DoH
-                # allowlist on this upgrade. Without this flag both
+                # reserved domains on this upgrade. Without this flag both
                 # fields stay `opt null` (preserve previous on-chain
                 # value), which is what most upgrades want once the
                 # canister has been initialized once.
                 UPDATE_EMAIL_RECOVERY_INIT=true
                 shift
                 ;;
-            --doh-domains)
+            --doh-reserved-domains)
                 shift
                 if [ $# -eq 0 ]; then
-                    echo "Error: --doh-domains requires a comma-separated list (use '' to disable DoH)" >&2
+                    echo "Error: --doh-reserved-domains requires a comma-separated list (use '' to reserve none)" >&2
                     return 1
                 fi
-                DOH_DOMAINS_ARG="$1"
-                DOH_DOMAINS_ARG_SET=true
+                DOH_RESERVED_DOMAINS_ARG="$1"
+                DOH_RESERVED_DOMAINS_ARG_SET=true
                 shift
                 ;;
             --openid-configs-file)
@@ -757,8 +761,8 @@ build_be_install_arg() {
             anchors_vec="$(fetch_and_review_iana_root_anchors)" || return 1
             _BE_DNSSEC_CONFIG_CANDID="opt opt record { root_anchors = $anchors_vec }"
         fi
-        # DoH allowlist — operator config (the user can override via
-        # --doh-domains; empty disables the DoH path entirely).
+        # DoH reserved domains — operator config (the user can override
+        # via --doh-reserved-domains; empty reserves no domain).
         local doh_record
         doh_record="$(_be_doh_config_candid)"
         extra=$(cat <<EXTRA
@@ -796,10 +800,16 @@ EXTRA
             echo "Error: failed to read --be-extra-args-file (or it is now empty): $BE_EXTRA_ARGS_FILE" >&2
             return 1
         fi
+        # `dnssec_config` and `doh_config` are the script's only with
+        # --update-email-recovery-init; without it the file may set them, e.g.
+        # `doh_config = opt null;` to switch the DoH path off.
+        local -a managed_fields=(backend_canister_id backend_origin related_origins
+                                 mcp_official_url openid_configs)
+        if [ "$UPDATE_EMAIL_RECOVERY_INIT" = true ]; then
+            managed_fields+=(dnssec_config doh_config)
+        fi
         local managed
-        for managed in backend_canister_id backend_origin related_origins \
-                       mcp_official_url \
-                       openid_configs dnssec_config doh_config; do
+        for managed in "${managed_fields[@]}"; do
             # Match the field name only as a record-field key: at a line start
             # (ignoring leading whitespace) and followed by `=`. This avoids
             # false positives on the same word appearing inside a value string.
@@ -810,7 +820,7 @@ EXTRA
                 echo "       staging selection (-sa/-sb/-sc/-sd / --staging); backend_origin," >&2
                 echo "       related_origins and mcp_official_url from the prompts; openid_configs from" >&2
                 echo "       --openid-configs-file; dnssec_config / doh_config from" >&2
-                echo "       --update-email-recovery-init." >&2
+                echo "       --update-email-recovery-init (drop that flag to set them here)." >&2
                 return 1
             fi
         done
@@ -831,26 +841,26 @@ $extra_user
 EOF
 }
 
-# Internal: render the DoH allowlist as Candid `opt opt DohConfig`.
-# - `--doh-domains` not passed → use DEFAULT_DOH_ALLOWED_DOMAINS.
-# - `--doh-domains foo,bar` → that list.
-# - `--doh-domains ''` → empty list, which the canister treats as
-#   "no domain may use the DoH path" (DNSSEC-only).
+# Internal: render the DoH config as Candid `opt opt DohConfig`.
+# - `--doh-reserved-domains` not passed → use DEFAULT_DOH_RESERVED_DOMAINS.
+# - `--doh-reserved-domains foo,bar` → that list.
+# - `--doh-reserved-domains ''` → empty list: no domain is reserved, and
+#   every domain draws from the shared outcall budget.
 _be_doh_config_candid() {
     local -a domains
-    if [ "$DOH_DOMAINS_ARG_SET" = true ]; then
+    if [ "$DOH_RESERVED_DOMAINS_ARG_SET" = true ]; then
         # Comma-separated list → array. Trim whitespace per element.
         # An empty string yields a single empty element, which we drop
-        # in the rendering loop below — so `--doh-domains ''` emits
-        # `allowed_domains = vec { };`.
-        IFS=',' read -ra domains <<< "$DOH_DOMAINS_ARG"
+        # in the rendering loop below — so `--doh-reserved-domains ''`
+        # emits `reserved_domains = opt vec { };`.
+        IFS=',' read -ra domains <<< "$DOH_RESERVED_DOMAINS_ARG"
         local i
         for i in "${!domains[@]}"; do
             domains[i]="${domains[i]## }"
             domains[i]="${domains[i]%% }"
         done
     else
-        domains=("${DEFAULT_DOH_ALLOWED_DOMAINS[@]}")
+        domains=("${DEFAULT_DOH_RESERVED_DOMAINS[@]}")
     fi
 
     local list=""
@@ -861,7 +871,7 @@ _be_doh_config_candid() {
     done
     cat <<EOF
 opt opt record {
-      allowed_domains = vec { $list};
+      reserved_domains = opt vec { $list};
       max_cache_age_secs = opt (3600 : nat64);
     }
 EOF
@@ -1234,7 +1244,7 @@ encode_install_arg_bin() {
     fi
     if ! command -v ic-wasm >/dev/null 2>&1; then
         echo "Error: \`ic-wasm\` not on PATH. Run \`./scripts/bootstrap\` (or" >&2
-        echo "       \`cargo install ic-wasm --version 0.8.5\`) to install it." >&2
+        echo "       \`cargo install ic-wasm --version 0.8.5 --locked\`) to install it." >&2
         return 1
     fi
     ensure_pinned_didc || return 1

@@ -1,12 +1,16 @@
 //! Tests for making sure that the current version can be upgraded to from the last release.
 //! This tests stable memory compatibility and pre / post install hooks.
 
+use crate::email_recovery::fresh_identity;
+use candid::{CandidType, Deserialize, Principal};
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
+use internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeDnsInput;
 use internet_identity_interface::internet_identity::types::*;
+use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
-use pocket_ic::RejectResponse;
+use pocket_ic::{call_candid, PocketIc, RejectResponse};
 use regex::Regex;
 
 /// Basic upgrade test.
@@ -161,4 +165,134 @@ fn should_report_no_browsers_for_an_anchor_from_the_previous_release() -> Result
     assert_eq!(info.authn_methods.len(), 1);
 
     Ok(())
+}
+
+/// `DohConfig` as the previous release declares it in its `.did`: an allowlist
+/// of registered domains instead of `reserved_domains`.
+#[derive(CandidType, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LegacyDohConfig {
+    pub(crate) allowed_domains: Vec<String>,
+    pub(crate) max_cache_age_secs: Option<u64>,
+}
+
+/// The `doh_config` field of the previous release's `InternetIdentityInit`,
+/// encoded as its upgrade arg and decoded from its `config` query; every other
+/// field is optional there, so it is left out.
+#[derive(CandidType, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LegacyDohInit {
+    pub(crate) doh_config: Option<Option<LegacyDohConfig>>,
+}
+
+/// Upgrades `canister_id` to the previous release with `doh_config` as its arg.
+pub(crate) fn configure_previous_release_doh(
+    env: &PocketIc,
+    canister_id: Principal,
+    doh_config: LegacyDohConfig,
+) {
+    let arg = Some(LegacyDohInit {
+        doh_config: Some(Some(doh_config)),
+    });
+    env.upgrade_canister(
+        canister_id,
+        II_WASM_PREVIOUS.clone(),
+        candid::encode_one(arg).expect("error encoding legacy DoH upgrade arg"),
+        None,
+    )
+    .expect("upgrade of the previous release with a legacy DoH config failed");
+}
+
+/// Reads `doh_config` from the `config` query in the previous release's shape.
+pub(crate) fn previous_release_doh_config(
+    env: &PocketIc,
+    canister_id: Principal,
+) -> Option<Option<LegacyDohConfig>> {
+    let (config,): (LegacyDohInit,) =
+        call_candid(env, canister_id, RawEffectivePrincipal::None, "config", ())
+            .expect("config query failed");
+    config.doh_config
+}
+
+/// Verifies that a DoH allowlist stored by the previous release keeps DoH configured
+/// after an upgrade without an arg: no domain is reserved, the cache age survives, and
+/// an address outside the old allowlist is accepted.
+#[test]
+fn should_keep_doh_configured_with_no_reserved_domains_after_upgrading_a_legacy_allowlist() {
+    for allowed_domains in [vec!["example.com".to_string()], vec![]] {
+        let env = env();
+        let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+        let legacy_config = LegacyDohConfig {
+            allowed_domains,
+            max_cache_age_secs: Some(1234),
+        };
+        configure_previous_release_doh(&env, canister_id, legacy_config.clone());
+        assert_eq!(
+            previous_release_doh_config(&env, canister_id),
+            Some(Some(legacy_config))
+        );
+
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        assert_eq!(
+            api::config(&env, canister_id).unwrap().doh_config,
+            Some(Some(DohConfig {
+                reserved_domains: None,
+                max_cache_age_secs: Some(1234),
+            }))
+        );
+        let (identity_number, principal) = fresh_identity(&env, canister_id);
+        let challenge = api::email_recovery_credential_prepare_add(
+            &env,
+            canister_id,
+            principal,
+            identity_number,
+            EmailChallengeDnsInput {
+                address: "bob@other.example".into(),
+                dns_proof: None,
+            },
+        )
+        .expect("prepare_add call failed")
+        .expect("prepare_add should accept a domain outside the legacy allowlist");
+        assert!(
+            challenge.nonce.starts_with("II-Recovery-"),
+            "unexpected nonce: {}",
+            challenge.nonce
+        );
+    }
+}
+
+/// Verifies that once a legacy DoH allowlist has been upgraded, an upgrade arg sets
+/// `reserved_domains`.
+#[test]
+fn should_reserve_doh_domains_by_upgrade_arg_after_upgrading_a_legacy_allowlist() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    configure_previous_release_doh(
+        &env,
+        canister_id,
+        LegacyDohConfig {
+            allowed_domains: vec!["example.com".into()],
+            max_cache_age_secs: Some(1234),
+        },
+    );
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    let reserved_config = DohConfig {
+        reserved_domains: Some(vec!["gmail.com".into(), "outlook.com".into()]),
+        max_cache_age_secs: Some(60),
+    };
+
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            doh_config: Some(Some(reserved_config.clone())),
+            ..Default::default()
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(
+        api::config(&env, canister_id).unwrap().doh_config,
+        Some(Some(reserved_config))
+    );
 }
