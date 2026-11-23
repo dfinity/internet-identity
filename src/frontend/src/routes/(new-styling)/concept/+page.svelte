@@ -11,7 +11,9 @@
     CompassIcon,
     FlaskConicalIcon,
     Grid2x2CheckIcon,
+    HouseIcon,
     KeyRoundIcon,
+    LayoutGridIcon,
     LogOutIcon,
     PanelBottomIcon,
     PanelRightIcon,
@@ -69,6 +71,7 @@
   import PanelHeader from "./foundation/frame/PanelHeader.svelte";
   import ProgressiveBlur from "./foundation/motion/ProgressiveBlur.svelte";
   import SearchOverlay from "./features/search/SearchOverlay.svelte";
+  import type { Command } from "./features/search/commands";
   import Sheet from "./foundation/frame/Sheet.svelte";
   import RecoveryFlow, {
     type RecoveryMethod,
@@ -1308,6 +1311,136 @@
     stopManaging();
   };
 
+  // --- The command line ---
+
+  /** What the search offers to do, besides finding an app (Misha: a command
+   *  line with the most usual steps, after Linear's ⌘K). First what the
+   *  account waits on, as the dock words it; then the steps people come
+   *  here for; then everything else, found by its words. Each does what
+   *  its place on the page does, so nothing is done in two ways. Which
+   *  steps are the usual ones is a guess until the product counts them. */
+  const commands = $derived.by((): Command[] => {
+    const toSection = (kind: CardKind) => () => {
+      openCard(kind);
+      panelOpen = true;
+    };
+    const waiting = attention.map((card): Command => ({
+      id: `waiting:${card.kind}`,
+      label: card.ask ?? card.sentence,
+      hint: card.ask === undefined ? undefined : card.sentence,
+      icon: SECTION_ICONS[card.kind],
+      dot: dotOf(card.tone),
+      suggested: true,
+      run: () => actFromDock(card.kind),
+    }));
+    const asks = (kind: CardKind) =>
+      attention.some((card) => card.kind === kind);
+    const recoverySet = current.scenario.recovery !== "none";
+    return [
+      ...waiting,
+      // A section the account already asks about isn't offered twice.
+      ...(asks("access")
+        ? []
+        : [
+            {
+              id: "access",
+              label: "Add a way to sign in",
+              hint: "Access",
+              icon: KeyRoundIcon,
+              keywords: ["passkey", "google", "apple", "microsoft", "method"],
+              suggested: true,
+              run: toSection("access"),
+            } satisfies Command,
+          ]),
+      {
+        id: "manage-apps",
+        label: "Manage apps",
+        hint: "My apps",
+        icon: Grid2x2CheckIcon,
+        keywords: ["edit", "remove", "forget", "notifications", "reorder"],
+        suggested: current.apps.length > 0,
+        run: () => {
+          goToPage(0);
+          startManaging();
+        },
+      },
+      {
+        id: "add-app",
+        label: "Add an app",
+        hint: "Search or paste a link",
+        icon: PlusIcon,
+        keywords: ["discover", "find", "new", "link"],
+        suggested: true,
+        opens: "apps",
+      },
+      ...(asks("devices")
+        ? []
+        : [
+            {
+              id: "devices",
+              label: "See where you're signed in",
+              hint: "Devices",
+              icon: MonitorSmartphoneIcon,
+              keywords: ["browsers", "sessions", "sign", "out"],
+              suggested: true,
+              run: toSection("devices"),
+            } satisfies Command,
+          ]),
+      ...(asks("recovery")
+        ? []
+        : [
+            {
+              id: "recovery",
+              label: recoverySet ? "Manage recovery" : "Set up recovery",
+              hint: "Recovery",
+              icon: BriefcaseMedicalIcon,
+              keywords: ["phrase", "email", "backup", "lost"],
+              suggested: true,
+              run: () => openRecovery(),
+            } satisfies Command,
+          ]),
+      ...otherIdentities.map((one): Command => ({
+        id: `switch:${one.identityNumber}`,
+        label: `Switch to ${one.name ?? one.identityNumber}`,
+        hint: "Identity",
+        icon: { identity: one, palette: paletteOf(one) },
+        keywords: ["identity", "account"],
+        run: () => switchIdentity(one.identityNumber),
+      })),
+      {
+        id: "connect-ai",
+        label: "Connect an AI assistant",
+        hint: "Connect",
+        icon: BotIcon,
+        keywords: ["mcp", "agent", "claude", "chatgpt", "cli"],
+        run: () => goToPage(2),
+      },
+      ...PAGES.map((page, index): Command => ({
+        id: `page:${page.id}`,
+        label: `Go to ${page.label}`,
+        hint: "Page",
+        icon: index === 1 ? CompassIcon : LayoutGridIcon,
+        run: () => goToPage(index),
+      })).filter((_, index) => index !== activePage && index !== 2),
+      {
+        id: "start-page",
+        label: "Make id.ai your start page",
+        hint: "Identity",
+        icon: HouseIcon,
+        keywords: ["home", "startup", "browser"],
+        run: showStartPage,
+      },
+      {
+        id: "sign-out",
+        label: "Sign out",
+        hint: "Identity",
+        icon: LogOutIcon,
+        keywords: ["log", "logout", "leave"],
+        run: () => unavailable("Signing out"),
+      },
+    ];
+  });
+
   // A panel that opens again starts with the list folded, on its overview.
   $effect(() => {
     if (!panelVisible) {
@@ -1626,7 +1759,7 @@
        dashed frame stays, and the free cells after it fill out its row. -->
   <button
     type="button"
-    onclick={() => search?.show()}
+    onclick={() => search?.show("apps")}
     inert={managing}
     aria-haspopup="dialog"
     class="group focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 transition-[scale] duration-160 ease-out outline-none focus-visible:ring-2 active:scale-[0.97] motion-reduce:active:scale-100"
@@ -1709,7 +1842,7 @@
     </p>
     <button
       type="button"
-      onclick={() => search?.show()}
+      onclick={() => search?.show("apps")}
       aria-haspopup="dialog"
       class="btn btn-primary btn-sm mt-3 rounded-full"
     >
@@ -2660,13 +2793,15 @@
     <ActionDock items={dockItems} onAction={actFromDock} />
   {/if}
 
-  <!-- The page's one search, over everything: the header's glyph opens it,
-       ⌘K on desktop, and Add app after the last tile. A new one for a phone
-       or a desktop, as the header's glyph is. -->
+  <!-- The page's command line, over everything: the header's glyph opens
+       it, ⌘K on desktop, and Add app after the last tile, turned to adding
+       an app. A new one for a phone or a desktop, as the header's glyph
+       is. -->
   {#key isDesktop.current}
     <SearchOverlay
       bind:this={search}
       compact={!isDesktop.current}
+      {commands}
       apps={current.apps}
       {isAdded}
       onAdd={(app) => addApp(app)}

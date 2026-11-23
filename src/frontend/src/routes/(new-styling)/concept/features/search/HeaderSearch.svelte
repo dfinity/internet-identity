@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * Finding an app from any page: a search glyph in the header, so search
-   * isn't a part of Explore only. It opens the page's one search
-   * (SearchOverlay), which ⌘K opens on desktop too.
+   * The command line from any page: a search glyph in the header, so
+   * finding an app or a step isn't a part of one page only. It opens the
+   * page's one search (SearchOverlay), which ⌘K opens on desktop too.
    */
   import { SearchIcon } from "@lucide/svelte";
   import type { ClassValue } from "svelte/elements";
@@ -29,10 +29,10 @@
 <button
   type="button"
   {onclick}
-  aria-label="Search apps"
+  aria-label="Search and commands"
   aria-haspopup="dialog"
   aria-keyshortcuts={compact ? undefined : "Meta+K Control+K"}
-  title={compact ? undefined : "Search apps  ⌘K"}
+  title={compact ? undefined : "Search and commands  ⌘K"}
   class={[
     "focus-visible:outline-focus-ring grid shrink-0 place-items-center rounded-full transition-[background-color,box-shadow,color] duration-200 ease-out focus-visible:outline-2 motion-reduce:transition-none",
     compact

@@ -1,25 +1,32 @@
 <script lang="ts">
   /**
-   * What the search shows: in the palette over the page on desktop, and over
-   * the whole screen on a phone. Before a letter is typed it already has
-   * something to offer: Explore's shelves to browse, the apps used last, and
-   * a few to try. From the first letter it lists what
-   * matches instead: yours first, to open, then the rest, to add, and a
-   * pasted link as an app of its own. A shelf picked from the chips narrows
-   * the list to it, and stands in the field as a token (SearchOverlay).
+   * What the command line shows: in the palette over the page on desktop,
+   * and over the whole screen on a phone. It is a command line first and a
+   * search second (Misha, 23 Nov, after Linear's ⌘K): before a letter is
+   * typed it offers what people come to do (what the account waits on, then
+   * the usual steps) and the apps used last. From the first letter it lists
+   * what matches: your apps, to open, then the commands, then the rest of
+   * the catalogue, to add, and a pasted link as an app of its own.
    *
-   * Every row is one action, the one its button names: Open for an app in
-   * My apps, Add for the rest. One highlight marks the row the keyboard or
-   * the pointer is on and glides from row to row, as in beUI's Command
-   * Palette (https://beui.dev/components/blocks/command-palette, MIT).
-   * Arrows move it, left and right along a row of chips or apps, and Enter
-   * does what the row's button says.
+   * Turned to adding an app (the tile after the last app, or the command),
+   * it is the search it was: Explore's shelves to browse, the apps used
+   * last and a few to try. A shelf picked from the chips narrows the list
+   * to it, and stands in the field as a token (SearchOverlay).
+   *
+   * Every row is one action: a command runs, Open for an app in My apps,
+   * Add for the rest. One highlight marks the row the keyboard or the
+   * pointer is on and glides from row to row, as in beUI's Command Palette
+   * (https://beui.dev/components/blocks/command-palette, MIT). Arrows move
+   * it, left and right along a row of chips or apps, and Enter does what
+   * the row says.
    */
   import { untrack } from "svelte";
   import { LinkIcon } from "@lucide/svelte";
   import { prefersReducedMotion } from "svelte/motion";
+  import IdentityAvatar from "$lib/components/ui/IdentityAvatar.svelte";
   import AppLogo from "../../../manage/(authenticated)/applications/components/AppLogo.svelte";
   import { asLink, searchCatalog } from "../explore/catalog";
+  import { matchesCommand, type Command } from "./commands";
   import {
     exploreFeed,
     type ConceptApp,
@@ -29,6 +36,14 @@
 
   interface Props {
     query: string;
+    /** `all`: the command line. `apps`: finding an app to add. */
+    mode: "all" | "apps";
+    /** What the page can do, for the command line. */
+    commands: Command[];
+    onCommand: (command: Command) => void;
+    /** Adding an app was reached from the command line: Escape steps back
+     *  to it. */
+    stepped?: boolean;
     /** The shelf the list is narrowed to, picked from the chips. */
     shelf?: ExploreShelfItem;
     onShelf: (shelf: ExploreShelfItem) => void;
@@ -51,6 +66,10 @@
 
   const {
     query,
+    mode,
+    commands,
+    onCommand,
+    stepped = false,
     shelf,
     onShelf,
     apps,
@@ -72,6 +91,7 @@
   );
 
   type Entry =
+    | { kind: "command"; id: string; command: Command }
     | { kind: "chip"; id: string; shelf: ExploreShelfItem }
     | { kind: "tile"; id: string; app: ConceptApp }
     | { kind: "app"; id: string; app: FeaturedApp }
@@ -93,6 +113,13 @@
     id: `app:${app.origin}`,
     app,
   });
+  const asCommand = (command: Command): Entry => ({
+    kind: "command",
+    id: `command:${command.id}`,
+    command,
+  });
+  /** How many commands a list shows: the ones people come for, not all. */
+  const COMMANDS_SHOWN = 5;
 
   const groups = $derived.by((): Group[] => {
     // A shelf picked: its apps, narrowed by what's typed.
@@ -113,6 +140,31 @@
         .filter((app) => app.lastUsedMillis > 0)
         .sort((a, b) => b.lastUsedMillis - a.lastUsedMillis)
         .slice(0, 6);
+      const used: Group = {
+        id: "recent",
+        title: "Recent",
+        layout: "tiles",
+        entries: recent.map((app) => ({
+          kind: "tile",
+          id: `recent:${app.origin}`,
+          app,
+        })),
+      };
+      // The command line: what to do first, then the apps used last.
+      if (mode === "all") {
+        return [
+          {
+            id: "suggested-commands",
+            title: "Suggested",
+            layout: "rows",
+            entries: commands
+              .filter(({ suggested }) => suggested === true)
+              .slice(0, COMMANDS_SHOWN)
+              .map(asCommand),
+          } satisfies Group,
+          used,
+        ].filter(({ entries }) => entries.length > 0);
+      }
       return [
         {
           id: "browse",
@@ -123,16 +175,7 @@
             shelf: one,
           })),
         },
-        {
-          id: "recent",
-          title: "Recent",
-          layout: "tiles",
-          entries: recent.map((app) => ({
-            kind: "tile",
-            id: `recent:${app.origin}`,
-            app,
-          })),
-        },
+        used,
         {
           id: "suggested",
           title: "Suggested",
@@ -164,6 +207,28 @@
       ),
     ];
     const rest = matches.filter(({ origin }) => !isAdded(origin)).slice(0, 12);
+    const yours: Group = {
+      id: "mine",
+      title: "My apps",
+      layout: "rows",
+      entries: mine.map(asRow),
+    };
+    const actions: Group = {
+      id: "commands",
+      title: "Actions",
+      layout: "rows",
+      entries:
+        mode === "all"
+          ? commands
+              .filter((command) => matchesCommand(command, typed))
+              .slice(0, COMMANDS_SHOWN)
+              .map(asCommand)
+          : [],
+    };
+    // An app of yours named as typed comes first, to open. One found only
+    // by its description gives way to a command, which is found by the
+    // start of its words.
+    const named = mine.some(({ name }) => name.toLowerCase().includes(lower));
     return [
       {
         id: "link",
@@ -173,12 +238,7 @@
             ? []
             : [{ kind: "link", id: `link:${host}`, app: link }],
       },
-      {
-        id: "mine",
-        title: "My apps",
-        layout: "rows",
-        entries: mine.map(asRow),
-      },
+      ...(named ? [yours, actions] : [actions, yours]),
       {
         id: "rest",
         title: mine.length > 0 ? "More apps" : "Apps",
@@ -213,6 +273,7 @@
   $effect(() => {
     void typed;
     void shelf;
+    void mode;
     untrack(() => {
       activeId = typed !== "" || shelf !== undefined ? flat[0]?.id : undefined;
     });
@@ -220,16 +281,28 @@
 
   const added = (entry: Entry) =>
     entry.kind === "tile" ||
-    (entry.kind !== "chip" && isAdded(entry.app.origin));
+    (entry.kind !== "chip" &&
+      entry.kind !== "command" &&
+      isAdded(entry.app.origin));
   /** What Enter (or a click) does on the entry, as its button says. */
   const verbOf = (entry: Entry) =>
-    entry.kind === "chip" ? "Show" : added(entry) ? "Open" : "Add";
+    entry.kind === "command"
+      ? "Run"
+      : entry.kind === "chip"
+        ? "Show"
+        : added(entry)
+          ? "Open"
+          : "Add";
 
   const open = (app: FeaturedApp) => {
     window.open(app.url, "_blank", "noopener,noreferrer");
     onOpen(app);
   };
   const run = (entry: Entry) => {
+    if (entry.kind === "command") {
+      onCommand(entry.command);
+      return;
+    }
     if (entry.kind === "chip") {
       onShelf(entry.shelf);
       return;
@@ -369,7 +442,63 @@
     onpointermove: point(entry),
     onclick: () => run(entry),
   }}
-  {#if entry.kind === "chip"}
+  {#if entry.kind === "command"}
+    {@const command = entry.command}
+    <!-- A command: its glyph on a plate at the row's start, in a slot as
+         wide as an app's logo, so both kinds of row start their words on
+         one line; what it leads to at the row's end. -->
+    <button
+      {...common}
+      type="button"
+      class="relative flex w-full items-center gap-3 rounded-2xl px-2 py-1.5 text-start"
+    >
+      <span aria-hidden="true" class="flex h-10 w-12 shrink-0 items-center">
+        {#if "identity" in command.icon}
+          <span class="grid size-10 place-items-center">
+            <IdentityAvatar
+              identity={command.icon.identity}
+              palette={command.icon.palette}
+              size="sm"
+            />
+          </span>
+        {:else}
+          {@const Icon = command.icon}
+          <span
+            class="text-fg-secondary relative grid size-10 place-items-center rounded-xl bg-(--ii-hover)"
+          >
+            <Icon class="size-4.5" />
+            {#if command.dot !== undefined}
+              <!-- The account waits on it: the section's own dot. -->
+              <span
+                class={[
+                  "absolute -end-0.5 -top-0.5 size-2 rounded-full",
+                  command.dot === "risk"
+                    ? "bg-bg-error-solid"
+                    : command.dot === "action"
+                      ? "bg-bg-warning-solid"
+                      : "bg-fg-primary",
+                ]}
+              ></span>
+            {/if}
+          </span>
+        {/if}
+      </span>
+      <!-- Where the row is narrow (a phone), the hint alone gives way: the
+           label keeps its words, up to the row's own room. -->
+      <span
+        class="text-text-primary max-w-[calc(100%-3.75rem)] shrink-0 truncate text-sm font-medium"
+      >
+        {command.label}
+      </span>
+      {#if command.hint !== undefined}
+        <span
+          class="text-text-tertiary ms-auto min-w-0 truncate ps-2 pe-1 text-xs"
+        >
+          {command.hint}
+        </span>
+      {/if}
+    </button>
+  {:else if entry.kind === "chip"}
     <button
       {...common}
       type="button"
@@ -428,7 +557,7 @@
   <div
     id={listId}
     role="listbox"
-    aria-label="Apps"
+    aria-label={mode === "all" ? "Commands and apps" : "Apps"}
     class="min-h-0 flex-1 [scrollbar-width:none] overflow-y-auto overscroll-contain p-2 [&::-webkit-scrollbar]:hidden"
   >
     <div bind:this={content} class="relative">
@@ -492,10 +621,12 @@
           <p
             class="text-text-primary text-sm font-medium [overflow-wrap:anywhere]"
           >
-            No app called “{typed}”
+            {mode === "all" ? "Nothing" : "No app"} called “{typed}”
           </p>
           <p class="text-text-tertiary text-sm text-pretty">
-            Paste its link to add it anyway.
+            {mode === "all"
+              ? "Paste an app's link to add it."
+              : "Paste its link to add it anyway."}
           </p>
         </div>
       {/each}
@@ -519,7 +650,11 @@
       {/if}
       <span class="ms-auto flex items-center gap-1.5">
         <kbd class="kbd">esc</kbd>
-        {shelf !== undefined || typed !== "" ? "Clear" : "Close"}
+        {shelf !== undefined || typed !== ""
+          ? "Clear"
+          : stepped
+            ? "Back"
+            : "Close"}
       </span>
     </div>
   {/if}

@@ -1,8 +1,10 @@
 <script lang="ts">
   /**
-   * The one search over the page, for finding an app and adding one: the
-   * header's glyph opens it, ⌘K on desktop, and so does Add app after the
-   * last tile. What it lists is SearchPalette's.
+   * The command line over the page: what to do here, and any app, from one
+   * field. The header's glyph opens it, and ⌘K on desktop; Add app after
+   * the last tile opens it turned to adding an app, which the command line
+   * reaches too ("Add an app"), a step Escape takes back. What it lists is
+   * SearchPalette's.
    *
    * On desktop it opens a palette over the page, after beUI's Command
    * Palette (https://beui.dev/components/blocks/command-palette, MIT): the
@@ -21,10 +23,13 @@
     FeaturedApp,
   } from "../../mock/mockData";
   import SearchPalette from "./SearchPalette.svelte";
+  import type { Command } from "./commands";
   import { FLOATING } from "../../foundation/surfaces/Elevated.svelte";
   import SurfaceLevel from "../../foundation/surfaces/SurfaceLevel.svelte";
 
   interface Props {
+    /** What the page can do. */
+    commands: Command[];
     apps: ConceptApp[];
     isAdded: (origin: string) => boolean;
     onAdd: (app: FeaturedApp) => void;
@@ -38,6 +43,7 @@
   }
 
   const {
+    commands,
     apps,
     isAdded,
     onAdd,
@@ -47,12 +53,20 @@
     compact = false,
   }: Props = $props();
 
-  const PLACEHOLDER = "Search apps or paste a link";
+  const PLACEHOLDERS = {
+    all: "Search apps or type a command",
+    apps: "Search apps or paste a link",
+  };
   const reduced = $derived(prefersReducedMotion.current);
   /** Emil Kowalski's strong ease-out, as --ii-ease-out. */
   const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 
   let query = $state("");
+  /** The command line, or turned to adding an app. */
+  let mode = $state<"all" | "apps">("all");
+  /** Adding an app was reached from the command line, so it's a step in
+   *  it: a token in the field, and Escape goes back. */
+  let stepped = $state(false);
   let shelf = $state<ExploreShelfItem>();
   let open = $state(false);
   let closing = false;
@@ -65,13 +79,15 @@
   const listId = `${uid}-list`;
   let activeOptionId = $state<string>();
 
-  /** Opens the search. Call it within the press itself, so a phone brings
-   *  its keyboard up with it: a focus from a timer or after a frame would
-   *  leave it down. */
-  export const show = () => {
+  /** Opens the command line, or with `apps` the search for an app to add.
+   *  Call it within the press itself, so a phone brings its keyboard up
+   *  with it: a focus from a timer or after a frame would leave it down. */
+  export const show = (scope: "all" | "apps" = "all") => {
     if (open) return;
     query = "";
     shelf = undefined;
+    mode = scope;
+    stepped = false;
     open = true;
     flushSync();
     dialog?.showModal();
@@ -131,16 +147,40 @@
     closing = false;
   };
 
+  /** From adding an app back to the command line that led to it. */
+  const leaveApps = () => {
+    mode = "all";
+    stepped = false;
+    input?.focus();
+  };
+
   /** Escape takes back one step at a time: the shelf, then what's typed,
-   *  then the search itself. */
+   *  then adding an app where the command line led to it, then the search
+   *  itself. */
   const back = () => {
     if (shelf !== undefined) {
       shelf = undefined;
     } else if (query !== "") {
       query = "";
+    } else if (stepped) {
+      leaveApps();
     } else {
       void hide();
     }
+  };
+
+  /** A command runs once the search has left, so what it opens (a dialog,
+   *  a section) takes the focus the search gives back. Adding an app is a
+   *  step within the search instead. */
+  const runCommand = (command: Command) => {
+    if (command.opens === "apps") {
+      mode = "apps";
+      stepped = true;
+      query = "";
+      input?.focus();
+      return;
+    }
+    void hide().then(() => command.run?.());
   };
 
   const onKeydown = (event: KeyboardEvent) => {
@@ -151,10 +191,10 @@
     } else if (
       event.key === "Backspace" &&
       query === "" &&
-      shelf !== undefined
+      (shelf !== undefined || stepped)
     ) {
       event.preventDefault();
-      shelf = undefined;
+      back();
     } else if (palette?.keydown(event) === true) {
       event.preventDefault();
     }
@@ -213,6 +253,22 @@
         <XIcon class="size-3.5" aria-hidden="true" />
       </button>
     </span>
+  {:else if stepped}
+    <!-- The step the command line took: the same token, back with its x,
+         Backspace or Escape. -->
+    <span
+      class="text-text-primary flex h-7 shrink-0 items-center gap-0.5 rounded-full bg-(--ii-selected) ps-3 pe-1 text-sm font-medium"
+    >
+      Add app
+      <button
+        type="button"
+        onclick={leaveApps}
+        aria-label="Back to all commands"
+        class="text-fg-tertiary hover:text-fg-secondary grid size-5 place-items-center rounded-full"
+      >
+        <XIcon class="size-3.5" aria-hidden="true" />
+      </button>
+    </span>
   {/if}
   <input
     bind:this={input}
@@ -224,8 +280,10 @@
     aria-controls={listId}
     aria-activedescendant={activeOptionId}
     aria-autocomplete="list"
-    placeholder={shelf !== undefined ? `Search ${shelf.title}` : PLACEHOLDER}
-    aria-label={PLACEHOLDER}
+    placeholder={shelf !== undefined
+      ? `Search ${shelf.title}`
+      : PLACEHOLDERS[mode]}
+    aria-label={PLACEHOLDERS[mode]}
     autocomplete="off"
     autocapitalize="off"
     spellcheck="false"
@@ -244,6 +302,10 @@
     {listId}
     onActive={(id) => (activeOptionId = id)}
     {query}
+    {mode}
+    {commands}
+    onCommand={runCommand}
+    {stepped}
     {shelf}
     onShelf={pickShelf}
     {apps}
@@ -260,7 +322,7 @@
   <!-- Phone: over the whole screen, in the top layer, over the tab bar. -->
   <dialog
     bind:this={dialog}
-    aria-label="Search apps"
+    aria-label="Search and commands"
     oncancel={(event) => {
       event.preventDefault();
       back();
@@ -299,7 +361,7 @@
        each comes and goes on its own timing. -->
   <dialog
     bind:this={dialog}
-    aria-label="Search apps"
+    aria-label="Search and commands"
     oncancel={(event) => {
       event.preventDefault();
       back();
