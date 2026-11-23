@@ -2260,8 +2260,15 @@ type Notification = record {
 // Applies in order: a later entry for a (recipient, id) replaces an earlier
 // one, as a re-send replaces a notification that is still pending.
 type SendNotificationArg = record {
+    // The frontend the notifications are sent for. Without derivation_origin, also
+    // the application whose users receive them.
     origin : FrontendHostname;
     notifications : vec Notification;
+    // The application whose users receive the notifications, where origin is one of
+    // its frontends: the derivation origin that frontend signs in with. The
+    // application must list origin in its /.well-known/ii-alternative-origins, and
+    // its sender list must name the caller.
+    derivation_origin : opt FrontendHostname;
 };
 
 type NotAcceptedReason = variant {
@@ -2285,6 +2292,9 @@ type SendNotificationError = variant {
     // The origin lists no such sender: no file, an empty or unusable one, or
     // one that does not name the caller.
     NoSuchSender;
+    // The application at derivation_origin does not list origin among its alternative
+    // origins: no file, an unusable one, or one that does not name it.
+    UnlistedFrontend;
     TooManyNotifications : record { limit : nat32 };
     InternalCanisterError : text;
 };

@@ -255,6 +255,7 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
+  const FrontendHostname = IDL.Text;
   const Urgency = IDL.Variant({
     'Low' : IDL.Null,
     'High' : IDL.Null,
@@ -267,8 +268,8 @@ export const idlFactory = ({ IDL }) => {
     'recipient' : IDL.Principal,
     'expires_at' : IDL.Opt(Timestamp),
   });
-  const FrontendHostname = IDL.Text;
   const SendNotificationArg = IDL.Record({
+    'derivation_origin' : IDL.Opt(FrontendHostname),
     'notifications' : IDL.Vec(Notification),
     'origin' : FrontendHostname,
   });
@@ -287,6 +288,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const SendNotificationError = IDL.Variant({
     'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
+    'UnlistedFrontend' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NoSuchSender' : IDL.Null,
   });

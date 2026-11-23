@@ -3277,6 +3277,7 @@ mod delivery_metrics {
             SendNotificationArg {
                 origin: origin.to_string(),
                 notifications,
+                derivation_origin: None,
             },
         )
     }
