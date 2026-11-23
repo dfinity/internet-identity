@@ -1,24 +1,34 @@
 //! What an app's own installed web app registered for Web Push, held on the identity's
-//! config for that app, one per browser entry, with the account it delivers for.
+//! config for that app, one per browser entry and frontend, with the account it delivers
+//! for.
+//!
+//! An app may be served from several origins, its frontends, which all sign in with the
+//! principals of the app's own origin. Each frontend is its own installed web app with its
+//! own service worker, so each holds a slot of its own: a notification for one frontend
+//! wakes that one, which opens its link signed in. A frontend other than the app's own
+//! origin is accepted only where the app lists it among its alternative origins.
 //!
 //! A push endpoint names one installed app on one device, and only one identity and
 //! account deliver through it at a time: the one whose session subscribed last. A
-//! subscribe for an endpoint another browser entry holds takes it over only when the keys
-//! it arrives with match that entry's, which only the device that subscribed knows:
+//! subscribe for an endpoint another slot holds takes it over only when the keys
+//! it arrives with match that slot's, which only the device that subscribed knows:
 //! knowing an endpoint is not enough to silence the device.
 
 use super::subscription;
 use super::validation::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
 use super::{seed_pool, transport};
+use crate::alternative_origins::{self, AlternativeOrigin};
 use crate::authz_utils::AuthorizedSession;
+use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{PendingTransport, ReadySubscription, WebPushSubscription};
 use crate::storage::storable::anchor_application_config::PwaSubscription;
+use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    PrepareWebPushSubscriptionResponse, PwaWebPushSubscription, SetWebPushSubscriptionError,
-    Timestamp, WebPushSubscriptionStatus,
+    FrontendHostname, PrepareWebPushSubscriptionResponse, PwaWebPushSubscription,
+    SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
 };
 use p256::elliptic_curve::subtle::ConstantTimeEq;
 use serde_bytes::ByteBuf;
@@ -79,6 +89,8 @@ impl TryFrom<PwaWebPushSubscription> for ValidatedPwaWebPushSubscription {
 pub enum PreparePwaSubscriptionError {
     /// The identity has not allowed this app to notify it.
     NotificationsNotAllowed,
+    /// The app does not list the frontend among its alternative origins.
+    UnlistedFrontend,
     /// Nothing the caller can act on: a broken invariant or a storage failure, and why.
     Internal(String),
 }
@@ -98,34 +110,55 @@ pub enum SetPwaSubscriptionError {
 }
 
 /// The keys an installed web app subscribes with, or `Pending` where the seed pool has
-/// nothing to derive them from yet.
+/// nothing to derive them from yet, or the app's alternative origins are not read yet.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PreparedPwaSubscription {
     Keys(PrepareWebPushSubscriptionResponse),
     Pending,
 }
 
+/// The frontend an app method names, as the origin it is keyed by. `None` where the method
+/// names none, which is the app's own origin; an error where it names no bare origin.
+pub fn validate_frontend_origin(
+    frontend_origin: Option<FrontendHostname>,
+) -> Result<Option<ApplicationOrigin>, String> {
+    frontend_origin
+        .map(|frontend_origin| ApplicationOrigin::try_from(frontend_origin.as_str()))
+        .transpose()
+}
+
 /// What [`resolve_pwa_holder`] answers for a session whose app has no application number.
 const NO_APPLICATION_NUMBER: &str = "the session's app has no application number";
 
-/// Where `session` registers: its identity, its app and the browser entry it signed in
-/// from. An error, logged, where the session's app has no application number, which an
-/// app with a session always has.
-pub fn resolve_pwa_holder(session: &AuthorizedSession) -> Result<PwaSubscriptionHolder, String> {
+/// Where `session`'s installed web app at `frontend_origin` registers: the session's
+/// identity, its app, the browser entry it signed in from, and the frontend, which is the
+/// app's own origin where `frontend_origin` is `None`. An error, logged, where the
+/// session's app has no application number, which an app with a session always has.
+///
+/// Whether the app accepts the frontend is not checked here: a slot exists only for a
+/// frontend [`prepare_pwa_subscription`] accepted.
+pub fn resolve_pwa_holder(
+    session: &AuthorizedSession,
+    frontend_origin: Option<&ApplicationOrigin>,
+) -> Result<PwaSubscriptionHolder, String> {
     let Some(application_number) =
         storage_borrow(|storage| storage.lookup_application_number_with_origin(&session.origin))
     else {
         ic_cdk::println!("ERROR: {NO_APPLICATION_NUMBER}");
         return Err(NO_APPLICATION_NUMBER.to_string());
     };
+    let frontend_origin_hash = StorableOriginSha256::from_origin(
+        &frontend_origin.map_or_else(|| session.origin.clone(), |origin| origin.to_string()),
+    );
     Ok(PwaSubscriptionHolder {
         anchor_number: session.anchor_number,
         application_number,
         browser_id: session.browser_id,
+        frontend_origin_hash,
     })
 }
 
-/// Records the key a fetch just minted for `holder`'s browser entry, for the account
+/// Records the key a fetch just minted for `holder`'s slot, for the account
 /// `account_principal` names. This replaces what the entry held, so it delivers nothing
 /// and holds no endpoint until the subscribe that spends the key lands.
 fn start_pwa_subscription(
@@ -151,11 +184,11 @@ fn start_pwa_subscription(
         .map_err(PreparePwaSubscriptionError::Internal)
 }
 
-/// Registers `holder`'s browser entry for Web Push for the account `account_principal`
+/// Registers `holder`'s slot for Web Push for the account `account_principal`
 /// names, replacing what it delivered for, or with `None` empties it where it delivers for
 /// that account.
 ///
-/// Where another browser entry holds the endpoint, that entry is emptied first, and only
+/// Where another slot holds the endpoint, that slot is emptied first, and only
 /// when it is the same app's and holds the same `p256dh` and `auth`: a device switching
 /// identity in its installed app subscribes with the keys it already has.
 pub fn set_pwa_subscription(
@@ -209,7 +242,7 @@ pub fn set_pwa_subscription(
         .map_err(SetPwaSubscriptionError::Internal)
 }
 
-/// Empties `holder`'s browser entry where it delivers for `account_principal`'s account.
+/// Empties `holder`'s slot where it delivers for `account_principal`'s account.
 /// One that holds nothing, or delivers for another account, is left as it is.
 fn remove_pwa_subscription(
     holder: PwaSubscriptionHolder,
@@ -279,7 +312,7 @@ fn check_takeover(
     Ok(())
 }
 
-/// The subscription a relay answered gone for, dropped where `holder`'s browser entry
+/// The subscription a relay answered gone for, dropped where `holder`'s slot
 /// still holds that endpoint.
 pub(crate) fn clear_gone_pwa_subscription(
     holder: PwaSubscriptionHolder,
@@ -297,7 +330,7 @@ pub(crate) fn clear_gone_pwa_subscription(
     write_pwa_subscription(holder, None, None)
 }
 
-/// The endpoint `holder`'s browser entry is subscribed at, where it is ready and delivers
+/// The endpoint `holder`'s slot is subscribed at, where it is ready and delivers
 /// for `account_principal`'s account.
 pub fn read_pwa_subscription_status(
     holder: PwaSubscriptionHolder,
@@ -312,22 +345,22 @@ pub fn read_pwa_subscription_status(
     Some(subscription::status_of(&ready_subscription, now_ns))
 }
 
-/// Whether `holder`'s browser entry holds a subscription that delivers for the account
+/// Whether `holder`'s slot holds a subscription that delivers for the account
 /// `account_principal` names.
 pub fn is_delivering_for(holder: PwaSubscriptionHolder, account_principal: Principal) -> bool {
     read_pwa_subscription(holder)
         .is_some_and(|held_subscription| held_subscription.account_principal == account_principal)
 }
 
-/// What `holder`'s browser entry holds, and the account it delivers for.
+/// What `holder`'s slot holds, and the account it delivers for.
 pub(crate) fn read_pwa_subscription(holder: PwaSubscriptionHolder) -> Option<PwaSubscription> {
     let config = storage_borrow(|storage| {
         storage.anchor_application_config(holder.anchor_number, holder.application_number)
     })?;
-    config.pwa_webpush_subscription(holder.browser_id)
+    config.pwa_webpush_subscription(holder.browser_id, holder.frontend_origin_hash)
 }
 
-/// Puts `subscription` on `holder`'s browser entry, or with `None` empties it, after
+/// Puts `subscription` on `holder`'s slot, or with `None` empties it, after
 /// emptying `displaced_holder`'s where one is given.
 pub(crate) fn write_pwa_subscription(
     holder: PwaSubscriptionHolder,
@@ -363,18 +396,37 @@ fn map_set_error(err: SetWebPushSubscriptionError) -> SetPwaSubscriptionError {
     }
 }
 
-/// The keys an installed web app subscribes `session`'s browser entry with, given the
-/// held `vapid_public_key`. `Pending` where the seed pool is cold.
+/// The keys `session`'s installed web app at `frontend_origin` (the app's own origin
+/// where `None`) subscribes its browser entry with, given the held `vapid_public_key`.
+/// `Pending` where the seed pool is cold or the app's alternative origins are not read
+/// yet; refused where the app does not list `frontend_origin` among them.
 pub fn prepare_pwa_subscription(
     session: &AuthorizedSession,
+    frontend_origin: Option<&ApplicationOrigin>,
     vapid_public_key: Vec<u8>,
     now_ns: Timestamp,
 ) -> Result<PreparedPwaSubscription, PreparePwaSubscriptionError> {
-    let holder = resolve_pwa_holder(session).map_err(PreparePwaSubscriptionError::Internal)?;
+    let holder = resolve_pwa_holder(session, frontend_origin)
+        .map_err(PreparePwaSubscriptionError::Internal)?;
     // Before the pool is asked, so an app without consent is told so rather than to come
     // back.
     if !is_notifications_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
+    }
+    if let Some(frontend_origin) = frontend_origin {
+        let application_origin = ApplicationOrigin::try_from(session.origin.as_str())
+            .map_err(PreparePwaSubscriptionError::Internal)?;
+        match alternative_origins::authorize_alternative_origin(
+            &application_origin,
+            frontend_origin,
+            now_ns,
+        ) {
+            AlternativeOrigin::Listed => {}
+            AlternativeOrigin::NotListed => {
+                return Err(PreparePwaSubscriptionError::UnlistedFrontend)
+            }
+            AlternativeOrigin::Pending { .. } => return Ok(PreparedPwaSubscription::Pending),
+        }
     }
     let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {
         return Ok(PreparedPwaSubscription::Pending);

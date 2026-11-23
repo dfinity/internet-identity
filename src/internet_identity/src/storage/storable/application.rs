@@ -49,8 +49,12 @@ impl Storable for StorableApplication {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+/// The SHA-256 of an origin, which keys what is stored per origin in 32 bytes however
+/// long the origin is.
+#[derive(Encode, Decode, Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[cbor(transparent)]
 pub struct StorableOriginSha256 {
+    #[cbor(n(0), with = "minicbor::bytes")]
     hash: [u8; 32],
 }
 
@@ -64,6 +68,10 @@ impl StorableOriginSha256 {
     pub fn from_origin(origin: &FrontendHostname) -> Self {
         let hash = sha256sum(origin.as_bytes());
         Self { hash }
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.hash
     }
 }
 

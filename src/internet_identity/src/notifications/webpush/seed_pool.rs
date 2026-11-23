@@ -126,19 +126,21 @@ pub(crate) async fn raw_rand() -> Result<[u8; 32], String> {
 }
 
 /// Where an installed web app subscribes, as bytes the derivation can mix in. Tagged apart
-/// from [`caller_bytes`], and carrying the identity, the app and the browser entry, so no
-/// two of them share seeds.
+/// from [`caller_bytes`], and carrying the identity, the app, the browser entry and the
+/// frontend's origin hash, so no two of them share seeds. Every field has a fixed length.
 fn encode_pwa_caller(holder: PwaSubscriptionHolder) -> Vec<u8> {
     let PwaSubscriptionHolder {
         anchor_number,
         application_number,
         browser_id,
+        frontend_origin_hash,
     } = holder;
     [
         &[PWA_CALLER_TAG][..],
         &anchor_number.to_be_bytes()[..],
         &application_number.to_be_bytes()[..],
         &browser_id.to_be_bytes()[..],
+        &frontend_origin_hash.as_bytes()[..],
     ]
     .concat()
 }

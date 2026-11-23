@@ -220,9 +220,11 @@ pub(crate) enum DeliveryTarget {
     Browser,
     /// The app record the entry routes through, shared with every identity pointing at it.
     App(NotificationAppId),
-    /// The app's own installed web app on this entry.
+    /// The app's own installed web app on this entry, at the frontend whose origin hashes
+    /// to `frontend_origin_hash`.
     Pwa {
         application_number: ApplicationNumber,
+        frontend_origin_hash: StorableOriginSha256,
     },
 }
 
@@ -235,10 +237,14 @@ impl DeliveryTarget {
         browser_id: BrowserId,
     ) -> Option<PwaSubscriptionHolder> {
         match self {
-            DeliveryTarget::Pwa { application_number } => Some(PwaSubscriptionHolder {
+            DeliveryTarget::Pwa {
+                application_number,
+                frontend_origin_hash,
+            } => Some(PwaSubscriptionHolder {
                 anchor_number,
                 application_number,
                 browser_id,
+                frontend_origin_hash,
             }),
             DeliveryTarget::Browser | DeliveryTarget::App(_) => None,
         }
@@ -468,12 +474,14 @@ fn resolve_identity_wake_up<M: Memory + Clone>(
         ),
         IdentityWakeUpPath::InstalledApp {
             application_number,
+            frontend_origin_hash,
             account_principal,
         } => {
             let pwa_route = PwaRoute::read(
                 storage,
                 pending.anchor_number,
                 application_number,
+                frontend_origin_hash,
                 account_principal,
             );
             (
@@ -696,6 +704,7 @@ fn fan_out_to_browsers(
             storage,
             pending.anchor_number,
             pending.application_number,
+            pending.frontend_origin_hash,
             pending.recipient,
         );
         // The sealing keys travel with each wake-up: the deposit that names its entry
@@ -972,28 +981,49 @@ pub(crate) fn routed_subscription<M: Memory + Clone>(
     Some((subscription.clone(), target))
 }
 
-/// The subscription `browser`'s installed web app of the app numbered
-/// `application_number` can be woken at right now, and the principal of the account it
-/// delivers for. `None` where it holds none, or the account has no session on `browser`
-/// live past [`PWA_SESSION_MARGIN_NS`].
-pub(crate) fn installed_app_subscription<M: Memory + Clone>(
+/// An installed web app subscription [`installed_app_subscriptions`] finds.
+pub(crate) struct InstalledAppSubscription {
+    /// The hash of the origin of the frontend it was subscribed from.
+    pub(crate) frontend_origin_hash: StorableOriginSha256,
+    pub(crate) subscription: ReadySubscription,
+    /// The principal of the account it delivers for.
+    pub(crate) account_principal: Principal,
+}
+
+/// The subscriptions `browser`'s installed web apps of the app numbered
+/// `application_number`, one per frontend, can be woken at right now. Leaves out each one
+/// whose account has no session on `browser` live past [`PWA_SESSION_MARGIN_NS`].
+pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
     storage: &Storage<M>,
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
     browser: &Browser,
     now_ns: Timestamp,
-) -> Option<(ReadySubscription, Principal)> {
-    let config = storage.anchor_application_config(anchor_number, application_number)?;
-    let held_subscription = config.pwa_webpush_subscription(browser.id)?;
-    let account_principal = held_subscription.account_principal;
-    let route = PwaRoute::read(
-        storage,
-        anchor_number,
-        application_number,
-        account_principal,
-    );
-    let (subscription, _, _) = find_pwa_wake_up_address(browser, &route, now_ns)?;
-    Some((subscription, account_principal))
+) -> Vec<InstalledAppSubscription> {
+    let Some(config) = storage.anchor_application_config(anchor_number, application_number) else {
+        return Vec::new();
+    };
+    let mut installed_app_subscriptions = Vec::new();
+    for (frontend_origin_hash, held_subscription) in
+        config.pwa_webpush_subscriptions_of_browser(browser.id)
+    {
+        let account_principal = held_subscription.account_principal;
+        let route = PwaRoute::read(
+            storage,
+            anchor_number,
+            application_number,
+            frontend_origin_hash,
+            account_principal,
+        );
+        if let Some((subscription, _, _)) = find_pwa_wake_up_address(browser, &route, now_ns) {
+            installed_app_subscriptions.push(InstalledAppSubscription {
+                frontend_origin_hash,
+                subscription,
+                account_principal,
+            });
+        }
+    }
+    installed_app_subscriptions
 }
 
 /// Puts one of Internet Identity's own wake-ups in the backlog, answering whether it was
@@ -1086,22 +1116,25 @@ fn wake_up_address<'a>(
 }
 
 /// What decides whether an app's notification wakes an entry's installed web app: the
-/// identity's config for the app, which holds the subscriptions, and the sessions of the
-/// recipient account there.
+/// identity's config for the app, which holds the subscriptions, the frontend the
+/// notification is for, and the sessions of the recipient account there.
 pub(crate) struct PwaRoute {
     config: Option<AnchorApplicationConfig>,
     sessions: Vec<Session>,
     application_number: ApplicationNumber,
+    frontend_origin_hash: StorableOriginSha256,
     account_principal: Principal,
 }
 
 impl PwaRoute {
     /// What `anchor_number` holds for the account `account_principal` names at
-    /// `application_number`. No sessions where it names no account of the identity.
+    /// `application_number`, for its frontend whose origin hashes to
+    /// `frontend_origin_hash`. No sessions where it names no account of the identity.
     pub(crate) fn read<M: Memory + Clone>(
         storage: &Storage<M>,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
+        frontend_origin_hash: StorableOriginSha256,
         account_principal: Principal,
     ) -> Self {
         let sessions = storage
@@ -1119,6 +1152,7 @@ impl PwaRoute {
             config: storage.anchor_application_config(anchor_number, application_number),
             sessions,
             application_number,
+            frontend_origin_hash,
             account_principal,
         }
     }
@@ -1138,11 +1172,12 @@ pub(crate) fn can_wake_for_app<M: Memory + Clone>(
 }
 
 /// Where `browser`, one of the identity's `browsers`, is woken for the app notification
-/// `route` describes. Nowhere where an installed web app on an entry linked to `browser`
-/// as sharing its device can deliver it: that one is woken instead, so the device is
-/// notified once, whatever `browser` registered of its own. Otherwise its own installed
-/// web app for that app, where that can deliver it, and else the address
-/// [`wake_up_address`] gives.
+/// `route` describes. Nowhere where an installed web app of the notification's frontend,
+/// on an entry linked to `browser` as sharing its device, can deliver it: that one is
+/// woken instead, so the device is notified once, whatever `browser` registered of its
+/// own. Otherwise its own installed web app of that frontend, where that can deliver it,
+/// and else the address [`wake_up_address`] gives: never an installed web app of another
+/// frontend, whose links open another app.
 fn app_wake_up_address(
     browsers: &[Browser],
     browser: &Browser,
@@ -1165,8 +1200,8 @@ fn app_wake_up_address(
     Some((subscription.clone(), relay_origin, target))
 }
 
-/// The entry's installed web app for this app, where it subscribed for the recipient
-/// account and a session of that account on this entry stays live past
+/// The entry's installed web app of the route's frontend, where it subscribed for the
+/// recipient account and a session of that account on this entry stays live past
 /// [`PWA_SESSION_MARGIN_NS`].
 fn find_pwa_wake_up_address(
     browser: &Browser,
@@ -1184,7 +1219,8 @@ fn find_pwa_wake_up_address(
         return None;
     }
     let config = route.config.as_ref()?;
-    let held_subscription = config.pwa_webpush_subscription(browser.id)?;
+    let held_subscription =
+        config.pwa_webpush_subscription(browser.id, route.frontend_origin_hash)?;
     if held_subscription.account_principal != route.account_principal {
         return None;
     }
@@ -1195,6 +1231,7 @@ fn find_pwa_wake_up_address(
         relay_origin,
         DeliveryTarget::Pwa {
             application_number: route.application_number,
+            frontend_origin_hash: route.frontend_origin_hash,
         },
     ))
 }
@@ -1772,6 +1809,7 @@ mod tests {
                     recipient: Principal::from_slice(&anchor_number.to_be_bytes()),
                     anchor_number,
                     application_number,
+                    frontend_origin_hash: StorableOriginSha256::from_origin(&APP.to_string()),
                     sender: sender(),
                     notification_id,
                     urgency: Urgency::Normal,

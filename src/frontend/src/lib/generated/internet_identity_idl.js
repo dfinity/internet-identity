@@ -180,6 +180,10 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
+  const FrontendHostname = IDL.Text;
+  const AppGetPwaWebPushSubscriptionStatusRequest = IDL.Record({
+    'frontend_origin' : IDL.Opt(FrontendHostname),
+  });
   const UnansweredPushes = IDL.Record({
     'first_sent_at_ns' : Timestamp,
     'count' : IDL.Nat32,
@@ -217,11 +221,15 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : PublicKey,
     'expiration' : Timestamp,
   });
+  const AppPreparePwaWebPushSubscriptionRequest = IDL.Record({
+    'frontend_origin' : IDL.Opt(FrontendHostname),
+  });
   const PrepareWebPushSubscriptionResponse = IDL.Record({
     'vapid_public_key' : IDL.Vec(IDL.Nat8),
     'transport_public_key' : IDL.Vec(IDL.Nat8),
   });
   const AppPreparePwaWebPushSubscriptionError = IDL.Variant({
+    'UnlistedFrontend' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
     'NotificationsNotAllowed' : IDL.Null,
@@ -232,6 +240,9 @@ export const idlFactory = ({ IDL }) => {
   const AppPrepareSameDeviceLinkError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
+  });
+  const AppProbePwaWebPushSubscriptionRequest = IDL.Record({
+    'frontend_origin' : IDL.Opt(FrontendHostname),
   });
   const AppProbePwaWebPushSubscriptionError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -244,6 +255,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const AppRemovePwaNotificationRequest = IDL.Record({
     'inbox_notification_id' : InboxNotificationId,
+    'frontend_origin' : IDL.Opt(FrontendHostname),
     'not_shown' : IDL.Opt(NotShownReason),
   });
   const RemoveNotificationResponse = IDL.Record({});
@@ -255,7 +267,6 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
-  const FrontendHostname = IDL.Text;
   const Urgency = IDL.Variant({
     'Low' : IDL.Null,
     'High' : IDL.Null,
@@ -300,6 +311,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const AppSetPwaWebPushSubscriptionRequest = IDL.Record({
     'subscription' : IDL.Opt(PwaWebPushSubscription),
+    'frontend_origin' : IDL.Opt(FrontendHostname),
   });
   const AppSetPwaWebPushSubscriptionError = IDL.Variant({
     'EndpointInUse' : IDL.Null,
@@ -1384,7 +1396,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'app_get_pwa_webpush_subscription_status' : IDL.Func(
-        [],
+        [IDL.Opt(AppGetPwaWebPushSubscriptionStatusRequest)],
         [
           IDL.Variant({
             'Ok' : IDL.Opt(WebPushSubscriptionStatus),
@@ -1424,7 +1436,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'app_prepare_pwa_webpush_subscription' : IDL.Func(
-        [],
+        [IDL.Opt(AppPreparePwaWebPushSubscriptionRequest)],
         [
           IDL.Variant({
             'Ok' : PrepareWebPushSubscriptionResponse,
@@ -1445,7 +1457,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'app_probe_pwa_webpush_subscription' : IDL.Func(
-        [],
+        [IDL.Opt(AppProbePwaWebPushSubscriptionRequest)],
         [
           IDL.Variant({
             'Ok' : IDL.Null,

@@ -41,10 +41,10 @@ fn link_key() -> BrowserKey {
 /// `principal_1`'s identity at [`APP`] in two entries of one phone: Safari, subscribed for
 /// itself at [`BROWSER_ENDPOINT`], and the installed web app, signed in from the browser
 /// seed 5 names and subscribed at [`PWA_ENDPOINT`]. Not linked yet.
-struct Phone {
-    canister_id: CanisterId,
+pub(super) struct Phone {
+    pub(super) canister_id: CanisterId,
     anchor: AnchorNumber,
-    account_principal: Principal,
+    pub(super) account_principal: Principal,
     /// The installed web app's session.
     pwa: Principal,
     /// Safari's session at [`APP`].
@@ -80,7 +80,7 @@ fn phone(env: &PocketIc) -> Phone {
 }
 
 /// [`phone`], with the installed web app's entry linked to Safari's.
-fn linked_phone(env: &PocketIc) -> Phone {
+pub(super) fn linked_phone(env: &PocketIc) -> Phone {
     let phone = phone(env);
     prepare_link(env, &phone);
     assert_eq!(claim(env, &phone, safari(), &link_key()), Ok(()));
@@ -217,6 +217,7 @@ fn remove_pwa_entry(env: &PocketIc, phone: &Phone, inbox_notification_id: InboxN
         AppRemovePwaNotificationRequest {
             inbox_notification_id,
             not_shown: None,
+            frontend_origin: None,
         },
     )
     .expect("remove rejected")
@@ -577,7 +578,7 @@ fn should_count_unanswered_pushes_until_one_is_fetched() {
 
 /// The installed web app's unanswered pushes, as its own session reads them.
 fn pwa_unanswered(env: &PocketIc, phone: &Phone) -> Option<(u32, bool)> {
-    app_get_pwa_webpush_subscription_status(env, phone.canister_id, phone.pwa)
+    app_get_pwa_webpush_subscription_status(env, phone.canister_id, phone.pwa, None)
         .expect("status rejected")
         .expect("status refused")
         .expect("subscribed")
@@ -897,7 +898,7 @@ fn should_leave_the_count_of_another_accounts_installed_app_when_one_account_rem
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
 
     assert_eq!(
-        app_get_pwa_webpush_subscription_status(&env, phone.canister_id, other_session)
+        app_get_pwa_webpush_subscription_status(&env, phone.canister_id, other_session, None)
             .expect("status rejected")
             .expect("status refused")
             .and_then(|status| status.unanswered_pushes)
@@ -936,7 +937,10 @@ fn should_refuse_a_claim_from_an_entry_already_linked() {
         &env,
         phone.canister_id,
         phone.pwa,
-        AppSetPwaWebPushSubscriptionRequest { subscription: None },
+        AppSetPwaWebPushSubscriptionRequest {
+            subscription: None,
+            frontend_origin: None,
+        },
     )
     .expect("remove rejected")
     .expect("remove refused");
@@ -1096,7 +1100,7 @@ fn should_send_no_second_probe_while_the_first_waits_to_be_fetched() {
 
     assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     assert_eq!(
-        app_probe_pwa_webpush_subscription(&env, phone.canister_id, phone.pwa)
+        app_probe_pwa_webpush_subscription(&env, phone.canister_id, phone.pwa, None)
             .expect("probe rejected"),
         Ok(())
     );
@@ -1142,7 +1146,7 @@ fn should_let_the_installed_app_probe_its_own_subscription() {
     let phone = phone(&env);
 
     assert_eq!(
-        app_probe_pwa_webpush_subscription(&env, phone.canister_id, phone.pwa)
+        app_probe_pwa_webpush_subscription(&env, phone.canister_id, phone.pwa, None)
             .expect("probe rejected"),
         Ok(())
     );
@@ -1307,7 +1311,7 @@ fn should_refuse_the_app_methods_without_a_live_session() -> Result<(), RejectRe
             Err(AppPrepareSameDeviceLinkError::NoSuchSession)
         );
         assert_eq!(
-            app_probe_pwa_webpush_subscription(&env, phone.canister_id, stranger)?,
+            app_probe_pwa_webpush_subscription(&env, phone.canister_id, stranger, None)?,
             Err(AppProbePwaWebPushSubscriptionError::NoSuchSession)
         );
     }
@@ -1409,7 +1413,7 @@ fn should_refuse_the_new_methods_while_notifications_are_disabled() -> Result<()
         Err(AppPrepareSameDeviceLinkError::InternalCanisterError(_))
     ));
     assert!(matches!(
-        app_probe_pwa_webpush_subscription(&env, canister_id, session)?,
+        app_probe_pwa_webpush_subscription(&env, canister_id, session, None)?,
         Err(AppProbePwaWebPushSubscriptionError::InternalCanisterError(
             _
         ))

@@ -199,16 +199,18 @@ pub(crate) fn clear_gone_subscription(
             }
             write_subscription(anchor, browser_id, None)
         }
-        DeliveryTarget::Pwa { application_number } => {
-            pwa_subscription::clear_gone_pwa_subscription(
-                PwaSubscriptionHolder {
-                    anchor_number,
-                    application_number,
-                    browser_id,
-                },
-                endpoint,
-            )
-        }
+        DeliveryTarget::Pwa {
+            application_number,
+            frontend_origin_hash,
+        } => pwa_subscription::clear_gone_pwa_subscription(
+            PwaSubscriptionHolder {
+                anchor_number,
+                application_number,
+                browser_id,
+                frontend_origin_hash,
+            },
+            endpoint,
+        ),
         DeliveryTarget::App(app_id) => {
             let gone = storage_borrow(|storage| {
                 storage.notification_app(app_id).is_some_and(|app| {

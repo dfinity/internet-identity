@@ -19,6 +19,10 @@ pub(crate) struct PendingNotification {
     pub(crate) anchor_number: AnchorNumber,
     /// II's number for the app's origin. Kept inside II: the service worker is told the origin.
     pub(crate) application_number: ApplicationNumber,
+    /// The hash of the origin of the app's frontend the notification is for: the app's own
+    /// origin, or one of its alternative origins. Only that frontend's installed web app
+    /// is woken for it.
+    pub(crate) frontend_origin_hash: StorableOriginSha256,
     /// The app canister that sent it, which the service worker fetches it from.
     pub(crate) sender: Principal,
     /// App-chosen ID, unique per recipient within the app.
@@ -125,6 +129,7 @@ mod tests {
             recipient: principal(anchor_number),
             anchor_number,
             application_number: 1,
+            frontend_origin_hash: origin("https://a.example"),
             sender: principal(u64::MAX),
             notification_id,
             urgency: Urgency::Normal,
@@ -209,12 +214,12 @@ mod tests {
         let cap = APP_BACKLOG.max_pending_per_group as u64;
 
         let within: Vec<_> = (0..cap).map(|id| notification(1, id)).collect();
-        assert!(results(backlog.admit(app.clone(), within, 1))
+        assert!(results(backlog.admit(app, within, 1))
             .iter()
             .all(|admission| *admission == Admission::Accepted));
 
         assert_eq!(
-            results(backlog.admit(app.clone(), vec![notification(1, cap)], 1)),
+            results(backlog.admit(app, vec![notification(1, cap)], 1)),
             vec![Admission::Full {
                 retry_after_ns: APP_BACKLOG.retry.base_ns,
                 cause: FullCause::Group,
@@ -232,7 +237,7 @@ mod tests {
     fn a_notification_comes_back_out_with_its_app_and_arrival() {
         let mut backlog = AppBacklog::new(APP_BACKLOG, 0);
         let app = origin("https://a.example");
-        backlog.admit(app.clone(), vec![notification(42, 7)], 1_000);
+        backlog.admit(app, vec![notification(42, 7)], 1_000);
 
         let taken = take(&mut backlog, 10, 2_000);
 
@@ -247,7 +252,7 @@ mod tests {
     fn the_more_urgent_notification_leaves_first() {
         let mut backlog = AppBacklog::new(APP_BACKLOG, 0);
         let app = origin("https://a.example");
-        backlog.admit(app.clone(), vec![at_urgency(1, Urgency::VeryLow)], 1);
+        backlog.admit(app, vec![at_urgency(1, Urgency::VeryLow)], 1);
         backlog.admit(app, vec![at_urgency(2, Urgency::High)], 2);
 
         assert_eq!(ids_taken(&mut backlog, 10, 3), vec![2, 1]);

@@ -1517,6 +1517,14 @@ pub enum ClaimSameDeviceLinkError {
     InternalCanisterError(String),
 }
 
+/// Which installed web app `app_probe_pwa_webpush_subscription` probes.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppProbePwaWebPushSubscriptionRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
+}
+
 /// Why `app_probe_pwa_webpush_subscription` sent nothing.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppProbePwaWebPushSubscriptionError {
@@ -1779,6 +1787,14 @@ pub enum AppPreparePwaWebPushSubscriptionResult {
     Err(AppPreparePwaWebPushSubscriptionError),
 }
 
+/// Which installed web app `app_prepare_pwa_webpush_subscription` prepares for.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPreparePwaWebPushSubscriptionRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
+}
+
 /// Why `app_prepare_pwa_webpush_subscription` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppPreparePwaWebPushSubscriptionError {
@@ -1786,6 +1802,9 @@ pub enum AppPreparePwaWebPushSubscriptionError {
     NoSuchSession,
     /// The identity has not allowed this app to notify it.
     NotificationsNotAllowed,
+    /// The app does not list `frontend_origin` among its alternative origins: no file,
+    /// an unusable one, or one that does not name it.
+    UnlistedFrontend,
     InternalCanisterError(String),
 }
 
@@ -1794,6 +1813,9 @@ pub enum AppPreparePwaWebPushSubscriptionError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppSetPwaWebPushSubscriptionRequest {
     pub subscription: Option<PwaWebPushSubscription>,
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// An installed web app's Web Push subscription, with the fields of
@@ -1825,6 +1847,14 @@ pub enum AppSetPwaWebPushSubscriptionError {
     /// Subscribe again for a fresh endpoint and re-send.
     EndpointInUse,
     InternalCanisterError(String),
+}
+
+/// Which installed web app `app_get_pwa_webpush_subscription_status` reads.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppGetPwaWebPushSubscriptionStatusRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// Why `app_get_pwa_webpush_subscription_status` refused.
@@ -1879,6 +1909,9 @@ pub struct AppRemovePwaNotificationRequest {
     pub inbox_notification_id: InboxNotificationId,
     /// Why the worker could not show it. Absent where it did.
     pub not_shown: Option<NotShownReason>,
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// Why `app_remove_pwa_notification` refused.
