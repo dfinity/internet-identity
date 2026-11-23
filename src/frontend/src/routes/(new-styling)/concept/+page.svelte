@@ -347,6 +347,14 @@
    *  so do the pages' contents. */
   const LOGO_SPAN =
     "w-full @lg:w-[26.5rem] @2xl:w-[34rem] @4xl:w-[calc(6*var(--ii-tile)+3rem+var(--ii-logo))] max-w-full";
+  /** On a wide canvas, from where the tiles start to grow, the header keeps
+   *  to the logos' reach too (LOGO_SPAN), so its controls stand over the
+   *  apps rather than out on the window's edges (Thomas): id.ai's glyph over
+   *  the first logo, search's pill ending over the last, the tabs between
+   *  them on the canvas's middle. Nothing grows for it. Narrower, the
+   *  header keeps its 20px from the canvas's edges. */
+  const HEADER_SPAN =
+    "@[72rem]/canvas:px-[calc((100%-(6*var(--ii-tile)+3rem+var(--ii-logo)))/2)]";
   // --- Layout: the concept compares three ---
 
   type Layout = "panel" | "island" | "top";
@@ -2052,6 +2060,7 @@
       <div
         class={[
           "grid items-center gap-x-1 px-4 sm:px-6 md:gap-x-4 md:px-5 @max-lg/canvas:px-(--ii-edge)",
+          HEADER_SPAN,
           phoneHead
             ? "grid-cols-[1fr_auto]"
             : "grid-cols-[1fr_auto] @[36rem]/canvas:grid-cols-[1fr_auto_1fr]",
@@ -2070,8 +2079,10 @@
             PILL_MOTION,
             "ii-hover focus-visible:outline-focus-ring my-3 flex h-10 items-center gap-3 justify-self-start px-4 focus-visible:outline-2 focus-visible:outline-offset-2",
             // On a phone the glyph stands on the edge; the pill reaches 10px
-            // past it once lifted.
-            "@max-lg/canvas:-ms-2.5 @max-lg/canvas:px-[9px]",
+            // past it once lifted. Over a wide canvas the glyph stands on
+            // the first logo's edge, and the pill reaches its 16px and its
+            // border past it.
+            "@max-lg/canvas:-ms-2.5 @max-lg/canvas:px-[9px] @[72rem]/canvas:-ms-[17px]",
           ]}
         >
           <Logo class="text-fg-primary h-4" />
@@ -2087,7 +2098,8 @@
         <!-- Desktop: search's glyph in the canvas's top corner, on every
              page and however far it's scrolled, so an app is found from
              wherever you are (⌘K too). Its pill ends where the account's
-             would, 20px in. -->
+             would, 20px in; over a wide canvas, over the last logo's edge
+             (HEADER_SPAN). -->
         <div
           class={[
             "col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-2",
