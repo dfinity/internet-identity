@@ -2541,7 +2541,7 @@
                     <h2
                       id="mine-title"
                       in:fade={{ duration: reduced ? 0 : 200 }}
-                      class="text-text-primary min-w-0 truncate text-base font-semibold @6xl/canvas:text-[17px]"
+                      class="text-text-secondary min-w-0 truncate text-sm font-medium"
                     >
                       {appsTitle}
                     </h2>
