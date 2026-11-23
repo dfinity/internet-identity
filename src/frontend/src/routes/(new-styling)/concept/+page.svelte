@@ -298,6 +298,17 @@
   const ADD_TILE = { origin: "add-app" } as const;
   type GridItem = ConceptApp | typeof ADD_TILE;
   const gridItems = $derived<GridItem[]>([...current.apps, ADD_TILE]);
+  /** My apps' title: where its apps come from (Arshavir), so no one has to
+   *  open Edit to learn why these are here. A new identity's starter apps,
+   *  until one is used; otherwise as Edit's setting has it, following it as
+   *  it's switched. */
+  const appsTitle = $derived(
+    current.apps.every(({ lastUsedMillis }) => lastUsedMillis === 0)
+      ? "Popular apps to start with"
+      : current.keepHistory
+        ? "Apps you sign in to"
+        : "Apps you've added",
+  );
   /** How the Add tile's plus and label leave and come back: a fade only. */
   const ADD_FADE = "transition-opacity duration-150 ease-out";
   const featured = $derived(
@@ -407,9 +418,9 @@
    *  8px above and below. */
   const MINE_TOP =
     "h-0 shrink-0 md:h-auto md:min-h-[clamp(0.25rem,calc(8vh-0.75rem),4.25rem)] md:shrink md:basis-[calc((100dvh-1rem)/3-var(--header-h)-0.75rem)]";
-  /** The greeting's row, over a page: the room under it grows with the
-   *  greeting. On a narrow canvas it steps in by the 10px the page keeps
-   *  short of the edge, where the logos stand. */
+  /** Explore's and Connect's title row, over a page: the room under it grows
+   *  with the title. On a narrow canvas it steps in by the 10px the page
+   *  keeps short of the edge, where the logos stand. */
   const HEAD_ROW =
     "shrink-0 pb-5 md:pb-10 @6xl/canvas:pb-11 @[88rem]/canvas:pb-12 @max-lg/canvas:px-2.5";
   /** A page's title over the grid, the greeting or Explore's and Connect's:
@@ -1532,8 +1543,8 @@
   <!-- On a phone, at the top of the page, it's a step smaller, so a long name
        keeps to the line, and closer to the logo than to the cards under it.
        Over the grid it's the page's title: it grows with the grid (28px from
-       seven columns, then with the tiles), and its row (HEAD_ROW) keeps it
-       well apart from what's under it. -->
+       seven columns, then with the tiles), and its row keeps it well apart
+       from the grid's own title under it. -->
   <p
     class={[
       "text-text-primary flex min-w-0 items-center gap-x-2 leading-7 font-semibold tracking-tight",
@@ -2444,32 +2455,19 @@
             <!-- The page says whose apps these are before anything else, the
                  way a person would: the name, with a dot in the identity's
                  colour before it. The name is said here only; the panel's
-                 card is for switching. Across from it, Edit (Done while apps
-                 are arranged), as over a list on iOS. The row is as wide as
-                 the grid (w-0 min-w-full), the name starting on the first
-                 logo's edge and Edit's pill reaching 4px past the last one,
-                 as the setting card under it does. -->
+                 card is for switching. The row is as wide as the grid
+                 (w-0 min-w-full), the name starting on the first logo's
+                 edge. It stands further from the title under it than the
+                 title does from the logos: the title is the grid's. -->
             {#if !phoneHead}
               <div
                 bind:this={pageHeads[0]}
                 class={[
-                  "flex w-0 min-w-full items-center justify-between gap-3 @lg:pe-[calc((var(--ii-tile)-var(--ii-logo))/2)]",
+                  "flex w-0 min-w-full shrink-0 items-center pb-5 md:pb-8 @max-lg/canvas:px-2.5 @6xl/canvas:pb-9 @[88rem]/canvas:pb-10",
                   INSET,
-                  HEAD_ROW,
                 ]}
               >
                 {@render greetingLine(false)}
-                <!-- Only once the apps are there to arrange. -->
-                {#if appsLoad.state === "ready" && current.apps.length > 0}
-                  <button
-                    type="button"
-                    in:fade={{ duration: reduced ? 150 : 200 }}
-                    onclick={managing ? stopManaging : startManaging}
-                    class="ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-1 h-10 shrink-0 rounded-full border border-transparent px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]"
-                  >
-                    {@render editWords("@max-lg/canvas:justify-items-end")}
-                  </button>
-                {/if}
               </div>
             {/if}
             <!-- Phone: an incident put away unanswered heads the apps. -->
@@ -2488,6 +2486,43 @@
                 />
               </div>
             {/if}
+            <!-- Over the grid, what it holds and why: where its apps come from,
+                 as its title (Arshavir), and across from it Edit (Done while
+                 apps are arranged), as over a list on iOS. On a phone too,
+                 where Edit used to stand under the apps. As wide as the grid
+                 (w-0 min-w-full), the title starting on the first logo's
+                 edge and Edit's pill reaching 4px past the last one, as the
+                 setting card under it does. Its room is there from the first
+                 frame; the words wait for the apps, and a switched setting
+                 fades the new ones in. -->
+            {#if appsLoad.state !== "ready" || current.apps.length > 0}
+              <div
+                class={[
+                  "flex h-10 w-0 min-w-full shrink-0 items-center justify-between gap-3 @max-lg/canvas:px-2.5 @lg:pe-[calc((var(--ii-tile)-var(--ii-logo))/2)]",
+                  INSET,
+                ]}
+              >
+                {#if appsLoad.state === "ready"}
+                  {#key appsTitle}
+                    <h2
+                      id="mine-title"
+                      in:fade={{ duration: reduced ? 0 : 200 }}
+                      class="text-text-primary min-w-0 truncate text-base font-semibold @6xl/canvas:text-[17px]"
+                    >
+                      {appsTitle}
+                    </h2>
+                  {/key}
+                  <button
+                    type="button"
+                    in:fade={{ duration: reduced ? 150 : 200 }}
+                    onclick={managing ? stopManaging : startManaging}
+                    class="ii-hover text-text-secondary hover:text-text-primary focus-visible:outline-focus-ring -me-1 h-10 shrink-0 rounded-full border border-transparent px-3.5 text-sm font-medium focus-visible:outline-2 @max-lg/canvas:-me-2.5 @max-lg/canvas:px-[9px]"
+                  >
+                    {@render editWords("@max-lg/canvas:justify-items-end")}
+                  </button>
+                {/if}
+              </div>
+            {/if}
             <!-- Until the apps land, their tiles' skeleton in the grid's place
                  (Swap); then the grid, its tiles one after another. -->
             <Swap status={appsLoad.state} items=".ii-tiles > li, .ii-tiles ~ *">
@@ -2498,8 +2533,8 @@
                 {@render appsFailed()}
               {/snippet}
               {#if current.apps.length > 0}
-                <!-- Named by its tab, right above it. -->
-                <section aria-labelledby="tab-mine" class="flex flex-col">
+                <!-- Named by its title, right above it. -->
+                <section aria-labelledby="mine-title" class="flex flex-col">
                   <!-- While apps are arranged, a privacy setting heads the grid.
                      Its room opens as the grid glides down and the card fades
                      in within it; on Done the card fades first and the room
@@ -2570,17 +2605,6 @@
                       {/if}
                     {/snippet}
                   </ReorderGrid>
-                  {#if phoneHead}
-                    <!-- Phone: the tabs are down in the tab bar, so Edit stands
-                       under the apps, as iOS puts Edit under the widgets. -->
-                    <button
-                      type="button"
-                      onclick={managing ? stopManaging : startManaging}
-                      class="btn btn-secondary btn-sm mt-6 self-center rounded-full px-5"
-                    >
-                      {@render editWords("")}
-                    </button>
-                  {/if}
                 </section>
               {:else}
                 {@render firstApps()}
