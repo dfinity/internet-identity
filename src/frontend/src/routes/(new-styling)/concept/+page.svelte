@@ -1252,8 +1252,9 @@
     });
   };
 
-  /** Removing asks first, and says what it does: sign out, no more
-   *  notifications, and the app is still in Explore. */
+  /** Forgetting asks first, and says what it does (notifications off, then
+   *  signed out) and, apart from it, what stays: the data in the app, and
+   *  signing in to it again (Arshavir). */
   let removing = $state<ConceptApp[]>();
   const askRemove = (apps: ConceptApp[]) => {
     removing = apps;
@@ -2831,32 +2832,46 @@
           id="concept-remove-title"
           class="text-text-primary text-lg font-semibold"
         >
-          Remove {what}?
+          Forget {what}?
         </h2>
-        <ul class="text-text-secondary flex flex-col gap-3 text-sm">
-          <li class="flex items-center gap-3">
-            <LogOutIcon
-              class="text-fg-tertiary size-4 shrink-0 rtl:-scale-x-100"
-              aria-hidden="true"
-            />
-            Signs you out of {apps.length === 1 ? apps[0].name : "them"}
-          </li>
-          <li class="flex items-center gap-3">
-            <BellOffIcon
-              class="text-fg-tertiary size-4 shrink-0"
-              aria-hidden="true"
-            />
-            Turns off {apps.length === 1 ? "its" : "their"} notifications
-          </li>
-          <li class="flex items-center gap-3">
-            <CompassIcon
-              class="text-fg-tertiary size-4 shrink-0"
-              aria-hidden="true"
-            />
-            {apps.length === 1 ? "It stays" : "They stay"} in Explore if you want
-            {apps.length === 1 ? " it" : " them"} back
-          </li>
-        </ul>
+        <!-- What happens, then, under a hairline and quieter, what stays:
+             said as facts, so they don't read as two more things lost. -->
+        <div class="flex flex-col gap-3 text-sm">
+          <ul class="text-text-secondary flex flex-col gap-3">
+            <li class="flex items-center gap-3">
+              <BellOffIcon
+                class="text-fg-tertiary size-4 shrink-0"
+                aria-hidden="true"
+              />
+              Turns off {apps.length === 1 ? "its" : "their"} notifications
+            </li>
+            <li class="flex items-center gap-3">
+              <LogOutIcon
+                class="text-fg-tertiary size-4 shrink-0 rtl:-scale-x-100"
+                aria-hidden="true"
+              />
+              Signs you out of {apps.length === 1 ? apps[0].name : "them"}
+            </li>
+          </ul>
+          <ul
+            class="border-border-tertiary text-text-tertiary flex flex-col gap-3 border-t pt-3"
+          >
+            <li class="flex items-center gap-3">
+              <CheckIcon
+                class="text-fg-quaternary size-4 shrink-0"
+                aria-hidden="true"
+              />
+              Your data in {apps.length === 1 ? apps[0].name : "the apps"} stays
+            </li>
+            <li class="flex items-center gap-3">
+              <CheckIcon
+                class="text-fg-quaternary size-4 shrink-0"
+                aria-hidden="true"
+              />
+              You can sign in to {apps.length === 1 ? "it" : "them"} again any time
+            </li>
+          </ul>
+        </div>
         <div class="flex gap-2">
           <button
             type="button"
@@ -2868,12 +2883,14 @@
           <button
             type="button"
             onclick={() => {
+              // Read before it's cleared: `apps` follows `removing`.
+              const forgetting = apps;
               removing = undefined;
-              remove(apps);
+              remove(forgetting);
             }}
             class="btn btn-primary btn-danger flex-1"
           >
-            Remove
+            Forget
           </button>
         </div>
       </div>
