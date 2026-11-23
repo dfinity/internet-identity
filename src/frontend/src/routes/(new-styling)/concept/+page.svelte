@@ -1243,9 +1243,9 @@
     toaster.create({
       title:
         apps.length === 1
-          ? `${apps[0].name} removed`
-          : `${apps.length} apps removed`,
-      description: "You're signed out. You can find them again in Explore.",
+          ? `${apps[0].name} forgotten`
+          : `${apps.length} apps forgotten`,
+      description: `You're signed out of ${apps.length === 1 ? "it" : "them"}.`,
       closable: true,
       duration: 5000,
       action: { label: "Undo", onClick: () => (state.apps = before) },
@@ -2083,7 +2083,7 @@
       <div class="flex flex-col gap-4">
         <PanelHeader
           title="Manage apps"
-          lead="Select apps to change their permissions or remove them."
+          lead="Select apps to change their notifications or forget them."
           backLabel="Done"
           onBack={stopManaging}
         />
@@ -2103,7 +2103,7 @@
           </span>
         {/snippet}
         {#snippet lead()}
-          Select apps to change their permissions or remove them.
+          Select apps to change their notifications or forget them.
         {/snippet}
         <ManageHints variant="card" />
       </PanelCard>

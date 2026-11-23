@@ -28,7 +28,7 @@
     {
       icon: MousePointerClickIcon,
       title: "Select an app",
-      detail: "Turn its notifications off or remove it.",
+      detail: "Turn its notifications off or forget it.",
     },
     {
       icon: CopyCheckIcon,

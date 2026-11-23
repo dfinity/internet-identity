@@ -7,7 +7,7 @@
     BellIcon,
     BellOffIcon,
     ChevronUpIcon,
-    Trash2Icon,
+    LogOutIcon,
     XIcon,
   } from "@lucide/svelte";
   import { untrack } from "svelte";
@@ -153,8 +153,8 @@
               onclick={onRemove}
               class={[ACTION, "btn-danger", PRESS]}
             >
-              <Trash2Icon aria-hidden="true" class="size-4" />
-              <span class={ACTION_LABEL}>Remove</span>
+              <LogOutIcon aria-hidden="true" class="size-4 rtl:-scale-x-100" />
+              <span class={ACTION_LABEL}>Forget</span>
             </button>
           {/if}
           <button

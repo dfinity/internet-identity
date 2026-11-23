@@ -8,7 +8,7 @@
     EllipsisIcon,
     ExternalLinkIcon,
     LinkIcon,
-    Trash2Icon,
+    LogOutIcon,
   } from "@lucide/svelte";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
@@ -50,7 +50,7 @@
      *  no longer may. Shown on the logo, since the grid can't tell otherwise. */
     muted?: boolean;
     /** From the tile's right-click menu: the app's settings, managing apps
-     *  starting from this one, or removing it. */
+     *  starting from this one, or forgetting it. */
     onSetNotifications?: (allowed: boolean) => void;
     onManage?: () => void;
     onRemove?: () => void;
@@ -93,7 +93,7 @@
   // What a browser's menu would offer for the link, then everything the app's
   // details panel offers, so none of it takes a trip to the panel. A group
   // shows only what the tile was given a handler for: a featured app the
-  // identity hasn't used has nothing to read, set, manage or remove.
+  // identity hasn't used has nothing to read, set, manage or forget.
   const menuItems: ContextMenuEntry[] = $derived.by(() => {
     const groups: ContextMenuEntry[][] = [
       [
@@ -141,8 +141,11 @@
           ? []
           : [
               {
-                label: "Remove app",
-                icon: Trash2Icon,
+                // Forget, as the pair of Edit's "Remember apps I sign in
+                // to" (Arshavir): nothing is deleted, the identity forgets
+                // it signed in, so the glyph is signing out, not a bin.
+                label: "Forget app",
+                icon: LogOutIcon,
                 tone: "destructive" as const,
                 onSelect: onRemove,
               },

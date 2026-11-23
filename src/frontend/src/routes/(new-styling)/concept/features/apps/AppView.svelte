@@ -249,17 +249,17 @@
       onclick={onRemove}
       class="btn btn-tertiary btn-danger btn-sm w-full font-medium"
     >
-      Remove app
+      Forget app
     </button>
     <p class="text-text-tertiary text-center text-[13px] leading-[18px]">
-      Signs you out. The app stays in Explore.
+      Signs you out. Your data in the app stays.
     </p>
   </div>
 {/snippet}
 
 {#if card}
   <!-- Read top to bottom as the page is: what the app is, the way into it,
-       what it sent, its settings, then removing it. The lists lie on a layer
+       what it sent, its settings, then forgetting it. The lists lie on a layer
        a step up from the card, as an open section's rows do. -->
   <PanelCard title={app.name} closeLabel={`Close ${app.name}`} onClose={onExit}>
     {#snippet icon(large: boolean)}

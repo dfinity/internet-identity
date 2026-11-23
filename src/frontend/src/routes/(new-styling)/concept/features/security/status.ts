@@ -328,7 +328,7 @@ const appsSaid = ({ apps }: StatusInput): Said =>
   apps.total === 0
     ? { tone: "neutral", sentence: "No apps yet" }
     : apps.notifying === 0
-      ? { tone: "neutral", sentence: "Change permissions or remove apps" }
+      ? { tone: "neutral", sentence: "Change notifications or forget apps" }
       : {
           tone: "neutral",
           sentence: `${apps.notifying} of ${apps.total} apps can notify you`,

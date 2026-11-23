@@ -81,7 +81,7 @@
 
 {#if variant === "card"}
   <!-- The same card an app's own options open in, for all the picked ones
-       at once: what's picked, the setting they share, removing them. -->
+       at once: what's picked, the setting they share, forgetting them. -->
   <PanelCard
     title={`${apps.length} apps selected`}
     closeLabel="Done"
@@ -115,10 +115,10 @@
         onclick={onRemove}
         class="btn btn-tertiary btn-danger btn-sm -ms-3 font-medium"
       >
-        Remove {apps.length} apps
+        Forget {apps.length} apps
       </button>
       <span class="text-text-tertiary text-[13px] leading-[18px]">
-        Signs you out of them and clears their settings.
+        Signs you out of them and turns off their notifications.
       </span>
     </div>
   </PanelCard>
@@ -160,10 +160,10 @@
         onclick={onRemove}
         class="btn btn-tertiary btn-danger btn-sm font-medium"
       >
-        Remove {apps.length} apps
+        Forget {apps.length} apps
       </button>
       <span class="text-text-tertiary text-center text-[13px] leading-[18px]">
-        Signs you out of them and clears their settings.
+        Signs you out of them and turns off their notifications.
       </span>
     </div>
   </div>
