@@ -450,7 +450,7 @@
   let board = $state(
     new URLSearchParams(location.search).get("board") === "states",
   );
-  /** The page's one search: the header's glyph, ⌘K and Add app open it. */
+  /** The page's command line: the header's glyph and ⌘K open it. */
   let search = $state<ReturnType<typeof SearchOverlay>>();
   /** A phone's header controls. The menu hangs from this pill's end, at the
    *  screen's edge: from the flask, mid-pill, it would run off the start. */
@@ -1381,7 +1381,7 @@
         label: "Add an app",
         hint: "Search or paste a link",
         icon: PlusIcon,
-        keywords: ["discover", "find", "new", "link"],
+        keywords: ["find", "new", "link"],
         suggested: true,
         opens: "apps",
       },
@@ -1427,13 +1427,25 @@
         keywords: ["mcp", "agent", "claude", "chatgpt", "cli"],
         run: () => goToPage(2),
       },
-      ...PAGES.map((page, index): Command => ({
-        id: `page:${page.id}`,
-        label: `Go to ${page.label}`,
-        hint: "Page",
-        icon: index === 1 ? CompassIcon : LayoutGridIcon,
-        run: () => goToPage(index),
-      })).filter((_, index) => index !== activePage && index !== 2),
+      // Explore is where Discover apps leads, the tile's word.
+      ...PAGES.map((page, index): Command =>
+        index === 1
+          ? {
+              id: `page:${page.id}`,
+              label: "Discover apps",
+              hint: page.label,
+              icon: CompassIcon,
+              keywords: ["explore", "browse", "go"],
+              run: () => goToPage(index),
+            }
+          : {
+              id: `page:${page.id}`,
+              label: `Go to ${page.label}`,
+              hint: "Page",
+              icon: LayoutGridIcon,
+              run: () => goToPage(index),
+            },
+      ).filter((_, index) => index !== activePage && index !== 2),
       {
         id: "start-page",
         label: "Make id.ai your start page",
@@ -1765,15 +1777,16 @@
 {/snippet}
 
 {#snippet addTile()}
-  <!-- After the last app, the way to add one by hand: the page's search,
-       which also takes a link. While apps are arranged it stays
-       where it is as the first free cell: the plus and the label fade, the
-       dashed frame stays, and the free cells after it fill out its row. -->
+  <!-- After the last app, the way to more: Discover apps opens Explore
+       (Arshavir: "Add app" asks you to know already what to add; Misha:
+       straight to Explore). Adding by name or link stays in the command
+       line. While apps are arranged it stays where it is as the first free
+       cell: the plus and the label fade, the dashed frame stays, and the
+       free cells after it fill out its row. -->
   <button
     type="button"
-    onclick={() => search?.show("apps")}
+    onclick={() => goToPage(1)}
     inert={managing}
-    aria-haspopup="dialog"
     class="group focus-visible:ring-focus-ring flex w-full flex-col items-center gap-2.5 rounded-2xl px-1.5 pt-4 pb-3 transition-[scale] duration-160 ease-out outline-none focus-visible:ring-2 active:scale-[0.97] motion-reduce:active:scale-100"
   >
     <!-- Like an app's tile, no plate: hovered or focused, the frame grows
@@ -1792,7 +1805,7 @@
         managing && "opacity-0",
       ]}
     >
-      Add app
+      Discover apps
     </span>
   </button>
 {/snippet}
@@ -2819,7 +2832,7 @@
   {/if}
 
   <!-- The page's command line, over everything: the header's glyph opens
-       it, ⌘K on desktop, and Add app after the last tile, turned to adding
+       it, and ⌘K on desktop; No apps yet's button opens it turned to adding
        an app. A new one for a phone or a desktop, as the header's glyph
        is. -->
   {#key isDesktop.current}

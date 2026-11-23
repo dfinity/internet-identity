@@ -1,10 +1,9 @@
 <script lang="ts">
   /**
    * The command line over the page: what to do here, and any app, from one
-   * field. The header's glyph opens it, and ⌘K on desktop; Add app after
-   * the last tile opens it turned to adding an app, which the command line
-   * reaches too ("Add an app"), a step Escape takes back. What it lists is
-   * SearchPalette's.
+   * field. The header's glyph opens it, and ⌘K on desktop. Adding an app
+   * is a step within it ("Add an app"), which Escape takes back; No apps
+   * yet's button opens it on that step. What it lists is SearchPalette's.
    *
    * On desktop it opens a palette over the page, after beUI's Command
    * Palette (https://beui.dev/components/blocks/command-palette, MIT): the
