@@ -10,7 +10,9 @@
   product's popovers do (see `menuIn` in ../motion.ts) instead of beUI's clip
   morph, grown from the point it was opened at, and it uses the product's tokens.
   Added: a press held on past the menu hands over to `onHold`, the way holding
-  an icon on an iPhone goes on into editing the home screen.
+  an icon on an iPhone goes on into editing the home screen; `showFrom` opens
+  it from a button ("⋯"), under it and ending where it ends; and an item's
+  `note`, a quiet line under it, says why it can't be picked.
 -->
 <script lang="ts" module>
   import type { Component } from "svelte";
@@ -23,6 +25,8 @@
     href?: string;
     tone?: "default" | "destructive";
     disabled?: boolean;
+    /** A quiet line under the item, e.g. why it's disabled. */
+    note?: string;
     onSelect?: () => void;
   };
 
@@ -125,6 +129,9 @@
   /** Each opening renders a fresh menu, placed where that opening happened. */
   let invocation = $state(0);
   let point: Point = { x: 0, y: 0 };
+  /** Opened from a button: the menu ends at the point instead of starting
+   *  there, so it hangs under the button's end. */
+  let fromEnd = false;
   let triggerRef: HTMLElement | undefined;
   let menuRef = $state<HTMLElement>();
   const itemRefs: HTMLElement[] = $state([]);
@@ -135,8 +142,9 @@
   const clamp = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(value, max));
 
-  const openAt = (at: Point, from: HTMLElement) => {
+  const openAt = (at: Point, from: HTMLElement, end = false) => {
     point = at;
+    fromEnd = end;
     triggerRef = from;
     active = undefined;
     glide = false;
@@ -144,11 +152,27 @@
     open = true;
   };
 
+  /** Opens it from a button, as a "⋯" menu: 4px under it, its end on the
+   *  button's end. A press on the button while it's open has already closed
+   *  it (the press outside does), so the same press doesn't open it again. */
+  let closedAt = 0;
+  export const showFrom = (anchor: HTMLElement) => {
+    if (disabled || performance.now() - closedAt < 300) return;
+    const rect = anchor.getBoundingClientRect();
+    const rtl = getComputedStyle(anchor).direction === "rtl";
+    openAt(
+      { x: rtl ? rect.left : rect.right, y: rect.bottom + 4 },
+      anchor,
+      !rtl,
+    );
+  };
+
   const close = (returnFocus: boolean) => {
     if (!open) {
       return;
     }
     open = false;
+    closedAt = performance.now();
     if (returnFocus) {
       triggerRef?.focus({ preventScroll: true });
     }
@@ -318,7 +342,7 @@
     const width = node.offsetWidth;
     const height = node.offsetHeight;
     const left = clamp(
-      point.x,
+      fromEnd ? point.x - width : point.x,
       VIEWPORT_PADDING,
       window.innerWidth - width - VIEWPORT_PADDING,
     );
@@ -553,6 +577,17 @@
           >
             {@render row(entry)}
           </button>
+          {#if entry.note !== undefined}
+            <!-- Under its item, starting where the item's words do. -->
+            <p
+              class={[
+                "text-text-tertiary px-2.5 pb-2 text-xs text-pretty",
+                entry.icon !== undefined && "ps-9",
+              ]}
+            >
+              {entry.note}
+            </p>
+          {/if}
         {/if}
       {/each}
     </div>

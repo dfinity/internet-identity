@@ -111,6 +111,17 @@ export type AccessState = "one" | "oneLocal" | "unused" | "calm";
 /** How many ways in the Access section lists. */
 export const accessCount = (state: AccessState): number =>
   state === "one" || state === "oneLocal" ? 1 : 3;
+
+/** The ways in the Access section lists, by id: the one this browser
+ *  signed in with first. */
+export const accessIds = (state: AccessState): string[] =>
+  accessCount(state) === 1 ? ["current"] : ["current", "yubikey", "google"];
+
+/** The ways in left once those removed from the Access section are gone. */
+export const waysLeft = (
+  state: AccessState,
+  removed: ReadonlySet<string> = new Set(),
+): string[] => accessIds(state).filter((id) => !removed.has(id));
 /** `known`: the new browser stays, once the user said it was theirs. */
 export type DevicesState = "newBrowser" | "known" | "many" | "calm";
 /** `calm`: AI and CLI access both on. `aiOnly` and `cliOnly`: one of them.
@@ -206,6 +217,8 @@ export interface StatusInput {
   signedOut: ReadonlySet<string>;
   /** Browsers left in the list, after those signed out. */
   browserCount: number;
+  /** Ways in removed from the Access section since the page opened. */
+  removedAccess?: ReadonlySet<string>;
   apps: { total: number; notifying: number };
 }
 
@@ -281,10 +294,13 @@ const recoverySaid = ({ scenario }: StatusInput): Said => {
 const waysIn = (count: number) =>
   count === 1 ? "1 way to sign in" : `${count} ways to sign in`;
 
-const accessSaid = ({ scenario }: StatusInput): Said =>
-  scenario.access === "unused"
+const accessSaid = ({ scenario, removedAccess }: StatusInput): Said =>
+  scenario.access === "unused" && removedAccess?.has("yubikey") !== true
     ? { tone: "info", sentence: "YubiKey unused for 8 months" }
-    : { tone: "neutral", sentence: waysIn(accessCount(scenario.access)) };
+    : {
+        tone: "neutral",
+        sentence: waysIn(waysLeft(scenario.access, removedAccess).length),
+      };
 
 const INTEGRATIONS: Record<IntegrationsState, Said> = {
   local: {

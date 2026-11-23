@@ -14,10 +14,10 @@ import {
 import type { Glyph } from "./Glyphs.svelte";
 import type { MockBrowser } from "../../mock/mockData";
 import {
-  accessCount,
   emailStatus,
   isOn,
   phraseStatus,
+  waysLeft,
   type CardStatus,
   type MethodStatus,
   type Scenario,
@@ -47,6 +47,8 @@ export const glyphsOf = (
   browsers: MockBrowser[],
   /** What this browser signed in with: the first way in. */
   signedInWith: string,
+  /** Ways in removed from the Access section. */
+  removedAccess: ReadonlySet<string> = new Set(),
 ): Glyph[] => {
   const neutral = card.tone === "neutral";
   if (card.kind === "access") {
@@ -80,18 +82,14 @@ export const glyphsOf = (
       label: local ? "Windows Hello" : signedInWith,
       note: local ? "Passkey on this device only" : "In use now",
     };
-    return accessCount(scenario.access) === 1
-      ? [current]
-      : [
-          current,
-          yubikey,
-          {
-            id: "google",
-            icon: UserRoundIcon,
-            label: "Google",
-            note: "t•••@gmail.com",
-          },
-        ];
+    const google: Glyph = {
+      id: "google",
+      icon: UserRoundIcon,
+      label: "Google",
+      note: "t•••@gmail.com",
+    };
+    const all = { current, yubikey, google } as Record<string, Glyph>;
+    return waysLeft(scenario.access, removedAccess).map((id) => all[id]);
   }
   if (card.kind === "recovery") {
     const phrase = phraseStatus(scenario.recovery);

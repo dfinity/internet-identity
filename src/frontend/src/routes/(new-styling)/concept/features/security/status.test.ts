@@ -8,6 +8,7 @@ import {
   needsAttention,
   phraseStatus,
   recoveryOf,
+  waysLeft,
   withAiAccess,
   withCliAccess,
   type Scenario,
@@ -316,5 +317,38 @@ describe("recoveryOf", () => {
     for (const state of states) {
       expect(recoveryOf(phraseStatus(state), emailStatus(state))).toBe(state);
     }
+  });
+});
+
+describe("removing a way to sign in", () => {
+  const access = (scenario: Partial<Scenario>, removed: string[]) =>
+    deriveStatus({
+      scenario: { ...calm, ...scenario },
+      signedOut: new Set(),
+      browserCount: 2,
+      removedAccess: new Set(removed),
+      apps: { total: 10, notifying: 4 },
+    }).find(({ kind }) => kind === "access");
+
+  it("counts only the ways left", () => {
+    expect(waysLeft("calm", new Set(["google"]))).toEqual([
+      "current",
+      "yubikey",
+    ]);
+    expect(access({}, ["google"])?.sentence).toBe("2 ways to sign in");
+    expect(access({}, ["google", "yubikey"])?.sentence).toBe(
+      "1 way to sign in",
+    );
+  });
+
+  it("drops the unused YubiKey's message once it's removed", () => {
+    expect(access({ access: "unused" }, [])).toMatchObject({
+      tone: "info",
+      sentence: "YubiKey unused for 8 months",
+    });
+    expect(access({ access: "unused" }, ["yubikey"])).toMatchObject({
+      tone: "neutral",
+      sentence: "2 ways to sign in",
+    });
   });
 });

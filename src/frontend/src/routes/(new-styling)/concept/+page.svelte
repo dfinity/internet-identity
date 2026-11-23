@@ -78,6 +78,7 @@
   } from "./features/security/RecoveryFlow.svelte";
   import ReorderGrid from "./features/apps/ReorderGrid.svelte";
   import SectionView, {
+    type AccessMethod,
     type Section,
   } from "./features/security/SectionView.svelte";
   import StateBoard from "./mock/StateBoard.svelte";
@@ -135,6 +136,8 @@
       recentOnly: [...recentOnly],
       scenario: { ...scenario },
       signedOut: [] as string[],
+      /** Ways in removed from Access on this visit. */
+      removedAccess: [] as string[],
       /** Not in Internet Identity today: whether the identity keeps a record
        *  of the apps it signs in to. On, a signed-in app joins My apps and
        *  history is kept; off, there's no record of where it signs in, so My
@@ -228,6 +231,7 @@
       scenario: current.scenario,
       signedOut: new Set(current.signedOut),
       browserCount: browsers.length,
+      removedAccess: new Set(current.removedAccess),
       apps: {
         total: current.apps.length,
         notifying: current.apps.filter((app) => app.notificationsAllowed)
@@ -1181,6 +1185,7 @@
   const applyPreset = (index: number) => {
     current.scenario = { ...scenarioPresets[index].scenario };
     current.signedOut = [];
+    current.removedAccess = [];
     navDirection = -1;
     arrive();
   };
@@ -1188,6 +1193,14 @@
   const signOut = (id: string) => {
     current.signedOut = [...current.signedOut, id];
     toaster.success({ title: "Signed out", duration: 2500 });
+  };
+
+  /** Removing a way in asks first, in the product's own words; it can't be
+   *  undone, so the button is red. */
+  let removingAccess = $state<AccessMethod>();
+  const removeAccess = (method: AccessMethod) => {
+    current.removedAccess = [...current.removedAccess, method.id];
+    toaster.success({ title: `${method.title} removed`, duration: 2500 });
   };
 
   const readAll = (app: ConceptApp) => {
@@ -2054,7 +2067,13 @@
       morphing={morphing === card.kind}
       onOpen={() => openCard(card.kind)}
       onClose={closeSection}
-      glyphs={glyphsOf(card, current.scenario, browsers, signedInWith.title)}
+      glyphs={glyphsOf(
+        card,
+        current.scenario,
+        browsers,
+        signedInWith.title,
+        new Set(current.removedAccess),
+      )}
     >
       {@render sectionOf(card.kind as Section, "card")}
     </StatusCard>
@@ -2074,6 +2093,8 @@
     onResolve={resolve}
     onRecovery={openRecovery}
     onUnavailable={unavailable}
+    removedAccess={current.removedAccess}
+    onRemoveAccess={(method) => (removingAccess = method)}
   />
 {/snippet}
 
@@ -2944,6 +2965,76 @@
         aria-labelledby="concept-remove-title"
       >
         {@render confirmRemove()}
+      </Sheet>
+    {/if}
+  {/if}
+
+  {#if removingAccess !== undefined}
+    {@const method = removingAccess}
+    {#snippet confirmRemoveAccess()}
+      <!-- The product's confirm (RemoveAccessMethod), in the concept's
+           frame: what the way in stops doing, and for a passkey, that it
+           stays on the device. -->
+      <div class="flex flex-col gap-5">
+        <h2
+          id="concept-remove-access-title"
+          class="text-text-primary text-lg font-semibold"
+        >
+          Remove {method.title}?
+        </h2>
+        <div class="text-text-secondary flex flex-col gap-3 text-sm">
+          {#if method.last}
+            <p>
+              It's your last way to sign in. Your recovery method will become
+              your only way back into this identity.
+            </p>
+          {:else if method.kind === "passkey"}
+            <p>
+              You won't be able to sign in with this passkey anymore. You can
+              always add a new one later.
+            </p>
+            <p class="text-text-tertiary">
+              It won't be removed from your device or password manager.
+            </p>
+          {:else}
+            <p>
+              You won't be able to sign in to your identity or your apps with
+              your {method.title} account anymore.
+            </p>
+          {/if}
+        </div>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            onclick={() => (removingAccess = undefined)}
+            class="btn btn-secondary flex-1"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onclick={() => {
+              const removing = method;
+              removingAccess = undefined;
+              removeAccess(removing);
+            }}
+            class="btn btn-primary btn-danger flex-1"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    {/snippet}
+    {#if isDesktop.current}
+      <Dialog onClose={() => (removingAccess = undefined)}>
+        {@render confirmRemoveAccess()}
+      </Dialog>
+    {:else}
+      <Sheet
+        onClose={() => (removingAccess = undefined)}
+        aria-labelledby="concept-remove-access-title"
+      >
+        {@render confirmRemoveAccess()}
       </Sheet>
     {/if}
   {/if}

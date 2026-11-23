@@ -1,17 +1,30 @@
 <script lang="ts" module>
   export type Section = "access" | "recovery" | "devices" | "integrations";
+
+  /** A way in asked to be removed, for the confirm (the product's own). */
+  export interface AccessMethod {
+    id: string;
+    title: string;
+    /** A passkey, or an account linked to sign in with (Google, SSO). */
+    kind: "passkey" | "account";
+    /** The only way in left: recovery becomes the only way back. */
+    last: boolean;
+  }
 </script>
 
 <script lang="ts">
   import type { Component } from "svelte";
   import {
     BookOpenIcon,
+    EllipsisIcon,
     KeyRoundIcon,
     MailIcon,
     MonitorSmartphoneIcon,
+    PencilIcon,
     PlusIcon,
     ServerIcon,
     SquareTerminalIcon,
+    Trash2Icon,
     UserRoundIcon,
     XIcon,
   } from "@lucide/svelte";
@@ -27,6 +40,10 @@
   import { MediaQuery } from "svelte/reactivity";
   import type { MockBrowser, MockIdentity } from "../../mock/mockData";
   import { TALL_PANEL } from "../../foundation/frame/panel";
+  import ContextMenu, {
+    type ContextMenuEntry,
+    type ContextMenuTriggerProps,
+  } from "../../foundation/frame/ContextMenu.svelte";
   import {
     accessCount,
     aiAccessOn,
@@ -34,6 +51,7 @@
     emailStatus,
     phraseStatus,
     throughRecovery,
+    waysLeft,
     withAiAccess,
     withCliAccess,
     type CardStatus,
@@ -70,6 +88,10 @@
     onRecovery: (method: RecoveryMethod) => void;
     /** For the steps the concept doesn't walk through. */
     onUnavailable: (step: string) => void;
+    /** Ways in removed from Access since the page opened. */
+    removedAccess?: string[];
+    /** Asks to remove a way in; without it, Access's rows have no menu. */
+    onRemoveAccess?: (method: AccessMethod) => void;
   }
 
   const {
@@ -84,7 +106,12 @@
     onResolve,
     onRecovery,
     onUnavailable,
+    removedAccess = [],
+    onRemoveAccess,
   }: Props = $props();
+
+  /** Each row's "⋯" menu, to open it from its button. */
+  const menus = $state<Record<string, ReturnType<typeof ContextMenu>>>({});
 
   /** As the card around it: a large title where the panel is tall. */
   const tall = new MediaQuery(TALL_PANEL);
@@ -112,6 +139,9 @@
       variant?: "primary" | "secondary" | "tertiary" | "danger";
       onclick: () => void;
     };
+    /** What else can be done with it, behind "⋯" at the row's end: a row
+     *  with an action shows that instead. */
+    menu?: ContextMenuEntry[];
   }
 
   const TITLES: Record<Section, [string, string]> = {
@@ -187,15 +217,55 @@
     ];
   };
 
+  /** The ways in left, after any removed here. */
+  const left = $derived(waysLeft(scenario.access, new Set(removedAccess)));
+
+  /** A way in's "⋯": the product's own options for it, Rename for a
+   *  passkey (the concept doesn't walk through it) and Remove. The one this
+   *  browser is signed in with can't go until you sign in another way, as
+   *  the product has it; signed in through recovery, it can (Arshavir: a
+   *  way to remove an access method). */
+  const menuOf = (
+    id: string,
+    title: string,
+    kind: AccessMethod["kind"],
+    inUse: boolean,
+  ): ContextMenuEntry[] | undefined =>
+    onRemoveAccess === undefined
+      ? undefined
+      : [
+          ...(kind === "passkey"
+            ? [
+                {
+                  label: "Rename",
+                  icon: PencilIcon,
+                  onSelect: () => onUnavailable("Renaming a passkey"),
+                },
+              ]
+            : []),
+          {
+            label: "Remove",
+            icon: Trash2Icon,
+            tone: "destructive" as const,
+            disabled: inUse,
+            note: inUse
+              ? "In use now. Sign in another way to remove it."
+              : undefined,
+            onSelect: () =>
+              onRemoveAccess({ id, title, kind, last: left.length === 1 }),
+          },
+        ];
+
   const accessRows = $derived.by<Row[]>(() => {
     // A passkey kept on this device alone, as Windows Hello keeps it, doesn't
     // sync anywhere: the one case where losing the device loses the way in.
     const local = scenario.access === "oneLocal";
+    const currentTitle = local ? "Windows Hello" : signedInWith.title;
     const rows: Row[] = [
       {
         id: "current",
         icon: signedInWith.kind === "sso" ? SsoIcon : PasskeyIcon,
-        title: local ? "Windows Hello" : signedInWith.title,
+        title: currentTitle,
         meta: local
           ? "Passkey on this device only · In use now"
           : throughRecovery(scenario.recovery)
@@ -204,6 +274,12 @@
         badge: throughRecovery(scenario.recovery)
           ? undefined
           : { label: "Active", color: "success" },
+        menu: menuOf(
+          "current",
+          currentTitle,
+          signedInWith.kind === "sso" ? "account" : "passkey",
+          !throughRecovery(scenario.recovery),
+        ),
       },
     ];
     if (accessCount(scenario.access) > 1) {
@@ -216,25 +292,34 @@
             scenario.access === "unused"
               ? "Security key · Last used 8 months ago"
               : "Security key · Last used 3 days ago",
+          // Unused for months: removing it is the card's step, so it's
+          // the row's button, through the same confirm.
           action:
-            scenario.access === "unused"
+            scenario.access === "unused" && onRemoveAccess !== undefined
               ? {
                   label: "Remove",
                   variant: "danger",
                   onclick: () =>
-                    onResolve({ access: "calm" }, "YubiKey removed"),
+                    onRemoveAccess({
+                      id: "yubikey",
+                      title: "YubiKey",
+                      kind: "passkey",
+                      last: left.length === 1,
+                    }),
                 }
               : undefined,
+          menu: menuOf("yubikey", "YubiKey", "passkey", false),
         },
         {
           id: "google",
           icon: UserRoundIcon,
           title: "Google",
           meta: "t•••@gmail.com",
+          menu: menuOf("google", "Google", "account", false),
         },
       );
     }
-    return rows;
+    return rows.filter(({ id }) => left.includes(id));
   });
 
   /** Both ways back in, said as recovery's dialog says them, each opening
@@ -551,6 +636,28 @@
       >
         {item.action.label}
       </button>
+    {:else if item.menu !== undefined}
+      <ContextMenu
+        bind:this={menus[item.id]}
+        items={item.menu}
+        label={`${item.title} options`}
+      >
+        {#snippet trigger(props: ContextMenuTriggerProps, open: boolean)}
+          <button
+            {...props}
+            type="button"
+            onclick={(event) => menus[item.id]?.showFrom(event.currentTarget)}
+            aria-label={`More for ${item.title}`}
+            class={[
+              "btn btn-tertiary btn-icon btn-sm shrink-0 rounded-full",
+              variant === "card" ? "-me-2" : "-me-3",
+              open && "bg-(--ii-hover)",
+            ]}
+          >
+            <EllipsisIcon class="size-4.5" aria-hidden="true" />
+          </button>
+        {/snippet}
+      </ContextMenu>
     {/if}
   </li>
 {/snippet}
