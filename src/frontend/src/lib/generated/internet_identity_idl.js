@@ -821,6 +821,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const InstalledAppsPath = IDL.Record({
     'origin' : FrontendHostname,
+    'frontend_origin' : IDL.Opt(FrontendHostname),
     'account_principal' : IDL.Principal,
   });
   const NotificationPath = IDL.Variant({
@@ -1250,6 +1251,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const RemoveUnansweredPwaWebPushSubscriptionsRequest = IDL.Record({
     'origin' : FrontendHostname,
+    'frontend_origin' : IDL.Opt(FrontendHostname),
     'account_principal' : IDL.Principal,
     'anchor_number' : UserNumber,
   });

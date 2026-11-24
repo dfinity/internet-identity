@@ -1374,18 +1374,21 @@ pub enum NotificationPath {
     /// Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
     /// routes through.
     ThisBrowser,
-    /// That app's installed web apps on the entries linked to this browser entry as
-    /// sharing its device, that deliver for one account. An installed app that shares
-    /// this browser entry itself checks its own path, and is not on this one.
+    /// That app's installed web apps of one of its frontends on the entries linked to this
+    /// browser entry as sharing its device, that deliver for one account. An installed app
+    /// that shares this browser entry itself checks its own path, and is not on this one.
     InstalledApps(InstalledAppsPath),
 }
 
-/// An app's installed web apps that deliver for one account at it.
+/// An app's installed web apps of one of its frontends that deliver for one account at it.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct InstalledAppsPath {
     pub origin: FrontendHostname,
     /// The account at that app whose installed web apps these are.
     pub account_principal: Principal,
+    /// The frontend of that app the installed web apps are served from, where it is not
+    /// the app's own origin. `None` is the app's own origin.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// Which path to the calling browser's device to read, for the identity it signs for.
@@ -1451,6 +1454,9 @@ pub struct RemoveUnansweredPwaWebPushSubscriptionsRequest {
     pub origin: FrontendHostname,
     /// The account at that app whose installed web apps to remove.
     pub account_principal: Principal,
+    /// The frontend of that app the installed web apps are served from, where it is not
+    /// the app's own origin. `None` is the app's own origin.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// Why `remove_unanswered_pwa_webpush_subscriptions` refused.

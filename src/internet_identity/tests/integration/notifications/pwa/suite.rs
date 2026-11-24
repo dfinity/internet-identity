@@ -2,13 +2,13 @@
 //! which lists them among its alternative origins, each with an installed web app of its
 //! own that only its own notifications wake.
 
-use super::same_device::linked_phone;
+use super::same_device::{installed_apps_of_frontend, linked_phone, path_status};
 use super::*;
 use canister_tests::framework::assert_metric;
 use canister_tests::api::internet_identity::notifications::subscribe_pwa_webpush_for_frontend;
 use internet_identity_interface::internet_identity::types::{
     AppGetPwaWebPushSubscriptionStatusRequest, AppPreparePwaWebPushSubscriptionRequest,
-    SendNotificationError, SendNotificationResponse,
+    NotificationPath, SendNotificationError, SendNotificationResponse,
 };
 
 /// A frontend [`APP`]'s alternative-origins list does not name.
@@ -239,6 +239,91 @@ fn should_refuse_to_prepare_for_a_frontend_the_application_does_not_list() {
     );
 }
 
+/// Another frontend of [`APP`], which a later list names instead of [`SUITE_FRONTEND`].
+const CALENDAR_FRONTEND: &str = "https://calendar.suite.example";
+/// Where [`CALENDAR_FRONTEND`]'s installed web app is subscribed.
+const CALENDAR_ENDPOINT: &str = "https://suite.push.example/calendar";
+/// How long II reads an application's alternative origins from its cache before it
+/// fetches them again: an hour.
+const ALTERNATIVE_ORIGINS_FRESH_FOR: Duration = Duration::from_secs(60 * 60);
+
+/// Answers every outcall for [`OUTCALL_ROUNDS`] rounds like [`answer_outcalls`], except
+/// that the alternative origins list names `alternative_origins`.
+fn answer_outcalls_listing(env: &PocketIc, alternative_origins: &[&str]) {
+    let alternative_origins_body = serde_json::to_vec(&serde_json::json!({
+        "alternativeOrigins": alternative_origins
+    }))
+    .expect("a list");
+    for _ in 0..OUTCALL_ROUNDS {
+        env.advance_time(Duration::from_millis(ROUND_MILLIS));
+        env.tick();
+        for request in env.get_canister_http() {
+            let body = if request.url.ends_with(ALTERNATIVE_ORIGINS_PATH) {
+                alternative_origins_body.clone()
+            } else if request.url.starts_with("https://listed") {
+                format!(r#"{{"senders":["{}"]}}"#, app_sender().to_text()).into_bytes()
+            } else {
+                vec![]
+            };
+            env.mock_canister_http_response(MockCanisterHttpResponse {
+                subnet_id: request.subnet_id,
+                request_id: request.request_id,
+                response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                    status: 200,
+                    headers: vec![],
+                    body,
+                }),
+                additional_responses: vec![],
+            });
+        }
+    }
+}
+
+#[test]
+fn should_drop_the_slot_of_a_frontend_the_application_stopped_listing_on_the_next_prepare() {
+    let env = env();
+    let (canister_id, account_session) = install_suite_subscribed(&env);
+    let session = session_of(&account_session);
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
+        Some(SUITE_ENDPOINT.to_string())
+    );
+
+    // The cached list still names only the suite frontend, and refreshes in the background.
+    env.advance_time(ALTERNATIVE_ORIGINS_FRESH_FOR + Duration::from_secs(1));
+    assert_eq!(
+        prepare_for_frontend(&env, canister_id, session, CALENDAR_FRONTEND),
+        AppPreparePwaWebPushSubscriptionResult::Err(
+            AppPreparePwaWebPushSubscriptionError::UnlistedFrontend
+        )
+    );
+    answer_outcalls_listing(&env, &[CALENDAR_FRONTEND]);
+    subscribe_pwa_webpush_for_frontend(
+        &env,
+        canister_id,
+        session,
+        Some(CALENDAR_FRONTEND),
+        CALENDAR_ENDPOINT,
+        p256dh(12),
+        &OTHER_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
+        None
+    );
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, Some(CALENDAR_FRONTEND)),
+        Some(CALENDAR_ENDPOINT.to_string())
+    );
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, None),
+        Some(PWA_ENDPOINT.to_string())
+    );
+}
+
 #[test]
 fn should_skip_a_linked_entry_only_for_the_frontend_whose_installed_app_is_linked() {
     let env = env();
@@ -262,6 +347,37 @@ fn should_skip_a_linked_entry_only_for_the_frontend_whose_installed_app_is_linke
     assert_eq!(
         deliver(&env, phone.canister_id, phone.account_principal, 2, 201),
         vec![PWA_ENDPOINT.to_string()]
+    );
+}
+
+/// On a phone whose installed web app of [`APP`]'s own origin is linked to Safari, a
+/// sign-in at [`SUITE_FRONTEND`] checks that frontend's installed web apps, of which there
+/// are none, so Safari's own subscription is the path its notifications take.
+#[test]
+fn should_check_only_the_installed_apps_of_the_frontend_signed_in_at() {
+    let env = env();
+    let phone = linked_phone(&env);
+
+    assert_eq!(
+        path_status(&env, &phone, installed_apps_of_frontend(&phone, None))
+            .subscriptions
+            .len(),
+        1
+    );
+    assert_eq!(
+        path_status(
+            &env,
+            &phone,
+            installed_apps_of_frontend(&phone, Some(SUITE_FRONTEND))
+        )
+        .subscriptions,
+        vec![]
+    );
+    assert_eq!(
+        path_status(&env, &phone, NotificationPath::ThisBrowser)
+            .subscriptions
+            .len(),
+        1
     );
 }
 

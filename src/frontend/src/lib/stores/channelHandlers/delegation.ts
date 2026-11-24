@@ -192,6 +192,7 @@ export const handleDelegationRequest =
           const repairOutcome = await repairNotificationPath({
             identityNumber,
             origin: effectiveOrigin,
+            frontendOrigin: channel.origin,
             accountPrincipal: Principal.selfAuthenticating(
               new Uint8Array(mintedDelegation.user_key),
             ),

@@ -1582,6 +1582,12 @@ export type InboxNotificationId = bigint;
 export interface InstalledAppsPath {
   'origin' : FrontendHostname,
   /**
+   * The frontend of that app the installed web apps are served from, where it is not the
+   * app's own origin: one the app lists in its /.well-known/ii-alternative-origins. Null
+   * is the app's own origin.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+  /**
    * The account at that app whose installed web apps these are.
    */
   'account_principal' : Principal,
@@ -1994,9 +2000,9 @@ export type NotificationPath = {
   } |
   {
     /**
-     * That app's installed web apps on the entries linked to this browser entry as sharing
-     * its device, that deliver for one account. An installed app that shares this browser
-     * entry itself checks its own path, and is not on this one.
+     * That app's installed web apps of one of its frontends on the entries linked to this
+     * browser entry as sharing its device, that deliver for one account. An installed app
+     * that shares this browser entry itself checks its own path, and is not on this one.
      */
     'InstalledApps' : InstalledAppsPath
   };
@@ -2616,6 +2622,12 @@ export type RemoveUnansweredPwaWebPushSubscriptionsError = {
   { 'InternalCanisterError' : string };
 export interface RemoveUnansweredPwaWebPushSubscriptionsRequest {
   'origin' : FrontendHostname,
+  /**
+   * The frontend of that app the installed web apps are served from, where it is not the
+   * app's own origin: one the app lists in its /.well-known/ii-alternative-origins. Null
+   * is the app's own origin.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
   /**
    * The account at that app whose installed web apps to remove.
    */
@@ -4025,8 +4037,8 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
-   * Removes that app's installed web app subscriptions on the entries linked to the
-   * caller's that can deliver now and have a probe nobody removed in the 10 seconds
+   * Removes that app's installed web app subscriptions of the frontend on the entries
+   * linked to the caller's that can deliver now and have a probe nobody removed in the 10 seconds
    * after the push service accepted it.
    */
   'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<

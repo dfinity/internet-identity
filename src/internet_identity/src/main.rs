@@ -926,8 +926,8 @@ fn probe_notification_path(
     })
 }
 
-/// Removes an app's installed web app subscriptions on the entries linked to the calling
-/// browser's, where a probe through them was never removed.
+/// Removes an app's installed web app subscriptions of one of its frontends on the entries
+/// linked to the calling browser's, where a probe through them was never removed.
 #[update]
 fn remove_unanswered_pwa_webpush_subscriptions(
     request: RemoveUnansweredPwaWebPushSubscriptionsRequest,
@@ -938,17 +938,22 @@ fn remove_unanswered_pwa_webpush_subscriptions(
         anchor_number,
         origin,
         account_principal,
+        frontend_origin,
     } = request;
     enabled_or(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let application_number =
         notifications::repair::lookup_application_number(&origin).map_err(InternalCanisterError)?;
+    let frontend_origin_hash =
+        notifications::repair::hash_frontend_origin(&origin, frontend_origin.as_deref())
+            .map_err(InternalCanisterError)?;
 
     notifications::repair::remove_unanswered_installed_apps(
         &anchor,
         browser_id,
         application_number,
+        frontend_origin_hash,
         account_principal,
         time(),
     );

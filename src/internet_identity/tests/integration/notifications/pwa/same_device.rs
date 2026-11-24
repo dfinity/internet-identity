@@ -126,7 +126,11 @@ fn link_status(env: &PocketIc, phone: &Phone) -> SameDeviceLinkStatus {
         .expect("status refused")
 }
 
-fn path_status(env: &PocketIc, phone: &Phone, path: NotificationPath) -> NotificationPathStatus {
+pub(super) fn path_status(
+    env: &PocketIc,
+    phone: &Phone,
+    path: NotificationPath,
+) -> NotificationPathStatus {
     get_notification_path_status(
         env,
         phone.canister_id,
@@ -154,9 +158,19 @@ fn unanswered(
 }
 
 fn installed_apps(phone: &Phone) -> NotificationPath {
+    installed_apps_of_frontend(phone, None)
+}
+
+/// The installed web apps of [`APP`]'s frontend at `frontend_origin`, the app's own origin
+/// where `None`, that deliver for `phone`'s account.
+pub(super) fn installed_apps_of_frontend(
+    phone: &Phone,
+    frontend_origin: Option<&str>,
+) -> NotificationPath {
     NotificationPath::InstalledApps(InstalledAppsPath {
         origin: APP.to_string(),
         account_principal: phone.account_principal,
+        frontend_origin: frontend_origin.map(str::to_string),
     })
 }
 
@@ -186,6 +200,7 @@ fn remove_unanswered(env: &PocketIc, phone: &Phone) {
             anchor_number: phone.anchor,
             origin: APP.to_string(),
             account_principal: phone.account_principal,
+            frontend_origin: None,
         },
     )
     .expect("remove rejected")
@@ -1366,6 +1381,7 @@ fn should_refuse_the_browser_methods_to_a_caller_that_is_no_browser_of_the_ident
                     anchor_number: phone.anchor,
                     origin: APP.to_string(),
                     account_principal: phone.account_principal,
+                    frontend_origin: None,
                 },
             )?,
             Err(RemoveUnansweredPwaWebPushSubscriptionsError::InvalidBrowserKey)
@@ -1447,6 +1463,7 @@ fn should_refuse_the_new_methods_while_notifications_are_disabled() -> Result<()
                 anchor_number: anchor,
                 origin: APP.to_string(),
                 account_principal: principal_1(),
+                frontend_origin: None,
             },
         )?,
         Err(RemoveUnansweredPwaWebPushSubscriptionsError::InternalCanisterError(_))

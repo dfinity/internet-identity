@@ -307,6 +307,7 @@ export const handleSessionDelegationRequest =
           const repairOutcome = await repairNotificationPath({
             identityNumber: createdSession.identityNumber,
             origin: effectiveOrigin,
+            frontendOrigin: channel.origin,
             accountPrincipal: createdSession.accountPrincipal,
             actor: createdSession.actor,
           });
