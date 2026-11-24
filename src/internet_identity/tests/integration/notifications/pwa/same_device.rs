@@ -26,7 +26,7 @@ const HOUR_NS: u64 = 60 * MINUTE_NS;
 
 /// How long a probe has to be answered before its silence is evidence: the canister's
 /// `MIN_PROBE_ANSWER_TIME_NS`, written out.
-const PROBE_ANSWER_TIME: std::time::Duration = std::time::Duration::from_secs(10);
+pub(super) const PROBE_ANSWER_TIME: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The key calls from the entry [`install_signed_in`] signs in from are signed with.
 fn safari() -> Principal {
@@ -46,12 +46,32 @@ pub(super) struct Phone {
     anchor: AnchorNumber,
     pub(super) account_principal: Principal,
     /// The installed web app's session.
-    pwa: Principal,
+    pub(super) pwa: Principal,
     /// Safari's session at [`APP`].
     safari_session: Principal,
 }
 
 fn phone(env: &PocketIc) -> Phone {
+    phone_with(env, |env, canister_id, pwa| {
+        subscribe_pwa_webpush(
+            env,
+            canister_id,
+            pwa,
+            PWA_ENDPOINT,
+            p256dh(9),
+            &TEST_AUTH_SECRET,
+        )
+        .expect("subscribe rejected")
+        .expect("subscribe refused");
+    })
+}
+
+/// [`phone`], with the installed web app's entry holding what `subscribe_installed_apps`
+/// subscribes with its session instead of [`PWA_ENDPOINT`].
+pub(super) fn phone_with(
+    env: &PocketIc,
+    subscribe_installed_apps: impl FnOnce(&PocketIc, CanisterId, Principal),
+) -> Phone {
     let (canister_id, anchor, safari_session) = install_signed_in(env, None, None);
     let pwa = sign_in(
         env,
@@ -59,16 +79,7 @@ fn phone(env: &PocketIc) -> Phone {
         principal_1(),
         session_request(anchor, APP, &BrowserKey::new(5)),
     );
-    subscribe_pwa_webpush(
-        env,
-        canister_id,
-        session_of(&pwa),
-        PWA_ENDPOINT,
-        p256dh(9),
-        &TEST_AUTH_SECRET,
-    )
-    .expect("subscribe rejected")
-    .expect("subscribe refused");
+    subscribe_installed_apps(env, canister_id, session_of(&pwa));
     assert_eq!(pwa.account_principal, safari_session.account_principal);
     Phone {
         canister_id,
@@ -81,7 +92,18 @@ fn phone(env: &PocketIc) -> Phone {
 
 /// [`phone`], with the installed web app's entry linked to Safari's.
 pub(super) fn linked_phone(env: &PocketIc) -> Phone {
-    let phone = phone(env);
+    link(env, phone(env))
+}
+
+/// [`phone_with`], with the installed web app's entry linked to Safari's.
+pub(super) fn linked_phone_with(
+    env: &PocketIc,
+    subscribe_installed_apps: impl FnOnce(&PocketIc, CanisterId, Principal),
+) -> Phone {
+    link(env, phone_with(env, subscribe_installed_apps))
+}
+
+fn link(env: &PocketIc, phone: Phone) -> Phone {
     prepare_link(env, &phone);
     assert_eq!(claim(env, &phone, safari(), &link_key()), Ok(()));
     phone
@@ -174,7 +196,7 @@ pub(super) fn installed_apps_of_frontend(
     })
 }
 
-fn probe(
+pub(super) fn probe(
     env: &PocketIc,
     phone: &Phone,
     path: NotificationPath,
@@ -192,6 +214,16 @@ fn probe(
 }
 
 fn remove_unanswered(env: &PocketIc, phone: &Phone) {
+    remove_unanswered_of_frontend(env, phone, None);
+}
+
+/// Safari removes the linked installed web apps of [`APP`]'s frontend at
+/// `frontend_origin`, the app's own origin where `None`, that did not answer their probe.
+pub(super) fn remove_unanswered_of_frontend(
+    env: &PocketIc,
+    phone: &Phone,
+    frontend_origin: Option<&str>,
+) {
     remove_unanswered_pwa_webpush_subscriptions(
         env,
         phone.canister_id,
@@ -200,7 +232,7 @@ fn remove_unanswered(env: &PocketIc, phone: &Phone) {
             anchor_number: phone.anchor,
             origin: APP.to_string(),
             account_principal: phone.account_principal,
-            frontend_origin: None,
+            frontend_origin: frontend_origin.map(str::to_string),
         },
     )
     .expect("remove rejected")
@@ -225,6 +257,17 @@ fn pwa_entry(
 }
 
 fn remove_pwa_entry(env: &PocketIc, phone: &Phone, inbox_notification_id: InboxNotificationId) {
+    remove_pwa_entry_of_frontend(env, phone, inbox_notification_id, None);
+}
+
+/// The installed web app of [`APP`]'s frontend at `frontend_origin`, the app's own origin
+/// where `None`, removes its entry `inbox_notification_id`, which answers its pushes.
+pub(super) fn remove_pwa_entry_of_frontend(
+    env: &PocketIc,
+    phone: &Phone,
+    inbox_notification_id: InboxNotificationId,
+    frontend_origin: Option<&str>,
+) {
     app_remove_pwa_notification(
         env,
         phone.canister_id,
@@ -232,7 +275,7 @@ fn remove_pwa_entry(env: &PocketIc, phone: &Phone, inbox_notification_id: InboxN
         AppRemovePwaNotificationRequest {
             inbox_notification_id,
             not_shown: None,
-            frontend_origin: None,
+            frontend_origin: frontend_origin.map(str::to_string),
         },
     )
     .expect("remove rejected")
@@ -1008,7 +1051,7 @@ fn should_refuse_a_claim_from_an_entry_holding_an_installed_app_of_its_own() {
 
 /// A third entry of `phone`'s identity, signed in to [`APP`] from the browser seed 6
 /// names, holding nothing. Answers its session.
-fn another_installed_app_entry(env: &PocketIc, phone: &Phone) -> Principal {
+pub(super) fn another_installed_app_entry(env: &PocketIc, phone: &Phone) -> Principal {
     session_of(&sign_in(
         env,
         phone.canister_id,
@@ -1018,7 +1061,7 @@ fn another_installed_app_entry(env: &PocketIc, phone: &Phone) -> Principal {
 }
 
 /// `session` registers `key` for its entry's same-device link.
-fn register_key(env: &PocketIc, phone: &Phone, session: Principal, key: &BrowserKey) {
+pub(super) fn register_key(env: &PocketIc, phone: &Phone, session: Principal, key: &BrowserKey) {
     app_prepare_same_device_link(
         env,
         phone.canister_id,
@@ -1032,7 +1075,7 @@ fn register_key(env: &PocketIc, phone: &Phone, session: Principal, key: &Browser
 }
 
 /// `caller` claims the link registered with `key`.
-fn claim_with(
+pub(super) fn claim_with(
     env: &PocketIc,
     phone: &Phone,
     caller: Principal,

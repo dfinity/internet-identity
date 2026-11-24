@@ -2,13 +2,17 @@
 //! which lists them among its alternative origins, each with an installed web app of its
 //! own that only its own notifications wake.
 
-use super::same_device::{installed_apps_of_frontend, linked_phone, path_status};
+use super::same_device::{
+    another_installed_app_entry, claim_with, installed_apps_of_frontend, linked_phone,
+    linked_phone_with, path_status, phone_with, probe, register_key, remove_pwa_entry_of_frontend,
+    remove_unanswered_of_frontend, Phone, PROBE_ANSWER_TIME,
+};
 use super::*;
 use canister_tests::api::internet_identity::notifications::subscribe_pwa_webpush_for_frontend;
 use canister_tests::framework::assert_metric;
 use internet_identity_interface::internet_identity::types::{
     AppGetPwaWebPushSubscriptionStatusRequest, AppPreparePwaWebPushSubscriptionRequest,
-    NotificationPath, SendNotificationError, SendNotificationResponse,
+    ClaimSameDeviceLinkError, NotificationPath, SendNotificationError, SendNotificationResponse,
 };
 
 /// A frontend [`APP`]'s alternative-origins list does not name.
@@ -239,7 +243,42 @@ fn should_refuse_to_prepare_for_a_frontend_the_application_does_not_list() {
     );
 }
 
-/// Another frontend of [`APP`], which a later list names instead of [`SUITE_FRONTEND`].
+/// An application at a plain `http` origin, which II reads no list from.
+const INSECURE_APP: &str = "http://insecure-app.example";
+
+#[test]
+fn should_refuse_to_prepare_for_a_frontend_of_an_application_at_an_http_origin() {
+    let env = env();
+    let (canister_id, _, _) = install_signed_in(&env, None, None);
+    let session = session_of(&second_identity_at(&env, canister_id, INSECURE_APP));
+
+    let mut urls = Vec::new();
+    let mut response = prepare_for_frontend(&env, canister_id, session, SUITE_FRONTEND);
+    for _ in 0..3 {
+        if response != AppPreparePwaWebPushSubscriptionResult::Pending {
+            break;
+        }
+        urls.extend(fetched_urls(&env));
+        response = prepare_for_frontend(&env, canister_id, session, SUITE_FRONTEND);
+    }
+    urls.extend(fetched_urls(&env));
+
+    assert_eq!(
+        response,
+        AppPreparePwaWebPushSubscriptionResult::Err(
+            AppPreparePwaWebPushSubscriptionError::InternalCanisterError(
+                "origin must be https".to_string()
+            )
+        )
+    );
+    assert!(
+        urls.iter()
+            .all(|url| !url.ends_with(ALTERNATIVE_ORIGINS_PATH)),
+        "II read the alternative origins of an http application: {urls:?}"
+    );
+}
+
+/// Another frontend of [`APP`].
 const CALENDAR_FRONTEND: &str = "https://calendar.suite.example";
 /// Where [`CALENDAR_FRONTEND`]'s installed web app is subscribed.
 const CALENDAR_ENDPOINT: &str = "https://suite.push.example/calendar";
@@ -378,6 +417,163 @@ fn should_check_only_the_installed_apps_of_the_frontend_signed_in_at() {
             .subscriptions
             .len(),
         1
+    );
+}
+
+/// Subscribes the installed web app `session` signs in to on its browser entry for
+/// [`SUITE_FRONTEND`] at [`SUITE_ENDPOINT`] and for [`CALENDAR_FRONTEND`] at
+/// [`CALENDAR_ENDPOINT`], with [`APP`]'s list naming both, and none for [`APP`] itself.
+fn subscribe_suite_and_calendar_frontends(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    session: Principal,
+) {
+    for (frontend_origin, endpoint, seed) in [
+        (SUITE_FRONTEND, SUITE_ENDPOINT, 11),
+        (CALENDAR_FRONTEND, CALENDAR_ENDPOINT, 12),
+    ] {
+        prepare_for_frontend(env, canister_id, session, frontend_origin);
+        answer_outcalls_listing(env, &[SUITE_FRONTEND, CALENDAR_FRONTEND]);
+        subscribe_pwa_webpush_for_frontend(
+            env,
+            canister_id,
+            session,
+            Some(frontend_origin),
+            endpoint,
+            p256dh(seed),
+            &OTHER_AUTH_SECRET,
+        )
+        .expect("subscribe rejected")
+        .expect("subscribe refused");
+    }
+    assert_eq!(frontend_endpoint(env, canister_id, session, None), None);
+}
+
+/// A phone whose installed web app entry holds [`SUITE_FRONTEND`]'s and
+/// [`CALENDAR_FRONTEND`]'s installed web apps, linked to Safari, with one push to each
+/// waiting for an answer.
+fn linked_suite_phone_with_a_push_to_each_frontend(env: &PocketIc) -> Phone {
+    let phone = linked_phone_with(env, subscribe_suite_and_calendar_frontends);
+    for (frontend_origin, endpoint, id) in [
+        (SUITE_FRONTEND, SUITE_ENDPOINT, 1),
+        (CALENDAR_FRONTEND, CALENDAR_ENDPOINT, 2),
+    ] {
+        let response = send_for_frontend(
+            env,
+            phone.canister_id,
+            frontend_origin,
+            phone.account_principal,
+            id,
+        );
+        assert!(matches!(response, Ok(response) if response.not_accepted.is_empty()));
+        assert_eq!(answer_outcalls(env, 201), vec![endpoint.to_string()]);
+    }
+    phone
+}
+
+/// The unanswered push count and whether a probe waits, of the one installed web app of
+/// `frontend_origin` on `phone`'s linked entry.
+fn frontend_slot_state(
+    env: &PocketIc,
+    phone: &Phone,
+    frontend_origin: &str,
+) -> Vec<(Option<u32>, bool)> {
+    path_status(
+        env,
+        phone,
+        installed_apps_of_frontend(phone, Some(frontend_origin)),
+    )
+    .subscriptions
+    .into_iter()
+    .map(|subscription| {
+        (
+            subscription.unanswered_pushes.map(|pushes| pushes.count),
+            subscription.probe_sent_at_ns.is_some(),
+        )
+    })
+    .collect()
+}
+
+#[test]
+fn should_probe_and_reset_only_the_installed_app_of_the_frontend_asked_about() {
+    let env = env();
+    let phone = linked_suite_phone_with_a_push_to_each_frontend(&env);
+
+    assert_eq!(
+        probe(
+            &env,
+            &phone,
+            installed_apps_of_frontend(&phone, Some(SUITE_FRONTEND))
+        ),
+        Ok(())
+    );
+    assert_eq!(answer_outcalls(&env, 201), vec![SUITE_ENDPOINT.to_string()]);
+    assert_eq!(
+        frontend_slot_state(&env, &phone, SUITE_FRONTEND),
+        vec![(Some(2), true)]
+    );
+    assert_eq!(
+        frontend_slot_state(&env, &phone, CALENDAR_FRONTEND),
+        vec![(Some(1), false)]
+    );
+
+    remove_pwa_entry_of_frontend(&env, &phone, FIRST_ENTRY, Some(SUITE_FRONTEND));
+
+    assert_eq!(
+        frontend_slot_state(&env, &phone, SUITE_FRONTEND),
+        vec![(None, false)]
+    );
+    assert_eq!(
+        frontend_slot_state(&env, &phone, CALENDAR_FRONTEND),
+        vec![(Some(1), false)]
+    );
+}
+
+#[test]
+fn should_remove_only_the_unanswered_installed_app_of_the_frontend_asked_about() {
+    let env = env();
+    let phone = linked_suite_phone_with_a_push_to_each_frontend(&env);
+    for frontend_origin in [SUITE_FRONTEND, CALENDAR_FRONTEND] {
+        assert_eq!(
+            probe(
+                &env,
+                &phone,
+                installed_apps_of_frontend(&phone, Some(frontend_origin))
+            ),
+            Ok(())
+        );
+        answer_outcalls(&env, 201);
+    }
+    env.advance_time(PROBE_ANSWER_TIME);
+
+    remove_unanswered_of_frontend(&env, &phone, Some(SUITE_FRONTEND));
+
+    assert_eq!(frontend_slot_state(&env, &phone, SUITE_FRONTEND), vec![]);
+    assert_eq!(
+        frontend_slot_state(&env, &phone, CALENDAR_FRONTEND),
+        vec![(Some(2), true)]
+    );
+}
+
+/// An entry whose only installed web app is [`SUITE_FRONTEND`]'s, an origin other than the
+/// derivation origin, holds one of its own, so it cannot link to another entry.
+#[test]
+fn should_refuse_a_claim_from_an_entry_holding_only_another_origins_installed_app() {
+    let env = env();
+    let phone = phone_with(&env, subscribe_suite_frontend);
+    assert_eq!(
+        frontend_endpoint(&env, phone.canister_id, phone.pwa, None),
+        None
+    );
+    let third = another_installed_app_entry(&env, &phone);
+    register_key(&env, &phone, third, &BrowserKey::new(42));
+
+    let installed_app_browser = BrowserKey::new(5).successor().principal();
+    assert_eq!(
+        claim_with(&env, &phone, installed_app_browser, &BrowserKey::new(42)),
+        Err(ClaimSameDeviceLinkError::InternalCanisterError(
+            "this browser holds an installed web app subscription of its own".to_string()
+        ))
     );
 }
 

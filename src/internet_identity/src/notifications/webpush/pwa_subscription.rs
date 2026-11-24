@@ -19,6 +19,7 @@ use super::validation::{deliverable_endpoint, PushEndpoint, SealedAuth, Subscrib
 use super::{seed_pool, transport};
 use crate::alternative_origins::{self, AlternativeOrigin};
 use crate::authz_utils::AuthorizedSession;
+use crate::notifications;
 use crate::origin::ApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{PendingTransport, ReadySubscription, WebPushSubscription};
@@ -425,8 +426,9 @@ enum FrontendAuthorization {
 
 /// Whether the app of `session` accepts `frontend_origin` as its own frontend, which it
 /// does without a list where `frontend_origin` is `None`, its own origin. Refused where
-/// its alternative origins do not list it. Starts the fetch of that list where it is not
-/// cached. `now_ns` is the call's time.
+/// its alternative origins do not list it, or where II will not fetch that list from the
+/// app's origin. Starts the fetch of that list where it is not cached. `now_ns` is the
+/// call's time.
 fn authorize_frontend(
     session: &AuthorizedSession,
     frontend_origin: Option<&ApplicationOrigin>,
@@ -438,6 +440,8 @@ fn authorize_frontend(
         });
     };
     let application_origin = ApplicationOrigin::try_from(session.origin.as_str())
+        .map_err(PreparePwaSubscriptionError::Internal)?;
+    notifications::fetchable_origin(&application_origin)
         .map_err(PreparePwaSubscriptionError::Internal)?;
     match alternative_origins::authorize_alternative_origin(
         &application_origin,
