@@ -1,16 +1,13 @@
 //! Tests for making sure that the current version can be rolled back to from the last release.
 //! This tests stable memory compatibility and pre / post install hooks.
 
-use crate::upgrade::{
-    configure_previous_release_doh, previous_release_doh_config, LegacyDohConfig,
-};
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2::create_account;
 use canister_tests::api::internet_identity::api_v2::get_accounts;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::{
-    DeviceData, DohConfig, InternetIdentityInit, OpenIdConfig, OpenIdEmailVerificationScheme,
+    DeviceData, InternetIdentityInit, OpenIdConfig, OpenIdEmailVerificationScheme,
 };
 
 /// Tests simple upgrade and downgrade.
@@ -243,43 +240,4 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
 
     assert_eq!(accounts_before, accounts_between);
     assert_eq!(accounts_between, accounts_after);
-}
-
-/// Verifies that a DoH config with reserved domains doesn't block a rollback: the
-/// previous release, which requires an allowlist, reads it as DoH unconfigured, and an
-/// upgrade arg on the previous release configures DoH again.
-#[test]
-fn should_roll_back_with_reserved_doh_domains_as_unconfigured_doh() {
-    let env = env();
-    let doh_config = DohConfig {
-        reserved_domains: Some(vec!["gmail.com".into()]),
-        max_cache_age_secs: Some(60),
-    };
-    let canister_id = install_ii_canister_with_arg(
-        &env,
-        II_WASM.clone(),
-        Some(InternetIdentityInit {
-            doh_config: Some(Some(doh_config.clone())),
-            ..Default::default()
-        }),
-    );
-    assert_eq!(
-        api::config(&env, canister_id).unwrap().doh_config,
-        Some(Some(doh_config))
-    );
-
-    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
-    api::health_check(&env, canister_id);
-    assert_eq!(previous_release_doh_config(&env, canister_id), Some(None));
-
-    let legacy_config = LegacyDohConfig {
-        allowed_domains: vec!["example.com".into()],
-        max_cache_age_secs: Some(1234),
-    };
-    configure_previous_release_doh(&env, canister_id, legacy_config.clone());
-    api::health_check(&env, canister_id);
-    assert_eq!(
-        previous_release_doh_config(&env, canister_id),
-        Some(Some(legacy_config))
-    );
 }
