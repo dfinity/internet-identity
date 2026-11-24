@@ -11,11 +11,13 @@
 //! [`SENDERS_OUTCALL_LIMIT`] and the failure backoff.
 
 use crate::origin::ApplicationOrigin;
+#[cfg(not(test))]
+use crate::origin::FetchableApplicationOrigin;
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
 use candid::Principal;
-use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
+use internet_identity_interface::internet_identity::types::Timestamp;
 use std::cell::RefCell;
 
 #[cfg(not(test))]
@@ -50,7 +52,7 @@ const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 
-type SendersCache = SingleFlightCache<FrontendHostname, Vec<Principal>, String>;
+type SendersCache = SingleFlightCache<ApplicationOrigin, Vec<Principal>, String>;
 
 thread_local! {
     static SENDERS_CACHE: RefCell<SendersCache> = RefCell::new(new_senders_cache());
@@ -89,7 +91,7 @@ pub enum Senders {
 /// the list is not cached. Only an update may call this: a fill spawns an
 /// outcall.
 pub fn authorize(origin: &ApplicationOrigin, caller: Principal, now_ns: Timestamp) -> Senders {
-    match single_flight_cache::get(&SENDERS_CACHE, origin.as_str().to_string()) {
+    match single_flight_cache::get(&SENDERS_CACHE, origin.clone()) {
         Cached::Ready(senders) => {
             if senders.contains(&caller) {
                 Senders::Listed
@@ -98,14 +100,14 @@ pub fn authorize(origin: &ApplicationOrigin, caller: Principal, now_ns: Timestam
             }
         }
         Cached::Pending => Senders::Pending {
-            retry_after: retry_after(&origin.as_str().to_string(), now_ns),
+            retry_after: retry_after(origin, now_ns),
         },
     }
 }
 
 /// A parked origin is not retried before the cache's own deadline, so sending
 /// the caller back sooner only buys deferrals.
-fn retry_after(origin: &FrontendHostname, now_ns: Timestamp) -> Timestamp {
+fn retry_after(origin: &ApplicationOrigin, now_ns: Timestamp) -> Timestamp {
     single_flight_cache::retry_at(&SENDERS_CACHE, origin)
         .map_or(now_ns + PENDING_RETRY_AFTER_NS, |secs| secs * 1_000_000_000)
 }
@@ -168,25 +170,27 @@ thread_local! {
 /// No outcall slot → abandon, which records nothing and retries once capacity
 /// frees.
 #[cfg(not(test))]
-async fn senders_fill(origin: FrontendHostname) -> FillOutcome<Vec<Principal>, String> {
+async fn senders_fill(origin: ApplicationOrigin) -> FillOutcome<Vec<Principal>, String> {
     let Some(_permit) = crate::concurrency::acquire(&SENDERS_OUTCALL_LIMIT) else {
         return FillOutcome::Abandoned;
     };
-    match fetch_senders(origin).await {
+    let fetch_origin = FetchableApplicationOrigin::from(&origin);
+    match fetch_senders(&fetch_origin).await {
         Ok(senders) => FillOutcome::Ready(senders),
         Err(err) => FillOutcome::Failed(err),
     }
 }
 
 #[cfg(not(test))]
-async fn fetch_senders(origin: FrontendHostname) -> Result<Vec<Principal>, String> {
-    use crate::origin;
+async fn fetch_senders(
+    fetch_origin: &FetchableApplicationOrigin,
+) -> Result<Vec<Principal>, String> {
     use ic_cdk::api::management_canister::http_request::{
         http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
     };
 
     let request = CanisterHttpRequestArgument {
-        url: format!("{}{WELL_KNOWN_PATH}", origin::fetch_origin(&origin)),
+        url: format!("{}{WELL_KNOWN_PATH}", fetch_origin.as_str()),
         method: HttpMethod::GET,
         body: None,
         max_response_bytes: Some(SENDERS_MAX_RESPONSE_BYTES),
@@ -210,9 +214,9 @@ async fn fetch_senders(origin: FrontendHostname) -> Result<Vec<Principal>, Strin
     senders_from_response(status, &response.body, MAX_SENDERS)
 }
 
-/// Narrows a response to the senders and nothing else, so what crosses
-/// consensus is what the authorization reads.
-#[cfg(not(test))]
+/// Narrows a response to the senders and nothing else, sorted and without
+/// duplicates, so what crosses consensus is what the authorization reads:
+/// replicas served the same set in a different order still agree.
 #[allow(clippy::needless_pass_by_value)]
 fn transform_senders(
     response: ic_cdk::api::management_canister::http_request::HttpResponse,
@@ -232,9 +236,11 @@ fn transform_senders(
         headers: vec![],
         body: b"invalid ii-notification-senders JSON".to_vec(),
     };
-    let Ok(list) = serde_json::from_slice::<SenderList>(response.body.as_slice()) else {
+    let Ok(mut list) = serde_json::from_slice::<SenderList>(response.body.as_slice()) else {
         return invalid();
     };
+    list.senders.sort();
+    list.senders.dedup();
     let Ok(body) = serde_json::to_vec(&list) else {
         return invalid();
     };
@@ -247,8 +253,8 @@ fn transform_senders(
 
 // In test builds the fill reads injected state instead of doing outcalls.
 #[cfg(test)]
-async fn senders_fill(origin: FrontendHostname) -> FillOutcome<Vec<Principal>, String> {
-    match tests::TEST_SENDERS.with_borrow(|m| m.get(&origin).cloned()) {
+async fn senders_fill(origin: ApplicationOrigin) -> FillOutcome<Vec<Principal>, String> {
+    match tests::TEST_SENDERS.with_borrow(|m| m.get(origin.as_str()).cloned()) {
         Some(senders) => FillOutcome::Ready(senders),
         None => FillOutcome::Failed(format!("no test sender list for {origin}")),
     }
@@ -257,6 +263,7 @@ async fn senders_fill(origin: FrontendHostname) -> FillOutcome<Vec<Principal>, S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use internet_identity_interface::internet_identity::types::FrontendHostname;
     use std::collections::HashMap;
 
     thread_local! {
@@ -432,6 +439,40 @@ mod tests {
             &br#"not json"#[..],
         ] {
             assert!(parse_senders(body, 10).is_none(), "must not be read");
+        }
+    }
+
+    fn transformed_body(body: &[u8]) -> Vec<u8> {
+        use ic_cdk::api::management_canister::http_request::{HttpHeader, HttpResponse};
+
+        transform_senders(HttpResponse {
+            status: HTTP_STATUS_OK.into(),
+            headers: vec![HttpHeader {
+                name: "Date".into(),
+                value: "differs per replica".into(),
+            }],
+            body: body.to_vec(),
+        })
+        .body
+    }
+
+    /// Replicas that are served one set in different orders, or with an entry
+    /// repeated, must hand consensus the same bytes.
+    #[test]
+    fn the_transform_answers_one_set_with_the_same_bytes_in_any_order() {
+        let canonical_body = transformed_body(
+            br#"{"senders":["rrkah-fqaaa-aaaaa-aaaaq-cai","ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#,
+        );
+        assert_eq!(
+            canonical_body,
+            br#"{"senders":["rrkah-fqaaa-aaaaa-aaaaq-cai","ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#
+                .to_vec()
+        );
+        for body in [
+            &br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai"]}"#[..],
+            &br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai","ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#[..],
+        ] {
+            assert_eq!(transformed_body(body), canonical_body);
         }
     }
 }

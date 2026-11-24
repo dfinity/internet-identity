@@ -61,31 +61,53 @@ const GATEWAY_DOMAINS: &[&str] = &["ic0.app", "icp0.io", "icp.net"];
 /// The gateway every canister is served through, so one request settles the question.
 const FETCH_DOMAIN: &str = "icp.net";
 
-/// Where a file the application at `origin` publishes under `/.well-known` is read from.
+/// The label a gateway origin carries between the canister id and the gateway domain
+/// when it names the uncertified endpoint, as in `<id>.raw.icp0.io`.
+const RAW_LABEL: &str = ".raw";
+
+/// Where a file the application at an [`ApplicationOrigin`] publishes under
+/// `/.well-known` is read from.
 ///
 /// An [`ApplicationOrigin`] is folded to `ic0.app`, a spelling the canister need not be
 /// served on: a boundary node answers `400 client_domain_canister_mismatch` where it is
 /// not, and the file would never be read. The gateway domains resolve to the same
-/// canister and serve the same file, so a gateway origin is read through
-/// [`FETCH_DOMAIN`]. Anything else, a custom domain or localhost, is read as it stands.
-pub fn fetch_origin(origin: &str) -> String {
-    origin
-        .strip_prefix("https://")
-        .and_then(|rest| {
-            GATEWAY_DOMAINS
-                .iter()
-                .find_map(|domain| rest.strip_suffix(&format!(".{domain}")))
-        })
-        .filter(|subdomain| {
-            !subdomain.is_empty()
-                && subdomain
-                    .chars()
-                    .all(|character| character.is_ascii_alphanumeric() || character == '-')
-        })
-        .map_or_else(
-            || origin.to_string(),
-            |subdomain| format!("https://{subdomain}.{FETCH_DOMAIN}"),
-        )
+/// canister and serve the same file, so a gateway origin `https://<id>.<gateway>` or
+/// `https://<id>.raw.<gateway>` is read as `https://<id>.icp.net`: through
+/// [`FETCH_DOMAIN`], and never through the raw endpoint, whose responses carry no
+/// certification. Anything else, a custom domain or localhost, is read as it stands.
+///
+/// Built only from an [`ApplicationOrigin`], so it is always a bare origin.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FetchableApplicationOrigin(String);
+
+impl FetchableApplicationOrigin {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&ApplicationOrigin> for FetchableApplicationOrigin {
+    fn from(origin: &ApplicationOrigin) -> Self {
+        let origin = origin.as_str();
+        let canister_id = origin
+            .strip_prefix("https://")
+            .and_then(|rest| {
+                GATEWAY_DOMAINS
+                    .iter()
+                    .find_map(|domain| rest.strip_suffix(&format!(".{domain}")))
+            })
+            .map(|subdomain| subdomain.strip_suffix(RAW_LABEL).unwrap_or(subdomain))
+            .filter(|canister_id| {
+                !canister_id.is_empty()
+                    && canister_id
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric() || character == '-')
+            });
+        match canister_id {
+            Some(canister_id) => Self(format!("https://{canister_id}.{FETCH_DOMAIN}")),
+            None => Self(origin.to_string()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -203,21 +225,42 @@ mod tests {
         );
     }
 
+    fn fetched(origin: &str) -> String {
+        let origin = ApplicationOrigin::try_from(origin).expect("a bare origin");
+        FetchableApplicationOrigin::from(&origin)
+            .as_str()
+            .to_string()
+    }
+
     #[test]
     fn a_gateway_origin_is_read_through_the_gateway_that_serves_every_canister() {
-        // The folded spelling, which the canister may not be served on.
-        assert_eq!(
-            fetch_origin("https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app"),
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
-        );
-        assert_eq!(
-            fetch_origin("https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io"),
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
-        );
-        assert_eq!(
-            fetch_origin("https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"),
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
-        );
+        for origin in [
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net",
+        ] {
+            assert_eq!(
+                fetched(origin),
+                "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net",
+                "{origin}"
+            );
+        }
+    }
+
+    /// The raw endpoint serves responses without certification, so it is never read.
+    #[test]
+    fn a_raw_gateway_origin_is_read_through_the_certified_gateway() {
+        for origin in [
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.raw.ic0.app",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.raw.icp0.io",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.raw.icp.net",
+        ] {
+            assert_eq!(
+                fetched(origin),
+                "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net",
+                "{origin}"
+            );
+        }
     }
 
     #[test]
@@ -225,11 +268,14 @@ mod tests {
         for origin in [
             "https://app.example",
             "https://nice-name.com",
+            "https://raw.example",
             "http://127.0.0.1:4943",
             // A gateway domain with nothing before it names no canister.
             "https://icp.net",
+            // Plain http is no gateway, whatever the host.
+            "http://vt36r-2qaaa-aaaad-aad5a-cai.localhost:4943",
         ] {
-            assert_eq!(fetch_origin(origin), origin);
+            assert_eq!(fetched(origin), origin);
         }
     }
 }

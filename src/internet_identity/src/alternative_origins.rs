@@ -11,7 +11,8 @@
 //! [`ALTERNATIVE_ORIGINS_OUTCALL_LIMIT`] and the failure backoff.
 
 use crate::concurrency::{self, ConcurrencyLimiter, LimiterConfig};
-use crate::origin::{self, ApplicationOrigin};
+use crate::origin::ApplicationOrigin;
+use crate::origin::FetchableApplicationOrigin;
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
@@ -66,9 +67,9 @@ const PENDING_RETRY_AFTER_NS: u64 = 3 * 1_000_000_000;
 const HTTP_STATUS_OK: u16 = 200;
 const HTTP_STATUS_NOT_FOUND: u16 = 404;
 
-/// The folded origins an application lists, keyed by the application's folded origin.
+/// The folded origins an application lists, keyed by the application's origin.
 type AlternativeOriginsCache =
-    SingleFlightCache<FrontendHostname, BTreeSet<FrontendHostname>, String>;
+    SingleFlightCache<ApplicationOrigin, BTreeSet<FrontendHostname>, String>;
 
 thread_local! {
     static ALTERNATIVE_ORIGINS_CACHE: RefCell<AlternativeOriginsCache> =
@@ -82,9 +83,9 @@ thread_local! {
 }
 
 /// A cache whose misses are filled by `fill`, which reads the list of the application at
-/// the folded origin it is given.
+/// the origin it is given.
 fn new_alternative_origins_cache<Fut>(
-    fill: impl Fn(FrontendHostname) -> Fut + 'static,
+    fill: impl Fn(ApplicationOrigin) -> Fut + 'static,
 ) -> AlternativeOriginsCache
 where
     Fut: Future<Output = FillOutcome<BTreeSet<FrontendHostname>, String>> + 'static,
@@ -125,7 +126,6 @@ pub fn authorize_alternative_origin(
     if derivation_origin == frontend_origin {
         return AlternativeOrigin::Listed;
     }
-    let derivation_origin = derivation_origin.as_str().to_string();
     match single_flight_cache::get(&ALTERNATIVE_ORIGINS_CACHE, derivation_origin.clone()) {
         Cached::Ready(alternative_origins) => {
             if alternative_origins.contains(frontend_origin.as_str()) {
@@ -135,14 +135,14 @@ pub fn authorize_alternative_origin(
             }
         }
         Cached::Pending => AlternativeOrigin::Pending {
-            retry_after: retry_after(&derivation_origin, now_ns),
+            retry_after: retry_after(derivation_origin, now_ns),
         },
     }
 }
 
 /// A parked origin is not retried before the cache's own deadline, so sending the caller
 /// back sooner only buys deferrals.
-fn retry_after(derivation_origin: &FrontendHostname, now_ns: Timestamp) -> Timestamp {
+fn retry_after(derivation_origin: &ApplicationOrigin, now_ns: Timestamp) -> Timestamp {
     single_flight_cache::retry_at(&ALTERNATIVE_ORIGINS_CACHE, derivation_origin).map_or(
         now_ns.saturating_add(PENDING_RETRY_AFTER_NS),
         |retry_at_seconds| retry_at_seconds.saturating_mul(1_000_000_000),
@@ -193,25 +193,23 @@ fn parse_alternative_origins(body: &[u8]) -> Option<BTreeSet<FrontendHostname>> 
 /// Reads the list of the application at `derivation_origin`. No outcall slot means
 /// abandon, which records nothing and retries once capacity frees.
 async fn fill_alternative_origins(
-    derivation_origin: FrontendHostname,
+    derivation_origin: ApplicationOrigin,
 ) -> FillOutcome<BTreeSet<FrontendHostname>, String> {
     let Some(_permit) = concurrency::acquire(&ALTERNATIVE_ORIGINS_OUTCALL_LIMIT) else {
         return FillOutcome::Abandoned;
     };
-    match fetch_alternative_origins(&derivation_origin).await {
+    let fetch_origin = FetchableApplicationOrigin::from(&derivation_origin);
+    match fetch_alternative_origins(&fetch_origin).await {
         Ok(alternative_origins) => FillOutcome::Ready(alternative_origins),
         Err(err) => FillOutcome::Failed(err),
     }
 }
 
 async fn fetch_alternative_origins(
-    derivation_origin: &str,
+    fetch_origin: &FetchableApplicationOrigin,
 ) -> Result<BTreeSet<FrontendHostname>, String> {
     let request = CanisterHttpRequestArgument {
-        url: format!(
-            "{}{WELL_KNOWN_PATH}",
-            origin::fetch_origin(derivation_origin)
-        ),
+        url: format!("{}{WELL_KNOWN_PATH}", fetch_origin.as_str()),
         method: HttpMethod::GET,
         body: None,
         max_response_bytes: Some(ALTERNATIVE_ORIGINS_MAX_RESPONSE_BYTES),
@@ -238,8 +236,9 @@ async fn fetch_alternative_origins(
     alternative_origins_from_response(status, &response.body)
 }
 
-/// Narrows a response to the list and nothing else, so what crosses consensus is what
-/// the check reads.
+/// Narrows a response to the list and nothing else, sorted and without duplicates, so
+/// what crosses consensus is what the check reads: replicas served the same set in a
+/// different order still agree.
 fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
     let HttpResponse { status, body, .. } = response;
     if status != HTTP_STATUS_OK {
@@ -254,9 +253,11 @@ fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
         headers: vec![],
         body: b"invalid ii-alternative-origins JSON".to_vec(),
     };
-    let Ok(list) = serde_json::from_slice::<AlternativeOriginList>(&body) else {
+    let Ok(mut list) = serde_json::from_slice::<AlternativeOriginList>(&body) else {
         return invalid_response;
     };
+    list.alternative_origins.sort();
+    list.alternative_origins.dedup();
     let Ok(body) = serde_json::to_vec(&list) else {
         return invalid_response;
     };
@@ -283,9 +284,9 @@ mod tests {
     const NOW_NS: Timestamp = 1_000_000_000_000;
 
     async fn fill_from_published_lists(
-        derivation_origin: FrontendHostname,
+        derivation_origin: ApplicationOrigin,
     ) -> FillOutcome<BTreeSet<FrontendHostname>, String> {
-        match PUBLISHED_LISTS.with_borrow(|lists| lists.get(&derivation_origin).cloned()) {
+        match PUBLISHED_LISTS.with_borrow(|lists| lists.get(derivation_origin.as_str()).cloned()) {
             Some(alternative_origins) => FillOutcome::Ready(alternative_origins),
             None => FillOutcome::Failed(format!("no test list for {derivation_origin}")),
         }
@@ -462,6 +463,37 @@ mod tests {
                 alternative_origins_from_response(status, b"").is_err(),
                 "{status} must not be an answer about the application's frontends"
             );
+        }
+    }
+
+    fn transformed_body(body: &[u8]) -> Vec<u8> {
+        transform_alternative_origins(HttpResponse {
+            status: HTTP_STATUS_OK.into(),
+            headers: vec![HttpHeader {
+                name: "Date".into(),
+                value: "differs per replica".into(),
+            }],
+            body: body.to_vec(),
+        })
+        .body
+    }
+
+    /// Replicas that are served one set in different orders, or with an entry repeated,
+    /// must hand consensus the same bytes.
+    #[test]
+    fn the_transform_answers_one_set_with_the_same_bytes_in_any_order() {
+        let canonical_body = transformed_body(
+            br#"{"alternativeOrigins":["https://a.example","https://b.example"]}"#,
+        );
+        assert_eq!(
+            canonical_body,
+            br#"{"alternativeOrigins":["https://a.example","https://b.example"]}"#.to_vec()
+        );
+        for body in [
+            &br#"{"alternativeOrigins":["https://b.example","https://a.example"]}"#[..],
+            &br#"{"alternativeOrigins":["https://b.example","https://a.example","https://b.example"]}"#[..],
+        ] {
+            assert_eq!(transformed_body(body), canonical_body);
         }
     }
 }
