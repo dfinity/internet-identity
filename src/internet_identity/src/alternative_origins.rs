@@ -140,6 +140,17 @@ pub fn authorize_alternative_origin(
     }
 }
 
+/// The folded origins the application at `derivation_origin` lists, where its list is
+/// cached. Reads the cache only: a miss starts no fetch.
+pub fn peek_alternative_origins(
+    derivation_origin: &ApplicationOrigin,
+) -> Option<BTreeSet<FrontendHostname>> {
+    match single_flight_cache::peek(&ALTERNATIVE_ORIGINS_CACHE, derivation_origin) {
+        Cached::Ready(alternative_origins) => Some(alternative_origins),
+        Cached::Pending => None,
+    }
+}
+
 /// A parked origin is not retried before the cache's own deadline, so sending the caller
 /// back sooner only buys deferrals.
 fn retry_after(derivation_origin: &ApplicationOrigin, now_ns: Timestamp) -> Timestamp {

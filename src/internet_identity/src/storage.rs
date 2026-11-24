@@ -3448,6 +3448,30 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Puts `subscription` in `holder`'s slot, after emptying every slot of the same
+    /// config, on every browser entry, whose frontend's origin hash is not in
+    /// `kept_frontend_origin_hashes`. The config must exist: a missing one is refused,
+    /// before anything is written.
+    pub fn write_pwa_webpush_subscription_keeping_frontends(
+        &mut self,
+        holder: PwaSubscriptionHolder,
+        subscription: PwaSubscription,
+        kept_frontend_origin_hashes: &BTreeSet<StorableOriginSha256>,
+    ) -> Result<(), StorageError> {
+        let mut config = self.pwa_subscription_config(holder)?;
+        config.retain_pwa_webpush_subscriptions_of_frontends(kept_frontend_origin_hashes);
+        config.set_pwa_webpush_subscription(
+            holder.browser_id,
+            holder.frontend_origin_hash,
+            Some(subscription),
+        );
+        self.store_anchor_application_config(
+            (holder.anchor_number, holder.application_number),
+            Some(config),
+        );
+        Ok(())
+    }
+
     /// Writes the keying material a dispatch pass refreshed for `holder`'s slot, for the
     /// account it delivers for. A slot that holds nothing any more is left empty.
     pub fn refresh_pwa_webpush_subscription(

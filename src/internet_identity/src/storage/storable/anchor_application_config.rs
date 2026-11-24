@@ -215,6 +215,19 @@ impl AnchorApplicationConfig {
         has_removed
     }
 
+    /// Empties every slot, of every browser entry, whose frontend's origin hash is not in
+    /// `frontend_origin_hashes`. A map holding nothing is stored as `None`.
+    pub fn retain_pwa_webpush_subscriptions_of_frontends(
+        &mut self,
+        frontend_origin_hashes: &BTreeSet<StorableOriginSha256>,
+    ) {
+        let Some(mut subscriptions) = self.pwa_webpush_subscriptions.take() else {
+            return;
+        };
+        subscriptions.retain(|slot, _| frontend_origin_hashes.contains(&slot.frontend_origin_hash));
+        self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
+    }
+
     /// Empties every slot.
     pub fn clear_pwa_webpush_subscriptions(&mut self) {
         self.pwa_webpush_subscriptions = None;

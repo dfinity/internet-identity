@@ -1,5 +1,5 @@
 //! Pending device wake-ups, grouped by app and limited per identity.
-//! Deduplication uses (recipient, notification ID); urgency sets the lane.
+//! Deduplication uses (recipient, frontend, notification ID); urgency sets the lane.
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
@@ -25,7 +25,7 @@ pub(crate) struct PendingNotification {
     pub(crate) frontend_origin_hash: StorableOriginSha256,
     /// The app canister that sent it, which the service worker fetches it from.
     pub(crate) sender: Principal,
-    /// App-chosen ID, unique per recipient within the app.
+    /// App-chosen ID, unique per recipient and frontend within the app.
     pub(crate) notification_id: NotificationId,
     pub(crate) urgency: Urgency,
     /// Optional app deadline, capped by the queue expiry limit.
@@ -33,14 +33,18 @@ pub(crate) struct PendingNotification {
 }
 
 impl QueueItem for PendingNotification {
-    type Key = (Principal, NotificationId);
+    type Key = (Principal, StorableOriginSha256, NotificationId);
 
     type Group = AnchorNumber;
 
     const TURNS: &'static [usize] = &[4, 3, 2, 1];
 
     fn key(&self) -> Self::Key {
-        (self.recipient, self.notification_id)
+        (
+            self.recipient,
+            self.frontend_origin_hash,
+            self.notification_id,
+        )
     }
 
     fn group(&self) -> Self::Group {
@@ -186,6 +190,46 @@ mod tests {
         assert_eq!(
             results(backlog.admit(origin("https://a.example"), vec![first, second], 1)),
             vec![Admission::Accepted; 2]
+        );
+    }
+
+    #[test]
+    fn one_id_reused_by_two_frontends_stays_two_notifications_until_one_is_sent_again() {
+        let mut backlog = AppBacklog::new(APP_BACKLOG, 0);
+        let app = origin("https://a.example");
+        let mail_notification = PendingNotification {
+            frontend_origin_hash: origin("https://mail.a.example"),
+            ..notification(1, 7)
+        };
+        let calendar_notification = PendingNotification {
+            frontend_origin_hash: origin("https://calendar.a.example"),
+            ..notification(1, 7)
+        };
+
+        assert_eq!(
+            results(backlog.admit(
+                app,
+                vec![mail_notification.clone(), calendar_notification.clone()],
+                1
+            )),
+            vec![Admission::Accepted; 2]
+        );
+        let resent_mail_notification = PendingNotification {
+            urgency: Urgency::High,
+            ..mail_notification
+        };
+        assert_eq!(
+            results(backlog.admit(app, vec![resent_mail_notification.clone()], 2)),
+            vec![Admission::Folded]
+        );
+
+        let pending_notifications: Vec<PendingNotification> = take(&mut backlog, 10, 3)
+            .into_iter()
+            .map(|taken| taken.entry.item)
+            .collect();
+        assert_eq!(
+            pending_notifications,
+            vec![resent_mail_notification, calendar_notification]
         );
     }
 

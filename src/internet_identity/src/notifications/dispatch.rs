@@ -32,6 +32,7 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, ApplicationNumber, BrowserId, IdentityForNotification, InboxNotificationId,
     NotificationEvent, NotificationId, Timestamp, Urgency,
 };
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
@@ -464,7 +465,7 @@ pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Del
 fn resolve_identity_wake_up<M: Memory + Clone>(
     storage: &Storage<M>,
     pending: &PendingIdentityNotification,
-) -> (InboxNotificationKind, Option<PwaRoute>) {
+) -> (InboxNotificationKind, Option<PwaRoute<'static>>) {
     match pending.path {
         IdentityWakeUpPath::Routed => (
             InboxNotificationKind::Identity {
@@ -1003,14 +1004,25 @@ pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
     let Some(config) = storage.anchor_application_config(anchor_number, application_number) else {
         return Vec::new();
     };
+    let mut sessions_by_account: BTreeMap<Principal, Vec<Session>> = BTreeMap::new();
     let mut installed_app_subscriptions = Vec::new();
     for (frontend_origin_hash, held_subscription) in
         config.pwa_webpush_subscriptions_of_browser(browser.id)
     {
         let account_principal = held_subscription.account_principal;
-        let route = PwaRoute::read(
-            storage,
-            anchor_number,
+        let sessions = sessions_by_account
+            .entry(account_principal)
+            .or_insert_with(|| {
+                read_account_sessions(
+                    storage,
+                    anchor_number,
+                    application_number,
+                    account_principal,
+                )
+            });
+        let route = PwaRoute::new(
+            &config,
+            sessions,
             application_number,
             frontend_origin_hash,
             account_principal,
@@ -1118,15 +1130,18 @@ fn wake_up_address<'a>(
 /// What decides whether an app's notification wakes an entry's installed web app: the
 /// identity's config for the app, which holds the subscriptions, the frontend the
 /// notification is for, and the sessions of the recipient account there.
-pub(crate) struct PwaRoute {
-    config: Option<AnchorApplicationConfig>,
-    sessions: Vec<Session>,
+///
+/// Owns what [`PwaRoute::read`] loads, and borrows what [`PwaRoute::new`] is handed by a
+/// caller that already loaded it.
+pub(crate) struct PwaRoute<'a> {
+    config: Option<Cow<'a, AnchorApplicationConfig>>,
+    sessions: Cow<'a, [Session]>,
     application_number: ApplicationNumber,
     frontend_origin_hash: StorableOriginSha256,
     account_principal: Principal,
 }
 
-impl PwaRoute {
+impl PwaRoute<'static> {
     /// What `anchor_number` holds for the account `account_principal` names at
     /// `application_number`, for its frontend whose origin hashes to
     /// `frontend_origin_hash`. No sessions where it names no account of the identity.
@@ -1137,25 +1152,61 @@ impl PwaRoute {
         frontend_origin_hash: StorableOriginSha256,
         account_principal: Principal,
     ) -> Self {
-        let sessions = storage
-            .lookup_account_with_principal(account_principal)
-            .filter(|account| account.anchor_number == anchor_number)
-            .map(|account| {
-                storage.read_account_sessions(
-                    anchor_number,
-                    application_number,
-                    account.account_number,
-                )
-            })
-            .unwrap_or_default();
+        let sessions = read_account_sessions(
+            storage,
+            anchor_number,
+            application_number,
+            account_principal,
+        );
+        let config = storage
+            .anchor_application_config(anchor_number, application_number)
+            .map(Cow::Owned);
         Self {
-            config: storage.anchor_application_config(anchor_number, application_number),
-            sessions,
+            config,
+            sessions: Cow::Owned(sessions),
             application_number,
             frontend_origin_hash,
             account_principal,
         }
     }
+}
+
+impl<'a> PwaRoute<'a> {
+    /// The route for the account `account_principal` names at `application_number`, for
+    /// its frontend whose origin hashes to `frontend_origin_hash`, from the identity's
+    /// `config` for the app and the account's `sessions` there, as the caller loaded them.
+    pub(crate) fn new(
+        config: &'a AnchorApplicationConfig,
+        sessions: &'a [Session],
+        application_number: ApplicationNumber,
+        frontend_origin_hash: StorableOriginSha256,
+        account_principal: Principal,
+    ) -> Self {
+        Self {
+            config: Some(Cow::Borrowed(config)),
+            sessions: Cow::Borrowed(sessions),
+            application_number,
+            frontend_origin_hash,
+            account_principal,
+        }
+    }
+}
+
+/// The sessions on any browser entry of the account `account_principal` names at
+/// `application_number`. None where it names no account of the identity `anchor_number`.
+fn read_account_sessions<M: Memory + Clone>(
+    storage: &Storage<M>,
+    anchor_number: AnchorNumber,
+    application_number: ApplicationNumber,
+    account_principal: Principal,
+) -> Vec<Session> {
+    storage
+        .lookup_account_with_principal(account_principal)
+        .filter(|account| account.anchor_number == anchor_number)
+        .map(|account| {
+            storage.read_account_sessions(anchor_number, application_number, account.account_number)
+        })
+        .unwrap_or_default()
 }
 
 /// Whether `browser`, one of the identity's `browsers`, could be woken right now for the

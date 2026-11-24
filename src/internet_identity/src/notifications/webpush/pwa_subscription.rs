@@ -32,6 +32,7 @@ use internet_identity_interface::internet_identity::types::{
 };
 use p256::elliptic_curve::subtle::ConstantTimeEq;
 use serde_bytes::ByteBuf;
+use std::collections::BTreeSet;
 
 /// What an installed web app's subscribe arrives with: the subscription's endpoint and
 /// `p256dh`, the transport key `sealed_auth` was encrypted to, and the sealed `auth`, each
@@ -160,12 +161,16 @@ pub fn resolve_pwa_holder(
 
 /// Records the key a fetch just minted for `holder`'s slot, for the account
 /// `account_principal` names. This replaces what the entry held, so it delivers nothing
-/// and holds no endpoint until the subscribe that spends the key lands.
+/// and holds no endpoint until the subscribe that spends the key lands. Where
+/// `kept_frontend_origin_hashes` is given, every slot of the app's config, on every
+/// browser entry, whose frontend's origin hash it does not hold is emptied in the same
+/// write.
 fn start_pwa_subscription(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
     secret_key: [u8; 32],
     sender_seed: [u8; 32],
+    kept_frontend_origin_hashes: Option<&BTreeSet<StorableOriginSha256>>,
     now_ns: Timestamp,
 ) -> Result<(), PreparePwaSubscriptionError> {
     if !is_notifications_allowed(holder) {
@@ -180,8 +185,18 @@ fn start_pwa_subscription(
         subscription: WebPushSubscription::Pending(pending_transport),
         account_principal,
     };
-    write_pwa_subscription(holder, Some(subscription), None)
-        .map_err(PreparePwaSubscriptionError::Internal)
+    let Some(kept_frontend_origin_hashes) = kept_frontend_origin_hashes else {
+        return write_pwa_subscription(holder, Some(subscription), None)
+            .map_err(PreparePwaSubscriptionError::Internal);
+    };
+    storage_borrow_mut(|storage| {
+        storage.write_pwa_webpush_subscription_keeping_frontends(
+            holder,
+            subscription,
+            kept_frontend_origin_hashes,
+        )
+    })
+    .map_err(|err| PreparePwaSubscriptionError::Internal(format!("{err}")))
 }
 
 /// Registers `holder`'s slot for Web Push for the account `account_principal`
@@ -396,6 +411,59 @@ fn map_set_error(err: SetWebPushSubscriptionError) -> SetPwaSubscriptionError {
     }
 }
 
+/// What the app's alternative origins say about the frontend a prepare names.
+enum FrontendAuthorization {
+    /// The app accepts the frontend. `kept_frontend_origin_hashes` are the origin hashes
+    /// of the app's own origin and of every frontend its list names, where the check read
+    /// that list: no slot of another frontend stays. `None` where no list was read.
+    Accepted {
+        kept_frontend_origin_hashes: Option<BTreeSet<StorableOriginSha256>>,
+    },
+    /// The app's alternative origins are not read yet.
+    Pending,
+}
+
+/// Whether the app of `session` accepts `frontend_origin` as its own frontend, which it
+/// does without a list where `frontend_origin` is `None`, its own origin. Refused where
+/// its alternative origins do not list it. Starts the fetch of that list where it is not
+/// cached. `now_ns` is the call's time.
+fn authorize_frontend(
+    session: &AuthorizedSession,
+    frontend_origin: Option<&ApplicationOrigin>,
+    now_ns: Timestamp,
+) -> Result<FrontendAuthorization, PreparePwaSubscriptionError> {
+    let Some(frontend_origin) = frontend_origin else {
+        return Ok(FrontendAuthorization::Accepted {
+            kept_frontend_origin_hashes: None,
+        });
+    };
+    let application_origin = ApplicationOrigin::try_from(session.origin.as_str())
+        .map_err(PreparePwaSubscriptionError::Internal)?;
+    match alternative_origins::authorize_alternative_origin(
+        &application_origin,
+        frontend_origin,
+        now_ns,
+    ) {
+        AlternativeOrigin::Listed => {}
+        AlternativeOrigin::NotListed => return Err(PreparePwaSubscriptionError::UnlistedFrontend),
+        AlternativeOrigin::Pending { .. } => return Ok(FrontendAuthorization::Pending),
+    }
+    let kept_frontend_origin_hashes = alternative_origins::peek_alternative_origins(
+        &application_origin,
+    )
+    .map(|alternative_origins| {
+        let mut kept_frontend_origin_hashes: BTreeSet<StorableOriginSha256> = alternative_origins
+            .iter()
+            .map(StorableOriginSha256::from_origin)
+            .collect();
+        kept_frontend_origin_hashes.insert(StorableOriginSha256::from_origin(&session.origin));
+        kept_frontend_origin_hashes
+    });
+    Ok(FrontendAuthorization::Accepted {
+        kept_frontend_origin_hashes,
+    })
+}
+
 /// The keys `session`'s installed web app at `frontend_origin` (the app's own origin
 /// where `None`) subscribes its browser entry with, given the held `vapid_public_key`.
 /// `Pending` where the seed pool is cold or the app's alternative origins are not read
@@ -413,21 +481,12 @@ pub fn prepare_pwa_subscription(
     if !is_notifications_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
-    if let Some(frontend_origin) = frontend_origin {
-        let application_origin = ApplicationOrigin::try_from(session.origin.as_str())
-            .map_err(PreparePwaSubscriptionError::Internal)?;
-        match alternative_origins::authorize_alternative_origin(
-            &application_origin,
-            frontend_origin,
-            now_ns,
-        ) {
-            AlternativeOrigin::Listed => {}
-            AlternativeOrigin::NotListed => {
-                return Err(PreparePwaSubscriptionError::UnlistedFrontend)
-            }
-            AlternativeOrigin::Pending { .. } => return Ok(PreparedPwaSubscription::Pending),
-        }
-    }
+    let kept_frontend_origin_hashes = match authorize_frontend(session, frontend_origin, now_ns)? {
+        FrontendAuthorization::Accepted {
+            kept_frontend_origin_hashes,
+        } => kept_frontend_origin_hashes,
+        FrontendAuthorization::Pending => return Ok(PreparedPwaSubscription::Pending),
+    };
     let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {
         return Ok(PreparedPwaSubscription::Pending);
     };
@@ -437,6 +496,7 @@ pub fn prepare_pwa_subscription(
         session.account_principal,
         seeds.transport_secret,
         seeds.sender_seed,
+        kept_frontend_origin_hashes.as_ref(),
         now_ns,
     )?;
     let vapid_public_key = ByteBuf::from(vapid_public_key);

@@ -204,7 +204,7 @@ fn submit(
             } => {
                 let retry_after = now_ns.saturating_add(retry_after_ns);
                 count_deferral(&labels, cause, retry_after, expires_at_ns);
-                let (recipient, id) = admitted.key;
+                let (recipient, _, id) = admitted.key;
                 not_accepted.push(NotAccepted {
                     id,
                     recipient,
