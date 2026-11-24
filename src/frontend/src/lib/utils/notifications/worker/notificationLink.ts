@@ -14,12 +14,17 @@
 
 import { fetchCapped } from "$lib/utils/appMetadata";
 import {
+  appUrl,
   MAX_ALTERNATIVE_ORIGINS,
   remapToLegacyDomain,
 } from "$lib/utils/urlUtils";
 
 const ALTERNATIVE_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
-const MAX_DOCUMENT_SIZE = 8_192;
+/** The largest alternative origins document read, as Internet Identity's canister reads
+ *  it (`ALTERNATIVE_ORIGINS_MAX_RESPONSE_BYTES` in
+ *  `src/internet_identity/src/alternative_origins.rs`): a list the canister accepts a
+ *  frontend from is one the link check can read too. */
+const ALTERNATIVE_ORIGINS_MAX_BYTES = 40 * 1024;
 
 /** The link to open, given the origins the app vouches for. */
 export const allowedLink = ({
@@ -46,17 +51,18 @@ export const allowedLink = ({
     : origin;
 };
 
-/** The origins an app publishes as its own, or none where it publishes nothing we can
- *  use. Read through the same capped fetch as the app's metadata document, which
+/** The origins the app at `origin` publishes as its own, or none where it publishes
+ *  nothing we can use. Read where {@link appUrl} puts the app, the gateway that serves
+ *  every canister, through the same capped fetch as the app's metadata document, which
  *  stops the download at the cap rather than buffering whatever the origin sends. */
 export const fetchAlternativeOrigins = async (
   origin: string,
 ): Promise<string[]> => {
   try {
     const result = await fetchCapped(
-      new URL(`${origin}${ALTERNATIVE_ORIGINS_PATH}`),
+      new URL(ALTERNATIVE_ORIGINS_PATH, appUrl(origin)),
       "application/json",
-      MAX_DOCUMENT_SIZE,
+      ALTERNATIVE_ORIGINS_MAX_BYTES,
     );
     if (!result.ok) {
       return [];

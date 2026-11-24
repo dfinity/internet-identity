@@ -4,7 +4,7 @@
   import { t } from "$lib/stores/locale.store";
   import { originLabel } from "$lib/utils/urlUtils";
   import AppLogo from "./AppLogo.svelte";
-  import { appUrl } from "../apps";
+  import { appUrl } from "$lib/utils/urlUtils";
 
   interface Props {
     /** For the app's name, which is what names the dialog. */

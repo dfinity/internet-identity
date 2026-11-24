@@ -6,7 +6,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
 import { nanosToMillis } from "$lib/utils/time";
-import { GATEWAY_ORIGIN_REGEX, originLabel } from "$lib/utils/urlUtils";
+import { appUrl, originLabel } from "$lib/utils/urlUtils";
 import { throwCanisterError } from "$lib/utils/utils";
 
 export interface App {
@@ -21,13 +21,6 @@ export interface App {
   /** When the app last notified the identity, or `undefined` where it never has. */
   lastNotifiedMillis: number | undefined;
 }
-
-/** Where the app is shown and opened: a canister on any gateway domain is on
- *  `icp.net`, and any other origin is as it stands. */
-export const appUrl = (origin: string): string => {
-  const groups = origin.match(GATEWAY_ORIGIN_REGEX)?.groups;
-  return groups === undefined ? origin : `https://${groups.subdomain}.icp.net`;
-};
 
 /** The identity's apps as the canister lists them, most recently used first and the
  *  ones never used last. */
