@@ -1333,8 +1333,8 @@ fn app_prepare_pwa_webpush_subscription(
         Err(pwa_subscription::PreparePwaSubscriptionError::NotificationsNotAllowed) => {
             AppPreparePwaWebPushSubscriptionResult::Err(NotificationsNotAllowed)
         }
-        Err(pwa_subscription::PreparePwaSubscriptionError::UnlistedFrontend) => {
-            AppPreparePwaWebPushSubscriptionResult::Err(UnlistedFrontend)
+        Err(pwa_subscription::PreparePwaSubscriptionError::NoSuchFrontend) => {
+            AppPreparePwaWebPushSubscriptionResult::Err(NoSuchFrontend)
         }
         Err(pwa_subscription::PreparePwaSubscriptionError::Internal(reason)) => {
             AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))

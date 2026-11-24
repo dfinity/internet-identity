@@ -229,7 +229,7 @@ export const idlFactory = ({ IDL }) => {
     'transport_public_key' : IDL.Vec(IDL.Nat8),
   });
   const AppPreparePwaWebPushSubscriptionError = IDL.Variant({
-    'UnlistedFrontend' : IDL.Null,
+    'NoSuchFrontend' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
     'NotificationsNotAllowed' : IDL.Null,

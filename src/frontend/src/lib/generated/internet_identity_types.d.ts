@@ -172,10 +172,10 @@ export interface AppPrepareDelegationResponse {
 }
 export type AppPreparePwaWebPushSubscriptionError = {
     /**
-     * The app does not list frontend_origin among its alternative origins: no file, an
-     * unusable one, or one that does not name it.
+     * The app lists no such frontend: no file, an unusable one, or one that does not
+     * name frontend_origin.
      */
-    'UnlistedFrontend' : null
+    'NoSuchFrontend' : null
   } |
   { 'InternalCanisterError' : string } |
   {

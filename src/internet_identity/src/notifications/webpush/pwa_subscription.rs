@@ -90,8 +90,8 @@ impl TryFrom<PwaWebPushSubscription> for ValidatedPwaWebPushSubscription {
 pub enum PreparePwaSubscriptionError {
     /// The identity has not allowed this app to notify it.
     NotificationsNotAllowed,
-    /// The app does not list the frontend among its alternative origins.
-    UnlistedFrontend,
+    /// The app lists no such frontend among its alternative origins.
+    NoSuchFrontend,
     /// Nothing the caller can act on: a broken invariant or a storage failure, and why.
     Internal(String),
 }
@@ -445,7 +445,7 @@ fn authorize_frontend(
         now_ns,
     ) {
         AlternativeOrigin::Listed => {}
-        AlternativeOrigin::NotListed => return Err(PreparePwaSubscriptionError::UnlistedFrontend),
+        AlternativeOrigin::NotListed => return Err(PreparePwaSubscriptionError::NoSuchFrontend),
         AlternativeOrigin::Pending { .. } => return Ok(FrontendAuthorization::Pending),
     }
     let kept_frontend_origin_hashes = alternative_origins::peek_alternative_origins(

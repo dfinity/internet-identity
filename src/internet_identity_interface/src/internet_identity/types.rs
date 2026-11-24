@@ -1808,9 +1808,9 @@ pub enum AppPreparePwaWebPushSubscriptionError {
     NoSuchSession,
     /// The identity has not allowed this app to notify it.
     NotificationsNotAllowed,
-    /// The app does not list `frontend_origin` among its alternative origins: no file,
-    /// an unusable one, or one that does not name it.
-    UnlistedFrontend,
+    /// The app lists no such frontend: no file, an unusable one, or one that does not
+    /// name `frontend_origin`.
+    NoSuchFrontend,
     InternalCanisterError(String),
 }
 

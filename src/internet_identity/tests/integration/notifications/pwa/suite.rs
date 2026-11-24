@@ -4,8 +4,8 @@
 
 use super::same_device::{installed_apps_of_frontend, linked_phone, path_status};
 use super::*;
-use canister_tests::framework::assert_metric;
 use canister_tests::api::internet_identity::notifications::subscribe_pwa_webpush_for_frontend;
+use canister_tests::framework::assert_metric;
 use internet_identity_interface::internet_identity::types::{
     AppGetPwaWebPushSubscriptionStatusRequest, AppPreparePwaWebPushSubscriptionRequest,
     NotificationPath, SendNotificationError, SendNotificationResponse,
@@ -230,7 +230,7 @@ fn should_refuse_to_prepare_for_a_frontend_the_application_does_not_list() {
     assert_eq!(
         prepare_for_frontend(&env, canister_id, session, unlisted_frontend),
         AppPreparePwaWebPushSubscriptionResult::Err(
-            AppPreparePwaWebPushSubscriptionError::UnlistedFrontend
+            AppPreparePwaWebPushSubscriptionError::NoSuchFrontend
         )
     );
     assert_eq!(
@@ -294,7 +294,7 @@ fn should_drop_the_slot_of_a_frontend_the_application_stopped_listing_on_the_nex
     assert_eq!(
         prepare_for_frontend(&env, canister_id, session, CALENDAR_FRONTEND),
         AppPreparePwaWebPushSubscriptionResult::Err(
-            AppPreparePwaWebPushSubscriptionError::UnlistedFrontend
+            AppPreparePwaWebPushSubscriptionError::NoSuchFrontend
         )
     );
     answer_outcalls_listing(&env, &[CALENDAR_FRONTEND]);
