@@ -287,8 +287,8 @@ export const idlFactory = ({ IDL }) => {
     'not_accepted' : IDL.Vec(NotAccepted),
   });
   const SendNotificationError = IDL.Variant({
+    'NoSuchFrontend' : IDL.Null,
     'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
-    'UnlistedFrontend' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NoSuchSender' : IDL.Null,
   });

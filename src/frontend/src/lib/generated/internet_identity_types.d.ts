@@ -2648,20 +2648,18 @@ export interface SendNotificationArg {
   'origin' : FrontendHostname,
 }
 export type SendNotificationError = {
-    'TooManyNotifications' : { 'limit' : number }
-  } |
-  {
     /**
-     * The application at derivation_origin does not list origin among its alternative
-     * origins: no file, an unusable one, or one that does not name it.
+     * The application at derivation_origin lists no such frontend: no file, an
+     * unusable one, or one that does not name it.
      */
-    'UnlistedFrontend' : null
+    'NoSuchFrontend' : null
   } |
+  { 'TooManyNotifications' : { 'limit' : number } } |
   { 'InternalCanisterError' : string } |
   {
     /**
-     * The origin lists no such sender: no file, an empty or unusable one, or
-     * one that does not name the caller.
+     * The application lists no such sender: no file, an empty or unusable one,
+     * or one that does not name the caller.
      */
     'NoSuchSender' : null
   };

@@ -22,7 +22,7 @@ pub enum BatchRefusal {
     /// The application lists no such sender.
     NoSuchSender,
     /// The application lists no such frontend among its alternative origins.
-    UnlistedFrontend,
+    NoSuchFrontend,
 }
 
 /// Queues `notifications` from `sender` for the application at `application_origin`,
@@ -79,7 +79,7 @@ pub fn authorize_and_submit(
                 delivery_metrics::count_received(&labels);
                 delivery_metrics::count_lost(Reason::FrontendNotListed, &labels);
             }
-            Err(BatchRefusal::UnlistedFrontend)
+            Err(BatchRefusal::NoSuchFrontend)
         }
         AlternativeOrigin::Pending { retry_after } => Ok(defer_batch(
             notifications,

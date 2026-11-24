@@ -2289,12 +2289,12 @@ type SendNotificationResponse = record {
 };
 
 type SendNotificationError = variant {
-    // The origin lists no such sender: no file, an empty or unusable one, or
-    // one that does not name the caller.
+    // The application lists no such sender: no file, an empty or unusable one,
+    // or one that does not name the caller.
     NoSuchSender;
-    // The application at derivation_origin does not list origin among its alternative
-    // origins: no file, an unusable one, or one that does not name it.
-    UnlistedFrontend;
+    // The application at derivation_origin lists no such frontend: no file, an
+    // unusable one, or one that does not name it.
+    NoSuchFrontend;
     TooManyNotifications : record { limit : nat32 };
     InternalCanisterError : text;
 };

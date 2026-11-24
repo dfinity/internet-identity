@@ -1540,7 +1540,7 @@ fn app_send_notification(
     )
     .map_err(|refusal| match refusal {
         BatchRefusal::NoSuchSender => SendNotificationError::NoSuchSender,
-        BatchRefusal::UnlistedFrontend => SendNotificationError::UnlistedFrontend,
+        BatchRefusal::NoSuchFrontend => SendNotificationError::NoSuchFrontend,
     })
 }
 

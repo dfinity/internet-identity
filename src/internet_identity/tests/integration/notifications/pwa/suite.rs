@@ -82,7 +82,7 @@ fn should_refuse_a_frontend_the_application_does_not_list() {
         1,
     );
 
-    assert_eq!(response, Err(SendNotificationError::UnlistedFrontend));
+    assert_eq!(response, Err(SendNotificationError::NoSuchFrontend));
     assert_eq!(answer_outcalls(&env, 200), Vec::<String>::new());
 }
 
