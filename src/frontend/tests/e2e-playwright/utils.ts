@@ -22,6 +22,7 @@ import { Agent } from "undici";
 import borc from "borc";
 import { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import { APP_METADATA_PATH } from "$lib/utils/appMetadata";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 const iiCanisterId = readCanisterId({ canisterName: "internet_identity" });
@@ -322,7 +323,7 @@ export const authorizeWithUrl = async (
 };
 
 /**
- * Serves `metadata` as the app metadata file (`/.well-known/ii-app-metadata`)
+ * Serves `metadata` as the app metadata file (`APP_METADATA_PATH`)
  * of `appOrigin` to every page of `context`, with the CORS header II's
  * cross-origin fetch of it needs.
  * @param context The browser context II's windows open in.
@@ -334,7 +335,7 @@ export const serveAppMetadata = async (
   appOrigin: string,
   metadata: { name: string },
 ): Promise<void> => {
-  const metadataUrl = new URL("/.well-known/ii-app-metadata", appOrigin);
+  const metadataUrl = new URL(APP_METADATA_PATH, appOrigin);
   await context.route(metadataUrl.href, (route) =>
     route.fulfill({
       status: 200,
