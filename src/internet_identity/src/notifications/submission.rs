@@ -55,14 +55,18 @@ pub fn authorize_and_submit(
         }
         Senders::Pending { retry_after } => {
             let deferred = defer_batch(
-                application_origin,
                 notifications,
                 DeferCause::SenderList,
                 retry_after,
+                |urgency| Labels::app(application_origin.as_str(), urgency),
             );
             return Ok(deferred);
         }
     }
+    // The sender is listed from here on, so the application counts in the ranking.
+    let listed_app_labels = |urgency: Option<&Urgency>| {
+        Labels::listed_app(application_origin.as_str(), urgency, now_ns)
+    };
     match alternative_origins::authorize_alternative_origin(
         application_origin,
         frontend_origin,
@@ -71,35 +75,32 @@ pub fn authorize_and_submit(
         AlternativeOrigin::Listed => Ok(submit(application_origin, notifications, sender, now_ns)),
         AlternativeOrigin::NotListed => {
             for notification in &notifications {
-                let labels =
-                    Labels::app(application_origin.as_str(), notification.urgency.as_ref());
+                let labels = listed_app_labels(notification.urgency.as_ref());
                 delivery_metrics::count_received(&labels);
                 delivery_metrics::count_lost(Reason::FrontendNotListed, &labels);
             }
             Err(BatchRefusal::UnlistedFrontend)
         }
         AlternativeOrigin::Pending { retry_after } => Ok(defer_batch(
-            application_origin,
             notifications,
             DeferCause::AlternativeOrigins,
             retry_after,
+            listed_app_labels,
         )),
     }
 }
 
 /// Answers every notification of the batch with a deferral to `retry_after`, counted
-/// under `cause` for the application at `application_origin`.
+/// under `cause` with the labels `labels_for_urgency` builds from each notification's
+/// urgency.
 fn defer_batch(
-    application_origin: &ApplicationOrigin,
     notifications: Vec<Notification>,
     cause: DeferCause,
     retry_after: Timestamp,
+    labels_for_urgency: impl Fn(Option<&Urgency>) -> Labels,
 ) -> SendNotificationResponse {
     for notification in &notifications {
-        delivery_metrics::count_deferred(
-            cause,
-            &Labels::app(application_origin.as_str(), notification.urgency.as_ref()),
-        );
+        delivery_metrics::count_deferred(cause, &labels_for_urgency(notification.urgency.as_ref()));
     }
     notifications::defer_whole_batch(notifications, retry_after)
 }

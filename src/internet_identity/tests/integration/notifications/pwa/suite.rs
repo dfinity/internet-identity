@@ -111,14 +111,16 @@ fn should_refuse_a_sender_the_application_does_not_list_before_reading_its_front
 
     let first_response = send();
     assert!(matches!(&first_response, Ok(response) if !response.not_accepted.is_empty()));
-    let fetched_urls = fetched_urls(&env);
+    let urls_fetched_before_refusal = fetched_urls(&env);
     assert_eq!(send(), Err(SendNotificationError::NoSuchSender));
-    assert!(
-        fetched_urls
-            .iter()
-            .all(|url| !url.ends_with(ALTERNATIVE_ORIGINS_PATH)),
-        "an unlisted sender made II read the application's frontends: {fetched_urls:?}"
-    );
+    let urls_fetched_after_refusal = fetched_urls(&env);
+    for urls in [&urls_fetched_before_refusal, &urls_fetched_after_refusal] {
+        assert!(
+            urls.iter()
+                .all(|url| !url.ends_with(ALTERNATIVE_ORIGINS_PATH)),
+            "an unlisted sender made II read the application's frontends: {urls:?}"
+        );
+    }
 }
 
 /// Answers every outcall like [`answer_outcalls`], and returns the URLs fetched with `GET`.
