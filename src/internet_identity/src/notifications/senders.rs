@@ -19,12 +19,12 @@ use crate::single_flight_cache::{
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 
 #[cfg(not(test))]
 const WELL_KNOWN_PATH: &str = "/.well-known/ii-notification-senders";
 
 /// Rejected over this, never truncated: a truncated list unlists a sender.
-#[cfg(not(test))]
 const MAX_SENDERS: usize = 10;
 
 /// Counted against headers too, and a gateway answers a certified asset with a
@@ -214,9 +214,11 @@ async fn fetch_senders(
     senders_from_response(status, &response.body, MAX_SENDERS)
 }
 
-/// Narrows a response to the senders and nothing else, sorted and without
-/// duplicates, so what crosses consensus is what the authorization reads:
-/// replicas served the same set in a different order still agree.
+/// Narrows a response to the senders [`parse_senders`] reads from it, sorted
+/// and without duplicates, so what crosses consensus is what the authorization
+/// reads: replicas served the same set in a different order still agree. A
+/// body the senders cannot be read from, over [`MAX_SENDERS`] entries
+/// included, becomes the invalid response, which names no senders.
 #[allow(clippy::needless_pass_by_value)]
 fn transform_senders(
     response: ic_cdk::api::management_canister::http_request::HttpResponse,
@@ -236,11 +238,13 @@ fn transform_senders(
         headers: vec![],
         body: b"invalid ii-notification-senders JSON".to_vec(),
     };
-    let Ok(mut list) = serde_json::from_slice::<SenderList>(response.body.as_slice()) else {
+    let Some(senders) = parse_senders(response.body.as_slice(), MAX_SENDERS) else {
         return invalid();
     };
-    list.senders.sort();
-    list.senders.dedup();
+    let senders: BTreeSet<String> = senders.iter().map(Principal::to_text).collect();
+    let list = SenderList {
+        senders: senders.into_iter().collect(),
+    };
     let Ok(body) = serde_json::to_vec(&list) else {
         return invalid();
     };
@@ -474,5 +478,24 @@ mod tests {
         ] {
             assert_eq!(transformed_body(body), canonical_body);
         }
+    }
+
+    #[test]
+    fn a_list_of_eleven_copies_of_one_sender_names_none_after_the_transform() {
+        let sender = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
+        let body = |count: usize| {
+            serde_json::to_vec(&SenderList {
+                senders: vec![sender.to_text(); count],
+            })
+            .expect("a list")
+        };
+        assert_eq!(
+            senders_from_response(200, &transformed_body(&body(10)), 10),
+            Ok(vec![sender])
+        );
+        assert_eq!(
+            senders_from_response(200, &transformed_body(&body(11)), 10),
+            Ok(vec![])
+        );
     }
 }

@@ -236,9 +236,11 @@ async fn fetch_alternative_origins(
     alternative_origins_from_response(status, &response.body)
 }
 
-/// Narrows a response to the list and nothing else, sorted and without duplicates, so
-/// what crosses consensus is what the check reads: replicas served the same set in a
-/// different order still agree.
+/// Narrows a response to the folded set [`parse_alternative_origins`] reads from it,
+/// sorted and without duplicates, so what crosses consensus is what the check reads:
+/// replicas served the same set in a different order or spelling still agree. A body
+/// that set cannot be read from, over [`MAX_ALTERNATIVE_ORIGINS`] entries included,
+/// becomes the invalid response, which names no frontends.
 fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
     let HttpResponse { status, body, .. } = response;
     if status != HTTP_STATUS_OK {
@@ -253,11 +255,12 @@ fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
         headers: vec![],
         body: b"invalid ii-alternative-origins JSON".to_vec(),
     };
-    let Ok(mut list) = serde_json::from_slice::<AlternativeOriginList>(&body) else {
+    let Some(alternative_origins) = parse_alternative_origins(&body) else {
         return invalid_response;
     };
-    list.alternative_origins.sort();
-    list.alternative_origins.dedup();
+    let list = AlternativeOriginList {
+        alternative_origins: alternative_origins.into_iter().collect(),
+    };
     let Ok(body) = serde_json::to_vec(&list) else {
         return invalid_response;
     };
@@ -495,5 +498,23 @@ mod tests {
         ] {
             assert_eq!(transformed_body(body), canonical_body);
         }
+    }
+
+    #[test]
+    fn a_list_of_one_hundred_and_one_copies_of_one_frontend_names_none_after_the_transform() {
+        let body = |count: usize| {
+            serde_json::to_vec(&AlternativeOriginList {
+                alternative_origins: vec![FRONTEND.to_string(); count],
+            })
+            .expect("a list")
+        };
+        assert_eq!(
+            alternative_origins_from_response(200, &transformed_body(&body(100))),
+            Ok(BTreeSet::from([FRONTEND.to_string()]))
+        );
+        assert_eq!(
+            alternative_origins_from_response(200, &transformed_body(&body(101))),
+            Ok(BTreeSet::new())
+        );
     }
 }
