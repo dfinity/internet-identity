@@ -15,13 +15,13 @@ use crate::notifications::webpush::{
     clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId, SubscriberKey,
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
+use crate::origin::OriginSha256;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::Session;
 use crate::storage::anchor::{
     Browser, InboxNotification, InboxNotificationKind, ReadySubscription, WebPushSubscription,
 };
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
-use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::{PwaSubscriptionHolder, Storage};
 use crate::{DAY_NS, HOUR_NS, MINUTE_NS, SECOND_NS};
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -225,7 +225,7 @@ pub(crate) enum DeliveryTarget {
     /// to `frontend_origin_hash`.
     Pwa {
         application_number: ApplicationNumber,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
     },
 }
 
@@ -668,7 +668,7 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
 /// Answers whether this notification is still waiting on something that is coming: the
 /// caller leaves it in the backlog rather than spending it.
 fn fan_out_to_browsers(
-    taken: &Taken<StorableOriginSha256, PendingNotification>,
+    taken: &Taken<OriginSha256, PendingNotification>,
     now_ns: Timestamp,
     out: &mut Vec<Delivery>,
 ) -> bool {
@@ -985,7 +985,7 @@ pub(crate) fn routed_subscription<M: Memory + Clone>(
 /// An installed web app subscription [`installed_app_subscriptions`] finds.
 pub(crate) struct InstalledAppSubscription {
     /// The hash of the origin of the frontend it was subscribed from.
-    pub(crate) frontend_origin_hash: StorableOriginSha256,
+    pub(crate) frontend_origin_hash: OriginSha256,
     pub(crate) subscription: ReadySubscription,
     /// The principal of the account it delivers for.
     pub(crate) account_principal: Principal,
@@ -1137,7 +1137,7 @@ pub(crate) struct PwaRoute<'a> {
     config: Option<Cow<'a, AnchorApplicationConfig>>,
     sessions: Cow<'a, [Session]>,
     application_number: ApplicationNumber,
-    frontend_origin_hash: StorableOriginSha256,
+    frontend_origin_hash: OriginSha256,
     account_principal: Principal,
 }
 
@@ -1149,7 +1149,7 @@ impl PwaRoute<'static> {
         storage: &Storage<M>,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     ) -> Self {
         let sessions = read_account_sessions(
@@ -1179,7 +1179,7 @@ impl<'a> PwaRoute<'a> {
         config: &'a AnchorApplicationConfig,
         sessions: &'a [Session],
         application_number: ApplicationNumber,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     ) -> Self {
         Self {
@@ -1856,12 +1856,12 @@ mod tests {
     ) {
         state::notification_backlog_mut(now_ns, |backlog| {
             backlog.admit(
-                StorableOriginSha256::from_origin(&APP.to_string()),
+                OriginSha256::from_origin(APP),
                 vec![PendingNotification {
                     recipient: Principal::from_slice(&anchor_number.to_be_bytes()),
                     anchor_number,
                     application_number,
-                    frontend_origin_hash: StorableOriginSha256::from_origin(&APP.to_string()),
+                    frontend_origin_hash: OriginSha256::from_origin(APP),
                     sender: sender(),
                     notification_id,
                     urgency: Urgency::Normal,

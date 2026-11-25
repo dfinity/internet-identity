@@ -108,6 +108,7 @@ use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_
 use crate::notifications::delivery_metrics;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
+use crate::origin::OriginSha256;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
@@ -5761,7 +5762,7 @@ pub struct PwaSubscriptionHolder {
     pub anchor_number: AnchorNumber,
     pub application_number: ApplicationNumber,
     pub browser_id: BrowserId,
-    pub frontend_origin_hash: StorableOriginSha256,
+    pub frontend_origin_hash: OriginSha256,
 }
 
 impl From<StorablePwaSubscriptionHolder> for PwaSubscriptionHolder {
@@ -5772,6 +5773,7 @@ impl From<StorablePwaSubscriptionHolder> for PwaSubscriptionHolder {
             browser_id,
             frontend_origin_hash,
         } = value;
+        let frontend_origin_hash = OriginSha256::from(frontend_origin_hash);
         Self {
             anchor_number,
             application_number,

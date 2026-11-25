@@ -8,7 +8,7 @@
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
-use crate::storage::storable::application::StorableOriginSha256;
+use crate::origin::OriginSha256;
 use crate::SECOND_NS;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -48,7 +48,7 @@ pub(crate) enum IdentityWakeUpPath {
     /// `account_principal` names, which is the only party that reads it.
     InstalledApp {
         application_number: ApplicationNumber,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     },
 }

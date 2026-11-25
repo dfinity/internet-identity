@@ -7,8 +7,8 @@ use crate::notifications::delivery_metrics::{self, DeferCause, Labels, Reason};
 use crate::notifications::senders::{self, Senders};
 use crate::notifications::{self, dispatch, BROWSER_GONE_AFTER_NS};
 use crate::origin::ApplicationOrigin;
+use crate::origin::OriginSha256;
 use crate::state::{self, storage_borrow};
-use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, ApplicationNumber, NotAccepted, NotAcceptedReason, Notification,
@@ -121,7 +121,7 @@ fn submit(
     sender: Principal,
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
-    let frontend_origin_hash = StorableOriginSha256::from_origin(&frontend_origin.to_string());
+    let frontend_origin_hash = OriginSha256::from_origin(frontend_origin.as_str());
     let mut not_accepted = Vec::new();
     let mut resolutions: BTreeMap<Principal, Result<Resolved, Refusal>> = BTreeMap::new();
     let mut reachable = Vec::new();
@@ -181,7 +181,7 @@ fn submit(
     }
     let admissions = state::notification_backlog_mut(now_ns, |backlog| {
         backlog.admit(
-            StorableOriginSha256::from_origin(&origin.as_str().to_string()),
+            OriginSha256::from_origin(origin.as_str()),
             reachable,
             now_ns,
         )
@@ -290,7 +290,7 @@ struct Resolved {
 fn resolve_recipient(
     recipient: Principal,
     origin: &ApplicationOrigin,
-    frontend_origin_hash: StorableOriginSha256,
+    frontend_origin_hash: OriginSha256,
     now_ns: Timestamp,
 ) -> Result<Resolved, Refusal> {
     let origin = &origin.as_str().to_string();
@@ -447,7 +447,7 @@ mod tests {
                     storage.lookup_application_number_with_origin(&APP.to_string())
                 })
                 .expect("signing in stores the application"),
-                frontend_origin_hash: StorableOriginSha256::from_origin(&APP.to_string()),
+                frontend_origin_hash: OriginSha256::from_origin(APP),
                 sender: sender(),
                 notification_id: 7,
                 urgency: Urgency::Normal,

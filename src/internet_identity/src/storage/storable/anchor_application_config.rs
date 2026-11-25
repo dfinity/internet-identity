@@ -1,3 +1,4 @@
+use crate::origin::OriginSha256;
 use crate::storage::anchor::WebPushSubscription;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::application::StorableOriginSha256;
@@ -145,9 +146,10 @@ impl AnchorApplicationConfig {
     pub fn pwa_webpush_subscription(
         &self,
         browser_id: BrowserId,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
     ) -> Option<PwaSubscription> {
         let stored_subscriptions = self.pwa_webpush_subscriptions.as_ref()?;
+        let frontend_origin_hash = StorableOriginSha256::from(frontend_origin_hash);
         let stored_subscription = stored_subscriptions.get(&StorablePwaSlot {
             browser_id,
             frontend_origin_hash,
@@ -160,7 +162,7 @@ impl AnchorApplicationConfig {
     pub fn pwa_webpush_subscriptions_of_browser(
         &self,
         browser_id: BrowserId,
-    ) -> Vec<(StorableOriginSha256, PwaSubscription)> {
+    ) -> Vec<(OriginSha256, PwaSubscription)> {
         let mut subscriptions = Vec::new();
         for (slot, stored_subscription) in self.pwa_webpush_subscriptions.iter().flatten() {
             if slot.browser_id != browser_id {
@@ -168,7 +170,7 @@ impl AnchorApplicationConfig {
             }
             if let Some(subscription) = read_back_pwa_subscription(browser_id, stored_subscription)
             {
-                subscriptions.push((slot.frontend_origin_hash, subscription));
+                subscriptions.push((OriginSha256::from(slot.frontend_origin_hash), subscription));
             }
         }
         subscriptions
@@ -179,13 +181,14 @@ impl AnchorApplicationConfig {
     /// not read back are left out.
     pub fn pwa_webpush_subscription_slots(
         &self,
-    ) -> Vec<(BrowserId, StorableOriginSha256, PwaSubscription)> {
+    ) -> Vec<(BrowserId, OriginSha256, PwaSubscription)> {
         let mut subscriptions = Vec::new();
         for (slot, stored_subscription) in self.pwa_webpush_subscriptions.iter().flatten() {
             if let Some(subscription) =
                 read_back_pwa_subscription(slot.browser_id, stored_subscription)
             {
-                subscriptions.push((slot.browser_id, slot.frontend_origin_hash, subscription));
+                let frontend_origin_hash = OriginSha256::from(slot.frontend_origin_hash);
+                subscriptions.push((slot.browser_id, frontend_origin_hash, subscription));
             }
         }
         subscriptions
@@ -197,9 +200,10 @@ impl AnchorApplicationConfig {
     pub fn set_pwa_webpush_subscription(
         &mut self,
         browser_id: BrowserId,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
         subscription: Option<PwaSubscription>,
     ) {
+        let frontend_origin_hash = StorableOriginSha256::from(frontend_origin_hash);
         let slot = StorablePwaSlot {
             browser_id,
             frontend_origin_hash,
@@ -329,8 +333,8 @@ mod tests {
         }
     }
 
-    fn frontend(origin: &str) -> StorableOriginSha256 {
-        StorableOriginSha256::from_origin(&origin.to_string())
+    fn frontend(origin: &str) -> OriginSha256 {
+        OriginSha256::from_origin(origin)
     }
 
     /// Rows carrying the retired key 4, subscriptions keyed by browser entry alone, decode
@@ -378,7 +382,7 @@ mod tests {
             config.pwa_webpush_subscription(4, frontend("https://c.example")),
             None
         );
-        let mut frontends_of_browser: Vec<StorableOriginSha256> = config
+        let mut frontends_of_browser: Vec<OriginSha256> = config
             .pwa_webpush_subscriptions_of_browser(4)
             .into_iter()
             .map(|(frontend_origin_hash, _)| frontend_origin_hash)

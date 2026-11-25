@@ -24,11 +24,11 @@ use crate::authz_utils::AuthorizedSession;
 use crate::notifications::dispatch;
 use crate::origin::ApplicationOrigin;
 use crate::origin::FetchableApplicationOrigin;
+use crate::origin::OriginSha256;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::account::Session;
 use crate::storage::anchor::{PendingTransport, WebPushSubscription};
 use crate::storage::storable::anchor_application_config::PwaSubscription;
-use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -155,8 +155,8 @@ pub fn resolve_pwa_holder(
         ic_cdk::println!("ERROR: {NO_APPLICATION_NUMBER}");
         return Err(NO_APPLICATION_NUMBER.to_string());
     };
-    let frontend_origin_hash = StorableOriginSha256::from_origin(
-        &frontend_origin.map_or_else(|| session.origin.clone(), |origin| origin.to_string()),
+    let frontend_origin_hash = OriginSha256::from_origin(
+        frontend_origin.map_or(session.origin.as_str(), ApplicationOrigin::as_str),
     );
     Ok(PwaSubscriptionHolder {
         anchor_number: session.anchor_number,
@@ -397,20 +397,15 @@ pub(crate) fn write_pwa_subscription(
 /// is cached, which accepts every frontend. Reads the cache only and starts no fetch.
 fn read_accepted_frontend_origin_hashes(
     application_number: ApplicationNumber,
-) -> Option<BTreeSet<StorableOriginSha256>> {
+) -> Option<BTreeSet<OriginSha256>> {
     let application_origin = storage_borrow(|storage| {
         storage.lookup_application_origin_with_number(application_number)
     })?;
     let folded_application_origin =
         ApplicationOrigin::try_from(application_origin.as_str()).ok()?;
-    let alternative_origin_hashes =
+    let mut accepted_frontend_origin_hashes =
         alternative_origins::peek_alternative_origins(&folded_application_origin)?;
-    let mut accepted_frontend_origin_hashes: BTreeSet<StorableOriginSha256> =
-        alternative_origin_hashes
-            .into_iter()
-            .map(StorableOriginSha256::from)
-            .collect();
-    accepted_frontend_origin_hashes.insert(StorableOriginSha256::from_origin(&application_origin));
+    accepted_frontend_origin_hashes.insert(OriginSha256::from_origin(&application_origin));
     Some(accepted_frontend_origin_hashes)
 }
 
@@ -421,7 +416,7 @@ fn read_accepted_frontend_origin_hashes(
 /// idle.
 fn find_stale_pwa_slots(
     holder: PwaSubscriptionHolder,
-    accepted_frontend_origin_hashes: Option<&BTreeSet<StorableOriginSha256>>,
+    accepted_frontend_origin_hashes: Option<&BTreeSet<OriginSha256>>,
     now_ns: Timestamp,
 ) -> BTreeSet<PwaSubscriptionHolder> {
     storage_borrow(|storage| {

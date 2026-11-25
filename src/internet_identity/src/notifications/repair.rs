@@ -15,9 +15,9 @@ use crate::notifications::webpush::pwa_subscription;
 use crate::notifications::webpush::rotation::{Destination, RegistrationId};
 use crate::notifications::webpush::unanswered;
 use crate::origin::ApplicationOrigin;
+use crate::origin::OriginSha256;
 use crate::state::storage_borrow;
 use crate::storage::anchor::{Anchor, Browser, ReadySubscription};
-use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -41,7 +41,7 @@ pub(crate) enum DevicePath {
     /// checks its own path when it next starts.
     InstalledApps {
         application_number: Option<ApplicationNumber>,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     },
 }
@@ -84,11 +84,9 @@ pub(crate) fn lookup_application_number(origin: &str) -> Result<Option<Applicati
 pub(crate) fn hash_frontend_origin(
     origin: &str,
     frontend_origin: Option<&str>,
-) -> Result<StorableOriginSha256, String> {
+) -> Result<OriginSha256, String> {
     let frontend_origin = ApplicationOrigin::try_from(frontend_origin.unwrap_or(origin))?;
-    Ok(StorableOriginSha256::from_origin(
-        &frontend_origin.as_str().to_string(),
-    ))
+    Ok(OriginSha256::from_origin(frontend_origin.as_str()))
 }
 
 /// Why a probe was not sent.
@@ -118,7 +116,7 @@ impl PathSubscription {
     fn is_installed_app_for(
         &self,
         application_number: ApplicationNumber,
-        frontend_origin_hash: StorableOriginSha256,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     ) -> bool {
         match self.wake_up_path {
@@ -266,7 +264,7 @@ pub(crate) fn remove_unanswered_installed_apps(
     anchor: &Anchor,
     browser_id: BrowserId,
     application_number: Option<ApplicationNumber>,
-    frontend_origin_hash: StorableOriginSha256,
+    frontend_origin_hash: OriginSha256,
     account_principal: Principal,
     now_ns: Timestamp,
 ) {

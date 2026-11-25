@@ -67,6 +67,11 @@ impl OriginSha256 {
         Self(sha256sum(origin.as_bytes()))
     }
 
+    /// A hash [`Self::from_origin`] computed, as read back from storage.
+    pub(crate) fn from_stored_digest(digest: [u8; 32]) -> Self {
+        Self(digest)
+    }
+
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
@@ -150,7 +155,6 @@ fn is_insecure_sender_list_allowed() -> bool {
 mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
-    use crate::storage::storable::application::StorableOriginSha256;
 
     fn parsed(origin: &str) -> Result<String, String> {
         ApplicationOrigin::try_from(origin).map(|origin| origin.as_str().to_string())
@@ -381,10 +385,6 @@ mod tests {
         assert_eq!(
             hex::encode(origin_hash.as_bytes()),
             "2bf585a6f689247104c31bb9cf683e2c8be97bfe0cb266d49c4ef99c81ebbdd6"
-        );
-        assert_eq!(
-            StorableOriginSha256::from(origin_hash),
-            StorableOriginSha256::from_origin(&"https://app.example".to_string())
         );
     }
 }

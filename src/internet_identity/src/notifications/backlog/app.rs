@@ -3,7 +3,7 @@
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
-use crate::storage::storable::application::StorableOriginSha256;
+use crate::origin::OriginSha256;
 use crate::SECOND_NS;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -22,7 +22,7 @@ pub(crate) struct PendingNotification {
     /// The hash of the origin of the app's frontend the notification is for: the app's own
     /// origin, or one of its alternative origins. Only that frontend's installed web app
     /// is woken for it.
-    pub(crate) frontend_origin_hash: StorableOriginSha256,
+    pub(crate) frontend_origin_hash: OriginSha256,
     /// The app canister that sent it, which the service worker fetches it from.
     pub(crate) sender: Principal,
     /// The sender's ID for it, unique per recipient and sender.
@@ -66,7 +66,7 @@ impl QueueItem for PendingNotification {
 
 /// Callers must authorize the app and hash its canonical origin after legacy-domain
 /// remapping so aliases share the same queue limits.
-pub(crate) type AppBacklog = AdmissionQueue<StorableOriginSha256, PendingNotification>;
+pub(crate) type AppBacklog = AdmissionQueue<OriginSha256, PendingNotification>;
 
 const MINUTE_NS: u64 = 60 * SECOND_NS;
 const EXPIRY_NS: u64 = 5 * MINUTE_NS;
@@ -116,8 +116,8 @@ mod tests {
             .collect()
     }
 
-    fn origin(host: &str) -> StorableOriginSha256 {
-        StorableOriginSha256::from_origin(&host.to_string())
+    fn origin(host: &str) -> OriginSha256 {
+        OriginSha256::from_origin(host)
     }
 
     fn principal(seed: u64) -> Principal {
@@ -356,7 +356,7 @@ mod tests {
         backlog: &mut AppBacklog,
         limit: usize,
         now_ns: u64,
-    ) -> Vec<Taken<StorableOriginSha256, PendingNotification>> {
+    ) -> Vec<Taken<OriginSha256, PendingNotification>> {
         backlog
             .take_batch(limit, now_ns, |batch| Ok::<_, ()>(batch.to_vec()))
             .unwrap()
