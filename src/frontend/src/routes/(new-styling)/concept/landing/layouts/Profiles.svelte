@@ -2,7 +2,8 @@
   1 · Profiles. The identities as large tiles in the dashboard's frame, the
   way My apps shows apps: the colour and the initial tell them apart before
   the name is read, and a new one is a dashed slot at the end. Edit puts a
-  remove mark on each, as a home screen does.
+  remove mark on each, as a home screen does. The badge on an avatar says,
+  when pointed at, how it was signed in to.
 -->
 <script lang="ts">
   import { MinusIcon, PlusIcon } from "@lucide/svelte";

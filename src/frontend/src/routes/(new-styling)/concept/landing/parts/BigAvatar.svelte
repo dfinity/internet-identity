@@ -2,11 +2,13 @@
   The product's identity avatar (`IdentityAvatar`: one initial on the
   identity's own pair of colours, a hairline inside, the frosted badge of how
   it signs in), at the sizes the landing's tiles and hero need. The product's
-  comes at 32 and 48px only.
+  comes at 32 and 48px only. Pointing at the badge says how the identity
+  was signed in to last.
 -->
 <script lang="ts">
   import { UserIcon } from "@lucide/svelte";
   import AuthMethodBadge from "$lib/components/ui/AuthMethodBadge.svelte";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import { identityInitial, identityPalette } from "$lib/utils/identityColors";
   import type { ClassValue } from "svelte/elements";
@@ -23,6 +25,28 @@
 
   const palette = $derived(identityPalette(identity.identityNumber));
   const initial = $derived(identityInitial(identity.name));
+
+  /** What the badge says when it's pointed at: how this identity was
+   *  signed in to last, on this device. */
+  const method = $derived.by(() => {
+    const { authMethod } = identity;
+    if ("sso" in authMethod) {
+      return {
+        label: `Signed in with ${authMethod.sso.name ?? authMethod.sso.domain}`,
+        description: "Your organization's account",
+      };
+    }
+    if ("openid" in authMethod) {
+      return {
+        label: "Signed in with Google",
+        description: "Your Google account",
+      };
+    }
+    return {
+      label: "Signed in with a passkey",
+      description: "Your face, fingerprint or screen lock",
+    };
+  });
 </script>
 
 <span
@@ -44,11 +68,13 @@
     {/if}
   </span>
   {#if badge}
-    <AuthMethodBadge
-      variant={"sso" in identity.authMethod
-        ? { type: "sso" }
-        : { type: "passkey" }}
-      size="lg"
-    />
+    <Tooltip label={method.label} description={method.description}>
+      <AuthMethodBadge
+        variant={"sso" in identity.authMethod
+          ? { type: "sso" }
+          : { type: "passkey" }}
+        size="lg"
+      />
+    </Tooltip>
   {/if}
 </span>

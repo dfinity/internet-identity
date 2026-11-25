@@ -50,6 +50,7 @@ From the product and the concept, unchanged: the surface ladder
 (`foundation/surfaces`, so `surfaces.test.ts` covers these files too),
 `motion.ts` (`arrive`, `travel`), the theme switch, `Popup`,
 `IdentityStack` and `IdentityList`, `IdentityAvatar` and its colours,
+`Tooltip` (on the badge of how an identity signs in),
 `AuthMethodBadge`, `Logo`, `Footer`, `Dialog`, `ProgressRing`, the
 `btn` classes and the concept's identities (Thomas, Work, Testing).
 
