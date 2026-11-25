@@ -263,14 +263,13 @@ export class Playground {
   };
 
   /** A way to sign in or to create an identity, from the empty state or
-   *  Add identity. */
-  useMethod = (label: string): void => {
+   *  Add identity, and what would happen next. */
+  useMethod = (
+    label: string,
+    next = "Here the passkey prompt or the provider's window opens.",
+  ): void => {
     this.methodsOpen = false;
-    toaster.create({
-      title: label,
-      description: "Here the passkey prompt or the provider's window opens.",
-      duration: 2500,
-    });
+    toaster.create({ title: label, description: next, duration: 2500 });
   };
 
   remove = (one: LastUsedIdentity): void => {

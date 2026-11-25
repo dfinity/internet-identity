@@ -238,6 +238,14 @@
     return () => window.removeEventListener("message", onFrameKey);
   });
 
+  /** Add identity opens on signing in, whatever it was left on. */
+  let methodsMode = $state<"signin" | "signup">("signin");
+  $effect(() => {
+    if (!p.methodsOpen) {
+      methodsMode = "signin";
+    }
+  });
+
   // A layout or a state arriving: its blocks fade in a step apart.
   const visit = $derived(`${p.layout}:${p.state}`);
 </script>
@@ -344,13 +352,15 @@
     <Dialog onClose={() => (p.methodsOpen = false)}>
       <div class="flex flex-col gap-1 pb-6">
         <h2 class="text-text-primary text-xl font-semibold tracking-tight">
-          Add an identity
+          {methodsMode === "signin" ? "Add an identity" : "Create an identity"}
         </h2>
         <p class="text-text-tertiary text-sm">
-          Sign in to one you have, or create a new one.
+          {methodsMode === "signin"
+            ? "Sign in to one you already have."
+            : "With a passkey or an account you already have."}
         </p>
       </div>
-      <SignInMethods onPick={p.useMethod} />
+      <SignInMethods onPick={p.useMethod} bind:mode={methodsMode} />
     </Dialog>
   {/if}
 </div>

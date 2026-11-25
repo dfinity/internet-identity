@@ -41,8 +41,11 @@ The bar at the top; each control has a key.
 | 6   | Immersive    | The texture is the page, the statement stands on it, and the identities float in a dock at the bottom        |
 
 In every layout: a click on an identity shows its spinner and then a toast
-(here the dashboard would open); Add identity opens the ways to sign in;
-Edit identities removes one from this device, with Undo.
+(here the dashboard would open); Add identity opens the ways in; Edit
+identities removes one from this device, with Undo. The ways in are
+today's landing page's: a passkey, Google, Apple, Microsoft or SSO; an
+identity from another device, by a link or QR code; recovery; and Create
+new identity, which turns the same buttons to creating one.
 
 Profiles puts each of today's actions in its own place: About at the top
 right, Edit identities under the tiles, and the footer's language, Support
@@ -72,9 +75,9 @@ New here, for review:
 - **`parts/BigAvatar.svelte`**: the product's avatar at the sizes tiles and
   the hero need (the product's comes at 32 and 48px).
 - **`parts/SignInMethods.svelte`**: the product's sign-in picker
-  (`PickAuthenticationMethod`, mode "both") on the concept's surfaces, with
-  the providers' marks drawn here (the product takes them from the
-  canister).
+  (`PickAuthenticationMethod`, signing in or creating) on the concept's
+  surfaces, with the providers' marks drawn here (the product takes them
+  from the canister).
 - **`parts/LandingFooter.svelte`**: the product's `Footer` for a layout
   with About in its header, and the playground's flask at the end.
 - **The copy** in `parts/Brand.svelte` is a draft to judge the layouts by.

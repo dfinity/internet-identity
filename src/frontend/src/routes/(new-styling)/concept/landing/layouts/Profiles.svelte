@@ -7,8 +7,9 @@
 
   What today's landing page does, each in its place: About at the top
   right; Edit identities under the tiles; Add identity (the last tile)
-  opens the ways in; with none on the device, those ways are the page. On
-  a phone the circles shrink so three fit a row.
+  opens the ways in, where you can also add an identity from another
+  device, recover one, or create a new one; with none on the device, those
+  ways are the page. On a phone the circles shrink so three fit a row.
 -->
 <script lang="ts">
   import { MinusIcon, PlusIcon } from "@lucide/svelte";
@@ -31,6 +32,9 @@
 
   const empty = $derived(p.identities.length === 0);
   const single = $derived(p.identities.length === 1);
+  /** With no identity on the device the ways in are the page: signing in,
+   *  or creating one. */
+  let mode = $state<"signin" | "signup">("signin");
 
   const TILE =
     "group flex w-26 flex-col items-center gap-3 rounded-3xl px-1 pt-4 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-focus-ring transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100 sm:w-36 sm:px-2";
@@ -84,21 +88,25 @@
           class="text-text-primary text-2xl leading-8 font-semibold tracking-tight md:text-[2rem] md:leading-10"
         >
           {empty
-            ? "Sign in to Internet Identity"
+            ? mode === "signin"
+              ? "Sign in to Internet Identity"
+              : "Create an identity"
             : single
               ? "Welcome back"
               : "Choose an identity"}
         </h1>
         <p class="text-text-tertiary mt-2 text-base text-balance">
           {empty
-            ? "No identities on this device yet."
+            ? mode === "signin"
+              ? "No identities on this device yet."
+              : "With a passkey or an account you already have."
             : "Open your apps and manage passkeys and recovery."}
         </p>
       </div>
 
       {#if empty}
         <div data-arrive class="mt-10 w-full max-w-[25rem]">
-          <SignInMethods onPick={p.useMethod} />
+          <SignInMethods onPick={p.useMethod} bind:mode />
         </div>
       {:else}
         <ul
