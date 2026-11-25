@@ -3,7 +3,8 @@
   way My apps shows apps: the colour and the initial tell them apart before
   the name is read, and a new one is a dashed slot at the end. Edit puts a
   remove mark on each, as a home screen does. The badge on an avatar says,
-  when pointed at, how it was signed in to.
+  when pointed at, how it was signed in to; one quiet line above the footer
+  says what Internet Identity stands for.
 -->
 <script lang="ts">
   import { MinusIcon, PlusIcon } from "@lucide/svelte";
@@ -78,10 +79,10 @@
               ? "Welcome back"
               : "Choose an identity"}
         </h1>
-        <p class="text-text-tertiary mt-2 text-base">
+        <p class="text-text-tertiary mt-2 text-base text-balance">
           {empty
             ? "No identities on this device yet."
-            : "Identities on this device"}
+            : "Open your apps and manage passkeys and recovery."}
         </p>
       </div>
 
@@ -196,6 +197,14 @@
         </ul>
       {/if}
     </main>
+    <!-- What Internet Identity stands for, in one quiet line above the
+         footer. The copy is a draft, as in Brand.svelte. -->
+    <p
+      data-arrive
+      class="text-text-tertiary px-6 pb-4 text-center text-sm text-balance"
+    >
+      No passwords to leak, and every app sees a different you.
+    </p>
     <Footer />
   </Elevated>
 </div>
