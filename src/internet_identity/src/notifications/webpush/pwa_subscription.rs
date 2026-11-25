@@ -19,8 +19,8 @@ use super::validation::{deliverable_endpoint, PushEndpoint, SealedAuth, Subscrib
 use super::{seed_pool, transport};
 use crate::alternative_origins::{self, AlternativeOrigin};
 use crate::authz_utils::AuthorizedSession;
-use crate::notifications;
 use crate::origin::ApplicationOrigin;
+use crate::origin::FetchableApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{PendingTransport, ReadySubscription, WebPushSubscription};
 use crate::storage::storable::anchor_application_config::PwaSubscription;
@@ -441,7 +441,7 @@ fn authorize_frontend(
     };
     let application_origin = ApplicationOrigin::try_from(session.origin.as_str())
         .map_err(PreparePwaSubscriptionError::Internal)?;
-    notifications::fetchable_origin(&application_origin)
+    FetchableApplicationOrigin::try_from(&application_origin)
         .map_err(PreparePwaSubscriptionError::Internal)?;
     match alternative_origins::authorize_alternative_origin(
         &application_origin,
