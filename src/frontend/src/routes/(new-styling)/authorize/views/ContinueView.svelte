@@ -732,7 +732,9 @@
     {@render header()}
   {:else}
     <AuthorizeHeader origin={displayOrigin} metadataOrigin={effectiveOrigin} />
-    <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
+    <h1
+      class="text-text-primary mb-2 self-start text-2xl font-medium wrap-anywhere"
+    >
       {$t`Continue to ${dappName}`}
     </h1>
     <p class="text-text-secondary mb-6 self-start text-sm">
