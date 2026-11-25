@@ -1,9 +1,10 @@
 <!--
   The product's footer (`Footer`) for a layout that puts About in its
-  header: the language, Support and Source code, and at the end the flask
-  that opens the playground's controls (not in a phone's or the overview's
-  frame, which have none). Same type and spacing as the product's, so the
-  two read alike.
+  header: the language, Support and Source code, and before the copyright
+  the flask that opens the playground's controls (not in a phone's or the
+  overview's frame, which have none). It stays on the start side, clear of
+  the badge Netlify puts in the bottom corner of the published concept.
+  Same type and spacing as the product's, so the two read alike.
 -->
 <script lang="ts">
   import { FlaskConicalIcon } from "@lucide/svelte";
@@ -26,7 +27,26 @@
     className,
   ]}
 >
-  <div class="text-text-tertiary text-xs font-medium">© Internet Identity</div>
+  <div class="flex items-center gap-3">
+    {#if !p.framed}
+      <button
+        type="button"
+        onclick={() => (p.controls = !p.controls)}
+        aria-expanded={p.controls}
+        aria-label="Playground controls"
+        title={`${p.controls ? "Hide" : "Show"} the controls (H)`}
+        class={[
+          "focus-visible:ring-focus-ring hover:text-fg-primary -m-1.5 grid size-7 place-items-center rounded-full transition-colors duration-150 outline-none hover:bg-(--ii-hover) focus-visible:ring-2",
+          p.controls ? "text-fg-primary" : "text-fg-quaternary",
+        ]}
+      >
+        <FlaskConicalIcon class="size-4" aria-hidden="true" />
+      </button>
+    {/if}
+    <span class="text-text-tertiary text-xs font-medium">
+      © Internet Identity
+    </span>
+  </div>
   <nav class="text-text-primary flex items-center gap-4 text-xs font-semibold">
     <button
       type="button"
@@ -51,21 +71,6 @@
     >
       Source code
     </a>
-    {#if !p.framed}
-      <button
-        type="button"
-        onclick={() => (p.controls = !p.controls)}
-        aria-expanded={p.controls}
-        aria-label="Playground controls"
-        title={`${p.controls ? "Hide" : "Show"} the controls (H)`}
-        class={[
-          "focus-visible:ring-focus-ring hover:text-fg-primary -m-1.5 grid size-7 place-items-center rounded-full transition-colors duration-150 outline-none hover:bg-(--ii-hover) focus-visible:ring-2",
-          p.controls ? "text-fg-primary" : "text-fg-quaternary",
-        ]}
-      >
-        <FlaskConicalIcon class="size-4" aria-hidden="true" />
-      </button>
-    {/if}
   </nav>
 </footer>
 

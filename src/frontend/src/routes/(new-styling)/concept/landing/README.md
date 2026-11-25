@@ -79,7 +79,7 @@ New here, for review:
   surfaces, with the providers' marks drawn here (the product takes them
   from the canister).
 - **`parts/LandingFooter.svelte`**: the product's `Footer` for a layout
-  with About in its header, and the playground's flask at the end.
+  with About in its header, and the playground's flask at its start.
 - **The copy** in `parts/Brand.svelte` is a draft to judge the layouts by.
   Each claim holds for Internet Identity today; the quote is Article 12 of
   the Universal Declaration of Human Rights.
