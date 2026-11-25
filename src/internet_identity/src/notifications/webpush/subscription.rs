@@ -178,11 +178,13 @@ fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Res
 
 /// `target` says who held the posted endpoint, rather than whoever the entry points at by
 /// the time the relay answers. A gone app endpoint means the app is gone, so the record goes.
+/// `now_ns` is the call's time.
 pub(crate) fn clear_gone_subscription(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     target: DeliveryTarget,
     endpoint: &str,
+    now_ns: Timestamp,
 ) -> Result<(), String> {
     match target {
         DeliveryTarget::Browser => {
@@ -210,6 +212,7 @@ pub(crate) fn clear_gone_subscription(
                 frontend_origin_hash,
             },
             endpoint,
+            now_ns,
         ),
         DeliveryTarget::App(app_id) => {
             let gone = storage_borrow(|storage| {

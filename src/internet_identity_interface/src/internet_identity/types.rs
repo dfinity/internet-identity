@@ -1849,8 +1849,8 @@ pub enum AppSetPwaWebPushSubscriptionError {
     /// Nothing here can open `sealed_auth`: the transport key it was encrypted to has
     /// expired, or a later prepare replaced it. Prepare again and re-send.
     TransportKeyExpired,
-    /// Another subscription holds this endpoint with other keys or for another app.
-    /// Subscribe again for a fresh endpoint and re-send.
+    /// Another subscription, of an account still signed in on its browser, holds this
+    /// endpoint. Subscribe again for a fresh endpoint and re-send.
     EndpointInUse,
     InternalCanisterError(String),
 }

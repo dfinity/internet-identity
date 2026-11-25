@@ -285,7 +285,7 @@ pub(crate) fn remove_unanswered_installed_apps(
         let RegistrationId::Pwa(holder) = path_subscription.registration else {
             continue;
         };
-        if let Err(err) = pwa_subscription::write_pwa_subscription(holder, None, None) {
+        if let Err(err) = pwa_subscription::write_pwa_subscription(holder, None, None, now_ns) {
             ic_cdk::println!("ERROR: Failed to remove an unanswered installed app: {err}");
         }
     }

@@ -290,8 +290,8 @@ export type AppSessionError = {
   };
 export type AppSetPwaWebPushSubscriptionError = {
     /**
-     * Another subscription holds this endpoint with other keys or for another app.
-     * Subscribe again for a fresh endpoint and re-send.
+     * Another subscription, of an account still signed in on its browser, holds this
+     * endpoint. Subscribe again for a fresh endpoint and re-send.
      */
     'EndpointInUse' : null
   } |

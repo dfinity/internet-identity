@@ -236,7 +236,7 @@ const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 39u8;
 // keyed by browser entry alone:
 // const DEPRECATED_LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX: u8 = 40u8;
 /// The installed web app subscription that holds each push endpoint, by the endpoint's
-/// SHA-256: what an endpoint is looked up by when another subscription takes it over.
+/// SHA-256: what a subscribe looks an endpoint up by, to refuse one another slot holds.
 const LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX: u8 = 41u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
@@ -1944,6 +1944,16 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&StorableOriginSha256::from_origin(origin))
     }
 
+    /// The origin of the application `application_number` names, where it still exists.
+    pub fn lookup_application_origin_with_number(
+        &self,
+        application_number: ApplicationNumber,
+    ) -> Option<FrontendHostname> {
+        self.stable_application_memory
+            .get(&application_number)
+            .map(|application| application.origin)
+    }
+
     /// Only used in tests.
     // TODO: mark this code as test-only or adjust the tests to avoid using this functions.
     #[allow(dead_code)]
@@ -3304,7 +3314,8 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Adds the endpoints `current_subscriptions` holds that `previous_subscriptions` did
-    /// not, and removes the ones it dropped where the lookup still names this row.
+    /// not, and removes the ones it dropped where the lookup names this row. A set refuses
+    /// an endpoint another kept slot holds, so each endpoint has at most one holder.
     fn sync_pwa_webpush_subscription_with_endpoint_index(
         &mut self,
         anchor_number: AnchorNumber,
@@ -3324,14 +3335,11 @@ impl<M: Memory + Clone> Storage<M> {
         );
 
         for (endpoint_hash, holder) in previous_holders.difference(&current_holders) {
-            let Some(indexed_holder) = self
+            if self
                 .lookup_pwa_webpush_subscription_with_endpoint_memory
                 .get(endpoint_hash)
-            else {
-                continue;
-            };
-            // Another row took this endpoint over, and the entry is that row's now.
-            if indexed_holder != *holder {
+                != Some(*holder)
+            {
                 continue;
             }
             self.lookup_pwa_webpush_subscription_with_endpoint_memory
@@ -3339,53 +3347,8 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         for (endpoint_hash, holder) in current_holders.difference(&previous_holders) {
-            if let Some(indexed_holder) = self
-                .lookup_pwa_webpush_subscription_with_endpoint_memory
-                .get(endpoint_hash)
-            {
-                if indexed_holder == *holder {
-                    continue;
-                }
-                // An entry whose slot no longer holds the endpoint, which a config written
-                // by a release that does not know the slots leaves behind, is replaced.
-                if self.holds_pwa_endpoint(indexed_holder, endpoint_hash) {
-                    ic_cdk::println!(
-                        "ERROR: an installed app endpoint is held by two subscriptions; the \
-                         lookup keeps {indexed_holder:?} rather than {holder:?}"
-                    );
-                    continue;
-                }
-            }
             self.lookup_pwa_webpush_subscription_with_endpoint_memory
                 .insert(*endpoint_hash, *holder);
-        }
-    }
-
-    /// Whether `holder`'s slot holds a subscribed endpoint hashing to `endpoint_hash`.
-    fn holds_pwa_endpoint(
-        &self,
-        holder: StorablePwaSubscriptionHolder,
-        endpoint_hash: &[u8; 32],
-    ) -> bool {
-        let Some(config) =
-            self.anchor_application_config(holder.anchor_number, holder.application_number)
-        else {
-            return false;
-        };
-        let Some(mut subscriptions) = config.pwa_webpush_subscriptions else {
-            return false;
-        };
-        let Some(held_subscription) = subscriptions.remove(&StorablePwaSlot {
-            browser_id: holder.browser_id,
-            frontend_origin_hash: holder.frontend_origin_hash,
-        }) else {
-            return false;
-        };
-        match held_subscription.subscription {
-            StorableWebPushSubscription::Ready { endpoint, .. } => {
-                hash_endpoint(&endpoint) == *endpoint_hash
-            }
-            StorableWebPushSubscription::Pending { .. } => false,
         }
     }
 
@@ -3400,14 +3363,15 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Puts `subscription` in `holder`'s slot, or with `None` empties it, after emptying
-    /// `displaced_holder`'s slot where one is given. Both configs must exist: a config is
-    /// started only by the account state write, so a missing one is refused, before
-    /// anything is written.
+    /// `displaced_holder`'s slot where one is given and every slot in `stale_holders` that
+    /// is on `holder`'s config. Both configs must exist: a config is started only by the
+    /// account state write, so a missing one is refused, before anything is written.
     pub fn write_pwa_webpush_subscription(
         &mut self,
         holder: PwaSubscriptionHolder,
         subscription: Option<PwaSubscription>,
         displaced_holder: Option<PwaSubscriptionHolder>,
+        stale_holders: &BTreeSet<PwaSubscriptionHolder>,
     ) -> Result<(), StorageError> {
         let config_key = (holder.anchor_number, holder.application_number);
         let mut config = self.pwa_subscription_config(holder)?;
@@ -3436,6 +3400,16 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
+        for stale_holder in stale_holders {
+            if (stale_holder.anchor_number, stale_holder.application_number) != config_key {
+                continue;
+            }
+            config.set_pwa_webpush_subscription(
+                stale_holder.browser_id,
+                stale_holder.frontend_origin_hash,
+                None,
+            );
+        }
         config.set_pwa_webpush_subscription(
             holder.browser_id,
             holder.frontend_origin_hash,
@@ -3445,30 +3419,6 @@ impl<M: Memory + Clone> Storage<M> {
             self.store_anchor_application_config(displaced_config_key, Some(config_of_displaced));
         }
         self.store_anchor_application_config(config_key, Some(config));
-        Ok(())
-    }
-
-    /// Puts `subscription` in `holder`'s slot, after emptying every slot of the same
-    /// config, on every browser entry, whose frontend's origin hash is not in
-    /// `kept_frontend_origin_hashes`. The config must exist: a missing one is refused,
-    /// before anything is written.
-    pub fn write_pwa_webpush_subscription_keeping_frontends(
-        &mut self,
-        holder: PwaSubscriptionHolder,
-        subscription: PwaSubscription,
-        kept_frontend_origin_hashes: &BTreeSet<StorableOriginSha256>,
-    ) -> Result<(), StorageError> {
-        let mut config = self.pwa_subscription_config(holder)?;
-        config.retain_pwa_webpush_subscriptions_of_frontends(kept_frontend_origin_hashes);
-        config.set_pwa_webpush_subscription(
-            holder.browser_id,
-            holder.frontend_origin_hash,
-            Some(subscription),
-        );
-        self.store_anchor_application_config(
-            (holder.anchor_number, holder.application_number),
-            Some(config),
-        );
         Ok(())
     }
 

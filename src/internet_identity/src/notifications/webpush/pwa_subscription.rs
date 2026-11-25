@@ -8,30 +8,34 @@
 //! wakes that one, which opens its link signed in. A frontend other than the app's own
 //! origin is accepted only where the app lists it among its alternative origins.
 //!
-//! A push endpoint names one installed app on one device, and only one identity and
-//! account deliver through it at a time: the one whose session subscribed last. A
-//! subscribe for an endpoint another slot holds takes it over only when the keys
-//! it arrives with match that slot's, which only the device that subscribed knows:
+//! A push endpoint names one installed app on one device, and only one slot holds it. A
+//! subscribe for an endpoint another slot holds is refused while that slot is kept, so
 //! knowing an endpoint is not enough to silence the device.
+//!
+//! Every write of an app's slots also empties the stale ones on that config: a slot whose
+//! account is no longer signed in on its browser entry, and a slot of a frontend the
+//! app's cached alternative origins no longer name.
 
 use super::subscription;
 use super::validation::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
 use super::{seed_pool, transport};
 use crate::alternative_origins::{self, AlternativeOrigin};
 use crate::authz_utils::AuthorizedSession;
+use crate::notifications::dispatch;
 use crate::origin::ApplicationOrigin;
 use crate::origin::FetchableApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::{PendingTransport, ReadySubscription, WebPushSubscription};
+use crate::storage::anchor::{PendingTransport, WebPushSubscription};
 use crate::storage::storable::anchor_application_config::PwaSubscription;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::PwaSubscriptionHolder;
+use crate::storage::Storage;
 use candid::Principal;
+use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     FrontendHostname, PrepareWebPushSubscriptionResponse, PwaWebPushSubscription,
     SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
 };
-use p256::elliptic_curve::subtle::ConstantTimeEq;
 use serde_bytes::ByteBuf;
 use std::collections::BTreeSet;
 
@@ -105,7 +109,7 @@ pub enum SetPwaSubscriptionError {
     /// The transport key `sealed_auth` was encrypted to has expired, or a later prepare
     /// replaced it.
     TransportKeyExpired,
-    /// Another subscription holds the endpoint with other keys or for another app.
+    /// Another slot holds the endpoint and is not stale.
     EndpointInUse,
     /// Nothing the caller can act on: a broken invariant or a storage failure, and why.
     Internal(String),
@@ -162,16 +166,13 @@ pub fn resolve_pwa_holder(
 
 /// Records the key a fetch just minted for `holder`'s slot, for the account
 /// `account_principal` names. This replaces what the entry held, so it delivers nothing
-/// and holds no endpoint until the subscribe that spends the key lands. Where
-/// `kept_frontend_origin_hashes` is given, every slot of the app's config, on every
-/// browser entry, whose frontend's origin hash it does not hold is emptied in the same
-/// write.
+/// and holds no endpoint until the subscribe that spends the key lands. `now_ns` is the
+/// call's time.
 fn start_pwa_subscription(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
     secret_key: [u8; 32],
     sender_seed: [u8; 32],
-    kept_frontend_origin_hashes: Option<&BTreeSet<StorableOriginSha256>>,
     now_ns: Timestamp,
 ) -> Result<(), PreparePwaSubscriptionError> {
     if !is_notifications_allowed(holder) {
@@ -186,27 +187,17 @@ fn start_pwa_subscription(
         subscription: WebPushSubscription::Pending(pending_transport),
         account_principal,
     };
-    let Some(kept_frontend_origin_hashes) = kept_frontend_origin_hashes else {
-        return write_pwa_subscription(holder, Some(subscription), None)
-            .map_err(PreparePwaSubscriptionError::Internal);
-    };
-    storage_borrow_mut(|storage| {
-        storage.write_pwa_webpush_subscription_keeping_frontends(
-            holder,
-            subscription,
-            kept_frontend_origin_hashes,
-        )
-    })
-    .map_err(|err| PreparePwaSubscriptionError::Internal(format!("{err}")))
+    write_pwa_subscription(holder, Some(subscription), None, now_ns)
+        .map_err(PreparePwaSubscriptionError::Internal)
 }
 
 /// Registers `holder`'s slot for Web Push for the account `account_principal`
 /// names, replacing what it delivered for, or with `None` empties it where it delivers for
 /// that account.
 ///
-/// Where another slot holds the endpoint, that slot is emptied first, and only
-/// when it is the same app's and holds the same `p256dh` and `auth`: a device switching
-/// identity in its installed app subscribes with the keys it already has.
+/// Where another slot holds the endpoint, it is refused with `EndpointInUse` while that
+/// slot is kept at `now_ns` (see [`find_stale_pwa_slots`]); a slot no longer kept is
+/// emptied in the same write.
 pub fn set_pwa_subscription(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
@@ -214,7 +205,7 @@ pub fn set_pwa_subscription(
     now_ns: Timestamp,
 ) -> Result<(), SetPwaSubscriptionError> {
     let Some(request) = request else {
-        return remove_pwa_subscription(holder, account_principal);
+        return remove_pwa_subscription(holder, account_principal, now_ns);
     };
     if !is_notifications_allowed(holder) {
         return Err(SetPwaSubscriptionError::NotificationsNotAllowed);
@@ -246,7 +237,9 @@ pub fn set_pwa_subscription(
     .map_err(map_set_error)?;
     let displaced_holder = find_endpoint_holder(holder, &ready_subscription.endpoint);
     if let Some(endpoint_holder) = displaced_holder {
-        check_takeover(holder, endpoint_holder, &ready_subscription)?;
+        if !find_stale_pwa_slots(endpoint_holder, now_ns).contains(&endpoint_holder) {
+            return Err(SetPwaSubscriptionError::EndpointInUse);
+        }
     }
 
     let subscription = WebPushSubscription::Ready(ready_subscription);
@@ -254,15 +247,17 @@ pub fn set_pwa_subscription(
         subscription,
         account_principal,
     };
-    write_pwa_subscription(holder, Some(subscription), displaced_holder)
+    write_pwa_subscription(holder, Some(subscription), displaced_holder, now_ns)
         .map_err(SetPwaSubscriptionError::Internal)
 }
 
 /// Empties `holder`'s slot where it delivers for `account_principal`'s account.
-/// One that holds nothing, or delivers for another account, is left as it is.
+/// One that holds nothing, or delivers for another account, is left as it is. `now_ns`
+/// is the call's time.
 fn remove_pwa_subscription(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
+    now_ns: Timestamp,
 ) -> Result<(), SetPwaSubscriptionError> {
     match read_pwa_subscription(holder) {
         Some(held_subscription) if held_subscription.account_principal != account_principal => {
@@ -271,13 +266,12 @@ fn remove_pwa_subscription(
         Some(_) => {}
         None => return Ok(()),
     }
-    write_pwa_subscription(holder, None, None).map_err(SetPwaSubscriptionError::Internal)
+    write_pwa_subscription(holder, None, None, now_ns).map_err(SetPwaSubscriptionError::Internal)
 }
 
-/// The other slot that holds `endpoint` now, which a subscription for `holder` at that
-/// endpoint takes it over from. `None` where no other slot holds it: the lookup is derived
-/// from the configs, so a slot it still names that no longer holds the endpoint holds
-/// nothing to take over.
+/// The other slot that holds `endpoint` now. `None` where no other slot holds it: the
+/// lookup is derived from the configs, so a slot it still names that no longer holds the
+/// endpoint does not count.
 fn find_endpoint_holder(
     holder: PwaSubscriptionHolder,
     endpoint: &PushEndpoint,
@@ -296,43 +290,12 @@ fn find_endpoint_holder(
     Some(indexed_holder)
 }
 
-/// Whether `holder` may take `ready_subscription`'s endpoint over from `endpoint_holder`:
-/// only the same app may, with the same keys, which is the same app on the same device
-/// subscribing again. Refused with `EndpointInUse` otherwise.
-fn check_takeover(
-    holder: PwaSubscriptionHolder,
-    endpoint_holder: PwaSubscriptionHolder,
-    ready_subscription: &ReadySubscription,
-) -> Result<(), SetPwaSubscriptionError> {
-    let Some(held_subscription) = read_pwa_subscription(endpoint_holder)
-        .and_then(|held_subscription| held_subscription.subscription.into_ready())
-    else {
-        return Ok(());
-    };
-    let is_same_application = endpoint_holder.application_number == holder.application_number;
-    let is_same_subscriber_key = bool::from(
-        held_subscription
-            .subscriber_key
-            .as_slice()
-            .ct_eq(ready_subscription.subscriber_key.as_slice()),
-    );
-    let is_same_auth = bool::from(
-        held_subscription
-            .auth
-            .as_slice()
-            .ct_eq(ready_subscription.auth.as_slice()),
-    );
-    if !(is_same_application && is_same_subscriber_key && is_same_auth) {
-        return Err(SetPwaSubscriptionError::EndpointInUse);
-    }
-    Ok(())
-}
-
 /// The subscription a relay answered gone for, dropped where `holder`'s slot
-/// still holds that endpoint.
+/// still holds that endpoint. `now_ns` is the call's time.
 pub(crate) fn clear_gone_pwa_subscription(
     holder: PwaSubscriptionHolder,
     endpoint: &str,
+    now_ns: Timestamp,
 ) -> Result<(), String> {
     let Some(held_subscription) = read_pwa_subscription(holder) else {
         return Ok(());
@@ -343,7 +306,7 @@ pub(crate) fn clear_gone_pwa_subscription(
     if registered_subscription.endpoint.as_str() != endpoint {
         return Ok(());
     }
-    write_pwa_subscription(holder, None, None)
+    write_pwa_subscription(holder, None, None, now_ns)
 }
 
 /// The endpoint `holder`'s slot is subscribed at, where it is ready and delivers
@@ -376,17 +339,105 @@ pub(crate) fn read_pwa_subscription(holder: PwaSubscriptionHolder) -> Option<Pwa
     config.pwa_webpush_subscription(holder.browser_id, holder.frontend_origin_hash)
 }
 
-/// Puts `subscription` on `holder`'s slot, or with `None` empties it, after
-/// emptying `displaced_holder`'s where one is given.
+/// Puts `subscription` on `holder`'s slot, or with `None` empties it, after emptying
+/// `displaced_holder`'s where one is given. Every prepare, set and removal of an app's
+/// slots writes through here, so the same write also empties every slot of `holder`'s
+/// config that [`find_stale_pwa_slots`] finds stale at `now_ns`.
 pub(crate) fn write_pwa_subscription(
     holder: PwaSubscriptionHolder,
     subscription: Option<PwaSubscription>,
     displaced_holder: Option<PwaSubscriptionHolder>,
+    now_ns: Timestamp,
 ) -> Result<(), String> {
+    let stale_holders = find_stale_pwa_slots(holder, now_ns);
     storage_borrow_mut(|storage| {
-        storage.write_pwa_webpush_subscription(holder, subscription, displaced_holder)
+        storage.write_pwa_webpush_subscription(
+            holder,
+            subscription,
+            displaced_holder,
+            &stale_holders,
+        )
     })
     .map_err(|err| format!("{err}"))
+}
+
+/// The slots of the identity's config for the app `holder` is on, on every browser
+/// entry, that are stale at `now_ns`: a slot whose account has no session on the slot's
+/// browser entry that is neither expired nor idle, and a slot of a frontend other than
+/// the app's own origin that the app's cached alternative origins no longer name. Where
+/// no list is cached, frontend slots are kept: this reads the cache only and starts no
+/// fetch.
+fn find_stale_pwa_slots(
+    holder: PwaSubscriptionHolder,
+    now_ns: Timestamp,
+) -> BTreeSet<PwaSubscriptionHolder> {
+    let Some(application_origin) = storage_borrow(|storage| {
+        storage.lookup_application_origin_with_number(holder.application_number)
+    }) else {
+        return BTreeSet::new();
+    };
+    let application_origin_hash = StorableOriginSha256::from_origin(&application_origin);
+    let listed_frontend_origin_hashes: Option<BTreeSet<StorableOriginSha256>> =
+        ApplicationOrigin::try_from(application_origin.as_str())
+            .ok()
+            .and_then(|application_origin| {
+                alternative_origins::peek_alternative_origins(&application_origin)
+            })
+            .map(|alternative_origin_hashes| {
+                alternative_origin_hashes
+                    .into_iter()
+                    .map(StorableOriginSha256::from)
+                    .collect()
+            });
+    storage_borrow(|storage| {
+        let Some(config) =
+            storage.anchor_application_config(holder.anchor_number, holder.application_number)
+        else {
+            return BTreeSet::new();
+        };
+        let mut stale_holders = BTreeSet::new();
+        for (browser_id, frontend_origin_hash, held_subscription) in
+            config.pwa_webpush_subscription_slots()
+        {
+            let slot_holder = PwaSubscriptionHolder {
+                browser_id,
+                frontend_origin_hash,
+                ..holder
+            };
+            let is_listed = frontend_origin_hash == application_origin_hash
+                || listed_frontend_origin_hashes
+                    .as_ref()
+                    .is_none_or(|listed_hashes| listed_hashes.contains(&frontend_origin_hash));
+            let has_live_session = has_live_pwa_session(
+                storage,
+                slot_holder,
+                held_subscription.account_principal,
+                now_ns,
+            );
+            if !is_listed || !has_live_session {
+                stale_holders.insert(slot_holder);
+            }
+        }
+        stale_holders
+    })
+}
+
+/// Whether the account `account_principal` names, of the identity `holder` is on, has a
+/// session on `holder`'s browser entry that is neither expired nor idle at `now_ns`.
+fn has_live_pwa_session<M: Memory + Clone>(
+    storage: &Storage<M>,
+    holder: PwaSubscriptionHolder,
+    account_principal: Principal,
+    now_ns: Timestamp,
+) -> bool {
+    dispatch::read_account_sessions(
+        storage,
+        holder.anchor_number,
+        holder.application_number,
+        account_principal,
+    )
+    .iter()
+    .any(|session| session.browser_id == holder.browser_id && !session.is_expired_or_idle(now_ns))
 }
 
 fn is_notifications_allowed(holder: PwaSubscriptionHolder) -> bool {
@@ -414,12 +465,8 @@ fn map_set_error(err: SetWebPushSubscriptionError) -> SetPwaSubscriptionError {
 
 /// What the app's alternative origins say about the frontend a prepare names.
 enum FrontendAuthorization {
-    /// The app accepts the frontend. `kept_frontend_origin_hashes` are the origin hashes
-    /// of the app's own origin and of every frontend its list names, where the check read
-    /// that list: no slot of another frontend stays. `None` where no list was read.
-    Accepted {
-        kept_frontend_origin_hashes: Option<BTreeSet<StorableOriginSha256>>,
-    },
+    /// The app accepts the frontend.
+    Accepted,
     /// The app's alternative origins are not read yet.
     Pending,
 }
@@ -435,16 +482,12 @@ fn authorize_frontend(
     now_ns: Timestamp,
 ) -> Result<FrontendAuthorization, PreparePwaSubscriptionError> {
     let Some(frontend_origin) = frontend_origin else {
-        return Ok(FrontendAuthorization::Accepted {
-            kept_frontend_origin_hashes: None,
-        });
+        return Ok(FrontendAuthorization::Accepted);
     };
     let application_origin = ApplicationOrigin::try_from(session.origin.as_str())
         .map_err(PreparePwaSubscriptionError::Internal)?;
     if *frontend_origin == application_origin {
-        return Ok(FrontendAuthorization::Accepted {
-            kept_frontend_origin_hashes: None,
-        });
+        return Ok(FrontendAuthorization::Accepted);
     }
     FetchableApplicationOrigin::try_from(&application_origin)
         .map_err(PreparePwaSubscriptionError::Internal)?;
@@ -453,24 +496,10 @@ fn authorize_frontend(
         frontend_origin,
         now_ns,
     ) {
-        AlternativeOrigin::Listed => {}
-        AlternativeOrigin::NotListed => return Err(PreparePwaSubscriptionError::NoSuchFrontend),
-        AlternativeOrigin::Pending { .. } => return Ok(FrontendAuthorization::Pending),
+        AlternativeOrigin::Listed => Ok(FrontendAuthorization::Accepted),
+        AlternativeOrigin::NotListed => Err(PreparePwaSubscriptionError::NoSuchFrontend),
+        AlternativeOrigin::Pending { .. } => Ok(FrontendAuthorization::Pending),
     }
-    let kept_frontend_origin_hashes = alternative_origins::peek_alternative_origins(
-        &application_origin,
-    )
-    .map(|alternative_origins| {
-        let mut kept_frontend_origin_hashes: BTreeSet<StorableOriginSha256> = alternative_origins
-            .into_iter()
-            .map(StorableOriginSha256::from)
-            .collect();
-        kept_frontend_origin_hashes.insert(StorableOriginSha256::from_origin(&session.origin));
-        kept_frontend_origin_hashes
-    });
-    Ok(FrontendAuthorization::Accepted {
-        kept_frontend_origin_hashes,
-    })
 }
 
 /// The keys `session`'s installed web app at `frontend_origin` (the app's own origin
@@ -490,12 +519,10 @@ pub fn prepare_pwa_subscription(
     if !is_notifications_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
-    let kept_frontend_origin_hashes = match authorize_frontend(session, frontend_origin, now_ns)? {
-        FrontendAuthorization::Accepted {
-            kept_frontend_origin_hashes,
-        } => kept_frontend_origin_hashes,
+    match authorize_frontend(session, frontend_origin, now_ns)? {
+        FrontendAuthorization::Accepted => {}
         FrontendAuthorization::Pending => return Ok(PreparedPwaSubscription::Pending),
-    };
+    }
     let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {
         return Ok(PreparedPwaSubscription::Pending);
     };
@@ -505,7 +532,6 @@ pub fn prepare_pwa_subscription(
         session.account_principal,
         seeds.transport_secret,
         seeds.sender_seed,
-        kept_frontend_origin_hashes.as_ref(),
         now_ns,
     )?;
     let vapid_public_key = ByteBuf::from(vapid_public_key);

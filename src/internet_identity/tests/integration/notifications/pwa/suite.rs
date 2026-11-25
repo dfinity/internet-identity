@@ -395,14 +395,36 @@ fn should_drop_the_slot_of_a_frontend_the_application_stopped_listing_on_the_nex
     );
 }
 
+/// Prepares `session`'s installed web app of [`APP`]'s own origin until II answers keys,
+/// answering every outcall between tries like [`answer_outcalls_listing`] with
+/// `alternative_origins`.
+fn prepare_own_origin_listing(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    session: Principal,
+    alternative_origins: &[&str],
+) {
+    let mut response = prepare_for_frontend(env, canister_id, session, APP);
+    for _ in 0..3 {
+        if response != AppPreparePwaWebPushSubscriptionResult::Pending {
+            break;
+        }
+        answer_outcalls_listing(env, alternative_origins);
+        response = prepare_for_frontend(env, canister_id, session, APP);
+    }
+    assert!(
+        matches!(response, AppPreparePwaWebPushSubscriptionResult::Ok(_)),
+        "{response:?}"
+    );
+}
+
 #[test]
-fn should_keep_every_frontends_slot_on_a_prepare_for_the_applications_own_origin() {
+fn should_drop_the_slot_of_the_last_frontend_the_application_stopped_listing_on_the_next_write() {
     let env = env();
     let (canister_id, account_session) = install_suite_subscribed(&env);
     let session = session_of(&account_session);
 
-    // The refresh this refusal starts caches a list that no longer names the suite
-    // frontend.
+    // The refresh this refusal starts caches a list that names no frontend at all.
     env.advance_time(ALTERNATIVE_ORIGINS_FRESH_FOR + Duration::from_secs(1));
     assert_eq!(
         prepare_for_frontend(&env, canister_id, session, CALENDAR_FRONTEND),
@@ -410,28 +432,51 @@ fn should_keep_every_frontends_slot_on_a_prepare_for_the_applications_own_origin
             AppPreparePwaWebPushSubscriptionError::NoSuchFrontend
         )
     );
-    answer_outcalls_listing(&env, &[CALENDAR_FRONTEND]);
+    answer_outcalls_listing(&env, &[]);
     assert_eq!(
         frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
         Some(SUITE_ENDPOINT.to_string())
     );
 
+    prepare_own_origin_listing(&env, canister_id, session, &[]);
+
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
+        None
+    );
+}
+
+#[test]
+fn should_keep_a_frontends_slot_and_fetch_no_list_on_a_write_while_no_list_is_cached() {
+    let env = env();
+    let (canister_id, account_session) = install_suite_subscribed(&env);
+    let session = session_of(&account_session);
+    // The cache lives on the heap, so an upgrade leaves no list cached.
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    let mut urls = Vec::new();
     let mut response = prepare_for_frontend(&env, canister_id, session, APP);
     for _ in 0..3 {
         if response != AppPreparePwaWebPushSubscriptionResult::Pending {
             break;
         }
-        answer_outcalls_listing(&env, &[CALENDAR_FRONTEND]);
+        urls.extend(fetched_urls(&env));
         response = prepare_for_frontend(&env, canister_id, session, APP);
     }
+    urls.extend(fetched_urls(&env));
+
     assert!(
         matches!(response, AppPreparePwaWebPushSubscriptionResult::Ok(_)),
         "{response:?}"
     );
-
     assert_eq!(
         frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
         Some(SUITE_ENDPOINT.to_string())
+    );
+    assert!(
+        urls.iter()
+            .all(|url| !url.ends_with(ALTERNATIVE_ORIGINS_PATH)),
+        "a write fetched the alternative origins: {urls:?}"
     );
 }
 

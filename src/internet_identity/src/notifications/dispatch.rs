@@ -1194,7 +1194,7 @@ impl<'a> PwaRoute<'a> {
 
 /// The sessions on any browser entry of the account `account_principal` names at
 /// `application_number`. None where it names no account of the identity `anchor_number`.
-fn read_account_sessions<M: Memory + Clone>(
+pub(crate) fn read_account_sessions<M: Memory + Clone>(
     storage: &Storage<M>,
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
@@ -1358,7 +1358,7 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
         PostOutcome::Sent => count_accepted_push(delivery, now_ns),
         // Nothing was posted, and the entry stays for whatever wakes this browser next.
         PostOutcome::Superseded => {}
-        PostOutcome::Gone => drop_gone_subscription(delivery),
+        PostOutcome::Gone => drop_gone_subscription(delivery, now_ns),
         PostOutcome::RateLimited
         | PostOutcome::RelayError
         | PostOutcome::RelayServerError
@@ -1415,7 +1415,7 @@ fn count_accepted_push(delivery: &Delivery, now_ns: Timestamp) {
 /// goes, and only that one, while the registration still names the endpoint that
 /// answered. That read is what tells the two apart, so it runs before the registration is
 /// cleared.
-fn drop_gone_subscription(delivery: &Delivery) {
+fn drop_gone_subscription(delivery: &Delivery, now_ns: Timestamp) {
     if let Some(notification) = delivery.notification.as_ref() {
         browser_inbox::remove_after_failed_wake_up(
             delivery.anchor_number,
@@ -1430,6 +1430,7 @@ fn drop_gone_subscription(delivery: &Delivery) {
         delivery.browser_id,
         delivery.target,
         &delivery.endpoint,
+        now_ns,
     ) {
         ic_cdk::println!("Failed to drop a push registration the relay called gone: {err}");
     }

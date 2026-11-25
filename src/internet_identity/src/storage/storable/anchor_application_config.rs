@@ -174,6 +174,23 @@ impl AnchorApplicationConfig {
         subscriptions
     }
 
+    /// Every installed app subscription, on every browser entry and for every frontend,
+    /// with the entry and the hash of the frontend's origin it is held under. Ones that do
+    /// not read back are left out.
+    pub fn pwa_webpush_subscription_slots(
+        &self,
+    ) -> Vec<(BrowserId, StorableOriginSha256, PwaSubscription)> {
+        let mut subscriptions = Vec::new();
+        for (slot, stored_subscription) in self.pwa_webpush_subscriptions.iter().flatten() {
+            if let Some(subscription) =
+                read_back_pwa_subscription(slot.browser_id, stored_subscription)
+            {
+                subscriptions.push((slot.browser_id, slot.frontend_origin_hash, subscription));
+            }
+        }
+        subscriptions
+    }
+
     /// Puts `subscription` on `browser_id` for the frontend whose origin hashes to
     /// `frontend_origin_hash`, or with `None` empties that slot. A map holding nothing is
     /// stored as `None`.
@@ -213,19 +230,6 @@ impl AnchorApplicationConfig {
         let has_removed = subscriptions.len() != held_count;
         self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
         has_removed
-    }
-
-    /// Empties every slot, of every browser entry, whose frontend's origin hash is not in
-    /// `frontend_origin_hashes`. A map holding nothing is stored as `None`.
-    pub fn retain_pwa_webpush_subscriptions_of_frontends(
-        &mut self,
-        frontend_origin_hashes: &BTreeSet<StorableOriginSha256>,
-    ) {
-        let Some(mut subscriptions) = self.pwa_webpush_subscriptions.take() else {
-            return;
-        };
-        subscriptions.retain(|slot, _| frontend_origin_hashes.contains(&slot.frontend_origin_hash));
-        self.pwa_webpush_subscriptions = (!subscriptions.is_empty()).then_some(subscriptions);
     }
 
     /// Empties every slot.
