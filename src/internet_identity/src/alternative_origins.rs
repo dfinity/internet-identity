@@ -198,7 +198,10 @@ async fn fill_alternative_origins(
     let Some(_permit) = concurrency::acquire(&ALTERNATIVE_ORIGINS_OUTCALL_LIMIT) else {
         return FillOutcome::Abandoned;
     };
-    let fetch_origin = FetchableApplicationOrigin::from(&derivation_origin);
+    let fetch_origin = match FetchableApplicationOrigin::try_from(&derivation_origin) {
+        Ok(fetch_origin) => fetch_origin,
+        Err(err) => return FillOutcome::Failed(err),
+    };
     match fetch_alternative_origins(&fetch_origin).await {
         Ok(alternative_origins) => FillOutcome::Ready(alternative_origins),
         Err(err) => FillOutcome::Failed(err),

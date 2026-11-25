@@ -174,7 +174,10 @@ async fn senders_fill(origin: ApplicationOrigin) -> FillOutcome<Vec<Principal>, 
     let Some(_permit) = crate::concurrency::acquire(&SENDERS_OUTCALL_LIMIT) else {
         return FillOutcome::Abandoned;
     };
-    let fetch_origin = FetchableApplicationOrigin::from(&origin);
+    let fetch_origin = match FetchableApplicationOrigin::try_from(&origin) {
+        Ok(fetch_origin) => fetch_origin,
+        Err(err) => return FillOutcome::Failed(err),
+    };
     match fetch_senders(&fetch_origin).await {
         Ok(senders) => FillOutcome::Ready(senders),
         Err(err) => FillOutcome::Failed(err),

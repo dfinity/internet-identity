@@ -1,6 +1,8 @@
 //! The origin an application is identified by, in the one spelling it is keyed under.
 
 use crate::delegation::frontend_length_within_limit;
+use crate::state;
+use crate::utils::is_loopback_host;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use std::fmt;
 use url::Url;
@@ -76,7 +78,11 @@ const RAW_LABEL: &str = ".raw";
 /// [`FETCH_DOMAIN`], and never through the raw endpoint, whose responses carry no
 /// certification. Anything else, a custom domain or localhost, is read as it stands.
 ///
-/// Built only from an [`ApplicationOrigin`], so it is always a bare origin.
+/// Built only from an [`ApplicationOrigin`] II may fetch from, so it is always a bare
+/// origin whose file cannot be replaced in flight: `https`, or `http` on a loopback host
+/// while the deployment allows insecure sender lists. Build one per fetch: the flag is
+/// persistent state, so a value kept across a configuration change would no longer
+/// hold.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FetchableApplicationOrigin(String);
 
@@ -86,9 +92,20 @@ impl FetchableApplicationOrigin {
     }
 }
 
-impl From<&ApplicationOrigin> for FetchableApplicationOrigin {
-    fn from(origin: &ApplicationOrigin) -> Self {
+impl TryFrom<&ApplicationOrigin> for FetchableApplicationOrigin {
+    type Error = String;
+
+    fn try_from(origin: &ApplicationOrigin) -> Result<Self, Self::Error> {
         let origin = origin.as_str();
+        let Ok(url) = Url::parse(origin) else {
+            return Err("origin is not a URL".to_string());
+        };
+        let is_insecure_fetch_allowed = url.scheme() == "http"
+            && is_insecure_sender_list_allowed()
+            && is_loopback_host(url.host_str().unwrap_or_default());
+        if url.scheme() != "https" && !is_insecure_fetch_allowed {
+            return Err("origin must be https".to_string());
+        }
         let canister_id = origin
             .strip_prefix("https://")
             .and_then(|rest| {
@@ -104,10 +121,14 @@ impl From<&ApplicationOrigin> for FetchableApplicationOrigin {
                         .all(|character| character.is_ascii_alphanumeric() || character == '-')
             });
         match canister_id {
-            Some(canister_id) => Self(format!("https://{canister_id}.{FETCH_DOMAIN}")),
-            None => Self(origin.to_string()),
+            Some(canister_id) => Ok(Self(format!("https://{canister_id}.{FETCH_DOMAIN}"))),
+            None => Ok(Self(origin.to_string())),
         }
     }
+}
+
+fn is_insecure_sender_list_allowed() -> bool {
+    state::persistent_state(|s| s.notifications_allow_insecure_sender_list).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -225,11 +246,19 @@ mod tests {
         );
     }
 
-    fn fetched(origin: &str) -> String {
+    fn allow_insecure(allow: bool) {
+        state::persistent_state_mut(|s| {
+            s.notifications_allow_insecure_sender_list = Some(allow);
+        });
+    }
+
+    fn fetchable(origin: &str) -> Result<String, String> {
         let origin = ApplicationOrigin::try_from(origin).expect("a bare origin");
-        FetchableApplicationOrigin::from(&origin)
-            .as_str()
-            .to_string()
+        FetchableApplicationOrigin::try_from(&origin).map(|origin| origin.as_str().to_string())
+    }
+
+    fn fetched(origin: &str) -> String {
+        fetchable(origin).expect("a fetchable origin")
     }
 
     #[test]
@@ -265,6 +294,7 @@ mod tests {
 
     #[test]
     fn anything_that_is_no_gateway_origin_is_read_as_it_stands() {
+        allow_insecure(true);
         for origin in [
             "https://app.example",
             "https://nice-name.com",
@@ -276,6 +306,54 @@ mod tests {
             "http://vt36r-2qaaa-aaaad-aad5a-cai.localhost:4943",
         ] {
             assert_eq!(fetched(origin), origin);
+        }
+    }
+
+    /// The scheme decides where II sends an outcall, so a file that would be
+    /// fetched over plain http is refused however the origin is spelled.
+    #[test]
+    fn refuses_an_origin_whose_file_would_not_be_fetched_over_https() {
+        allow_insecure(false);
+        for origin in [
+            "http://app.example",
+            "http://localhost:5173",
+            "http://127.0.0.1:8080",
+        ] {
+            assert_eq!(
+                fetchable(origin),
+                Err("origin must be https".to_string()),
+                "{origin} must not be fetched"
+            );
+        }
+        assert_eq!(
+            fetchable("https://app.example"),
+            Ok("https://app.example".to_string())
+        );
+    }
+
+    /// The flag reaches loopback only: a public host over http stays refused,
+    /// so a flagged deployment still cannot be pointed at a plaintext app.
+    #[test]
+    fn the_insecure_flag_reaches_loopback_only() {
+        allow_insecure(true);
+        for origin in [
+            "http://localhost:5173",
+            "http://127.0.0.1:8080",
+            "http://localhost",
+        ] {
+            assert_eq!(fetchable(origin), Ok(origin.to_string()));
+        }
+        assert!(fetchable("http://app.example").is_err());
+    }
+
+    /// And it reaches `http` only. A scheme II cannot fetch would fail at the
+    /// outcall anyway, but the rule is what the type states, not where the
+    /// call happens to break.
+    #[test]
+    fn the_insecure_flag_reaches_http_only() {
+        allow_insecure(true);
+        for origin in ["ftp://localhost", "ws://localhost:5173", "wss://localhost"] {
+            assert!(fetchable(origin).is_err(), "{origin} must not be fetched");
         }
     }
 }

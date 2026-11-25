@@ -4,6 +4,7 @@ use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::delegation::DelegationAccess;
 use crate::origin::ApplicationOrigin;
+use crate::origin::FetchableApplicationOrigin;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -50,7 +51,7 @@ use notifications::webpush::pwa_subscription;
 use notifications::webpush::rotation;
 use notifications::webpush::vapid_key::VapidPublicKey;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
-use notifications::{admit_batch, enabled_or, fetchable_origin, TooManyNotifications};
+use notifications::{admit_batch, enabled_or, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -1524,7 +1525,8 @@ fn app_send_notification(
         None => frontend_origin.clone(),
     };
     enabled_or(SendNotificationError::InternalCanisterError)?;
-    fetchable_origin(&application_origin).map_err(SendNotificationError::InternalCanisterError)?;
+    FetchableApplicationOrigin::try_from(&application_origin)
+        .map_err(SendNotificationError::InternalCanisterError)?;
     let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {
         SendNotificationError::TooManyNotifications {
             limit: limit as u32,
