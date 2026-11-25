@@ -76,9 +76,10 @@ export const LAYOUTS: LayoutOption[] = [
 ];
 
 export const STATES: { id: StateId; label: string; note: string }[] = [
-  { id: "several", label: "Several", note: "Three identities on this device" },
-  { id: "one", label: "One", note: "A single identity" },
   { id: "none", label: "None", note: "No identity yet: sign in or create" },
+  { id: "one", label: "One", note: "A single identity" },
+  { id: "two", label: "Two", note: "Two identities, a passkey and SSO" },
+  { id: "several", label: "Three", note: "Three identities on this device" },
   { id: "many", label: "Many", note: "Seven, to see where a layout runs out" },
 ];
 
@@ -134,7 +135,7 @@ const pick = <T extends string>(
 
 export class Playground {
   layout = $state<LayoutId>("profiles");
-  state = $state<StateId>("several");
+  state = $state<StateId>("two");
   lastUsed = $state(true);
   texture = $state<TextureId>("none");
   brand = $state<BrandId>("statement");

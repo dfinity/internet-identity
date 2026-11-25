@@ -1,8 +1,8 @@
 /**
  * The identities the landing playground shows, for each state it compares.
  * The first three are the concept's own (Thomas, Work, Testing, from
- * `../mock/mockData.ts`); "Many" adds four more, to see where a layout runs
- * out of room. Nothing here talks to a canister.
+ * `../mock/mockData.ts`); "Two" is Thomas and Work, a passkey and an SSO
+ * account; "Many" adds four more, to see where a layout runs out of room. Nothing here talks to a canister.
  */
 import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
 import { identities as conceptIdentities } from "../mock/mockData";
@@ -11,7 +11,7 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const now = Date.now();
 
-export type StateId = "several" | "one" | "none" | "many";
+export type StateId = "none" | "one" | "two" | "several" | "many";
 
 const passkey = (
   identityNumber: number,
@@ -35,9 +35,10 @@ const more: LastUsedIdentity[] = [
 
 /** The identities on this device, in each state; the most recent first. */
 export const IDENTITIES_BY_STATE: Record<StateId, LastUsedIdentity[]> = {
-  several: concept,
-  one: concept.slice(0, 1),
   none: [],
+  one: concept.slice(0, 1),
+  two: concept.slice(0, 2),
+  several: concept,
   many: [...concept, ...more],
 };
 

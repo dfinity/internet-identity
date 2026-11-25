@@ -18,16 +18,16 @@ opens the same combination.
 
 The bar at the top; each control has a key.
 
-| Control                  | Key     | What it does                                                                                                         |
-| ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------- |
-| Layout                   | ← →     | Six layouts, below                                                                                                   |
-| Identities               | 1 2 3 4 | Several (3), One, None (sign in or create), Many (7, to see where it breaks)                                         |
-| Last used                | L       | The mark on the identity used last (shown where there's more than one)                                               |
-| Texture                  | T       | None, the product's own dots (FlairCanvas), or one of six textures                                                   |
-| Brand (Split, Immersive) | B, C    | What the brand side says (statement, quote, principles), and whether it takes the colours of the identity pointed at |
-| View                     | W P O   | This window, on a phone (a 390px frame), all layouts at once                                                         |
-| Theme                    | D       | Light or dark                                                                                                        |
-| Hide the bar             | H       | The bar starts folded into a flask in the header; the flask (or H) opens it                                          |
+| Control                  | Key   | What it does                                                                                                         |
+| ------------------------ | ----- | -------------------------------------------------------------------------------------------------------------------- |
+| Layout                   | ← →   | Six layouts, below                                                                                                   |
+| Identities               | 1–5   | None (sign in or create), One, Two (the default: a passkey and SSO), Three, Many (7, to see where it breaks)         |
+| Last used                | L     | The mark on the identity used last (shown where there's more than one)                                               |
+| Texture                  | T     | None, the product's own dots (FlairCanvas), or one of six textures                                                   |
+| Brand (Split, Immersive) | B, C  | What the brand side says (statement, quote, principles), and whether it takes the colours of the identity pointed at |
+| View                     | W P O | This window, on a phone (a 390px frame), all layouts at once                                                         |
+| Theme                    | D     | Light or dark                                                                                                        |
+| Hide the bar             | H     | The bar starts folded into a flask in the header; the flask (or H) opens it                                          |
 
 ## Layouts
 
