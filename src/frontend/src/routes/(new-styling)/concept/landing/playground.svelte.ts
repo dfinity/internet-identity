@@ -34,6 +34,9 @@ export interface LayoutOption {
   group: string;
   /** What to look at in it, one line, for the menu and the overview. */
   note: string;
+  /** Its footer holds the flask that opens the controls; elsewhere the
+   *  flask floats in the middle of the header. */
+  labInFooter?: boolean;
 }
 
 export const LAYOUTS: LayoutOption[] = [
@@ -41,6 +44,7 @@ export const LAYOUTS: LayoutOption[] = [
     id: "profiles",
     label: "Profiles",
     group: "Priority",
+    labInFooter: true,
     note: "Identities as large tiles, like the apps on My apps. The colour tells them apart before the name does.",
   },
   {
@@ -143,6 +147,9 @@ export class Playground {
   view = $state<ViewId>("page");
   /** Inside the phone's or the overview's frame: no controls. */
   framed = $state(false);
+  /** Whether the controls are open. They start folded into the flask, so
+   *  the page is seen as it would be. */
+  controls = $state(false);
 
   /** Identities removed on this visit, by number. */
   removed = $state<string[]>([]);

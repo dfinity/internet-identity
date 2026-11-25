@@ -10,9 +10,9 @@ npm run dev:concept
 ```
 
 Then open http://127.0.0.1:5174/concept/landing. It opens on Profiles,
-the layout we're taking forward, with the controls folded into a flask in
-the middle of the header. Every choice is kept in the address, so a link
-opens the same combination.
+the layout we're taking forward, with two identities on the device and the
+controls folded into a flask in its footer. Every choice is kept in the
+address, so a link opens the same combination.
 
 ## Controls
 
@@ -27,7 +27,7 @@ The bar at the top; each control has a key.
 | Brand (Split, Immersive) | B, C  | What the brand side says (statement, quote, principles), and whether it takes the colours of the identity pointed at |
 | View                     | W P O | This window, on a phone (a 390px frame), all layouts at once                                                         |
 | Theme                    | D     | Light or dark                                                                                                        |
-| Hide the bar             | H     | The bar starts folded into a flask in the header; the flask (or H) opens it                                          |
+| Hide the bar             | H     | The bar starts folded into a flask, in Profiles' footer (elsewhere in the header); the flask (or H) opens it         |
 
 ## Layouts
 
@@ -43,6 +43,10 @@ The bar at the top; each control has a key.
 In every layout: a click on an identity shows its spinner and then a toast
 (here the dashboard would open); Add identity opens the ways to sign in;
 Edit identities removes one from this device, with Undo.
+
+Profiles puts each of today's actions in its own place: About at the top
+right, Edit identities under the tiles, and the footer's language, Support
+and Source code. On a phone its circles shrink so three fit a row.
 
 ## What it reuses, what is new
 
@@ -71,6 +75,8 @@ New here, for review:
   (`PickAuthenticationMethod`, mode "both") on the concept's surfaces, with
   the providers' marks drawn here (the product takes them from the
   canister).
+- **`parts/LandingFooter.svelte`**: the product's `Footer` for a layout
+  with About in its header, and the playground's flask at the end.
 - **The copy** in `parts/Brand.svelte` is a draft to judge the layouts by.
   Each claim holds for Internet Identity today; the quote is Article 12 of
   the Universal Declaration of Human Rights.

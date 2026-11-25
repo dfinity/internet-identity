@@ -54,10 +54,12 @@
   const Layout = $derived(LAYOUT_OF[p.layout]);
   const current = $derived(LAYOUTS.find((one) => one.id === p.layout));
 
-  /** The controls start folded into a flask in the middle of the header,
-   *  where they open, so the page is seen as it would be; the flask (or H)
-   *  opens them. */
-  let hidden = $state(true);
+  /** Where the flask is while the controls are folded: in the footer of
+   *  a layout that has room for it (Profiles), else floating in the middle
+   *  of the header, where the controls open. */
+  const labInFooter = $derived(
+    p.view === "page" && current?.labInFooter === true,
+  );
 
   // --- The frames: a phone, and the overview ---
 
@@ -184,7 +186,7 @@
     } else if (key === "o") {
       p.view = p.view === "all" ? "page" : "all";
     } else if (key === "h") {
-      hidden = !hidden;
+      p.controls = !p.controls;
     } else if (key === "escape" && p.editing) {
       p.editing = false;
     } else {
@@ -315,24 +317,24 @@
   {/if}
 
   {#if !p.framed}
-    {#if hidden}
+    {#if !p.controls && !labInFooter}
       <button
         type="button"
         title="Show the controls (H)"
         aria-label="Show the controls"
-        onclick={() => (hidden = false)}
+        onclick={() => (p.controls = true)}
         transition:fade={{ duration: 150 }}
         class="text-fg-quaternary hover:text-fg-tertiary focus-visible:outline-focus-ring fixed start-1/2 top-3.5 z-30 grid size-9 -translate-x-1/2 place-items-center rounded-full bg-(--ii-floating) shadow-(--ii-shadow-4) transition-colors duration-150 focus-visible:outline-2 md:top-6.5 rtl:translate-x-1/2"
       >
         <FlaskConicalIcon class="size-4" aria-hidden="true" />
       </button>
-    {:else}
+    {:else if p.controls}
       <div
         class="pointer-events-none fixed inset-x-0 top-3 z-30 flex justify-center px-2"
         transition:fade={{ duration: 150 }}
       >
         <div class="pointer-events-auto">
-          <Toolbar {p} {theme} onHide={() => (hidden = true)} />
+          <Toolbar {p} {theme} onHide={() => (p.controls = false)} />
         </div>
       </div>
     {/if}

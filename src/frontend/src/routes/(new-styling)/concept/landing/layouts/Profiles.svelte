@@ -3,15 +3,18 @@
   way My apps shows apps: the colour and the initial tell them apart before
   the name is read, and a new one is a dashed slot at the end. Edit puts a
   remove mark on each, as a home screen does. The badge on an avatar says,
-  when pointed at, how it was signed in to; one quiet line above the footer
-  says what Internet Identity stands for.
+  when pointed at, how it was signed in to.
+
+  What today's landing page does, each in its place: About at the top
+  right; Edit identities under the tiles; Add identity (the last tile)
+  opens the ways in; with none on the device, those ways are the page. On
+  a phone the circles shrink so three fit a row.
 -->
 <script lang="ts">
   import { MinusIcon, PlusIcon } from "@lucide/svelte";
   import { quintOut } from "svelte/easing";
   import { prefersReducedMotion } from "svelte/motion";
   import { fade, scale } from "svelte/transition";
-  import Footer from "$lib/components/layout/Footer.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Elevated from "../../foundation/surfaces/Elevated.svelte";
@@ -20,6 +23,7 @@
   import Backdrop from "../parts/Backdrop.svelte";
   import BigAvatar from "../parts/BigAvatar.svelte";
   import EditToggle from "../parts/EditToggle.svelte";
+  import LandingFooter from "../parts/LandingFooter.svelte";
   import LastUsed from "../parts/LastUsed.svelte";
   import SignInMethods from "../parts/SignInMethods.svelte";
 
@@ -29,7 +33,7 @@
   const single = $derived(p.identities.length === 1);
 
   const TILE =
-    "group flex w-32 flex-col items-center gap-3 rounded-3xl px-2 pt-4 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-focus-ring transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100 sm:w-36";
+    "group flex w-26 flex-col items-center gap-3 rounded-3xl px-1 pt-4 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-focus-ring transition-[scale] duration-160 ease-out active:scale-[0.97] motion-reduce:active:scale-100 sm:w-36 sm:px-2";
   const LIFT =
     "relative transition-[scale] duration-220 ease-(--ii-ease-out) group-hover:scale-106 group-focus-visible:scale-106 motion-reduce:transition-none";
 </script>
@@ -48,9 +52,15 @@
       class="flex h-16 shrink-0 items-center justify-between px-5 md:px-8"
     >
       <Logo class="text-fg-primary h-5.5" aria-label="Internet Identity" />
-      {#if !empty}
-        <EditToggle {p} />
-      {/if}
+      <!-- The product's About page; in the product, "/about". -->
+      <a
+        href="https://id.ai/about"
+        target="_blank"
+        rel="noopener"
+        class="btn btn-tertiary btn-sm text-text-tertiary hover:text-text-primary -me-3 rounded-full font-medium"
+      >
+        About
+      </a>
     </header>
 
     <main
@@ -122,7 +132,13 @@
                 aria-busy={pending}
               >
                 <span class={LIFT}>
-                  <BigAvatar identity={one} size={88} badge />
+                  <BigAvatar identity={one} size={72} badge class="sm:hidden" />
+                  <BigAvatar
+                    identity={one}
+                    size={88}
+                    badge
+                    class="max-sm:hidden"
+                  />
                   {#if pending}
                     <span
                       class="absolute -inset-2"
@@ -178,7 +194,7 @@
                 <span
                   class={[
                     LIFT,
-                    "border-border-primary text-fg-tertiary grid size-22 place-items-center rounded-full border-[1.5px] border-dashed",
+                    "border-border-primary text-fg-tertiary grid size-18 place-items-center rounded-full border-[1.5px] border-dashed sm:size-22",
                   ]}
                 >
                   <PlusIcon class="size-6" />
@@ -187,24 +203,21 @@
                   <span class="text-text-primary text-base font-medium">
                     Add identity
                   </span>
-                  <span class="text-text-tertiary h-5 text-xs leading-5">
-                    Passkey or account
+                  <span
+                    class="text-text-tertiary h-5 text-xs leading-5 whitespace-nowrap"
+                  >
+                    Sign in or create
                   </span>
                 </span>
               </button>
             </li>
           {/if}
         </ul>
+        <div data-arrive class="mt-6">
+          <EditToggle {p} />
+        </div>
       {/if}
     </main>
-    <!-- What Internet Identity stands for, in one quiet line above the
-         footer. The copy is a draft, as in Brand.svelte. -->
-    <p
-      data-arrive
-      class="text-text-tertiary px-6 pb-4 text-center text-sm text-balance"
-    >
-      No passwords to leak, and every app sees a different you.
-    </p>
-    <Footer />
+    <LandingFooter {p} />
   </Elevated>
 </div>
