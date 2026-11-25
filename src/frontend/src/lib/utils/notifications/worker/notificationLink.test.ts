@@ -47,7 +47,7 @@ describe("allowedLink", () => {
         origin: "https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app",
         alternativeOrigins: [],
       }),
-    ).toBe("https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app");
+    ).toBe("https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net");
   });
 
   it("replaces a link the app does not vouch for with the app itself", () => {
@@ -74,6 +74,49 @@ describe("allowedLink", () => {
     expect(
       allowedLink({ url: undefined, origin: APP, alternativeOrigins: [] }),
     ).toBe(APP);
+  });
+
+  describe("opens a canister's own origin on icp.net where the link falls back", () => {
+    const CANISTER_ORIGIN = "https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app";
+    const CANISTER_APP_URL = "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net";
+
+    it("for a missing link", () => {
+      expect(
+        allowedLink({
+          url: undefined,
+          origin: CANISTER_ORIGIN,
+          alternativeOrigins: [],
+        }),
+      ).toBe(CANISTER_APP_URL);
+    });
+
+    it("for a link that is no URL", () => {
+      expect(
+        allowedLink({
+          url: "not a url",
+          origin: CANISTER_ORIGIN,
+          alternativeOrigins: [],
+        }),
+      ).toBe(CANISTER_APP_URL);
+    });
+
+    it("for a link the app does not vouch for", () => {
+      expect(
+        allowedLink({
+          url: "https://evil.example/drain",
+          origin: CANISTER_ORIGIN,
+          alternativeOrigins: [],
+        }),
+      ).toBe(CANISTER_APP_URL);
+    });
+  });
+
+  it("falls back to a custom domain as it stands", () => {
+    for (const url of [undefined, "not a url", "https://evil.example/drain"]) {
+      expect(allowedLink({ url, origin: APP, alternativeOrigins: [] })).toBe(
+        APP,
+      );
+    }
   });
 });
 

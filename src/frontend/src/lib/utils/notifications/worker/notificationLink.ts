@@ -3,13 +3,14 @@
  *
  * The app names the link, so it is checked before it is ever opened: it must be on the
  * origin that sent the notification, or on one of the origins that origin publishes as
- * its own in `/.well-known/ii-alternative-origins`. Anything else — and anything
- * missing or unparsable — becomes the sending origin itself, so acting on a
- * notification always lands on the app and never anywhere the app did not vouch for.
+ * its own in `/.well-known/ii-alternative-origins`. Anything else, and anything
+ * missing or unparsable, opens the sending origin itself where {@link appUrl} puts it,
+ * so acting on a notification always lands on the app and never anywhere the app did
+ * not vouch for.
  *
  * The origin that sent it has been remapped onto `ic0.app`, and an app names its link
  * on the domain it is actually served on, so both sides of that check are remapped the
- * same way. What opens is the app's link as it wrote it.
+ * same way. A link that passes opens as the app wrote it.
  */
 
 import { fetchCapped } from "$lib/utils/appMetadata";
@@ -37,18 +38,18 @@ export const allowedLink = ({
   alternativeOrigins: string[];
 }): string => {
   if (url === undefined) {
-    return origin;
+    return appUrl(origin);
   }
   let named: URL;
   try {
     named = new URL(url);
   } catch {
-    return origin;
+    return appUrl(origin);
   }
   const vouched = [origin, ...alternativeOrigins].map(remapToLegacyDomain);
   return vouched.includes(remapToLegacyDomain(named.origin))
     ? named.toString()
-    : origin;
+    : appUrl(origin);
 };
 
 /** The origins the app at `origin` publishes as its own, or none where it publishes
