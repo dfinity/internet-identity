@@ -13,13 +13,14 @@
 use crate::concurrency::{self, ConcurrencyLimiter, LimiterConfig};
 use crate::origin::ApplicationOrigin;
 use crate::origin::FetchableApplicationOrigin;
+use crate::origin::OriginSha256;
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
 use ic_cdk::api::management_canister::http_request::{
     http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse,
 };
-use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
+use internet_identity_interface::internet_identity::types::Timestamp;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::future::Future;
@@ -46,9 +47,10 @@ const ALTERNATIVE_ORIGINS_CALL_CYCLES: u128 = 30_000_000_000;
 const FRESH_FOR_SECONDS: u64 = 60 * 60;
 const STALE_FOR_SECONDS: u64 = 60 * 60;
 
-/// Eviction headroom: a list holds up to about 26 KiB, so at the cap the cache holds at
-/// most about 52 MB. An origin evicted by junk is fetched again on its next call.
-const CACHE_MAX_ENTRIES: usize = 2_000;
+/// Eviction headroom rather than capacity: junk origins are free to generate, and an
+/// origin evicted by them is fetched again on its next call. About 220 MB at the worst
+/// case of [`MAX_ALTERNATIVE_ORIGINS`] hashes a list, realistically far less.
+const CACHE_MAX_ENTRIES: usize = 50_000;
 const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 /// Above the outcall timeout of about a minute, so a live fill is never taken over.
@@ -67,9 +69,9 @@ const PENDING_RETRY_AFTER_NS: u64 = 3 * 1_000_000_000;
 const HTTP_STATUS_OK: u16 = 200;
 const HTTP_STATUS_NOT_FOUND: u16 = 404;
 
-/// The folded origins an application lists, keyed by the application's origin.
-type AlternativeOriginsCache =
-    SingleFlightCache<ApplicationOrigin, BTreeSet<FrontendHostname>, String>;
+/// The hashes of the folded origins an application lists, keyed by the application's
+/// origin.
+type AlternativeOriginsCache = SingleFlightCache<ApplicationOrigin, BTreeSet<OriginSha256>, String>;
 
 thread_local! {
     static ALTERNATIVE_ORIGINS_CACHE: RefCell<AlternativeOriginsCache> =
@@ -88,7 +90,7 @@ fn new_alternative_origins_cache<Fut>(
     fill: impl Fn(ApplicationOrigin) -> Fut + 'static,
 ) -> AlternativeOriginsCache
 where
-    Fut: Future<Output = FillOutcome<BTreeSet<FrontendHostname>, String>> + 'static,
+    Fut: Future<Output = FillOutcome<BTreeSet<OriginSha256>, String>> + 'static,
 {
     SingleFlightCache::new(
         fill,
@@ -128,7 +130,7 @@ pub fn authorize_alternative_origin(
     }
     match single_flight_cache::get(&ALTERNATIVE_ORIGINS_CACHE, derivation_origin.clone()) {
         Cached::Ready(alternative_origins) => {
-            if alternative_origins.contains(frontend_origin.as_str()) {
+            if alternative_origins.contains(&OriginSha256::from_origin(frontend_origin.as_str())) {
                 AlternativeOrigin::Listed
             } else {
                 AlternativeOrigin::NotListed
@@ -140,11 +142,11 @@ pub fn authorize_alternative_origin(
     }
 }
 
-/// The folded origins the application at `derivation_origin` lists, where its list is
-/// cached. Reads the cache only: a miss starts no fetch.
+/// The hashes of the folded origins the application at `derivation_origin` lists, where
+/// its list is cached. Reads the cache only: a miss starts no fetch.
 pub fn peek_alternative_origins(
     derivation_origin: &ApplicationOrigin,
-) -> Option<BTreeSet<FrontendHostname>> {
+) -> Option<BTreeSet<OriginSha256>> {
     match single_flight_cache::peek(&ALTERNATIVE_ORIGINS_CACHE, derivation_origin) {
         Cached::Ready(alternative_origins) => Some(alternative_origins),
         Cached::Pending => None,
@@ -167,27 +169,33 @@ struct AlternativeOriginList {
     alternative_origins: Vec<String>,
 }
 
-/// What a response means for an application's frontends. An application that serves no
-/// list, or one II cannot use, lists none: that is its own configuration, so it fills
-/// successfully with an empty set. Only II's own trouble, a status it did not ask for, is
-/// a failed fill, which the cache retries with backoff.
+/// What a response means for an application's frontends: the hashes of the folded
+/// origins it lists. An application that serves no list, or one II cannot use, lists
+/// none: that is its own configuration, so it fills successfully with an empty set. Only
+/// II's own trouble, a status it did not ask for, is a failed fill, which the cache
+/// retries with backoff.
 fn alternative_origins_from_response(
     status: u16,
     body: &[u8],
-) -> Result<BTreeSet<FrontendHostname>, String> {
+) -> Result<BTreeSet<OriginSha256>, String> {
     if status == HTTP_STATUS_NOT_FOUND {
         return Ok(BTreeSet::new());
     }
     if status != HTTP_STATUS_OK {
         return Err(format!("ii-alternative-origins answered {status}"));
     }
-    Ok(parse_alternative_origins(body).unwrap_or_default())
+    let alternative_origins = parse_alternative_origins(body).unwrap_or_default();
+    let alternative_origin_hashes: BTreeSet<OriginSha256> = alternative_origins
+        .iter()
+        .map(|alternative_origin| OriginSha256::from_origin(alternative_origin.as_str()))
+        .collect();
+    Ok(alternative_origin_hashes)
 }
 
 /// The folded origins a list names, or `None` where the body is not a list II can use:
 /// unparsable, or over [`MAX_ALTERNATIVE_ORIGINS`]. An entry that is not a bare origin
 /// is skipped, as it can never match a frontend.
-fn parse_alternative_origins(body: &[u8]) -> Option<BTreeSet<FrontendHostname>> {
+fn parse_alternative_origins(body: &[u8]) -> Option<BTreeSet<ApplicationOrigin>> {
     let list = serde_json::from_slice::<AlternativeOriginList>(body).ok()?;
     if list.alternative_origins.len() > MAX_ALTERNATIVE_ORIGINS {
         return None;
@@ -195,7 +203,7 @@ fn parse_alternative_origins(body: &[u8]) -> Option<BTreeSet<FrontendHostname>> 
     let mut alternative_origins = BTreeSet::new();
     for entry in &list.alternative_origins {
         if let Ok(alternative_origin) = ApplicationOrigin::try_from(entry.as_str()) {
-            alternative_origins.insert(alternative_origin.as_str().to_string());
+            alternative_origins.insert(alternative_origin);
         }
     }
     Some(alternative_origins)
@@ -205,7 +213,7 @@ fn parse_alternative_origins(body: &[u8]) -> Option<BTreeSet<FrontendHostname>> 
 /// abandon, which records nothing and retries once capacity frees.
 async fn fill_alternative_origins(
     derivation_origin: ApplicationOrigin,
-) -> FillOutcome<BTreeSet<FrontendHostname>, String> {
+) -> FillOutcome<BTreeSet<OriginSha256>, String> {
     let Some(_permit) = concurrency::acquire(&ALTERNATIVE_ORIGINS_OUTCALL_LIMIT) else {
         return FillOutcome::Abandoned;
     };
@@ -221,7 +229,7 @@ async fn fill_alternative_origins(
 
 async fn fetch_alternative_origins(
     fetch_origin: &FetchableApplicationOrigin,
-) -> Result<BTreeSet<FrontendHostname>, String> {
+) -> Result<BTreeSet<OriginSha256>, String> {
     let request = CanisterHttpRequestArgument {
         url: format!("{}{WELL_KNOWN_PATH}", fetch_origin.as_str()),
         method: HttpMethod::GET,
@@ -273,7 +281,10 @@ fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
         return invalid_response;
     };
     let list = AlternativeOriginList {
-        alternative_origins: alternative_origins.into_iter().collect(),
+        alternative_origins: alternative_origins
+            .iter()
+            .map(|alternative_origin| alternative_origin.as_str().to_string())
+            .collect(),
     };
     let Ok(body) = serde_json::to_vec(&list) else {
         return invalid_response;
@@ -288,6 +299,7 @@ fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use internet_identity_interface::internet_identity::types::FrontendHostname;
     use std::collections::BTreeMap;
 
     thread_local! {
@@ -302,9 +314,14 @@ mod tests {
 
     async fn fill_from_published_lists(
         derivation_origin: ApplicationOrigin,
-    ) -> FillOutcome<BTreeSet<FrontendHostname>, String> {
+    ) -> FillOutcome<BTreeSet<OriginSha256>, String> {
         match PUBLISHED_LISTS.with_borrow(|lists| lists.get(derivation_origin.as_str()).cloned()) {
-            Some(alternative_origins) => FillOutcome::Ready(alternative_origins),
+            Some(alternative_origins) => FillOutcome::Ready(
+                alternative_origins
+                    .iter()
+                    .map(|alternative_origin| OriginSha256::from_origin(alternative_origin))
+                    .collect(),
+            ),
             None => FillOutcome::Failed(format!("no test list for {derivation_origin}")),
         }
     }
@@ -330,6 +347,13 @@ mod tests {
 
     fn origin(origin: &str) -> ApplicationOrigin {
         ApplicationOrigin::try_from(origin).expect("a bare origin")
+    }
+
+    fn hashes(origins: &[&str]) -> BTreeSet<OriginSha256> {
+        origins
+            .iter()
+            .map(|origin| OriginSha256::from_origin(origin))
+            .collect()
     }
 
     fn is_pending(answer: AlternativeOrigin) -> bool {
@@ -411,10 +435,7 @@ mod tests {
         let body = br#"{"alternativeOrigins":["https://app.example","https://aaaaa-aa.icp0.io"]}"#;
         assert_eq!(
             alternative_origins_from_response(200, body),
-            Ok(BTreeSet::from([
-                "https://aaaaa-aa.ic0.app".to_string(),
-                "https://app.example".to_string(),
-            ]))
+            Ok(hashes(&["https://aaaaa-aa.ic0.app", "https://app.example"]))
         );
     }
 
@@ -423,7 +444,7 @@ mod tests {
         let body = br#"{"alternativeOrigins":["https://app.example/path","https://app.example"]}"#;
         assert_eq!(
             alternative_origins_from_response(200, body),
-            Ok(BTreeSet::from(["https://app.example".to_string()]))
+            Ok(hashes(&["https://app.example"]))
         );
     }
 
@@ -524,7 +545,7 @@ mod tests {
         };
         assert_eq!(
             alternative_origins_from_response(200, &transformed_body(&body(100))),
-            Ok(BTreeSet::from([FRONTEND.to_string()]))
+            Ok(hashes(&[FRONTEND]))
         );
         assert_eq!(
             alternative_origins_from_response(200, &transformed_body(&body(101))),

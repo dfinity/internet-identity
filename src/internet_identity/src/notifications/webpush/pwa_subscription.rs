@@ -462,8 +462,8 @@ fn authorize_frontend(
     )
     .map(|alternative_origins| {
         let mut kept_frontend_origin_hashes: BTreeSet<StorableOriginSha256> = alternative_origins
-            .iter()
-            .map(StorableOriginSha256::from_origin)
+            .into_iter()
+            .map(StorableOriginSha256::from)
             .collect();
         kept_frontend_origin_hashes.insert(StorableOriginSha256::from_origin(&session.origin));
         kept_frontend_origin_hashes

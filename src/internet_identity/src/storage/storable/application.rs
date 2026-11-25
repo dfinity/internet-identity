@@ -6,7 +6,8 @@ use std::{
     fmt::{self, Display},
 };
 
-use crate::utils::{sha256sum, slice_to_bounded_32};
+use crate::origin::OriginSha256;
+use crate::utils::slice_to_bounded_32;
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq)]
 #[cbor(map)]
@@ -66,12 +67,18 @@ impl Display for StorableOriginSha256 {
 
 impl StorableOriginSha256 {
     pub fn from_origin(origin: &FrontendHostname) -> Self {
-        let hash = sha256sum(origin.as_bytes());
-        Self { hash }
+        Self::from(OriginSha256::from_origin(origin))
     }
 
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.hash
+    }
+}
+
+impl From<OriginSha256> for StorableOriginSha256 {
+    fn from(origin_hash: OriginSha256) -> Self {
+        let hash = *origin_hash.as_bytes();
+        Self { hash }
     }
 }
 
