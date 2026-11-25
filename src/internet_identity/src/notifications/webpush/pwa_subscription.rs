@@ -32,8 +32,8 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    FrontendHostname, PrepareWebPushSubscriptionResponse, PwaWebPushSubscription,
-    SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
+    ApplicationNumber, FrontendHostname, PrepareWebPushSubscriptionResponse,
+    PwaWebPushSubscription, SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
 };
 use serde_bytes::ByteBuf;
 use std::collections::{BTreeMap, BTreeSet};
@@ -110,8 +110,8 @@ pub enum SetPwaSubscriptionError {
     TransportKeyExpired,
     /// Another slot holds the endpoint and is not stale.
     EndpointInUse,
-    /// The slot written is stale: the app's cached alternative origins no longer name its
-    /// frontend.
+    /// The app's cached alternative origins no longer name the frontend of the slot
+    /// written.
     FrontendNotListed,
     /// Nothing the caller can act on: a broken invariant or a storage failure, and why.
     Internal(String),
@@ -250,7 +250,10 @@ pub fn set_pwa_subscription(
     .map_err(map_set_error)?;
     let displaced_holder = find_endpoint_holder(holder, &ready_subscription.endpoint);
     if let Some(endpoint_holder) = displaced_holder {
-        if !find_stale_pwa_slots(endpoint_holder, now_ns).contains(&endpoint_holder) {
+        let is_frontend_listed = frontend_listing(endpoint_holder.application_number);
+        if !find_stale_pwa_slots(endpoint_holder, &is_frontend_listed, now_ns)
+            .contains(&endpoint_holder)
+        {
             return Err(SetPwaSubscriptionError::EndpointInUse);
         }
     }
@@ -355,18 +358,20 @@ pub(crate) fn read_pwa_subscription(holder: PwaSubscriptionHolder) -> Option<Pwa
 /// `displaced_holder`'s where one is given. Every prepare, set and removal of an app's
 /// slots writes through here, so the same write also empties every slot of `holder`'s
 /// config that [`find_stale_pwa_slots`] finds stale at `now_ns`. Putting a subscription on
-/// a slot that is itself stale is refused before anything is written, so a stale slot is
-/// never recreated.
+/// a slot of a frontend the app no longer lists is refused before anything is written,
+/// so such a slot is never recreated; a stale previous occupant of `holder`'s slot is
+/// replaced.
 pub(crate) fn write_pwa_subscription(
     holder: PwaSubscriptionHolder,
     subscription: Option<PwaSubscription>,
     displaced_holder: Option<PwaSubscriptionHolder>,
     now_ns: Timestamp,
 ) -> Result<(), SetPwaSubscriptionError> {
-    let stale_holders = find_stale_pwa_slots(holder, now_ns);
-    if subscription.is_some() && stale_holders.contains(&holder) {
+    let is_frontend_listed = frontend_listing(holder.application_number);
+    if subscription.is_some() && !is_frontend_listed(holder.frontend_origin_hash) {
         return Err(SetPwaSubscriptionError::FrontendNotListed);
     }
+    let stale_holders = find_stale_pwa_slots(holder, &is_frontend_listed, now_ns);
     storage_borrow_mut(|storage| {
         storage.write_pwa_webpush_subscription(
             holder,
@@ -378,34 +383,48 @@ pub(crate) fn write_pwa_subscription(
     .map_err(|err| SetPwaSubscriptionError::Internal(format!("{err}")))
 }
 
+/// Whether the app `application_number` names still accepts a frontend, by the hash of
+/// the frontend's origin: its own origin always, and any other frontend unless the app's
+/// cached alternative origins no longer name it. Where no list is cached, every frontend
+/// is accepted: this reads the cache only and starts no fetch.
+fn frontend_listing(
+    application_number: ApplicationNumber,
+) -> impl Fn(StorableOriginSha256) -> bool {
+    let application_origin =
+        storage_borrow(|storage| storage.lookup_application_origin_with_number(application_number));
+    let application_origin_hash = application_origin
+        .as_ref()
+        .map(StorableOriginSha256::from_origin);
+    let listed_frontend_origin_hashes: Option<BTreeSet<StorableOriginSha256>> = application_origin
+        .and_then(|application_origin| {
+            ApplicationOrigin::try_from(application_origin.as_str()).ok()
+        })
+        .and_then(|application_origin| {
+            alternative_origins::peek_alternative_origins(&application_origin)
+        })
+        .map(|alternative_origin_hashes| {
+            alternative_origin_hashes
+                .into_iter()
+                .map(StorableOriginSha256::from)
+                .collect()
+        });
+    move |frontend_origin_hash| {
+        application_origin_hash == Some(frontend_origin_hash)
+            || listed_frontend_origin_hashes
+                .as_ref()
+                .is_none_or(|listed_hashes| listed_hashes.contains(&frontend_origin_hash))
+    }
+}
+
 /// The slots of the identity's config for the app `holder` is on, on every browser
-/// entry, that are stale at `now_ns`: a slot whose account has no session on the slot's
-/// browser entry that is neither expired nor idle, and a slot of a frontend other than
-/// the app's own origin that the app's cached alternative origins no longer name. Where
-/// no list is cached, frontend slots are kept: this reads the cache only and starts no
-/// fetch.
+/// entry, that are stale at `now_ns`: a slot of a frontend `is_frontend_listed` refuses,
+/// and a slot whose account has no session on the slot's browser entry that is neither
+/// expired nor idle.
 fn find_stale_pwa_slots(
     holder: PwaSubscriptionHolder,
+    is_frontend_listed: &impl Fn(StorableOriginSha256) -> bool,
     now_ns: Timestamp,
 ) -> BTreeSet<PwaSubscriptionHolder> {
-    let Some(application_origin) = storage_borrow(|storage| {
-        storage.lookup_application_origin_with_number(holder.application_number)
-    }) else {
-        return BTreeSet::new();
-    };
-    let application_origin_hash = StorableOriginSha256::from_origin(&application_origin);
-    let listed_frontend_origin_hashes: Option<BTreeSet<StorableOriginSha256>> =
-        ApplicationOrigin::try_from(application_origin.as_str())
-            .ok()
-            .and_then(|application_origin| {
-                alternative_origins::peek_alternative_origins(&application_origin)
-            })
-            .map(|alternative_origin_hashes| {
-                alternative_origin_hashes
-                    .into_iter()
-                    .map(StorableOriginSha256::from)
-                    .collect()
-            });
     storage_borrow(|storage| {
         let Some(config) =
             storage.anchor_application_config(holder.anchor_number, holder.application_number)
@@ -422,11 +441,7 @@ fn find_stale_pwa_slots(
                 frontend_origin_hash,
                 ..holder
             };
-            let is_listed = frontend_origin_hash == application_origin_hash
-                || listed_frontend_origin_hashes
-                    .as_ref()
-                    .is_none_or(|listed_hashes| listed_hashes.contains(&frontend_origin_hash));
-            if !is_listed {
+            if !is_frontend_listed(frontend_origin_hash) {
                 stale_holders.insert(slot_holder);
                 continue;
             }

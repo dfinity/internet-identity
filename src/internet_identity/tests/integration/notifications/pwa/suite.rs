@@ -521,6 +521,82 @@ fn should_refuse_a_set_for_a_frontend_the_application_stopped_listing_after_its_
 }
 
 #[test]
+fn should_let_another_account_take_over_a_browsers_slots_once_the_first_accounts_sessions_expired()
+{
+    let env = env();
+    let (canister_id, anchor, first_account_session) =
+        install_signed_in(&env, Some(20 * MINUTE_NS), None);
+    let first_session = session_of(&first_account_session);
+    subscribe_suite_frontend(&env, canister_id, first_session);
+    subscribe_pwa_webpush(
+        &env,
+        canister_id,
+        first_session,
+        PWA_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+    env.advance_time(Duration::from_nanos(21 * MINUTE_NS));
+
+    let other_account = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        APP.into(),
+        "Other".to_string(),
+    )
+    .expect("create rejected")
+    .expect("create refused")
+    .account_number;
+    let other_session = session_of(&sign_in(
+        &env,
+        canister_id,
+        principal_1(),
+        PrepareAccountSessionRequest {
+            account_number: other_account,
+            ..session_request(anchor, APP, &BrowserKey::new(1).successor())
+        },
+    ));
+    let other_suite_endpoint = "https://suite.push.example/other-account";
+    let other_app_endpoint = "https://pwa.push.example/other-account";
+    assert_eq!(
+        subscribe_pwa_webpush_for_frontend(
+            &env,
+            canister_id,
+            other_session,
+            Some(SUITE_FRONTEND),
+            other_suite_endpoint,
+            p256dh(13),
+            &OTHER_AUTH_SECRET,
+        ),
+        Ok(Ok(()))
+    );
+    assert_eq!(
+        subscribe_pwa_webpush(
+            &env,
+            canister_id,
+            other_session,
+            other_app_endpoint,
+            p256dh(14),
+            &TEST_AUTH_SECRET,
+        ),
+        Ok(Ok(()))
+    );
+
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, other_session, Some(SUITE_FRONTEND)),
+        Some(other_suite_endpoint.to_string())
+    );
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, other_session, None),
+        Some(other_app_endpoint.to_string())
+    );
+}
+
+#[test]
 fn should_keep_a_frontends_slot_and_fetch_no_list_on_a_write_while_no_list_is_cached() {
     let env = env();
     let (canister_id, account_session) = install_suite_subscribed(&env);
