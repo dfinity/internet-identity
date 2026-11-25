@@ -1,5 +1,5 @@
 <!--
-  1 · Centered. One column in the middle of the window, a card holding the
+  2 · Centered. One column in the middle of the window, a card holding the
   identities, the way most sign-in pages choose an account. A texture, if
   one is picked, stays faint behind it and fades out towards the card.
 -->

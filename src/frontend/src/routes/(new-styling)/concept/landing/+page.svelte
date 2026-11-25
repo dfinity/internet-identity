@@ -54,7 +54,10 @@
   const Layout = $derived(LAYOUT_OF[p.layout]);
   const current = $derived(LAYOUTS.find((one) => one.id === p.layout));
 
-  let hidden = $state(false);
+  /** The controls start folded into a flask in the middle of the header,
+   *  where they open, so the page is seen as it would be; the flask (or H)
+   *  opens them. */
+  let hidden = $state(true);
 
   // --- The frames: a phone, and the overview ---
 
@@ -319,7 +322,7 @@
         aria-label="Show the controls"
         onclick={() => (hidden = false)}
         transition:fade={{ duration: 150 }}
-        class="text-fg-quaternary hover:text-fg-tertiary focus-visible:outline-focus-ring fixed start-3 bottom-3 z-30 grid size-9 place-items-center rounded-full bg-(--ii-floating) shadow-(--ii-shadow-4) transition-colors duration-150 focus-visible:outline-2"
+        class="text-fg-quaternary hover:text-fg-tertiary focus-visible:outline-focus-ring fixed start-1/2 top-3.5 z-30 grid size-9 -translate-x-1/2 place-items-center rounded-full bg-(--ii-floating) shadow-(--ii-shadow-4) transition-colors duration-150 focus-visible:outline-2 md:top-6.5 rtl:translate-x-1/2"
       >
         <FlaskConicalIcon class="size-4" aria-hidden="true" />
       </button>

@@ -268,7 +268,7 @@
             : "Brand"}
       >
         {#if menu.kind === "layout"}
-          {#each ["Conventional", "Alternative"] as group (group)}
+          {#each ["Priority", "Conventional", "Alternative"] as group (group)}
             <div
               aria-hidden="true"
               class="text-text-tertiary px-3 pt-2 pb-1 text-xs"

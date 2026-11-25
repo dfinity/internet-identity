@@ -38,6 +38,12 @@ export interface LayoutOption {
 
 export const LAYOUTS: LayoutOption[] = [
   {
+    id: "profiles",
+    label: "Profiles",
+    group: "Priority",
+    note: "Identities as large tiles, like the apps on My apps. The colour tells them apart before the name does.",
+  },
+  {
     id: "centered",
     label: "Centered",
     group: "Conventional",
@@ -48,12 +54,6 @@ export const LAYOUTS: LayoutOption[] = [
     label: "Split",
     group: "Conventional",
     note: "Choosing on the left, the brand on the right: room to say what Internet Identity stands for.",
-  },
-  {
-    id: "profiles",
-    label: "Profiles",
-    group: "Alternative",
-    note: "Identities as large tiles, like the apps on My apps. The colour tells them apart before the name does.",
   },
   {
     id: "welcome",
@@ -133,10 +133,10 @@ const pick = <T extends string>(
 ): T => options.find((one) => one.id === value)?.id ?? fallback;
 
 export class Playground {
-  layout = $state<LayoutId>("split");
+  layout = $state<LayoutId>("profiles");
   state = $state<StateId>("several");
   lastUsed = $state(true);
-  texture = $state<TextureId>("blinds");
+  texture = $state<TextureId>("none");
   brand = $state<BrandId>("statement");
   tone = $state<ToneId>("neutral");
   view = $state<ViewId>("page");

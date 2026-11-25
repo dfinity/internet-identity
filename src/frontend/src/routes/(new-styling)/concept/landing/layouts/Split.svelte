@@ -1,5 +1,5 @@
 <!--
-  2 · Split. Half the window to choose an identity, half to the brand: a
+  3 · Split. Half the window to choose an identity, half to the brand: a
   framed panel, as the dashboard frames its canvas, with a texture and what
   Internet Identity stands for. In "Identity colour" the panel takes the
   colours of the identity pointed at (the most recent one otherwise), so
