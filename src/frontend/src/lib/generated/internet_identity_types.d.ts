@@ -299,7 +299,8 @@ export type AppSetPwaWebPushSubscriptionError = {
   {
     /**
      * Nothing here can open sealed_auth: the transport key it was encrypted to has
-     * expired, or a later prepare replaced it. Prepare again and re-send.
+     * expired, a later prepare replaced it, or the app no longer lists this frontend.
+     * Prepare again and re-send.
      */
     'TransportKeyExpired' : null
   } |

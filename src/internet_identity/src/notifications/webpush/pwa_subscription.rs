@@ -25,19 +25,18 @@ use crate::notifications::dispatch;
 use crate::origin::ApplicationOrigin;
 use crate::origin::FetchableApplicationOrigin;
 use crate::state::{storage_borrow, storage_borrow_mut};
+use crate::storage::account::Session;
 use crate::storage::anchor::{PendingTransport, WebPushSubscription};
 use crate::storage::storable::anchor_application_config::PwaSubscription;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::PwaSubscriptionHolder;
-use crate::storage::Storage;
 use candid::Principal;
-use ic_stable_structures::Memory;
 use internet_identity_interface::internet_identity::types::{
     FrontendHostname, PrepareWebPushSubscriptionResponse, PwaWebPushSubscription,
     SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
 };
 use serde_bytes::ByteBuf;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// What an installed web app's subscribe arrives with: the subscription's endpoint and
 /// `p256dh`, the transport key `sealed_auth` was encrypted to, and the sealed `auth`, each
@@ -111,6 +110,9 @@ pub enum SetPwaSubscriptionError {
     TransportKeyExpired,
     /// Another slot holds the endpoint and is not stale.
     EndpointInUse,
+    /// The slot written is stale: the app's cached alternative origins no longer name its
+    /// frontend.
+    FrontendNotListed,
     /// Nothing the caller can act on: a broken invariant or a storage failure, and why.
     Internal(String),
 }
@@ -187,8 +189,19 @@ fn start_pwa_subscription(
         subscription: WebPushSubscription::Pending(pending_transport),
         account_principal,
     };
-    write_pwa_subscription(holder, Some(subscription), None, now_ns)
-        .map_err(PreparePwaSubscriptionError::Internal)
+    write_pwa_subscription(holder, Some(subscription), None, now_ns).map_err(|err| match err {
+        SetPwaSubscriptionError::NotificationsNotAllowed => {
+            PreparePwaSubscriptionError::NotificationsNotAllowed
+        }
+        SetPwaSubscriptionError::FrontendNotListed => PreparePwaSubscriptionError::NoSuchFrontend,
+        SetPwaSubscriptionError::TransportKeyExpired => {
+            PreparePwaSubscriptionError::Internal("a transport key expired".to_string())
+        }
+        SetPwaSubscriptionError::EndpointInUse => {
+            PreparePwaSubscriptionError::Internal("an endpoint is in use".to_string())
+        }
+        SetPwaSubscriptionError::Internal(reason) => PreparePwaSubscriptionError::Internal(reason),
+    })
 }
 
 /// Registers `holder`'s slot for Web Push for the account `account_principal`
@@ -248,7 +261,6 @@ pub fn set_pwa_subscription(
         account_principal,
     };
     write_pwa_subscription(holder, Some(subscription), displaced_holder, now_ns)
-        .map_err(SetPwaSubscriptionError::Internal)
 }
 
 /// Empties `holder`'s slot where it delivers for `account_principal`'s account.
@@ -266,7 +278,7 @@ fn remove_pwa_subscription(
         Some(_) => {}
         None => return Ok(()),
     }
-    write_pwa_subscription(holder, None, None, now_ns).map_err(SetPwaSubscriptionError::Internal)
+    write_pwa_subscription(holder, None, None, now_ns)
 }
 
 /// The other slot that holds `endpoint` now. `None` where no other slot holds it: the
@@ -306,7 +318,7 @@ pub(crate) fn clear_gone_pwa_subscription(
     if registered_subscription.endpoint.as_str() != endpoint {
         return Ok(());
     }
-    write_pwa_subscription(holder, None, None, now_ns)
+    write_pwa_subscription(holder, None, None, now_ns).map_err(|err| format!("{err:?}"))
 }
 
 /// The endpoint `holder`'s slot is subscribed at, where it is ready and delivers
@@ -342,14 +354,19 @@ pub(crate) fn read_pwa_subscription(holder: PwaSubscriptionHolder) -> Option<Pwa
 /// Puts `subscription` on `holder`'s slot, or with `None` empties it, after emptying
 /// `displaced_holder`'s where one is given. Every prepare, set and removal of an app's
 /// slots writes through here, so the same write also empties every slot of `holder`'s
-/// config that [`find_stale_pwa_slots`] finds stale at `now_ns`.
+/// config that [`find_stale_pwa_slots`] finds stale at `now_ns`. Putting a subscription on
+/// a slot that is itself stale is refused before anything is written, so a stale slot is
+/// never recreated.
 pub(crate) fn write_pwa_subscription(
     holder: PwaSubscriptionHolder,
     subscription: Option<PwaSubscription>,
     displaced_holder: Option<PwaSubscriptionHolder>,
     now_ns: Timestamp,
-) -> Result<(), String> {
+) -> Result<(), SetPwaSubscriptionError> {
     let stale_holders = find_stale_pwa_slots(holder, now_ns);
+    if subscription.is_some() && stale_holders.contains(&holder) {
+        return Err(SetPwaSubscriptionError::FrontendNotListed);
+    }
     storage_borrow_mut(|storage| {
         storage.write_pwa_webpush_subscription(
             holder,
@@ -358,7 +375,7 @@ pub(crate) fn write_pwa_subscription(
             &stale_holders,
         )
     })
-    .map_err(|err| format!("{err}"))
+    .map_err(|err| SetPwaSubscriptionError::Internal(format!("{err}")))
 }
 
 /// The slots of the identity's config for the app `holder` is on, on every browser
@@ -396,6 +413,7 @@ fn find_stale_pwa_slots(
             return BTreeSet::new();
         };
         let mut stale_holders = BTreeSet::new();
+        let mut sessions_by_account: BTreeMap<Principal, Vec<Session>> = BTreeMap::new();
         for (browser_id, frontend_origin_hash, held_subscription) in
             config.pwa_webpush_subscription_slots()
         {
@@ -408,36 +426,30 @@ fn find_stale_pwa_slots(
                 || listed_frontend_origin_hashes
                     .as_ref()
                     .is_none_or(|listed_hashes| listed_hashes.contains(&frontend_origin_hash));
-            let has_live_session = has_live_pwa_session(
-                storage,
-                slot_holder,
-                held_subscription.account_principal,
-                now_ns,
-            );
-            if !is_listed || !has_live_session {
+            if !is_listed {
+                stale_holders.insert(slot_holder);
+                continue;
+            }
+            let account_principal = held_subscription.account_principal;
+            let sessions = sessions_by_account
+                .entry(account_principal)
+                .or_insert_with(|| {
+                    dispatch::read_account_sessions(
+                        storage,
+                        holder.anchor_number,
+                        holder.application_number,
+                        account_principal,
+                    )
+                });
+            let has_live_session = sessions.iter().any(|session| {
+                session.browser_id == browser_id && !session.is_expired_or_idle(now_ns)
+            });
+            if !has_live_session {
                 stale_holders.insert(slot_holder);
             }
         }
         stale_holders
     })
-}
-
-/// Whether the account `account_principal` names, of the identity `holder` is on, has a
-/// session on `holder`'s browser entry that is neither expired nor idle at `now_ns`.
-fn has_live_pwa_session<M: Memory + Clone>(
-    storage: &Storage<M>,
-    holder: PwaSubscriptionHolder,
-    account_principal: Principal,
-    now_ns: Timestamp,
-) -> bool {
-    dispatch::read_account_sessions(
-        storage,
-        holder.anchor_number,
-        holder.application_number,
-        account_principal,
-    )
-    .iter()
-    .any(|session| session.browser_id == holder.browser_id && !session.is_expired_or_idle(now_ns))
 }
 
 fn is_notifications_allowed(holder: PwaSubscriptionHolder) -> bool {

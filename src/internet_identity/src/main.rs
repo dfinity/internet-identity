@@ -1373,6 +1373,7 @@ fn app_set_pwa_webpush_subscription(
             }
             pwa_subscription::SetPwaSubscriptionError::TransportKeyExpired => TransportKeyExpired,
             pwa_subscription::SetPwaSubscriptionError::EndpointInUse => EndpointInUse,
+            pwa_subscription::SetPwaSubscriptionError::FrontendNotListed => TransportKeyExpired,
             pwa_subscription::SetPwaSubscriptionError::Internal(reason) => {
                 InternalCanisterError(reason)
             }

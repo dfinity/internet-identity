@@ -8,11 +8,13 @@ use super::same_device::{
     remove_unanswered_of_frontend, Phone, PROBE_ANSWER_TIME,
 };
 use super::*;
+use canister_tests::api::internet_identity::notifications::seal_auth;
 use canister_tests::api::internet_identity::notifications::subscribe_pwa_webpush_for_frontend;
 use canister_tests::framework::assert_metric;
 use internet_identity_interface::internet_identity::types::{
     AppGetPwaWebPushSubscriptionStatusRequest, AppPreparePwaWebPushSubscriptionRequest,
-    ClaimSameDeviceLinkError, NotificationPath, SendNotificationError, SendNotificationResponse,
+    AppSetPwaWebPushSubscriptionRequest, ClaimSameDeviceLinkError, NotificationPath,
+    PwaWebPushSubscription, SendNotificationError, SendNotificationResponse,
 };
 
 /// A frontend [`APP`]'s alternative-origins list does not name.
@@ -443,6 +445,78 @@ fn should_drop_the_slot_of_the_last_frontend_the_application_stopped_listing_on_
     assert_eq!(
         frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
         None
+    );
+}
+
+#[test]
+fn should_refuse_a_set_for_a_frontend_the_application_stopped_listing_after_its_prepare() {
+    let env = env();
+    let (canister_id, _, account_session) = install_signed_in(&env, None, None);
+    let session = session_of(&account_session);
+    assert_eq!(
+        prepare_for_frontend(&env, canister_id, session, SUITE_FRONTEND),
+        AppPreparePwaWebPushSubscriptionResult::Pending
+    );
+    answer_outcalls(&env, 200);
+
+    // Prepared while the cached list still names the frontend, a few minutes before it
+    // is refreshed.
+    env.advance_time(ALTERNATIVE_ORIGINS_FRESH_FOR - Duration::from_secs(120));
+    let mut response = prepare_for_frontend(&env, canister_id, session, SUITE_FRONTEND);
+    for _ in 0..3 {
+        if response != AppPreparePwaWebPushSubscriptionResult::Pending {
+            break;
+        }
+        answer_outcalls(&env, 200);
+        response = prepare_for_frontend(&env, canister_id, session, SUITE_FRONTEND);
+    }
+    let AppPreparePwaWebPushSubscriptionResult::Ok(keys) = response else {
+        panic!("prepare answered {response:?}");
+    };
+    env.advance_time(Duration::from_secs(180));
+    assert_eq!(
+        prepare_for_frontend(&env, canister_id, session, CALENDAR_FRONTEND),
+        AppPreparePwaWebPushSubscriptionResult::Err(
+            AppPreparePwaWebPushSubscriptionError::NoSuchFrontend
+        )
+    );
+    answer_outcalls_listing(&env, &[]);
+
+    let (transport_key, sealed_auth) = seal_auth(&keys.transport_public_key, &OTHER_AUTH_SECRET);
+    assert_eq!(
+        app_set_pwa_webpush_subscription(
+            &env,
+            canister_id,
+            session,
+            AppSetPwaWebPushSubscriptionRequest {
+                subscription: Some(PwaWebPushSubscription {
+                    endpoint: SUITE_ENDPOINT.to_string(),
+                    p256dh: p256dh(11),
+                    transport_key,
+                    sealed_auth,
+                }),
+                frontend_origin: Some(SUITE_FRONTEND.to_string()),
+            },
+        )
+        .expect("set rejected"),
+        Err(AppSetPwaWebPushSubscriptionError::TransportKeyExpired)
+    );
+
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
+        None
+    );
+    let other_session = session_of(&second_identity_at(&env, canister_id, APP));
+    assert_eq!(
+        subscribe_pwa_webpush(
+            &env,
+            canister_id,
+            other_session,
+            SUITE_ENDPOINT,
+            p256dh(12),
+            &OTHER_AUTH_SECRET
+        ),
+        Ok(Ok(()))
     );
 }
 

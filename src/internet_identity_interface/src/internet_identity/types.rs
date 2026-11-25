@@ -1847,7 +1847,8 @@ pub enum AppSetPwaWebPushSubscriptionError {
     /// The identity has not allowed this app to notify it.
     NotificationsNotAllowed,
     /// Nothing here can open `sealed_auth`: the transport key it was encrypted to has
-    /// expired, or a later prepare replaced it. Prepare again and re-send.
+    /// expired, a later prepare replaced it, or the app no longer lists this frontend.
+    /// Prepare again and re-send.
     TransportKeyExpired,
     /// Another subscription, of an account still signed in on its browser, holds this
     /// endpoint. Subscribe again for a fresh endpoint and re-send.
