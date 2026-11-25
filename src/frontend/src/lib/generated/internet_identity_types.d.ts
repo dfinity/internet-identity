@@ -1984,8 +1984,8 @@ export interface NotificationGrantConsentRequest {
   'anchor_number' : UserNumber,
 }
 /**
- * Scoped to (origin, recipient), and shared across the canisters sending for
- * one origin.
+ * Scoped to the recipient and the canister sending it: two canisters may each use
+ * one id for one recipient.
  */
 export type NotificationId = bigint;
 /**

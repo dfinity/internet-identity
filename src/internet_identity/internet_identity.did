@@ -2252,8 +2252,8 @@ type AppProbePwaWebPushSubscriptionError = variant {
 
 // ===== Notifications sent by an app =====
 
-// Scoped to (origin, recipient), and shared across the canisters sending for
-// one origin.
+// Scoped to the recipient and the canister sending it: two canisters may each use
+// one id for one recipient.
 type NotificationId = nat64;
 
 // Internet Identity's own id for one entry in one browser's inbox, assigned when the entry
