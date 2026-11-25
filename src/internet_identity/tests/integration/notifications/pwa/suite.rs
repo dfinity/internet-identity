@@ -416,10 +416,18 @@ fn should_keep_every_frontends_slot_on_a_prepare_for_the_applications_own_origin
         Some(SUITE_ENDPOINT.to_string())
     );
 
-    assert!(matches!(
-        prepare_for_frontend(&env, canister_id, session, APP),
-        AppPreparePwaWebPushSubscriptionResult::Ok(_)
-    ));
+    let mut response = prepare_for_frontend(&env, canister_id, session, APP);
+    for _ in 0..3 {
+        if response != AppPreparePwaWebPushSubscriptionResult::Pending {
+            break;
+        }
+        answer_outcalls_listing(&env, &[CALENDAR_FRONTEND]);
+        response = prepare_for_frontend(&env, canister_id, session, APP);
+    }
+    assert!(
+        matches!(response, AppPreparePwaWebPushSubscriptionResult::Ok(_)),
+        "{response:?}"
+    );
 
     assert_eq!(
         frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),

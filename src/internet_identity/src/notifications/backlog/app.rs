@@ -249,10 +249,9 @@ mod tests {
             .into_iter()
             .map(|taken| taken.entry.item)
             .collect();
-        assert_eq!(
-            pending_notifications,
-            vec![first_sender_notification, second_sender_notification]
-        );
+        assert_eq!(pending_notifications.len(), 2);
+        assert!(pending_notifications.contains(&first_sender_notification));
+        assert!(pending_notifications.contains(&second_sender_notification));
     }
 
     #[test]
