@@ -425,10 +425,10 @@ enum FrontendAuthorization {
 }
 
 /// Whether the app of `session` accepts `frontend_origin` as its own frontend, which it
-/// does without a list where `frontend_origin` is `None`, its own origin. Refused where
-/// its alternative origins do not list it, or where II will not fetch that list from the
-/// app's origin. Starts the fetch of that list where it is not cached. `now_ns` is the
-/// call's time.
+/// does without a list where `frontend_origin` is `None` or the app's own origin.
+/// Refused where its alternative origins do not list it, or where II will not fetch that
+/// list from the app's origin. Starts the fetch of that list where it is not cached.
+/// `now_ns` is the call's time.
 fn authorize_frontend(
     session: &AuthorizedSession,
     frontend_origin: Option<&ApplicationOrigin>,
@@ -441,6 +441,11 @@ fn authorize_frontend(
     };
     let application_origin = ApplicationOrigin::try_from(session.origin.as_str())
         .map_err(PreparePwaSubscriptionError::Internal)?;
+    if *frontend_origin == application_origin {
+        return Ok(FrontendAuthorization::Accepted {
+            kept_frontend_origin_hashes: None,
+        });
+    }
     FetchableApplicationOrigin::try_from(&application_origin)
         .map_err(PreparePwaSubscriptionError::Internal)?;
     match alternative_origins::authorize_alternative_origin(

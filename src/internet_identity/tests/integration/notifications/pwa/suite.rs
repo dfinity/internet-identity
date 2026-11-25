@@ -278,6 +278,38 @@ fn should_refuse_to_prepare_for_a_frontend_of_an_application_at_an_http_origin()
     );
 }
 
+/// An application at a plain `http` loopback origin, which II reads no list from while
+/// insecure lists are not allowed.
+const LOOPBACK_APP: &str = "http://localhost:5173";
+
+#[test]
+fn should_answer_keys_to_an_http_application_that_names_its_own_origin() {
+    let env = env();
+    let (canister_id, _, _) = install_signed_in(&env, None, None);
+    let session = session_of(&second_identity_at(&env, canister_id, LOOPBACK_APP));
+
+    let mut urls = Vec::new();
+    let mut response = prepare_for_frontend(&env, canister_id, session, LOOPBACK_APP);
+    for _ in 0..3 {
+        if response != AppPreparePwaWebPushSubscriptionResult::Pending {
+            break;
+        }
+        urls.extend(fetched_urls(&env));
+        response = prepare_for_frontend(&env, canister_id, session, LOOPBACK_APP);
+    }
+    urls.extend(fetched_urls(&env));
+
+    assert!(
+        matches!(response, AppPreparePwaWebPushSubscriptionResult::Ok(_)),
+        "{response:?}"
+    );
+    assert!(
+        urls.iter()
+            .all(|url| !url.ends_with(ALTERNATIVE_ORIGINS_PATH)),
+        "II read the alternative origins for the application's own origin: {urls:?}"
+    );
+}
+
 /// Another frontend of [`APP`].
 const CALENDAR_FRONTEND: &str = "https://calendar.suite.example";
 /// Where [`CALENDAR_FRONTEND`]'s installed web app is subscribed.
@@ -360,6 +392,38 @@ fn should_drop_the_slot_of_a_frontend_the_application_stopped_listing_on_the_nex
     assert_eq!(
         frontend_endpoint(&env, canister_id, session, None),
         Some(PWA_ENDPOINT.to_string())
+    );
+}
+
+#[test]
+fn should_keep_every_frontends_slot_on_a_prepare_for_the_applications_own_origin() {
+    let env = env();
+    let (canister_id, account_session) = install_suite_subscribed(&env);
+    let session = session_of(&account_session);
+
+    // The refresh this refusal starts caches a list that no longer names the suite
+    // frontend.
+    env.advance_time(ALTERNATIVE_ORIGINS_FRESH_FOR + Duration::from_secs(1));
+    assert_eq!(
+        prepare_for_frontend(&env, canister_id, session, CALENDAR_FRONTEND),
+        AppPreparePwaWebPushSubscriptionResult::Err(
+            AppPreparePwaWebPushSubscriptionError::NoSuchFrontend
+        )
+    );
+    answer_outcalls_listing(&env, &[CALENDAR_FRONTEND]);
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
+        Some(SUITE_ENDPOINT.to_string())
+    );
+
+    assert!(matches!(
+        prepare_for_frontend(&env, canister_id, session, APP),
+        AppPreparePwaWebPushSubscriptionResult::Ok(_)
+    ));
+
+    assert_eq!(
+        frontend_endpoint(&env, canister_id, session, Some(SUITE_FRONTEND)),
+        Some(SUITE_ENDPOINT.to_string())
     );
 }
 
