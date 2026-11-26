@@ -16,7 +16,8 @@
   import { TALL_PANEL } from "../../foundation/frame/panel";
   import type { CardKind, Tone } from "./status";
   import { swapIn, swapOut } from "../../foundation/motion/motion";
-  import Glyphs, { type Glyph } from "./Glyphs.svelte";
+  import type { Glyph } from "./glyph";
+  import Glyphs from "./Glyphs.svelte";
   import Swap from "../../foundation/motion/Swap.svelte";
 
   interface Props {

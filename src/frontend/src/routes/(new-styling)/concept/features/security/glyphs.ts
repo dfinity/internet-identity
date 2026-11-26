@@ -11,7 +11,7 @@ import {
   brandIconOf,
   nameOf,
 } from "../../../manage/(authenticated)/devices/browsers";
-import type { Glyph } from "./Glyphs.svelte";
+import type { Glyph } from "./glyph";
 import type { MockBrowser } from "../../mock/mockData";
 import {
   emailStatus,
