@@ -121,7 +121,7 @@ export const mintPullIdentity = async ({
     return undefined;
   }
 
-  const fetched = await retryFor(5, () =>
+  const fetched = await retryFor(8, () =>
     actor
       .get_notification_delegation({
         anchor_number: identityNumber,

@@ -40,6 +40,8 @@
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
+  import { authorizeAddedIdentity } from "./addIdentity";
+  import { notificationProbeStore } from "$lib/stores/notificationProbe.store";
 
   const { children }: LayoutProps = $props();
 
@@ -134,8 +136,8 @@
     $attributeConsentStore !== undefined &&
       $attributeConsentResultStore === undefined,
   );
-  // Notification consent runs after authorize for the same reason, so it needs
-  // the same exemption.
+  // Notification consent, and the probe that can lead to it, run after authorize for
+  // the same reason, so they need the same exemption.
   const isNotificationConsenting = $derived(
     $notificationConsentStore !== undefined &&
       $notificationConsentSettledStore === undefined,
@@ -144,6 +146,7 @@
     isReady &&
       (isAttributeConsenting ||
         isNotificationConsenting ||
+        $notificationProbeStore ||
         ($authorizedStore === undefined &&
           flow !== "openid-init" &&
           flow !== "sso-init" &&
@@ -206,6 +209,19 @@
       if (nextIdentity !== undefined) {
         lastUsedIdentitiesStore.selectIdentity(nextIdentity.identityNumber);
       }
+    }
+
+    // Before the app is authorized, the page's sign-in would act for the
+    // identity selected next, so it goes with the removed identity; that one
+    // signs in when it's used. Once authorized, the consent screens finish
+    // with the sign-in the app was authorized with.
+    if (
+      $authenticationStore?.identityNumber === identityNumber &&
+      $authorizedStore === undefined &&
+      flow !== "openid-resume"
+    ) {
+      authenticationStore.reset();
+      sessionStore.reset();
     }
 
     const removedIdentity =
@@ -360,8 +376,14 @@
               }}
             >
               <AuthWizard
-                onSignIn={handleSignIn}
-                onSignUp={handleSignUp}
+                onSignIn={async (identityNumber) => {
+                  await handleSignIn(identityNumber);
+                  await authorizeAddedIdentity(authorizeDefault);
+                }}
+                onSignUp={async (identityNumber) => {
+                  await handleSignUp(identityNumber);
+                  await authorizeAddedIdentity(authorizeDefault);
+                }}
                 onError={(error) => {
                   isAuthDialogOpen = false;
                   isAuthenticating = false;

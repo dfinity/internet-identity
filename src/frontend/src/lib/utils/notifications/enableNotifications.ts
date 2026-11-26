@@ -52,14 +52,23 @@ export const turnOnNotifications = async ({
   device: DeviceNotificationState;
   consented: boolean;
 }): Promise<EnableNotificationsResult> => {
-  // A browser that cannot hold a subscription has nothing to prompt for: subscribing would register an endpoint iOS never delivers to.
-  if (device.source === "app") {
-    return turnOnInApp({
-      identityNumber,
-      origin,
-      actor,
-      consented,
-    });
+  switch (device.source) {
+    // A browser that cannot hold a subscription has nothing to prompt for: subscribing would register an endpoint iOS never delivers to.
+    case "app":
+      return turnOnInApp({
+        identityNumber,
+        origin,
+        actor,
+        consented,
+      });
+    // The installed app subscribes for itself once it is told consent was given.
+    case "installed-app":
+      if (!consented) {
+        await grantConsent({ identityNumber, origin, actor });
+      }
+      return { status: "enabled" };
+    case "browser":
+      break;
   }
 
   if (device.permission !== "granted") {

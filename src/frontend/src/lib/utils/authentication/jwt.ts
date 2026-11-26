@@ -3,6 +3,7 @@ import { Actor, type Identity } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
+  retryFor,
   throwCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
@@ -68,21 +69,27 @@ export const authenticateWithSso = async ({
       sso_attr_bundle: ssoAttrBundle,
     } = await throwCanisterError(prepared);
 
-    const delegation = await actor.sso_get_delegation({
-      jwt,
-      salt: session.salt,
-      session_key: sessionKey,
-      expiration,
-      org_domain: discoveryDomain,
-      target_app_origin: origin,
-      sso_attr_bundle: ssoAttrBundle,
-    });
-    if ("Pending" in delegation) {
+    const delegation = await retryFor(8, () =>
+      actor
+        .sso_get_delegation({
+          jwt,
+          salt: session.salt,
+          session_key: sessionKey,
+          expiration,
+          org_domain: discoveryDomain,
+          target_app_origin: origin,
+          sso_attr_bundle: ssoAttrBundle,
+        })
+        .then((result) =>
+          "Pending" in result ? undefined : throwCanisterError(result),
+        ),
+    );
+    if (delegation === undefined) {
       await pollDelay();
       continue;
     }
     const { signed_delegation: signedDelegation, sso_attr_bundle_signature } =
-      await throwCanisterError(delegation);
+      delegation;
     const transformedDelegation = transformSignedDelegation(signedDelegation);
     const delegationChain = DelegationChain.fromDelegations(
       [transformedDelegation],
@@ -149,18 +156,23 @@ export const authenticateWithJWT = async ({
       user_key,
     } = await throwCanisterError(prepared);
 
-    const delegation = await actor.openid_get_delegation(
-      jwt,
-      session.salt,
-      sessionKey,
-      expiration,
-      domain,
+    const signedDelegation = await retryFor(8, () =>
+      actor
+        .openid_get_delegation(
+          jwt,
+          session.salt,
+          sessionKey,
+          expiration,
+          domain,
+        )
+        .then((result) =>
+          "Pending" in result ? undefined : throwCanisterError(result),
+        ),
     );
-    if ("Pending" in delegation) {
+    if (signedDelegation === undefined) {
       await pollDelay();
       continue;
     }
-    const signedDelegation = await throwCanisterError(delegation);
     const transformedDelegation = transformSignedDelegation(signedDelegation);
     const delegationChain = DelegationChain.fromDelegations(
       [transformedDelegation],

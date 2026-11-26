@@ -12,6 +12,7 @@ import {
   authorizationPromptStore,
   authorizationStore,
   authorizedStore,
+  type Authorized,
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
@@ -44,7 +45,7 @@ import {
   DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@icp-sdk/core/identity";
-import type { PublicKey, Signature } from "@icp-sdk/core/agent";
+import type { ActorSubclass, PublicKey, Signature } from "@icp-sdk/core/agent";
 import { get } from "svelte/store";
 import {
   chooseSilentSession,
@@ -52,6 +53,8 @@ import {
 } from "$lib/stores/channelHandlers/silentReauth";
 import type { AccountSessionError } from "$lib/generated/internet_identity_types";
 import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
+import { repairNotificationPath } from "$lib/stores/channelHandlers/notificationRepair";
+import { MIN_REMAINING_LIFETIME_MS } from "$lib/stores/channelHandlers/credentialLifetime";
 import {
   StaleBrowserKeyError,
   withBrowserProof,
@@ -290,23 +293,59 @@ export const handleSessionDelegationRequest =
           return;
         }
 
-        const created = await createSession(
-          effectiveOrigin,
-          params.maxTimeToLive,
-          params.maxTimeToIdle,
-          resumable === true,
-        );
-        const chain = await extendToApp(
-          created.record,
-          params.sessionPublicKey,
-        );
-        await channel.send({
-          jsonrpc: "2.0",
-          id: requestId,
-          result: SessionResultSchema.encode({
-            chain,
-          }),
-        });
+        // The authorization a sign-in that was given up on was minted for, so the next
+        // turn waits for another one.
+        let previousAuthorization: Authorized | undefined;
+        for (;;) {
+          const createdSession = await createSession(
+            effectiveOrigin,
+            params.maxTimeToLive,
+            params.maxTimeToIdle,
+            resumable === true,
+            previousAuthorization,
+          );
+          const repairOutcome = await repairNotificationPath({
+            identityNumber: createdSession.identityNumber,
+            origin: effectiveOrigin,
+            accountPrincipal: createdSession.accountPrincipal,
+            actor: createdSession.actor,
+          });
+          // What was minted is for an identity the user has moved away from: the app
+          // gets the one the user authorizes next, minted in this same request.
+          if (repairOutcome === "identity-changed") {
+            previousAuthorization = createdSession.authorized;
+            continue;
+          }
+          // Created again, with the same authorization and no second check, where the
+          // allow screen kept it open for most of its lifetime, or long enough for the
+          // canister to end it as idle.
+          const isSessionStale =
+            createdSession.record.expiresAtMillis - Date.now() <
+              MIN_REMAINING_LIFETIME_MS ||
+            (repairOutcome === "asked" &&
+              !(await sessionIsLive(createdSession.record)));
+          const answeredSession = isSessionStale
+            ? await createSession(
+                effectiveOrigin,
+                params.maxTimeToLive,
+                params.maxTimeToIdle,
+                resumable === true,
+              )
+            : createdSession;
+          const chain = await extendToApp(
+            answeredSession.record,
+            params.sessionPublicKey,
+          );
+          await answeredSession.keepSession();
+          await channel.send({
+            jsonrpc: "2.0",
+            id: requestId,
+            result: SessionResultSchema.encode({
+              chain,
+            }),
+          });
+          return;
+        }
       } catch (error) {
         console.error(error);
         if (isSilent) {
@@ -334,9 +373,24 @@ const createSession = async (
   requestedMaxTimeToLive: bigint | undefined,
   requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
-): Promise<{ record: AppSessionRecord }> => {
+  /** An authorization already minted for and given up on, to wait past. */
+  previousAuthorization?: Authorized,
+): Promise<{
+  record: AppSessionRecord;
+  /** Keeps the session for a later silent sign-in where the app asked for that. Called
+   *  only for the session the app is sent: one minted for an identity the user then
+   *  switched away from must not be the one a later request resumes. */
+  keepSession: () => Promise<void>;
+  authorized: Authorized;
+  /** Who the session was minted for, which the notification check is about. */
+  identityNumber: bigint;
+  accountPrincipal: Principal;
+  actor: ActorSubclass<_SERVICE>;
+}> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
-  let authorized = await waitForStore(authorizedStore);
+  let authorized = await waitForStore(authorizedStore, (current) =>
+    current !== previousAuthorization ? current : undefined,
+  );
   // Switching identity on a consent screen authorizes again; mint for the
   // identity the user ends on, as `delegation.ts` does.
   while (
@@ -424,7 +478,7 @@ const createSession = async (
     (prepared) => prepared.browser_id,
   );
 
-  const fetched = await retryFor(5, () =>
+  const fetched = await retryFor(8, () =>
     actor
       .get_account_session({
         identity_number: identityNumber,
@@ -468,8 +522,13 @@ const createSession = async (
   await rememberAppAccount(recordKey, {
     accountPrincipal: prepared.account_principal.toText(),
   });
-  if (resumable) {
-    await storeAppSession(recordKey, record);
-  }
-  return { record };
+  return {
+    record,
+    keepSession: () =>
+      resumable ? storeAppSession(recordKey, record) : Promise.resolve(),
+    authorized,
+    identityNumber,
+    accountPrincipal: prepared.account_principal,
+    actor,
+  };
 };

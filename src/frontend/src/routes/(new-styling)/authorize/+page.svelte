@@ -22,9 +22,10 @@
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
+  import AppleConnectingView from "$lib/components/views/AppleConnectingView.svelte";
+  import { callWhenAppleSheetIsCanceled } from "$lib/utils/appleSheet";
   import SsoConnectErrorView from "./views/SsoConnectErrorView.svelte";
   import SsoConnectingView from "$lib/components/views/SsoConnectingView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
@@ -33,6 +34,7 @@
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
   import NotifOptInView from "./views/NotifOptInView.svelte";
+  import NotifProbingView from "./views/NotifProbingView.svelte";
   import {
     type AttributeConsent,
     attributeConsentStore,
@@ -40,6 +42,7 @@
     attributeConsentResultStore,
   } from "$lib/stores/attributeConsent.store";
   import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
+  import { notificationProbeStore } from "$lib/stores/notificationProbe.store";
   import {
     notificationConsentSettledStore,
     notificationConsentStore,
@@ -56,6 +59,7 @@
     findConfig,
     isAppleSignInSheetBrowser,
     isOpenIdCancelError,
+    PopupBlockedError,
     selectAuthScopes,
   } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
@@ -97,9 +101,6 @@
   // The redirect to Apple is waiting behind the native Sign in with Apple
   // sheet, which keeps this page on screen.
   let isBehindAppleSheet = $state(false);
-  // iOS tells this page nothing when the sheet is canceled, so a way back to
-  // the app shows up after a moment.
-  let canReturnToApp = $state(false);
   let ssoInitError = $state<{ cause: unknown }>();
   // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
   // Holds everything the dialog needs to run one normal (primary-client)
@@ -203,6 +204,11 @@
       if (isOpenIdCancelError(e)) {
         return;
       }
+      if (e instanceof PopupBlockedError) {
+        // Stays on the dialog, whose button can still open the pop-up.
+        handleError(e);
+        return;
+      }
       ssoNormalLogin = undefined;
       handleError(e);
     }
@@ -270,48 +276,9 @@
       isAppleSignInSheetBrowser(navigator.userAgent)
     ) {
       isBehindAppleSheet = true;
-      closeWhenAppleSheetIsCanceled();
-      setTimeout(() => (canReturnToApp = true), 10_000);
+      callWhenAppleSheetIsCanceled(returnToApp);
     }
     window.location.assign(next);
-  };
-
-  /**
-   * Canceling the sheet can drop the redirect without telling this page: the
-   * window only gets its focus back. A completed sheet gives focus back too,
-   * but the redirect then goes on and `beforeunload` follows within
-   * milliseconds, so focus that stays without one is a cancel.
-   *
-   * A cancel can also let the redirect go on towards Apple's web page, which
-   * fires `beforeunload` as well. A completed sheet replaces this page with
-   * Apple's reply within moments, so a page still here seconds after the
-   * sheet closed is a cancel either way.
-   */
-  const closeWhenAppleSheetIsCanceled = () => {
-    let sheetOpened = false;
-    let leaving = false;
-    let returned = false;
-    const returnOnce = () => {
-      if (returned) {
-        return;
-      }
-      returned = true;
-      returnToApp();
-    };
-    window.addEventListener("blur", () => (sheetOpened = true));
-    window.addEventListener("beforeunload", () => (leaving = true));
-    window.addEventListener("focus", () => {
-      if (!sheetOpened) {
-        return;
-      }
-      setTimeout(() => {
-        if (leaving) {
-          return;
-        }
-        returnOnce();
-      }, 500);
-      setTimeout(returnOnce, 5000);
-    });
   };
 
   /**
@@ -697,20 +664,7 @@
 {#if data.flow === "openid-init"}
   <!-- OpenID init — onMount redirects to the provider; only Apple's native sheet keeps this page on screen. -->
   {#if isBehindAppleSheet}
-    <div
-      role="status"
-      class="flex flex-col items-center gap-3 px-8 text-center"
-    >
-      <ProgressRing class="size-8" />
-      <p class="text-text-primary text-base font-medium">
-        {$t`Connecting to Apple`}
-      </p>
-      {#if canReturnToApp}
-        <button class="btn btn-secondary mt-3" onclick={returnToApp}>
-          {$t`Return to app`}
-        </button>
-      {/if}
-    </div>
+    <AppleConnectingView onReturnToApp={returnToApp} />
   {/if}
 {:else if data.flow === "sso-init"}
   {#if ssoInitError !== undefined}
@@ -728,6 +682,9 @@
 {:else if $notificationConsentStore !== undefined && $notificationConsentSettledStore === undefined}
   <!-- Notification consent — runs after authorize, before the redirect. -->
   {@render panelWrapper(notificationConsentContent)}
+{:else if $notificationProbeStore && $authorizedStore !== undefined}
+  <!-- The sign-in is probing this device's notification path before it answers. -->
+  {@render panelWrapper(notificationProbeContent)}
 {:else if (!holdingScreen && $authorizedStore !== undefined) || (data.flow === "openid-resume" && openIdResumeProcessing)}
   <!-- Authorized or OpenID callback processing — show redirect animation. -->
   <RedirectAnimationView />
@@ -763,6 +720,7 @@
 {#snippet notificationConsentContent()}
   {#if $notificationConsentStore !== undefined}
     {#key $notificationConsentStore}
+      {@const context = $notificationConsentStore}
       <NotifOptInView
         appName={dapp.name}
         appLogo={dapp.logo}
@@ -772,10 +730,15 @@
         device={$notificationConsentStore.device}
         consented={$notificationConsentStore.consented}
         installFirst={$notificationConsentStore.installFirst}
-        onDone={() => notificationConsentStore.settle()}
+        isRepair={$notificationConsentStore.isRepair}
+        onDone={() => notificationConsentStore.settle(context)}
       />
     {/key}
   {/if}
+{/snippet}
+
+{#snippet notificationProbeContent()}
+  <NotifProbingView />
 {/snippet}
 
 {#snippet upgradeSuccessContent()}

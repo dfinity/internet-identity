@@ -9,6 +9,7 @@ import {
   extractIdTokenFromCallback,
   isOpenIdCancelError,
   OAuthProviderError,
+  PopupBlockedError,
   requestWithPopup,
   type RequestConfig,
 } from "./openID";
@@ -569,6 +570,10 @@ describe("isOpenIdCancelError", () => {
     expect(isOpenIdCancelError(networkError)).toBe(true);
   });
 
+  it("returns false for PopupBlockedError (the pop-up never opened)", () => {
+    expect(isOpenIdCancelError(new PopupBlockedError())).toBe(false);
+  });
+
   it("returns false for a generic Error", () => {
     expect(isOpenIdCancelError(new Error("something bad"))).toBe(false);
   });
@@ -653,6 +658,43 @@ describe("requestWithPopup", () => {
     vi.restoreAllMocks();
   });
 
+  it("rejects with PopupBlockedError when the browser refuses the popup", async () => {
+    vi.spyOn(window, "open").mockReturnValue(null);
+
+    const error: unknown = await requestWithPopup(config, {
+      nonce: "nonce",
+    }).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(PopupBlockedError);
+    expect(error).not.toBeInstanceOf(CallbackPopupClosedError);
+    // Nothing is left waiting on a popup that never opened.
+    expect(FakeBroadcastChannel.instances).toHaveLength(0);
+  });
+
+  it("rejects with PopupBlockedError when the browser refuses a deferred popup", async () => {
+    vi.spyOn(window, "open").mockReturnValue(null);
+
+    const error: unknown = await requestWithPopup(Promise.resolve(config), {
+      nonce: "nonce",
+    }).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(PopupBlockedError);
+  });
+
+  it("rejects with PopupBlockedError when the browser refuses the popup behind Apple's sheet", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+    );
+    vi.spyOn(window, "open").mockReturnValue(null);
+
+    const error: unknown = await requestWithPopup(
+      { ...config, authURL: "https://appleid.apple.com/auth/authorize" },
+      { nonce: "nonce" },
+    ).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(PopupBlockedError);
+  });
+
   it("opens a deferred popup to /sso-connecting synchronously, then navigates the same window", async () => {
     const popup = { closed: false, close: vi.fn(), location: { href: "" } };
     const open = vi
@@ -684,7 +726,7 @@ describe("requestWithPopup", () => {
     const rejection = expect(result).rejects.toBeInstanceOf(
       CallbackPopupClosedError,
     );
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(6000);
     await rejection;
   });
 
@@ -694,9 +736,9 @@ describe("requestWithPopup", () => {
     // The callback page posts the payload and closes itself back to back.
     // The popup already reads as closed while the message is in flight.
     popup.closed = true;
-    // Polls at 250, 500, 750 and 1000 ms all see the popup closed, 750 ms
-    // into the grace period that starts at the first of them.
-    await vi.advanceTimersByTimeAsync(1000);
+    // Polls from 250 ms to 5000 ms all see the popup closed, 4750 ms into
+    // the grace period that starts at the first of them.
+    await vi.advanceTimersByTimeAsync(5000);
     expect(channel.closed).toBe(false);
 
     channel.deliver({ id_token: "token", state });
@@ -714,9 +756,9 @@ describe("requestWithPopup", () => {
     });
 
     popup.closed = true;
-    // The first poll to see the popup closed is at 250 ms, so the 1 s grace
-    // period runs out at the 1250 ms poll.
-    await vi.advanceTimersByTimeAsync(1000);
+    // The first poll to see the popup closed is at 250 ms, so the 5 s grace
+    // period runs out at the 5250 ms poll.
+    await vi.advanceTimersByTimeAsync(5000);
     expect(error).toBeUndefined();
     expect(channel.closed).toBe(false);
 

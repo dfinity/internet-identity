@@ -45,24 +45,10 @@
     >
       <p>
         <Trans>
-          To accept email from a domain we either need DNSSEC at its apex (so we
-          can cryptographically validate the DKIM key your provider uses) or for
-          the domain to be on our list of known mailbox providers.
-        </Trans>
-      </p>
-      <p>
-        <Trans>
-          The DNSSEC zone must use a current algorithm — RSA/SHA-256,
-          RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms
-          aren't supported.
-        </Trans>
-      </p>
-      <p>
-        <Trans>
-          If you administer
-          <strong class="break-all">{domain}</strong>, enabling DNSSEC at your
-          domain registrar usually takes a few clicks. Once it propagates, this
-          address will work automatically. No further action from us needed.
+          We verify an email by checking the signature its provider adds, using
+          a key published in the domain's DNS.
+          <strong class="break-all">{domain}</strong> isn't a domain we can look that
+          key up for, so emails from this address can't be verified.
         </Trans>
       </p>
     </div>

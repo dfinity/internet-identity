@@ -1,4 +1,11 @@
-import { CDPSession, ConsoleMessage, expect, Page } from "@playwright/test";
+import {
+  BrowserContext,
+  CDPSession,
+  ConsoleMessage,
+  expect,
+  Locator,
+  Page,
+} from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { DER_COSE_OID, wrapDER } from "@icp-sdk/core/identity";
@@ -15,6 +22,7 @@ import { Agent } from "undici";
 import borc from "borc";
 import { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import { APP_METADATA_PATH } from "$lib/utils/appMetadata";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 const iiCanisterId = readCanisterId({ canisterName: "internet_identity" });
@@ -27,6 +35,11 @@ export const TEST_APP_SIBLING_A_URL = "https://a.nice-name.com";
 export const TEST_APP_SIBLING_B_URL = "https://b.nice-name.com";
 export const TEST_APP_DERIVATION_ORIGIN = "https://auth.nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
+/** The test app at an origin wider than the sign-in panel, whose first label has
+ *  no hyphen, so neither the origin badge nor a line naming the host can wrap
+ *  without help. */
+export const TEST_APP_LONG_ORIGIN_URL =
+  "https://averyveryverylongappsubdomainwithnohyphenstobreakat.nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 
 export type DummyAuthFn = (page: Page) => void;
@@ -66,6 +79,90 @@ export const authorize = (
   authenticate: (page: Page) => Promise<void>,
 ): Promise<string> => {
   return authorizeWithUrl(page, TEST_APP_URL, II_URL, authenticate);
+};
+
+/**
+ * Makes `window.open` on `origin` behave the way it does in Safari: a window
+ * opens only while the press that asked for it is being handled, and `null`
+ * comes back afterwards.
+ *
+ * Chromium as these tests launch it blocks no pop-up at all, and a regular
+ * Chrome opens one for seconds after a press, whatever was awaited in
+ * between. A sign-in that awaits something before its pop-up therefore passes
+ * here and fails for every Safari user, which is what this is for.
+ *
+ * "Being handled" is the task of the click and its microtasks. Whatever comes
+ * back in a task of its own (IndexedDB, the network, a timer) is too late.
+ * Safari gives timers, and lately fetches, some leeway; this gives none.
+ *
+ * Not covered: WebCrypto. Chromium settles most `crypto.subtle` promises
+ * within the click's microtasks, so a pop-up opened after awaiting a digest
+ * or a signature passes here, where WebKit refuses it.
+ *
+ * Takes effect in the documents the context loads after the call: a page that
+ * is open already is covered from its next navigation on.
+ * @param context The browser context II's windows open in.
+ * @param origin The origin to block late pop-ups on.
+ */
+export const blockPopupsOutsideOfPresses = async (
+  context: BrowserContext,
+  origin: string,
+): Promise<void> => {
+  await context.addInitScript((blockedOrigin) => {
+    if (window.location.origin !== blockedOrigin) {
+      return;
+    }
+    let isPressBeingHandled = false;
+    const endPress = () => {
+      isPressBeingHandled = false;
+    };
+    const channel = new MessageChannel();
+    channel.port1.onmessage = endPress;
+    window.addEventListener(
+      "click",
+      (event) => {
+        if (!event.isTrusted) {
+          return;
+        }
+        isPressBeingHandled = true;
+        // Both run as tasks of their own, queued ahead of anything the click
+        // goes on to start; whichever comes first ends the press.
+        setTimeout(endPress);
+        channel.port2.postMessage(undefined);
+      },
+      true,
+    );
+    const open = window.open.bind(window);
+    window.open = (...args) => (isPressBeingHandled ? open(...args) : null);
+  }, origin);
+};
+
+/**
+ * Makes `window.open` on `origin` return `null` the first time it is called, the
+ * way a browser that blocks the pop-up answers, and open windows after that.
+ *
+ * Takes effect in the documents the context loads after the call.
+ * @param context The browser context II's windows open in.
+ * @param origin The origin to refuse the first pop-up on.
+ */
+export const refuseFirstPopup = async (
+  context: BrowserContext,
+  origin: string,
+): Promise<void> => {
+  await context.addInitScript((refusedOrigin) => {
+    if (window.location.origin !== refusedOrigin) {
+      return;
+    }
+    const open = window.open.bind(window);
+    let isRefused = false;
+    window.open = (...args) => {
+      if (isRefused) {
+        return open(...args);
+      }
+      isRefused = true;
+      return null;
+    };
+  }, origin);
 };
 
 /**
@@ -223,6 +320,50 @@ export const authorizeWithUrl = async (
   expect(principal).toEqual(Principal.fromText(principal).toText());
 
   return principal;
+};
+
+/**
+ * Serves `metadata` as the app metadata file (`APP_METADATA_PATH`)
+ * of `appOrigin` to every page of `context`, with the CORS header II's
+ * cross-origin fetch of it needs.
+ * @param context The browser context II's windows open in.
+ * @param appOrigin The origin the metadata belongs to, e.g. `TEST_APP_URL`.
+ * @param metadata The JSON document to serve, as an app would publish it.
+ */
+export const serveAppMetadata = async (
+  context: BrowserContext,
+  appOrigin: string,
+  metadata: { name: string },
+): Promise<void> => {
+  const metadataUrl = new URL(APP_METADATA_PATH, appOrigin);
+  await context.route(metadataUrl.href, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify(metadata),
+    }),
+  );
+};
+
+/**
+ * Asserts that the text of the element `locator` points at is fully on screen:
+ * the element lies inside the viewport, uncut by an ancestor that clips it, and
+ * its text stays within the element's width. Text that can't wrap does one of
+ * two things depending on how its element is sized: it widens an element sized
+ * to its content until an ancestor clips it, or it spills out of an element
+ * sized by its container, which no viewport check sees.
+ * @param locator The element whose text must be fully visible.
+ */
+export const expectTextFullyVisible = async (
+  locator: Locator,
+): Promise<void> => {
+  await expect(locator).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(() =>
+      locator.evaluate((element) => element.scrollWidth <= element.clientWidth),
+    )
+    .toBe(true);
 };
 
 /**

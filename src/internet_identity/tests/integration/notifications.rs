@@ -28,6 +28,8 @@ use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanis
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 
+mod pwa;
+
 const ORIGIN: &str = "https://some-dapp.com";
 const GATEWAY: &str = "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app";
 const UNREACHED: &str = "https://never-visited.example";
@@ -1535,7 +1537,9 @@ mod installing_over_an_app {
         disable_notification_app, subscribe_webpush,
     };
     use internet_identity_interface::internet_identity::types::{
-        DisableNotificationAppError, DisableNotificationAppRequest, PrepareNotificationAppLinkError,
+        DisableNotificationAppError, DisableNotificationAppRequest,
+        GetNotificationPathStatusRequest, NotificationPath, PrepareNotificationAppLinkError,
+        ProbeNotificationPathError, ProbeNotificationPathRequest,
     };
     use pretty_assertions::assert_eq;
 
@@ -1579,6 +1583,99 @@ mod installing_over_an_app {
 
     /// An install nobody has opened holds the slot but is no app: answering Ok would
     /// tell the caller the switch moved when the flag it writes does not exist yet.
+    /// A repair probe through the app that had its window and was never fetched says the
+    /// app is gone, as an unanswered enable probe does, so the reinstall the repair
+    /// offers is accepted.
+    #[test]
+    fn should_install_over_an_app_that_left_a_repair_probe_unanswered() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor) = install_with_anchor(&env);
+        let (app, _) = link_app(&env, canister_id, anchor, FIRST_BROWSER_SEED, 100);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        canister_tests::api::internet_identity::notifications::probe_notification_path(
+            &env,
+            canister_id,
+            BrowserKey::new(FIRST_BROWSER_SEED).successor().principal(),
+            internet_identity_interface::internet_identity::types::ProbeNotificationPathRequest {
+                anchor_number: anchor,
+                path: internet_identity_interface::internet_identity::types::NotificationPath::ThisBrowser,
+            },
+        )?
+        .expect("the probe returned Err");
+        // Recorded once the push service accepts it.
+        super::pwa::answer_outcalls(&env, 201);
+
+        // Inside its window the probe may still be answered.
+        assert_eq!(
+            prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 200)?,
+            Err(PrepareNotificationAppLinkError::AppAlreadyDelivering)
+        );
+        env.advance_time(std::time::Duration::from_secs(60));
+
+        assert_eq!(
+            prepare(&env, canister_id, anchor, FIRST_BROWSER_SEED, 201)?,
+            Ok(())
+        );
+        Ok(())
+    }
+
+    /// Declining a repair drops this browser's registration, and with it the Home Screen
+    /// app it routes through, so a later sign-in finds nothing on this browser's path to
+    /// probe.
+    #[test]
+    fn should_leave_nothing_to_probe_once_the_browser_is_unregistered() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) =
+            super::subscriptions::install_with_browser(&env);
+        let (app, _) = link_app(&env, canister_id, anchor, 1, 100);
+        subscribe_webpush(&env, canister_id, app, request(anchor, ENDPOINT))?
+            .expect("the subscribe returned Err");
+        let this_browser = || {
+            canister_tests::api::internet_identity::notifications::get_notification_path_status(
+                &env,
+                canister_id,
+                browser.successor().principal(),
+                GetNotificationPathStatusRequest {
+                    anchor_number: anchor,
+                    path: NotificationPath::ThisBrowser,
+                },
+            )
+        };
+        assert_eq!(
+            this_browser()?
+                .expect("the status returned Err")
+                .subscriptions
+                .len(),
+            1
+        );
+
+        remove_webpush_subscription(&env, canister_id, principal_1(), anchor, browser_id)?
+            .expect("the remove returned Err");
+
+        assert_eq!(
+            this_browser()?
+                .expect("the status returned Err")
+                .subscriptions,
+            vec![]
+        );
+        assert_eq!(
+            canister_tests::api::internet_identity::notifications::probe_notification_path(
+                &env,
+                canister_id,
+                browser.successor().principal(),
+                ProbeNotificationPathRequest {
+                    anchor_number: anchor,
+                    path: NotificationPath::ThisBrowser,
+                },
+            )?,
+            Err(ProbeNotificationPathError::NotReachable)
+        );
+        Ok(())
+    }
+
     #[test]
     fn should_refuse_to_switch_an_install_nobody_has_opened() -> Result<(), RejectResponse> {
         let env = env();

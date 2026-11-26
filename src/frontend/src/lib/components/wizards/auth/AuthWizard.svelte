@@ -13,7 +13,7 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
-  import { isOpenIdCancelError } from "$lib/utils/openID";
+  import { isOpenIdCancelError, PopupBlockedError } from "$lib/utils/openID";
   import ContinueOnAnotherDeviceView from "$lib/components/wizards/auth/views/ContinueOnAnotherDeviceView.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
@@ -153,7 +153,7 @@
         await onSignIn(identityNumber);
       }
     } catch (error) {
-      if (isOpenIdCancelError(error)) {
+      if (isOpenIdCancelError(error) || error instanceof PopupBlockedError) {
         return;
       }
       onError(error);
@@ -361,7 +361,7 @@
         authFlow.setupNewIdentity();
       }
     } catch (error) {
-      if (isOpenIdCancelError(error)) {
+      if (isOpenIdCancelError(error) || error instanceof PopupBlockedError) {
         return "cancelled";
       }
       onError(error);
@@ -422,7 +422,7 @@
       );
       await applySsoAuthResult(authResult, ssoResult, preSnapshot);
     } catch (error) {
-      if (isOpenIdCancelError(error)) {
+      if (isOpenIdCancelError(error) || error instanceof PopupBlockedError) {
         return "cancelled";
       }
       // Gated non-`sub` login can't resolve directly — show the normal-login

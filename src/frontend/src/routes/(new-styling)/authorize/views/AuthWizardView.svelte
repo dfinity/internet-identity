@@ -48,7 +48,7 @@
       ? $t`Create an Identity`
       : $t`Sign in to Internet Identity`}
   </h1>
-  <p class="text-text-secondary mb-6 self-start text-sm">
+  <p class="text-text-secondary mb-6 self-start text-sm wrap-anywhere">
     {$t`to continue to ${dappName}`}
   </p>
 </AuthWizard>

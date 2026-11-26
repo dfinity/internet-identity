@@ -269,7 +269,7 @@ export const handleLegacyAttributes =
         .then(throwCanisterError);
 
       const { certified_attributes, expires_at_timestamp_ns } = await retryFor(
-        5,
+        8,
         () =>
           authenticated.actor
             .get_attributes({
@@ -457,7 +457,7 @@ const certifyAndSend = async (params: {
       })
       .then(throwCanisterError);
 
-    const { signature } = await retryFor(5, () =>
+    const { signature } = await retryFor(8, () =>
       authenticated.actor
         .get_icrc3_attributes({
           origin,

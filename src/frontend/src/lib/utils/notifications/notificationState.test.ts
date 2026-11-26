@@ -251,6 +251,7 @@ describe("resolveOptIn", () => {
       resolveOptIn({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(true),
         browser: readBrowserPushState(),
       }),
@@ -262,6 +263,7 @@ describe("resolveOptIn", () => {
       resolveOptIn({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(false),
         browser: readBrowserPushState(),
       }),
@@ -280,6 +282,7 @@ describe("resolveOptIn", () => {
       resolveOptIn({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(false),
         browser: Promise.resolve(undefined),
       }),
@@ -297,6 +300,7 @@ describe("resolveOptIn", () => {
       resolveOptIn({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(false),
         browser: readBrowserPushState(),
       }),
@@ -323,6 +327,7 @@ describe("resolveOptIn", () => {
       resolveOptIn({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor,
         browser,
       }),
@@ -341,6 +346,7 @@ describe("resolveOptIn", () => {
       resolveOptIn({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor,
         browser: readBrowserPushState(),
       }),
@@ -378,6 +384,7 @@ describe("readGranted", () => {
       readGranted({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(true),
       }),
     ).resolves.toBe(true);
@@ -388,6 +395,7 @@ describe("readGranted", () => {
       readGranted({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(false),
       }),
     ).resolves.toBe(false);
@@ -401,6 +409,7 @@ describe("readGranted", () => {
       readGranted({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(true),
       }),
     ).resolves.toBe(false);
@@ -412,6 +421,7 @@ describe("readGranted", () => {
       readGranted({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(true),
       }),
     ).resolves.toBe(false);
@@ -423,6 +433,7 @@ describe("readGranted", () => {
       readGranted({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(true),
       }),
     ).resolves.toBe(false);
@@ -434,6 +445,7 @@ describe("readGranted", () => {
       readGranted({
         identityNumber: IDENTITY,
         origin: ORIGIN,
+        isInstalledApp: false,
         actor: actorGranting(true),
       }),
     ).resolves.toBe(false);
@@ -453,7 +465,12 @@ describe("readGranted", () => {
     } as unknown as ActorSubclass<_SERVICE>;
 
     await expect(
-      readGranted({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        isInstalledApp: false,
+      }),
     ).resolves.toBe(true);
   });
 });
@@ -586,6 +603,7 @@ describe("where a Home Screen app delivers", () => {
     resolveOptIn({
       identityNumber: IDENTITY,
       origin: ORIGIN,
+      isInstalledApp: false,
       actor: actorGranting(consented),
       browser: Promise.resolve(undefined),
     });
@@ -594,6 +612,7 @@ describe("where a Home Screen app delivers", () => {
     readGranted({
       identityNumber: IDENTITY,
       origin: ORIGIN,
+      isInstalledApp: false,
       actor: actorGranting(consented),
     });
 
@@ -731,6 +750,7 @@ describe("where a Home Screen app delivers", () => {
         resolveOptIn({
           identityNumber: IDENTITY,
           origin: ORIGIN,
+          isInstalledApp: false,
           actor: actorGranting(true),
           browser: new Promise(() => undefined),
         }),
@@ -803,8 +823,70 @@ describe("where a Home Screen app delivers", () => {
       } as unknown as ActorSubclass<_SERVICE>;
 
       await expect(
-        readGranted({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+        readGranted({
+          identityNumber: IDENTITY,
+          origin: ORIGIN,
+          actor,
+          isInstalledApp: false,
+        }),
       ).resolves.toBe(true);
     });
+  });
+});
+
+describe("where the app that asked is installed and subscribes for itself", () => {
+  const actorGranting = (granted: boolean) =>
+    ({
+      notification_consent_granted: vi.fn(() => Promise.resolve(granted)),
+    }) as unknown as ActorSubclass<_SERVICE>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // A phone, where every other path offers the Home Screen app.
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Ios: "17.4" },
+    } as unknown as ReturnType<typeof browserAndSystem>);
+  });
+
+  it("asks for consent alone, offering no install and reading no device", async () => {
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        isInstalledApp: true,
+        actor: actorGranting(false),
+        browser: new Promise(() => undefined),
+      }),
+    ).resolves.toEqual({
+      screen: "enable",
+      state: { source: "installed-app" },
+      consented: false,
+      installFirst: false,
+    });
+    expect(browserAppStatus).not.toHaveBeenCalled();
+  });
+
+  it("has nothing to ask once the app is allowed", async () => {
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        isInstalledApp: true,
+        actor: actorGranting(true),
+        browser: new Promise(() => undefined),
+      }),
+    ).resolves.toEqual({ screen: "skip", granted: true });
+  });
+
+  it("is granted on consent alone", async () => {
+    await expect(
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        isInstalledApp: true,
+        actor: actorGranting(true),
+      }),
+    ).resolves.toBe(true);
+    expect(browserAppStatus).not.toHaveBeenCalled();
   });
 });

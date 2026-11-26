@@ -12,7 +12,11 @@ import type {
   OpenIdCredentialRemoveError,
   OpenIdDelegationError,
 } from "$lib/generated/internet_identity_types";
-import { OAuthProviderError, isOpenIdCancelError } from "$lib/utils/openID";
+import {
+  OAuthProviderError,
+  PopupBlockedError,
+  isOpenIdCancelError,
+} from "$lib/utils/openID";
 import {
   AuthenticationV2Events,
   authenticationV2Funnel,
@@ -20,6 +24,14 @@ import {
 import { t } from "$lib/stores/locale.store";
 
 export const handleError = (error: unknown) => {
+  if (error instanceof PopupBlockedError) {
+    toaster.warning({
+      title: t`Pop-up blocked`,
+      description: t`Your browser blocked the sign-in window. Try again. If it keeps happening, check your browser's pop-up settings.`,
+    });
+    return;
+  }
+
   // Handle browser errors
   if (isWebAuthnCancelError(error) || isOpenIdCancelError(error)) {
     toaster.info({
