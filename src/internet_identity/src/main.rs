@@ -926,8 +926,8 @@ fn probe_notification_path(
     })
 }
 
-/// Removes an app's installed web app subscriptions on the entries linked to the calling
-/// browser's, where a probe through them was never removed.
+/// Removes an app's installed web app subscriptions of one of its frontends on the entries
+/// linked to the calling browser's, where a probe through them was never removed.
 #[update]
 fn remove_unanswered_pwa_webpush_subscriptions(
     request: RemoveUnansweredPwaWebPushSubscriptionsRequest,
@@ -938,17 +938,22 @@ fn remove_unanswered_pwa_webpush_subscriptions(
         anchor_number,
         origin,
         account_principal,
+        frontend_origin,
     } = request;
     enabled_or(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let application_number =
         notifications::repair::lookup_application_number(&origin).map_err(InternalCanisterError)?;
+    let frontend_origin_hash =
+        notifications::repair::hash_frontend_origin(&origin, frontend_origin.as_deref())
+            .map_err(InternalCanisterError)?;
 
     notifications::repair::remove_unanswered_installed_apps(
         &anchor,
         browser_id,
         application_number,
+        frontend_origin_hash,
         account_principal,
         time(),
     );
@@ -1281,11 +1286,14 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
 
 // ---- Notifications: called by an app's installed web app ----
 
-/// The keys an installed web app subscribes with, for the calling session's identity, app
-/// and browser entry. An update call for the reason `prepare_webpush_subscription` is one,
-/// and `Pending` on the same grounds.
+/// The keys an installed web app subscribes with, for the calling session's identity, app,
+/// browser entry and the frontend the request names. An update call for the reason
+/// `prepare_webpush_subscription` is one, and `Pending` on the same grounds, or while the
+/// app's alternative origins are fetched.
 #[update]
-fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionResult {
+fn app_prepare_pwa_webpush_subscription(
+    request: AppPreparePwaWebPushSubscriptionRequest,
+) -> AppPreparePwaWebPushSubscriptionResult {
     use AppPreparePwaWebPushSubscriptionError::*;
 
     let now = time();
@@ -1295,6 +1303,13 @@ fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionRes
     if let Err(err) = enabled_or(InternalCanisterError) {
         return AppPreparePwaWebPushSubscriptionResult::Err(err);
     }
+    let AppPreparePwaWebPushSubscriptionRequest { frontend_origin } = request;
+    let frontend_origin = match pwa_subscription::validate_frontend_origin(frontend_origin) {
+        Ok(frontend_origin) => frontend_origin,
+        Err(reason) => {
+            return AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+        }
+    };
     let vapid_public_key = match notifications::webpush::vapid_key::read_or_fetch_public_key() {
         VapidPublicKey::Held(key) => key,
         VapidPublicKey::Fetching => return AppPreparePwaWebPushSubscriptionResult::Pending,
@@ -1302,7 +1317,12 @@ fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionRes
             return AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
         }
     };
-    match pwa_subscription::prepare_pwa_subscription(&session, vapid_public_key, now) {
+    match pwa_subscription::prepare_pwa_subscription(
+        &session,
+        frontend_origin.as_ref(),
+        vapid_public_key,
+        now,
+    ) {
         Ok(pwa_subscription::PreparedPwaSubscription::Keys(keys)) => {
             AppPreparePwaWebPushSubscriptionResult::Ok(keys)
         }
@@ -1312,6 +1332,9 @@ fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionRes
         Err(pwa_subscription::PreparePwaSubscriptionError::NotificationsNotAllowed) => {
             AppPreparePwaWebPushSubscriptionResult::Err(NotificationsNotAllowed)
         }
+        Err(pwa_subscription::PreparePwaSubscriptionError::NoSuchFrontend) => {
+            AppPreparePwaWebPushSubscriptionResult::Err(NoSuchFrontend)
+        }
         Err(pwa_subscription::PreparePwaSubscriptionError::Internal(reason)) => {
             AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
         }
@@ -1319,7 +1342,7 @@ fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionRes
 }
 
 /// Sets or, with `None`, removes the installed web app subscription of the calling
-/// session's identity, app, browser entry and account.
+/// session's identity, app, browser entry and account, at the frontend the request names.
 #[update]
 fn app_set_pwa_webpush_subscription(
     request: AppSetPwaWebPushSubscriptionRequest,
@@ -1329,12 +1352,18 @@ fn app_set_pwa_webpush_subscription(
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let AppSetPwaWebPushSubscriptionRequest { subscription } = request;
+    let AppSetPwaWebPushSubscriptionRequest {
+        subscription,
+        frontend_origin,
+    } = request;
     let subscription = subscription
         .map(pwa_subscription::ValidatedPwaWebPushSubscription::try_from)
         .transpose()
         .map_err(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
 
     pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
         .map_err(|err| match err {
@@ -1343,6 +1372,7 @@ fn app_set_pwa_webpush_subscription(
             }
             pwa_subscription::SetPwaSubscriptionError::TransportKeyExpired => TransportKeyExpired,
             pwa_subscription::SetPwaSubscriptionError::EndpointInUse => EndpointInUse,
+            pwa_subscription::SetPwaSubscriptionError::FrontendNotListed => TransportKeyExpired,
             pwa_subscription::SetPwaSubscriptionError::Internal(reason) => {
                 InternalCanisterError(reason)
             }
@@ -1350,19 +1380,24 @@ fn app_set_pwa_webpush_subscription(
 }
 
 /// The endpoint the calling session's browser entry is subscribed at for the session's
-/// account. `None` where nothing is subscribed, where the subscription awaits its
+/// account, at the frontend the request names. `None` where nothing is subscribed, where the subscription awaits its
 /// `app_set_pwa_webpush_subscription`, or where it delivers for another account. An
 /// `Option` inside the `Result` because nothing subscribed is an answer the app acts on,
 /// while the error is only ever a refused caller.
 #[query]
 fn app_get_pwa_webpush_subscription_status(
+    request: AppGetPwaWebPushSubscriptionStatusRequest,
 ) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
     use AppGetPwaWebPushSubscriptionStatusError::*;
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let AppGetPwaWebPushSubscriptionStatusRequest { frontend_origin } = request;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
 
     Ok(pwa_subscription::read_pwa_subscription_status(
         holder,
@@ -1385,7 +1420,9 @@ fn app_get_pwa_notification(
     let AppGetPwaNotificationRequest {
         inbox_notification_id,
     } = request;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    // The inbox is the browser entry's, shared by every frontend's installed web app.
+    let holder =
+        pwa_subscription::resolve_pwa_holder(&session, None).map_err(InternalCanisterError)?;
 
     Ok(notifications::browser_inbox::find_pwa_notification(
         holder,
@@ -1409,8 +1446,12 @@ fn app_remove_pwa_notification(
     let AppRemovePwaNotificationRequest {
         inbox_notification_id,
         not_shown,
+        frontend_origin,
     } = request;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
 
     notifications::browser_inbox::remove_pwa_collected(
         holder,
@@ -1430,16 +1471,23 @@ fn app_remove_pwa_notification(
     Ok(RemoveNotificationResponse {})
 }
 
-/// Sends Internet Identity's own notification to the calling session's installed web app,
-/// unless one sent before is still waiting to be removed.
+/// Sends Internet Identity's own notification to the calling session's installed web app
+/// at the frontend the request names, unless one sent before is still waiting to be
+/// removed.
 #[update]
-fn app_probe_pwa_webpush_subscription() -> Result<(), AppProbePwaWebPushSubscriptionError> {
+fn app_probe_pwa_webpush_subscription(
+    request: AppProbePwaWebPushSubscriptionRequest,
+) -> Result<(), AppProbePwaWebPushSubscriptionError> {
     use AppProbePwaWebPushSubscriptionError::*;
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let AppProbePwaWebPushSubscriptionRequest { frontend_origin } = request;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
     let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
         .map_err(|err| InternalCanisterError(format!("{err}")))?;
 
@@ -1468,7 +1516,9 @@ fn app_get_same_device_link_status() -> Result<SameDeviceLinkStatus, AppGetSameD
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    // The link and the app are the browser entry's, whichever frontend asks.
+    let holder =
+        pwa_subscription::resolve_pwa_holder(&session, None).map_err(InternalCanisterError)?;
     let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
         .map_err(|err| InternalCanisterError(format!("{err}")))?;
 

@@ -3,6 +3,7 @@
 use crate::delegation::frontend_length_within_limit;
 use crate::state;
 use crate::utils::is_loopback_host;
+use crate::utils::sha256sum;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use std::fmt;
 use url::Url;
@@ -54,6 +55,25 @@ impl TryFrom<&str> for ApplicationOrigin {
             return Err("origin must be a bare scheme://host[:port]".to_string());
         }
         Ok(Self(remap_to_legacy_domain(origin)))
+    }
+}
+
+/// The SHA-256 of an origin string, for comparing origins without holding them.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct OriginSha256([u8; 32]);
+
+impl OriginSha256 {
+    pub fn from_origin(origin: &str) -> Self {
+        Self(sha256sum(origin.as_bytes()))
+    }
+
+    /// A hash [`Self::from_origin`] computed, as read back from storage.
+    pub(crate) fn from_stored_digest(digest: [u8; 32]) -> Self {
+        Self(digest)
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
     }
 }
 
@@ -355,5 +375,16 @@ mod tests {
         for origin in ["ftp://localhost", "ws://localhost:5173", "wss://localhost"] {
             assert!(fetchable(origin).is_err(), "{origin} must not be fetched");
         }
+    }
+
+    /// Stored slots are keyed by this digest, so it is the SHA-256 of the origin's bytes
+    /// and nothing else.
+    #[test]
+    fn an_origin_hash_is_the_sha256_of_the_origin() {
+        let origin_hash = OriginSha256::from_origin("https://app.example");
+        assert_eq!(
+            hex::encode(origin_hash.as_bytes()),
+            "2bf585a6f689247104c31bb9cf683e2c8be97bfe0cb266d49c4ef99c81ebbdd6"
+        );
     }
 }

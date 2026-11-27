@@ -99,10 +99,10 @@ pub(crate) fn prepare(
 ///
 /// Links never chain: the claimer must point at nothing and the entry that registered
 /// the key must be pointed at by nothing. And the claimer must hold no installed web
-/// app of its own, which an entry shares with its installed apps only where one browser
-/// runs both, so there is no second entry to link. An entry that is skipped therefore
-/// never has an installed web app of its own that would compete with the one skipping
-/// it.
+/// app of its own, for any frontend of any app, which an entry shares with its installed
+/// apps only where one browser runs both, so there is no second entry to link. An entry
+/// that is skipped therefore never has an installed web app of its own that would compete
+/// with the one skipping it.
 pub(crate) fn claim(
     mut anchor: Anchor,
     claimer: BrowserId,

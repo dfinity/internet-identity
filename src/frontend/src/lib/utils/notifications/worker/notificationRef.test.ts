@@ -17,7 +17,9 @@ const ref: NotificationRef = {
 
 describe("tagOf", () => {
   it("names one notification of one app and account", () => {
-    expect(tagOf(ref)).toBe("10000|https://app.example|3|42");
+    expect(tagOf(ref)).toBe(
+      "10000|https://app.example|3|un4fu-tqaaa-aaaab-qadjq-cai|42",
+    );
   });
 
   it("tells the default account apart from a numbered one", () => {
@@ -26,6 +28,13 @@ describe("tagOf", () => {
 
   it("tells two notifications of the same app apart", () => {
     expect(tagOf({ ...ref, id: BigInt(43) })).not.toBe(tagOf(ref));
+  });
+
+  it("tells two canisters sending for the same app apart", () => {
+    // Each canister picks its own ids, so the same one can come from both.
+    expect(
+      tagOf({ ...ref, appCanisterId: "rrkah-fqaaa-aaaaa-aaaaq-cai" }),
+    ).not.toBe(tagOf(ref));
   });
 
   it("tells two identities on one browser apart", () => {

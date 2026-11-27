@@ -78,13 +78,15 @@ impl Destination {
                 anchor_number: self.anchor_number,
                 browser_id: self.browser_id,
             },
-            DeliveryTarget::Pwa { application_number } => {
-                RegistrationId::Pwa(PwaSubscriptionHolder {
-                    anchor_number: self.anchor_number,
-                    application_number,
-                    browser_id: self.browser_id,
-                })
-            }
+            DeliveryTarget::Pwa {
+                application_number,
+                frontend_origin_hash,
+            } => RegistrationId::Pwa(PwaSubscriptionHolder {
+                anchor_number: self.anchor_number,
+                application_number,
+                browser_id: self.browser_id,
+                frontend_origin_hash,
+            }),
         }
     }
 }

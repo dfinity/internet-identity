@@ -186,7 +186,7 @@ describe("onWakeUp", () => {
       {
         body: "See you at six",
         icon: undefined,
-        tag: `${IDENTITY}|${ORIGIN}||42`,
+        tag: `${IDENTITY}|${ORIGIN}||${SENDER.toText()}|42`,
         data: expect.objectContaining({ url: `${ORIGIN}/chats/7` }),
       },
     );

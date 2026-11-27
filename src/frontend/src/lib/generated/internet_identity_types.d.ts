@@ -128,6 +128,14 @@ export type AppGetPwaWebPushSubscriptionStatusError = {
      */
     'NoSuchSession' : null
   };
+export interface AppGetPwaWebPushSubscriptionStatusRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export type AppGetSameDeviceLinkStatusError = {
     'InternalCanisterError' : string
   } |
@@ -163,8 +171,13 @@ export interface AppPrepareDelegationResponse {
   'expiration' : Timestamp,
 }
 export type AppPreparePwaWebPushSubscriptionError = {
-    'InternalCanisterError' : string
+    /**
+     * The app lists no such frontend: no file, an unusable one, or one that does not
+     * name frontend_origin.
+     */
+    'NoSuchFrontend' : null
   } |
+  { 'InternalCanisterError' : string } |
   {
     /**
      * No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -177,6 +190,14 @@ export type AppPreparePwaWebPushSubscriptionError = {
      */
     'NotificationsNotAllowed' : null
   };
+export interface AppPreparePwaWebPushSubscriptionRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export type AppPrepareSameDeviceLinkError = {
     'InternalCanisterError' : string
   } |
@@ -208,6 +229,14 @@ export type AppProbePwaWebPushSubscriptionError = {
      */
     'NotReachable' : null
   };
+export interface AppProbePwaWebPushSubscriptionRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export type AppRemovePwaNotificationError = {
     'InternalCanisterError' : string
   } |
@@ -222,6 +251,12 @@ export interface AppRemovePwaNotificationRequest {
    * As the wake-up that announced it named it.
    */
   'inbox_notification_id' : InboxNotificationId,
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
   /**
    * Why the worker could not show it. Absent where it did.
    */
@@ -255,8 +290,8 @@ export type AppSessionError = {
   };
 export type AppSetPwaWebPushSubscriptionError = {
     /**
-     * Another subscription holds this endpoint with other keys or for another app.
-     * Subscribe again for a fresh endpoint and re-send.
+     * Another subscription, of an account still signed in on its browser, holds this
+     * endpoint. Subscribe again for a fresh endpoint and re-send.
      */
     'EndpointInUse' : null
   } |
@@ -264,7 +299,8 @@ export type AppSetPwaWebPushSubscriptionError = {
   {
     /**
      * Nothing here can open sealed_auth: the transport key it was encrypted to has
-     * expired, or a later prepare replaced it. Prepare again and re-send.
+     * expired, a later prepare replaced it, or the app no longer lists this frontend.
+     * Prepare again and re-send.
      */
     'TransportKeyExpired' : null
   } |
@@ -282,10 +318,16 @@ export type AppSetPwaWebPushSubscriptionError = {
   };
 /**
  * What an installed web app's page registers. Null removes the subscription held for the
- * calling session's browser and account.
+ * calling session's browser, account and frontend.
  */
 export interface AppSetPwaWebPushSubscriptionRequest {
   'subscription' : [] | [PwaWebPushSubscription],
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
 }
 /**
  * Whether an organization domain can be used for SSO sign-in, read by
@@ -1541,6 +1583,12 @@ export type InboxNotificationId = bigint;
 export interface InstalledAppsPath {
   'origin' : FrontendHostname,
   /**
+   * The frontend of that app the installed web apps are served from, where it is not the
+   * app's own origin: one the app lists in its /.well-known/ii-alternative-origins. Null
+   * is the app's own origin.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+  /**
    * The account at that app whose installed web apps these are.
    */
   'account_principal' : Principal,
@@ -1937,8 +1985,8 @@ export interface NotificationGrantConsentRequest {
   'anchor_number' : UserNumber,
 }
 /**
- * Scoped to (origin, recipient), and shared across the canisters sending for
- * one origin.
+ * Scoped to the recipient and the canister sending it: two canisters may each use
+ * one id for one recipient.
  */
 export type NotificationId = bigint;
 /**
@@ -1953,9 +2001,9 @@ export type NotificationPath = {
   } |
   {
     /**
-     * That app's installed web apps on the entries linked to this browser entry as sharing
-     * its device, that deliver for one account. An installed app that shares this browser
-     * entry itself checks its own path, and is not on this one.
+     * That app's installed web apps of one of its frontends on the entries linked to this
+     * browser entry as sharing its device, that deliver for one account. An installed app
+     * that shares this browser entry itself checks its own path, and is not on this one.
      */
     'InstalledApps' : InstalledAppsPath
   };
@@ -2576,6 +2624,12 @@ export type RemoveUnansweredPwaWebPushSubscriptionsError = {
 export interface RemoveUnansweredPwaWebPushSubscriptionsRequest {
   'origin' : FrontendHostname,
   /**
+   * The frontend of that app the installed web apps are served from, where it is not the
+   * app's own origin: one the app lists in its /.well-known/ii-alternative-origins. Null
+   * is the app's own origin.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+  /**
    * The account at that app whose installed web apps to remove.
    */
   'account_principal' : Principal,
@@ -3043,12 +3097,12 @@ export interface _SERVICE {
       { 'Err' : AppGetPwaNotificationError }
   >,
   /**
-   * The endpoint the session's browser and account are subscribed at. Null where nothing
-   * is subscribed, where the subscription awaits its app_set_pwa_webpush_subscription, or
-   * where it delivers for another account.
+   * The endpoint the session's browser, account and frontend are subscribed at. Null
+   * where nothing is subscribed, where the subscription awaits its
+   * app_set_pwa_webpush_subscription, or where it delivers for another account.
    */
   'app_get_pwa_webpush_subscription_status' : ActorMethod<
-    [],
+    [AppGetPwaWebPushSubscriptionStatusRequest],
     { 'Ok' : [] | [WebPushSubscriptionStatus] } |
       { 'Err' : AppGetPwaWebPushSubscriptionStatusError }
   >,
@@ -3077,19 +3131,20 @@ export interface _SERVICE {
   >,
   /**
    * Called by an app's installed web app, signed by its session. The identity, browser
-   * and account are the session's.
+   * and account are the session's; the frontend is the one the request names. An app's
+   * notification wakes only the installed web app of the frontend it was sent for.
    * 
    * Returns II's VAPID public key, which the app passes to PushManager.subscribe, and a
    * new one-time transport public key. The app encrypts the subscription's auth secret
    * to that key and sends it with app_set_pwa_webpush_subscription within 5 minutes.
-   * It replaces this browser's existing subscription, if any, so the installed web app
-   * gets no pushes until app_set_pwa_webpush_subscription succeeds.
-   * Pending: II is fetching its VAPID key, or has no fresh randomness to make the
-   * transport key. Call again shortly. Once a fetch of the VAPID key has failed, this
-   * answers InternalCanisterError with the reason.
+   * It replaces this browser's existing subscription for that frontend, if any, so the
+   * installed web app gets no pushes until app_set_pwa_webpush_subscription succeeds.
+   * Pending: II is fetching its VAPID key or the app's alternative origins, or has no
+   * fresh randomness to make the transport key. Call again shortly. Once a fetch of the
+   * VAPID key has failed, this answers InternalCanisterError with the reason.
    */
   'app_prepare_pwa_webpush_subscription' : ActorMethod<
-    [],
+    [AppPreparePwaWebPushSubscriptionRequest],
     { 'Ok' : PrepareWebPushSubscriptionResponse } |
       { 'Err' : AppPreparePwaWebPushSubscriptionError } |
       { 'Pending' : null }
@@ -3104,11 +3159,12 @@ export interface _SERVICE {
       { 'Err' : AppPrepareSameDeviceLinkError }
   >,
   /**
-   * Sends Internet Identity's own notification to the session's installed web app.
-   * Removing it with app_remove_pwa_notification resets its unanswered pushes.
+   * Sends Internet Identity's own notification to the session's installed web app of the
+   * frontend. Removing it with app_remove_pwa_notification, naming that frontend, resets
+   * its unanswered pushes.
    */
   'app_probe_pwa_webpush_subscription' : ActorMethod<
-    [],
+    [AppProbePwaWebPushSubscriptionRequest],
     { 'Ok' : null } |
       { 'Err' : AppProbePwaWebPushSubscriptionError }
   >,
@@ -3144,7 +3200,8 @@ export interface _SERVICE {
       { 'Err' : SendNotificationError }
   >,
   /**
-   * Sets or, with null, removes the subscription of the session's browser and account.
+   * Sets or, with null, removes the subscription of the session's browser, account and
+   * frontend.
    */
   'app_set_pwa_webpush_subscription' : ActorMethod<
     [AppSetPwaWebPushSubscriptionRequest],
@@ -3981,8 +4038,8 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
-   * Removes that app's installed web app subscriptions on the entries linked to the
-   * caller's that can deliver now and have a probe nobody removed in the 10 seconds
+   * Removes that app's installed web app subscriptions of the frontend on the entries
+   * linked to the caller's that can deliver now and have a probe nobody removed in the 10 seconds
    * after the push service accepted it.
    */
   'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<

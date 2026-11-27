@@ -21,6 +21,8 @@ vi.mock("$lib/utils/notifications/subscribeDevice", () => ({
 }));
 
 const ORIGIN = "https://app.example";
+/** The app's frontend the sign-in came from. */
+const FRONTEND_ORIGIN = "https://mail.app.example";
 const ACCOUNT = Principal.fromText("2vxsx-fae");
 const IDENTITY_NUMBER = BigInt(10_000);
 /** Longer than the check waits for a probe. */
@@ -91,6 +93,7 @@ const check = (browser: BrowserCalls) => {
   const checked = checkNotificationPath({
     identityNumber: IDENTITY_NUMBER,
     origin: ORIGIN,
+    frontendOrigin: FRONTEND_ORIGIN,
     accountPrincipal: ACCOUNT,
     actor: consenting,
     browser,
@@ -119,7 +122,7 @@ describe("checkNotificationPath", () => {
     expect(calls.probed).toEqual([]);
   });
 
-  it("asks about the installed apps of the account that signed in", async () => {
+  it("asks about the installed apps of the account and frontend that signed in", async () => {
     const { browser, calls } = browserAnswering({
       installedApps: [
         { subscriptions: [pastLimit] },
@@ -132,13 +135,18 @@ describe("checkNotificationPath", () => {
     await check(browser);
 
     expect(calls.asked[0]).toEqual({
-      InstalledApps: { origin: ORIGIN, account_principal: ACCOUNT },
+      InstalledApps: {
+        origin: ORIGIN,
+        account_principal: ACCOUNT,
+        frontend_origin: [FRONTEND_ORIGIN],
+      },
     });
     expect(calls.removed).toEqual([
       {
         anchor_number: IDENTITY_NUMBER,
         origin: ORIGIN,
         account_principal: ACCOUNT,
+        frontend_origin: [FRONTEND_ORIGIN],
       },
     ]);
   });
@@ -216,6 +224,7 @@ describe("checkNotificationPath", () => {
     void checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: slowBrowser,
@@ -245,7 +254,13 @@ describe("checkNotificationPath", () => {
     await expect(check(browser)).resolves.toEqual({ kind: "working" });
     expect(calls.removed).toHaveLength(1);
     expect(calls.probed).toEqual([
-      { InstalledApps: { origin: ORIGIN, account_principal: ACCOUNT } },
+      {
+        InstalledApps: {
+          origin: ORIGIN,
+          account_principal: ACCOUNT,
+          frontend_origin: [FRONTEND_ORIGIN],
+        },
+      },
     ]);
   });
 });
@@ -317,6 +332,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser,
@@ -353,6 +369,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: switchingBrowser,
@@ -393,6 +410,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: switchingBrowser,
@@ -425,6 +443,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser,
@@ -460,6 +479,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser,
@@ -502,6 +522,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: switchingBrowser,

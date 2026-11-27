@@ -48,6 +48,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/map-errors-once` Map errors in one place. Business logic returns `Result<T, ModuleError>` and propagates with `?`; the endpoint converts that error to the method's candid error type once, not by building an error response at each failure.
 - `be/abstract-storage` Storage is abstract: it takes and returns domain types, keeps `Storable*` types, internal numbers (`ApplicationNumber`) and index sync to itself (inside `Storage::write`), and contains no feature logic.
 - `be/invariant-in-lowest-layer` Enforce an invariant in the lowest layer that must hold it.
+- `be/correct-in-isolation` A function holds its own invariants whatever order its callers run in. Never justify a missing check by the current call order or by a branch being unreachable today.
 - `be/one-owner-for-related-maps` Keep maps that must agree behind one struct that owns every mutation, or model multi-step state as one enum, so inconsistent combinations can't be represented.
 - `be/state-in-state-module` Keep mutable state in the `state` module and don't nest `STATE.with` borrows.
 - `be/no-hidden-global-reads` A helper doesn't read global state behind the caller's back: pass what it needs.

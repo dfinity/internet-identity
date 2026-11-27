@@ -38,8 +38,9 @@ export type RepairOutcome = "done" | "asked" | "identity-changed";
 const CHECK_DEADLINE_MS = 40_000;
 
 /**
- * Checks, once the identity has signed in to `origin` as the account `accountPrincipal`
- * names, that this device still receives the app's notifications, and puts the allow
+ * Checks, once the identity has signed in to `origin` from its frontend at
+ * `frontendOrigin` as the account `accountPrincipal` names, that this device still
+ * receives the app's notifications for that frontend, and puts the allow
  * screen in front of the user where only they can repair it. Holds the sign-in only
  * while a path past its limit is probed, and never past {@link CHECK_DEADLINE_MS}.
  * `browserActor` is what signs as this browser.
@@ -51,17 +52,25 @@ const CHECK_DEADLINE_MS = 40_000;
 export const repairNotificationPath = async ({
   identityNumber,
   origin,
+  frontendOrigin,
   accountPrincipal,
   actor,
   browserActor = browserKeyActor,
 }: {
   identityNumber: bigint;
   origin: string;
+  /** The page the sign-in came from: `origin` itself, or one of its alternative
+   *  origins. */
+  frontendOrigin: string;
   accountPrincipal: Principal;
   actor: ActorSubclass<_SERVICE>;
   browserActor?: (identityNumber: bigint) => Promise<BrowserCalls>;
 }): Promise<RepairOutcome> => {
-  if (!get(PUSH_NOTIFICATIONS) || !isWebOrigin(origin)) {
+  if (
+    !get(PUSH_NOTIFICATIONS) ||
+    !isWebOrigin(origin) ||
+    !isWebOrigin(frontendOrigin)
+  ) {
     return "done";
   }
   // Shown once a path is past its limit, which is when the check probes it, and taken
@@ -89,6 +98,7 @@ export const repairNotificationPath = async ({
       checkPath({
         identityNumber,
         origin,
+        frontendOrigin,
         accountPrincipal,
         actor,
         browserActor,
@@ -175,6 +185,7 @@ const checkWithin = <T>(signal: AbortSignal, check: Promise<T>): Promise<T> =>
 const checkPath = async ({
   identityNumber,
   origin,
+  frontendOrigin,
   accountPrincipal,
   actor,
   browserActor,
@@ -183,6 +194,7 @@ const checkPath = async ({
 }: {
   identityNumber: bigint;
   origin: string;
+  frontendOrigin: string;
   accountPrincipal: Principal;
   actor: ActorSubclass<_SERVICE>;
   browserActor: (identityNumber: bigint) => Promise<BrowserCalls>;
@@ -201,6 +213,7 @@ const checkPath = async ({
   return checkNotificationPath({
     identityNumber,
     origin,
+    frontendOrigin,
     accountPrincipal,
     actor,
     browser,

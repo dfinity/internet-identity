@@ -1,9 +1,9 @@
 //! Pending device wake-ups, grouped by app and limited per identity.
-//! Deduplication uses (recipient, notification ID); urgency sets the lane.
+//! Deduplication uses (recipient, sender, notification ID); urgency sets the lane.
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
-use crate::storage::storable::application::StorableOriginSha256;
+use crate::origin::OriginSha256;
 use crate::SECOND_NS;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -19,9 +19,13 @@ pub(crate) struct PendingNotification {
     pub(crate) anchor_number: AnchorNumber,
     /// II's number for the app's origin. Kept inside II: the service worker is told the origin.
     pub(crate) application_number: ApplicationNumber,
+    /// The hash of the origin of the app's frontend the notification is for: the app's own
+    /// origin, or one of its alternative origins. Only that frontend's installed web app
+    /// is woken for it.
+    pub(crate) frontend_origin_hash: OriginSha256,
     /// The app canister that sent it, which the service worker fetches it from.
     pub(crate) sender: Principal,
-    /// App-chosen ID, unique per recipient within the app.
+    /// The sender's ID for it, unique per recipient and sender.
     pub(crate) notification_id: NotificationId,
     pub(crate) urgency: Urgency,
     /// Optional app deadline, capped by the queue expiry limit.
@@ -29,14 +33,14 @@ pub(crate) struct PendingNotification {
 }
 
 impl QueueItem for PendingNotification {
-    type Key = (Principal, NotificationId);
+    type Key = (Principal, Principal, NotificationId);
 
     type Group = AnchorNumber;
 
     const TURNS: &'static [usize] = &[4, 3, 2, 1];
 
     fn key(&self) -> Self::Key {
-        (self.recipient, self.notification_id)
+        (self.recipient, self.sender, self.notification_id)
     }
 
     fn group(&self) -> Self::Group {
@@ -62,7 +66,7 @@ impl QueueItem for PendingNotification {
 
 /// Callers must authorize the app and hash its canonical origin after legacy-domain
 /// remapping so aliases share the same queue limits.
-pub(crate) type AppBacklog = AdmissionQueue<StorableOriginSha256, PendingNotification>;
+pub(crate) type AppBacklog = AdmissionQueue<OriginSha256, PendingNotification>;
 
 const MINUTE_NS: u64 = 60 * SECOND_NS;
 const EXPIRY_NS: u64 = 5 * MINUTE_NS;
@@ -112,8 +116,8 @@ mod tests {
             .collect()
     }
 
-    fn origin(host: &str) -> StorableOriginSha256 {
-        StorableOriginSha256::from_origin(&host.to_string())
+    fn origin(host: &str) -> OriginSha256 {
+        OriginSha256::from_origin(host)
     }
 
     fn principal(seed: u64) -> Principal {
@@ -125,6 +129,7 @@ mod tests {
             recipient: principal(anchor_number),
             anchor_number,
             application_number: 1,
+            frontend_origin_hash: origin("https://a.example"),
             sender: principal(u64::MAX),
             notification_id,
             urgency: Urgency::Normal,
@@ -184,6 +189,71 @@ mod tests {
         );
     }
 
+    /// One sender's id names one notification whichever frontend it is sent for, so a
+    /// later send replaces the earlier one still pending.
+    #[test]
+    fn one_senders_id_sent_for_two_frontends_folds_into_one_notification() {
+        let mut backlog = AppBacklog::new(APP_BACKLOG, 0);
+        let app = origin("https://a.example");
+        let mail_notification = PendingNotification {
+            frontend_origin_hash: origin("https://mail.a.example"),
+            ..notification(1, 7)
+        };
+        let calendar_notification = PendingNotification {
+            frontend_origin_hash: origin("https://calendar.a.example"),
+            urgency: Urgency::High,
+            ..notification(1, 7)
+        };
+
+        assert_eq!(
+            results(backlog.admit(app, vec![mail_notification], 1)),
+            vec![Admission::Accepted]
+        );
+        assert_eq!(
+            results(backlog.admit(app, vec![calendar_notification.clone()], 2)),
+            vec![Admission::Folded]
+        );
+
+        let pending_notifications: Vec<PendingNotification> = take(&mut backlog, 10, 3)
+            .into_iter()
+            .map(|taken| taken.entry.item)
+            .collect();
+        assert_eq!(pending_notifications, vec![calendar_notification]);
+    }
+
+    /// Two canisters sending for one app each pick their own ids, so one id from each
+    /// stays two notifications.
+    #[test]
+    fn one_id_from_two_senders_stays_two_notifications() {
+        let mut backlog = AppBacklog::new(APP_BACKLOG, 0);
+        let app = origin("https://a.example");
+        let first_sender_notification = notification(1, 7);
+        let second_sender_notification = PendingNotification {
+            sender: principal(u64::MAX - 1),
+            ..notification(1, 7)
+        };
+
+        assert_eq!(
+            results(backlog.admit(
+                app,
+                vec![
+                    first_sender_notification.clone(),
+                    second_sender_notification.clone()
+                ],
+                1
+            )),
+            vec![Admission::Accepted; 2]
+        );
+
+        let pending_notifications: Vec<PendingNotification> = take(&mut backlog, 10, 2)
+            .into_iter()
+            .map(|taken| taken.entry.item)
+            .collect();
+        assert_eq!(pending_notifications.len(), 2);
+        assert!(pending_notifications.contains(&first_sender_notification));
+        assert!(pending_notifications.contains(&second_sender_notification));
+    }
+
     #[test]
     fn a_recipients_notifications_share_a_group() {
         assert_eq!(notification(1, 7).group(), notification(1, 8).group());
@@ -209,12 +279,12 @@ mod tests {
         let cap = APP_BACKLOG.max_pending_per_group as u64;
 
         let within: Vec<_> = (0..cap).map(|id| notification(1, id)).collect();
-        assert!(results(backlog.admit(app.clone(), within, 1))
+        assert!(results(backlog.admit(app, within, 1))
             .iter()
             .all(|admission| *admission == Admission::Accepted));
 
         assert_eq!(
-            results(backlog.admit(app.clone(), vec![notification(1, cap)], 1)),
+            results(backlog.admit(app, vec![notification(1, cap)], 1)),
             vec![Admission::Full {
                 retry_after_ns: APP_BACKLOG.retry.base_ns,
                 cause: FullCause::Group,
@@ -232,7 +302,7 @@ mod tests {
     fn a_notification_comes_back_out_with_its_app_and_arrival() {
         let mut backlog = AppBacklog::new(APP_BACKLOG, 0);
         let app = origin("https://a.example");
-        backlog.admit(app.clone(), vec![notification(42, 7)], 1_000);
+        backlog.admit(app, vec![notification(42, 7)], 1_000);
 
         let taken = take(&mut backlog, 10, 2_000);
 
@@ -247,7 +317,7 @@ mod tests {
     fn the_more_urgent_notification_leaves_first() {
         let mut backlog = AppBacklog::new(APP_BACKLOG, 0);
         let app = origin("https://a.example");
-        backlog.admit(app.clone(), vec![at_urgency(1, Urgency::VeryLow)], 1);
+        backlog.admit(app, vec![at_urgency(1, Urgency::VeryLow)], 1);
         backlog.admit(app, vec![at_urgency(2, Urgency::High)], 2);
 
         assert_eq!(ids_taken(&mut backlog, 10, 3), vec![2, 1]);
@@ -286,7 +356,7 @@ mod tests {
         backlog: &mut AppBacklog,
         limit: usize,
         now_ns: u64,
-    ) -> Vec<Taken<StorableOriginSha256, PendingNotification>> {
+    ) -> Vec<Taken<OriginSha256, PendingNotification>> {
         backlog
             .take_batch(limit, now_ns, |batch| Ok::<_, ()>(batch.to_vec()))
             .unwrap()

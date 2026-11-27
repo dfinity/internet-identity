@@ -68,6 +68,22 @@ export const LEGACY_GATEWAY_DOMAIN = GATEWAY_DOMAINS[0];
 export const GATEWAY_ORIGIN_REGEX =
   /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.(?<domain>ic0\.app|icp0\.io|icp\.net)$/;
 
+/** The `.raw` label of a gateway origin's subdomain, which names the endpoint that
+ *  serves the canister's responses without certification. */
+const RAW_LABEL_REGEX = /\.raw$/;
+
+/** Where an app is shown, opened and read from: a canister on any gateway domain, raw
+ *  or not, is at its certified `https://<canister id>.icp.net`, which serves every
+ *  canister, and any other origin is as it stands. */
+export const appUrl = (origin: string): string => {
+  const groups = origin.match(GATEWAY_ORIGIN_REGEX)?.groups;
+  if (groups === undefined) {
+    return origin;
+  }
+  const canisterId = groups.subdomain.replace(RAW_LABEL_REGEX, "");
+  return `https://${canisterId}.icp.net`;
+};
+
 /**
  * The same canister's origins on the gateway domains other than the one
  * `origin` uses, in {@link GATEWAY_DOMAINS} order. Empty for anything that is

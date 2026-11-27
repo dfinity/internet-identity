@@ -1,8 +1,7 @@
 <script lang="ts">
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
-  import { originLabel } from "$lib/utils/urlUtils";
+  import { appUrl, originLabel } from "$lib/utils/urlUtils";
   import AppLogo from "./AppLogo.svelte";
-  import { appUrl } from "../apps";
 
   interface Props {
     origin: string;

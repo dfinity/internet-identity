@@ -97,7 +97,7 @@ fn read_posted_endpoint<M: Memory + Clone>(
             .and_then(|holder| {
                 let config = storage
                     .anchor_application_config(holder.anchor_number, holder.application_number)?;
-                config.pwa_webpush_subscription(holder.browser_id)
+                config.pwa_webpush_subscription(holder.browser_id, holder.frontend_origin_hash)
             })
             .and_then(|held_subscription| held_subscription.subscription.into_ready())
             .map(|registered_subscription| registered_subscription.endpoint.into_string()),

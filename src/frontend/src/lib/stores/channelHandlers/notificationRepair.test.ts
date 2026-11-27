@@ -73,6 +73,7 @@ const repair = () =>
   repairNotificationPath({
     identityNumber: IDENTITY_NUMBER,
     origin: "https://app.example",
+    frontendOrigin: "https://app.example",
     accountPrincipal: Principal.fromText("2vxsx-fae"),
     actor,
     browserActor: () => Promise.resolve(silentInstalledApp),
@@ -114,6 +115,23 @@ describe("repairNotificationPath", () => {
       repairNotificationPath({
         identityNumber: IDENTITY_NUMBER,
         origin: "chrome-extension://abcdefghijklmnop",
+        frontendOrigin: "chrome-extension://abcdefghijklmnop",
+        accountPrincipal: Principal.fromText("2vxsx-fae"),
+        actor,
+        browserActor,
+      }),
+    ).resolves.toBe("done");
+    expect(browserActor).not.toHaveBeenCalled();
+  });
+
+  it("skips a frontend that is not a web page's, whatever this browser holds", async () => {
+    const browserActor = vi.fn(() => new Promise<BrowserCalls>(() => {}));
+
+    await expect(
+      repairNotificationPath({
+        identityNumber: IDENTITY_NUMBER,
+        origin: "https://app.example",
+        frontendOrigin: "chrome-extension://abcdefghijklmnop",
         accountPrincipal: Principal.fromText("2vxsx-fae"),
         actor,
         browserActor,
@@ -126,6 +144,7 @@ describe("repairNotificationPath", () => {
     const repaired = repairNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: "https://app.example",
+      frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
       actor,
       browserActor: () => new Promise<BrowserCalls>(() => {}),
@@ -152,6 +171,7 @@ describe("repairNotificationPath", () => {
     const repaired = repairNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: "https://app.example",
+      frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
       actor,
       browserActor: () =>
@@ -179,6 +199,7 @@ describe("repairNotificationPath", () => {
       const repaired = repairNotificationPath({
         identityNumber: IDENTITY_NUMBER,
         origin: "https://app.example",
+        frontendOrigin: "https://app.example",
         accountPrincipal: Principal.fromText("2vxsx-fae"),
         actor,
         browserActor: () => Promise.reject(new Error("the lookup failed")),
@@ -197,6 +218,7 @@ describe("repairNotificationPath", () => {
     const repaired = repairNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: "https://app.example",
+      frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
       actor,
       browserActor: () => {
@@ -253,6 +275,7 @@ describe("repairNotificationPath while the allow screen is prepared", () => {
     repairNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: "https://app.example",
+      frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
       actor: stallingActor(),
       browserActor: () => Promise.resolve(silentBrowser),
@@ -339,6 +362,7 @@ describe("repairNotificationPath on an iPhone", () => {
     const repaired = repairNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: "https://app.example",
+      frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
       actor,
       browserActor: () => Promise.resolve(silentAlerts),

@@ -58,18 +58,21 @@ export type BrowserCalls = {
 /** The outcome where nothing is left for the user to do. */
 const workingOutcome: PathCheckOutcome = { kind: "working" };
 
-/** Checks the path that delivers `origin`'s notifications to this device for the account
- *  `accountPrincipal` names, of the identity `identityNumber` names: `actor` signs as the
- *  identity and `browser` as this browser. Calls `onPastLimit` once a path is past its
- *  limit, before anything is probed, and stops with `signal`'s reason once it is
- *  aborted.
+/** Checks the path that delivers `origin`'s notifications for its frontend at
+ *  `frontendOrigin` to this device, for the account `accountPrincipal` names, of the
+ *  identity `identityNumber` names: `actor` signs as the identity and `browser` as this
+ *  browser. Calls `onPastLimit` once a path is past its limit, before anything is probed,
+ *  and stops with `signal`'s reason once it is aborted.
  *
- *  An installed web app that delivers for the account is the path, and this browser's
- *  own only takes over where none is left: one that is not past its limit is working,
- *  and whatever this browser's own path holds is beside the point. */
+ *  An installed web app of that frontend that delivers for the account is the path, and
+ *  this browser's own only takes over where none is left: one that is not past its limit
+ *  is working, and whatever this browser's own path holds is beside the point. Another
+ *  frontend's installed web app is no part of it: the frontend's notifications never
+ *  wake it. */
 export const checkNotificationPath = async ({
   identityNumber,
   origin,
+  frontendOrigin,
   accountPrincipal,
   actor,
   browser,
@@ -79,6 +82,9 @@ export const checkNotificationPath = async ({
 }: {
   identityNumber: bigint;
   origin: string;
+  /** The page the sign-in came from: `origin` itself, or one of its alternative
+   *  origins. */
+  frontendOrigin: string;
   accountPrincipal: Principal;
   actor: IdentityCalls;
   browser: BrowserCalls;
@@ -98,7 +104,11 @@ export const checkNotificationPath = async ({
     return workingOutcome;
   }
   const installedApps: NotificationPath = {
-    InstalledApps: { origin, account_principal: accountPrincipal },
+    InstalledApps: {
+      origin,
+      account_principal: accountPrincipal,
+      frontend_origin: [frontendOrigin],
+    },
   };
   const thisBrowser: NotificationPath = { ThisBrowser: null };
 
@@ -122,6 +132,7 @@ export const checkNotificationPath = async ({
         anchor_number: identityNumber,
         origin,
         account_principal: accountPrincipal,
+        frontend_origin: [frontendOrigin],
       })
       .then(throwCanisterError);
     const remainingStatus = await pathStatus(

@@ -9,12 +9,13 @@
 //! notifications go back to where the browser itself delivers them.
 
 use crate::notifications::backlog::identity::IdentityWakeUpPath;
-use crate::notifications::dispatch;
+use crate::notifications::dispatch::{self, InstalledAppSubscription};
 use crate::notifications::webpush;
 use crate::notifications::webpush::pwa_subscription;
 use crate::notifications::webpush::rotation::{Destination, RegistrationId};
 use crate::notifications::webpush::unanswered;
 use crate::origin::ApplicationOrigin;
+use crate::origin::OriginSha256;
 use crate::state::storage_borrow;
 use crate::storage::anchor::{Anchor, Browser, ReadySubscription};
 use crate::storage::PwaSubscriptionHolder;
@@ -30,16 +31,17 @@ use internet_identity_interface::internet_identity::types::{
 pub(crate) enum DevicePath {
     /// Where the calling browser's wake-ups go.
     ThisBrowser,
-    /// The installed web apps of the app numbered `application_number` on the entries
-    /// linked to the calling browser's as sharing its device, that deliver for the account
-    /// `account_principal` names. `None` for an app nobody has signed in to, which has
-    /// none.
+    /// The installed web apps of the app numbered `application_number`, at its frontend
+    /// whose origin hashes to `frontend_origin_hash`, on the entries linked to the calling
+    /// browser's as sharing its device, that deliver for the account `account_principal`
+    /// names. `None` for an app nobody has signed in to, which has none.
     ///
     /// Not the calling browser's own entry: an installed app sharing it holds the session
     /// a sign-in from the browser replaces, so it could not answer a probe sent now. It
     /// checks its own path when it next starts.
     InstalledApps {
         application_number: Option<ApplicationNumber>,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     },
 }
@@ -52,10 +54,14 @@ impl DevicePath {
             NotificationPath::InstalledApps(InstalledAppsPath {
                 origin,
                 account_principal,
+                frontend_origin,
             }) => {
                 let application_number = lookup_application_number(&origin)?;
+                let frontend_origin_hash =
+                    hash_frontend_origin(&origin, frontend_origin.as_deref())?;
                 Ok(DevicePath::InstalledApps {
                     application_number,
+                    frontend_origin_hash,
                     account_principal,
                 })
             }
@@ -70,6 +76,17 @@ pub(crate) fn lookup_application_number(origin: &str) -> Result<Option<Applicati
     Ok(storage_borrow(|storage| {
         storage.lookup_application_number_with_origin(&origin.as_str().to_string())
     }))
+}
+
+/// The origin hash of the frontend at `frontend_origin` of the app at `origin`, which is
+/// the app's own origin where `frontend_origin` is `None`. An error for a string that is
+/// not an origin.
+pub(crate) fn hash_frontend_origin(
+    origin: &str,
+    frontend_origin: Option<&str>,
+) -> Result<OriginSha256, String> {
+    let frontend_origin = ApplicationOrigin::try_from(frontend_origin.unwrap_or(origin))?;
+    Ok(OriginSha256::from_origin(frontend_origin.as_str()))
 }
 
 /// Why a probe was not sent.
@@ -93,18 +110,27 @@ struct PathSubscription {
 }
 
 impl PathSubscription {
-    /// Whether this is the installed web app of the app numbered `application_number`
-    /// that delivers for the account `account_principal` names.
+    /// Whether this is an installed web app of the app numbered `application_number`, at
+    /// its frontend whose origin hashes to `frontend_origin_hash`, that delivers for the
+    /// account `account_principal` names.
     fn is_installed_app_for(
         &self,
         application_number: ApplicationNumber,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     ) -> bool {
-        self.wake_up_path
-            == IdentityWakeUpPath::InstalledApp {
-                application_number,
-                account_principal,
+        match self.wake_up_path {
+            IdentityWakeUpPath::Routed => false,
+            IdentityWakeUpPath::InstalledApp {
+                application_number: path_application_number,
+                frontend_origin_hash: path_frontend_origin_hash,
+                account_principal: path_account_principal,
+            } => {
+                path_application_number == application_number
+                    && path_frontend_origin_hash == frontend_origin_hash
+                    && path_account_principal == account_principal
             }
+        }
     }
 }
 
@@ -179,17 +205,23 @@ pub(crate) fn probe_installed_app(
     let browser = anchor
         .browser(holder.browser_id)
         .ok_or(ProbeRefusal::NotReachable)?;
-    let Some(path_subscription) = installed_app_on_path(
+    let Some(path_subscription) = installed_apps_on_path(
         browser,
         holder.anchor_number,
         holder.application_number,
         now_ns,
-    ) else {
+    )
+    .into_iter()
+    .find(|path_subscription| {
+        path_subscription.registration == RegistrationId::Pwa(holder)
+            && path_subscription.is_installed_app_for(
+                holder.application_number,
+                holder.frontend_origin_hash,
+                account_principal,
+            )
+    }) else {
         return Err(ProbeRefusal::NotReachable);
     };
-    if !path_subscription.is_installed_app_for(holder.application_number, account_principal) {
-        return Err(ProbeRefusal::NotReachable);
-    }
     probe_path_subscription(holder.anchor_number, path_subscription, identity, now_ns)
 }
 
@@ -218,9 +250,10 @@ fn probe_path_subscription(
     Ok(())
 }
 
-/// Removes the installed web app subscriptions of the app numbered `application_number`
-/// on the entries of `anchor` linked to `browser_id`'s that deliver for the account
-/// `account_principal` names, where they can deliver now and a probe through them was
+/// Removes the installed web app subscriptions of the app numbered `application_number`,
+/// at its frontend whose origin hashes to `frontend_origin_hash`, on the entries of
+/// `anchor` linked to `browser_id`'s that deliver for the account `account_principal`
+/// names, where they can deliver now and a probe through them was
 /// never removed in [`unanswered::MIN_PROBE_ANSWER_TIME_NS`]. One that answered its probe,
 /// or whose probe is younger than that, is kept. `None` for an app nobody has signed in
 /// to, which has none.
@@ -231,11 +264,13 @@ pub(crate) fn remove_unanswered_installed_apps(
     anchor: &Anchor,
     browser_id: BrowserId,
     application_number: Option<ApplicationNumber>,
+    frontend_origin_hash: OriginSha256,
     account_principal: Principal,
     now_ns: Timestamp,
 ) {
     let path = DevicePath::InstalledApps {
         application_number,
+        frontend_origin_hash,
         account_principal,
     };
     for path_subscription in path_subscriptions(anchor, browser_id, path, now_ns) {
@@ -248,8 +283,8 @@ pub(crate) fn remove_unanswered_installed_apps(
         let RegistrationId::Pwa(holder) = path_subscription.registration else {
             continue;
         };
-        if let Err(err) = pwa_subscription::write_pwa_subscription(holder, None, None) {
-            ic_cdk::println!("ERROR: Failed to remove an unanswered installed app: {err}");
+        if let Err(err) = pwa_subscription::write_pwa_subscription(holder, None, None, now_ns) {
+            ic_cdk::println!("ERROR: Failed to remove an unanswered installed app: {err:?}");
         }
     }
 }
@@ -274,20 +309,25 @@ fn path_subscriptions(
         } => Vec::new(),
         DevicePath::InstalledApps {
             application_number: Some(application_number),
+            frontend_origin_hash,
             account_principal,
         } => {
             let mut path_subscriptions = Vec::new();
             for entry in same_device_entries(anchor, browser) {
                 path_subscriptions.extend(
-                    installed_app_on_path(
+                    installed_apps_on_path(
                         entry,
                         anchor.anchor_number(),
                         application_number,
                         now_ns,
                     )
+                    .into_iter()
                     .filter(|path_subscription| {
-                        path_subscription
-                            .is_installed_app_for(application_number, account_principal)
+                        path_subscription.is_installed_app_for(
+                            application_number,
+                            frontend_origin_hash,
+                            account_principal,
+                        )
                     }),
                 );
             }
@@ -317,36 +357,47 @@ fn routed_on_path(
     })
 }
 
-/// `browser`'s installed web app of the app numbered `application_number`, as a
-/// subscription on a path, where it can deliver now.
-fn installed_app_on_path(
+/// `browser`'s installed web apps of the app numbered `application_number`, one per
+/// frontend, as subscriptions on a path, where they can deliver now.
+fn installed_apps_on_path(
     browser: &Browser,
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
     now_ns: Timestamp,
-) -> Option<PathSubscription> {
-    let (subscription, account_principal) = storage_borrow(|storage| {
-        dispatch::installed_app_subscription(
+) -> Vec<PathSubscription> {
+    let installed_app_subscriptions = storage_borrow(|storage| {
+        dispatch::installed_app_subscriptions(
             storage,
             anchor_number,
             application_number,
             browser,
             now_ns,
         )
-    })?;
-    Some(PathSubscription {
-        browser_id: browser.id,
-        registration: RegistrationId::Pwa(PwaSubscriptionHolder {
-            anchor_number,
-            application_number,
-            browser_id: browser.id,
-        }),
+    });
+    let mut path_subscriptions = Vec::new();
+    for InstalledAppSubscription {
+        frontend_origin_hash,
         subscription,
-        wake_up_path: IdentityWakeUpPath::InstalledApp {
-            application_number,
-            account_principal,
-        },
-    })
+        account_principal,
+    } in installed_app_subscriptions
+    {
+        path_subscriptions.push(PathSubscription {
+            browser_id: browser.id,
+            registration: RegistrationId::Pwa(PwaSubscriptionHolder {
+                anchor_number,
+                application_number,
+                browser_id: browser.id,
+                frontend_origin_hash,
+            }),
+            subscription,
+            wake_up_path: IdentityWakeUpPath::InstalledApp {
+                application_number,
+                frontend_origin_hash,
+                account_principal,
+            },
+        });
+    }
+    path_subscriptions
 }
 
 /// Every entry of `anchor` linked to `browser` as sharing its device.
