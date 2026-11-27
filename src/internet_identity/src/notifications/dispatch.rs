@@ -15,13 +15,13 @@ use crate::notifications::webpush::{
     clear_gone_subscription, payload, relays, vapid_key, PayloadIkm, PayloadKeyId, SubscriberKey,
 };
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
+use crate::origin::OriginSha256;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::Session;
 use crate::storage::anchor::{
     Browser, InboxNotification, InboxNotificationKind, ReadySubscription, WebPushSubscription,
 };
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
-use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::{PwaSubscriptionHolder, Storage};
 use crate::{DAY_NS, HOUR_NS, MINUTE_NS, SECOND_NS};
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -32,6 +32,7 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, ApplicationNumber, BrowserId, IdentityForNotification, InboxNotificationId,
     NotificationEvent, NotificationId, Timestamp, Urgency,
 };
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
@@ -220,9 +221,11 @@ pub(crate) enum DeliveryTarget {
     Browser,
     /// The app record the entry routes through, shared with every identity pointing at it.
     App(NotificationAppId),
-    /// The app's own installed web app on this entry.
+    /// The app's own installed web app on this entry, at the frontend whose origin hashes
+    /// to `frontend_origin_hash`.
     Pwa {
         application_number: ApplicationNumber,
+        frontend_origin_hash: OriginSha256,
     },
 }
 
@@ -234,13 +237,19 @@ impl DeliveryTarget {
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> Option<PwaSubscriptionHolder> {
+        use DeliveryTarget::*;
+
         match self {
-            DeliveryTarget::Pwa { application_number } => Some(PwaSubscriptionHolder {
+            Pwa {
+                application_number,
+                frontend_origin_hash,
+            } => Some(PwaSubscriptionHolder {
                 anchor_number,
                 application_number,
                 browser_id,
+                frontend_origin_hash,
             }),
-            DeliveryTarget::Browser | DeliveryTarget::App(_) => None,
+            Browser | App(_) => None,
         }
     }
 }
@@ -458,22 +467,26 @@ pub(crate) fn plan_identity_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Del
 fn resolve_identity_wake_up<M: Memory + Clone>(
     storage: &Storage<M>,
     pending: &PendingIdentityNotification,
-) -> (InboxNotificationKind, Option<PwaRoute>) {
+) -> (InboxNotificationKind, Option<PwaRoute<'static>>) {
+    use IdentityWakeUpPath::*;
+
     match pending.path {
-        IdentityWakeUpPath::Routed => (
+        Routed => (
             InboxNotificationKind::Identity {
                 event: pending.event.clone(),
             },
             None,
         ),
-        IdentityWakeUpPath::InstalledApp {
+        InstalledApp {
             application_number,
+            frontend_origin_hash,
             account_principal,
         } => {
             let pwa_route = PwaRoute::read(
                 storage,
                 pending.anchor_number,
                 application_number,
+                frontend_origin_hash,
                 account_principal,
             );
             (
@@ -659,7 +672,7 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
 /// Answers whether this notification is still waiting on something that is coming: the
 /// caller leaves it in the backlog rather than spending it.
 fn fan_out_to_browsers(
-    taken: &Taken<StorableOriginSha256, PendingNotification>,
+    taken: &Taken<OriginSha256, PendingNotification>,
     now_ns: Timestamp,
     out: &mut Vec<Delivery>,
 ) -> bool {
@@ -696,6 +709,7 @@ fn fan_out_to_browsers(
             storage,
             pending.anchor_number,
             pending.application_number,
+            pending.frontend_origin_hash,
             pending.recipient,
         );
         // The sealing keys travel with each wake-up: the deposit that names its entry
@@ -972,28 +986,73 @@ pub(crate) fn routed_subscription<M: Memory + Clone>(
     Some((subscription.clone(), target))
 }
 
-/// The subscription `browser`'s installed web app of the app numbered
-/// `application_number` can be woken at right now, and the principal of the account it
-/// delivers for. `None` where it holds none, or the account has no session on `browser`
-/// live past [`PWA_SESSION_MARGIN_NS`].
-pub(crate) fn installed_app_subscription<M: Memory + Clone>(
+/// An installed web app subscription [`installed_app_subscriptions`] finds.
+pub(crate) struct InstalledAppSubscription {
+    /// The hash of the origin of the frontend it was subscribed from.
+    pub(crate) frontend_origin_hash: OriginSha256,
+    pub(crate) subscription: ReadySubscription,
+    /// The principal of the account it delivers for.
+    pub(crate) account_principal: Principal,
+    /// Whether the app disabled it, so nothing is sent to it.
+    pub(crate) is_disabled: bool,
+}
+
+/// The subscriptions `browser`'s installed web apps of the app numbered
+/// `application_number`, one per frontend, can be woken at right now, and the ones the
+/// app disabled. Leaves out each one that is not disabled and whose account has no session
+/// on `browser` live past [`PWA_SESSION_MARGIN_NS`].
+pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
     storage: &Storage<M>,
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
     browser: &Browser,
     now_ns: Timestamp,
-) -> Option<(ReadySubscription, Principal)> {
-    let config = storage.anchor_application_config(anchor_number, application_number)?;
-    let held_subscription = config.pwa_webpush_subscription(browser.id)?;
-    let account_principal = held_subscription.account_principal;
-    let route = PwaRoute::read(
-        storage,
-        anchor_number,
-        application_number,
-        account_principal,
-    );
-    let (subscription, _, _) = find_pwa_wake_up_address(browser, &route, now_ns)?;
-    Some((subscription, account_principal))
+) -> Vec<InstalledAppSubscription> {
+    use InstalledAppDelivery::*;
+
+    let Some(config) = storage.anchor_application_config(anchor_number, application_number) else {
+        return Vec::new();
+    };
+
+    let mut sessions_by_account: BTreeMap<Principal, Vec<Session>> = BTreeMap::new();
+    let mut installed_app_subscriptions = Vec::new();
+
+    for (frontend_origin_hash, held_subscription) in
+        config.pwa_webpush_subscriptions_of_browser(browser.id)
+    {
+        let account_principal = held_subscription.account_principal;
+        let sessions = sessions_by_account
+            .entry(account_principal)
+            .or_insert_with(|| {
+                read_account_sessions(
+                    storage,
+                    anchor_number,
+                    application_number,
+                    account_principal,
+                )
+            });
+        let route = PwaRoute::new(
+            &config,
+            sessions,
+            application_number,
+            frontend_origin_hash,
+            account_principal,
+        );
+        let (subscription, is_disabled) = match find_installed_app_delivery(browser, &route, now_ns)
+        {
+            Some(Wakes { subscription, .. }) => (subscription, false),
+            Some(Disabled { subscription }) => (subscription, true),
+            None => continue,
+        };
+        installed_app_subscriptions.push(InstalledAppSubscription {
+            frontend_origin_hash,
+            subscription,
+            account_principal,
+            is_disabled,
+        });
+    }
+
+    installed_app_subscriptions
 }
 
 /// Puts one of Internet Identity's own wake-ups in the backlog, answering whether it was
@@ -1086,42 +1145,85 @@ fn wake_up_address<'a>(
 }
 
 /// What decides whether an app's notification wakes an entry's installed web app: the
-/// identity's config for the app, which holds the subscriptions, and the sessions of the
-/// recipient account there.
-pub(crate) struct PwaRoute {
-    config: Option<AnchorApplicationConfig>,
-    sessions: Vec<Session>,
+/// identity's config for the app, which holds the subscriptions, the frontend the
+/// notification is for, and the sessions of the recipient account there.
+///
+/// Owns what [`PwaRoute::read`] loads, and borrows what [`PwaRoute::new`] is handed by a
+/// caller that already loaded it.
+pub(crate) struct PwaRoute<'a> {
+    config: Option<Cow<'a, AnchorApplicationConfig>>,
+    sessions: Cow<'a, [Session]>,
     application_number: ApplicationNumber,
+    frontend_origin_hash: OriginSha256,
     account_principal: Principal,
 }
 
-impl PwaRoute {
+impl PwaRoute<'static> {
     /// What `anchor_number` holds for the account `account_principal` names at
-    /// `application_number`. No sessions where it names no account of the identity.
+    /// `application_number`, for its frontend whose origin hashes to
+    /// `frontend_origin_hash`. No sessions where it names no account of the identity.
     pub(crate) fn read<M: Memory + Clone>(
         storage: &Storage<M>,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     ) -> Self {
-        let sessions = storage
-            .lookup_account_with_principal(account_principal)
-            .filter(|account| account.anchor_number == anchor_number)
-            .map(|account| {
-                storage.read_account_sessions(
-                    anchor_number,
-                    application_number,
-                    account.account_number,
-                )
-            })
-            .unwrap_or_default();
-        Self {
-            config: storage.anchor_application_config(anchor_number, application_number),
-            sessions,
+        let sessions = read_account_sessions(
+            storage,
+            anchor_number,
             application_number,
+            account_principal,
+        );
+        let config = storage
+            .anchor_application_config(anchor_number, application_number)
+            .map(Cow::Owned);
+        Self {
+            config,
+            sessions: Cow::Owned(sessions),
+            application_number,
+            frontend_origin_hash,
             account_principal,
         }
     }
+}
+
+impl<'a> PwaRoute<'a> {
+    /// The route for the account `account_principal` names at `application_number`, for
+    /// its frontend whose origin hashes to `frontend_origin_hash`, from the identity's
+    /// `config` for the app and the account's `sessions` there, as the caller loaded them.
+    pub(crate) fn new(
+        config: &'a AnchorApplicationConfig,
+        sessions: &'a [Session],
+        application_number: ApplicationNumber,
+        frontend_origin_hash: OriginSha256,
+        account_principal: Principal,
+    ) -> Self {
+        Self {
+            config: Some(Cow::Borrowed(config)),
+            sessions: Cow::Borrowed(sessions),
+            application_number,
+            frontend_origin_hash,
+            account_principal,
+        }
+    }
+}
+
+/// The sessions on any browser entry of the account `account_principal` names at
+/// `application_number`. None where it names no account of the identity `anchor_number`.
+pub(crate) fn read_account_sessions<M: Memory + Clone>(
+    storage: &Storage<M>,
+    anchor_number: AnchorNumber,
+    application_number: ApplicationNumber,
+    account_principal: Principal,
+) -> Vec<Session> {
+    storage
+        .lookup_account_with_principal(account_principal)
+        .filter(|account| account.anchor_number == anchor_number)
+        .map(|account| {
+            storage.read_account_sessions(anchor_number, application_number, account.account_number)
+        })
+        .unwrap_or_default()
 }
 
 /// Whether `browser`, one of the identity's `browsers`, could be woken right now for the
@@ -1138,11 +1240,13 @@ pub(crate) fn can_wake_for_app<M: Memory + Clone>(
 }
 
 /// Where `browser`, one of the identity's `browsers`, is woken for the app notification
-/// `route` describes. Nowhere where an installed web app on an entry linked to `browser`
-/// as sharing its device can deliver it: that one is woken instead, so the device is
-/// notified once, whatever `browser` registered of its own. Otherwise its own installed
-/// web app for that app, where that can deliver it, and else the address
-/// [`wake_up_address`] gives.
+/// `route` describes. Nowhere where an installed web app of the notification's frontend,
+/// on an entry linked to `browser` as sharing its device, delivers it or was disabled by
+/// its app: the device is notified once, through that one, or not at all, whatever
+/// `browser` registered of its own. Otherwise its own installed web app of that frontend,
+/// where that can deliver it, nowhere where the app disabled that one, and else the
+/// address [`wake_up_address`] gives: never an installed web app of another frontend,
+/// whose links open another app.
 fn app_wake_up_address(
     browsers: &[Browser],
     browser: &Browser,
@@ -1150,32 +1254,66 @@ fn app_wake_up_address(
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> Option<(ReadySubscription, String, DeliveryTarget)> {
-    let is_delivered_on_same_device = browsers.iter().any(|other_browser| {
+    use InstalledAppDelivery::*;
+
+    let is_handled_on_same_device = browsers.iter().any(|other_browser| {
         other_browser.id != browser.id
             && other_browser.same_device_browser_id == Some(browser.id)
-            && find_pwa_wake_up_address(other_browser, route, now_ns).is_some()
+            && find_installed_app_delivery(other_browser, route, now_ns).is_some()
     });
-    if is_delivered_on_same_device {
+    if is_handled_on_same_device {
         return None;
     }
-    if let Some(installed_app) = find_pwa_wake_up_address(browser, route, now_ns) {
-        return Some(installed_app);
+    match find_installed_app_delivery(browser, route, now_ns) {
+        Some(Wakes {
+            subscription,
+            relay_origin,
+            target,
+        }) => return Some((subscription, relay_origin, target)),
+        Some(Disabled { .. }) => return None,
+        None => {}
     }
     let (subscription, relay_origin, target) = wake_up_address(browser, app, now_ns)?;
     Some((subscription.clone(), relay_origin, target))
 }
 
-/// The entry's installed web app for this app, where it subscribed for the recipient
-/// account and a session of that account on this entry stays live past
-/// [`PWA_SESSION_MARGIN_NS`].
-fn find_pwa_wake_up_address(
+/// What an entry's installed web app of a route's frontend does with the notifications
+/// for that route, where [`find_installed_app_delivery`] finds one.
+enum InstalledAppDelivery {
+    /// It is woken at `subscription`, through the relay at `relay_origin`.
+    Wakes {
+        subscription: ReadySubscription,
+        relay_origin: String,
+        target: DeliveryTarget,
+    },
+    /// It could be woken at `subscription`, but its app disabled it: nothing is sent to it,
+    /// and the device it is on is not notified another way.
+    Disabled { subscription: ReadySubscription },
+}
+
+/// The entry's installed web app of the route's frontend, where it subscribed for the
+/// recipient account, and whether it is woken or its app disabled it. A disabled one is
+/// found whatever its sessions; one that is woken needs a session of that account on this
+/// entry that stays live past [`PWA_SESSION_MARGIN_NS`].
+fn find_installed_app_delivery(
     browser: &Browser,
     route: &PwaRoute,
     now_ns: Timestamp,
-) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+) -> Option<InstalledAppDelivery> {
+    let config = route.config.as_ref()?;
+    let held_subscription =
+        config.pwa_webpush_subscription(browser.id, route.frontend_origin_hash)?;
+    if held_subscription.account_principal != route.account_principal {
+        return None;
+    }
+    let subscription = held_subscription.subscription.into_ready()?;
+    if held_subscription.disabled_at_ns.is_some() {
+        return Some(InstalledAppDelivery::Disabled { subscription });
+    }
     if browser.session_count == 0 {
         return None;
     }
+
     let live_until_ns = now_ns.checked_add(PWA_SESSION_MARGIN_NS)?;
     let has_live_session = route.sessions.iter().any(|session| {
         session.browser_id == browser.id && !session.is_expired_or_idle(live_until_ns)
@@ -1183,20 +1321,36 @@ fn find_pwa_wake_up_address(
     if !has_live_session {
         return None;
     }
-    let config = route.config.as_ref()?;
-    let held_subscription = config.pwa_webpush_subscription(browser.id)?;
-    if held_subscription.account_principal != route.account_principal {
-        return None;
-    }
-    let subscription = held_subscription.subscription.into_ready()?;
+
     let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
-    Some((
+    let target = DeliveryTarget::Pwa {
+        application_number: route.application_number,
+        frontend_origin_hash: route.frontend_origin_hash,
+    };
+    Some(InstalledAppDelivery::Wakes {
         subscription,
         relay_origin,
-        DeliveryTarget::Pwa {
-            application_number: route.application_number,
-        },
-    ))
+        target,
+    })
+}
+
+/// Where the entry's installed web app of the route's frontend is woken, as
+/// [`find_installed_app_delivery`] finds it. Nowhere where its app disabled it.
+fn find_pwa_wake_up_address(
+    browser: &Browser,
+    route: &PwaRoute,
+    now_ns: Timestamp,
+) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    use InstalledAppDelivery::*;
+
+    match find_installed_app_delivery(browser, route, now_ns)? {
+        Wakes {
+            subscription,
+            relay_origin,
+            target,
+        } => Some((subscription, relay_origin, target)),
+        Disabled { .. } => None,
+    }
 }
 
 /// Liveness is the entry's, whichever address this is: the app has none of its own.
@@ -1256,6 +1410,8 @@ fn is_probe(notification: &InboxNotification) -> bool {
 /// way: a failed post removes the entry it announced, since no wake-up is coming for it,
 /// and a relay that lost the subscription also takes the registration with it.
 pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestamp) {
+    use PostOutcome::*;
+
     record_post_outcome(outcome);
     if let (Some(notification), Some(loss)) = (delivery.notification.as_ref(), outcome.loss()) {
         delivery_metrics::count_push_outcome(
@@ -1267,16 +1423,13 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
         );
     }
     match outcome {
-        PostOutcome::Sent => count_accepted_push(delivery, now_ns),
+        Sent => count_accepted_push(delivery, now_ns),
         // Nothing was posted, and the entry stays for whatever wakes this browser next.
-        PostOutcome::Superseded => {}
-        PostOutcome::Gone => drop_gone_subscription(delivery),
-        PostOutcome::RateLimited
-        | PostOutcome::RelayError
-        | PostOutcome::RelayServerError
-        | PostOutcome::Rejected
-        | PostOutcome::NoCapacity
-        | PostOutcome::Unsealed => drop_failed_wake_up(delivery),
+        Superseded => {}
+        Gone => drop_gone_subscription(delivery, now_ns),
+        RateLimited | RelayError | RelayServerError | Rejected | NoCapacity | Unsealed => {
+            drop_failed_wake_up(delivery)
+        }
     }
 }
 
@@ -1327,7 +1480,7 @@ fn count_accepted_push(delivery: &Delivery, now_ns: Timestamp) {
 /// goes, and only that one, while the registration still names the endpoint that
 /// answered. That read is what tells the two apart, so it runs before the registration is
 /// cleared.
-fn drop_gone_subscription(delivery: &Delivery) {
+fn drop_gone_subscription(delivery: &Delivery, now_ns: Timestamp) {
     if let Some(notification) = delivery.notification.as_ref() {
         browser_inbox::remove_after_failed_wake_up(
             delivery.anchor_number,
@@ -1342,6 +1495,7 @@ fn drop_gone_subscription(delivery: &Delivery) {
         delivery.browser_id,
         delivery.target,
         &delivery.endpoint,
+        now_ns,
     ) {
         ic_cdk::println!("Failed to drop a push registration the relay called gone: {err}");
     }
@@ -1767,11 +1921,12 @@ mod tests {
     ) {
         state::notification_backlog_mut(now_ns, |backlog| {
             backlog.admit(
-                StorableOriginSha256::from_origin(&APP.to_string()),
+                OriginSha256::from_origin(APP),
                 vec![PendingNotification {
                     recipient: Principal::from_slice(&anchor_number.to_be_bytes()),
                     anchor_number,
                     application_number,
+                    frontend_origin_hash: OriginSha256::from_origin(APP),
                     sender: sender(),
                     notification_id,
                     urgency: Urgency::Normal,

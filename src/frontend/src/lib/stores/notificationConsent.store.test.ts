@@ -16,6 +16,8 @@ const contextFor = (identityNumber: bigint): NotificationConsentContext => ({
   consented: true,
   installFirst: true,
   isRepair: true,
+  disabledInstalledApps: undefined,
+  isTurnedOn: false,
 });
 
 describe("notificationConsentStore", () => {

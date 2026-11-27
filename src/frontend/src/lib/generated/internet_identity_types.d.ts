@@ -89,6 +89,27 @@ export interface AnchorCredentials {
   'credentials' : Array<WebAuthnCredential>,
   'recovery_credentials' : Array<WebAuthnCredential>,
 }
+export type AppDisablePwaWebPushSubscriptionError = {
+    /**
+     * The app no longer lists frontend_origin in its /.well-known/ii-alternative-origins.
+     */
+    'NoSuchFrontend' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+export interface AppDisablePwaWebPushSubscriptionRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export interface AppGetDelegationRequest {
   'session_key' : SessionKey,
   /**
@@ -128,6 +149,14 @@ export type AppGetPwaWebPushSubscriptionStatusError = {
      */
     'NoSuchSession' : null
   };
+export interface AppGetPwaWebPushSubscriptionStatusRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export type AppGetSameDeviceLinkStatusError = {
     'InternalCanisterError' : string
   } |
@@ -163,8 +192,13 @@ export interface AppPrepareDelegationResponse {
   'expiration' : Timestamp,
 }
 export type AppPreparePwaWebPushSubscriptionError = {
-    'InternalCanisterError' : string
+    /**
+     * The app lists no such frontend: no file, an unusable one, or one that does not
+     * name frontend_origin.
+     */
+    'NoSuchFrontend' : null
   } |
+  { 'InternalCanisterError' : string } |
   {
     /**
      * No live session behind this caller: expired, idle, revoked, or never one at all.
@@ -177,6 +211,14 @@ export type AppPreparePwaWebPushSubscriptionError = {
      */
     'NotificationsNotAllowed' : null
   };
+export interface AppPreparePwaWebPushSubscriptionRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export type AppPrepareSameDeviceLinkError = {
     'InternalCanisterError' : string
   } |
@@ -208,6 +250,14 @@ export type AppProbePwaWebPushSubscriptionError = {
      */
     'NotReachable' : null
   };
+export interface AppProbePwaWebPushSubscriptionRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export type AppRemovePwaNotificationError = {
     'InternalCanisterError' : string
   } |
@@ -222,6 +272,12 @@ export interface AppRemovePwaNotificationRequest {
    * As the wake-up that announced it named it.
    */
   'inbox_notification_id' : InboxNotificationId,
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
   /**
    * Why the worker could not show it. Absent where it did.
    */
@@ -255,8 +311,8 @@ export type AppSessionError = {
   };
 export type AppSetPwaWebPushSubscriptionError = {
     /**
-     * Another subscription holds this endpoint with other keys or for another app.
-     * Subscribe again for a fresh endpoint and re-send.
+     * Another subscription, of an account still signed in on its browser, holds this
+     * endpoint. Subscribe again for a fresh endpoint and re-send.
      */
     'EndpointInUse' : null
   } |
@@ -264,7 +320,8 @@ export type AppSetPwaWebPushSubscriptionError = {
   {
     /**
      * Nothing here can open sealed_auth: the transport key it was encrypted to has
-     * expired, or a later prepare replaced it. Prepare again and re-send.
+     * expired, a later prepare replaced it, or the app no longer lists this frontend.
+     * Prepare again and re-send.
      */
     'TransportKeyExpired' : null
   } |
@@ -282,10 +339,16 @@ export type AppSetPwaWebPushSubscriptionError = {
   };
 /**
  * What an installed web app's page registers. Null removes the subscription held for the
- * calling session's browser and account.
+ * calling session's browser, account and frontend.
  */
 export interface AppSetPwaWebPushSubscriptionRequest {
   'subscription' : [] | [PwaWebPushSubscription],
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
 }
 /**
  * Whether an organization domain can be used for SSO sign-in, read by
@@ -1541,6 +1604,12 @@ export type InboxNotificationId = bigint;
 export interface InstalledAppsPath {
   'origin' : FrontendHostname,
   /**
+   * The frontend of that app the installed web apps are served from, where it is not the
+   * app's own origin: one the app lists in its /.well-known/ii-alternative-origins. Null
+   * is the app's own origin.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+  /**
    * The account at that app whose installed web apps these are.
    */
   'account_principal' : Principal,
@@ -1764,6 +1833,12 @@ export interface ListAvailableAttributesRequest {
    * Identity for which available attributes should be listed.
    */
   'identity_number' : IdentityNumber,
+  /**
+   * Whether Apple private relay addresses are listed, as `email` and
+   * `verified_email` rows. They only take mail from senders registered with
+   * II's Apple developer team. Absent or `false` leaves them out.
+   */
+  'include_private_relay_emails' : [] | [boolean],
 }
 export type ListAvailableAttributesResponse = Array<
   [string, Uint8Array | number[]]
@@ -1931,8 +2006,8 @@ export interface NotificationGrantConsentRequest {
   'anchor_number' : UserNumber,
 }
 /**
- * Scoped to (origin, recipient), and shared across the canisters sending for
- * one origin.
+ * Scoped to the recipient and the canister sending it: two canisters may each use
+ * one id for one recipient.
  */
 export type NotificationId = bigint;
 /**
@@ -1947,15 +2022,17 @@ export type NotificationPath = {
   } |
   {
     /**
-     * That app's installed web apps on the entries linked to this browser entry as sharing
-     * its device, that deliver for one account. An installed app that shares this browser
-     * entry itself checks its own path, and is not on this one.
+     * That app's installed web apps of one of its frontends that deliver for one account:
+     * on the entries linked to this browser entry as sharing its device, and on this
+     * browser entry itself where the app disabled them. One that shares this browser entry
+     * and is not disabled checks its own path, and is not on this one.
      */
     'InstalledApps' : InstalledAppsPath
   };
 export interface NotificationPathStatus {
   /**
-   * One per subscription on the path that can deliver now. Empty where none can.
+   * One per subscription on the path that can deliver now, and one per installed web
+   * app on it that its app disabled. Empty where there is none.
    */
   'subscriptions' : Array<SubscriptionDeliveryStatus>,
 }
@@ -2096,7 +2173,7 @@ export type OpenIdEmailVerification = { 'Google' : null } |
     /**
      * Trusts email_verified like Google. Apple's private relay addresses,
      * which only senders registered with II's Apple developer team can deliver
-     * mail to, are not kept on the credential at all.
+     * mail to, are listed by `list_available_attributes` only on request.
      */
     'Apple' : null
   } |
@@ -2260,7 +2337,10 @@ export interface PrepareIcrc3AttributeRequest {
    */
   'account_number' : [] | [AccountNumber],
   /**
-   * The attributes to be certified.
+   * The attributes to be certified. An `email` or `verified_email` value
+   * that is an Apple private relay address is certified together with the
+   * same key suffixed `_private_relay`, set to "true" (e.g. `email` and
+   * `email_private_relay`). Other values get no such key.
    */
   'attributes' : Array<AttributeSpec>,
   /**
@@ -2481,6 +2561,26 @@ export interface PwaWebPushSubscription {
   'transport_key' : Uint8Array | number[],
 }
 /**
+ * Whether the session's browser, account and frontend are subscribed, and at which
+ * endpoint.
+ */
+export type PwaWebPushSubscriptionStatus = {
+    /**
+     * The app disabled it for the session's account with
+     * app_disable_pwa_webpush_subscription. Nothing is sent to it until a subscription is
+     * prepared or set again, or the user allows notifications on the device again.
+     */
+    'Disabled' : null
+  } |
+  { 'Subscribed' : WebPushSubscriptionStatus } |
+  {
+    /**
+     * Nothing is subscribed for the session's account, the subscription awaits its
+     * app_set_pwa_webpush_subscription, or it delivers for another account.
+     */
+    'NotSubscribed' : null
+  };
+/**
  * Rate limit configuration.
  * Currently only used for `register`.
  */
@@ -2567,6 +2667,12 @@ export type RemoveUnansweredPwaWebPushSubscriptionsError = {
 export interface RemoveUnansweredPwaWebPushSubscriptionsRequest {
   'origin' : FrontendHostname,
   /**
+   * The frontend of that app the installed web apps are served from, where it is not the
+   * app's own origin: one the app lists in its /.well-known/ii-alternative-origins. Null
+   * is the app's own origin.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+  /**
    * The account at that app whose installed web apps to remove.
    */
   'account_principal' : Principal,
@@ -2624,17 +2730,33 @@ export type SameDeviceLinkStatus = {
  * one, as a re-send replaces a notification that is still pending.
  */
 export interface SendNotificationArg {
+  /**
+   * The application whose users receive the notifications, where origin is one of
+   * its frontends: the derivation origin that frontend signs in with. The
+   * application must list origin in its /.well-known/ii-alternative-origins, and
+   * its sender list must name the caller.
+   */
+  'derivation_origin' : [] | [FrontendHostname],
   'notifications' : Array<Notification>,
+  /**
+   * The frontend the notifications are sent for. Without derivation_origin, also
+   * the application whose users receive them.
+   */
   'origin' : FrontendHostname,
 }
 export type SendNotificationError = {
-    'TooManyNotifications' : { 'limit' : number }
+    /**
+     * The application at derivation_origin lists no such frontend: no file, an
+     * unusable one, or one that does not name it.
+     */
+    'NoSuchFrontend' : null
   } |
+  { 'TooManyNotifications' : { 'limit' : number } } |
   { 'InternalCanisterError' : string } |
   {
     /**
-     * The origin lists no such sender: no file, an empty or unusable one, or
-     * one that does not name the caller.
+     * The application lists no such sender: no file, an empty or unusable one,
+     * or one that does not name the caller.
      */
     'NoSuchSender' : null
   };
@@ -2876,6 +2998,11 @@ export type StreamingStrategy = {
 export type Sub = string;
 export interface SubscriptionDeliveryStatus {
   /**
+   * Whether the app disabled this installed web app subscription on its device: nothing
+   * is sent to it, and the device is not notified another way.
+   */
+  'is_disabled' : [] | [boolean],
+  /**
    * Null where the notification of every push posted through it has been removed since.
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
@@ -2929,7 +3056,14 @@ export type VerificationPath = { 'Doh' : null } |
  * credential. The `verified_at` timestamp is when DKIM/DMARC
  * verification completed successfully.
  */
-export interface VerifiedEmail { 'address' : string, 'verified_at' : Timestamp }
+export interface VerifiedEmail {
+  /**
+   * `opt true` for an Apple private relay address; absent counts as not one.
+   */
+  'is_private_relay' : [] | [boolean],
+  'address' : string,
+  'verified_at' : Timestamp,
+}
 export type VerifyTentativeDeviceResponse = {
     /**
      * Device registration mode is off, either due to timeout or because it was never enabled.
@@ -2996,6 +3130,17 @@ export interface _SERVICE {
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
   >,
+  /**
+   * Disables the subscription of the session's browser, account and frontend: nothing
+   * is sent to it, and the device it is on is not notified another way. Already
+   * disabled or nothing subscribed is Ok. It stays disabled until a subscription is
+   * prepared or set again, or the user allows notifications on the device again.
+   */
+  'app_disable_pwa_webpush_subscription' : ActorMethod<
+    [AppDisablePwaWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : AppDisablePwaWebPushSubscriptionError }
+  >,
   'app_get_delegation' : ActorMethod<
     [AppGetDelegationRequest],
     { 'Ok' : SignedDelegation } |
@@ -3011,13 +3156,12 @@ export interface _SERVICE {
       { 'Err' : AppGetPwaNotificationError }
   >,
   /**
-   * The endpoint the session's browser and account are subscribed at. Null where nothing
-   * is subscribed, where the subscription awaits its app_set_pwa_webpush_subscription, or
-   * where it delivers for another account.
+   * Whether the session's browser, account and frontend are subscribed, disabled by the
+   * app, or not subscribed.
    */
   'app_get_pwa_webpush_subscription_status' : ActorMethod<
-    [],
-    { 'Ok' : [] | [WebPushSubscriptionStatus] } |
+    [AppGetPwaWebPushSubscriptionStatusRequest],
+    { 'Ok' : PwaWebPushSubscriptionStatus } |
       { 'Err' : AppGetPwaWebPushSubscriptionStatusError }
   >,
   'app_get_same_device_link_status' : ActorMethod<
@@ -3045,19 +3189,20 @@ export interface _SERVICE {
   >,
   /**
    * Called by an app's installed web app, signed by its session. The identity, browser
-   * and account are the session's.
+   * and account are the session's; the frontend is the one the request names. An app's
+   * notification wakes only the installed web app of the frontend it was sent for.
    * 
    * Returns II's VAPID public key, which the app passes to PushManager.subscribe, and a
    * new one-time transport public key. The app encrypts the subscription's auth secret
    * to that key and sends it with app_set_pwa_webpush_subscription within 5 minutes.
-   * It replaces this browser's existing subscription, if any, so the installed web app
-   * gets no pushes until app_set_pwa_webpush_subscription succeeds.
-   * Pending: II is fetching its VAPID key, or has no fresh randomness to make the
-   * transport key. Call again shortly. Once a fetch of the VAPID key has failed, this
-   * answers InternalCanisterError with the reason.
+   * It replaces this browser's existing subscription for that frontend, if any, so the
+   * installed web app gets no pushes until app_set_pwa_webpush_subscription succeeds.
+   * Pending: II is fetching its VAPID key or the app's alternative origins, or has no
+   * fresh randomness to make the transport key. Call again shortly. Once a fetch of the
+   * VAPID key has failed, this answers InternalCanisterError with the reason.
    */
   'app_prepare_pwa_webpush_subscription' : ActorMethod<
-    [],
+    [AppPreparePwaWebPushSubscriptionRequest],
     { 'Ok' : PrepareWebPushSubscriptionResponse } |
       { 'Err' : AppPreparePwaWebPushSubscriptionError } |
       { 'Pending' : null }
@@ -3072,11 +3217,12 @@ export interface _SERVICE {
       { 'Err' : AppPrepareSameDeviceLinkError }
   >,
   /**
-   * Sends Internet Identity's own notification to the session's installed web app.
-   * Removing it with app_remove_pwa_notification resets its unanswered pushes.
+   * Sends Internet Identity's own notification to the session's installed web app of the
+   * frontend. Removing it with app_remove_pwa_notification, naming that frontend, resets
+   * its unanswered pushes.
    */
   'app_probe_pwa_webpush_subscription' : ActorMethod<
-    [],
+    [AppProbePwaWebPushSubscriptionRequest],
     { 'Ok' : null } |
       { 'Err' : AppProbePwaWebPushSubscriptionError }
   >,
@@ -3112,7 +3258,8 @@ export interface _SERVICE {
       { 'Err' : SendNotificationError }
   >,
   /**
-   * Sets or, with null, removes the subscription of the session's browser and account.
+   * Sets or, with null, removes the subscription of the session's browser, account and
+   * frontend. Null leaves one the app disabled as it is.
    */
   'app_set_pwa_webpush_subscription' : ActorMethod<
     [AppSetPwaWebPushSubscriptionRequest],
@@ -3278,7 +3425,7 @@ export interface _SERVICE {
   /**
    * Called by the browser that the installed web app's link names. Links the entry
    * that registered the key to the caller's: an app's notification skips the caller's
-   * entry while that entry's installed web app can deliver it.
+   * entry while that entry's installed web app can deliver it, or the app disabled it.
    */
   'claim_same_device_link' : ActorMethod<
     [ClaimSameDeviceLinkRequest],
@@ -3935,8 +4082,8 @@ export interface _SERVICE {
   >,
   /**
    * Sends Internet Identity's own notification through every subscription on the path
-   * that can deliver now. Removing a notification pushed through one resets its
-   * unanswered pushes.
+   * that can deliver now and was not disabled. Removing a notification pushed through
+   * one resets its unanswered pushes.
    */
   'probe_notification_path' : ActorMethod<
     [ProbeNotificationPathRequest],
@@ -3949,9 +4096,9 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
-   * Removes that app's installed web app subscriptions on the entries linked to the
-   * caller's that can deliver now and have a probe nobody removed in the 10 seconds
-   * after the push service accepted it.
+   * Removes that app's installed web app subscriptions of the frontend on the path:
+   * those the app disabled, and those that can deliver now and have a probe nobody
+   * removed in the 10 seconds after the push service accepted it.
    */
   'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<
     [RemoveUnansweredPwaWebPushSubscriptionsRequest],

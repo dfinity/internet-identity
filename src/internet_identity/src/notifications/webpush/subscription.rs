@@ -178,14 +178,18 @@ fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Res
 
 /// `target` says who held the posted endpoint, rather than whoever the entry points at by
 /// the time the relay answers. A gone app endpoint means the app is gone, so the record goes.
+/// `now_ns` is the call's time.
 pub(crate) fn clear_gone_subscription(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     target: DeliveryTarget,
     endpoint: &str,
+    now_ns: Timestamp,
 ) -> Result<(), String> {
+    use DeliveryTarget::*;
+
     match target {
-        DeliveryTarget::Browser => {
+        Browser => {
             let anchor = storage_borrow(|storage| storage.read(anchor_number))
                 .map_err(|err| format!("{err}"))?;
             let Some(registered) = anchor
@@ -199,17 +203,20 @@ pub(crate) fn clear_gone_subscription(
             }
             write_subscription(anchor, browser_id, None)
         }
-        DeliveryTarget::Pwa { application_number } => {
-            pwa_subscription::clear_gone_pwa_subscription(
-                PwaSubscriptionHolder {
-                    anchor_number,
-                    application_number,
-                    browser_id,
-                },
-                endpoint,
-            )
-        }
-        DeliveryTarget::App(app_id) => {
+        Pwa {
+            application_number,
+            frontend_origin_hash,
+        } => pwa_subscription::clear_gone_pwa_subscription(
+            PwaSubscriptionHolder {
+                anchor_number,
+                application_number,
+                browser_id,
+                frontend_origin_hash,
+            },
+            endpoint,
+            now_ns,
+        ),
+        App(app_id) => {
             let gone = storage_borrow(|storage| {
                 storage.notification_app(app_id).is_some_and(|app| {
                     app.webpush_subscription

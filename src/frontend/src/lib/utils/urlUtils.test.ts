@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSameOrigin, originLabel } from "./urlUtils";
+import { appUrl, isSameOrigin, originLabel } from "./urlUtils";
 
 describe("urlUtils", () => {
   describe("isSameOrigin", () => {
@@ -102,5 +102,32 @@ describe("urlUtils", () => {
     it("should show unparseable values verbatim", () => {
       expect(originLabel("not-an-origin")).toBe("not-an-origin");
     });
+  });
+});
+
+describe("appUrl", () => {
+  it("moves a canister on any gateway domain to icp.net", () => {
+    for (const origin of [
+      "https://2vxsx-fae.ic0.app",
+      "https://2vxsx-fae.icp0.io",
+      "https://2vxsx-fae.icp.net",
+    ]) {
+      expect(appUrl(origin)).toBe("https://2vxsx-fae.icp.net");
+    }
+  });
+
+  it("moves a canister's raw endpoint to its certified one on icp.net", () => {
+    for (const origin of [
+      "https://2vxsx-fae.raw.ic0.app",
+      "https://2vxsx-fae.raw.icp0.io",
+      "https://2vxsx-fae.raw.icp.net",
+    ]) {
+      expect(appUrl(origin)).toBe("https://2vxsx-fae.icp.net");
+    }
+  });
+
+  it("leaves a custom domain alone", () => {
+    expect(appUrl("https://oisy.com")).toBe("https://oisy.com");
+    expect(appUrl("https://raw.example")).toBe("https://raw.example");
   });
 });

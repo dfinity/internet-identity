@@ -43,6 +43,12 @@ pub use sso_gating::{resolve_ii_client_identity, verify_sso_for_registration, ve
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
+/// Credential metadata key set to `"true"` when the credential's `email` is
+/// one of Apple's private relay addresses, which only take mail from senders
+/// registered with II's Apple developer team. Named after Apple's
+/// `is_private_email` claim.
+const PRIVATE_RELAY_EMAIL_METADATA_KEY: &str = "is_private_email";
+
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);
 pub type Iss = String;
 pub type Sub = String;
@@ -226,6 +232,13 @@ impl OpenIdCredential {
         self.read_metadata_string("email")
     }
 
+    /// Whether the credential's `email` is one of Apple's private relay
+    /// addresses, as marked under [`PRIVATE_RELAY_EMAIL_METADATA_KEY`].
+    pub fn has_private_relay_email(&self) -> bool {
+        self.read_metadata_string(PRIVATE_RELAY_EMAIL_METADATA_KEY)
+            .is_some_and(|value| value == "true")
+    }
+
     fn get_google_verified_email(&self) -> Option<String> {
         let email_verified = self.read_metadata_string("email_verified")?;
 
@@ -264,8 +277,6 @@ impl OpenIdCredential {
             Unknown => None,
             Google => self.get_google_verified_email(),
             Microsoft => self.get_microsoft_verified_email(),
-            // Same check as Google: an Apple private relay address is never
-            // kept on the credential (see `verify::reachable_email`).
             Apple => self.get_google_verified_email(),
         }
     }

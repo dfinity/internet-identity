@@ -1,12 +1,14 @@
 //! Put an app's batch into the backlog, answering for what II cannot take.
 
 use crate::admission_queue::{Admission, FullCause};
+use crate::alternative_origins::{self, AlternativeOrigin};
 use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::delivery_metrics::{self, DeferCause, Labels, Reason};
-use crate::notifications::{dispatch, BROWSER_GONE_AFTER_NS};
+use crate::notifications::senders::{self, Senders};
+use crate::notifications::{self, dispatch, BROWSER_GONE_AFTER_NS};
 use crate::origin::ApplicationOrigin;
+use crate::origin::OriginSha256;
 use crate::state::{self, storage_borrow};
-use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, ApplicationNumber, NotAccepted, NotAcceptedReason, Notification,
@@ -14,14 +16,138 @@ use internet_identity_interface::internet_identity::types::{
 };
 use std::collections::BTreeMap;
 
-/// Queue what can reach its recipient, and schedule a pass for it. `sender` is the app
-/// canister the service worker fetches the content from.
-pub fn submit(
+/// Why a batch was refused as a whole.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BatchRefusal {
+    /// The application lists no such sender.
+    NoSuchSender,
+    /// The application lists no such frontend among its alternative origins.
+    NoSuchFrontend,
+}
+
+/// Queues `notifications` from `sender` for the application at `application_origin`,
+/// sent on behalf of its frontend at `frontend_origin` (the application's own origin
+/// where the sender names no other). Refused where the application lists neither
+/// `sender` as a sender nor `frontend_origin` as an alternative origin; deferred as a
+/// whole while either list is not read yet. `now_ns` is the call's time.
+pub fn authorize_and_submit(
+    application_origin: &ApplicationOrigin,
+    frontend_origin: &ApplicationOrigin,
+    notifications: Vec<Notification>,
+    sender: Principal,
+    now_ns: Timestamp,
+) -> Result<SendNotificationResponse, BatchRefusal> {
+    use Senders::*;
+
+    match senders::authorize(application_origin, sender, now_ns) {
+        Listed => {}
+        NotListed => {
+            for notification in &notifications {
+                let labels =
+                    Labels::app(application_origin.as_str(), notification.urgency.as_ref());
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_unlisted_sender(
+                    sender,
+                    application_origin.as_str(),
+                    &labels,
+                    now_ns,
+                );
+            }
+            return Err(BatchRefusal::NoSuchSender);
+        }
+        Pending { retry_after } => {
+            let deferred = defer_batch(
+                notifications,
+                DeferCause::SenderList,
+                retry_after,
+                |urgency| Labels::app(application_origin.as_str(), urgency),
+            );
+            return Ok(deferred);
+        }
+    }
+
+    authorize_frontend_and_submit(
+        application_origin,
+        frontend_origin,
+        notifications,
+        sender,
+        now_ns,
+    )
+}
+
+/// Queues `notifications` from `sender`, a listed sender of the application at
+/// `application_origin`, sent on behalf of its frontend at `frontend_origin`. Refused
+/// where the application does not list `frontend_origin` as an alternative origin, and
+/// deferred as a whole while that list is not read yet. `now_ns` is the call's time.
+fn authorize_frontend_and_submit(
+    application_origin: &ApplicationOrigin,
+    frontend_origin: &ApplicationOrigin,
+    notifications: Vec<Notification>,
+    sender: Principal,
+    now_ns: Timestamp,
+) -> Result<SendNotificationResponse, BatchRefusal> {
+    use AlternativeOrigin::*;
+
+    // The sender is listed, so the application counts in the ranking.
+    let listed_app_labels = |urgency: Option<&Urgency>| {
+        Labels::listed_app(application_origin.as_str(), urgency, now_ns)
+    };
+
+    match alternative_origins::authorize_alternative_origin(
+        application_origin,
+        frontend_origin,
+        now_ns,
+    ) {
+        Listed => Ok(submit(
+            application_origin,
+            frontend_origin,
+            notifications,
+            sender,
+            now_ns,
+        )),
+        NotListed => {
+            for notification in &notifications {
+                let labels = listed_app_labels(notification.urgency.as_ref());
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_lost(Reason::FrontendNotListed, &labels);
+            }
+            Err(BatchRefusal::NoSuchFrontend)
+        }
+        Pending { retry_after } => Ok(defer_batch(
+            notifications,
+            DeferCause::AlternativeOrigins,
+            retry_after,
+            listed_app_labels,
+        )),
+    }
+}
+
+/// Answers every notification of the batch with a deferral to `retry_after`, counted
+/// under `cause` with the labels `labels_for_urgency` builds from each notification's
+/// urgency.
+fn defer_batch(
+    notifications: Vec<Notification>,
+    cause: DeferCause,
+    retry_after: Timestamp,
+    labels_for_urgency: impl Fn(Option<&Urgency>) -> Labels,
+) -> SendNotificationResponse {
+    for notification in &notifications {
+        delivery_metrics::count_deferred(cause, &labels_for_urgency(notification.urgency.as_ref()));
+    }
+    notifications::defer_whole_batch(notifications, retry_after)
+}
+
+/// Queue what can reach its recipient at the app at `origin`, for its frontend at
+/// `frontend_origin`, and schedule a pass for it. `sender` is the app canister the service
+/// worker fetches the content from.
+fn submit(
     origin: &ApplicationOrigin,
+    frontend_origin: &ApplicationOrigin,
     notifications: Vec<Notification>,
     sender: Principal,
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
+    let frontend_origin_hash = OriginSha256::from_origin(frontend_origin.as_str());
     let mut not_accepted = Vec::new();
     let mut resolutions: BTreeMap<Principal, Result<Resolved, Refusal>> = BTreeMap::new();
     let mut reachable = Vec::new();
@@ -35,7 +161,7 @@ pub fn submit(
     {
         let resolution = resolutions
             .entry(recipient)
-            .or_insert_with(|| resolve_recipient(recipient, origin, now_ns))
+            .or_insert_with(|| resolve_recipient(recipient, origin, frontend_origin_hash, now_ns))
             .clone();
         match resolution {
             Ok(Resolved {
@@ -45,6 +171,7 @@ pub fn submit(
                 recipient,
                 anchor_number,
                 application_number,
+                frontend_origin_hash,
                 sender,
                 notification_id: id,
                 urgency: urgency.unwrap_or(Urgency::Normal),
@@ -80,7 +207,7 @@ pub fn submit(
     }
     let admissions = state::notification_backlog_mut(now_ns, |backlog| {
         backlog.admit(
-            StorableOriginSha256::from_origin(&origin.as_str().to_string()),
+            OriginSha256::from_origin(origin.as_str()),
             reachable,
             now_ns,
         )
@@ -103,7 +230,7 @@ pub fn submit(
             } => {
                 let retry_after = now_ns.saturating_add(retry_after_ns);
                 count_deferral(&labels, cause, retry_after, expires_at_ns);
-                let (recipient, id) = admitted.key;
+                let (recipient, _, id) = admitted.key;
                 not_accepted.push(NotAccepted {
                     id,
                     recipient,
@@ -184,11 +311,12 @@ struct Resolved {
 
 /// What a principal names at `origin`. No such recipient when it names none
 /// there, or when none of its browsers was used within [`BROWSER_GONE_AFTER_NS`]. No
-/// channel when it has not allowed the app, or no browser or installed web app of the
-/// app can be woken now.
+/// channel when it has not allowed the app, or no browser, or installed web app of the
+/// app's frontend whose origin hashes to `frontend_origin_hash`, can be woken now.
 fn resolve_recipient(
     recipient: Principal,
     origin: &ApplicationOrigin,
+    frontend_origin_hash: OriginSha256,
     now_ns: Timestamp,
 ) -> Result<Resolved, Refusal> {
     let origin = &origin.as_str().to_string();
@@ -217,6 +345,7 @@ fn resolve_recipient(
             storage,
             account.anchor_number,
             application_number,
+            frontend_origin_hash,
             recipient,
         );
         let browsers = anchor.browsers();
@@ -299,7 +428,14 @@ mod tests {
     }
 
     fn send(notifications: Vec<Notification>, now_ns: Timestamp) -> Vec<NotAccepted> {
-        submit(&app_origin(), notifications, sender(), now_ns).not_accepted
+        submit(
+            &app_origin(),
+            &app_origin(),
+            notifications,
+            sender(),
+            now_ns,
+        )
+        .not_accepted
     }
 
     fn queued(now_ns: Timestamp) -> Vec<PendingNotification> {
@@ -337,6 +473,7 @@ mod tests {
                     storage.lookup_application_number_with_origin(&APP.to_string())
                 })
                 .expect("signing in stores the application"),
+                frontend_origin_hash: OriginSha256::from_origin(APP),
                 sender: sender(),
                 notification_id: 7,
                 urgency: Urgency::Normal,

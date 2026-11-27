@@ -8,6 +8,7 @@
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::notifications::dispatch;
+use crate::origin::OriginSha256;
 use crate::SECOND_NS;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -42,10 +43,12 @@ pub(crate) enum IdentityWakeUpPath {
     /// Where the destination's wake-ups go: its own subscription, or the app it routes
     /// through.
     Routed,
-    /// The destination's installed web app of the app numbered `application_number`, for
-    /// the account `account_principal` names, which is the only party that reads it.
+    /// The destination's installed web app of the app numbered `application_number`, at
+    /// its frontend whose origin hashes to `frontend_origin_hash`, for the account
+    /// `account_principal` names, which is the only party that reads it.
     InstalledApp {
         application_number: ApplicationNumber,
+        frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     },
 }

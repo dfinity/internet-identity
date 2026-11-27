@@ -7,7 +7,7 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp,
 };
 use serde_bytes::ByteBuf;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 const TEST_CALLER_PUBKEY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -1212,7 +1212,7 @@ mod mirror_verified_email_tests {
     fn appends_new_address() {
         let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
 
-        assert!(anchor.mirror_verified_email_from_oidc("user@example.com", 100));
+        assert!(anchor.mirror_verified_email_from_oidc("user@example.com", false, 100));
 
         let entries: Vec<&VerifiedEmail> = anchor.verified_emails.iter().collect();
         assert_eq!(entries.len(), 1);
@@ -1224,7 +1224,7 @@ mod mirror_verified_email_tests {
     fn lowercases_address_on_append() {
         let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
 
-        assert!(anchor.mirror_verified_email_from_oidc("User@Example.COM", 100));
+        assert!(anchor.mirror_verified_email_from_oidc("User@Example.COM", false, 100));
 
         assert_eq!(anchor.verified_emails[0].address, "user@example.com");
     }
@@ -1235,9 +1235,10 @@ mod mirror_verified_email_tests {
         anchor.verified_emails.push(VerifiedEmail {
             address: "user@example.com".to_string(),
             verified_at: 50,
+            is_private_relay: None,
         });
 
-        assert!(!anchor.mirror_verified_email_from_oidc("USER@EXAMPLE.com", 999));
+        assert!(!anchor.mirror_verified_email_from_oidc("USER@EXAMPLE.com", false, 999));
 
         assert_eq!(anchor.verified_emails.len(), 1);
         assert_eq!(
@@ -1254,10 +1255,11 @@ mod mirror_verified_email_tests {
             anchor.verified_emails.push(VerifiedEmail {
                 address: format!("user{i}@example.com"),
                 verified_at: i as u64,
+                is_private_relay: None,
             });
         }
 
-        assert!(!anchor.mirror_verified_email_from_oidc("new@example.com", 999));
+        assert!(!anchor.mirror_verified_email_from_oidc("new@example.com", false, 999));
 
         assert_eq!(
             anchor.verified_emails.len(),
@@ -2524,7 +2526,7 @@ mod browser_tests {
                 2_000,
             )
             .unwrap();
-        anchor.link_same_device(installed_app, safari);
+        anchor.link_same_device(installed_app, safari, &BTreeSet::new());
         (anchor, safari, installed_app)
     }
 
@@ -2579,7 +2581,7 @@ mod browser_tests {
         anchor.stamp_browser_use(installed_app, 5_000);
         evict_the_oldest(&mut anchor);
         // Put the stale pointer back, as a rollback could leave it.
-        anchor.link_same_device(installed_app, safari);
+        anchor.link_same_device(installed_app, safari, &BTreeSet::new());
 
         assert_eq!(anchor.same_device_browser_of(installed_app), None);
     }

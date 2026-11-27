@@ -192,9 +192,12 @@ export const handleDelegationRequest =
           const repairOutcome = await repairNotificationPath({
             identityNumber,
             origin: effectiveOrigin,
+            frontendOrigin: channel.origin,
             accountPrincipal: Principal.selfAuthenticating(
               new Uint8Array(mintedDelegation.user_key),
             ),
+            // An ICRC-34 request does not say whether the app runs installed.
+            isInstalledApp: false,
             actor,
           });
           // What was minted is for an identity the user has moved away from: the app gets

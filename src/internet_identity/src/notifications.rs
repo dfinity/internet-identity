@@ -31,7 +31,7 @@ use internet_identity_interface::internet_identity::types::{
 };
 pub(crate) use validation::NOT_ENABLED_MESSAGE;
 pub use validation::{
-    admit_batch, enabled_or, fetchable_origin, notifications_enabled, TooManyNotifications,
+    admit_batch, check_notifications_enabled, notifications_enabled, TooManyNotifications,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at

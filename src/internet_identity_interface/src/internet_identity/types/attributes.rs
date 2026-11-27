@@ -850,12 +850,15 @@ pub enum GetIcrc3AttributeError {
 pub struct ListAvailableAttributesRequest {
     pub identity_number: AnchorNumber,
     pub attributes: Option<Vec<String>>,
+    pub include_private_relay_emails: Option<bool>,
 }
 
 #[derive(Debug)]
 pub struct ValidatedListAvailableAttributesRequest {
     pub identity_number: AnchorNumber,
     pub attributes: Option<Vec<AttributeKey>>,
+    /// Whether Apple private relay addresses are listed.
+    pub include_private_relay_emails: bool,
 }
 
 impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttributesRequest {
@@ -898,6 +901,7 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
         Ok(ValidatedListAvailableAttributesRequest {
             identity_number: request.identity_number,
             attributes,
+            include_private_relay_emails: request.include_private_relay_emails == Some(true),
         })
     }
 }
@@ -2461,6 +2465,7 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: None,
+                include_private_relay_emails: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             assert!(validated.attributes.is_none());
@@ -2469,6 +2474,7 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec![]),
+                include_private_relay_emails: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             pretty_assert_eq!(validated.attributes.unwrap().len(), 0);
@@ -2477,6 +2483,7 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["openid:https://accounts.google.com:email".to_string()]),
+                include_private_relay_emails: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             let attrs = validated.attributes.unwrap();
@@ -2487,6 +2494,7 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["email".to_string()]),
+                include_private_relay_emails: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             let attrs = validated.attributes.unwrap();
@@ -2505,6 +2513,7 @@ mod tests {
                         .map(|_| "email".to_string())
                         .collect(),
                 ),
+                include_private_relay_emails: None,
             };
             let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
             match err {
@@ -2518,6 +2527,7 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["unknown_attribute".to_string()]),
+                include_private_relay_emails: None,
             };
             let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
             match err {
@@ -2531,6 +2541,7 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["sso:dfinity.org:email".to_string()]),
+                include_private_relay_emails: None,
             };
             let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
             match err {

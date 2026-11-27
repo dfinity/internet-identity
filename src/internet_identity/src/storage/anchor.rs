@@ -29,7 +29,7 @@ use internet_identity_interface::internet_identity::types::openid::OpenIdCredent
 use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 
 #[cfg(test)]
@@ -1313,17 +1313,27 @@ impl Anchor {
     }
 
     /// Links `browser_id`'s entry to `same_device_browser_id`'s as sharing its device,
-    /// spending the pending link that authorized it.
-    pub fn link_same_device(&mut self, browser_id: BrowserId, same_device_browser_id: BrowserId) {
-        let Some(browser) = self
-            .browsers
-            .iter_mut()
-            .find(|browser| browser.id == browser_id)
-        else {
+    /// spending the pending link that authorized it, and unlinks each entry
+    /// `superseded_browser_ids` names from `same_device_browser_id`'s.
+    pub fn link_same_device(
+        &mut self,
+        browser_id: BrowserId,
+        same_device_browser_id: BrowserId,
+        superseded_browser_ids: &BTreeSet<BrowserId>,
+    ) {
+        if !self.browsers.iter().any(|browser| browser.id == browser_id) {
             return;
-        };
-        browser.same_device_browser_id = Some(same_device_browser_id);
-        browser.pending_same_device_link = None;
+        }
+        for browser in self.browsers.iter_mut() {
+            if browser.id == browser_id {
+                browser.same_device_browser_id = Some(same_device_browser_id);
+                browser.pending_same_device_link = None;
+            } else if superseded_browser_ids.contains(&browser.id)
+                && browser.same_device_browser_id == Some(same_device_browser_id)
+            {
+                browser.same_device_browser_id = None;
+            }
+        }
     }
 
     /// The browser of this anchor whose pending install names `caller`, where the slot has
@@ -2054,12 +2064,15 @@ impl Anchor {
         Ok(())
     }
 
-    /// Returns `true` when appended, `false` if already present or cap
-    /// reached. Never errors — the surrounding OIDC link must not fail
-    /// just because the verified-emails bucket is full.
+    /// Appends `address`, verified at `verified_at_ns` and marked as an Apple
+    /// private relay address when `is_private_relay` is set. Returns `true`
+    /// when appended, `false` if already present or cap reached. Never errors
+    /// — the surrounding OIDC link must not fail just because the
+    /// verified-emails bucket is full.
     pub fn mirror_verified_email_from_oidc(
         &mut self,
         address: &str,
+        is_private_relay: bool,
         verified_at_ns: Timestamp,
     ) -> bool {
         if self
@@ -2075,6 +2088,7 @@ impl Anchor {
         self.verified_emails.push(VerifiedEmail {
             address: address.to_ascii_lowercase(),
             verified_at: verified_at_ns,
+            is_private_relay: Some(is_private_relay),
         });
         true
     }

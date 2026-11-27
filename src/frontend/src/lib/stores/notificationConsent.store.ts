@@ -1,6 +1,9 @@
 import { get, type Readable, writable } from "svelte/store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type {
+  _SERVICE,
+  RemoveUnansweredPwaWebPushSubscriptionsRequest,
+} from "$lib/generated/internet_identity_types";
 import type { DeviceNotificationState } from "$lib/utils/notifications/notificationState";
 
 /** What the consent screen needs to run, once the user is authenticated. */
@@ -18,8 +21,17 @@ export interface NotificationConsentContext {
   installFirst: boolean;
   /** Opened because the way this device receives the app's notifications stopped
    *  working, rather than because the app asked: declining drops what this device
-   *  registered, so the next sign-in has nothing left to check here. */
+   *  registered, so the next sign-in has nothing left to check here, unless
+   *  `disabledInstalledApps` is what mutes it. */
   isRepair: boolean;
+  /** The installed web apps the app disabled that mute this device, which allowing
+   *  removes once notifications are on here, and declining leaves as they are.
+   *  `undefined` where none does. */
+  disabledInstalledApps:
+    RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
+  /** Whether the app holds this identity's consent and this device delivers already,
+   *  so allowing turns nothing on and only removes `disabledInstalledApps`. */
+  isTurnedOn: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();

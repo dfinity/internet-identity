@@ -37,6 +37,7 @@
 - `pr/user-perspective` Write the title and description from the user's perspective: "Fix multiple accounts toggle staying on after switching identity", not "Reset continue screen state when switching identity".
 - `pr/description-template` Follow the template: Motivation (no heading, just the text), `# Changes`, `# Tests`. Include Tests only for new or updated tests, and state what was actually tested ("manually exercised" when nothing automated covers it).
 - `pr/explain-why` Explain why, not only what: the reason for a design choice or for any added, removed or changed dependency goes here, not in a code comment.
+- `pr/abstractions-in-description` List the abstractions the PR adds and removes, in two sections: `# New abstractions`, one line each on why it is needed, and `# Removed abstractions`. An abstraction is anything a reviewer must learn to read the code: a type, trait, alias, generic, module, storage map or endpoint. Leave out plain functions and constants, and drop a section that would be empty.
 - `pr/screenshots` Attach screenshots or a video for every UI change.
 - `pr/description-in-sync` Keep the description in sync with the code. After every push that changes scope or approach, update it with `gh pr edit` without being asked, and re-read it for claims that are no longer true.
 - `pr/call-out-breaking-changes` Call out any breaking change and any behaviour change outside the PR's stated purpose.

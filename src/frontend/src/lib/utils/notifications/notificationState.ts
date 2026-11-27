@@ -175,9 +175,10 @@ const unreadBrowserState: BrowserDeviceState = {
 export type OptInScreen = "enable" | "skip";
 
 /** Nothing to ask, so the answer is already known, or the question and what answering
- *  it still has to do. */
+ *  it still has to do. Either way with this device's `state` as the resolution found
+ *  it. */
 export type OptInResolution =
-  | { screen: "skip"; granted: boolean }
+  | { screen: "skip"; granted: boolean; state: DeviceNotificationState }
   | {
       screen: "enable";
       state: DeviceNotificationState;
@@ -217,7 +218,7 @@ export const resolveOptIn = async ({
   if (isInstalledApp) {
     const consented = await consent;
     return consented
-      ? { screen: "skip", granted: true }
+      ? { screen: "skip", granted: true, state: { source: "installed-app" } }
       : {
           screen: "enable",
           state: { source: "installed-app" },
@@ -240,7 +241,7 @@ export const resolveOptIn = async ({
   recordPermission(state.permission);
   const screen = resolveOptInScreen(state, consented);
   return screen === "skip"
-    ? { screen, granted: consented && deliversHere(state) }
+    ? { screen, granted: consented && deliversHere(state), state }
     : { screen, state, consented, installFirst: false };
 };
 
@@ -273,7 +274,11 @@ const resolveAppOptIn = async (
       }
       // The canister records which browser points at an app, so a second browser on the same phone finds none of its own and would keep asking.
       if (consented && (await saidAlreadyInstalled(identityNumber))) {
-        return { screen: "skip", granted: consented };
+        return {
+          screen: "skip",
+          granted: consented,
+          state: asAppState(undefined),
+        };
       }
       const state = asAppState(undefined);
       return {
@@ -295,7 +300,7 @@ const resolveAppOptIn = async (
       const state = asAppState(status.app);
       const screen = resolveOptInScreen(state, consented);
       return screen === "skip"
-        ? { screen, granted: consented && deliversHere(state) }
+        ? { screen, granted: consented && deliversHere(state), state }
         : {
             screen,
             state,

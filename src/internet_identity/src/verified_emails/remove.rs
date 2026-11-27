@@ -47,6 +47,7 @@ mod tests {
             a.verified_emails.push(VerifiedEmail {
                 address: (*addr).to_string(),
                 verified_at: 100,
+                is_private_relay: None,
             });
         }
         a

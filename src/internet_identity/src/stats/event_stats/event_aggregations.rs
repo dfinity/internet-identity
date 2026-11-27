@@ -5,7 +5,7 @@ use crate::stats::event_stats::event_aggregations::AggregationWindow::{Day, Mont
 use crate::stats::event_stats::{AggregationEvent, Event, EventData, PrepareDelegationEvent};
 use crate::storage::Storage;
 use candid::Deserialize;
-use ic_stable_structures::{storable, Memory, Storable};
+use ic_stable_structures::{storable, Memory, StableBTreeMap, Storable};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::borrow::Cow;
@@ -93,15 +93,25 @@ fn retrieve_aggregation_internal<M: Memory>(
         ii_domain,
         data: ByteBuf::from(vec![]),
     };
-    let range_end = range_start.upper_bound();
-    let mut data: Vec<_> = s
-        .event_aggregations
-        .range((Bound::Included(range_start), range_end))
-        .take(AGGREGATIONS_LIMIT)
-        .map(|(key, weight)| (aggregation.key_label(key), weight))
-        .collect();
+    let mut data: Vec<_> =
+        aggregations_sharing_kind_window_and_domain(&s.event_aggregations, range_start)
+            .take(AGGREGATIONS_LIMIT)
+            .map(|(key, weight)| (aggregation.key_label(key), weight))
+            .collect();
     data.sort_by(|(_, weight_a), (_, weight_b)| weight_b.cmp(weight_a));
     data
+}
+
+/// The aggregations of `aggregations` in key order that share the `kind`, `window` and
+/// `ii_domain` of `range_start`, whatever their `data`: every key from `range_start`,
+/// included, up to [`AggregationKey::upper_bound`] of it, which is excluded where it is
+/// the first key of the next `ii_domain`, `window` or `kind`, and unbounded after the last.
+fn aggregations_sharing_kind_window_and_domain<'a, M: Memory + 'a>(
+    aggregations: &'a StableBTreeMap<AggregationKey, u64, M>,
+    range_start: AggregationKey,
+) -> impl Iterator<Item = (AggregationKey, u64)> + 'a {
+    let range_end = range_start.upper_bound();
+    aggregations.range((Bound::Included(range_start), range_end))
 }
 
 /// Aggregates the count of prepare delegation events

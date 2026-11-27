@@ -1374,18 +1374,22 @@ pub enum NotificationPath {
     /// Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
     /// routes through.
     ThisBrowser,
-    /// That app's installed web apps on the entries linked to this browser entry as
-    /// sharing its device, that deliver for one account. An installed app that shares
-    /// this browser entry itself checks its own path, and is not on this one.
+    /// That app's installed web apps of one of its frontends that deliver for one account:
+    /// on the entries linked to this browser entry as sharing its device, and on this
+    /// browser entry itself where the app disabled them. One that shares this browser
+    /// entry and is not disabled checks its own path, and is not on this one.
     InstalledApps(InstalledAppsPath),
 }
 
-/// An app's installed web apps that deliver for one account at it.
+/// An app's installed web apps of one of its frontends that deliver for one account at it.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct InstalledAppsPath {
     pub origin: FrontendHostname,
     /// The account at that app whose installed web apps these are.
     pub account_principal: Principal,
+    /// The frontend of that app the installed web apps are served from, where it is not
+    /// the app's own origin. `None` is the app's own origin.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// Which path to the calling browser's device to read, for the identity it signs for.
@@ -1395,10 +1399,12 @@ pub struct GetNotificationPathStatusRequest {
     pub path: NotificationPath,
 }
 
-/// The subscriptions on one path that can deliver now.
+/// The subscriptions on one path that can deliver now, and the installed web apps on it
+/// that their app disabled.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationPathStatus {
-    /// One per subscription on the path that can deliver now. Empty where none can.
+    /// One per subscription on the path that can deliver now, and one per installed web
+    /// app on it that its app disabled. Empty where there is none.
     pub subscriptions: Vec<SubscriptionDeliveryStatus>,
 }
 
@@ -1417,6 +1423,9 @@ pub struct SubscriptionDeliveryStatus {
     /// the least time it is given to be answered before its subscription may be removed.
     /// `false` where no probe is outstanding.
     pub has_probe_had_its_answer_time: bool,
+    /// Whether the app disabled this installed web app subscription on its device:
+    /// nothing is sent to it, and the device is not notified another way.
+    pub is_disabled: Option<bool>,
 }
 
 /// Why `get_notification_path_status` refused.
@@ -1451,6 +1460,9 @@ pub struct RemoveUnansweredPwaWebPushSubscriptionsRequest {
     pub origin: FrontendHostname,
     /// The account at that app whose installed web apps to remove.
     pub account_principal: Principal,
+    /// The frontend of that app the installed web apps are served from, where it is not
+    /// the app's own origin. `None` is the app's own origin.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// Why `remove_unanswered_pwa_webpush_subscriptions` refused.
@@ -1517,6 +1529,14 @@ pub enum ClaimSameDeviceLinkError {
     InternalCanisterError(String),
 }
 
+/// Which installed web app `app_probe_pwa_webpush_subscription` probes.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppProbePwaWebPushSubscriptionRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
+}
+
 /// Why `app_probe_pwa_webpush_subscription` sent nothing.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppProbePwaWebPushSubscriptionError {
@@ -1581,6 +1601,7 @@ impl Notification {
 pub struct SendNotificationArg {
     pub origin: FrontendHostname,
     pub notifications: Vec<Notification>,
+    pub derivation_origin: Option<FrontendHostname>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1608,9 +1629,12 @@ pub struct SendNotificationResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SendNotificationError {
-    /// The origin lists no such sender: no file, an empty or unusable one, or
-    /// one that does not name the caller.
+    /// The application lists no such sender: no file, an empty or unusable one,
+    /// or one that does not name the caller.
     NoSuchSender,
+    /// The application at the derivation origin lists no such frontend: no file, an
+    /// unusable one, or one that does not name it.
+    NoSuchFrontend,
     /// More entries than II will process in one call; nothing was enqueued.
     /// `limit` is fixed, not a measure of how much the queue holds.
     TooManyNotifications { limit: u32 },
@@ -1775,6 +1799,14 @@ pub enum AppPreparePwaWebPushSubscriptionResult {
     Err(AppPreparePwaWebPushSubscriptionError),
 }
 
+/// Which installed web app `app_prepare_pwa_webpush_subscription` prepares for.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPreparePwaWebPushSubscriptionRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
+}
+
 /// Why `app_prepare_pwa_webpush_subscription` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppPreparePwaWebPushSubscriptionError {
@@ -1782,14 +1814,20 @@ pub enum AppPreparePwaWebPushSubscriptionError {
     NoSuchSession,
     /// The identity has not allowed this app to notify it.
     NotificationsNotAllowed,
+    /// The app lists no such frontend: no file, an unusable one, or one that does not
+    /// name `frontend_origin`.
+    NoSuchFrontend,
     InternalCanisterError(String),
 }
 
 /// What an installed web app's page registers, or `None` to remove the subscription its
-/// session's browser entry and account hold.
+/// session's browser entry and account hold, which leaves one the app disabled as it is.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppSetPwaWebPushSubscriptionRequest {
     pub subscription: Option<PwaWebPushSubscription>,
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// An installed web app's Web Push subscription, with the fields of
@@ -1815,12 +1853,34 @@ pub enum AppSetPwaWebPushSubscriptionError {
     /// The identity has not allowed this app to notify it.
     NotificationsNotAllowed,
     /// Nothing here can open `sealed_auth`: the transport key it was encrypted to has
-    /// expired, or a later prepare replaced it. Prepare again and re-send.
+    /// expired, a later prepare replaced it, or the app no longer lists this frontend.
+    /// Prepare again and re-send.
     TransportKeyExpired,
-    /// Another subscription holds this endpoint with other keys or for another app.
-    /// Subscribe again for a fresh endpoint and re-send.
+    /// Another subscription, of an account still signed in on its browser, holds this
+    /// endpoint. Subscribe again for a fresh endpoint and re-send.
     EndpointInUse,
     InternalCanisterError(String),
+}
+
+/// Which installed web app `app_get_pwa_webpush_subscription_status` reads.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppGetPwaWebPushSubscriptionStatusRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
+}
+
+/// Whether the calling installed web app's browser entry is subscribed for the session's
+/// account at one frontend, and at which endpoint.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PwaWebPushSubscriptionStatus {
+    /// Nothing is subscribed for the session's account, the subscription awaits its
+    /// `app_set_pwa_webpush_subscription`, or it delivers for another account.
+    NotSubscribed,
+    /// The app disabled this subscription for the session's account with
+    /// `app_disable_pwa_webpush_subscription`.
+    Disabled,
+    Subscribed(WebPushSubscriptionStatus),
 }
 
 /// Why `app_get_pwa_webpush_subscription_status` refused.
@@ -1828,6 +1888,24 @@ pub enum AppSetPwaWebPushSubscriptionError {
 pub enum AppGetPwaWebPushSubscriptionStatusError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
     NoSuchSession,
+    InternalCanisterError(String),
+}
+
+/// Which installed web app `app_disable_pwa_webpush_subscription` disables.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppDisablePwaWebPushSubscriptionRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
+}
+
+/// Why `app_disable_pwa_webpush_subscription` refused.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppDisablePwaWebPushSubscriptionError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    /// The app no longer lists the frontend among its alternative origins.
+    NoSuchFrontend,
     InternalCanisterError(String),
 }
 
@@ -1875,6 +1953,9 @@ pub struct AppRemovePwaNotificationRequest {
     pub inbox_notification_id: InboxNotificationId,
     /// Why the worker could not show it. Absent where it did.
     pub not_shown: Option<NotShownReason>,
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
 }
 
 /// Why `app_remove_pwa_notification` refused.

@@ -295,21 +295,61 @@ fn validate_spec_value(
     false
 }
 
+/// Suffix of the certified key that marks an attribute value as an Apple
+/// private relay address: `email` gets `email_private_relay`, and
+/// `openid:<issuer>:email` gets `openid:<issuer>:email_private_relay`. Only a
+/// relay address gets the key, set to `"true"`. Relay addresses only take mail
+/// from senders registered with II's Apple developer team, and an `@icloud.com`
+/// relay address can't be told apart from a real one by its domain.
+const PRIVATE_RELAY_KEY_SUFFIX: &str = "_private_relay";
+
 /// Inserts `(certified_key, stored)` into `certified_pairs`, recording
 /// a `Duplicate certified attribute key` problem if the key is already
 /// taken. The certified key is `attribute_name` when `omit_scope` is
-/// set and the full scoped key otherwise.
+/// set and the full scoped key otherwise. When `is_private_relay` is set,
+/// also inserts the certified key with [`PRIVATE_RELAY_KEY_SUFFIX`] as
+/// `"true"`.
 fn insert_certified_attribute(
     certified_pairs: &mut BTreeMap<String, Icrc3Value>,
     problems: &mut Vec<String>,
     spec: &ValidatedAttributeSpec,
     stored: String,
+    is_private_relay: bool,
 ) {
     let certified_key = if spec.omit_scope {
         spec.key.attribute_name.to_string()
     } else {
         spec.key.to_string()
     };
+    if is_private_relay {
+        let private_relay_key = format!("{certified_key}{PRIVATE_RELAY_KEY_SUFFIX}");
+        insert_certified_pair(
+            certified_pairs,
+            problems,
+            spec,
+            private_relay_key,
+            Icrc3Value::Text("true".to_string()),
+        );
+    }
+    insert_certified_pair(
+        certified_pairs,
+        problems,
+        spec,
+        certified_key,
+        Icrc3Value::Text(stored),
+    );
+}
+
+/// Inserts `(certified_key, value)` into `certified_pairs`, recording a
+/// `Duplicate certified attribute key` problem, naming `spec`, if the key is
+/// already taken.
+fn insert_certified_pair(
+    certified_pairs: &mut BTreeMap<String, Icrc3Value>,
+    problems: &mut Vec<String>,
+    spec: &ValidatedAttributeSpec,
+    certified_key: String,
+    value: Icrc3Value,
+) {
     match certified_pairs.entry(certified_key) {
         std::collections::btree_map::Entry::Occupied(entry) => {
             problems.push(format!(
@@ -319,7 +359,7 @@ fn insert_certified_attribute(
             ));
         }
         std::collections::btree_map::Entry::Vacant(entry) => {
-            entry.insert(Icrc3Value::Text(stored));
+            entry.insert(value);
         }
     }
 }
@@ -428,10 +468,15 @@ impl Anchor {
                         continue;
                     };
 
-                    let stored_value = match spec.key.attribute_name {
-                        AttributeName::Email => credential.get_email(),
-                        AttributeName::Name => credential.get_name(),
-                        AttributeName::VerifiedEmail => credential.get_verified_email(),
+                    let (stored_value, is_private_relay) = match spec.key.attribute_name {
+                        AttributeName::Email => {
+                            (credential.get_email(), credential.has_private_relay_email())
+                        }
+                        AttributeName::Name => (credential.get_name(), false),
+                        AttributeName::VerifiedEmail => (
+                            credential.get_verified_email(),
+                            credential.has_private_relay_email(),
+                        ),
                     };
                     let Some(stored) = stored_value else {
                         problems.push(format!(
@@ -444,7 +489,13 @@ impl Anchor {
                     if !validate_spec_value(spec, &stored, &mut problems) {
                         continue;
                     }
-                    insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
+                    insert_certified_attribute(
+                        &mut certified_pairs,
+                        &mut problems,
+                        spec,
+                        stored,
+                        is_private_relay,
+                    );
                 }
                 Some(AttributeScope::Sso { domain }) => {
                     // Certify SSO attributes only for a session that signed in through this exact domain.
@@ -468,10 +519,12 @@ impl Anchor {
                     // `verified_email` is intentionally not supported under `sso:`
                     // — surface it here as "not available" (ICRC-3 requires
                     // explicit presence).
-                    let stored_value = match spec.key.attribute_name {
-                        AttributeName::Email => credential.get_email(),
-                        AttributeName::Name => credential.get_name(),
-                        AttributeName::VerifiedEmail => None,
+                    let (stored_value, is_private_relay) = match spec.key.attribute_name {
+                        AttributeName::Email => {
+                            (credential.get_email(), credential.has_private_relay_email())
+                        }
+                        AttributeName::Name => (credential.get_name(), false),
+                        AttributeName::VerifiedEmail => (None, false),
                     };
                     let Some(stored) = stored_value else {
                         problems.push(format!(
@@ -484,7 +537,13 @@ impl Anchor {
                     if !validate_spec_value(spec, &stored, &mut problems) {
                         continue;
                     }
-                    insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
+                    insert_certified_attribute(
+                        &mut certified_pairs,
+                        &mut problems,
+                        spec,
+                        stored,
+                        is_private_relay,
+                    );
                 }
                 None => {
                     // Unscoped specs are reserved for verified-email entries:
@@ -511,6 +570,7 @@ impl Anchor {
                         &mut problems,
                         spec,
                         entry.address.clone(),
+                        entry.is_private_relay == Some(true),
                     );
                 }
             }
@@ -607,10 +667,15 @@ impl Anchor {
     /// rows that share the same key but carry different values.
     ///
     /// `sso_session_domain` gates `sso:<domain>` rows to the domain this session can certify.
+    ///
+    /// Apple private relay addresses are listed only when
+    /// `include_private_relay_emails` is set, as OIDC/SSO email rows and as
+    /// verified-email rows alike.
     pub fn list_available_attributes(
         &self,
         requested: Option<Vec<AttributeKey>>,
         sso_session_domain: Option<String>,
+        include_private_relay_emails: bool,
     ) -> Vec<(String, Vec<u8>)> {
         let all_attribute_names = AttributeName::all();
         let mut result: Vec<(String, Vec<u8>)> = Vec::new();
@@ -639,7 +704,19 @@ impl Anchor {
                 }
             }
 
+            let is_email_hidden =
+                credential.has_private_relay_email() && !include_private_relay_emails;
+
             for &attr_name in all_attribute_names {
+                if is_email_hidden
+                    && matches!(
+                        attr_name,
+                        AttributeName::Email | AttributeName::VerifiedEmail
+                    )
+                {
+                    continue;
+                }
+
                 // `verified_email` isn't supported under `sso:` yet (PR
                 // #3805); skip listing it so the listing matches what's
                 // actually certifiable.
@@ -687,6 +764,9 @@ impl Anchor {
         // emails flow); `Anchor.email_recovery` stays private.
         for entry in &self.verified_emails {
             if oidc_exposed_emails.contains(&entry.address.to_ascii_lowercase()) {
+                continue;
+            }
+            if entry.is_private_relay == Some(true) && !include_private_relay_emails {
                 continue;
             }
 
@@ -1856,9 +1936,6 @@ mod tests {
             })
         }
 
-        // Apple's private relay addresses never reach these tests: they are not
-        // kept on the credential at all (see `openid::verify::reachable_email`).
-
         #[test]
         fn test_apple_returns_verified_email_when_email_verified_is_true() {
             pretty_assert_eq!(
@@ -2398,7 +2475,7 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
 
             // Should have email and name (verified_email requires email_verified=true in metadata)
             pretty_assert_eq!(result.len(), 2);
@@ -2420,6 +2497,7 @@ mod tests {
                     attribute_name: AttributeName::Email,
                 }]),
                 None,
+                false,
             );
 
             pretty_assert_eq!(result.len(), 1);
@@ -2439,6 +2517,7 @@ mod tests {
                     attribute_name: AttributeName::Email,
                 }]),
                 None,
+                false,
             );
 
             pretty_assert_eq!(result.len(), 1);
@@ -2459,6 +2538,7 @@ mod tests {
                     attribute_name: AttributeName::VerifiedEmail,
                 }]),
                 None,
+                false,
             );
 
             // verified_email is not available because email_verified is not "true" in metadata
@@ -2470,7 +2550,7 @@ mod tests {
             setup_google_provider();
             let anchor = Anchor::new(ANCHOR_NUMBER, 0); // no credentials
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
             pretty_assert_eq!(result.len(), 0);
         }
 
@@ -2480,7 +2560,7 @@ mod tests {
             let anchor = google_anchor();
 
             // Some(vec![]) means "filter by these keys" with no keys → nothing matches
-            let result = anchor.list_available_attributes(Some(vec![]), None);
+            let result = anchor.list_available_attributes(Some(vec![]), None, false);
             pretty_assert_eq!(result.len(), 0);
         }
 
@@ -2497,6 +2577,7 @@ mod tests {
                     attribute_name: AttributeName::Email,
                 }]),
                 None,
+                false,
             );
 
             pretty_assert_eq!(result.len(), 0);
@@ -2636,7 +2717,8 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            let listed = anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()));
+            let listed =
+                anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()), false);
             let keys: BTreeSet<String> = listed.iter().map(|(k, _)| k.clone()).collect();
 
             pretty_assert_eq!(
@@ -2655,10 +2737,10 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            pretty_assert_eq!(anchor.list_available_attributes(None, None), vec![]);
+            pretty_assert_eq!(anchor.list_available_attributes(None, None, false), vec![]);
 
             pretty_assert_eq!(
-                anchor.list_available_attributes(None, Some("other.example".to_string())),
+                anchor.list_available_attributes(None, Some("other.example".to_string()), false),
                 vec![]
             );
         }
@@ -2790,6 +2872,7 @@ mod tests {
                 .map(|(i, addr)| VerifiedEmail {
                     address: (*addr).to_string(),
                     verified_at: 1_000 + i as u64,
+                    is_private_relay: None,
                 })
                 .collect();
             anchor
@@ -2835,7 +2918,7 @@ mod tests {
         #[test]
         fn lists_email_and_verified_email_for_each_entry() {
             let anchor = anchor_with_verified(&["alice@example.com"]);
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
 
             let entries: Vec<(String, String)> = result
                 .iter()
@@ -2863,7 +2946,7 @@ mod tests {
         #[test]
         fn lists_multiple_verified_emails() {
             let anchor = anchor_with_verified(&["alice@example.com", "bob@example.com"]);
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
             pretty_assert_eq!(result.len(), 4);
 
             let emails: Vec<&str> = result
@@ -2876,6 +2959,39 @@ mod tests {
         }
 
         #[test]
+        fn lists_private_relay_verified_email_only_when_requested() {
+            let mut anchor = anchor_with_verified(&["alice@example.com"]);
+            anchor.verified_emails.push(VerifiedEmail {
+                address: "ep9ks2tnph@privaterelay.appleid.com".to_string(),
+                verified_at: 2_000,
+                is_private_relay: Some(true),
+            });
+
+            pretty_assert_eq!(
+                anchor.list_available_attributes(None, None, false),
+                vec![
+                    ("email".to_string(), b"alice@example.com".to_vec()),
+                    ("verified_email".to_string(), b"alice@example.com".to_vec()),
+                ]
+            );
+            pretty_assert_eq!(
+                anchor.list_available_attributes(None, None, true),
+                vec![
+                    ("email".to_string(), b"alice@example.com".to_vec()),
+                    ("verified_email".to_string(), b"alice@example.com".to_vec()),
+                    (
+                        "email".to_string(),
+                        b"ep9ks2tnph@privaterelay.appleid.com".to_vec()
+                    ),
+                    (
+                        "verified_email".to_string(),
+                        b"ep9ks2tnph@privaterelay.appleid.com".to_vec()
+                    ),
+                ]
+            );
+        }
+
+        #[test]
         fn filters_by_unscoped_key() {
             let anchor = anchor_with_verified(&["alice@example.com"]);
             let result = anchor.list_available_attributes(
@@ -2884,6 +3000,7 @@ mod tests {
                     attribute_name: AttributeName::Email,
                 }]),
                 None,
+                false,
             );
 
             pretty_assert_eq!(result.len(), 1);
@@ -2899,7 +3016,7 @@ mod tests {
                 created_at: 1_000,
                 last_used: None,
             }];
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
             pretty_assert_eq!(result.len(), 0, "recovery email leaked: {result:?}");
         }
 
@@ -2909,7 +3026,7 @@ mod tests {
             let mut anchor = anchor_with_verified(&["user@gmail.com"]);
             anchor.openid_credentials = vec![google_credential_with("user@gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
 
             assert!(
@@ -2931,7 +3048,7 @@ mod tests {
             anchor.openid_credentials =
                 vec![google_credential_with("alice.personal@gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
 
             assert!(
@@ -2950,7 +3067,7 @@ mod tests {
             let mut anchor = anchor_with_verified(&["alice@gmail.com"]);
             anchor.openid_credentials = vec![google_credential_with("Alice@Gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, false);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
             assert!(
                 !keys.iter().any(|k| *k == "email" || *k == "verified_email"),

@@ -108,6 +108,7 @@ use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_
 use crate::notifications::delivery_metrics;
 use crate::notifications::installed_app::{NotificationApp, NotificationAppId, PendingProbe};
 use crate::openid::{Domain, OpenIdCredentialKey};
+use crate::origin::OriginSha256;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
@@ -125,7 +126,7 @@ use crate::storage::storable::account_key::StorableAccountKey;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::{
-    AnchorApplicationConfig, PwaSubscription, StorablePwaSubscription,
+    AnchorApplicationConfig, PwaSubscription, StorablePwaSlot, StorablePwaSubscription,
 };
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
@@ -232,9 +233,12 @@ const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 const NOTIFICATION_APP_MEMORY_INDEX: u8 = 37u8;
 const NEXT_NOTIFICATION_APP_ID_MEMORY_INDEX: u8 = 38u8;
 const NEXT_IDENTITY_NOTIFICATION_ID_MEMORY_INDEX: u8 = 39u8;
+// Abandoned along with the per-entry installed app subscriptions it indexed, which were
+// keyed by browser entry alone:
+// const DEPRECATED_LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX: u8 = 40u8;
 /// The installed web app subscription that holds each push endpoint, by the endpoint's
-/// SHA-256: what an endpoint is looked up by when another subscription takes it over.
-const LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX: u8 = 40u8;
+/// SHA-256: what a subscribe looks an endpoint up by, to refuse one another slot holds.
+const LOOKUP_PWA_WEBPUSH_SUBSCRIPTION_WITH_ENDPOINT_MEMORY_INDEX: u8 = 41u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -1387,9 +1391,7 @@ impl<M: Memory + Clone> Storage<M> {
         budget: usize,
     ) -> usize {
         let expired: Vec<Principal> = self
-            .mcp_registration_memory
-            .range(start..)
-            .chain(self.mcp_registration_memory.range(..start))
+            .mcp_registrations_wrapping_from(start)
             .take(budget)
             .filter(|(_, entry)| entry.expires_at_ns <= now_ns)
             .map(|(principal, _)| principal)
@@ -1398,6 +1400,18 @@ impl<M: Memory + Clone> Storage<M> {
             self.mcp_registration_memory.remove(principal);
         }
         expired.len()
+    }
+
+    /// Every MCP registration, in principal order starting at `start` and wrapping around:
+    /// the keys from `start` to the last one, `start` included, then the keys from the
+    /// first one up to `start`, `start` excluded. Each registration is yielded once.
+    fn mcp_registrations_wrapping_from(
+        &self,
+        start: Principal,
+    ) -> impl Iterator<Item = (Principal, StorableMcpRegistration)> + '_ {
+        self.mcp_registration_memory
+            .range(start..)
+            .chain(self.mcp_registration_memory.range(..start))
     }
 
     /// Read `anchor_number`'s synced trusted-MCP-server config. Returns the
@@ -1941,6 +1955,16 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&StorableOriginSha256::from_origin(origin))
     }
 
+    /// The origin of the application `application_number` names, where it still exists.
+    pub fn lookup_application_origin_with_number(
+        &self,
+        application_number: ApplicationNumber,
+    ) -> Option<FrontendHostname> {
+        self.stable_application_memory
+            .get(&application_number)
+            .map(|application| application.origin)
+    }
+
     /// Only used in tests.
     // TODO: mark this code as test-only or adjust the tests to avoid using this functions.
     #[allow(dead_code)]
@@ -2002,10 +2026,7 @@ impl<M: Memory + Clone> Storage<M> {
         now: Timestamp,
     ) -> BTreeSet<SessionId> {
         let stored: Vec<Session> = self
-            .stable_account_reference_list_memory
-            .range(
-                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
-            )
+            .anchor_account_reference_lists(anchor_number)
             .flat_map(|(_, list)| Vec::<AccountReference>::from(list))
             .flat_map(|reference| reference.sessions)
             .collect();
@@ -2038,6 +2059,38 @@ impl<M: Memory + Clone> Storage<M> {
         giving_up
     }
 
+    /// Every account reference list the identity `anchor_number` holds, each with the
+    /// number of the application it is for, in ascending application number order. Reads
+    /// the keys from `(anchor_number, ApplicationNumber::MIN)` to
+    /// `(anchor_number, ApplicationNumber::MAX)`, both bounds included: every application
+    /// number of that identity, and none of another identity's.
+    fn anchor_account_reference_lists(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> impl Iterator<Item = (ApplicationNumber, StorableAccountReferenceList)> + '_ {
+        self.stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .map(|((_, application_number), list)| (application_number, list))
+    }
+
+    /// Every config the identity `anchor_number` holds, each with the number of the
+    /// application it is for, in ascending application number order. Reads the keys from
+    /// `(anchor_number, ApplicationNumber::MIN)` to `(anchor_number, ApplicationNumber::MAX)`,
+    /// both bounds included: every application number of that identity, and none of
+    /// another identity's.
+    fn anchor_application_configs(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> impl Iterator<Item = (ApplicationNumber, AnchorApplicationConfig)> + '_ {
+        self.stable_anchor_application_config_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .map(|((_, application_number), config)| (application_number, config))
+    }
+
     /// How many sessions a set of account references holds.
     fn sessions_in(references: &[AccountReference]) -> u32 {
         references
@@ -2052,10 +2105,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// anywhere, so the stored count drifts upwards and the cap must not be enforced
     /// against a number nobody counted.
     fn stored_session_count(&self, anchor_number: AnchorNumber) -> u32 {
-        self.stable_account_reference_list_memory
-            .range(
-                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
-            )
+        self.anchor_account_reference_lists(anchor_number)
             .map(|(_, list)| Self::sessions_in(&Vec::<AccountReference>::from(list)))
             .sum()
     }
@@ -2073,11 +2123,8 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: AnchorNumber,
     ) -> BTreeMap<FrontendHostname, AccountReferenceListWrite> {
-        self.stable_account_reference_list_memory
-            .range(
-                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
-            )
-            .filter_map(|((_, application_number), list)| {
+        self.anchor_account_reference_lists(anchor_number)
+            .filter_map(|(application_number, list)| {
                 // A reference list for an application that does not exist is illegal, and
                 // this is where it surfaces: the write gate is keyed by origin, so a list
                 // whose application number resolves to nothing cannot be handed to a
@@ -3129,11 +3176,8 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: AnchorNumber,
     ) -> Vec<(ApplicationNumber, Option<Timestamp>)> {
-        self.stable_account_reference_list_memory
-            .range(
-                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
-            )
-            .filter_map(|((_, application_number), list)| {
+        self.anchor_account_reference_lists(anchor_number)
+            .filter_map(|(application_number, list)| {
                 let references: Vec<AccountReference> = list.into();
                 match references.as_slice() {
                     [tracked_default] if tracked_default.account_number.is_none() => {
@@ -3152,12 +3196,9 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: AnchorNumber,
     ) -> Vec<(FrontendHostname, Option<Timestamp>, AnchorApplicationConfig)> {
-        self.stable_anchor_application_config_memory
-            .range(
-                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
-            )
+        self.anchor_application_configs(anchor_number)
             .filter(|(_, config)| config.has_permission_decision())
-            .filter_map(|((_, application_number), config)| {
+            .filter_map(|(application_number, config)| {
                 // A config is stored with its reference list and reclaimed with it, so
                 // its application exists. Skipped rather than refused where it does not:
                 // one bad row must not hide the identity's other apps.
@@ -3301,13 +3342,14 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Adds the endpoints `current_subscriptions` holds that `previous_subscriptions` did
-    /// not, and removes the ones it dropped where the lookup still names this row.
+    /// not, and removes the ones it dropped where the lookup names this row. A set refuses
+    /// an endpoint another kept slot holds, so each endpoint has at most one holder.
     fn sync_pwa_webpush_subscription_with_endpoint_index(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        previous_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
-        current_subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+        previous_subscriptions: Option<&BTreeMap<StorablePwaSlot, StorablePwaSubscription>>,
+        current_subscriptions: Option<&BTreeMap<StorablePwaSlot, StorablePwaSubscription>>,
     ) {
         let previous_holders = collect_pwa_subscription_holders(
             anchor_number,
@@ -3321,14 +3363,11 @@ impl<M: Memory + Clone> Storage<M> {
         );
 
         for (endpoint_hash, holder) in previous_holders.difference(&current_holders) {
-            let Some(indexed_holder) = self
+            if self
                 .lookup_pwa_webpush_subscription_with_endpoint_memory
                 .get(endpoint_hash)
-            else {
-                continue;
-            };
-            // Another row took this endpoint over, and the entry is that row's now.
-            if indexed_holder != *holder {
+                != Some(*holder)
+            {
                 continue;
             }
             self.lookup_pwa_webpush_subscription_with_endpoint_memory
@@ -3336,51 +3375,8 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         for (endpoint_hash, holder) in current_holders.difference(&previous_holders) {
-            if let Some(indexed_holder) = self
-                .lookup_pwa_webpush_subscription_with_endpoint_memory
-                .get(endpoint_hash)
-            {
-                if indexed_holder == *holder {
-                    continue;
-                }
-                // An entry whose slot no longer holds the endpoint, which a config written
-                // by a release that does not know the slots leaves behind, is replaced.
-                if self.holds_pwa_endpoint(indexed_holder, endpoint_hash) {
-                    ic_cdk::println!(
-                        "ERROR: an installed app endpoint is held by two subscriptions; the \
-                         lookup keeps {indexed_holder:?} rather than {holder:?}"
-                    );
-                    continue;
-                }
-            }
             self.lookup_pwa_webpush_subscription_with_endpoint_memory
                 .insert(*endpoint_hash, *holder);
-        }
-    }
-
-    /// Whether `holder`'s browser entry holds a subscribed endpoint hashing to
-    /// `endpoint_hash`.
-    fn holds_pwa_endpoint(
-        &self,
-        holder: StorablePwaSubscriptionHolder,
-        endpoint_hash: &[u8; 32],
-    ) -> bool {
-        let Some(config) =
-            self.anchor_application_config(holder.anchor_number, holder.application_number)
-        else {
-            return false;
-        };
-        let Some(mut subscriptions) = config.pwa_webpush_subscriptions else {
-            return false;
-        };
-        let Some(held_subscription) = subscriptions.remove(&holder.browser_id) else {
-            return false;
-        };
-        match held_subscription.subscription {
-            StorableWebPushSubscription::Ready { endpoint, .. } => {
-                hash_endpoint(&endpoint) == *endpoint_hash
-            }
-            StorableWebPushSubscription::Pending { .. } => false,
         }
     }
 
@@ -3395,14 +3391,15 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Puts `subscription` in `holder`'s slot, or with `None` empties it, after emptying
-    /// `displaced_holder`'s slot where one is given. Both configs must exist: a config is
-    /// started only by the account state write, so a missing one is refused, before
-    /// anything is written.
+    /// `displaced_holder`'s slot where one is given and every slot in `stale_holders` that
+    /// is on `holder`'s config. Both configs must exist: a config is started only by the
+    /// account state write, so a missing one is refused, before anything is written.
     pub fn write_pwa_webpush_subscription(
         &mut self,
         holder: PwaSubscriptionHolder,
         subscription: Option<PwaSubscription>,
         displaced_holder: Option<PwaSubscriptionHolder>,
+        stale_holders: &BTreeSet<PwaSubscriptionHolder>,
     ) -> Result<(), StorageError> {
         let config_key = (holder.anchor_number, holder.application_number);
         let mut config = self.pwa_subscription_config(holder)?;
@@ -3415,15 +3412,37 @@ impl<M: Memory + Clone> Storage<M> {
                 displaced_holder.application_number,
             );
             if displaced_config_key == config_key {
-                config.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
+                config.set_pwa_webpush_subscription(
+                    displaced_holder.browser_id,
+                    displaced_holder.frontend_origin_hash,
+                    None,
+                );
             } else {
                 let mut config_of_displaced = self.pwa_subscription_config(displaced_holder)?;
-                config_of_displaced.set_pwa_webpush_subscription(displaced_holder.browser_id, None);
+                config_of_displaced.set_pwa_webpush_subscription(
+                    displaced_holder.browser_id,
+                    displaced_holder.frontend_origin_hash,
+                    None,
+                );
                 displaced_config = Some((displaced_config_key, config_of_displaced));
             }
         }
 
-        config.set_pwa_webpush_subscription(holder.browser_id, subscription);
+        for stale_holder in stale_holders {
+            if (stale_holder.anchor_number, stale_holder.application_number) != config_key {
+                continue;
+            }
+            config.set_pwa_webpush_subscription(
+                stale_holder.browser_id,
+                stale_holder.frontend_origin_hash,
+                None,
+            );
+        }
+        config.set_pwa_webpush_subscription(
+            holder.browser_id,
+            holder.frontend_origin_hash,
+            subscription,
+        );
         if let Some((displaced_config_key, config_of_displaced)) = displaced_config {
             self.store_anchor_application_config(displaced_config_key, Some(config_of_displaced));
         }
@@ -3431,25 +3450,32 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Writes the keying material a dispatch pass refreshed for `holder`'s browser entry,
-    /// for the account it delivers for. A browser entry that holds nothing any more is left
-    /// empty.
+    /// Writes the keying material a dispatch pass refreshed for `holder`'s slot, for the
+    /// account it delivers for. A slot that holds nothing any more is left empty.
     pub fn refresh_pwa_webpush_subscription(
         &mut self,
         holder: PwaSubscriptionHolder,
         subscription: ReadySubscription,
     ) -> Result<(), StorageError> {
         let mut config = self.pwa_subscription_config(holder)?;
-        let Some(held_subscription) = config.pwa_webpush_subscription(holder.browser_id) else {
+        let Some(held_subscription) =
+            config.pwa_webpush_subscription(holder.browser_id, holder.frontend_origin_hash)
+        else {
             return Ok(());
         };
         let subscription = WebPushSubscription::Ready(subscription);
-        let account_principal = held_subscription.account_principal;
+        let PwaSubscription {
+            subscription: _,
+            account_principal,
+            disabled_at_ns,
+        } = held_subscription;
         config.set_pwa_webpush_subscription(
             holder.browser_id,
+            holder.frontend_origin_hash,
             Some(PwaSubscription {
                 subscription,
                 account_principal,
+                disabled_at_ns,
             }),
         );
         self.store_anchor_application_config(
@@ -3480,32 +3506,51 @@ impl<M: Memory + Clone> Storage<M> {
         if browser_ids.is_empty() {
             return;
         }
-        let configs: Vec<((AnchorNumber, ApplicationNumber), AnchorApplicationConfig)> = self
-            .stable_anchor_application_config_memory
-            .range(
-                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
-            )
+        let configs: Vec<(ApplicationNumber, AnchorApplicationConfig)> = self
+            .anchor_application_configs(anchor_number)
             .filter(|(_, config)| config.pwa_webpush_subscriptions.is_some())
             .collect();
-        for (key, mut config) in configs {
+        for (application_number, mut config) in configs {
             if config.remove_pwa_webpush_subscriptions_of_browsers(browser_ids) {
-                self.store_anchor_application_config(key, Some(config));
+                self.store_anchor_application_config(
+                    (anchor_number, application_number),
+                    Some(config),
+                );
             }
         }
     }
 
     /// Whether `browser_id`'s entry of `anchor_number` holds an installed web app
-    /// subscription for any app.
+    /// subscription for any app and any of its frontends.
     pub fn holds_pwa_webpush_subscription(
         &self,
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> bool {
-        self.stable_anchor_application_config_memory
-            .range(
-                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
-            )
-            .any(|(_, config)| config.pwa_webpush_subscription(browser_id).is_some())
+        self.anchor_application_configs(anchor_number)
+            .any(|(_, config)| {
+                !config
+                    .pwa_webpush_subscriptions_of_browser(browser_id)
+                    .is_empty()
+            })
+    }
+
+    /// The apps and their frontends `browser_id`'s entry of `anchor_number` holds an
+    /// installed web app subscription of, as the app's number and the hash of the
+    /// frontend's origin.
+    pub fn pwa_webpush_frontends_of_browser(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> BTreeSet<(ApplicationNumber, OriginSha256)> {
+        let mut frontends = BTreeSet::new();
+        for (application_number, config) in self.anchor_application_configs(anchor_number) {
+            for (frontend_origin_hash, _) in config.pwa_webpush_subscriptions_of_browser(browser_id)
+            {
+                frontends.insert((application_number, frontend_origin_hash));
+            }
+        }
+        frontends
     }
 
     /// What this identity has configured for the app at `origin`, or `None` where it has
@@ -4419,11 +4464,7 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: AnchorNumber,
     ) -> Vec<AccountReference> {
-        let range_start = (anchor_number, ApplicationNumber::MIN);
-        let range_end = (anchor_number, ApplicationNumber::MAX);
-
-        self.stable_account_reference_list_memory
-            .range(range_start..=range_end)
+        self.anchor_account_reference_lists(anchor_number)
             .flat_map(|(_, storable_account_ref_list_val)| storable_account_ref_list_val.into_vec())
             .map(AccountReference::from)
             .collect()
@@ -4780,13 +4821,22 @@ impl<M: Memory + Clone> Storage<M> {
     /// Prune all archive entries with sequence numbers less than or equal to the given sequence number.
     pub fn prune_archive_entries(&mut self, sequence_number: u64) {
         let entries_to_prune = self
-            .archive_entries_buffer
-            .range(..=sequence_number)
-            .map(|(k, _)| k)
+            .archive_entry_sequence_numbers_up_to(sequence_number)
             .collect::<Vec<_>>();
         entries_to_prune.iter().for_each(|k| {
             self.archive_entries_buffer.remove(k);
         });
+    }
+
+    /// The sequence numbers of the buffered archive entries, ascending, from the first one
+    /// to `sequence_number`, `sequence_number` included.
+    fn archive_entry_sequence_numbers_up_to(
+        &self,
+        sequence_number: u64,
+    ) -> impl Iterator<Item = u64> + '_ {
+        self.archive_entries_buffer
+            .range(..=sequence_number)
+            .map(|(entry_sequence_number, _)| entry_sequence_number)
     }
 
     /// Returns the number of entries in the archive buffer.
@@ -5757,20 +5807,30 @@ mod allocate_anchor_safe_tests {
 }
 
 /// Where an installed app subscription is held: the identity, the application whose config
-/// holds it, and the browser entry it is on there.
+/// holds it, the browser entry it is on there, and the frontend of the application it
+/// was subscribed from, by the SHA-256 of that frontend's origin.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct PwaSubscriptionHolder {
     pub anchor_number: AnchorNumber,
     pub application_number: ApplicationNumber,
     pub browser_id: BrowserId,
+    pub frontend_origin_hash: OriginSha256,
 }
 
 impl From<StorablePwaSubscriptionHolder> for PwaSubscriptionHolder {
     fn from(value: StorablePwaSubscriptionHolder) -> Self {
+        let StorablePwaSubscriptionHolder {
+            anchor_number,
+            application_number,
+            browser_id,
+            frontend_origin_hash,
+        } = value;
+        let frontend_origin_hash = OriginSha256::from(frontend_origin_hash);
         Self {
-            anchor_number: value.anchor_number,
-            application_number: value.application_number,
-            browser_id: value.browser_id,
+            anchor_number,
+            application_number,
+            browser_id,
+            frontend_origin_hash,
         }
     }
 }
@@ -5785,21 +5845,25 @@ fn hash_endpoint(endpoint: &str) -> [u8; 32] {
 fn collect_pwa_subscription_holders(
     anchor_number: AnchorNumber,
     application_number: ApplicationNumber,
-    subscriptions: Option<&BTreeMap<BrowserId, StorablePwaSubscription>>,
+    subscriptions: Option<&BTreeMap<StorablePwaSlot, StorablePwaSubscription>>,
 ) -> BTreeSet<([u8; 32], StorablePwaSubscriptionHolder)> {
     let mut holders = BTreeSet::new();
-    for (browser_id, held_subscription) in subscriptions.into_iter().flatten() {
+    for (slot, held_subscription) in subscriptions.into_iter().flatten() {
         let endpoint = match &held_subscription.subscription {
             StorableWebPushSubscription::Ready { endpoint, .. } => endpoint,
             StorableWebPushSubscription::Pending { .. } => continue,
         };
-        let browser_id = *browser_id;
+        let StorablePwaSlot {
+            browser_id,
+            frontend_origin_hash,
+        } = *slot;
         holders.insert((
             hash_endpoint(endpoint),
             StorablePwaSubscriptionHolder {
                 anchor_number,
                 application_number,
                 browser_id,
+                frontend_origin_hash,
             },
         ));
     }

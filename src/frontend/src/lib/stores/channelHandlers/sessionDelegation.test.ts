@@ -59,11 +59,14 @@ const notificationCheck = vi.hoisted(() => {
   const state: {
     outcomes: ("done" | "asked" | "identity-changed")[];
     onIdentityChanged: () => void;
-  } = { outcomes: [], onIdentityChanged: () => {} };
+    /** Whether each check was told the sign-in came from an installed web app. */
+    isInstalledAppByCheck: boolean[];
+  } = { outcomes: [], onIdentityChanged: () => {}, isInstalledAppByCheck: [] };
   return state;
 });
 vi.mock("$lib/stores/channelHandlers/notificationRepair", () => ({
-  repairNotificationPath: () => {
+  repairNotificationPath: ({ isInstalledApp }: { isInstalledApp: boolean }) => {
+    notificationCheck.isInstalledAppByCheck.push(isInstalledApp);
     const outcome = notificationCheck.outcomes.shift() ?? "done";
     if (outcome === "identity-changed") {
       notificationCheck.onIdentityChanged();
@@ -779,6 +782,44 @@ describe("keeping a session for later", () => {
     await expect(appAccountsForOrigin(ORIGIN)).resolves.toMatchObject([
       { record: { accountPrincipal: "2vxsx-fae" } },
     ]);
+  });
+});
+
+describe("an installed web app signing in", () => {
+  beforeEach(async () => {
+    await purgeAppSessions(BigInt(10_000));
+    notificationCheck.isInstalledAppByCheck = [];
+  });
+
+  it("tells the notification check the sign-in came from an installed web app", async () => {
+    await runCeremony(true, { installedApp: true });
+
+    expect(notificationCheck.isInstalledAppByCheck).toEqual([true]);
+  });
+
+  it("tells the notification check nothing came from an installed web app where the app does not say", async () => {
+    await runCeremony(true);
+
+    expect(notificationCheck.isInstalledAppByCheck).toEqual([false]);
+  });
+
+  it("rejects an installedApp that is not a boolean", async () => {
+    const { channel, sent } = channelWith();
+    const onError = vi.fn();
+
+    await handleSessionDelegationRequest(
+      channel,
+      onError,
+    )({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ii_session_delegation",
+      params: { sessionPublicKey: await appKey(), installedApp: "yes" },
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ id: 1, error: { code: -32602 } });
+    expect(onError).toHaveBeenCalledWith("invalid-request");
   });
 });
 

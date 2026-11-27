@@ -6,7 +6,8 @@ use std::{
     fmt::{self, Display},
 };
 
-use crate::utils::{sha256sum, slice_to_bounded_32};
+use crate::origin::OriginSha256;
+use crate::utils::slice_to_bounded_32;
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq)]
 #[cbor(map)]
@@ -49,8 +50,12 @@ impl Storable for StorableApplication {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+/// The SHA-256 of an origin, which keys what is stored per origin in 32 bytes however
+/// long the origin is.
+#[derive(Encode, Decode, Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[cbor(transparent)]
 pub struct StorableOriginSha256 {
+    #[cbor(n(0), with = "minicbor::bytes")]
     hash: [u8; 32],
 }
 
@@ -62,8 +67,20 @@ impl Display for StorableOriginSha256 {
 
 impl StorableOriginSha256 {
     pub fn from_origin(origin: &FrontendHostname) -> Self {
-        let hash = sha256sum(origin.as_bytes());
+        Self::from(OriginSha256::from_origin(origin))
+    }
+}
+
+impl From<OriginSha256> for StorableOriginSha256 {
+    fn from(origin_hash: OriginSha256) -> Self {
+        let hash = *origin_hash.as_bytes();
         Self { hash }
+    }
+}
+
+impl From<StorableOriginSha256> for OriginSha256 {
+    fn from(origin_hash: StorableOriginSha256) -> Self {
+        OriginSha256::from_stored_digest(origin_hash.hash)
     }
 }
 
@@ -87,6 +104,17 @@ impl Storable for StorableOriginSha256 {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    /// Slots are stored under the stored form of an origin's hash, so both forms hash an
+    /// origin alike and convert into each other unchanged.
+    #[test]
+    fn the_stored_origin_hash_agrees_with_the_origin_hash() {
+        let origin_hash = OriginSha256::from_origin("https://app.example");
+        let stored_origin_hash =
+            StorableOriginSha256::from_origin(&"https://app.example".to_string());
+        assert_eq!(StorableOriginSha256::from(origin_hash), stored_origin_hash);
+        assert_eq!(OriginSha256::from(stored_origin_hash), origin_hash);
+    }
 
     /// The shape every application stored before the tombstone count existed has on
     /// disk. Decoding one has to keep working, and has to read as no tombstones: nothing

@@ -39,6 +39,7 @@ const createFeatureFlagStore = (
   // Initialize feature flag object with value from localstorage
   const initializedFeatureFlag = new FeatureFlag(
     window.localStorage,
+    window.sessionStorage,
     LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
     defaultValue,
     { subscribe, set, update },
@@ -56,8 +57,9 @@ const createFeatureFlagStore = (
     return initializedFeatureFlag;
   };
   const initialize = (): void => {
-    // A value persisted in localStorage (from the browser console or a
-    // `?feature_flag_*` URL param) always wins — leave it untouched.
+    // A value set from the browser console (localStorage) or a
+    // `?feature_flag_*` URL param (sessionStorage) always wins — leave it
+    // untouched.
     if (initializedFeatureFlag.isSet()) {
       return;
     }
@@ -191,8 +193,17 @@ export const PUSH_NOTIFICATIONS = createFeatureFlagStore(
   },
 );
 
+/// Lists Apple private relay ("Hide My Email") addresses when an app asks for
+/// an email. They only take mail from senders registered with II's Apple
+/// developer team, so off by default.
+export const SHARE_PRIVATE_RELAY_EMAILS = createFeatureFlagStore(
+  "SHARE_PRIVATE_RELAY_EMAILS",
+  false,
+);
+
 export default {
   PUSH_NOTIFICATIONS,
+  SHARE_PRIVATE_RELAY_EMAILS,
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,

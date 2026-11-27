@@ -4,6 +4,7 @@ use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::delegation::DelegationAccess;
 use crate::origin::ApplicationOrigin;
+use crate::origin::FetchableApplicationOrigin;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -44,15 +45,13 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::same_device_link::ClaimRefusal;
-use notifications::senders::Senders;
+use notifications::submission::BatchRefusal;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::pwa_subscription;
 use notifications::webpush::rotation;
 use notifications::webpush::vapid_key::VapidPublicKey;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
-use notifications::{
-    admit_batch, delivery_metrics, enabled_or, fetchable_origin, TooManyNotifications,
-};
+use notifications::{admit_batch, check_notifications_enabled, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -61,6 +60,7 @@ use storage::{Salt, Storage};
 
 mod account_management;
 mod admission_queue;
+mod alternative_origins;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -356,7 +356,9 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 /// finds it.
 #[update]
 fn prepare_webpush_subscription(anchor_number: AnchorNumber) -> PrepareWebPushSubscriptionResult {
-    if let Err(err) = enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError) {
+    if let Err(err) =
+        check_notifications_enabled(PrepareWebPushSubscriptionError::InternalCanisterError)
+    {
         return PrepareWebPushSubscriptionResult::Err(err);
     }
     let Ok(key) = check_browser_or_notification_app_authorization(anchor_number) else {
@@ -416,7 +418,7 @@ fn set_webpush_subscription(
         transport_key,
         sealed_auth,
     } = request;
-    enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
+    check_notifications_enabled(SetWebPushSubscriptionError::InternalCanisterError)?;
 
     // Every field at once rather than the first to fail, so a browser doesn't go round
     // four times to learn what one answer can say.
@@ -487,7 +489,7 @@ fn remove_webpush_subscription(
         anchor_number,
         browser_id,
     } = request;
-    enabled_or(RemoveWebPushSubscriptionError::InternalCanisterError)?;
+    check_notifications_enabled(RemoveWebPushSubscriptionError::InternalCanisterError)?;
     check_authz_and_record_activity(anchor_number)
         .map_err(|_| RemoveWebPushSubscriptionError::Unauthorized(caller()))?;
 
@@ -839,7 +841,7 @@ fn claim_same_device_link(
         link_public_key,
         signature,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
 
@@ -881,7 +883,7 @@ fn get_notification_path_status(
         anchor_number,
         path,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
@@ -906,7 +908,7 @@ fn probe_notification_path(
         anchor_number,
         path,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
@@ -926,8 +928,8 @@ fn probe_notification_path(
     })
 }
 
-/// Removes an app's installed web app subscriptions on the entries linked to the calling
-/// browser's, where a probe through them was never removed.
+/// Removes an app's installed web app subscriptions of one of its frontends on the entries
+/// linked to the calling browser's, where a probe through them was never removed.
 #[update]
 fn remove_unanswered_pwa_webpush_subscriptions(
     request: RemoveUnansweredPwaWebPushSubscriptionsRequest,
@@ -938,17 +940,22 @@ fn remove_unanswered_pwa_webpush_subscriptions(
         anchor_number,
         origin,
         account_principal,
+        frontend_origin,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let application_number =
         notifications::repair::lookup_application_number(&origin).map_err(InternalCanisterError)?;
+    let frontend_origin_hash =
+        notifications::repair::hash_frontend_origin(&origin, frontend_origin.as_deref())
+            .map_err(InternalCanisterError)?;
 
     notifications::repair::remove_unanswered_installed_apps(
         &anchor,
         browser_id,
         application_number,
+        frontend_origin_hash,
         account_principal,
         time(),
     );
@@ -1067,7 +1074,7 @@ fn prepare_notification_delegation(
     } = request;
     let origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(NotificationDelegationError::InternalCanisterError)?;
-    enabled_or(NotificationDelegationError::InternalCanisterError)?;
+    check_notifications_enabled(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
@@ -1098,7 +1105,7 @@ fn get_notification_delegation(
     } = request;
     let origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(NotificationDelegationError::InternalCanisterError)?;
-    enabled_or(NotificationDelegationError::InternalCanisterError)?;
+    check_notifications_enabled(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
@@ -1126,7 +1133,7 @@ fn browser_get_notification(
         browser_id,
         inbox_notification_id,
     } = request;
-    enabled_or(GetNotificationError::InternalCanisterError)?;
+    check_notifications_enabled(GetNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| GetNotificationError::InvalidBrowserKey)?;
     let anchor = anchor_delivering_to(anchor_number, key, browser_id)
@@ -1153,7 +1160,7 @@ fn browser_remove_notification(
         inbox_notification_id,
         not_shown,
     } = request;
-    enabled_or(RemoveNotificationError::InternalCanisterError)?;
+    check_notifications_enabled(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
     let anchor = anchor_delivering_to(anchor_number, key, browser_id)
@@ -1194,7 +1201,7 @@ fn notification_grant_consent(
     } = request;
 
     let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
 
     check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
@@ -1211,7 +1218,7 @@ fn notification_revoke_consent(
     use NotificationRevokeConsentError::*;
 
     let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
 
     check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
@@ -1247,7 +1254,7 @@ fn app_notification_consent_status(
 ) -> Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError> {
     use AppNotificationConsentStatusError::*;
 
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
 
     let AuthorizedSession {
         anchor_number,
@@ -1272,7 +1279,7 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
         ..
     } = check_app_authorization(now).map_err(|_| NoSuchSession)?;
 
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
     let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
 
     notifications::revoke_consent(anchor_number, &origin, now)
@@ -1281,20 +1288,31 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
 
 // ---- Notifications: called by an app's installed web app ----
 
-/// The keys an installed web app subscribes with, for the calling session's identity, app
-/// and browser entry. An update call for the reason `prepare_webpush_subscription` is one,
-/// and `Pending` on the same grounds.
+/// The keys an installed web app subscribes with, for the calling session's identity, app,
+/// browser entry and the frontend the request names. An update call for the reason
+/// `prepare_webpush_subscription` is one, and `Pending` on the same grounds, or while the
+/// app's alternative origins are fetched.
 #[update]
-fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionResult {
+fn app_prepare_pwa_webpush_subscription(
+    request: AppPreparePwaWebPushSubscriptionRequest,
+) -> AppPreparePwaWebPushSubscriptionResult {
+    use pwa_subscription::PreparedPwaSubscription::*;
     use AppPreparePwaWebPushSubscriptionError::*;
 
     let now = time();
     let Ok(session) = check_app_authorization(now) else {
         return AppPreparePwaWebPushSubscriptionResult::Err(NoSuchSession);
     };
-    if let Err(err) = enabled_or(InternalCanisterError) {
+    if let Err(err) = check_notifications_enabled(InternalCanisterError) {
         return AppPreparePwaWebPushSubscriptionResult::Err(err);
     }
+    let AppPreparePwaWebPushSubscriptionRequest { frontend_origin } = request;
+    let frontend_origin = match pwa_subscription::validate_frontend_origin(frontend_origin) {
+        Ok(frontend_origin) => frontend_origin,
+        Err(reason) => {
+            return AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+        }
+    };
     let vapid_public_key = match notifications::webpush::vapid_key::read_or_fetch_public_key() {
         VapidPublicKey::Held(key) => key,
         VapidPublicKey::Fetching => return AppPreparePwaWebPushSubscriptionResult::Pending,
@@ -1302,24 +1320,32 @@ fn app_prepare_pwa_webpush_subscription() -> AppPreparePwaWebPushSubscriptionRes
             return AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
         }
     };
-    match pwa_subscription::prepare_pwa_subscription(&session, vapid_public_key, now) {
-        Ok(pwa_subscription::PreparedPwaSubscription::Keys(keys)) => {
-            AppPreparePwaWebPushSubscriptionResult::Ok(keys)
-        }
-        Ok(pwa_subscription::PreparedPwaSubscription::Pending) => {
-            AppPreparePwaWebPushSubscriptionResult::Pending
-        }
-        Err(pwa_subscription::PreparePwaSubscriptionError::NotificationsNotAllowed) => {
-            AppPreparePwaWebPushSubscriptionResult::Err(NotificationsNotAllowed)
-        }
-        Err(pwa_subscription::PreparePwaSubscriptionError::Internal(reason)) => {
-            AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+    match pwa_subscription::prepare_pwa_subscription(
+        &session,
+        frontend_origin.as_ref(),
+        vapid_public_key,
+        now,
+    ) {
+        Ok(Keys(keys)) => AppPreparePwaWebPushSubscriptionResult::Ok(keys),
+        Ok(Pending) => AppPreparePwaWebPushSubscriptionResult::Pending,
+        Err(err) => {
+            use pwa_subscription::PreparePwaSubscriptionError::*;
+
+            let err = match err {
+                NotificationsNotAllowed => {
+                    AppPreparePwaWebPushSubscriptionError::NotificationsNotAllowed
+                }
+                NoSuchFrontend => AppPreparePwaWebPushSubscriptionError::NoSuchFrontend,
+                Internal(reason) => InternalCanisterError(reason),
+            };
+            AppPreparePwaWebPushSubscriptionResult::Err(err)
         }
     }
 }
 
 /// Sets or, with `None`, removes the installed web app subscription of the calling
-/// session's identity, app, browser entry and account.
+/// session's identity, app, browser entry and account, at the frontend the request names.
+/// `None` leaves one the app disabled as it is.
 #[update]
 fn app_set_pwa_webpush_subscription(
     request: AppSetPwaWebPushSubscriptionRequest,
@@ -1328,41 +1354,78 @@ fn app_set_pwa_webpush_subscription(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
-    let AppSetPwaWebPushSubscriptionRequest { subscription } = request;
+    check_notifications_enabled(InternalCanisterError)?;
+    let AppSetPwaWebPushSubscriptionRequest {
+        subscription,
+        frontend_origin,
+    } = request;
     let subscription = subscription
         .map(pwa_subscription::ValidatedPwaWebPushSubscription::try_from)
         .transpose()
         .map_err(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
 
     pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
-        .map_err(|err| match err {
-            pwa_subscription::SetPwaSubscriptionError::NotificationsNotAllowed => {
-                NotificationsNotAllowed
-            }
-            pwa_subscription::SetPwaSubscriptionError::TransportKeyExpired => TransportKeyExpired,
-            pwa_subscription::SetPwaSubscriptionError::EndpointInUse => EndpointInUse,
-            pwa_subscription::SetPwaSubscriptionError::Internal(reason) => {
-                InternalCanisterError(reason)
+        .map_err(|err| {
+            use pwa_subscription::SetPwaSubscriptionError::*;
+
+            match err {
+                NotificationsNotAllowed => {
+                    AppSetPwaWebPushSubscriptionError::NotificationsNotAllowed
+                }
+                TransportKeyExpired => AppSetPwaWebPushSubscriptionError::TransportKeyExpired,
+                EndpointInUse => AppSetPwaWebPushSubscriptionError::EndpointInUse,
+                FrontendNotListed => AppSetPwaWebPushSubscriptionError::TransportKeyExpired,
+                Internal(reason) => InternalCanisterError(reason),
             }
         })
 }
 
-/// The endpoint the calling session's browser entry is subscribed at for the session's
-/// account. `None` where nothing is subscribed, where the subscription awaits its
-/// `app_set_pwa_webpush_subscription`, or where it delivers for another account. An
-/// `Option` inside the `Result` because nothing subscribed is an answer the app acts on,
-/// while the error is only ever a refused caller.
+/// Disables the installed web app subscription of the calling session's identity, app,
+/// browser entry and account, at the frontend the request names.
+#[update]
+fn app_disable_pwa_webpush_subscription(
+    request: AppDisablePwaWebPushSubscriptionRequest,
+) -> Result<(), AppDisablePwaWebPushSubscriptionError> {
+    use pwa_subscription::DisablePwaSubscriptionError::*;
+    use AppDisablePwaWebPushSubscriptionError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    check_notifications_enabled(InternalCanisterError)?;
+    let AppDisablePwaWebPushSubscriptionRequest { frontend_origin } = request;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
+
+    pwa_subscription::disable_pwa_subscription(holder, session.account_principal, now).map_err(
+        |err| match err {
+            FrontendNotListed => NoSuchFrontend,
+            Internal(reason) => InternalCanisterError(reason),
+        },
+    )
+}
+
+/// Whether the calling session's browser entry is subscribed for the session's account at
+/// the frontend the request names, disabled there by the app, or not subscribed.
 #[query]
 fn app_get_pwa_webpush_subscription_status(
-) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
+    request: AppGetPwaWebPushSubscriptionStatusRequest,
+) -> Result<PwaWebPushSubscriptionStatus, AppGetPwaWebPushSubscriptionStatusError> {
     use AppGetPwaWebPushSubscriptionStatusError::*;
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
+    let AppGetPwaWebPushSubscriptionStatusRequest { frontend_origin } = request;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
 
     Ok(pwa_subscription::read_pwa_subscription_status(
         holder,
@@ -1381,11 +1444,13 @@ fn app_get_pwa_notification(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppGetPwaNotificationRequest {
         inbox_notification_id,
     } = request;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    // The inbox is the browser entry's, shared by every frontend's installed web app.
+    let holder =
+        pwa_subscription::resolve_pwa_holder(&session, None).map_err(InternalCanisterError)?;
 
     Ok(notifications::browser_inbox::find_pwa_notification(
         holder,
@@ -1405,12 +1470,16 @@ fn app_remove_pwa_notification(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppRemovePwaNotificationRequest {
         inbox_notification_id,
         not_shown,
+        frontend_origin,
     } = request;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
 
     notifications::browser_inbox::remove_pwa_collected(
         holder,
@@ -1430,16 +1499,23 @@ fn app_remove_pwa_notification(
     Ok(RemoveNotificationResponse {})
 }
 
-/// Sends Internet Identity's own notification to the calling session's installed web app,
-/// unless one sent before is still waiting to be removed.
+/// Sends Internet Identity's own notification to the calling session's installed web app
+/// at the frontend the request names, unless one sent before is still waiting to be
+/// removed.
 #[update]
-fn app_probe_pwa_webpush_subscription() -> Result<(), AppProbePwaWebPushSubscriptionError> {
+fn app_probe_pwa_webpush_subscription(
+    request: AppProbePwaWebPushSubscriptionRequest,
+) -> Result<(), AppProbePwaWebPushSubscriptionError> {
     use AppProbePwaWebPushSubscriptionError::*;
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
+    let AppProbePwaWebPushSubscriptionRequest { frontend_origin } = request;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
     let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
         .map_err(|err| InternalCanisterError(format!("{err}")))?;
 
@@ -1467,8 +1543,10 @@ fn app_get_same_device_link_status() -> Result<SameDeviceLinkStatus, AppGetSameD
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
-    let holder = pwa_subscription::resolve_pwa_holder(&session).map_err(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
+    // The link and the app are the browser entry's, whichever frontend asks.
+    let holder =
+        pwa_subscription::resolve_pwa_holder(&session, None).map_err(InternalCanisterError)?;
     let anchor = state::storage_borrow(|storage| storage.read(session.anchor_number))
         .map_err(|err| InternalCanisterError(format!("{err}")))?;
 
@@ -1490,7 +1568,7 @@ fn app_prepare_same_device_link(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppPrepareSameDeviceLinkRequest { link_public_key } = request;
 
     notifications::same_device_link::prepare(
@@ -1504,57 +1582,48 @@ fn app_prepare_same_device_link(
 
 // ---- Notifications: called by an app's backend ----
 
-/// Authorized by the origin listing the caller in the sender list it publishes. A
-/// caller II cannot judge yet has its batch deferred rather than refused.
+/// Authorized by the application listing the caller in the sender list it publishes,
+/// and, where the caller names a frontend on the application's behalf, that frontend
+/// among its alternative origins. A caller II cannot judge yet has its batch deferred
+/// rather than refused.
 #[update]
 fn app_send_notification(
     request: SendNotificationArg,
 ) -> Result<SendNotificationResponse, SendNotificationError> {
+    use BatchRefusal::*;
+
     let SendNotificationArg {
         origin,
         notifications,
+        derivation_origin,
     } = request;
-    let origin = ApplicationOrigin::try_from(origin.as_str())
+    let frontend_origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(SendNotificationError::InternalCanisterError)?;
-    enabled_or(SendNotificationError::InternalCanisterError)?;
-    fetchable_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
+    let application_origin = match derivation_origin {
+        Some(derivation_origin) => ApplicationOrigin::try_from(derivation_origin.as_str())
+            .map_err(SendNotificationError::InternalCanisterError)?,
+        None => frontend_origin.clone(),
+    };
+    check_notifications_enabled(SendNotificationError::InternalCanisterError)?;
+    FetchableApplicationOrigin::try_from(&application_origin)
+        .map_err(SendNotificationError::InternalCanisterError)?;
     let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {
         SendNotificationError::TooManyNotifications {
             limit: limit as u32,
         }
     })?;
 
-    match notifications::senders::authorize(&origin, caller(), ic_cdk::api::time()) {
-        Senders::NotListed => {
-            for notification in &notifications {
-                let labels =
-                    delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref());
-                delivery_metrics::count_received(&labels);
-                delivery_metrics::count_unlisted_sender(
-                    caller(),
-                    origin.as_str(),
-                    &labels,
-                    ic_cdk::api::time(),
-                );
-            }
-            Err(SendNotificationError::NoSuchSender)
-        }
-        Senders::Pending { retry_after } => {
-            for notification in &notifications {
-                delivery_metrics::count_deferred(
-                    delivery_metrics::DeferCause::SenderList,
-                    &delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref()),
-                );
-            }
-            Ok(notifications::defer_whole_batch(notifications, retry_after))
-        }
-        Senders::Listed => Ok(notifications::submission::submit(
-            &origin,
-            notifications,
-            caller(),
-            ic_cdk::api::time(),
-        )),
-    }
+    notifications::submission::authorize_and_submit(
+        &application_origin,
+        &frontend_origin,
+        notifications,
+        caller(),
+        ic_cdk::api::time(),
+    )
+    .map_err(|refusal| match refusal {
+        NoSuchSender => SendNotificationError::NoSuchSender,
+        NoSuchFrontend => SendNotificationError::NoSuchFrontend,
+    })
 }
 
 #[query]
@@ -3789,6 +3858,7 @@ mod attribute_sharing {
         let ValidatedListAvailableAttributesRequest {
             identity_number,
             attributes,
+            include_private_relay_emails,
         } = request.try_into()?;
 
         // Gate `sso:<domain>` rows by the certified bundle; the bundle is the trusted source of the SSO domain.
@@ -3799,7 +3869,11 @@ mod attribute_sharing {
                 ListAvailableAttributesError::AuthorizationError(principal)
             })?;
 
-        Ok(anchor.list_available_attributes(attributes, sso_session_domain))
+        Ok(anchor.list_available_attributes(
+            attributes,
+            sso_session_domain,
+            include_private_relay_emails,
+        ))
     }
 }
 

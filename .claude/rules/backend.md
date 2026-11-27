@@ -48,6 +48,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/map-errors-once` Map errors in one place. Business logic returns `Result<T, ModuleError>` and propagates with `?`; the endpoint converts that error to the method's candid error type once, not by building an error response at each failure.
 - `be/abstract-storage` Storage is abstract: it takes and returns domain types, keeps `Storable*` types, internal numbers (`ApplicationNumber`) and index sync to itself (inside `Storage::write`), and contains no feature logic.
 - `be/invariant-in-lowest-layer` Enforce an invariant in the lowest layer that must hold it.
+- `be/correct-in-isolation` A function holds its own invariants whatever order its callers run in. Never justify a missing check by the current call order or by a branch being unreachable today.
 - `be/one-owner-for-related-maps` Keep maps that must agree behind one struct that owns every mutation, or model multi-step state as one enum, so inconsistent combinations can't be represented.
 - `be/state-in-state-module` Keep mutable state in the `state` module and don't nest `STATE.with` borrows.
 - `be/no-hidden-global-reads` A helper doesn't read global state behind the caller's back: pass what it needs.
@@ -61,6 +62,7 @@ See also `candid-api.md`, `stable-memory.md` and `security.md`.
 - `be/unwrap-at-source` Unwrap an `Option` or `Result` where it is produced (`let Some(anchor_number) = ... else { return Err(...) };` or `?`). Don't carry `*_maybe` bindings to a later check.
 - `be/shadow-with-validated` Shadow a raw value with its validated form (`let request = ValidatedRequest::try_from(request)?;`), so the raw value can't be used afterwards.
 - `be/exhaustive-match` Prefer a full `match` over `if let` on enums, and keep distinct cases in distinct arms (no catch-all `_` merging them).
+- `be/import-variants-for-match` In a function that matches on an enum, put `use Enum::*;` inside that function (never at module level) and write the arms unqualified (`attributes.rs`: `use AttributeName::*;`, then `Name => ...`). Glob-import only the enum being matched. Where a variant name of another enum the arm produces clashes with it (both have `FrontendNotListed` or `Internal`), keep that other enum qualified. An enum with `Ok`/`Err` variants stays qualified, since its glob would shadow `Result`'s. Where one function matches two enums whose variants clash, split it into one function per match.
 - `be/one-question-mark-per-line` At most one `?` per line.
 - `be/visible-early-exit` A `?` ends its own `let` or statement, so every early exit is at the end of a line: never inside a tuple, a struct literal, a call argument or a match arm. Bind the value first (`let sender = principal(&bytes)?;`). Test code may keep a `?` inside an assertion's arguments.
 - `be/no-mutation-in-conditions` No state-changing calls inside `if` conditions.

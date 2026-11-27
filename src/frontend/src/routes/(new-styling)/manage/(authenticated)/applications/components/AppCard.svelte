@@ -7,7 +7,8 @@
   } from "@lucide/svelte";
   import { formatRelative, t } from "$lib/stores/locale.store";
   import AppSummary from "./AppSummary.svelte";
-  import { appNameStore, appUrl } from "../apps";
+  import { appNameStore } from "../apps";
+  import { appUrl } from "$lib/utils/urlUtils";
 
   interface Props {
     origin: string;

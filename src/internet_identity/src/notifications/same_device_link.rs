@@ -8,7 +8,8 @@
 //! the installed app. The app registers a one-shot key on its entry, the page it opens in
 //! Safari signs a claim with that key, and the app's entry then points at Safari's. An
 //! app's notification skips an entry while an installed web app on an entry pointing at
-//! it can deliver it.
+//! it can deliver it, or its app disabled it. A device keeps one link per frontend of an
+//! app: linking a new installed web app unlinks the entry of one removed before it.
 
 use crate::browser_key;
 use crate::notifications::dispatch;
@@ -18,6 +19,7 @@ use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, ApplicationNumber, BrowserId, PublicKey, SameDeviceLinkStatus, Timestamp,
 };
+use std::collections::BTreeSet;
 
 /// How long a one-shot key stays claimable: long enough to switch to Safari and sign in
 /// there, short enough that a link left in a browser history is of little use.
@@ -99,10 +101,15 @@ pub(crate) fn prepare(
 ///
 /// Links never chain: the claimer must point at nothing and the entry that registered
 /// the key must be pointed at by nothing. And the claimer must hold no installed web
-/// app of its own, which an entry shares with its installed apps only where one browser
-/// runs both, so there is no second entry to link. An entry that is skipped therefore
-/// never has an installed web app of its own that would compete with the one skipping
-/// it.
+/// app of its own, for any frontend of any app, which an entry shares with its installed
+/// apps only where one browser runs both, so there is no second entry to link. An entry
+/// that is skipped therefore never has an installed web app of its own that would compete
+/// with the one skipping it.
+///
+/// A device needs one link per frontend of an app: an installed web app removed from the
+/// device keeps its entry and its link. So an entry linked to `claimer`'s that holds an
+/// installed web app of a frontend the linking entry holds one of too is unlinked in the
+/// same write.
 pub(crate) fn claim(
     mut anchor: Anchor,
     claimer: BrowserId,
@@ -142,7 +149,39 @@ pub(crate) fn claim(
     if !is_signed {
         return Err(ClaimRefusal::InvalidSignature);
     }
-    anchor.link_same_device(linking_browser_id, claimer);
+    let superseded_browser_ids = find_superseded_links(&anchor, linking_browser_id, claimer);
+    anchor.link_same_device(linking_browser_id, claimer, &superseded_browser_ids);
     storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| ClaimRefusal::StorageError(format!("{err}")))
+}
+
+/// The entries of `anchor` other than `linking_browser_id`'s, linked to
+/// `same_device_browser_id`'s, that hold an installed web app subscription of an app's
+/// frontend that `linking_browser_id`'s entry holds one of too.
+fn find_superseded_links(
+    anchor: &Anchor,
+    linking_browser_id: BrowserId,
+    same_device_browser_id: BrowserId,
+) -> BTreeSet<BrowserId> {
+    storage_borrow(|storage| {
+        let linking_frontends =
+            storage.pwa_webpush_frontends_of_browser(anchor.anchor_number(), linking_browser_id);
+
+        let mut superseded_browser_ids = BTreeSet::new();
+
+        for browser in anchor.browsers() {
+            if browser.id == linking_browser_id
+                || browser.same_device_browser_id != Some(same_device_browser_id)
+            {
+                continue;
+            }
+            let browser_frontends =
+                storage.pwa_webpush_frontends_of_browser(anchor.anchor_number(), browser.id);
+            if !browser_frontends.is_disjoint(&linking_frontends) {
+                superseded_browser_ids.insert(browser.id);
+            }
+        }
+
+        superseded_browser_ids
+    })
 }

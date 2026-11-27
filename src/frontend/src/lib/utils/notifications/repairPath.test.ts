@@ -7,6 +7,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import {
   checkNotificationPath,
+  hasDisabledInstalledApp,
   type BrowserCalls,
   type IdentityCalls,
 } from "./repairPath";
@@ -21,6 +22,8 @@ vi.mock("$lib/utils/notifications/subscribeDevice", () => ({
 }));
 
 const ORIGIN = "https://app.example";
+/** The app's frontend the sign-in came from. */
+const FRONTEND_ORIGIN = "https://mail.app.example";
 const ACCOUNT = Principal.fromText("2vxsx-fae");
 const IDENTITY_NUMBER = BigInt(10_000);
 /** Longer than the check waits for a probe. */
@@ -32,11 +35,13 @@ const pastLimit: SubscriptionDeliveryStatus = {
   ],
   probe_sent_at_ns: [],
   has_probe_had_its_answer_time: false,
+  is_disabled: [false],
 };
 const underLimit: SubscriptionDeliveryStatus = {
   unanswered_pushes: [],
   probe_sent_at_ns: [],
   has_probe_had_its_answer_time: false,
+  is_disabled: [false],
 };
 /** A probe was sent, has had its answer time and nothing removed it, whatever the count
  *  says. */
@@ -44,6 +49,13 @@ const probeWaiting: SubscriptionDeliveryStatus = {
   unanswered_pushes: [],
   probe_sent_at_ns: [BigInt(1)],
   has_probe_had_its_answer_time: true,
+  is_disabled: [false],
+};
+/** An installed web app the app disabled: nothing is sent to it, and it mutes this
+ *  device. */
+const disabledInstalledApp: SubscriptionDeliveryStatus = {
+  ...underLimit,
+  is_disabled: [true],
 };
 
 const consenting: IdentityCalls = {
@@ -91,6 +103,7 @@ const check = (browser: BrowserCalls) => {
   const checked = checkNotificationPath({
     identityNumber: IDENTITY_NUMBER,
     origin: ORIGIN,
+    frontendOrigin: FRONTEND_ORIGIN,
     accountPrincipal: ACCOUNT,
     actor: consenting,
     browser,
@@ -119,7 +132,7 @@ describe("checkNotificationPath", () => {
     expect(calls.probed).toEqual([]);
   });
 
-  it("asks about the installed apps of the account that signed in", async () => {
+  it("asks about the installed apps of the account and frontend that signed in", async () => {
     const { browser, calls } = browserAnswering({
       installedApps: [
         { subscriptions: [pastLimit] },
@@ -132,13 +145,18 @@ describe("checkNotificationPath", () => {
     await check(browser);
 
     expect(calls.asked[0]).toEqual({
-      InstalledApps: { origin: ORIGIN, account_principal: ACCOUNT },
+      InstalledApps: {
+        origin: ORIGIN,
+        account_principal: ACCOUNT,
+        frontend_origin: [FRONTEND_ORIGIN],
+      },
     });
     expect(calls.removed).toEqual([
       {
         anchor_number: IDENTITY_NUMBER,
         origin: ORIGIN,
         account_principal: ACCOUNT,
+        frontend_origin: [FRONTEND_ORIGIN],
       },
     ]);
   });
@@ -206,6 +224,7 @@ describe("checkNotificationPath", () => {
                     probe_sent_at_ns: [BigInt(1)],
                     has_probe_had_its_answer_time:
                       Date.now() - probedAtMs >= 10_000,
+                    is_disabled: [false],
                   },
                 ],
               },
@@ -216,6 +235,7 @@ describe("checkNotificationPath", () => {
     void checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: slowBrowser,
@@ -245,8 +265,92 @@ describe("checkNotificationPath", () => {
     await expect(check(browser)).resolves.toEqual({ kind: "working" });
     expect(calls.removed).toHaveLength(1);
     expect(calls.probed).toEqual([
-      { InstalledApps: { origin: ORIGIN, account_principal: ACCOUNT } },
+      {
+        InstalledApps: {
+          origin: ORIGIN,
+          account_principal: ACCOUNT,
+          frontend_origin: [FRONTEND_ORIGIN],
+        },
+      },
     ]);
+  });
+});
+
+describe("hasDisabledInstalledApp", () => {
+  it("finds a disabled installed app among enabled ones", () => {
+    expect(
+      hasDisabledInstalledApp({
+        subscriptions: [underLimit, disabledInstalledApp],
+      }),
+    ).toBe(true);
+  });
+
+  it("finds none on a path whose installed apps are all enabled", () => {
+    expect(
+      hasDisabledInstalledApp({ subscriptions: [underLimit, pastLimit] }),
+    ).toBe(false);
+  });
+
+  it("finds none where the canister did not say", () => {
+    expect(
+      hasDisabledInstalledApp({
+        subscriptions: [{ ...underLimit, is_disabled: [] }],
+      }),
+    ).toBe(false);
+  });
+
+  it("finds none on an empty path", () => {
+    expect(hasDisabledInstalledApp({ subscriptions: [] })).toBe(false);
+  });
+});
+
+describe("checkNotificationPath with a disabled installed app", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("asks, naming the installed apps allowing removes, and probes and removes nothing itself", async () => {
+    const { browser, calls } = browserAnswering({
+      installedApps: [{ subscriptions: [disabledInstalledApp, pastLimit] }],
+      thisBrowser: [{ subscriptions: [underLimit] }],
+    });
+
+    await expect(check(browser)).resolves.toEqual({
+      kind: "ask",
+      installFirst: false,
+      disabledInstalledApps: {
+        anchor_number: IDENTITY_NUMBER,
+        origin: ORIGIN,
+        account_principal: ACCOUNT,
+        frontend_origin: [FRONTEND_ORIGIN],
+      },
+    });
+    expect(calls.probed).toEqual([]);
+    expect(calls.removed).toEqual([]);
+    expect(calls.disabled).toEqual([]);
+  });
+
+  it("asks nothing where the app is not allowed", async () => {
+    const { browser } = browserAnswering({
+      installedApps: [{ subscriptions: [disabledInstalledApp] }],
+      thisBrowser: [{ subscriptions: [underLimit] }],
+    });
+
+    await expect(
+      checkNotificationPath({
+        identityNumber: IDENTITY_NUMBER,
+        origin: ORIGIN,
+        frontendOrigin: FRONTEND_ORIGIN,
+        accountPrincipal: ACCOUNT,
+        actor: { notification_consent_granted: () => Promise.resolve(false) },
+        browser,
+        onPastLimit: () => {},
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toEqual({ kind: "working" });
   });
 });
 
@@ -317,6 +421,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser,
@@ -353,6 +458,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: switchingBrowser,
@@ -393,6 +499,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: switchingBrowser,
@@ -425,6 +532,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser,
@@ -460,6 +568,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser,
@@ -502,6 +611,7 @@ describe("checkNotificationPath where this browser may notify", () => {
     const checked = checkNotificationPath({
       identityNumber: IDENTITY_NUMBER,
       origin: ORIGIN,
+      frontendOrigin: FRONTEND_ORIGIN,
       accountPrincipal: ACCOUNT,
       actor: consenting,
       browser: switchingBrowser,
