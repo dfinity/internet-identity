@@ -1,11 +1,8 @@
-//! Turning a caller's notification request into values the notification logic can act
-//! on: an application's origin, and a batch bounded and collapsed to one entry per
-//! recipient and id.
+//! Turning a caller's notification batch into one the notification logic can act on:
+//! bounded and collapsed to one entry per recipient and id.
 
-use crate::origin::ApplicationOrigin;
 use internet_identity_interface::internet_identity::types::Notification;
 use std::collections::HashMap;
-use url::Url;
 
 /// The message a refusal carries while this deployment does not notify.
 pub(crate) const NOT_ENABLED_MESSAGE: &str = "notifications are not enabled";
@@ -56,32 +53,6 @@ fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
     kept
 }
 
-/// Refuses an origin II will not fetch a sender list from: an `ApplicationOrigin`
-/// accepts any scheme, but a list read over plain `http` can be replaced in flight. As
-/// in SSO discovery, `http` needs a loopback host and the deploy flag.
-///
-/// Read per call rather than carried on the origin: both answers come from persistent
-/// state, so a value minted under one configuration would lie under the next.
-pub fn fetchable_origin(origin: &ApplicationOrigin) -> Result<(), String> {
-    let Ok(url) = Url::parse(origin.as_str()) else {
-        return Err("origin is not a URL".to_string());
-    };
-    if url.scheme() == "https" {
-        return Ok(());
-    }
-    if url.scheme() == "http"
-        && allow_insecure_sender_list()
-        && crate::utils::is_loopback_host(url.host_str().unwrap_or_default())
-    {
-        return Ok(());
-    }
-    Err("origin must be https".to_string())
-}
-
-fn allow_insecure_sender_list() -> bool {
-    crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list).unwrap_or(false)
-}
-
 /// Whether this deployment notifies, for every app at once.
 pub fn notifications_enabled() -> bool {
     crate::state::persistent_state(|s| s.notifications_enabled).unwrap_or(false)
@@ -98,15 +69,10 @@ pub fn enabled_or<E>(refusal: impl FnOnce(String) -> E) -> Result<(), E> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::origin::ApplicationOrigin;
     use internet_identity_interface::internet_identity::types::Urgency;
     fn set_enabled(enabled: Option<bool>) {
         crate::state::persistent_state_mut(|s| s.notifications_enabled = enabled);
-    }
-
-    fn allow_insecure(allow: bool) {
-        crate::state::persistent_state_mut(|s| {
-            s.notifications_allow_insecure_sender_list = Some(allow);
-        });
     }
 
     fn notification(id: u64, recipient: &str, urgency: Urgency) -> Notification {
@@ -180,59 +146,6 @@ mod tests {
             refused.err().map(|TooManyNotifications { limit }| limit),
             Some(MAX_NOTIFICATIONS_PER_APP_CALL)
         );
-    }
-
-    /// The scheme decides where II sends an outcall, so a list that would be
-    /// fetched over plain http is refused however the origin is spelled.
-    #[test]
-    fn refuses_an_origin_whose_list_would_not_be_fetched_over_https() {
-        allow_insecure(false);
-        for origin in [
-            "http://app.example",
-            "http://localhost:5173",
-            "http://127.0.0.1:8080",
-        ] {
-            assert!(
-                fetchable_origin(&origin.try_into().expect("a bare origin")).is_err(),
-                "{origin} must not be fetched"
-            );
-        }
-        assert!(
-            fetchable_origin(&"https://app.example".try_into().expect("a bare origin")).is_ok()
-        );
-    }
-
-    /// The flag reaches loopback only: a public host over http stays refused,
-    /// so a flagged deployment still cannot be pointed at a plaintext app.
-    #[test]
-    fn the_insecure_flag_reaches_loopback_only() {
-        allow_insecure(true);
-        assert!(
-            fetchable_origin(&"http://localhost:5173".try_into().expect("a bare origin")).is_ok()
-        );
-        assert!(
-            fetchable_origin(&"http://127.0.0.1:8080".try_into().expect("a bare origin")).is_ok()
-        );
-        assert!(fetchable_origin(&"http://localhost".try_into().expect("a bare origin")).is_ok());
-        assert!(
-            fetchable_origin(&"http://app.example".try_into().expect("a bare origin")).is_err()
-        );
-        allow_insecure(false);
-    }
-
-    /// And it reaches `http` only. A scheme II cannot fetch would fail at the
-    /// outcall anyway, but the rule is what the guard states, not where the
-    /// call happens to break.
-    #[test]
-    fn the_insecure_flag_reaches_http_only() {
-        allow_insecure(true);
-        for origin in ["ftp://localhost", "ws://localhost:5173", "wss://localhost"] {
-            assert!(
-                fetchable_origin(&origin.try_into().expect("a bare origin")).is_err(),
-                "{origin} must not be fetched"
-            );
-        }
-        allow_insecure(false);
     }
 
     #[test]

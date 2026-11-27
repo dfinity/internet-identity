@@ -4,6 +4,7 @@ use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::delegation::DelegationAccess;
 use crate::origin::ApplicationOrigin;
+use crate::origin::FetchableApplicationOrigin;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -44,15 +45,13 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use notifications::installed_app::NotificationAppRef;
 use notifications::same_device_link::ClaimRefusal;
-use notifications::senders::Senders;
+use notifications::submission::BatchRefusal;
 use notifications::validation::NOT_ENABLED_MESSAGE;
 use notifications::webpush::pwa_subscription;
 use notifications::webpush::rotation;
 use notifications::webpush::vapid_key::VapidPublicKey;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
-use notifications::{
-    admit_batch, delivery_metrics, enabled_or, fetchable_origin, TooManyNotifications,
-};
+use notifications::{admit_batch, enabled_or, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -61,6 +60,7 @@ use storage::{Salt, Storage};
 
 mod account_management;
 mod admission_queue;
+mod alternative_origins;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -1504,8 +1504,10 @@ fn app_prepare_same_device_link(
 
 // ---- Notifications: called by an app's backend ----
 
-/// Authorized by the origin listing the caller in the sender list it publishes. A
-/// caller II cannot judge yet has its batch deferred rather than refused.
+/// Authorized by the application listing the caller in the sender list it publishes,
+/// and, where the caller names a frontend on the application's behalf, that frontend
+/// among its alternative origins. A caller II cannot judge yet has its batch deferred
+/// rather than refused.
 #[update]
 fn app_send_notification(
     request: SendNotificationArg,
@@ -1513,48 +1515,35 @@ fn app_send_notification(
     let SendNotificationArg {
         origin,
         notifications,
+        derivation_origin,
     } = request;
-    let origin = ApplicationOrigin::try_from(origin.as_str())
+    let frontend_origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(SendNotificationError::InternalCanisterError)?;
+    let application_origin = match derivation_origin {
+        Some(derivation_origin) => ApplicationOrigin::try_from(derivation_origin.as_str())
+            .map_err(SendNotificationError::InternalCanisterError)?,
+        None => frontend_origin.clone(),
+    };
     enabled_or(SendNotificationError::InternalCanisterError)?;
-    fetchable_origin(&origin).map_err(SendNotificationError::InternalCanisterError)?;
+    FetchableApplicationOrigin::try_from(&application_origin)
+        .map_err(SendNotificationError::InternalCanisterError)?;
     let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {
         SendNotificationError::TooManyNotifications {
             limit: limit as u32,
         }
     })?;
 
-    match notifications::senders::authorize(&origin, caller(), ic_cdk::api::time()) {
-        Senders::NotListed => {
-            for notification in &notifications {
-                let labels =
-                    delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref());
-                delivery_metrics::count_received(&labels);
-                delivery_metrics::count_unlisted_sender(
-                    caller(),
-                    origin.as_str(),
-                    &labels,
-                    ic_cdk::api::time(),
-                );
-            }
-            Err(SendNotificationError::NoSuchSender)
-        }
-        Senders::Pending { retry_after } => {
-            for notification in &notifications {
-                delivery_metrics::count_deferred(
-                    delivery_metrics::DeferCause::SenderList,
-                    &delivery_metrics::Labels::app(origin.as_str(), notification.urgency.as_ref()),
-                );
-            }
-            Ok(notifications::defer_whole_batch(notifications, retry_after))
-        }
-        Senders::Listed => Ok(notifications::submission::submit(
-            &origin,
-            notifications,
-            caller(),
-            ic_cdk::api::time(),
-        )),
-    }
+    notifications::submission::authorize_and_submit(
+        &application_origin,
+        &frontend_origin,
+        notifications,
+        caller(),
+        ic_cdk::api::time(),
+    )
+    .map_err(|refusal| match refusal {
+        BatchRefusal::NoSuchSender => SendNotificationError::NoSuchSender,
+        BatchRefusal::NoSuchFrontend => SendNotificationError::NoSuchFrontend,
+    })
 }
 
 #[query]

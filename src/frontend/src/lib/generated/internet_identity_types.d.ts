@@ -2633,17 +2633,33 @@ export type SameDeviceLinkStatus = {
  * one, as a re-send replaces a notification that is still pending.
  */
 export interface SendNotificationArg {
+  /**
+   * The application whose users receive the notifications, where origin is one of
+   * its frontends: the derivation origin that frontend signs in with. The
+   * application must list origin in its /.well-known/ii-alternative-origins, and
+   * its sender list must name the caller.
+   */
+  'derivation_origin' : [] | [FrontendHostname],
   'notifications' : Array<Notification>,
+  /**
+   * The frontend the notifications are sent for. Without derivation_origin, also
+   * the application whose users receive them.
+   */
   'origin' : FrontendHostname,
 }
 export type SendNotificationError = {
-    'TooManyNotifications' : { 'limit' : number }
+    /**
+     * The application at derivation_origin lists no such frontend: no file, an
+     * unusable one, or one that does not name it.
+     */
+    'NoSuchFrontend' : null
   } |
+  { 'TooManyNotifications' : { 'limit' : number } } |
   { 'InternalCanisterError' : string } |
   {
     /**
-     * The origin lists no such sender: no file, an empty or unusable one, or
-     * one that does not name the caller.
+     * The application lists no such sender: no file, an empty or unusable one,
+     * or one that does not name the caller.
      */
     'NoSuchSender' : null
   };

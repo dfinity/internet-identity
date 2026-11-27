@@ -11,18 +11,20 @@
 //! [`SENDERS_OUTCALL_LIMIT`] and the failure backoff.
 
 use crate::origin::ApplicationOrigin;
+#[cfg(not(test))]
+use crate::origin::FetchableApplicationOrigin;
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
 use candid::Principal;
-use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
+use internet_identity_interface::internet_identity::types::Timestamp;
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 
 #[cfg(not(test))]
 const WELL_KNOWN_PATH: &str = "/.well-known/ii-notification-senders";
 
 /// Rejected over this, never truncated: a truncated list unlists a sender.
-#[cfg(not(test))]
 const MAX_SENDERS: usize = 10;
 
 /// Counted against headers too, and a gateway answers a certified asset with a
@@ -50,7 +52,7 @@ const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 
-type SendersCache = SingleFlightCache<FrontendHostname, Vec<Principal>, String>;
+type SendersCache = SingleFlightCache<ApplicationOrigin, Vec<Principal>, String>;
 
 thread_local! {
     static SENDERS_CACHE: RefCell<SendersCache> = RefCell::new(new_senders_cache());
@@ -73,40 +75,6 @@ fn new_senders_cache() -> SendersCache {
 /// A little over one outcall round trip.
 const PENDING_RETRY_AFTER_NS: u64 = 3 * 1_000_000_000;
 
-/// The canister gateway domains an origin may name.
-const GATEWAY_DOMAINS: &[&str] = &["ic0.app", "icp0.io", "icp.net"];
-
-/// The gateway every canister is served through, so one request settles the question.
-const FETCH_DOMAIN: &str = "icp.net";
-
-/// Where the list is read from.
-///
-/// The origin reaching this module has been folded to `ic0.app`, the spelling consent
-/// is keyed by — and one a canister need not be served on: a boundary node answers
-/// `400 client_domain_canister_mismatch` where it is not, and the list would never be
-/// read. The gateway domains resolve to the same canister and serve the same file, so a
-/// gateway origin is read through [`FETCH_DOMAIN`]. Anything else — a custom domain,
-/// localhost — is read as it stands.
-fn fetch_origin(origin: &FrontendHostname) -> String {
-    origin
-        .strip_prefix("https://")
-        .and_then(|rest| {
-            GATEWAY_DOMAINS
-                .iter()
-                .find_map(|domain| rest.strip_suffix(&format!(".{domain}")))
-        })
-        .filter(|subdomain| {
-            !subdomain.is_empty()
-                && subdomain
-                    .chars()
-                    .all(|character| character.is_ascii_alphanumeric() || character == '-')
-        })
-        .map_or_else(
-            || origin.clone(),
-            |subdomain| format!("https://{subdomain}.{FETCH_DOMAIN}"),
-        )
-}
-
 /// What the origin's list says about a caller.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Senders {
@@ -123,7 +91,7 @@ pub enum Senders {
 /// the list is not cached. Only an update may call this: a fill spawns an
 /// outcall.
 pub fn authorize(origin: &ApplicationOrigin, caller: Principal, now_ns: Timestamp) -> Senders {
-    match single_flight_cache::get(&SENDERS_CACHE, origin.as_str().to_string()) {
+    match single_flight_cache::get(&SENDERS_CACHE, origin.clone()) {
         Cached::Ready(senders) => {
             if senders.contains(&caller) {
                 Senders::Listed
@@ -132,14 +100,14 @@ pub fn authorize(origin: &ApplicationOrigin, caller: Principal, now_ns: Timestam
             }
         }
         Cached::Pending => Senders::Pending {
-            retry_after: retry_after(&origin.as_str().to_string(), now_ns),
+            retry_after: retry_after(origin, now_ns),
         },
     }
 }
 
 /// A parked origin is not retried before the cache's own deadline, so sending
 /// the caller back sooner only buys deferrals.
-fn retry_after(origin: &FrontendHostname, now_ns: Timestamp) -> Timestamp {
+fn retry_after(origin: &ApplicationOrigin, now_ns: Timestamp) -> Timestamp {
     single_flight_cache::retry_at(&SENDERS_CACHE, origin)
         .map_or(now_ns + PENDING_RETRY_AFTER_NS, |secs| secs * 1_000_000_000)
 }
@@ -202,24 +170,30 @@ thread_local! {
 /// No outcall slot → abandon, which records nothing and retries once capacity
 /// frees.
 #[cfg(not(test))]
-async fn senders_fill(origin: FrontendHostname) -> FillOutcome<Vec<Principal>, String> {
+async fn senders_fill(origin: ApplicationOrigin) -> FillOutcome<Vec<Principal>, String> {
     let Some(_permit) = crate::concurrency::acquire(&SENDERS_OUTCALL_LIMIT) else {
         return FillOutcome::Abandoned;
     };
-    match fetch_senders(origin).await {
+    let fetch_origin = match FetchableApplicationOrigin::try_from(&origin) {
+        Ok(fetch_origin) => fetch_origin,
+        Err(err) => return FillOutcome::Failed(err),
+    };
+    match fetch_senders(&fetch_origin).await {
         Ok(senders) => FillOutcome::Ready(senders),
         Err(err) => FillOutcome::Failed(err),
     }
 }
 
 #[cfg(not(test))]
-async fn fetch_senders(origin: FrontendHostname) -> Result<Vec<Principal>, String> {
+async fn fetch_senders(
+    fetch_origin: &FetchableApplicationOrigin,
+) -> Result<Vec<Principal>, String> {
     use ic_cdk::api::management_canister::http_request::{
         http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
     };
 
     let request = CanisterHttpRequestArgument {
-        url: format!("{}{WELL_KNOWN_PATH}", fetch_origin(&origin)),
+        url: format!("{}{WELL_KNOWN_PATH}", fetch_origin.as_str()),
         method: HttpMethod::GET,
         body: None,
         max_response_bytes: Some(SENDERS_MAX_RESPONSE_BYTES),
@@ -243,9 +217,11 @@ async fn fetch_senders(origin: FrontendHostname) -> Result<Vec<Principal>, Strin
     senders_from_response(status, &response.body, MAX_SENDERS)
 }
 
-/// Narrows a response to the senders and nothing else, so what crosses
-/// consensus is what the authorization reads.
-#[cfg(not(test))]
+/// Narrows a response to the senders [`parse_senders`] reads from it, sorted
+/// and without duplicates, so what crosses consensus is what the authorization
+/// reads: replicas served the same set in a different order still agree. A
+/// body the senders cannot be read from, over [`MAX_SENDERS`] entries
+/// included, becomes the invalid response, which names no senders.
 #[allow(clippy::needless_pass_by_value)]
 fn transform_senders(
     response: ic_cdk::api::management_canister::http_request::HttpResponse,
@@ -265,8 +241,12 @@ fn transform_senders(
         headers: vec![],
         body: b"invalid ii-notification-senders JSON".to_vec(),
     };
-    let Ok(list) = serde_json::from_slice::<SenderList>(response.body.as_slice()) else {
+    let Some(senders) = parse_senders(response.body.as_slice(), MAX_SENDERS) else {
         return invalid();
+    };
+    let senders: BTreeSet<String> = senders.iter().map(Principal::to_text).collect();
+    let list = SenderList {
+        senders: senders.into_iter().collect(),
     };
     let Ok(body) = serde_json::to_vec(&list) else {
         return invalid();
@@ -280,8 +260,8 @@ fn transform_senders(
 
 // In test builds the fill reads injected state instead of doing outcalls.
 #[cfg(test)]
-async fn senders_fill(origin: FrontendHostname) -> FillOutcome<Vec<Principal>, String> {
-    match tests::TEST_SENDERS.with_borrow(|m| m.get(&origin).cloned()) {
+async fn senders_fill(origin: ApplicationOrigin) -> FillOutcome<Vec<Principal>, String> {
+    match tests::TEST_SENDERS.with_borrow(|m| m.get(origin.as_str()).cloned()) {
         Some(senders) => FillOutcome::Ready(senders),
         None => FillOutcome::Failed(format!("no test sender list for {origin}")),
     }
@@ -289,40 +269,8 @@ async fn senders_fill(origin: FrontendHostname) -> FillOutcome<Vec<Principal>, S
 
 #[cfg(test)]
 mod tests {
-    use super::fetch_origin;
-
-    #[test]
-    fn a_gateway_origin_is_read_through_the_gateway_that_serves_every_canister() {
-        // The folded spelling consent is keyed by, which the canister may not be
-        // served on: that is the bug this exists for.
-        assert_eq!(
-            fetch_origin(&"https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app".to_string()),
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
-        );
-        assert_eq!(
-            fetch_origin(&"https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io".to_string()),
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
-        );
-        assert_eq!(
-            fetch_origin(&"https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net".to_string()),
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
-        );
-    }
-
-    #[test]
-    fn anything_that_is_no_gateway_origin_is_read_as_it_stands() {
-        for origin in [
-            "https://app.example",
-            "https://nice-name.com",
-            "http://127.0.0.1:4943",
-            // A gateway domain with nothing before it names no canister.
-            "https://icp.net",
-        ] {
-            assert_eq!(fetch_origin(&origin.to_string()), origin);
-        }
-    }
-
     use super::*;
+    use internet_identity_interface::internet_identity::types::FrontendHostname;
     use std::collections::HashMap;
 
     thread_local! {
@@ -499,5 +447,58 @@ mod tests {
         ] {
             assert!(parse_senders(body, 10).is_none(), "must not be read");
         }
+    }
+
+    fn transformed_body(body: &[u8]) -> Vec<u8> {
+        use ic_cdk::api::management_canister::http_request::{HttpHeader, HttpResponse};
+
+        transform_senders(HttpResponse {
+            status: HTTP_STATUS_OK.into(),
+            headers: vec![HttpHeader {
+                name: "Date".into(),
+                value: "differs per replica".into(),
+            }],
+            body: body.to_vec(),
+        })
+        .body
+    }
+
+    /// Replicas that are served one set in different orders, or with an entry
+    /// repeated, must hand consensus the same bytes.
+    #[test]
+    fn the_transform_answers_one_set_with_the_same_bytes_in_any_order() {
+        let canonical_body = transformed_body(
+            br#"{"senders":["rrkah-fqaaa-aaaaa-aaaaq-cai","ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#,
+        );
+        assert_eq!(
+            canonical_body,
+            br#"{"senders":["rrkah-fqaaa-aaaaa-aaaaq-cai","ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#
+                .to_vec()
+        );
+        for body in [
+            &br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai"]}"#[..],
+            &br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai","ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#[..],
+        ] {
+            assert_eq!(transformed_body(body), canonical_body);
+        }
+    }
+
+    #[test]
+    fn a_list_of_eleven_copies_of_one_sender_names_none_after_the_transform() {
+        let sender = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
+        let body = |count: usize| {
+            serde_json::to_vec(&SenderList {
+                senders: vec![sender.to_text(); count],
+            })
+            .expect("a list")
+        };
+        assert_eq!(
+            senders_from_response(200, &transformed_body(&body(10)), 10),
+            Ok(vec![sender])
+        );
+        assert_eq!(
+            senders_from_response(200, &transformed_body(&body(11)), 10),
+            Ok(vec![])
+        );
     }
 }

@@ -1,9 +1,11 @@
 //! Put an app's batch into the backlog, answering for what II cannot take.
 
 use crate::admission_queue::{Admission, FullCause};
+use crate::alternative_origins::{self, AlternativeOrigin};
 use crate::notifications::backlog::app::PendingNotification;
 use crate::notifications::delivery_metrics::{self, DeferCause, Labels, Reason};
-use crate::notifications::{dispatch, BROWSER_GONE_AFTER_NS};
+use crate::notifications::senders::{self, Senders};
+use crate::notifications::{self, dispatch, BROWSER_GONE_AFTER_NS};
 use crate::origin::ApplicationOrigin;
 use crate::state::{self, storage_borrow};
 use crate::storage::storable::application::StorableOriginSha256;
@@ -14,9 +16,98 @@ use internet_identity_interface::internet_identity::types::{
 };
 use std::collections::BTreeMap;
 
+/// Why a batch was refused as a whole.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BatchRefusal {
+    /// The application lists no such sender.
+    NoSuchSender,
+    /// The application lists no such frontend among its alternative origins.
+    NoSuchFrontend,
+}
+
+/// Queues `notifications` from `sender` for the application at `application_origin`,
+/// sent on behalf of its frontend at `frontend_origin` (the application's own origin
+/// where the sender names no other). Refused where the application lists neither
+/// `sender` as a sender nor `frontend_origin` as an alternative origin; deferred as a
+/// whole while either list is not read yet. `now_ns` is the call's time.
+pub fn authorize_and_submit(
+    application_origin: &ApplicationOrigin,
+    frontend_origin: &ApplicationOrigin,
+    notifications: Vec<Notification>,
+    sender: Principal,
+    now_ns: Timestamp,
+) -> Result<SendNotificationResponse, BatchRefusal> {
+    match senders::authorize(application_origin, sender, now_ns) {
+        Senders::Listed => {}
+        Senders::NotListed => {
+            for notification in &notifications {
+                let labels =
+                    Labels::app(application_origin.as_str(), notification.urgency.as_ref());
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_unlisted_sender(
+                    sender,
+                    application_origin.as_str(),
+                    &labels,
+                    now_ns,
+                );
+            }
+            return Err(BatchRefusal::NoSuchSender);
+        }
+        Senders::Pending { retry_after } => {
+            let deferred = defer_batch(
+                notifications,
+                DeferCause::SenderList,
+                retry_after,
+                |urgency| Labels::app(application_origin.as_str(), urgency),
+            );
+            return Ok(deferred);
+        }
+    }
+    // The sender is listed from here on, so the application counts in the ranking.
+    let listed_app_labels = |urgency: Option<&Urgency>| {
+        Labels::listed_app(application_origin.as_str(), urgency, now_ns)
+    };
+    match alternative_origins::authorize_alternative_origin(
+        application_origin,
+        frontend_origin,
+        now_ns,
+    ) {
+        AlternativeOrigin::Listed => Ok(submit(application_origin, notifications, sender, now_ns)),
+        AlternativeOrigin::NotListed => {
+            for notification in &notifications {
+                let labels = listed_app_labels(notification.urgency.as_ref());
+                delivery_metrics::count_received(&labels);
+                delivery_metrics::count_lost(Reason::FrontendNotListed, &labels);
+            }
+            Err(BatchRefusal::NoSuchFrontend)
+        }
+        AlternativeOrigin::Pending { retry_after } => Ok(defer_batch(
+            notifications,
+            DeferCause::AlternativeOrigins,
+            retry_after,
+            listed_app_labels,
+        )),
+    }
+}
+
+/// Answers every notification of the batch with a deferral to `retry_after`, counted
+/// under `cause` with the labels `labels_for_urgency` builds from each notification's
+/// urgency.
+fn defer_batch(
+    notifications: Vec<Notification>,
+    cause: DeferCause,
+    retry_after: Timestamp,
+    labels_for_urgency: impl Fn(Option<&Urgency>) -> Labels,
+) -> SendNotificationResponse {
+    for notification in &notifications {
+        delivery_metrics::count_deferred(cause, &labels_for_urgency(notification.urgency.as_ref()));
+    }
+    notifications::defer_whole_batch(notifications, retry_after)
+}
+
 /// Queue what can reach its recipient, and schedule a pass for it. `sender` is the app
 /// canister the service worker fetches the content from.
-pub fn submit(
+fn submit(
     origin: &ApplicationOrigin,
     notifications: Vec<Notification>,
     sender: Principal,

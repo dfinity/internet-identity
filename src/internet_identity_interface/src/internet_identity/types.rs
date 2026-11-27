@@ -1581,6 +1581,7 @@ impl Notification {
 pub struct SendNotificationArg {
     pub origin: FrontendHostname,
     pub notifications: Vec<Notification>,
+    pub derivation_origin: Option<FrontendHostname>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1608,9 +1609,12 @@ pub struct SendNotificationResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SendNotificationError {
-    /// The origin lists no such sender: no file, an empty or unusable one, or
-    /// one that does not name the caller.
+    /// The application lists no such sender: no file, an empty or unusable one,
+    /// or one that does not name the caller.
     NoSuchSender,
+    /// The application at the derivation origin lists no such frontend: no file, an
+    /// unusable one, or one that does not name it.
+    NoSuchFrontend,
     /// More entries than II will process in one call; nothing was enqueued.
     /// `limit` is fixed, not a measure of how much the queue holds.
     TooManyNotifications { limit: u32 },

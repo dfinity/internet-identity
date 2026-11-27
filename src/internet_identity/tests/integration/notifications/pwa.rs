@@ -28,11 +28,16 @@ use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
 use std::time::Duration;
 
 mod same_device;
+mod suite;
 
 /// An app whose sender list names [`app_sender`].
 const APP: &str = "https://listed-app.example";
 /// A second app whose sender list names [`app_sender`].
 const OTHER_APP: &str = "https://listed-other.example";
+/// The frontend every app's alternative origins list names.
+const SUITE_FRONTEND: &str = "https://mail.suite.example";
+/// Where an app publishes its alternative origins.
+const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
 const PWA_ENDPOINT: &str = "https://pwa.push.example/device";
 const BROWSER_ENDPOINT: &str = "https://browser.push.example/device";
 /// An installed app endpoint at a relay no test posts to before it subscribes there.
@@ -190,16 +195,21 @@ fn second_identity_at(
     account_session
 }
 
-/// Answers every outcall for [`OUTCALL_ROUNDS`] rounds: a sender list with
-/// [`app_sender`], `push_status` to every push, and any other `GET`, a relay probe, with
-/// `200`. Answers the URLs pushed to.
+/// Answers every outcall for [`OUTCALL_ROUNDS`] rounds: an alternative origins list with
+/// [`SUITE_FRONTEND`], a sender list with [`app_sender`], `push_status` to every push, and
+/// any other `GET`, a relay probe, with `200`. Answers the URLs pushed to.
 pub(super) fn answer_outcalls(env: &PocketIc, push_status: u16) -> Vec<String> {
     let mut pushed_urls = Vec::new();
     for _ in 0..OUTCALL_ROUNDS {
         env.advance_time(Duration::from_millis(ROUND_MILLIS));
         env.tick();
         for request in env.get_canister_http() {
-            let (status, body) = if request.url.starts_with("https://listed") {
+            let (status, body) = if request.url.ends_with(ALTERNATIVE_ORIGINS_PATH) {
+                (
+                    200,
+                    format!(r#"{{"alternativeOrigins":["{SUITE_FRONTEND}"]}}"#).into_bytes(),
+                )
+            } else if request.url.starts_with("https://listed") {
                 (
                     200,
                     format!(r#"{{"senders":["{}"]}}"#, app_sender().to_text()).into_bytes(),
@@ -272,6 +282,7 @@ fn send_accepted_from(
                     expires_at: None,
                     urgency: None,
                 }],
+                derivation_origin: None,
             },
         )
         .expect("send rejected")
@@ -643,6 +654,7 @@ fn send_refusal(
                     expires_at: None,
                     urgency: None,
                 }],
+                derivation_origin: None,
             },
         )
         .expect("send rejected")

@@ -220,6 +220,8 @@ pub(crate) enum Reason {
     NoChannel,
     /// The calling canister is not one of the app's senders.
     SenderNotAllowed,
+    /// The frontend the app named is not one its alternative origins list.
+    FrontendNotListed,
     /// The backlog was full, and the time the app was told to send again is past the
     /// notification's expiry.
     CapacityPastExpiry,
@@ -272,6 +274,7 @@ impl Reason {
             Reason::DormantIdentity => "dormant_identity",
             Reason::NoChannel => "no_channel",
             Reason::SenderNotAllowed => "sender_not_allowed",
+            Reason::FrontendNotListed => "frontend_not_listed",
             Reason::CapacityPastExpiry => "capacity_past_expiry",
             Reason::AppLimitPastExpiry => "app_limit_past_expiry",
             Reason::BacklogFull => "backlog_full",
@@ -304,6 +307,7 @@ impl Reason {
             | Reason::DormantIdentity
             | Reason::NoChannel
             | Reason::SenderNotAllowed
+            | Reason::FrontendNotListed
             | Reason::CapacityPastExpiry
             | Reason::AppLimitPastExpiry
             | Reason::BacklogFull => DropPoint::Accept,
@@ -340,6 +344,8 @@ pub(crate) enum DeferCause {
     AppLimit,
     /// Internet Identity has not read the app's sender list yet.
     SenderList,
+    /// Internet Identity has not read the app's alternative origins yet.
+    AlternativeOrigins,
 }
 
 impl DeferCause {
@@ -348,6 +354,7 @@ impl DeferCause {
             DeferCause::Capacity => "capacity",
             DeferCause::AppLimit => "app_limit",
             DeferCause::SenderList => "sender_list",
+            DeferCause::AlternativeOrigins => "alternative_origins",
         }
     }
 }

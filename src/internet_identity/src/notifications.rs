@@ -30,9 +30,7 @@ use internet_identity_interface::internet_identity::types::{
     NotificationGrantConsentError, SendNotificationResponse, Timestamp,
 };
 pub(crate) use validation::NOT_ENABLED_MESSAGE;
-pub use validation::{
-    admit_batch, enabled_or, fetchable_origin, notifications_enabled, TooManyNotifications,
-};
+pub use validation::{admit_batch, enabled_or, notifications_enabled, TooManyNotifications};
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at
 /// `retry_after`.

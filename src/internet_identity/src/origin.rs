@@ -1,6 +1,8 @@
 //! The origin an application is identified by, in the one spelling it is keyed under.
 
 use crate::delegation::frontend_length_within_limit;
+use crate::state;
+use crate::utils::is_loopback_host;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use std::fmt;
 use url::Url;
@@ -53,6 +55,80 @@ impl TryFrom<&str> for ApplicationOrigin {
         }
         Ok(Self(remap_to_legacy_domain(origin)))
     }
+}
+
+/// The canister gateway domains an origin may name.
+const GATEWAY_DOMAINS: &[&str] = &["ic0.app", "icp0.io", "icp.net"];
+
+/// The gateway every canister is served through, so one request settles the question.
+const FETCH_DOMAIN: &str = "icp.net";
+
+/// The label a gateway origin carries between the canister id and the gateway domain
+/// when it names the uncertified endpoint, as in `<id>.raw.icp0.io`.
+const RAW_LABEL: &str = ".raw";
+
+/// Where a file the application at an [`ApplicationOrigin`] publishes under
+/// `/.well-known` is read from.
+///
+/// An [`ApplicationOrigin`] is folded to `ic0.app`, a spelling the canister need not be
+/// served on: a boundary node answers `400 client_domain_canister_mismatch` where it is
+/// not, and the file would never be read. The gateway domains resolve to the same
+/// canister and serve the same file, so a gateway origin `https://<id>.<gateway>` or
+/// `https://<id>.raw.<gateway>` is read as `https://<id>.icp.net`: through
+/// [`FETCH_DOMAIN`], and never through the raw endpoint, whose responses carry no
+/// certification. Anything else, a custom domain or localhost, is read as it stands.
+///
+/// Built only from an [`ApplicationOrigin`] II may fetch from, so it is always a bare
+/// origin whose file cannot be replaced in flight: `https`, or `http` on a loopback host
+/// while the deployment allows insecure sender lists. Build one per fetch: the flag is
+/// persistent state, so a value kept across a configuration change would no longer
+/// hold.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FetchableApplicationOrigin(String);
+
+impl FetchableApplicationOrigin {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&ApplicationOrigin> for FetchableApplicationOrigin {
+    type Error = String;
+
+    fn try_from(origin: &ApplicationOrigin) -> Result<Self, Self::Error> {
+        let origin = origin.as_str();
+        let Ok(url) = Url::parse(origin) else {
+            return Err("origin is not a URL".to_string());
+        };
+        let is_insecure_fetch_allowed = url.scheme() == "http"
+            && is_insecure_sender_list_allowed()
+            && is_loopback_host(url.host_str().unwrap_or_default());
+        if url.scheme() != "https" && !is_insecure_fetch_allowed {
+            return Err("origin must be https".to_string());
+        }
+        let canister_id = origin
+            .strip_prefix("https://")
+            .and_then(|rest| {
+                GATEWAY_DOMAINS
+                    .iter()
+                    .find_map(|domain| rest.strip_suffix(&format!(".{domain}")))
+            })
+            .map(|subdomain| subdomain.strip_suffix(RAW_LABEL).unwrap_or(subdomain))
+            .filter(|canister_id| {
+                !canister_id.is_empty()
+                    && canister_id
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric() || character == '-')
+            });
+        match canister_id {
+            Some(canister_id) => Ok(Self(format!("https://{canister_id}.{FETCH_DOMAIN}"))),
+            None => Ok(Self(origin.to_string())),
+        }
+    }
+}
+
+fn is_insecure_sender_list_allowed() -> bool {
+    state::persistent_state(|s| s.notifications_allow_insecure_sender_list).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -168,5 +244,116 @@ mod tests {
             parsed("https://not-a-gateway.com"),
             Ok("https://not-a-gateway.com".into())
         );
+    }
+
+    fn allow_insecure(allow: bool) {
+        state::persistent_state_mut(|s| {
+            s.notifications_allow_insecure_sender_list = Some(allow);
+        });
+    }
+
+    fn fetchable(origin: &str) -> Result<String, String> {
+        let origin = ApplicationOrigin::try_from(origin).expect("a bare origin");
+        FetchableApplicationOrigin::try_from(&origin).map(|origin| origin.as_str().to_string())
+    }
+
+    fn fetched(origin: &str) -> String {
+        fetchable(origin).expect("a fetchable origin")
+    }
+
+    #[test]
+    fn a_gateway_origin_is_read_through_the_gateway_that_serves_every_canister() {
+        for origin in [
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net",
+        ] {
+            assert_eq!(
+                fetched(origin),
+                "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net",
+                "{origin}"
+            );
+        }
+    }
+
+    /// The raw endpoint serves responses without certification, so it is never read.
+    #[test]
+    fn a_raw_gateway_origin_is_read_through_the_certified_gateway() {
+        for origin in [
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.raw.ic0.app",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.raw.icp0.io",
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.raw.icp.net",
+        ] {
+            assert_eq!(
+                fetched(origin),
+                "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net",
+                "{origin}"
+            );
+        }
+    }
+
+    #[test]
+    fn anything_that_is_no_gateway_origin_is_read_as_it_stands() {
+        allow_insecure(true);
+        for origin in [
+            "https://app.example",
+            "https://nice-name.com",
+            "https://raw.example",
+            "http://127.0.0.1:4943",
+            // A gateway domain with nothing before it names no canister.
+            "https://icp.net",
+            // Plain http is no gateway, whatever the host.
+            "http://vt36r-2qaaa-aaaad-aad5a-cai.localhost:4943",
+        ] {
+            assert_eq!(fetched(origin), origin);
+        }
+    }
+
+    /// The scheme decides where II sends an outcall, so a file that would be
+    /// fetched over plain http is refused however the origin is spelled.
+    #[test]
+    fn refuses_an_origin_whose_file_would_not_be_fetched_over_https() {
+        allow_insecure(false);
+        for origin in [
+            "http://app.example",
+            "http://localhost:5173",
+            "http://127.0.0.1:8080",
+        ] {
+            assert_eq!(
+                fetchable(origin),
+                Err("origin must be https".to_string()),
+                "{origin} must not be fetched"
+            );
+        }
+        assert_eq!(
+            fetchable("https://app.example"),
+            Ok("https://app.example".to_string())
+        );
+    }
+
+    /// The flag reaches loopback only: a public host over http stays refused,
+    /// so a flagged deployment still cannot be pointed at a plaintext app.
+    #[test]
+    fn the_insecure_flag_reaches_loopback_only() {
+        allow_insecure(true);
+        for origin in [
+            "http://localhost:5173",
+            "http://127.0.0.1:8080",
+            "http://localhost",
+        ] {
+            assert_eq!(fetchable(origin), Ok(origin.to_string()));
+        }
+        assert!(fetchable("http://app.example").is_err());
+    }
+
+    /// And it reaches `http` only. A scheme II cannot fetch would fail at the
+    /// outcall anyway, but the rule is what the type states, not where the
+    /// call happens to break.
+    #[test]
+    fn the_insecure_flag_reaches_http_only() {
+        allow_insecure(true);
+        for origin in ["ftp://localhost", "ws://localhost:5173", "wss://localhost"] {
+            assert!(fetchable(origin).is_err(), "{origin} must not be fetched");
+        }
     }
 }
