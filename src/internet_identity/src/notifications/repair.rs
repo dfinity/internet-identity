@@ -6,7 +6,8 @@
 //! [`crate::notifications::webpush::unanswered`]). A browser reads those counts for one
 //! path, probes the path with Internet Identity's own notification where they are past
 //! the limit, and removes an installed web app that does not answer, so its app's
-//! notifications go back to where the browser itself delivers them.
+//! notifications go back to where the browser itself delivers them. An installed web app
+//! its app disabled is on its path too, and is removed the same way, without a probe.
 
 use crate::notifications::backlog::identity::IdentityWakeUpPath;
 use crate::notifications::dispatch::{self, InstalledAppSubscription};
@@ -32,13 +33,16 @@ pub(crate) enum DevicePath {
     /// Where the calling browser's wake-ups go.
     ThisBrowser,
     /// The installed web apps of the app numbered `application_number`, at its frontend
-    /// whose origin hashes to `frontend_origin_hash`, on the entries linked to the calling
-    /// browser's as sharing its device, that deliver for the account `account_principal`
-    /// names. `None` for an app nobody has signed in to, which has none.
+    /// whose origin hashes to `frontend_origin_hash`, that deliver for the account
+    /// `account_principal` names: on the entries linked to the calling browser's as
+    /// sharing its device, and on the calling browser's own entry where the app disabled
+    /// them. `None` for an app nobody has signed in to, which has none.
     ///
-    /// Not the calling browser's own entry: an installed app sharing it holds the session
-    /// a sign-in from the browser replaces, so it could not answer a probe sent now. It
-    /// checks its own path when it next starts.
+    /// Not one on the calling browser's own entry that the app did not disable: an
+    /// installed app sharing that entry holds the session a sign-in from the browser
+    /// replaces, so it could not answer a probe sent now. It checks its own path when it
+    /// next starts. A disabled one is never probed, and it keeps the entry's own path
+    /// muted, so it is on the path whether or not the installed app is still there.
     InstalledApps {
         application_number: Option<ApplicationNumber>,
         frontend_origin_hash: OriginSha256,
@@ -98,7 +102,7 @@ pub(crate) enum ProbeRefusal {
     BacklogFull,
 }
 
-/// One subscription on a path that can deliver now.
+/// One subscription on a path that can deliver now, or could but its app disabled it.
 struct PathSubscription {
     /// The entry it is woken through.
     browser_id: BrowserId,
@@ -107,6 +111,8 @@ struct PathSubscription {
     subscription: ReadySubscription,
     /// How a probe reaches it.
     wake_up_path: IdentityWakeUpPath,
+    /// Whether its app disabled it, so nothing, probes included, is sent to it.
+    is_disabled: bool,
 }
 
 impl PathSubscription {
@@ -154,6 +160,7 @@ pub(crate) fn read_path_status(
                         subscription,
                         now_ns,
                     ),
+                    is_disabled: Some(path_subscription.is_disabled),
                 }
             })
             .collect(),
@@ -161,7 +168,8 @@ pub(crate) fn read_path_status(
 }
 
 /// Sends Internet Identity's own notification about `identity` through every
-/// subscription on `path` for `browser_id` of `anchor` that has no probe outstanding.
+/// subscription on `path` for `browser_id` of `anchor` that its app did not disable and
+/// has no probe outstanding.
 ///
 /// Every subscription is tried: one the backlog refused leaves the others probed, so the
 /// refusal is answered only where none of them was.
@@ -172,7 +180,11 @@ pub(crate) fn probe_device_path(
     identity: &IdentityForNotification,
     now_ns: Timestamp,
 ) -> Result<(), ProbeRefusal> {
-    let path_subscriptions = path_subscriptions(anchor, browser_id, path, now_ns);
+    let path_subscriptions: Vec<PathSubscription> =
+        path_subscriptions(anchor, browser_id, path, now_ns)
+            .into_iter()
+            .filter(|path_subscription| !path_subscription.is_disabled)
+            .collect();
     if path_subscriptions.is_empty() {
         return Err(ProbeRefusal::NotReachable);
     }
@@ -193,8 +205,8 @@ pub(crate) fn probe_device_path(
 }
 
 /// Sends Internet Identity's own notification about `identity` to the installed web app
-/// `holder` names, where it can be woken now for the account `account_principal` names
-/// and has no probe outstanding.
+/// `holder` names, where it can be woken now for the account `account_principal` names,
+/// its app did not disable it, and it has no probe outstanding.
 pub(crate) fn probe_installed_app(
     anchor: &Anchor,
     holder: PwaSubscriptionHolder,
@@ -214,6 +226,7 @@ pub(crate) fn probe_installed_app(
     .into_iter()
     .find(|path_subscription| {
         path_subscription.registration == RegistrationId::Pwa(holder)
+            && !path_subscription.is_disabled
             && path_subscription.is_installed_app_for(
                 holder.application_number,
                 holder.frontend_origin_hash,
@@ -251,12 +264,12 @@ fn probe_path_subscription(
 }
 
 /// Removes the installed web app subscriptions of the app numbered `application_number`,
-/// at its frontend whose origin hashes to `frontend_origin_hash`, on the entries of
-/// `anchor` linked to `browser_id`'s that deliver for the account `account_principal`
-/// names, where they can deliver now and a probe through them was
-/// never removed in [`unanswered::MIN_PROBE_ANSWER_TIME_NS`]. One that answered its probe,
-/// or whose probe is younger than that, is kept. `None` for an app nobody has signed in
-/// to, which has none.
+/// at its frontend whose origin hashes to `frontend_origin_hash`, that deliver for the
+/// account `account_principal` names, on the path [`DevicePath::InstalledApps`] names for
+/// `browser_id` of `anchor`: one its app disabled, and one that can deliver now whose
+/// probe was never removed in [`unanswered::MIN_PROBE_ANSWER_TIME_NS`]. One that answered
+/// its probe, or whose probe is younger than that, is kept. `None` for an app nobody has
+/// signed in to, which has none.
 ///
 /// Every one is tried, so a failure to remove one leaves the others removed; failures
 /// are logged.
@@ -277,7 +290,9 @@ pub(crate) fn remove_unanswered_installed_apps(
         // Only a probe nobody removed, in the time it takes to answer one, is evidence: a
         // count raised again by an ordinary push after the installed app answered its
         // probe is not, and neither is a probe the push service accepted a moment ago.
-        if !unanswered::has_probe_had_its_answer_time(&path_subscription.subscription, now_ns) {
+        if !path_subscription.is_disabled
+            && !unanswered::has_probe_had_its_answer_time(&path_subscription.subscription, now_ns)
+        {
             continue;
         }
         let RegistrationId::Pwa(holder) = path_subscription.registration else {
@@ -289,7 +304,8 @@ pub(crate) fn remove_unanswered_installed_apps(
     }
 }
 
-/// The subscriptions on `path` for `browser_id` of `anchor` that can deliver now.
+/// The subscriptions on `path` for `browser_id` of `anchor` that can deliver now, and the
+/// installed web apps on it that could but their app disabled.
 fn path_subscriptions(
     anchor: &Anchor,
     browser_id: BrowserId,
@@ -311,29 +327,52 @@ fn path_subscriptions(
             application_number: Some(application_number),
             frontend_origin_hash,
             account_principal,
-        } => {
-            let mut path_subscriptions = Vec::new();
-            for entry in same_device_entries(anchor, browser) {
-                path_subscriptions.extend(
-                    installed_apps_on_path(
-                        entry,
-                        anchor.anchor_number(),
-                        application_number,
-                        now_ns,
-                    )
-                    .into_iter()
-                    .filter(|path_subscription| {
-                        path_subscription.is_installed_app_for(
-                            application_number,
-                            frontend_origin_hash,
-                            account_principal,
-                        )
-                    }),
-                );
-            }
-            path_subscriptions
-        }
+        } => installed_apps_path_subscriptions(
+            anchor,
+            browser,
+            application_number,
+            frontend_origin_hash,
+            account_principal,
+            now_ns,
+        ),
     }
+}
+
+/// The installed web apps on the path [`DevicePath::InstalledApps`] names for `browser`
+/// of `anchor`: of the app numbered `application_number`, at its frontend whose origin
+/// hashes to `frontend_origin_hash`, delivering for the account `account_principal`
+/// names, on the entries linked to `browser`'s and, where the app disabled them, on
+/// `browser`'s own, as at `now_ns`.
+fn installed_apps_path_subscriptions(
+    anchor: &Anchor,
+    browser: &Browser,
+    application_number: ApplicationNumber,
+    frontend_origin_hash: OriginSha256,
+    account_principal: Principal,
+    now_ns: Timestamp,
+) -> Vec<PathSubscription> {
+    let is_on_path = |path_subscription: &PathSubscription| {
+        path_subscription.is_installed_app_for(
+            application_number,
+            frontend_origin_hash,
+            account_principal,
+        )
+    };
+    let mut path_subscriptions: Vec<PathSubscription> =
+        installed_apps_on_path(browser, anchor.anchor_number(), application_number, now_ns)
+            .into_iter()
+            .filter(|path_subscription| {
+                path_subscription.is_disabled && is_on_path(path_subscription)
+            })
+            .collect();
+    for entry in same_device_entries(anchor, browser) {
+        path_subscriptions.extend(
+            installed_apps_on_path(entry, anchor.anchor_number(), application_number, now_ns)
+                .into_iter()
+                .filter(is_on_path),
+        );
+    }
+    path_subscriptions
 }
 
 /// Where `browser`'s wake-ups go now, as a subscription on a path.
@@ -354,11 +393,13 @@ fn routed_on_path(
         .registration(),
         subscription,
         wake_up_path: IdentityWakeUpPath::Routed,
+        is_disabled: false,
     })
 }
 
 /// `browser`'s installed web apps of the app numbered `application_number`, one per
-/// frontend, as subscriptions on a path, where they can deliver now.
+/// frontend, as subscriptions on a path, where they can deliver now or could but their app
+/// disabled them.
 fn installed_apps_on_path(
     browser: &Browser,
     anchor_number: AnchorNumber,
@@ -379,6 +420,7 @@ fn installed_apps_on_path(
         frontend_origin_hash,
         subscription,
         account_principal,
+        is_disabled,
     } in installed_app_subscriptions
     {
         path_subscriptions.push(PathSubscription {
@@ -395,6 +437,7 @@ fn installed_apps_on_path(
                 frontend_origin_hash,
                 account_principal,
             },
+            is_disabled,
         });
     }
     path_subscriptions

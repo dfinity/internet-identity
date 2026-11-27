@@ -53,7 +53,7 @@ pub(super) struct Phone {
     safari_session: Principal,
 }
 
-fn phone(env: &PocketIc) -> Phone {
+pub(super) fn phone(env: &PocketIc) -> Phone {
     phone_with(env, |env, canister_id, pwa| {
         subscribe_pwa_webpush(
             env,
@@ -89,6 +89,20 @@ pub(super) fn phone_with(
         account_principal: pwa.account_principal,
         pwa: session_of(&pwa),
         safari_session: session_of(&safari_session),
+    }
+}
+
+/// A desktop browser and the web app installed from it on one browser entry: the installed
+/// app subscribes from the session of the very entry that signs in, as [`install_subscribed`]
+/// sets it up, so `pwa` and `safari_session` are one session.
+pub(super) fn shared_entry_phone(env: &PocketIc) -> Phone {
+    let (canister_id, anchor, signed_in) = install_subscribed(env);
+    Phone {
+        canister_id,
+        anchor,
+        account_principal: signed_in.account_principal,
+        pwa: session_of(&signed_in),
+        safari_session: session_of(&signed_in),
     }
 }
 
@@ -181,7 +195,7 @@ fn unanswered(
         .collect()
 }
 
-fn installed_apps(phone: &Phone) -> NotificationPath {
+pub(super) fn installed_apps(phone: &Phone) -> NotificationPath {
     installed_apps_of_frontend(phone, None)
 }
 
@@ -1334,15 +1348,7 @@ fn should_keep_an_installed_app_that_answered_its_probe_though_a_later_push_wait
 #[test]
 fn should_leave_an_installed_app_sharing_the_callers_entry_off_the_path() {
     let env = env();
-    // The installed app subscribes from the session of the very browser entry that asks.
-    let (canister_id, anchor, signed_in) = install_subscribed(&env);
-    let shared = Phone {
-        canister_id,
-        anchor,
-        account_principal: signed_in.account_principal,
-        pwa: session_of(&signed_in),
-        safari_session: session_of(&signed_in),
-    };
+    let shared = shared_entry_phone(&env);
 
     assert_eq!(
         path_status(&env, &shared, installed_apps(&shared)).subscriptions,

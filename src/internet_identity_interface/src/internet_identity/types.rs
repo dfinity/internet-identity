@@ -1374,9 +1374,10 @@ pub enum NotificationPath {
     /// Where this browser's wake-ups go: its own subscription, or the ICP Alerts app it
     /// routes through.
     ThisBrowser,
-    /// That app's installed web apps of one of its frontends on the entries linked to this
-    /// browser entry as sharing its device, that deliver for one account. An installed app
-    /// that shares this browser entry itself checks its own path, and is not on this one.
+    /// That app's installed web apps of one of its frontends that deliver for one account:
+    /// on the entries linked to this browser entry as sharing its device, and on this
+    /// browser entry itself where the app disabled them. One that shares this browser
+    /// entry and is not disabled checks its own path, and is not on this one.
     InstalledApps(InstalledAppsPath),
 }
 
@@ -1398,10 +1399,12 @@ pub struct GetNotificationPathStatusRequest {
     pub path: NotificationPath,
 }
 
-/// The subscriptions on one path that can deliver now.
+/// The subscriptions on one path that can deliver now, and the installed web apps on it
+/// that could but their app disabled.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationPathStatus {
-    /// One per subscription on the path that can deliver now. Empty where none can.
+    /// One per subscription on the path that can deliver now, or could but its app
+    /// disabled it. Empty where there is none.
     pub subscriptions: Vec<SubscriptionDeliveryStatus>,
 }
 
@@ -1420,6 +1423,9 @@ pub struct SubscriptionDeliveryStatus {
     /// the least time it is given to be answered before its subscription may be removed.
     /// `false` where no probe is outstanding.
     pub has_probe_had_its_answer_time: bool,
+    /// Whether the app disabled this installed web app subscription on its device:
+    /// nothing is sent to it, and the device is not notified another way.
+    pub is_disabled: Option<bool>,
 }
 
 /// Why `get_notification_path_status` refused.
@@ -1869,6 +1875,24 @@ pub struct AppGetPwaWebPushSubscriptionStatusRequest {
 pub enum AppGetPwaWebPushSubscriptionStatusError {
     /// No live session behind this caller: expired, idle, revoked, or never one at all.
     NoSuchSession,
+    InternalCanisterError(String),
+}
+
+/// Which installed web app `app_disable_pwa_webpush_subscription` disables.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppDisablePwaWebPushSubscriptionRequest {
+    /// The frontend of the session's app the installed web app is served from, where it
+    /// is not the app's own origin: one the app lists among its alternative origins.
+    pub frontend_origin: Option<FrontendHostname>,
+}
+
+/// Why `app_disable_pwa_webpush_subscription` refused.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppDisablePwaWebPushSubscriptionError {
+    /// No live session behind this caller: expired, idle, revoked, or never one at all.
+    NoSuchSession,
+    /// The app no longer lists the frontend among its alternative origins.
+    NoSuchFrontend,
     InternalCanisterError(String),
 }
 

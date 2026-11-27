@@ -3437,13 +3437,18 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(());
         };
         let subscription = WebPushSubscription::Ready(subscription);
-        let account_principal = held_subscription.account_principal;
+        let PwaSubscription {
+            subscription: _,
+            account_principal,
+            disabled_at_ns,
+        } = held_subscription;
         config.set_pwa_webpush_subscription(
             holder.browser_id,
             holder.frontend_origin_hash,
             Some(PwaSubscription {
                 subscription,
                 account_principal,
+                disabled_at_ns,
             }),
         );
         self.store_anchor_application_config(

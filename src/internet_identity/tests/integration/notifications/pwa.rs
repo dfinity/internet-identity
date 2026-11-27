@@ -28,6 +28,7 @@ use internet_identity_interface::internet_identity::types::{
 use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
 use std::time::Duration;
 
+mod disable;
 mod same_device;
 mod suite;
 

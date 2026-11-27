@@ -89,6 +89,27 @@ export interface AnchorCredentials {
   'credentials' : Array<WebAuthnCredential>,
   'recovery_credentials' : Array<WebAuthnCredential>,
 }
+export type AppDisablePwaWebPushSubscriptionError = {
+    /**
+     * The app no longer lists frontend_origin in its /.well-known/ii-alternative-origins.
+     */
+    'NoSuchFrontend' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * No live session behind this caller: expired, idle, revoked, or never one at all.
+     */
+    'NoSuchSession' : null
+  };
+export interface AppDisablePwaWebPushSubscriptionRequest {
+  /**
+   * The frontend of the session's app the installed web app is served from, where it is
+   * not the app's own origin: one the app lists in its /.well-known/ii-alternative-origins.
+   * Null is the app's own origin. Each frontend holds its own subscription per browser.
+   */
+  'frontend_origin' : [] | [FrontendHostname],
+}
 export interface AppGetDelegationRequest {
   'session_key' : SessionKey,
   /**
@@ -2001,15 +2022,17 @@ export type NotificationPath = {
   } |
   {
     /**
-     * That app's installed web apps of one of its frontends on the entries linked to this
-     * browser entry as sharing its device, that deliver for one account. An installed app
-     * that shares this browser entry itself checks its own path, and is not on this one.
+     * That app's installed web apps of one of its frontends that deliver for one account:
+     * on the entries linked to this browser entry as sharing its device, and on this
+     * browser entry itself where the app disabled them. One that shares this browser entry
+     * and is not disabled checks its own path, and is not on this one.
      */
     'InstalledApps' : InstalledAppsPath
   };
 export interface NotificationPathStatus {
   /**
-   * One per subscription on the path that can deliver now. Empty where none can.
+   * One per subscription on the path that can deliver now, or could but its app
+   * disabled it. Empty where there is none.
    */
   'subscriptions' : Array<SubscriptionDeliveryStatus>,
 }
@@ -2955,6 +2978,11 @@ export type StreamingStrategy = {
 export type Sub = string;
 export interface SubscriptionDeliveryStatus {
   /**
+   * Whether the app disabled this installed web app subscription on its device: nothing
+   * is sent to it, and the device is not notified another way.
+   */
+  'is_disabled' : [] | [boolean],
+  /**
    * Null where the notification of every push posted through it has been removed since.
    */
   'unanswered_pushes' : [] | [UnansweredPushes],
@@ -3081,6 +3109,16 @@ export interface _SERVICE {
   'add_tentative_device' : ActorMethod<
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
+  >,
+  /**
+   * Disables the subscription of the session's browser, account and frontend: nothing
+   * is sent to it, and the device it is on is not notified another way. Already
+   * disabled or nothing subscribed is Ok. Setting a subscription again enables it.
+   */
+  'app_disable_pwa_webpush_subscription' : ActorMethod<
+    [AppDisablePwaWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : AppDisablePwaWebPushSubscriptionError }
   >,
   'app_get_delegation' : ActorMethod<
     [AppGetDelegationRequest],
@@ -3367,7 +3405,7 @@ export interface _SERVICE {
   /**
    * Called by the browser that the installed web app's link names. Links the entry
    * that registered the key to the caller's: an app's notification skips the caller's
-   * entry while that entry's installed web app can deliver it.
+   * entry while that entry's installed web app can deliver it, or the app disabled it.
    */
   'claim_same_device_link' : ActorMethod<
     [ClaimSameDeviceLinkRequest],
@@ -4024,8 +4062,8 @@ export interface _SERVICE {
   >,
   /**
    * Sends Internet Identity's own notification through every subscription on the path
-   * that can deliver now. Removing a notification pushed through one resets its
-   * unanswered pushes.
+   * that can deliver now and was not disabled. Removing a notification pushed through
+   * one resets its unanswered pushes.
    */
   'probe_notification_path' : ActorMethod<
     [ProbeNotificationPathRequest],
@@ -4038,9 +4076,9 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
-   * Removes that app's installed web app subscriptions of the frontend on the entries
-   * linked to the caller's that can deliver now and have a probe nobody removed in the 10 seconds
-   * after the push service accepted it.
+   * Removes that app's installed web app subscriptions of the frontend on the path:
+   * those the app disabled, and those that can deliver now and have a probe nobody
+   * removed in the 10 seconds after the push service accepted it.
    */
   'remove_unanswered_pwa_webpush_subscriptions' : ActorMethod<
     [RemoveUnansweredPwaWebPushSubscriptionsRequest],

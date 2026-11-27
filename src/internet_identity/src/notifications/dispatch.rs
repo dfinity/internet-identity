@@ -989,11 +989,14 @@ pub(crate) struct InstalledAppSubscription {
     pub(crate) subscription: ReadySubscription,
     /// The principal of the account it delivers for.
     pub(crate) account_principal: Principal,
+    /// Whether the app disabled it, so nothing is sent to it.
+    pub(crate) is_disabled: bool,
 }
 
 /// The subscriptions `browser`'s installed web apps of the app numbered
-/// `application_number`, one per frontend, can be woken at right now. Leaves out each one
-/// whose account has no session on `browser` live past [`PWA_SESSION_MARGIN_NS`].
+/// `application_number`, one per frontend, can be woken at right now, and the ones that
+/// could be but the app disabled. Leaves out each one whose account has no session on
+/// `browser` live past [`PWA_SESSION_MARGIN_NS`].
 pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
     storage: &Storage<M>,
     anchor_number: AnchorNumber,
@@ -1027,13 +1030,18 @@ pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
             frontend_origin_hash,
             account_principal,
         );
-        if let Some((subscription, _, _)) = find_pwa_wake_up_address(browser, &route, now_ns) {
-            installed_app_subscriptions.push(InstalledAppSubscription {
-                frontend_origin_hash,
-                subscription,
-                account_principal,
-            });
-        }
+        let (subscription, is_disabled) = match find_installed_app_delivery(browser, &route, now_ns)
+        {
+            Some(InstalledAppDelivery::Wakes { subscription, .. }) => (subscription, false),
+            Some(InstalledAppDelivery::Disabled { subscription }) => (subscription, true),
+            None => continue,
+        };
+        installed_app_subscriptions.push(InstalledAppSubscription {
+            frontend_origin_hash,
+            subscription,
+            account_principal,
+            is_disabled,
+        });
     }
     installed_app_subscriptions
 }
@@ -1224,11 +1232,12 @@ pub(crate) fn can_wake_for_app<M: Memory + Clone>(
 
 /// Where `browser`, one of the identity's `browsers`, is woken for the app notification
 /// `route` describes. Nowhere where an installed web app of the notification's frontend,
-/// on an entry linked to `browser` as sharing its device, can deliver it: that one is
-/// woken instead, so the device is notified once, whatever `browser` registered of its
-/// own. Otherwise its own installed web app of that frontend, where that can deliver it,
-/// and else the address [`wake_up_address`] gives: never an installed web app of another
-/// frontend, whose links open another app.
+/// on an entry linked to `browser` as sharing its device, delivers it or was disabled by
+/// its app: the device is notified once, through that one, or not at all, whatever
+/// `browser` registered of its own. Otherwise its own installed web app of that frontend,
+/// where that can deliver it, nowhere where the app disabled that one, and else the
+/// address [`wake_up_address`] gives: never an installed web app of another frontend,
+/// whose links open another app.
 fn app_wake_up_address(
     browsers: &[Browser],
     browser: &Browser,
@@ -1236,29 +1245,49 @@ fn app_wake_up_address(
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> Option<(ReadySubscription, String, DeliveryTarget)> {
-    let is_delivered_on_same_device = browsers.iter().any(|other_browser| {
+    let is_handled_on_same_device = browsers.iter().any(|other_browser| {
         other_browser.id != browser.id
             && other_browser.same_device_browser_id == Some(browser.id)
-            && find_pwa_wake_up_address(other_browser, route, now_ns).is_some()
+            && find_installed_app_delivery(other_browser, route, now_ns).is_some()
     });
-    if is_delivered_on_same_device {
+    if is_handled_on_same_device {
         return None;
     }
-    if let Some(installed_app) = find_pwa_wake_up_address(browser, route, now_ns) {
-        return Some(installed_app);
+    match find_installed_app_delivery(browser, route, now_ns) {
+        Some(InstalledAppDelivery::Wakes {
+            subscription,
+            relay_origin,
+            target,
+        }) => return Some((subscription, relay_origin, target)),
+        Some(InstalledAppDelivery::Disabled { .. }) => return None,
+        None => {}
     }
     let (subscription, relay_origin, target) = wake_up_address(browser, app, now_ns)?;
     Some((subscription.clone(), relay_origin, target))
 }
 
+/// What an entry's installed web app of a route's frontend does with the notifications
+/// for that route, where [`find_installed_app_delivery`] finds one.
+enum InstalledAppDelivery {
+    /// It is woken at `subscription`, through the relay at `relay_origin`.
+    Wakes {
+        subscription: ReadySubscription,
+        relay_origin: String,
+        target: DeliveryTarget,
+    },
+    /// It could be woken at `subscription`, but its app disabled it: nothing is sent to it,
+    /// and the device it is on is not notified another way.
+    Disabled { subscription: ReadySubscription },
+}
+
 /// The entry's installed web app of the route's frontend, where it subscribed for the
 /// recipient account and a session of that account on this entry stays live past
-/// [`PWA_SESSION_MARGIN_NS`].
-fn find_pwa_wake_up_address(
+/// [`PWA_SESSION_MARGIN_NS`], and whether it is woken or its app disabled it.
+fn find_installed_app_delivery(
     browser: &Browser,
     route: &PwaRoute,
     now_ns: Timestamp,
-) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+) -> Option<InstalledAppDelivery> {
     if browser.session_count == 0 {
         return None;
     }
@@ -1277,14 +1306,35 @@ fn find_pwa_wake_up_address(
     }
     let subscription = held_subscription.subscription.into_ready()?;
     let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
-    Some((
+    if held_subscription.disabled_at_ns.is_some() {
+        return Some(InstalledAppDelivery::Disabled { subscription });
+    }
+    let target = DeliveryTarget::Pwa {
+        application_number: route.application_number,
+        frontend_origin_hash: route.frontend_origin_hash,
+    };
+    Some(InstalledAppDelivery::Wakes {
         subscription,
         relay_origin,
-        DeliveryTarget::Pwa {
-            application_number: route.application_number,
-            frontend_origin_hash: route.frontend_origin_hash,
-        },
-    ))
+        target,
+    })
+}
+
+/// Where the entry's installed web app of the route's frontend is woken, as
+/// [`find_installed_app_delivery`] finds it. Nowhere where its app disabled it.
+fn find_pwa_wake_up_address(
+    browser: &Browser,
+    route: &PwaRoute,
+    now_ns: Timestamp,
+) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    match find_installed_app_delivery(browser, route, now_ns)? {
+        InstalledAppDelivery::Wakes {
+            subscription,
+            relay_origin,
+            target,
+        } => Some((subscription, relay_origin, target)),
+        InstalledAppDelivery::Disabled { .. } => None,
+    }
 }
 
 /// Liveness is the entry's, whichever address this is: the app has none of its own.

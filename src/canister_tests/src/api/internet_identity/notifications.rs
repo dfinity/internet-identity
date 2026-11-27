@@ -2,17 +2,17 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AppGetPwaNotificationError, AppGetPwaNotificationRequest,
-    AppGetPwaNotificationResponse, AppGetPwaWebPushSubscriptionStatusError,
-    AppGetPwaWebPushSubscriptionStatusRequest, AppNotificationConsentStatusError,
-    AppNotificationConsentStatusResponse, AppPreparePwaWebPushSubscriptionRequest,
-    AppPreparePwaWebPushSubscriptionResult, AppProbePwaWebPushSubscriptionRequest,
-    AppRemovePwaNotificationError, AppRemovePwaNotificationRequest,
-    AppRevokeNotificationConsentError, AppSetPwaWebPushSubscriptionError,
-    AppSetPwaWebPushSubscriptionRequest, BrowserId, ClaimNotificationAppError,
-    ClaimNotificationAppRequest, DisableNotificationAppError, DisableNotificationAppRequest,
-    EnableNotificationAppError, EnableNotificationAppRequest, FrontendHostname,
-    GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
+    AnchorNumber, AppDisablePwaWebPushSubscriptionError, AppDisablePwaWebPushSubscriptionRequest,
+    AppGetPwaNotificationError, AppGetPwaNotificationRequest, AppGetPwaNotificationResponse,
+    AppGetPwaWebPushSubscriptionStatusError, AppGetPwaWebPushSubscriptionStatusRequest,
+    AppNotificationConsentStatusError, AppNotificationConsentStatusResponse,
+    AppPreparePwaWebPushSubscriptionRequest, AppPreparePwaWebPushSubscriptionResult,
+    AppProbePwaWebPushSubscriptionRequest, AppRemovePwaNotificationError,
+    AppRemovePwaNotificationRequest, AppRevokeNotificationConsentError,
+    AppSetPwaWebPushSubscriptionError, AppSetPwaWebPushSubscriptionRequest, BrowserId,
+    ClaimNotificationAppError, ClaimNotificationAppRequest, DisableNotificationAppError,
+    DisableNotificationAppRequest, EnableNotificationAppError, EnableNotificationAppRequest,
+    FrontendHostname, GetNotificationAppStatusRequest, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetNotificationError, GetNotificationRequest,
     GetNotificationResponse, GetWebPushSubscriptionStatusRequest, LinkNotificationAppError,
     LinkNotificationAppRequest, LinkNotificationAppResponse, NotificationAppAnchorsRequest,
@@ -609,6 +609,23 @@ pub fn subscribe_pwa_webpush_for_frontend(
             frontend_origin,
         },
     )
+}
+
+pub fn app_disable_pwa_webpush_subscription(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppDisablePwaWebPushSubscriptionRequest,
+) -> Result<Result<(), AppDisablePwaWebPushSubscriptionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_disable_pwa_webpush_subscription",
+        (request,),
+    )
+    .map(|(x,)| x)
 }
 
 pub fn app_get_pwa_webpush_subscription_status(

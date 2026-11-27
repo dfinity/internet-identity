@@ -188,6 +188,7 @@ fn start_pwa_subscription(
     let subscription = PwaSubscription {
         subscription: WebPushSubscription::Pending(pending_transport),
         account_principal,
+        disabled_at_ns: None,
     };
     write_pwa_subscription(holder, Some(subscription), None, now_ns).map_err(|err| match err {
         SetPwaSubscriptionError::NotificationsNotAllowed => {
@@ -266,8 +267,62 @@ pub fn set_pwa_subscription(
     let subscription = PwaSubscription {
         subscription,
         account_principal,
+        disabled_at_ns: None,
     };
     write_pwa_subscription(holder, Some(subscription), displaced_holder, now_ns)
+}
+
+/// Why an installed web app's subscription was not disabled.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DisablePwaSubscriptionError {
+    /// The app's cached alternative origins no longer name the frontend of the slot.
+    FrontendNotListed,
+    /// Nothing the caller can act on: a storage failure, and why.
+    Internal(String),
+}
+
+/// Disables `holder`'s slot as of `now_ns` where it delivers for the account
+/// `account_principal` names: nothing is sent to it from then on, while it keeps counting
+/// as the way its device is notified. A slot already disabled keeps the time it was
+/// disabled at. One that holds nothing, or delivers for another account, is left as it
+/// is. Setting a subscription on the slot again writes it enabled.
+pub fn disable_pwa_subscription(
+    holder: PwaSubscriptionHolder,
+    account_principal: Principal,
+    now_ns: Timestamp,
+) -> Result<(), DisablePwaSubscriptionError> {
+    let Some(held_subscription) = read_pwa_subscription(holder) else {
+        return Ok(());
+    };
+    let PwaSubscription {
+        subscription,
+        account_principal: held_account_principal,
+        disabled_at_ns,
+    } = held_subscription;
+    if held_account_principal != account_principal || disabled_at_ns.is_some() {
+        return Ok(());
+    }
+    let disabled_at_ns = Some(now_ns);
+    let subscription = PwaSubscription {
+        subscription,
+        account_principal,
+        disabled_at_ns,
+    };
+    write_pwa_subscription(holder, Some(subscription), None, now_ns).map_err(|err| match err {
+        SetPwaSubscriptionError::FrontendNotListed => {
+            DisablePwaSubscriptionError::FrontendNotListed
+        }
+        SetPwaSubscriptionError::Internal(reason) => DisablePwaSubscriptionError::Internal(reason),
+        SetPwaSubscriptionError::NotificationsNotAllowed => {
+            DisablePwaSubscriptionError::Internal("notifications are not allowed".to_string())
+        }
+        SetPwaSubscriptionError::TransportKeyExpired => {
+            DisablePwaSubscriptionError::Internal("a transport key expired".to_string())
+        }
+        SetPwaSubscriptionError::EndpointInUse => {
+            DisablePwaSubscriptionError::Internal("an endpoint is in use".to_string())
+        }
+    })
 }
 
 /// Empties `holder`'s slot where it delivers for `account_principal`'s account.

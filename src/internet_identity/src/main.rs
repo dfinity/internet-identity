@@ -1379,6 +1379,33 @@ fn app_set_pwa_webpush_subscription(
         })
 }
 
+/// Disables the installed web app subscription of the calling session's identity, app,
+/// browser entry and account, at the frontend the request names.
+#[update]
+fn app_disable_pwa_webpush_subscription(
+    request: AppDisablePwaWebPushSubscriptionRequest,
+) -> Result<(), AppDisablePwaWebPushSubscriptionError> {
+    use AppDisablePwaWebPushSubscriptionError::*;
+
+    let now = time();
+    let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
+    enabled_or(InternalCanisterError)?;
+    let AppDisablePwaWebPushSubscriptionRequest { frontend_origin } = request;
+    let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
+        .map_err(InternalCanisterError)?;
+    let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
+        .map_err(InternalCanisterError)?;
+
+    pwa_subscription::disable_pwa_subscription(holder, session.account_principal, now).map_err(
+        |err| match err {
+            pwa_subscription::DisablePwaSubscriptionError::FrontendNotListed => NoSuchFrontend,
+            pwa_subscription::DisablePwaSubscriptionError::Internal(reason) => {
+                InternalCanisterError(reason)
+            }
+        },
+    )
+}
+
 /// The endpoint the calling session's browser entry is subscribed at for the session's
 /// account, at the frontend the request names. `None` where nothing is subscribed, where the subscription awaits its
 /// `app_set_pwa_webpush_subscription`, or where it delivers for another account. An
