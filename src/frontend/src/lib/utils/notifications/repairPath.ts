@@ -9,8 +9,8 @@
  * app's notifications come back here; this browser's own path is then probed in turn.
  *
  * An installed web app the app disabled keeps this device muted, whether or not it is
- * still installed, so the user is asked: allowing removes it and turns notifications
- * on here.
+ * still installed, so the user is asked: allowing turns notifications on here first,
+ * and removes it once they are on.
  */
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
