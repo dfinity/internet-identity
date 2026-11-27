@@ -17,6 +17,12 @@ const frontendCanisterOrigin = (): string => {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+  // The UI concept (`npm run dev:concept`) runs on mock data with no replica,
+  // so there is no canister to forward to or to take the page's config from.
+  if (import.meta.env.II_CONCEPT === "1") {
+    return resolve(event);
+  }
+
   // OpenID providers deliver the OAuth response with `response_mode=form_post`:
   // a form POST to `/callback`. In production the frontend canister translates
   // it into a certified HTML page that hands the payload to the frontend. The

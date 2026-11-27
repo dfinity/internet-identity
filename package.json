@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite",
     "host": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite --host",
+    "dev:concept": "II_CONCEPT=1 vite --config vite.concept.config.ts",
     "build": "npm run extract && tsc --noEmit && vite build",
     "preview": "vite preview",
     "postinstall": "scripts/render-local-init-args",

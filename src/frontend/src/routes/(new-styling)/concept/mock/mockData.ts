@@ -1,0 +1,654 @@
+/**
+ * Mock data for the holistic-redesign UI concept. Nothing here talks to a canister.
+ *
+ * Shapes follow what the canister already returns where it can (the apps an identity
+ * signed in to, the browsers it is signed in on), and are marked where the concept
+ * needs data Internet Identity does not hold today.
+ */
+import type { BrowserDescription } from "$lib/generated/internet_identity_types";
+import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+import dappsJson from "$lib/legacy/flows/dappsExplorer/dapps.json" with { type: "json" };
+import { KnownDapp } from "$lib/legacy/flows/dappsExplorer/dapps";
+import type { Scenario } from "../features/security/status";
+
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+const now = Date.now();
+
+const dapp = (name: string): KnownDapp => {
+  const descr = dappsJson.find((entry) => entry.name === name);
+  if (descr === undefined) {
+    throw new Error(`No curated dapp named ${name}`);
+  }
+  return new KnownDapp(descr);
+};
+
+export interface MockNotification {
+  id: string;
+  title: string;
+  body: string;
+  sentMillis: number;
+}
+
+export interface ConceptApp {
+  /** The origin the app's identity is derived for. */
+  origin: string;
+  name: string;
+  logo: string;
+  url: string;
+  /** From `list_applications`: the latest sign-in to the app. 0 where there
+   *  was none yet: an app a new identity starts with (see `presetApps`). */
+  lastUsedMillis: number;
+  /** From `list_applications`: whether the identity allows the app to notify it. */
+  notificationsAllowed: boolean;
+  /** From `list_applications`: when the app last had a notification queued, or
+   *  unset where it never has. An app that has notified but no longer may is one
+   *  the user turned off, so its tile says it's muted. */
+  lastNotifiedMillis?: number;
+  /** Not in Internet Identity today: the browser the app was last signed in from. */
+  lastBrowser: string;
+  /** Not in Internet Identity today: when an AI agent last used the app. */
+  aiUsedMillis?: number;
+  /** Not in Internet Identity today: notifications the identity has not read. Their
+   *  text lives in the app's canister, and the inbox is per browser. */
+  unread: MockNotification[];
+  /** From the curated list, where it has one. */
+  oneLiner?: string;
+}
+
+export interface FeaturedApp {
+  origin: string;
+  name: string;
+  logo: string;
+  url: string;
+  oneLiner?: string;
+}
+
+const app = (
+  name: string,
+  rest: Omit<ConceptApp, "origin" | "name" | "logo" | "url">,
+): ConceptApp => {
+  const known = dapp(name);
+  return {
+    origin: new URL(known.website).origin,
+    name: known.name,
+    logo: known.logoSrc,
+    url: known.website,
+    oneLiner: known.oneLiner,
+    ...rest,
+  };
+};
+
+/** `oneLiner` stands in where the curated list has none. */
+const featured = (name: string, oneLiner?: string): FeaturedApp => {
+  const known = dapp(name);
+  return {
+    origin: new URL(known.website).origin,
+    name: known.name,
+    logo: known.logoSrc,
+    url: known.website,
+    oneLiner: known.oneLiner ?? oneLiner,
+  };
+};
+
+const notification = (
+  id: string,
+  title: string,
+  body: string,
+  agoMillis: number,
+): MockNotification => ({ id, title, body, sentMillis: now - agoMillis });
+
+// Listed in the order the apps were added, which All apps keeps. It differs
+// from the order of use so Recent doesn't just repeat the grid's first row.
+const thomasApps: ConceptApp[] = [
+  app("NNS Dapp", {
+    lastUsedMillis: now - 3 * HOUR,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 3 * HOUR,
+    lastBrowser: "Chrome on Mac",
+    unread: [
+      notification(
+        "nns-1",
+        "Vote now",
+        "A proposal you follow is open until Friday.",
+        3 * HOUR,
+      ),
+    ],
+  }),
+  app("Funded", {
+    lastUsedMillis: now - 64 * DAY,
+    notificationsAllowed: false,
+    lastBrowser: "Safari on iPhone",
+    unread: [],
+  }),
+  app("TAGGR", {
+    lastUsedMillis: now - 4 * DAY,
+    notificationsAllowed: false,
+    lastBrowser: "Safari on iPhone",
+    unread: [],
+  }),
+  app("OpenChat", {
+    lastUsedMillis: now - 40 * MINUTE,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 25 * MINUTE,
+    lastBrowser: "Safari on iPhone",
+    aiUsedMillis: now - 5 * MINUTE,
+    unread: [
+      notification(
+        "oc-1",
+        "New message",
+        "Sam: Are we still on for tomorrow?",
+        25 * MINUTE,
+      ),
+    ],
+  }),
+  app("Juno", {
+    lastUsedMillis: now - 30 * DAY,
+    notificationsAllowed: false,
+    lastBrowser: "Firefox on Windows",
+    unread: [],
+  }),
+  app("OISY Wallet", {
+    lastUsedMillis: now - 12 * MINUTE,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 10 * MINUTE,
+    lastBrowser: "Chrome on Mac",
+    unread: [
+      notification(
+        "oisy-1",
+        "Transfer received",
+        "12.5 ICP arrived from a saved contact.",
+        10 * MINUTE,
+      ),
+      notification(
+        "oisy-2",
+        "Swap completed",
+        "Your ckBTC to ICP swap went through.",
+        HOUR,
+      ),
+      notification(
+        "oisy-3",
+        "Weekly summary",
+        "Your activity for this week is ready to view.",
+        2 * HOUR,
+      ),
+    ],
+  }),
+  app("ICPSwap", {
+    lastUsedMillis: now - 16 * DAY,
+    notificationsAllowed: false,
+    lastBrowser: "Chrome on Mac",
+    unread: [],
+  }),
+  app("Water Neuron", {
+    lastUsedMillis: now - 9 * DAY,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 5 * DAY,
+    lastBrowser: "Chrome on Mac",
+    aiUsedMillis: now - 2 * DAY,
+    unread: [],
+  }),
+  app("KongSwap", {
+    lastUsedMillis: now - DAY,
+    notificationsAllowed: false,
+    lastNotifiedMillis: now - 3 * DAY,
+    lastBrowser: "Chrome on Mac",
+    unread: [],
+  }),
+  app("DSCVR", {
+    lastUsedMillis: now - 2 * DAY,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 2 * DAY,
+    lastBrowser: "Firefox on Windows",
+    unread: [],
+  }),
+];
+
+const workApps: ConceptApp[] = [
+  app("Juno", {
+    lastUsedMillis: now - 2 * HOUR,
+    notificationsAllowed: true,
+    lastNotifiedMillis: now - 2 * HOUR,
+    lastBrowser: "Chrome on Mac",
+    aiUsedMillis: now - 30 * MINUTE,
+    unread: [
+      notification(
+        "juno-1",
+        "Deploy finished",
+        "Your satellite is live with the latest build.",
+        2 * HOUR,
+      ),
+    ],
+  }),
+  app("NNS Dapp", {
+    lastUsedMillis: now - 3 * DAY,
+    notificationsAllowed: false,
+    lastNotifiedMillis: now - 6 * DAY,
+    lastBrowser: "Chrome on Mac",
+    unread: [],
+  }),
+];
+
+/** What the current home page features, as configured per deployment. */
+export const featuredApps: FeaturedApp[] = [
+  featured("OISY Wallet"),
+  featured("OpenChat"),
+  featured("NNS Dapp"),
+  featured("DecideAI"),
+  featured("Yuku"),
+  featured("Catalyze"),
+];
+
+/** Not in Internet Identity today: what a new identity's My apps starts with,
+ *  so its home page is never empty and there's no empty state to design
+ *  around. The team picks the set; here, the first three featured apps. */
+export const presetApps: FeaturedApp[] = featuredApps.slice(0, 3);
+
+/** A preset app in My apps: there from the start, never signed in to. */
+const fromPreset = (one: FeaturedApp): ConceptApp => ({
+  ...one,
+  lastUsedMillis: 0,
+  notificationsAllowed: false,
+  lastBrowser: "",
+  unread: [],
+});
+
+export interface ExploreBannerItem {
+  kind: "banner";
+  app: FeaturedApp;
+  eyebrow: string;
+  title: string;
+  /** The card's background, as CSS: one flat color. */
+  background: string;
+  /** Light text on a dark card. */
+  dark: boolean;
+}
+
+export interface ExploreShelfItem {
+  kind: "shelf";
+  title: string;
+  apps: FeaturedApp[];
+}
+
+/** Where the featured apps the identity doesn't use yet go in the feed. */
+export interface ExploreFeaturedItem {
+  kind: "featured";
+  title: string;
+}
+
+/** Not in Internet Identity today: the one place Explore says you can make
+ *  an app of your own, led by the app that needs nothing but words. */
+export interface ExploreBuildItem {
+  kind: "build";
+  app: FeaturedApp;
+}
+
+/** Not in Internet Identity today: Explore laid out the way the App Store
+ *  lays out its Today and Apps tabs, a banner, a shelf, another banner, more
+ *  shelves. Apps and their one-liners come from the curated dapps list. */
+export const exploreFeed: (
+  ExploreBannerItem | ExploreShelfItem | ExploreFeaturedItem | ExploreBuildItem
+)[] = [
+  {
+    kind: "banner",
+    app: featured("OpenChat"),
+    eyebrow: "Messaging",
+    title: "Chat with no company in the middle.",
+    // A pale wash of the orange in OpenChat's ring, so its blue icon stands
+    // out rather than sinking into another blue.
+    background: "#fdebd9",
+    dark: false,
+  },
+  { kind: "featured", title: "Featured on Internet Identity" },
+  {
+    kind: "banner",
+    app: featured("Open Cloud"),
+    eyebrow: "Sovereign cloud",
+    title: "A cloud of your own, on the Internet Computer.",
+    background: "#dbe7ff",
+    dark: false,
+  },
+  {
+    kind: "shelf",
+    title: "Trade and earn",
+    apps: [
+      featured(
+        "ICPSwap",
+        "Swap and provide liquidity on the Internet Computer",
+      ),
+      featured("Sonic DEX"),
+      featured("ICPEx"),
+      featured("Water Neuron"),
+      featured("NeuronPool"),
+      featured("BIT10"),
+    ],
+  },
+  // The third banner, after the apps: what you can make comes after what you
+  // can use.
+  { kind: "build", app: featured("Caffeine") },
+  {
+    kind: "shelf",
+    title: "Talk and share",
+    apps: [
+      featured("distrikt"),
+      featured("Hobbi"),
+      featured("MORA"),
+      featured("Dmail Network"),
+      featured("Signals"),
+      featured("RuBaRu"),
+    ],
+  },
+  {
+    kind: "shelf",
+    title: "Play",
+    apps: [
+      featured("dragginz"),
+      featured("Cosmicrafts"),
+      featured("AutoRoyale"),
+    ],
+  },
+];
+
+/** Not in Internet Identity today: an app signed in to that isn't in My apps,
+ *  with when it was last used. */
+export interface RecentOnly {
+  app: FeaturedApp;
+  usedMillis: number;
+}
+
+export interface MockIdentity {
+  identity: LastUsedIdentity;
+  /** The access method this browser signed in with. */
+  signedInWith: { title: string; meta: string; kind: "passkey" | "sso" };
+  apps: ConceptApp[];
+  /** Used lately but never added to My apps. */
+  recentOnly: RecentOnly[];
+  scenario: Scenario;
+}
+
+export const identities: MockIdentity[] = [
+  {
+    identity: {
+      identityNumber: BigInt(10_042),
+      name: "Thomas",
+      authMethod: { passkey: { credentialId: new Uint8Array([1]) } },
+      lastUsedTimestampMillis: now,
+    },
+    signedInWith: {
+      title: "iCloud Keychain",
+      meta: "Synced across your Apple devices",
+      kind: "passkey",
+    },
+    apps: thomasApps,
+    recentOnly: [
+      { app: featured("Yuku"), usedMillis: now - 2 * HOUR },
+      { app: featured("Kinic"), usedMillis: now - DAY },
+      { app: featured("DecideAI"), usedMillis: now - 6 * DAY },
+    ],
+    scenario: {
+      recovery: "none",
+      access: "calm",
+      devices: "newBrowser",
+      integrations: "calm",
+    },
+  },
+  {
+    identity: {
+      identityNumber: BigInt(10_077),
+      name: "Work",
+      authMethod: { sso: { domain: "dfinity.org", name: "DFINITY" } },
+      lastUsedTimestampMillis: now - DAY,
+    },
+    signedInWith: {
+      title: "DFINITY SSO",
+      meta: "Your organization's sign-in",
+      kind: "sso",
+    },
+    apps: workApps,
+    recentOnly: [],
+    scenario: {
+      recovery: "calm",
+      access: "calm",
+      devices: "calm",
+      integrations: "local",
+    },
+  },
+  {
+    identity: {
+      identityNumber: BigInt(10_103),
+      name: "Testing",
+      authMethod: { passkey: { credentialId: new Uint8Array([2]) } },
+      lastUsedTimestampMillis: now - 5 * DAY,
+    },
+    signedInWith: {
+      title: "Google Password Manager",
+      meta: "Synced across your Android devices",
+      kind: "passkey",
+    },
+    apps: presetApps.map(fromPreset),
+    recentOnly: [],
+    scenario: {
+      recovery: "none",
+      access: "one",
+      devices: "calm",
+      integrations: "off",
+    },
+  },
+];
+
+/** Presets for the concept's scenario picker, so each card state can be
+ *  reviewed: the states in Thomas's list, and the ones they combine into. */
+export const scenarioPresets: { label: string; scenario: Scenario }[] = [
+  {
+    label: "No recovery, new browser",
+    scenario: identities[0].scenario,
+  },
+  {
+    label: "All set up",
+    scenario: {
+      recovery: "calm",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Recovery phrase only",
+    scenario: {
+      recovery: "phraseOnly",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Recovery email only",
+    scenario: {
+      recovery: "emailOnly",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Recovery phrase not verified",
+    scenario: {
+      recovery: "unverified",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Phrase not verified, email set up",
+    scenario: {
+      recovery: "unverifiedWithEmail",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Recovery email waiting for its code",
+    scenario: {
+      recovery: "emailPending",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "No recovery, one synced passkey",
+    scenario: {
+      recovery: "none",
+      access: "one",
+      devices: "calm",
+      integrations: "off",
+    },
+  },
+  {
+    label: "No recovery, passkey on this device only",
+    scenario: {
+      recovery: "none",
+      access: "oneLocal",
+      devices: "calm",
+      integrations: "off",
+    },
+  },
+  {
+    label: "Signed in with recovery phrase",
+    scenario: {
+      recovery: "usedPhrase",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Signed in with recovery email",
+    scenario: {
+      recovery: "usedEmail",
+      access: "calm",
+      devices: "calm",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "Phrase changed from a new browser",
+    scenario: {
+      recovery: "phraseReset",
+      access: "calm",
+      devices: "newBrowser",
+      integrations: "calm",
+    },
+  },
+  {
+    label: "YubiKey unused, many browsers",
+    scenario: {
+      recovery: "phraseOnly",
+      access: "unused",
+      devices: "many",
+      integrations: "cliConfirm",
+    },
+  },
+  {
+    label: "Local MCP server open",
+    scenario: {
+      recovery: "calm",
+      access: "calm",
+      devices: "calm",
+      integrations: "local",
+    },
+  },
+];
+
+export interface MockBrowser {
+  id: string;
+  description: BrowserDescription;
+  lastUsedMillis: number;
+  isCurrent?: boolean;
+  isNew?: boolean;
+  /** Unused long enough to suggest signing it out. */
+  isStale?: boolean;
+}
+
+const browser = (
+  id: string,
+  brand: BrowserDescription["brand"],
+  os: BrowserDescription["os"],
+  formFactor: BrowserDescription["form_factor"],
+  lastUsedMillis: number,
+  extra: Partial<MockBrowser> = {},
+): MockBrowser => ({
+  id,
+  description: { brand, os, form_factor: formFactor, model: [] },
+  lastUsedMillis,
+  ...extra,
+});
+
+/** The browsers behind the Devices card, for its state. */
+export const browsersFor = (devices: Scenario["devices"]): MockBrowser[] => {
+  const list: MockBrowser[] = [
+    browser("this", { Chrome: null }, { Macos: null }, { Desktop: null }, now, {
+      isCurrent: true,
+    }),
+    browser(
+      "iphone",
+      { Safari: null },
+      { Ios: null },
+      { Mobile: null },
+      now - DAY,
+    ),
+  ];
+  // Once the user says the new browser was theirs, it stays, no longer new.
+  if (devices === "newBrowser" || devices === "known") {
+    list.push(
+      browser(
+        "firefox",
+        { Firefox: null },
+        { Windows: null },
+        { Desktop: null },
+        now - 10 * MINUTE,
+        { isNew: devices === "newBrowser" },
+      ),
+    );
+  }
+  if (devices === "many") {
+    list.push(
+      browser(
+        "edge",
+        { Edge: null },
+        { Windows: null },
+        { Desktop: null },
+        now - 150 * DAY,
+        { isStale: true },
+      ),
+      browser(
+        "samsung",
+        { SamsungInternet: null },
+        { Android: null },
+        { Mobile: null },
+        now - 210 * DAY,
+        { isStale: true },
+      ),
+      browser(
+        "linux",
+        { Firefox: null },
+        { Linux: null },
+        { Desktop: null },
+        now - 300 * DAY,
+        { isStale: true },
+      ),
+      browser(
+        "ipad",
+        { Safari: null },
+        { Ipados: null },
+        { Tablet: null },
+        now - 7 * DAY,
+      ),
+    );
+  }
+  return list;
+};
