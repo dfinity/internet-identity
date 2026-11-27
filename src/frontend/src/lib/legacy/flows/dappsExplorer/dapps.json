@@ -778,6 +778,6 @@
     "oneLiner": "Cross-chain loans: borrow against your assets and lend to earn interest.",
     "website": "https://app.liquidium.fi",
     "authOrigins": ["https://cicgv-7yaaa-aaaar-qca2a-cai.icp0.io"],
-    "logo": "liquidium_logo.png"
+    "logo": "liquidium_logo.svg"
   }
 ]
