@@ -33,7 +33,7 @@ use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     ApplicationNumber, FrontendHostname, PrepareWebPushSubscriptionResponse,
-    PwaWebPushSubscription, SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
+    PwaWebPushSubscription, PwaWebPushSubscriptionStatus, SetWebPushSubscriptionError, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::collections::{BTreeMap, BTreeSet};
@@ -177,6 +177,8 @@ fn start_pwa_subscription(
     sender_seed: [u8; 32],
     now_ns: Timestamp,
 ) -> Result<(), PreparePwaSubscriptionError> {
+    use SetPwaSubscriptionError::*;
+
     if !is_notifications_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
@@ -188,19 +190,16 @@ fn start_pwa_subscription(
     let subscription = PwaSubscription {
         subscription: WebPushSubscription::Pending(pending_transport),
         account_principal,
+        disabled_at_ns: None,
     };
     write_pwa_subscription(holder, Some(subscription), None, now_ns).map_err(|err| match err {
-        SetPwaSubscriptionError::NotificationsNotAllowed => {
-            PreparePwaSubscriptionError::NotificationsNotAllowed
-        }
-        SetPwaSubscriptionError::FrontendNotListed => PreparePwaSubscriptionError::NoSuchFrontend,
-        SetPwaSubscriptionError::TransportKeyExpired => {
+        NotificationsNotAllowed => PreparePwaSubscriptionError::NotificationsNotAllowed,
+        FrontendNotListed => PreparePwaSubscriptionError::NoSuchFrontend,
+        TransportKeyExpired => {
             PreparePwaSubscriptionError::Internal("a transport key expired".to_string())
         }
-        SetPwaSubscriptionError::EndpointInUse => {
-            PreparePwaSubscriptionError::Internal("an endpoint is in use".to_string())
-        }
-        SetPwaSubscriptionError::Internal(reason) => PreparePwaSubscriptionError::Internal(reason),
+        EndpointInUse => PreparePwaSubscriptionError::Internal("an endpoint is in use".to_string()),
+        Internal(reason) => PreparePwaSubscriptionError::Internal(reason),
     })
 }
 
@@ -228,6 +227,7 @@ pub fn set_pwa_subscription(
     else {
         return Err(SetPwaSubscriptionError::TransportKeyExpired);
     };
+
     let ValidatedPwaWebPushSubscription {
         endpoint,
         subscriber_key,
@@ -248,6 +248,7 @@ pub fn set_pwa_subscription(
         }
     })
     .map_err(map_set_error)?;
+
     let displaced_holder = find_endpoint_holder(holder, &ready_subscription.endpoint);
     if let Some(endpoint_holder) = displaced_holder {
         let accepted_frontend_origin_hashes =
@@ -266,12 +267,68 @@ pub fn set_pwa_subscription(
     let subscription = PwaSubscription {
         subscription,
         account_principal,
+        disabled_at_ns: None,
     };
     write_pwa_subscription(holder, Some(subscription), displaced_holder, now_ns)
 }
 
+/// Why an installed web app's subscription was not disabled.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DisablePwaSubscriptionError {
+    /// The app's cached alternative origins no longer name the frontend of the slot.
+    FrontendNotListed,
+    /// Nothing the caller can act on: a storage failure, and why.
+    Internal(String),
+}
+
+/// Disables `holder`'s slot as of `now_ns` where it delivers for the account
+/// `account_principal` names: nothing is sent to it from then on, while it keeps counting
+/// as the way its device is notified. A slot already disabled keeps the time it was
+/// disabled at. One that holds nothing, or delivers for another account, is left as it
+/// is. Preparing or setting a subscription on the slot again writes it enabled; removing
+/// the slot's subscription leaves it disabled, and so do a lapsed session and a push
+/// service that answers its endpoint gone.
+pub fn disable_pwa_subscription(
+    holder: PwaSubscriptionHolder,
+    account_principal: Principal,
+    now_ns: Timestamp,
+) -> Result<(), DisablePwaSubscriptionError> {
+    use SetPwaSubscriptionError::*;
+
+    let Some(held_subscription) = read_pwa_subscription(holder) else {
+        return Ok(());
+    };
+    let PwaSubscription {
+        subscription,
+        account_principal: held_account_principal,
+        disabled_at_ns,
+    } = held_subscription;
+    if held_account_principal != account_principal || disabled_at_ns.is_some() {
+        return Ok(());
+    }
+
+    let disabled_at_ns = Some(now_ns);
+    let subscription = PwaSubscription {
+        subscription,
+        account_principal,
+        disabled_at_ns,
+    };
+    write_pwa_subscription(holder, Some(subscription), None, now_ns).map_err(|err| match err {
+        FrontendNotListed => DisablePwaSubscriptionError::FrontendNotListed,
+        Internal(reason) => DisablePwaSubscriptionError::Internal(reason),
+        NotificationsNotAllowed => {
+            DisablePwaSubscriptionError::Internal("notifications are not allowed".to_string())
+        }
+        TransportKeyExpired => {
+            DisablePwaSubscriptionError::Internal("a transport key expired".to_string())
+        }
+        EndpointInUse => DisablePwaSubscriptionError::Internal("an endpoint is in use".to_string()),
+    })
+}
+
 /// Empties `holder`'s slot where it delivers for `account_principal`'s account.
-/// One that holds nothing, or delivers for another account, is left as it is. `now_ns`
+/// One that holds nothing, delivers for another account, or was disabled by its app, is
+/// left as it is: a disabled slot mutes its device until the user allows it again. `now_ns`
 /// is the call's time.
 fn remove_pwa_subscription(
     holder: PwaSubscriptionHolder,
@@ -282,6 +339,7 @@ fn remove_pwa_subscription(
         Some(held_subscription) if held_subscription.account_principal != account_principal => {
             return Ok(())
         }
+        Some(held_subscription) if held_subscription.disabled_at_ns.is_some() => return Ok(()),
         Some(_) => {}
         None => return Ok(()),
     }
@@ -310,7 +368,8 @@ fn find_endpoint_holder(
 }
 
 /// The subscription a relay answered gone for, dropped where `holder`'s slot
-/// still holds that endpoint. `now_ns` is the call's time.
+/// still holds that endpoint and its app did not disable it: a disabled slot mutes its
+/// device whether or not its endpoint still delivers. `now_ns` is the call's time.
 pub(crate) fn clear_gone_pwa_subscription(
     holder: PwaSubscriptionHolder,
     endpoint: &str,
@@ -319,6 +378,9 @@ pub(crate) fn clear_gone_pwa_subscription(
     let Some(held_subscription) = read_pwa_subscription(holder) else {
         return Ok(());
     };
+    if held_subscription.disabled_at_ns.is_some() {
+        return Ok(());
+    }
     let Some(registered_subscription) = held_subscription.subscription.into_ready() else {
         return Ok(());
     };
@@ -328,19 +390,32 @@ pub(crate) fn clear_gone_pwa_subscription(
     write_pwa_subscription(holder, None, None, now_ns).map_err(|err| format!("{err:?}"))
 }
 
-/// The endpoint `holder`'s slot is subscribed at, where it is ready and delivers
-/// for `account_principal`'s account.
+/// What `holder`'s slot is for `account_principal`'s account at `now_ns`: `Disabled` where
+/// it delivers for that account and its app disabled it, ready or not; `Subscribed` where
+/// it delivers for that account and is ready; `NotSubscribed` otherwise.
 pub fn read_pwa_subscription_status(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
     now_ns: Timestamp,
-) -> Option<WebPushSubscriptionStatus> {
-    let held_subscription = read_pwa_subscription(holder)?;
-    if held_subscription.account_principal != account_principal {
-        return None;
+) -> PwaWebPushSubscriptionStatus {
+    let Some(held_subscription) = read_pwa_subscription(holder) else {
+        return PwaWebPushSubscriptionStatus::NotSubscribed;
+    };
+    let PwaSubscription {
+        subscription,
+        account_principal: held_account_principal,
+        disabled_at_ns,
+    } = held_subscription;
+    if held_account_principal != account_principal {
+        return PwaWebPushSubscriptionStatus::NotSubscribed;
     }
-    let ready_subscription = held_subscription.subscription.into_ready()?;
-    Some(subscription::status_of(&ready_subscription, now_ns))
+    if disabled_at_ns.is_some() {
+        return PwaWebPushSubscriptionStatus::Disabled;
+    }
+    let Some(ready_subscription) = subscription.into_ready() else {
+        return PwaWebPushSubscriptionStatus::NotSubscribed;
+    };
+    PwaWebPushSubscriptionStatus::Subscribed(subscription::status_of(&ready_subscription, now_ns))
 }
 
 /// Whether `holder`'s slot holds a subscription that delivers for the account
@@ -381,6 +456,7 @@ pub(crate) fn write_pwa_subscription(
     }
     let stale_holders =
         find_stale_pwa_slots(holder, accepted_frontend_origin_hashes.as_ref(), now_ns);
+
     storage_borrow_mut(|storage| {
         storage.write_pwa_webpush_subscription(
             holder,
@@ -412,8 +488,9 @@ fn read_accepted_frontend_origin_hashes(
 /// The slots of the identity's config for the app `holder` is on, on every browser
 /// entry, that are stale at `now_ns`: a slot of a frontend whose origin hash
 /// `accepted_frontend_origin_hashes` does not hold (none, where it is `None`), and a slot
-/// whose account has no session on the slot's browser entry that is neither expired nor
-/// idle.
+/// its app did not disable whose account has no session on the slot's browser entry that
+/// is neither expired nor idle. A disabled slot outlives its sessions: it mutes its device
+/// until the user allows it again.
 fn find_stale_pwa_slots(
     holder: PwaSubscriptionHolder,
     accepted_frontend_origin_hashes: Option<&BTreeSet<OriginSha256>>,
@@ -425,8 +502,10 @@ fn find_stale_pwa_slots(
         else {
             return BTreeSet::new();
         };
+
         let mut stale_holders = BTreeSet::new();
         let mut sessions_by_account: BTreeMap<Principal, Vec<Session>> = BTreeMap::new();
+
         for (browser_id, frontend_origin_hash, held_subscription) in
             config.pwa_webpush_subscription_slots()
         {
@@ -439,6 +518,9 @@ fn find_stale_pwa_slots(
                 .is_none_or(|hashes| hashes.contains(&frontend_origin_hash));
             if !is_frontend_accepted {
                 stale_holders.insert(slot_holder);
+                continue;
+            }
+            if held_subscription.disabled_at_ns.is_some() {
                 continue;
             }
             let account_principal = held_subscription.account_principal;
@@ -459,6 +541,7 @@ fn find_stale_pwa_slots(
                 stale_holders.insert(slot_holder);
             }
         }
+
         stale_holders
     })
 }
@@ -504,6 +587,8 @@ fn authorize_frontend(
     frontend_origin: Option<&ApplicationOrigin>,
     now_ns: Timestamp,
 ) -> Result<FrontendAuthorization, PreparePwaSubscriptionError> {
+    use AlternativeOrigin::*;
+
     let Some(frontend_origin) = frontend_origin else {
         return Ok(FrontendAuthorization::Accepted);
     };
@@ -519,9 +604,9 @@ fn authorize_frontend(
         frontend_origin,
         now_ns,
     ) {
-        AlternativeOrigin::Listed => Ok(FrontendAuthorization::Accepted),
-        AlternativeOrigin::NotListed => Err(PreparePwaSubscriptionError::NoSuchFrontend),
-        AlternativeOrigin::Pending { .. } => Ok(FrontendAuthorization::Pending),
+        Listed => Ok(FrontendAuthorization::Accepted),
+        NotListed => Err(PreparePwaSubscriptionError::NoSuchFrontend),
+        Pending { .. } => Ok(FrontendAuthorization::Pending),
     }
 }
 
@@ -535,6 +620,8 @@ pub fn prepare_pwa_subscription(
     vapid_public_key: Vec<u8>,
     now_ns: Timestamp,
 ) -> Result<PreparedPwaSubscription, PreparePwaSubscriptionError> {
+    use FrontendAuthorization::*;
+
     let holder = resolve_pwa_holder(session, frontend_origin)
         .map_err(PreparePwaSubscriptionError::Internal)?;
     // Before the pool is asked, so an app without consent is told so rather than to come
@@ -543,9 +630,10 @@ pub fn prepare_pwa_subscription(
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
     match authorize_frontend(session, frontend_origin, now_ns)? {
-        FrontendAuthorization::Accepted => {}
-        FrontendAuthorization::Pending => return Ok(PreparedPwaSubscription::Pending),
+        Accepted => {}
+        Pending => return Ok(PreparedPwaSubscription::Pending),
     }
+
     let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {
         return Ok(PreparedPwaSubscription::Pending);
     };
@@ -557,6 +645,7 @@ pub fn prepare_pwa_subscription(
         seeds.sender_seed,
         now_ns,
     )?;
+
     let vapid_public_key = ByteBuf::from(vapid_public_key);
     let transport_public_key = ByteBuf::from(transport_public_key);
     Ok(PreparedPwaSubscription::Keys(

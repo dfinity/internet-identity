@@ -87,12 +87,14 @@ fn read_posted_endpoint<M: Memory + Clone>(
     browser_id: BrowserId,
     target: DeliveryTarget,
 ) -> Option<String> {
+    use DeliveryTarget::*;
+
     match target {
-        DeliveryTarget::Browser => anchor
+        Browser => anchor
             .webpush_subscription(browser_id)
             .and_then(WebPushSubscription::ready)
             .map(|registered_subscription| registered_subscription.endpoint.as_str().to_string()),
-        DeliveryTarget::Pwa { .. } => target
+        Pwa { .. } => target
             .pwa_holder(anchor.anchor_number(), browser_id)
             .and_then(|holder| {
                 let config = storage
@@ -101,7 +103,7 @@ fn read_posted_endpoint<M: Memory + Clone>(
             })
             .and_then(|held_subscription| held_subscription.subscription.into_ready())
             .map(|registered_subscription| registered_subscription.endpoint.into_string()),
-        DeliveryTarget::App(app_id) => {
+        App(app_id) => {
             // The app's address stands for this entry only while the entry still
             // points at it. A switch to another record, or an install started, makes
             // the queue somebody else's, and a late failure from the old address

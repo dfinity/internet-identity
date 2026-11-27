@@ -22,6 +22,8 @@ pub struct StorablePwaSubscription {
     pub subscription: StorableWebPushSubscription,
     #[cbor(n(1), with = "minicbor::bytes")]
     pub account_principal: Vec<u8>,
+    #[n(2)]
+    pub disabled_at_ns: Option<Timestamp>, // None while the app has not disabled it
 }
 
 /// [`StorablePwaSubscription`] read back.
@@ -29,6 +31,12 @@ pub struct StorablePwaSubscription {
 pub struct PwaSubscription {
     pub subscription: WebPushSubscription,
     pub account_principal: Principal,
+    /// When the app disabled the subscription on its device: nothing is sent to it from
+    /// then on, and the device is not notified another way, until the slot is prepared or
+    /// set again or the user allows notifications there again. A disabled slot outlives
+    /// its sessions, its endpoint and a removal without a subscription. `None` while the
+    /// app has not.
+    pub disabled_at_ns: Option<Timestamp>,
 }
 
 impl TryFrom<StorablePwaSubscription> for PwaSubscription {
@@ -40,6 +48,7 @@ impl TryFrom<StorablePwaSubscription> for PwaSubscription {
         let StorablePwaSubscription {
             subscription,
             account_principal,
+            disabled_at_ns,
         } = value;
         let subscription = WebPushSubscription::try_from(subscription)?;
         let account_principal = Principal::try_from_slice(&account_principal)
@@ -47,6 +56,7 @@ impl TryFrom<StorablePwaSubscription> for PwaSubscription {
         Ok(Self {
             subscription,
             account_principal,
+            disabled_at_ns,
         })
     }
 }
@@ -56,12 +66,14 @@ impl From<PwaSubscription> for StorablePwaSubscription {
         let PwaSubscription {
             subscription,
             account_principal,
+            disabled_at_ns,
         } = value;
         let subscription = StorableWebPushSubscription::from(subscription);
         let account_principal = account_principal.as_slice().to_vec();
         Self {
             subscription,
             account_principal,
+            disabled_at_ns,
         }
     }
 }
@@ -298,6 +310,7 @@ mod tests {
                         minted_at_ns: 6,
                     },
                     account_principal: vec![5; 29],
+                    disabled_at_ns: None,
                 },
             )])),
         };
@@ -330,6 +343,7 @@ mod tests {
                 minted_at_ns: 6,
             },
             account_principal: vec![5; 29],
+            disabled_at_ns: None,
         }
     }
 
@@ -351,6 +365,46 @@ mod tests {
         let decoded = AnchorApplicationConfig::from_bytes(Cow::Borrowed(&buffer));
         assert_eq!(decoded.pwa_webpush_subscriptions, None);
         assert_eq!(decoded.last_notified_at_ns, Some(9));
+    }
+
+    /// A subscription written before it could be disabled, without key 2, decodes as
+    /// enabled, and a disabled one keeps when it was disabled.
+    #[test]
+    fn should_read_a_subscription_without_a_disabled_time_as_enabled() {
+        #[derive(Encode)]
+        #[cbor(map)]
+        struct StorablePwaSubscriptionWithoutDisabledTime {
+            #[n(0)]
+            subscription: StorableWebPushSubscription,
+            #[cbor(n(1), with = "minicbor::bytes")]
+            account_principal: Vec<u8>,
+        }
+        let StorablePwaSubscription {
+            subscription,
+            account_principal,
+            disabled_at_ns: _,
+        } = pending_subscription(1);
+        let mut buffer = Vec::new();
+        minicbor::encode(
+            StorablePwaSubscriptionWithoutDisabledTime {
+                subscription,
+                account_principal,
+            },
+            &mut buffer,
+        )
+        .unwrap();
+
+        let decoded: StorablePwaSubscription = minicbor::decode(&buffer).unwrap();
+        assert_eq!(decoded, pending_subscription(1));
+
+        let disabled_subscription = StorablePwaSubscription {
+            disabled_at_ns: Some(8),
+            ..pending_subscription(1)
+        };
+        let mut buffer = Vec::new();
+        minicbor::encode(&disabled_subscription, &mut buffer).unwrap();
+        let decoded: StorablePwaSubscription = minicbor::decode(&buffer).unwrap();
+        assert_eq!(decoded, disabled_subscription);
     }
 
     #[test]
@@ -429,6 +483,7 @@ mod tests {
                         minted_at_ns: 6,
                     },
                     account_principal: vec![5; 29],
+                    disabled_at_ns: None,
                 },
             )])),
         };

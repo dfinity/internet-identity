@@ -34,11 +34,13 @@ const pastLimit: SubscriptionDeliveryStatus = {
   ],
   probe_sent_at_ns: [],
   has_probe_had_its_answer_time: false,
+  is_disabled: [false],
 };
 const underLimit: SubscriptionDeliveryStatus = {
   unanswered_pushes: [],
   probe_sent_at_ns: [],
   has_probe_had_its_answer_time: false,
+  is_disabled: [false],
 };
 /** A probe was sent, has had its answer time and nothing removed it, whatever the count
  *  says. */
@@ -46,6 +48,7 @@ const probeWaiting: SubscriptionDeliveryStatus = {
   unanswered_pushes: [],
   probe_sent_at_ns: [BigInt(1)],
   has_probe_had_its_answer_time: true,
+  is_disabled: [false],
 };
 
 const consenting: IdentityCalls = {
@@ -214,6 +217,7 @@ describe("checkNotificationPath", () => {
                     probe_sent_at_ns: [BigInt(1)],
                     has_probe_had_its_answer_time:
                       Date.now() - probedAtMs >= 10_000,
+                    is_disabled: [false],
                   },
                 ],
               },

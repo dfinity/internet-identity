@@ -22,12 +22,14 @@ use internet_identity_interface::internet_identity::types::{
     AppRemovePwaNotificationRequest, AppSetPwaWebPushSubscriptionError,
     AppSetPwaWebPushSubscriptionRequest, NotAcceptedReason, Notification,
     NotificationDelegationError, PrepareAccountSessionResponse,
-    PrepareNotificationDelegationRequest, PwaNotification, RevokeBrowserSessionsRequest,
-    SendNotificationArg, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    PrepareNotificationDelegationRequest, PwaNotification, PwaWebPushSubscriptionStatus,
+    RevokeBrowserSessionsRequest, SendNotificationArg, SetWebPushSubscriptionRequest,
+    WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::{CanisterHttpMethod, CanisterHttpRequest};
 use std::time::Duration;
 
+mod disable;
 mod same_device;
 mod suite;
 
@@ -790,7 +792,10 @@ fn should_give_an_endpoint_to_another_identity_once_its_holders_sessions_expired
         principal_1(),
         session_request(anchor, APP, &BrowserKey::new(1).successor()),
     ));
-    assert_eq!(pwa_status(&env, canister_id, first_session_again), None);
+    assert_eq!(
+        pwa_status(&env, canister_id, first_session_again),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
     assert_eq!(
         deliver(
             &env,
@@ -857,11 +862,15 @@ fn should_drop_a_slot_whose_accounts_sessions_expired_on_the_next_write_to_its_c
         principal_1(),
         session_request(anchor, APP, &BrowserKey::new(1).successor()),
     ));
-    assert_eq!(pwa_status(&env, canister_id, first_session_again), None);
     assert_eq!(
-        pwa_status(&env, canister_id, other_browser_session).map(|status| status.endpoint),
-        Some(OTHER_PWA_ENDPOINT.to_string())
+        pwa_status(&env, canister_id, first_session_again),
+        PwaWebPushSubscriptionStatus::NotSubscribed
     );
+    assert!(matches!(
+        pwa_status(&env, canister_id, other_browser_session),
+        PwaWebPushSubscriptionStatus::Subscribed(WebPushSubscriptionStatus { endpoint, .. })
+            if endpoint == OTHER_PWA_ENDPOINT
+    ));
 }
 
 #[test]
@@ -941,7 +950,7 @@ fn pwa_status(
     env: &PocketIc,
     canister_id: CanisterId,
     session: Principal,
-) -> Option<WebPushSubscriptionStatus> {
+) -> PwaWebPushSubscriptionStatus {
     app_get_pwa_webpush_subscription_status(
         env,
         canister_id,
@@ -960,7 +969,10 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
     let env = env();
     let (canister_id, anchor, first_account_session) = install_signed_in(&env, None, None);
     let first_session = session_of(&first_account_session);
-    assert_eq!(pwa_status(&env, canister_id, first_session), None);
+    assert_eq!(
+        pwa_status(&env, canister_id, first_session),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
 
     // A prepared subscription awaiting its set is not one yet.
     let prepare_result = (0..10)
@@ -985,7 +997,10 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
         prepare_result,
         AppPreparePwaWebPushSubscriptionResult::Ok(_)
     ));
-    assert_eq!(pwa_status(&env, canister_id, first_session), None);
+    assert_eq!(
+        pwa_status(&env, canister_id, first_session),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
 
     subscribe_pwa_webpush(
         &env,
@@ -998,7 +1013,7 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
     .expect("subscribe refused");
     assert_eq!(
         pwa_status(&env, canister_id, first_session),
-        Some(WebPushSubscriptionStatus {
+        PwaWebPushSubscriptionStatus::Subscribed(WebPushSubscriptionStatus {
             endpoint: PWA_ENDPOINT.to_string(),
             unanswered_pushes: None,
             probe_sent_at_ns: None,
@@ -1035,10 +1050,13 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
         &TEST_AUTH_SECRET,
     )?
     .expect("subscribe refused");
-    assert_eq!(pwa_status(&env, canister_id, first_session), None);
+    assert_eq!(
+        pwa_status(&env, canister_id, first_session),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
     assert_eq!(
         pwa_status(&env, canister_id, other_session),
-        Some(WebPushSubscriptionStatus {
+        PwaWebPushSubscriptionStatus::Subscribed(WebPushSubscriptionStatus {
             endpoint: PWA_ENDPOINT.to_string(),
             unanswered_pushes: None,
             probe_sent_at_ns: None,
@@ -1055,7 +1073,10 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
         },
     )?
     .expect("remove refused");
-    assert_eq!(pwa_status(&env, canister_id, other_session), None);
+    assert_eq!(
+        pwa_status(&env, canister_id, other_session),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
     Ok(())
 }
 

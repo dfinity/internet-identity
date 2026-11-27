@@ -32,6 +32,10 @@ A decoding mistake here traps every read of the affected records and can take si
 - `mem/monotonic-ids` Ids that delegations or principals derive from come from a stored monotonic counter, never from a collection's length, and are never reissued.
 - `mem/count-before-insert` Bump a counter before the insert it counts: a count that is too high is recoverable, a missing one is not.
 
+## Range queries
+
+- `mem/no-raw-ranges` A range query over a stable map goes through a named, documented helper (`Storage::anchor_application_configs`), never a raw `.range(...)` at the call site. Its doc comment states which bounds the range includes, so a reader never has to work out whether `..=` or `..` was meant.
+
 ## Upgrades
 
 - `mem/heap-resets` Heap `thread_local!` state resets on every upgrade. Anything that must survive (sequence counters, queued work) lives in stable memory or is rebuilt from it.
