@@ -2959,6 +2959,39 @@ mod tests {
         }
 
         #[test]
+        fn lists_private_relay_verified_email_only_when_requested() {
+            let mut anchor = anchor_with_verified(&["alice@example.com"]);
+            anchor.verified_emails.push(VerifiedEmail {
+                address: "ep9ks2tnph@privaterelay.appleid.com".to_string(),
+                verified_at: 2_000,
+                is_private_relay: Some(true),
+            });
+
+            pretty_assert_eq!(
+                anchor.list_available_attributes(None, None, false),
+                vec![
+                    ("email".to_string(), b"alice@example.com".to_vec()),
+                    ("verified_email".to_string(), b"alice@example.com".to_vec()),
+                ]
+            );
+            pretty_assert_eq!(
+                anchor.list_available_attributes(None, None, true),
+                vec![
+                    ("email".to_string(), b"alice@example.com".to_vec()),
+                    ("verified_email".to_string(), b"alice@example.com".to_vec()),
+                    (
+                        "email".to_string(),
+                        b"ep9ks2tnph@privaterelay.appleid.com".to_vec()
+                    ),
+                    (
+                        "verified_email".to_string(),
+                        b"ep9ks2tnph@privaterelay.appleid.com".to_vec()
+                    ),
+                ]
+            );
+        }
+
+        #[test]
         fn filters_by_unscoped_key() {
             let anchor = anchor_with_verified(&["alice@example.com"]);
             let result = anchor.list_available_attributes(
