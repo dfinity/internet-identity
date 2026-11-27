@@ -3102,7 +3102,7 @@ export interface _SERVICE {
    * app_set_pwa_webpush_subscription, or where it delivers for another account.
    */
   'app_get_pwa_webpush_subscription_status' : ActorMethod<
-    [[] | [AppGetPwaWebPushSubscriptionStatusRequest]],
+    [AppGetPwaWebPushSubscriptionStatusRequest],
     { 'Ok' : [] | [WebPushSubscriptionStatus] } |
       { 'Err' : AppGetPwaWebPushSubscriptionStatusError }
   >,
@@ -3144,7 +3144,7 @@ export interface _SERVICE {
    * VAPID key has failed, this answers InternalCanisterError with the reason.
    */
   'app_prepare_pwa_webpush_subscription' : ActorMethod<
-    [[] | [AppPreparePwaWebPushSubscriptionRequest]],
+    [AppPreparePwaWebPushSubscriptionRequest],
     { 'Ok' : PrepareWebPushSubscriptionResponse } |
       { 'Err' : AppPreparePwaWebPushSubscriptionError } |
       { 'Pending' : null }
@@ -3164,7 +3164,7 @@ export interface _SERVICE {
    * its unanswered pushes.
    */
   'app_probe_pwa_webpush_subscription' : ActorMethod<
-    [[] | [AppProbePwaWebPushSubscriptionRequest]],
+    [AppProbePwaWebPushSubscriptionRequest],
     { 'Ok' : null } |
       { 'Err' : AppProbePwaWebPushSubscriptionError }
   >,

@@ -16,7 +16,8 @@ use canister_tests::api::internet_identity::notifications::{
 use canister_tests::framework::{get_metrics, II_WASM_PREVIOUS};
 use internet_identity_interface::internet_identity::types::{
     AccountUpdate, AppGetPwaNotificationError, AppGetPwaNotificationRequest,
-    AppGetPwaWebPushSubscriptionStatusError, AppPreparePwaWebPushSubscriptionError,
+    AppGetPwaWebPushSubscriptionStatusError, AppGetPwaWebPushSubscriptionStatusRequest,
+    AppPreparePwaWebPushSubscriptionError, AppPreparePwaWebPushSubscriptionRequest,
     AppPreparePwaWebPushSubscriptionResult, AppRemovePwaNotificationError,
     AppRemovePwaNotificationRequest, AppSetPwaWebPushSubscriptionError,
     AppSetPwaWebPushSubscriptionRequest, NotAcceptedReason, Notification,
@@ -379,7 +380,14 @@ fn should_refuse_every_caller_without_a_live_app_session() -> Result<(), RejectR
         Principal::anonymous(),
     ] {
         assert_eq!(
-            app_prepare_pwa_webpush_subscription(&env, canister_id, stranger, None)?,
+            app_prepare_pwa_webpush_subscription(
+                &env,
+                canister_id,
+                stranger,
+                AppPreparePwaWebPushSubscriptionRequest {
+                    frontend_origin: None
+                }
+            )?,
             AppPreparePwaWebPushSubscriptionResult::Err(
                 AppPreparePwaWebPushSubscriptionError::NoSuchSession
             )
@@ -421,7 +429,14 @@ fn should_refuse_every_caller_without_a_live_app_session() -> Result<(), RejectR
             Err(AppRemovePwaNotificationError::NoSuchSession)
         );
         assert_eq!(
-            app_get_pwa_webpush_subscription_status(&env, canister_id, stranger, None)?,
+            app_get_pwa_webpush_subscription_status(
+                &env,
+                canister_id,
+                stranger,
+                AppGetPwaWebPushSubscriptionStatusRequest {
+                    frontend_origin: None
+                }
+            )?,
             Err(AppGetPwaWebPushSubscriptionStatusError::NoSuchSession)
         );
     }
@@ -447,7 +462,14 @@ fn should_refuse_every_method_while_notifications_are_disabled() -> Result<(), R
     ));
 
     assert!(matches!(
-        app_prepare_pwa_webpush_subscription(&env, canister_id, session, None)?,
+        app_prepare_pwa_webpush_subscription(
+            &env,
+            canister_id,
+            session,
+            AppPreparePwaWebPushSubscriptionRequest {
+                frontend_origin: None
+            }
+        )?,
         AppPreparePwaWebPushSubscriptionResult::Err(
             AppPreparePwaWebPushSubscriptionError::InternalCanisterError(_)
         )
@@ -489,7 +511,14 @@ fn should_refuse_every_method_while_notifications_are_disabled() -> Result<(), R
         Err(AppRemovePwaNotificationError::InternalCanisterError(_))
     ));
     assert!(matches!(
-        app_get_pwa_webpush_subscription_status(&env, canister_id, session, None)?,
+        app_get_pwa_webpush_subscription_status(
+            &env,
+            canister_id,
+            session,
+            AppGetPwaWebPushSubscriptionStatusRequest {
+                frontend_origin: None
+            }
+        )?,
         Err(AppGetPwaWebPushSubscriptionStatusError::InternalCanisterError(_))
     ));
     Ok(())
@@ -509,7 +538,14 @@ fn should_refuse_to_subscribe_an_app_the_identity_has_not_allowed() -> Result<()
     ));
 
     assert_eq!(
-        app_prepare_pwa_webpush_subscription(&env, canister_id, session, None)?,
+        app_prepare_pwa_webpush_subscription(
+            &env,
+            canister_id,
+            session,
+            AppPreparePwaWebPushSubscriptionRequest {
+                frontend_origin: None
+            }
+        )?,
         AppPreparePwaWebPushSubscriptionResult::Err(
             AppPreparePwaWebPushSubscriptionError::NotificationsNotAllowed
         )
@@ -906,9 +942,16 @@ fn pwa_status(
     canister_id: CanisterId,
     session: Principal,
 ) -> Option<WebPushSubscriptionStatus> {
-    app_get_pwa_webpush_subscription_status(env, canister_id, session, None)
-        .expect("status rejected")
-        .expect("status refused")
+    app_get_pwa_webpush_subscription_status(
+        env,
+        canister_id,
+        session,
+        AppGetPwaWebPushSubscriptionStatusRequest {
+            frontend_origin: None,
+        },
+    )
+    .expect("status rejected")
+    .expect("status refused")
 }
 
 #[test]
@@ -921,7 +964,16 @@ fn should_report_the_endpoint_only_while_it_delivers_for_the_sessions_account(
 
     // A prepared subscription awaiting its set is not one yet.
     let prepare_result = (0..10)
-        .map(|_| app_prepare_pwa_webpush_subscription(&env, canister_id, first_session, None))
+        .map(|_| {
+            app_prepare_pwa_webpush_subscription(
+                &env,
+                canister_id,
+                first_session,
+                AppPreparePwaWebPushSubscriptionRequest {
+                    frontend_origin: None,
+                },
+            )
+        })
         .find(|prepare_result| {
             !matches!(
                 prepare_result,
@@ -2130,7 +2182,14 @@ fn should_answer_the_failure_once_the_vapid_key_fetch_failed() -> Result<(), Rej
     }
     assert!(is_refused, "the failed fetch is answered to a browser");
     assert!(matches!(
-        app_prepare_pwa_webpush_subscription(&env, canister_id, session, None)?,
+        app_prepare_pwa_webpush_subscription(
+            &env,
+            canister_id,
+            session,
+            AppPreparePwaWebPushSubscriptionRequest {
+                frontend_origin: None
+            }
+        )?,
         AppPreparePwaWebPushSubscriptionResult::Err(
             AppPreparePwaWebPushSubscriptionError::InternalCanisterError(_)
         )
@@ -2145,7 +2204,14 @@ fn should_answer_pending_to_an_installed_app_until_the_vapid_key_is_held(
     let (canister_id, anchor, _, session) = install_fetching_the_vapid_key(&env);
 
     assert_eq!(
-        app_prepare_pwa_webpush_subscription(&env, canister_id, session, None)?,
+        app_prepare_pwa_webpush_subscription(
+            &env,
+            canister_id,
+            session,
+            AppPreparePwaWebPushSubscriptionRequest {
+                frontend_origin: None
+            }
+        )?,
         AppPreparePwaWebPushSubscriptionResult::Pending
     );
 
@@ -2154,7 +2220,14 @@ fn should_answer_pending_to_an_installed_app_until_the_vapid_key_is_held(
     for _ in 0..OUTCALL_ROUNDS {
         env.tick();
         if matches!(
-            app_prepare_pwa_webpush_subscription(&env, canister_id, session, None)?,
+            app_prepare_pwa_webpush_subscription(
+                &env,
+                canister_id,
+                session,
+                AppPreparePwaWebPushSubscriptionRequest {
+                    frontend_origin: None
+                }
+            )?,
             AppPreparePwaWebPushSubscriptionResult::Ok(_)
         ) {
             is_ready = true;

@@ -1292,7 +1292,7 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
 /// app's alternative origins are fetched.
 #[update]
 fn app_prepare_pwa_webpush_subscription(
-    request: Option<AppPreparePwaWebPushSubscriptionRequest>,
+    request: AppPreparePwaWebPushSubscriptionRequest,
 ) -> AppPreparePwaWebPushSubscriptionResult {
     use AppPreparePwaWebPushSubscriptionError::*;
 
@@ -1303,8 +1303,7 @@ fn app_prepare_pwa_webpush_subscription(
     if let Err(err) = enabled_or(InternalCanisterError) {
         return AppPreparePwaWebPushSubscriptionResult::Err(err);
     }
-    let frontend_origin = request
-        .and_then(|AppPreparePwaWebPushSubscriptionRequest { frontend_origin }| frontend_origin);
+    let AppPreparePwaWebPushSubscriptionRequest { frontend_origin } = request;
     let frontend_origin = match pwa_subscription::validate_frontend_origin(frontend_origin) {
         Ok(frontend_origin) => frontend_origin,
         Err(reason) => {
@@ -1387,15 +1386,14 @@ fn app_set_pwa_webpush_subscription(
 /// while the error is only ever a refused caller.
 #[query]
 fn app_get_pwa_webpush_subscription_status(
-    request: Option<AppGetPwaWebPushSubscriptionStatusRequest>,
+    request: AppGetPwaWebPushSubscriptionStatusRequest,
 ) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
     use AppGetPwaWebPushSubscriptionStatusError::*;
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let frontend_origin = request
-        .and_then(|AppGetPwaWebPushSubscriptionStatusRequest { frontend_origin }| frontend_origin);
+    let AppGetPwaWebPushSubscriptionStatusRequest { frontend_origin } = request;
     let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
         .map_err(InternalCanisterError)?;
     let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())
@@ -1478,15 +1476,14 @@ fn app_remove_pwa_notification(
 /// removed.
 #[update]
 fn app_probe_pwa_webpush_subscription(
-    request: Option<AppProbePwaWebPushSubscriptionRequest>,
+    request: AppProbePwaWebPushSubscriptionRequest,
 ) -> Result<(), AppProbePwaWebPushSubscriptionError> {
     use AppProbePwaWebPushSubscriptionError::*;
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
     enabled_or(InternalCanisterError)?;
-    let frontend_origin = request
-        .and_then(|AppProbePwaWebPushSubscriptionRequest { frontend_origin }| frontend_origin);
+    let AppProbePwaWebPushSubscriptionRequest { frontend_origin } = request;
     let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
         .map_err(InternalCanisterError)?;
     let holder = pwa_subscription::resolve_pwa_holder(&session, frontend_origin.as_ref())

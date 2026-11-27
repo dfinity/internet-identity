@@ -1398,7 +1398,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'app_get_pwa_webpush_subscription_status' : IDL.Func(
-        [IDL.Opt(AppGetPwaWebPushSubscriptionStatusRequest)],
+        [AppGetPwaWebPushSubscriptionStatusRequest],
         [
           IDL.Variant({
             'Ok' : IDL.Opt(WebPushSubscriptionStatus),
@@ -1438,7 +1438,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'app_prepare_pwa_webpush_subscription' : IDL.Func(
-        [IDL.Opt(AppPreparePwaWebPushSubscriptionRequest)],
+        [AppPreparePwaWebPushSubscriptionRequest],
         [
           IDL.Variant({
             'Ok' : PrepareWebPushSubscriptionResponse,
@@ -1459,7 +1459,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'app_probe_pwa_webpush_subscription' : IDL.Func(
-        [IDL.Opt(AppProbePwaWebPushSubscriptionRequest)],
+        [AppProbePwaWebPushSubscriptionRequest],
         [
           IDL.Variant({
             'Ok' : IDL.Null,

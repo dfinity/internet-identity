@@ -11,10 +11,12 @@ use canister_tests::api::internet_identity::notifications::{
     remove_unanswered_pwa_webpush_subscriptions,
 };
 use internet_identity_interface::internet_identity::types::{
-    AppGetPwaNotificationResponse, AppGetSameDeviceLinkStatusError, AppPrepareSameDeviceLinkError,
-    AppPrepareSameDeviceLinkRequest, AppProbePwaWebPushSubscriptionError, ClaimSameDeviceLinkError,
-    ClaimSameDeviceLinkRequest, GetNotificationPathStatusError, GetNotificationPathStatusRequest,
-    InstalledAppsPath, NotificationPath, NotificationPathStatus, ProbeNotificationPathError,
+    AppGetPwaNotificationResponse, AppGetPwaWebPushSubscriptionStatusRequest,
+    AppGetSameDeviceLinkStatusError, AppPrepareSameDeviceLinkError,
+    AppPrepareSameDeviceLinkRequest, AppProbePwaWebPushSubscriptionError,
+    AppProbePwaWebPushSubscriptionRequest, ClaimSameDeviceLinkError, ClaimSameDeviceLinkRequest,
+    GetNotificationPathStatusError, GetNotificationPathStatusRequest, InstalledAppsPath,
+    NotificationPath, NotificationPathStatus, ProbeNotificationPathError,
     ProbeNotificationPathRequest, PwaNotificationEvent, RemoveNotificationRequest,
     RemoveUnansweredPwaWebPushSubscriptionsError, RemoveUnansweredPwaWebPushSubscriptionsRequest,
     SameDeviceLinkStatus, UnansweredPushes,
@@ -636,12 +638,19 @@ fn should_count_unanswered_pushes_until_one_is_fetched() {
 
 /// The installed web app's unanswered pushes, as its own session reads them.
 fn pwa_unanswered(env: &PocketIc, phone: &Phone) -> Option<(u32, bool)> {
-    app_get_pwa_webpush_subscription_status(env, phone.canister_id, phone.pwa, None)
-        .expect("status rejected")
-        .expect("status refused")
-        .expect("subscribed")
-        .unanswered_pushes
-        .map(|unanswered| (unanswered.count, unanswered.is_past_limit))
+    app_get_pwa_webpush_subscription_status(
+        env,
+        phone.canister_id,
+        phone.pwa,
+        AppGetPwaWebPushSubscriptionStatusRequest {
+            frontend_origin: None,
+        },
+    )
+    .expect("status rejected")
+    .expect("status refused")
+    .expect("subscribed")
+    .unanswered_pushes
+    .map(|unanswered| (unanswered.count, unanswered.is_past_limit))
 }
 
 #[test]
@@ -956,11 +965,18 @@ fn should_leave_the_count_of_another_accounts_installed_app_when_one_account_rem
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
 
     assert_eq!(
-        app_get_pwa_webpush_subscription_status(&env, phone.canister_id, other_session, None)
-            .expect("status rejected")
-            .expect("status refused")
-            .and_then(|status| status.unanswered_pushes)
-            .map(|unanswered| unanswered.count),
+        app_get_pwa_webpush_subscription_status(
+            &env,
+            phone.canister_id,
+            other_session,
+            AppGetPwaWebPushSubscriptionStatusRequest {
+                frontend_origin: None
+            }
+        )
+        .expect("status rejected")
+        .expect("status refused")
+        .and_then(|status| status.unanswered_pushes)
+        .map(|unanswered| unanswered.count),
         Some(1)
     );
 }
@@ -1158,8 +1174,15 @@ fn should_send_no_second_probe_while_the_first_waits_to_be_fetched() {
 
     assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
     assert_eq!(
-        app_probe_pwa_webpush_subscription(&env, phone.canister_id, phone.pwa, None)
-            .expect("probe rejected"),
+        app_probe_pwa_webpush_subscription(
+            &env,
+            phone.canister_id,
+            phone.pwa,
+            AppProbePwaWebPushSubscriptionRequest {
+                frontend_origin: None
+            }
+        )
+        .expect("probe rejected"),
         Ok(())
     );
     assert_eq!(answer_outcalls(&env, 201), Vec::<String>::new());
@@ -1204,8 +1227,15 @@ fn should_let_the_installed_app_probe_its_own_subscription() {
     let phone = phone(&env);
 
     assert_eq!(
-        app_probe_pwa_webpush_subscription(&env, phone.canister_id, phone.pwa, None)
-            .expect("probe rejected"),
+        app_probe_pwa_webpush_subscription(
+            &env,
+            phone.canister_id,
+            phone.pwa,
+            AppProbePwaWebPushSubscriptionRequest {
+                frontend_origin: None
+            }
+        )
+        .expect("probe rejected"),
         Ok(())
     );
     assert_eq!(answer_outcalls(&env, 201), vec![PWA_ENDPOINT.to_string()]);
@@ -1369,7 +1399,14 @@ fn should_refuse_the_app_methods_without_a_live_session() -> Result<(), RejectRe
             Err(AppPrepareSameDeviceLinkError::NoSuchSession)
         );
         assert_eq!(
-            app_probe_pwa_webpush_subscription(&env, phone.canister_id, stranger, None)?,
+            app_probe_pwa_webpush_subscription(
+                &env,
+                phone.canister_id,
+                stranger,
+                AppProbePwaWebPushSubscriptionRequest {
+                    frontend_origin: None
+                }
+            )?,
             Err(AppProbePwaWebPushSubscriptionError::NoSuchSession)
         );
     }
@@ -1472,7 +1509,14 @@ fn should_refuse_the_new_methods_while_notifications_are_disabled() -> Result<()
         Err(AppPrepareSameDeviceLinkError::InternalCanisterError(_))
     ));
     assert!(matches!(
-        app_probe_pwa_webpush_subscription(&env, canister_id, session, None)?,
+        app_probe_pwa_webpush_subscription(
+            &env,
+            canister_id,
+            session,
+            AppProbePwaWebPushSubscriptionRequest {
+                frontend_origin: None
+            }
+        )?,
         Err(AppProbePwaWebPushSubscriptionError::InternalCanisterError(
             _
         ))

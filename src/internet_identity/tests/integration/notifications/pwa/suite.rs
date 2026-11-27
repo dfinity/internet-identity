@@ -35,9 +35,9 @@ fn prepare_for_frontend(
         env,
         canister_id,
         session,
-        Some(AppPreparePwaWebPushSubscriptionRequest {
+        AppPreparePwaWebPushSubscriptionRequest {
             frontend_origin: Some(frontend_origin.to_string()),
-        }),
+        },
     )
     .expect("prepare rejected")
 }
@@ -72,9 +72,9 @@ fn frontend_endpoint(
         env,
         canister_id,
         session,
-        Some(AppGetPwaWebPushSubscriptionStatusRequest {
+        AppGetPwaWebPushSubscriptionStatusRequest {
             frontend_origin: frontend_origin.map(str::to_string),
-        }),
+        },
     )
     .expect("status rejected")
     .expect("status refused")

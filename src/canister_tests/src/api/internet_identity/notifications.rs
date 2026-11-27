@@ -523,7 +523,7 @@ pub fn app_prepare_pwa_webpush_subscription(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: Option<AppPreparePwaWebPushSubscriptionRequest>,
+    request: AppPreparePwaWebPushSubscriptionRequest,
 ) -> Result<AppPreparePwaWebPushSubscriptionResult, RejectResponse> {
     call_candid_as(
         env,
@@ -586,7 +586,7 @@ pub fn subscribe_pwa_webpush_for_frontend(
         let request = AppPreparePwaWebPushSubscriptionRequest {
             frontend_origin: frontend_origin.clone(),
         };
-        match app_prepare_pwa_webpush_subscription(env, canister_id, sender, Some(request))? {
+        match app_prepare_pwa_webpush_subscription(env, canister_id, sender, request)? {
             AppPreparePwaWebPushSubscriptionResult::Ok(keys) => {
                 (transport_key, sealed_auth) = seal_auth(&keys.transport_public_key, auth);
                 break;
@@ -615,7 +615,7 @@ pub fn app_get_pwa_webpush_subscription_status(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: Option<AppGetPwaWebPushSubscriptionStatusRequest>,
+    request: AppGetPwaWebPushSubscriptionStatusRequest,
 ) -> Result<
     Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError>,
     RejectResponse,
@@ -667,7 +667,7 @@ pub fn app_probe_pwa_webpush_subscription(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: Option<AppProbePwaWebPushSubscriptionRequest>,
+    request: AppProbePwaWebPushSubscriptionRequest,
 ) -> Result<Result<(), AppProbePwaWebPushSubscriptionError>, RejectResponse> {
     call_candid_as(
         env,
