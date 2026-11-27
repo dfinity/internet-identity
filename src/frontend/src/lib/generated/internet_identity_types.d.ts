@@ -2561,6 +2561,26 @@ export interface PwaWebPushSubscription {
   'transport_key' : Uint8Array | number[],
 }
 /**
+ * Whether the session's browser, account and frontend are subscribed, and at which
+ * endpoint.
+ */
+export type PwaWebPushSubscriptionStatus = {
+    /**
+     * The app disabled it for the session's account with
+     * app_disable_pwa_webpush_subscription. Nothing is sent to it until a subscription is
+     * prepared or set again, or the user allows notifications on the device again.
+     */
+    'Disabled' : null
+  } |
+  { 'Subscribed' : WebPushSubscriptionStatus } |
+  {
+    /**
+     * Nothing is subscribed for the session's account, the subscription awaits its
+     * app_set_pwa_webpush_subscription, or it delivers for another account.
+     */
+    'NotSubscribed' : null
+  };
+/**
  * Rate limit configuration.
  * Currently only used for `register`.
  */
@@ -3136,13 +3156,12 @@ export interface _SERVICE {
       { 'Err' : AppGetPwaNotificationError }
   >,
   /**
-   * The endpoint the session's browser, account and frontend are subscribed at. Null
-   * where nothing is subscribed, where the subscription awaits its
-   * app_set_pwa_webpush_subscription, or where it delivers for another account.
+   * Whether the session's browser, account and frontend are subscribed, disabled by the
+   * app, or not subscribed.
    */
   'app_get_pwa_webpush_subscription_status' : ActorMethod<
     [AppGetPwaWebPushSubscriptionStatusRequest],
-    { 'Ok' : [] | [WebPushSubscriptionStatus] } |
+    { 'Ok' : PwaWebPushSubscriptionStatus } |
       { 'Err' : AppGetPwaWebPushSubscriptionStatusError }
   >,
   'app_get_same_device_link_status' : ActorMethod<

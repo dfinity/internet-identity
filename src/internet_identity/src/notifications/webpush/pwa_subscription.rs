@@ -33,7 +33,7 @@ use crate::storage::PwaSubscriptionHolder;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
     ApplicationNumber, FrontendHostname, PrepareWebPushSubscriptionResponse,
-    PwaWebPushSubscription, SetWebPushSubscriptionError, Timestamp, WebPushSubscriptionStatus,
+    PwaWebPushSubscription, PwaWebPushSubscriptionStatus, SetWebPushSubscriptionError, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::collections::{BTreeMap, BTreeSet};
@@ -391,19 +391,32 @@ pub(crate) fn clear_gone_pwa_subscription(
     write_pwa_subscription(holder, None, None, now_ns).map_err(|err| format!("{err:?}"))
 }
 
-/// The endpoint `holder`'s slot is subscribed at, where it is ready and delivers
-/// for `account_principal`'s account.
+/// What `holder`'s slot is for `account_principal`'s account at `now_ns`: `Disabled` where
+/// it delivers for that account and its app disabled it, ready or not; `Subscribed` where
+/// it delivers for that account and is ready; `NotSubscribed` otherwise.
 pub fn read_pwa_subscription_status(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
     now_ns: Timestamp,
-) -> Option<WebPushSubscriptionStatus> {
-    let held_subscription = read_pwa_subscription(holder)?;
-    if held_subscription.account_principal != account_principal {
-        return None;
+) -> PwaWebPushSubscriptionStatus {
+    let Some(held_subscription) = read_pwa_subscription(holder) else {
+        return PwaWebPushSubscriptionStatus::NotSubscribed;
+    };
+    let PwaSubscription {
+        subscription,
+        account_principal: held_account_principal,
+        disabled_at_ns,
+    } = held_subscription;
+    if held_account_principal != account_principal {
+        return PwaWebPushSubscriptionStatus::NotSubscribed;
     }
-    let ready_subscription = held_subscription.subscription.into_ready()?;
-    Some(subscription::status_of(&ready_subscription, now_ns))
+    if disabled_at_ns.is_some() {
+        return PwaWebPushSubscriptionStatus::Disabled;
+    }
+    let Some(ready_subscription) = subscription.into_ready() else {
+        return PwaWebPushSubscriptionStatus::NotSubscribed;
+    };
+    PwaWebPushSubscriptionStatus::Subscribed(subscription::status_of(&ready_subscription, now_ns))
 }
 
 /// Whether `holder`'s slot holds a subscription that delivers for the account

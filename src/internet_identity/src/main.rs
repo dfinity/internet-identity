@@ -1407,15 +1407,12 @@ fn app_disable_pwa_webpush_subscription(
     )
 }
 
-/// The endpoint the calling session's browser entry is subscribed at for the session's
-/// account, at the frontend the request names. `None` where nothing is subscribed, where the subscription awaits its
-/// `app_set_pwa_webpush_subscription`, or where it delivers for another account. An
-/// `Option` inside the `Result` because nothing subscribed is an answer the app acts on,
-/// while the error is only ever a refused caller.
+/// Whether the calling session's browser entry is subscribed for the session's account at
+/// the frontend the request names, disabled there by the app, or not subscribed.
 #[query]
 fn app_get_pwa_webpush_subscription_status(
     request: AppGetPwaWebPushSubscriptionStatusRequest,
-) -> Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError> {
+) -> Result<PwaWebPushSubscriptionStatus, AppGetPwaWebPushSubscriptionStatusError> {
     use AppGetPwaWebPushSubscriptionStatusError::*;
 
     let now = time();

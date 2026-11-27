@@ -202,6 +202,11 @@ export const idlFactory = ({ IDL }) => {
     'unanswered_pushes' : IDL.Opt(UnansweredPushes),
     'probe_sent_at_ns' : IDL.Opt(Timestamp),
   });
+  const PwaWebPushSubscriptionStatus = IDL.Variant({
+    'Disabled' : IDL.Null,
+    'Subscribed' : WebPushSubscriptionStatus,
+    'NotSubscribed' : IDL.Null,
+  });
   const AppGetPwaWebPushSubscriptionStatusError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
@@ -1420,7 +1425,7 @@ export const idlFactory = ({ IDL }) => {
         [AppGetPwaWebPushSubscriptionStatusRequest],
         [
           IDL.Variant({
-            'Ok' : IDL.Opt(WebPushSubscriptionStatus),
+            'Ok' : PwaWebPushSubscriptionStatus,
             'Err' : AppGetPwaWebPushSubscriptionStatusError,
           }),
         ],

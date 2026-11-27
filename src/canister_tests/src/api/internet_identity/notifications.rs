@@ -23,10 +23,10 @@ use internet_identity_interface::internet_identity::types::{
     PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
     PrepareWebPushSubscriptionResponse, PrepareWebPushSubscriptionResult,
     ProbeNotificationAppError, ProbeNotificationAppRequest, PwaWebPushSubscription,
-    RemoveNotificationError, RemoveNotificationRequest, RemoveNotificationResponse,
-    RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest, SendNotificationArg,
-    SendNotificationError, SendNotificationResponse, SetWebPushSubscriptionError,
-    SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
+    PwaWebPushSubscriptionStatus, RemoveNotificationError, RemoveNotificationRequest,
+    RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
+    SendNotificationArg, SendNotificationError, SendNotificationResponse,
+    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
 use internet_identity_interface::internet_identity::types::{
     AppGetSameDeviceLinkStatusError, AppPrepareSameDeviceLinkError,
@@ -634,7 +634,7 @@ pub fn app_get_pwa_webpush_subscription_status(
     sender: Principal,
     request: AppGetPwaWebPushSubscriptionStatusRequest,
 ) -> Result<
-    Result<Option<WebPushSubscriptionStatus>, AppGetPwaWebPushSubscriptionStatusError>,
+    Result<PwaWebPushSubscriptionStatus, AppGetPwaWebPushSubscriptionStatusError>,
     RejectResponse,
 > {
     query_candid_as(

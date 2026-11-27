@@ -2534,6 +2534,19 @@ type AppGetPwaWebPushSubscriptionStatusRequest = record {
     frontend_origin : opt FrontendHostname;
 };
 
+// Whether the session's browser, account and frontend are subscribed, and at which
+// endpoint.
+type PwaWebPushSubscriptionStatus = variant {
+    // Nothing is subscribed for the session's account, the subscription awaits its
+    // app_set_pwa_webpush_subscription, or it delivers for another account.
+    NotSubscribed;
+    // The app disabled it for the session's account with
+    // app_disable_pwa_webpush_subscription. Nothing is sent to it until a subscription is
+    // prepared or set again, or the user allows notifications on the device again.
+    Disabled;
+    Subscribed : WebPushSubscriptionStatus;
+};
+
 type AppGetPwaWebPushSubscriptionStatusError = variant {
     // No live session behind this caller: expired, idle, revoked, or never one at all.
     NoSuchSession;
@@ -3190,10 +3203,9 @@ service : (opt InternetIdentityInit) -> {
     // disabled or nothing subscribed is Ok. It stays disabled until a subscription is
     // prepared or set again, or the user allows notifications on the device again.
     app_disable_pwa_webpush_subscription : (AppDisablePwaWebPushSubscriptionRequest) -> (variant { Ok; Err : AppDisablePwaWebPushSubscriptionError });
-    // The endpoint the session's browser, account and frontend are subscribed at. Null
-    // where nothing is subscribed, where the subscription awaits its
-    // app_set_pwa_webpush_subscription, or where it delivers for another account.
-    app_get_pwa_webpush_subscription_status : (AppGetPwaWebPushSubscriptionStatusRequest) -> (variant { Ok : opt WebPushSubscriptionStatus; Err : AppGetPwaWebPushSubscriptionStatusError }) query;
+    // Whether the session's browser, account and frontend are subscribed, disabled by the
+    // app, or not subscribed.
+    app_get_pwa_webpush_subscription_status : (AppGetPwaWebPushSubscriptionStatusRequest) -> (variant { Ok : PwaWebPushSubscriptionStatus; Err : AppGetPwaWebPushSubscriptionStatusError }) query;
     // Sends Internet Identity's own notification to the session's installed web app of the
     // frontend. Removing it with app_remove_pwa_notification, naming that frontend, resets
     // its unanswered pushes.

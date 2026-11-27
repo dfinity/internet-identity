@@ -1870,6 +1870,19 @@ pub struct AppGetPwaWebPushSubscriptionStatusRequest {
     pub frontend_origin: Option<FrontendHostname>,
 }
 
+/// Whether the calling installed web app's browser entry is subscribed for the session's
+/// account at one frontend, and at which endpoint.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum PwaWebPushSubscriptionStatus {
+    /// Nothing is subscribed for the session's account, the subscription awaits its
+    /// `app_set_pwa_webpush_subscription`, or it delivers for another account.
+    NotSubscribed,
+    /// The app disabled this subscription for the session's account with
+    /// `app_disable_pwa_webpush_subscription`.
+    Disabled,
+    Subscribed(WebPushSubscriptionStatus),
+}
+
 /// Why `app_get_pwa_webpush_subscription_status` refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppGetPwaWebPushSubscriptionStatusError {

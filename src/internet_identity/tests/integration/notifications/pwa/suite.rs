@@ -68,7 +68,7 @@ fn frontend_endpoint(
     session: Principal,
     frontend_origin: Option<&str>,
 ) -> Option<String> {
-    app_get_pwa_webpush_subscription_status(
+    let status = app_get_pwa_webpush_subscription_status(
         env,
         canister_id,
         session,
@@ -77,8 +77,12 @@ fn frontend_endpoint(
         },
     )
     .expect("status rejected")
-    .expect("status refused")
-    .map(|status| status.endpoint)
+    .expect("status refused");
+    match status {
+        PwaWebPushSubscriptionStatus::Subscribed(status) => Some(status.endpoint),
+        PwaWebPushSubscriptionStatus::NotSubscribed => None,
+        PwaWebPushSubscriptionStatus::Disabled => panic!("the installed web app is disabled"),
+    }
 }
 
 /// [`install_subscribed`], with the same session's installed web app of

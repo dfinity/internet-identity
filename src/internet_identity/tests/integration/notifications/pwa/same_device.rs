@@ -716,7 +716,7 @@ fn should_count_unanswered_pushes_until_one_is_fetched() {
 
 /// The installed web app's unanswered pushes, as its own session reads them.
 fn pwa_unanswered(env: &PocketIc, phone: &Phone) -> Option<(u32, bool)> {
-    app_get_pwa_webpush_subscription_status(
+    let status = app_get_pwa_webpush_subscription_status(
         env,
         phone.canister_id,
         phone.pwa,
@@ -725,10 +725,13 @@ fn pwa_unanswered(env: &PocketIc, phone: &Phone) -> Option<(u32, bool)> {
         },
     )
     .expect("status rejected")
-    .expect("status refused")
-    .expect("subscribed")
-    .unanswered_pushes
-    .map(|unanswered| (unanswered.count, unanswered.is_past_limit))
+    .expect("status refused");
+    let PwaWebPushSubscriptionStatus::Subscribed(status) = status else {
+        panic!("not subscribed: {status:?}");
+    };
+    status
+        .unanswered_pushes
+        .map(|unanswered| (unanswered.count, unanswered.is_past_limit))
 }
 
 #[test]
@@ -1042,19 +1045,21 @@ fn should_leave_the_count_of_another_accounts_installed_app_when_one_account_rem
     // installed app that now delivers for the other account.
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
 
+    let status = app_get_pwa_webpush_subscription_status(
+        &env,
+        phone.canister_id,
+        other_session,
+        AppGetPwaWebPushSubscriptionStatusRequest {
+            frontend_origin: None,
+        },
+    )
+    .expect("status rejected")
+    .expect("status refused");
+    let PwaWebPushSubscriptionStatus::Subscribed(status) = status else {
+        panic!("not subscribed: {status:?}");
+    };
     assert_eq!(
-        app_get_pwa_webpush_subscription_status(
-            &env,
-            phone.canister_id,
-            other_session,
-            AppGetPwaWebPushSubscriptionStatusRequest {
-                frontend_origin: None
-            }
-        )
-        .expect("status rejected")
-        .expect("status refused")
-        .and_then(|status| status.unanswered_pushes)
-        .map(|unanswered| unanswered.count),
+        status.unanswered_pushes.map(|unanswered| unanswered.count),
         Some(1)
     );
 }

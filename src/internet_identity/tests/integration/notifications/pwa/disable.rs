@@ -3,16 +3,17 @@
 //! on that device sees it on its installed apps path, where removing it unmutes the device.
 
 use super::same_device::{
-    installed_apps, linked_phone, path_status, phone, probe, remove_unanswered_of_frontend,
-    shared_entry_phone, Phone,
+    installed_apps, linked_phone, path_status, phone, phone_with, probe,
+    remove_unanswered_of_frontend, shared_entry_phone, Phone,
 };
 use super::*;
 use canister_tests::api::internet_identity::notifications::{
-    app_disable_pwa_webpush_subscription, app_probe_pwa_webpush_subscription,
-    app_set_pwa_webpush_subscription,
+    app_disable_pwa_webpush_subscription, app_prepare_pwa_webpush_subscription,
+    app_probe_pwa_webpush_subscription, app_set_pwa_webpush_subscription,
 };
 use internet_identity_interface::internet_identity::types::{
     AppDisablePwaWebPushSubscriptionError, AppDisablePwaWebPushSubscriptionRequest,
+    AppPreparePwaWebPushSubscriptionRequest, AppPreparePwaWebPushSubscriptionResult,
     AppProbePwaWebPushSubscriptionError, AppProbePwaWebPushSubscriptionRequest,
     AppSetPwaWebPushSubscriptionRequest, ProbeNotificationPathError,
 };
@@ -46,6 +47,58 @@ fn disabled_on_path(env: &PocketIc, phone: &Phone) -> Vec<Option<bool>> {
         .into_iter()
         .map(|subscription| subscription.is_disabled)
         .collect()
+}
+
+/// How many times [`prepare`] asks before giving up on a prepare that stays pending.
+const PREPARE_ATTEMPTS: usize = 10;
+
+/// `session` prepares a subscription of its installed web app of [`APP`]'s own origin,
+/// asking again while the answer is pending, and leaves it awaiting its set.
+fn prepare(env: &PocketIc, canister_id: CanisterId, session: Principal) {
+    for _ in 0..PREPARE_ATTEMPTS {
+        let prepare_result = app_prepare_pwa_webpush_subscription(
+            env,
+            canister_id,
+            session,
+            AppPreparePwaWebPushSubscriptionRequest {
+                frontend_origin: None,
+            },
+        )
+        .expect("prepare rejected");
+        match prepare_result {
+            AppPreparePwaWebPushSubscriptionResult::Ok(_) => return,
+            AppPreparePwaWebPushSubscriptionResult::Pending => {}
+            AppPreparePwaWebPushSubscriptionResult::Err(err) => {
+                panic!("prepare refused: {err:?}")
+            }
+        }
+    }
+    panic!("prepare stayed pending");
+}
+
+/// A session of another account of `phone`'s identity at [`APP`], signed in on the
+/// installed web app's browser entry.
+fn another_accounts_installed_app_session(env: &PocketIc, phone: &Phone) -> Principal {
+    let other_account_number = create_account(
+        env,
+        phone.canister_id,
+        principal_1(),
+        phone.anchor,
+        APP.into(),
+        "Other".to_string(),
+    )
+    .expect("creating the account rejected")
+    .expect("creating the account refused")
+    .account_number;
+    session_of(&sign_in(
+        env,
+        phone.canister_id,
+        principal_1(),
+        PrepareAccountSessionRequest {
+            account_number: other_account_number,
+            ..session_request(phone.anchor, APP, &BrowserKey::new(5).successor())
+        },
+    ))
 }
 
 /// Longer than the default 7 days a session may go unused before it ends: the installed
@@ -333,6 +386,119 @@ fn should_keep_a_disabled_installed_app_disabled_when_it_removes_its_subscriptio
         Some(NotAcceptedReason::NoChannel)
     );
     Ok(())
+}
+
+// ---- The installed app's status ----
+
+#[test]
+fn should_read_disabled_once_the_installed_app_disables() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert!(matches!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::Subscribed(_)
+    ));
+
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::Disabled
+    );
+}
+
+#[test]
+fn should_read_disabled_for_a_disabled_installed_app_that_removes_its_subscription(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    assert_eq!(
+        app_set_pwa_webpush_subscription(
+            &env,
+            phone.canister_id,
+            phone.pwa,
+            AppSetPwaWebPushSubscriptionRequest {
+                subscription: None,
+                frontend_origin: None,
+            },
+        )?,
+        Ok(())
+    );
+
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::Disabled
+    );
+    Ok(())
+}
+
+#[test]
+fn should_read_disabled_for_an_installed_app_disabled_while_awaiting_its_set() {
+    let env = env();
+    let phone = phone_with(&env, prepare);
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
+
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::Disabled
+    );
+}
+
+#[test]
+fn should_read_not_subscribed_for_another_account_on_the_disabled_installed_apps_browser() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    let other_account_session = another_accounts_installed_app_session(&env, &phone);
+
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, other_account_session),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::Disabled
+    );
+}
+
+#[test]
+fn should_read_subscribed_once_the_disabled_installed_app_prepares_and_subscribes_again() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    prepare(&env, phone.canister_id, phone.pwa);
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::NotSubscribed
+    );
+
+    subscribe_pwa_webpush(
+        &env,
+        phone.canister_id,
+        phone.pwa,
+        PWA_ENDPOINT,
+        p256dh(9),
+        &TEST_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+    assert_eq!(
+        pwa_status(&env, phone.canister_id, phone.pwa),
+        PwaWebPushSubscriptionStatus::Subscribed(WebPushSubscriptionStatus {
+            endpoint: PWA_ENDPOINT.to_string(),
+            unanswered_pushes: None,
+            probe_sent_at_ns: None,
+        })
+    );
 }
 
 // ---- The installed apps path ----
