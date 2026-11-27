@@ -205,3 +205,27 @@ test("session value does not reach a new session", () => {
   expect(otherSessionFlag.isEnabled()).toEqual(false);
   expect(otherSessionFlag.isSet()).toEqual(false);
 });
+
+test("set replaces an earlier session value across a reload", () => {
+  const storage = new MockStorage();
+  const sessionStorage = new MockStorage();
+
+  const flag = new FeatureFlag(
+    storage,
+    sessionStorage,
+    "a",
+    false,
+    writable(false),
+  );
+  flag.setForSession(true);
+  flag.set(false);
+
+  const reloadedFlag = new FeatureFlag(
+    storage,
+    sessionStorage,
+    "a",
+    false,
+    writable(false),
+  );
+  expect(reloadedFlag.isEnabled()).toEqual(false);
+});

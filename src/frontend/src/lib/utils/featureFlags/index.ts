@@ -52,6 +52,7 @@ export class FeatureFlag {
   set(value: boolean) {
     this.#store.set(Boolean(value));
     this.#storage.setItem(this.#key, JSON.stringify(get(this.#store)));
+    this.#sessionStorage.removeItem(this.#key);
   }
 
   setForSession(value: boolean) {
