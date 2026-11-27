@@ -1400,11 +1400,11 @@ pub struct GetNotificationPathStatusRequest {
 }
 
 /// The subscriptions on one path that can deliver now, and the installed web apps on it
-/// that could but their app disabled.
+/// that their app disabled.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationPathStatus {
-    /// One per subscription on the path that can deliver now, or could but its app
-    /// disabled it. Empty where there is none.
+    /// One per subscription on the path that can deliver now, and one per installed web
+    /// app on it that its app disabled. Empty where there is none.
     pub subscriptions: Vec<SubscriptionDeliveryStatus>,
 }
 
@@ -1821,7 +1821,7 @@ pub enum AppPreparePwaWebPushSubscriptionError {
 }
 
 /// What an installed web app's page registers, or `None` to remove the subscription its
-/// session's browser entry and account hold.
+/// session's browser entry and account hold, which leaves one the app disabled as it is.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AppSetPwaWebPushSubscriptionRequest {
     pub subscription: Option<PwaWebPushSubscription>,

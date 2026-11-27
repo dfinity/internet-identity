@@ -102,7 +102,8 @@ pub(crate) enum ProbeRefusal {
     BacklogFull,
 }
 
-/// One subscription on a path that can deliver now, or could but its app disabled it.
+/// One subscription on a path that can deliver now, or an installed web app on it that its
+/// app disabled.
 struct PathSubscription {
     /// The entry it is woken through.
     browser_id: BrowserId,
@@ -305,7 +306,7 @@ pub(crate) fn remove_unanswered_installed_apps(
 }
 
 /// The subscriptions on `path` for `browser_id` of `anchor` that can deliver now, and the
-/// installed web apps on it that could but their app disabled.
+/// installed web apps on it that their app disabled.
 fn path_subscriptions(
     anchor: &Anchor,
     browser_id: BrowserId,
@@ -398,8 +399,8 @@ fn routed_on_path(
 }
 
 /// `browser`'s installed web apps of the app numbered `application_number`, one per
-/// frontend, as subscriptions on a path, where they can deliver now or could but their app
-/// disabled them.
+/// frontend, as subscriptions on a path, where they can deliver now or their app disabled
+/// them.
 fn installed_apps_on_path(
     browser: &Browser,
     anchor_number: AnchorNumber,

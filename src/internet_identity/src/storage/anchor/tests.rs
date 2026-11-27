@@ -7,7 +7,7 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp,
 };
 use serde_bytes::ByteBuf;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 const TEST_CALLER_PUBKEY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -2526,7 +2526,7 @@ mod browser_tests {
                 2_000,
             )
             .unwrap();
-        anchor.link_same_device(installed_app, safari);
+        anchor.link_same_device(installed_app, safari, &BTreeSet::new());
         (anchor, safari, installed_app)
     }
 
@@ -2581,7 +2581,7 @@ mod browser_tests {
         anchor.stamp_browser_use(installed_app, 5_000);
         evict_the_oldest(&mut anchor);
         // Put the stale pointer back, as a rollback could leave it.
-        anchor.link_same_device(installed_app, safari);
+        anchor.link_same_device(installed_app, safari, &BTreeSet::new());
 
         assert_eq!(anchor.same_device_browser_of(installed_app), None);
     }

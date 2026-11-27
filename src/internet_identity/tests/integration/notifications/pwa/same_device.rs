@@ -5,21 +5,22 @@
 
 use super::*;
 use canister_tests::api::internet_identity::notifications::{
-    app_get_pwa_webpush_subscription_status, app_get_same_device_link_status,
-    app_prepare_same_device_link, app_probe_pwa_webpush_subscription, browser_remove_notification,
-    claim_same_device_link, get_notification_path_status, probe_notification_path,
+    app_disable_pwa_webpush_subscription, app_get_pwa_webpush_subscription_status,
+    app_get_same_device_link_status, app_prepare_same_device_link,
+    app_probe_pwa_webpush_subscription, browser_remove_notification, claim_same_device_link,
+    get_notification_path_status, probe_notification_path,
     remove_unanswered_pwa_webpush_subscriptions,
 };
 use internet_identity_interface::internet_identity::types::{
-    AppGetPwaNotificationResponse, AppGetPwaWebPushSubscriptionStatusRequest,
-    AppGetSameDeviceLinkStatusError, AppPrepareSameDeviceLinkError,
-    AppPrepareSameDeviceLinkRequest, AppProbePwaWebPushSubscriptionError,
-    AppProbePwaWebPushSubscriptionRequest, ClaimSameDeviceLinkError, ClaimSameDeviceLinkRequest,
-    GetNotificationPathStatusError, GetNotificationPathStatusRequest, InstalledAppsPath,
-    NotificationPath, NotificationPathStatus, ProbeNotificationPathError,
-    ProbeNotificationPathRequest, PwaNotificationEvent, RemoveNotificationRequest,
-    RemoveUnansweredPwaWebPushSubscriptionsError, RemoveUnansweredPwaWebPushSubscriptionsRequest,
-    SameDeviceLinkStatus, UnansweredPushes,
+    AppDisablePwaWebPushSubscriptionRequest, AppGetPwaNotificationResponse,
+    AppGetPwaWebPushSubscriptionStatusRequest, AppGetSameDeviceLinkStatusError,
+    AppPrepareSameDeviceLinkError, AppPrepareSameDeviceLinkRequest,
+    AppProbePwaWebPushSubscriptionError, AppProbePwaWebPushSubscriptionRequest,
+    ClaimSameDeviceLinkError, ClaimSameDeviceLinkRequest, GetNotificationPathStatusError,
+    GetNotificationPathStatusRequest, InstalledAppsPath, NotificationPath, NotificationPathStatus,
+    ProbeNotificationPathError, ProbeNotificationPathRequest, PwaNotificationEvent,
+    RemoveNotificationRequest, RemoveUnansweredPwaWebPushSubscriptionsError,
+    RemoveUnansweredPwaWebPushSubscriptionsRequest, SameDeviceLinkStatus, UnansweredPushes,
 };
 
 /// The entry [`install_signed_in`] signs in from: the first of the identity's.
@@ -45,7 +46,7 @@ fn link_key() -> BrowserKey {
 /// seed 5 names and subscribed at [`PWA_ENDPOINT`]. Not linked yet.
 pub(super) struct Phone {
     pub(super) canister_id: CanisterId,
-    anchor: AnchorNumber,
+    pub(super) anchor: AnchorNumber,
     pub(super) account_principal: Principal,
     /// The installed web app's session.
     pub(super) pwa: Principal,
@@ -508,6 +509,69 @@ fn should_refuse_a_link_key_that_is_not_a_p256_key() -> Result<(), RejectRespons
         Err(AppPrepareSameDeviceLinkError::InternalCanisterError(_))
     ));
     Ok(())
+}
+
+#[test]
+fn should_unlink_a_removed_installed_app_once_a_new_install_of_its_frontend_links() {
+    let env = env();
+    // The first install disabled its notifications, then was removed from the phone: its
+    // entry keeps its disabled subscription and its link.
+    let phone = linked_phone(&env);
+    assert_eq!(
+        app_disable_pwa_webpush_subscription(
+            &env,
+            phone.canister_id,
+            phone.pwa,
+            AppDisablePwaWebPushSubscriptionRequest {
+                frontend_origin: None,
+            },
+        )
+        .expect("disable rejected"),
+        Ok(())
+    );
+    // A new install of the same frontend signs in as another entry, subscribes and links.
+    let new_install = Phone {
+        pwa: session_of(&sign_in(
+            &env,
+            phone.canister_id,
+            principal_1(),
+            session_request(phone.anchor, APP, &BrowserKey::new(6)),
+        )),
+        ..phone
+    };
+    subscribe_pwa_webpush(
+        &env,
+        new_install.canister_id,
+        new_install.pwa,
+        OTHER_PWA_ENDPOINT,
+        p256dh(11),
+        &OTHER_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+    prepare_link(&env, &new_install);
+
+    assert_eq!(claim(&env, &new_install, safari(), &link_key()), Ok(()));
+
+    // Only the new install is on Safari's path: the removed one no longer mutes Safari
+    // through the link.
+    let is_disabled_on_path: Vec<Option<bool>> =
+        path_status(&env, &new_install, installed_apps(&new_install))
+            .subscriptions
+            .into_iter()
+            .map(|subscription| subscription.is_disabled)
+            .collect();
+    assert_eq!(is_disabled_on_path, vec![Some(false)]);
+    assert_eq!(
+        deliver(
+            &env,
+            new_install.canister_id,
+            new_install.account_principal,
+            1,
+            201
+        ),
+        vec![OTHER_PWA_ENDPOINT.to_string()]
+    );
 }
 
 // ---- Skipping the linked entry ----
@@ -1306,39 +1370,16 @@ fn should_keep_the_linked_installed_app_that_answered() {
 fn should_keep_an_installed_app_that_answered_its_probe_though_a_later_push_waits() {
     let env = env();
     let phone = linked_phone(&env);
-    // A second installed app of the same account on the same phone, at an address of its own.
-    let second = another_installed_app_entry(&env, &phone);
-    subscribe_pwa_webpush(
-        &env,
-        phone.canister_id,
-        second,
-        UNPROBED_PWA_ENDPOINT,
-        p256dh(10),
-        &OTHER_AUTH_SECRET,
-    )
-    .expect("subscribe rejected")
-    .expect("subscribe refused");
-    register_key(&env, &phone, second, &BrowserKey::new(42));
-    assert_eq!(
-        claim_with(&env, &phone, safari(), &BrowserKey::new(42)),
-        Ok(())
-    );
     assert_eq!(probe(&env, &phone, installed_apps(&phone)), Ok(()));
-    let mut probed = answer_outcalls(&env, 201);
-    probed.sort();
-    assert_eq!(
-        probed,
-        vec![PWA_ENDPOINT.to_string(), UNPROBED_PWA_ENDPOINT.to_string()]
-    );
+    assert_eq!(answer_outcalls(&env, 201), vec![PWA_ENDPOINT.to_string()]);
 
-    // The first answers its probe, then an ordinary push reaches both and waits.
+    // It answers its probe, then an ordinary push reaches it and waits.
     remove_pwa_entry(&env, &phone, FIRST_ENTRY);
     deliver(&env, phone.canister_id, phone.account_principal, 1, 201);
     env.advance_time(PROBE_ANSWER_TIME);
 
     remove_unanswered(&env, &phone);
 
-    // Only the second, whose probe nobody fetched, is gone.
     assert_eq!(
         deliver(&env, phone.canister_id, phone.account_principal, 2, 201),
         vec![PWA_ENDPOINT.to_string()]

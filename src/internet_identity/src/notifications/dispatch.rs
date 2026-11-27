@@ -994,9 +994,9 @@ pub(crate) struct InstalledAppSubscription {
 }
 
 /// The subscriptions `browser`'s installed web apps of the app numbered
-/// `application_number`, one per frontend, can be woken at right now, and the ones that
-/// could be but the app disabled. Leaves out each one whose account has no session on
-/// `browser` live past [`PWA_SESSION_MARGIN_NS`].
+/// `application_number`, one per frontend, can be woken at right now, and the ones the
+/// app disabled. Leaves out each one that is not disabled and whose account has no session
+/// on `browser` live past [`PWA_SESSION_MARGIN_NS`].
 pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
     storage: &Storage<M>,
     anchor_number: AnchorNumber,
@@ -1281,13 +1281,24 @@ enum InstalledAppDelivery {
 }
 
 /// The entry's installed web app of the route's frontend, where it subscribed for the
-/// recipient account and a session of that account on this entry stays live past
-/// [`PWA_SESSION_MARGIN_NS`], and whether it is woken or its app disabled it.
+/// recipient account, and whether it is woken or its app disabled it. A disabled one is
+/// found whatever its sessions; one that is woken needs a session of that account on this
+/// entry that stays live past [`PWA_SESSION_MARGIN_NS`].
 fn find_installed_app_delivery(
     browser: &Browser,
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> Option<InstalledAppDelivery> {
+    let config = route.config.as_ref()?;
+    let held_subscription =
+        config.pwa_webpush_subscription(browser.id, route.frontend_origin_hash)?;
+    if held_subscription.account_principal != route.account_principal {
+        return None;
+    }
+    let subscription = held_subscription.subscription.into_ready()?;
+    if held_subscription.disabled_at_ns.is_some() {
+        return Some(InstalledAppDelivery::Disabled { subscription });
+    }
     if browser.session_count == 0 {
         return None;
     }
@@ -1298,17 +1309,7 @@ fn find_installed_app_delivery(
     if !has_live_session {
         return None;
     }
-    let config = route.config.as_ref()?;
-    let held_subscription =
-        config.pwa_webpush_subscription(browser.id, route.frontend_origin_hash)?;
-    if held_subscription.account_principal != route.account_principal {
-        return None;
-    }
-    let subscription = held_subscription.subscription.into_ready()?;
     let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
-    if held_subscription.disabled_at_ns.is_some() {
-        return Some(InstalledAppDelivery::Disabled { subscription });
-    }
     let target = DeliveryTarget::Pwa {
         application_number: route.application_number,
         frontend_origin_hash: route.frontend_origin_hash,

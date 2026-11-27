@@ -2031,8 +2031,8 @@ export type NotificationPath = {
   };
 export interface NotificationPathStatus {
   /**
-   * One per subscription on the path that can deliver now, or could but its app
-   * disabled it. Empty where there is none.
+   * One per subscription on the path that can deliver now, and one per installed web
+   * app on it that its app disabled. Empty where there is none.
    */
   'subscriptions' : Array<SubscriptionDeliveryStatus>,
 }
@@ -3113,7 +3113,8 @@ export interface _SERVICE {
   /**
    * Disables the subscription of the session's browser, account and frontend: nothing
    * is sent to it, and the device it is on is not notified another way. Already
-   * disabled or nothing subscribed is Ok. Setting a subscription again enables it.
+   * disabled or nothing subscribed is Ok. It stays disabled until a subscription is
+   * prepared or set again, or the user allows notifications on the device again.
    */
   'app_disable_pwa_webpush_subscription' : ActorMethod<
     [AppDisablePwaWebPushSubscriptionRequest],
@@ -3239,7 +3240,7 @@ export interface _SERVICE {
   >,
   /**
    * Sets or, with null, removes the subscription of the session's browser, account and
-   * frontend.
+   * frontend. Null leaves one the app disabled as it is.
    */
   'app_set_pwa_webpush_subscription' : ActorMethod<
     [AppSetPwaWebPushSubscriptionRequest],

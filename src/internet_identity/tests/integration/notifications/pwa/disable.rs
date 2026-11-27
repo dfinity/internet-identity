@@ -9,12 +9,14 @@ use super::same_device::{
 use super::*;
 use canister_tests::api::internet_identity::notifications::{
     app_disable_pwa_webpush_subscription, app_probe_pwa_webpush_subscription,
+    app_set_pwa_webpush_subscription,
 };
 use internet_identity_interface::internet_identity::types::{
     AppDisablePwaWebPushSubscriptionError, AppDisablePwaWebPushSubscriptionRequest,
     AppProbePwaWebPushSubscriptionError, AppProbePwaWebPushSubscriptionRequest,
-    ProbeNotificationPathError,
+    AppSetPwaWebPushSubscriptionRequest, ProbeNotificationPathError,
 };
+use std::time::Duration;
 
 /// `session` disables its installed web app of [`APP`]'s own origin.
 fn disable_as(
@@ -44,6 +46,22 @@ fn disabled_on_path(env: &PocketIc, phone: &Phone) -> Vec<Option<bool>> {
         .into_iter()
         .map(|subscription| subscription.is_disabled)
         .collect()
+}
+
+/// Longer than the default 7 days a session may go unused before it ends: the installed
+/// app's session has ended once the clock moves this far.
+const PAST_THE_DEFAULT_IDLE_TIME: Duration = Duration::from_secs(8 * 24 * 60 * 60);
+
+/// Moves the clock past the end of `phone`'s installed web app's session, and signs Safari
+/// in again, so only the installed app's session has ended.
+fn end_the_installed_apps_session(env: &PocketIc, phone: &Phone) {
+    env.advance_time(PAST_THE_DEFAULT_IDLE_TIME);
+    sign_in(
+        env,
+        phone.canister_id,
+        principal_1(),
+        session_request(phone.anchor, APP, &BrowserKey::new(1).successor()),
+    );
 }
 
 // ---- Who may call ----
@@ -219,6 +237,102 @@ fn should_keep_the_installed_app_disabled_across_an_upgrade() {
         send_refusal(&env, phone.canister_id, phone.account_principal, 1),
         Some(NotAcceptedReason::NoChannel)
     );
+}
+
+#[test]
+fn should_keep_safari_muted_once_the_disabled_linked_installed_apps_session_has_ended() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    end_the_installed_apps_session(&env, &phone);
+
+    assert_eq!(
+        send_refusal(&env, phone.canister_id, phone.account_principal, 1),
+        Some(NotAcceptedReason::NoChannel)
+    );
+}
+
+#[test]
+fn should_keep_a_disabled_installed_app_whose_session_ended_when_another_browser_subscribes() {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(disable(&env, &phone), Ok(()));
+    end_the_installed_apps_session(&env, &phone);
+
+    // The same identity on another browser writes to the same config.
+    let other_browser_session = session_of(&sign_in(
+        &env,
+        phone.canister_id,
+        principal_1(),
+        session_request(phone.anchor, APP, &BrowserKey::new(3)),
+    ));
+    subscribe_pwa_webpush(
+        &env,
+        phone.canister_id,
+        other_browser_session,
+        OTHER_PWA_ENDPOINT,
+        p256dh(11),
+        &OTHER_AUTH_SECRET,
+    )
+    .expect("subscribe rejected")
+    .expect("subscribe refused");
+
+    // Safari stays muted: only the other browser's installed app is woken.
+    assert_eq!(
+        deliver(&env, phone.canister_id, phone.account_principal, 1, 201),
+        vec![OTHER_PWA_ENDPOINT.to_string()]
+    );
+}
+
+#[test]
+fn should_keep_a_disabled_installed_app_its_push_service_calls_gone() {
+    let env = env();
+    let phone = shared_entry_phone(&env);
+    // Reads the sender list and probes the relay, so the next wake-up is posted at once.
+    deliver(&env, phone.canister_id, phone.account_principal, 1, 201);
+    send_accepted(&env, phone.canister_id, phone.account_principal, 2, 201);
+    let wake_up = hold_wake_up(&env);
+    assert_eq!(wake_up.url, PWA_ENDPOINT);
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    reply(&env, &wake_up, 410, vec![]);
+    answer_outcalls(&env, 201);
+
+    assert_eq!(disabled_on_path(&env, &phone), vec![Some(true)]);
+    assert_eq!(
+        send_refusal(&env, phone.canister_id, phone.account_principal, 3),
+        Some(NotAcceptedReason::NoChannel)
+    );
+}
+
+#[test]
+fn should_keep_a_disabled_installed_app_disabled_when_it_removes_its_subscription(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let phone = linked_phone(&env);
+    assert_eq!(disable(&env, &phone), Ok(()));
+
+    // What signing out of the installed app sends.
+    assert_eq!(
+        app_set_pwa_webpush_subscription(
+            &env,
+            phone.canister_id,
+            phone.pwa,
+            AppSetPwaWebPushSubscriptionRequest {
+                subscription: None,
+                frontend_origin: None,
+            },
+        )?,
+        Ok(())
+    );
+
+    assert_eq!(disabled_on_path(&env, &phone), vec![Some(true)]);
+    assert_eq!(
+        send_refusal(&env, phone.canister_id, phone.account_principal, 1),
+        Some(NotAcceptedReason::NoChannel)
+    );
+    Ok(())
 }
 
 // ---- The installed apps path ----

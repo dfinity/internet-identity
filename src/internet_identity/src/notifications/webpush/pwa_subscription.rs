@@ -285,7 +285,9 @@ pub enum DisablePwaSubscriptionError {
 /// `account_principal` names: nothing is sent to it from then on, while it keeps counting
 /// as the way its device is notified. A slot already disabled keeps the time it was
 /// disabled at. One that holds nothing, or delivers for another account, is left as it
-/// is. Setting a subscription on the slot again writes it enabled.
+/// is. Preparing or setting a subscription on the slot again writes it enabled; removing
+/// the slot's subscription leaves it disabled, and so do a lapsed session and a push
+/// service that answers its endpoint gone.
 pub fn disable_pwa_subscription(
     holder: PwaSubscriptionHolder,
     account_principal: Principal,
@@ -326,7 +328,8 @@ pub fn disable_pwa_subscription(
 }
 
 /// Empties `holder`'s slot where it delivers for `account_principal`'s account.
-/// One that holds nothing, or delivers for another account, is left as it is. `now_ns`
+/// One that holds nothing, delivers for another account, or was disabled by its app, is
+/// left as it is: a disabled slot mutes its device until the user allows it again. `now_ns`
 /// is the call's time.
 fn remove_pwa_subscription(
     holder: PwaSubscriptionHolder,
@@ -337,6 +340,7 @@ fn remove_pwa_subscription(
         Some(held_subscription) if held_subscription.account_principal != account_principal => {
             return Ok(())
         }
+        Some(held_subscription) if held_subscription.disabled_at_ns.is_some() => return Ok(()),
         Some(_) => {}
         None => return Ok(()),
     }
@@ -365,7 +369,8 @@ fn find_endpoint_holder(
 }
 
 /// The subscription a relay answered gone for, dropped where `holder`'s slot
-/// still holds that endpoint. `now_ns` is the call's time.
+/// still holds that endpoint and its app did not disable it: a disabled slot mutes its
+/// device whether or not its endpoint still delivers. `now_ns` is the call's time.
 pub(crate) fn clear_gone_pwa_subscription(
     holder: PwaSubscriptionHolder,
     endpoint: &str,
@@ -374,6 +379,9 @@ pub(crate) fn clear_gone_pwa_subscription(
     let Some(held_subscription) = read_pwa_subscription(holder) else {
         return Ok(());
     };
+    if held_subscription.disabled_at_ns.is_some() {
+        return Ok(());
+    }
     let Some(registered_subscription) = held_subscription.subscription.into_ready() else {
         return Ok(());
     };
@@ -467,8 +475,9 @@ fn read_accepted_frontend_origin_hashes(
 /// The slots of the identity's config for the app `holder` is on, on every browser
 /// entry, that are stale at `now_ns`: a slot of a frontend whose origin hash
 /// `accepted_frontend_origin_hashes` does not hold (none, where it is `None`), and a slot
-/// whose account has no session on the slot's browser entry that is neither expired nor
-/// idle.
+/// its app did not disable whose account has no session on the slot's browser entry that
+/// is neither expired nor idle. A disabled slot outlives its sessions: it mutes its device
+/// until the user allows it again.
 fn find_stale_pwa_slots(
     holder: PwaSubscriptionHolder,
     accepted_frontend_origin_hashes: Option<&BTreeSet<OriginSha256>>,
@@ -494,6 +503,9 @@ fn find_stale_pwa_slots(
                 .is_none_or(|hashes| hashes.contains(&frontend_origin_hash));
             if !is_frontend_accepted {
                 stale_holders.insert(slot_holder);
+                continue;
+            }
+            if held_subscription.disabled_at_ns.is_some() {
                 continue;
             }
             let account_principal = held_subscription.account_principal;

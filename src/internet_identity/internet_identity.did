@@ -2135,8 +2135,8 @@ type GetNotificationPathStatusRequest = record {
 };
 
 type NotificationPathStatus = record {
-    // One per subscription on the path that can deliver now, or could but its app
-    // disabled it. Empty where there is none.
+    // One per subscription on the path that can deliver now, and one per installed web
+    // app on it that its app disabled. Empty where there is none.
     subscriptions : vec SubscriptionDeliveryStatus;
 };
 
@@ -3183,11 +3183,12 @@ service : (opt InternetIdentityInit) -> {
     // VAPID key has failed, this answers InternalCanisterError with the reason.
     app_prepare_pwa_webpush_subscription : (AppPreparePwaWebPushSubscriptionRequest) -> (variant { Ok : PrepareWebPushSubscriptionResponse; Pending; Err : AppPreparePwaWebPushSubscriptionError });
     // Sets or, with null, removes the subscription of the session's browser, account and
-    // frontend.
+    // frontend. Null leaves one the app disabled as it is.
     app_set_pwa_webpush_subscription : (AppSetPwaWebPushSubscriptionRequest) -> (variant { Ok; Err : AppSetPwaWebPushSubscriptionError });
     // Disables the subscription of the session's browser, account and frontend: nothing
     // is sent to it, and the device it is on is not notified another way. Already
-    // disabled or nothing subscribed is Ok. Setting a subscription again enables it.
+    // disabled or nothing subscribed is Ok. It stays disabled until a subscription is
+    // prepared or set again, or the user allows notifications on the device again.
     app_disable_pwa_webpush_subscription : (AppDisablePwaWebPushSubscriptionRequest) -> (variant { Ok; Err : AppDisablePwaWebPushSubscriptionError });
     // The endpoint the session's browser, account and frontend are subscribed at. Null
     // where nothing is subscribed, where the subscription awaits its

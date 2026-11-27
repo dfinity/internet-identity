@@ -3511,6 +3511,26 @@ impl<M: Memory + Clone> Storage<M> {
             })
     }
 
+    /// The apps and their frontends `browser_id`'s entry of `anchor_number` holds an
+    /// installed web app subscription of, as the app's number and the hash of the
+    /// frontend's origin.
+    pub fn pwa_webpush_frontends_of_browser(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> BTreeSet<(ApplicationNumber, OriginSha256)> {
+        let mut frontends = BTreeSet::new();
+        for ((_, application_number), config) in self.stable_anchor_application_config_memory.range(
+            (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+        ) {
+            for (frontend_origin_hash, _) in config.pwa_webpush_subscriptions_of_browser(browser_id)
+            {
+                frontends.insert((application_number, frontend_origin_hash));
+            }
+        }
+        frontends
+    }
+
     /// What this identity has configured for the app at `origin`, or `None` where it has
     /// never signed in there or has configured nothing since.
     pub fn read_anchor_application_config(

@@ -1343,6 +1343,7 @@ fn app_prepare_pwa_webpush_subscription(
 
 /// Sets or, with `None`, removes the installed web app subscription of the calling
 /// session's identity, app, browser entry and account, at the frontend the request names.
+/// `None` leaves one the app disabled as it is.
 #[update]
 fn app_set_pwa_webpush_subscription(
     request: AppSetPwaWebPushSubscriptionRequest,

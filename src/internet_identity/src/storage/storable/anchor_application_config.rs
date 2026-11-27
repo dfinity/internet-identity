@@ -32,7 +32,10 @@ pub struct PwaSubscription {
     pub subscription: WebPushSubscription,
     pub account_principal: Principal,
     /// When the app disabled the subscription on its device: nothing is sent to it from
-    /// then on. `None` while the app has not.
+    /// then on, and the device is not notified another way, until the slot is prepared or
+    /// set again or the user allows notifications there again. A disabled slot outlives
+    /// its sessions, its endpoint and a removal without a subscription. `None` while the
+    /// app has not.
     pub disabled_at_ns: Option<Timestamp>,
 }
 
