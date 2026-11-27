@@ -39,6 +39,7 @@ const createFeatureFlagStore = (
   // Initialize feature flag object with value from localstorage
   const initializedFeatureFlag = new FeatureFlag(
     window.localStorage,
+    window.sessionStorage,
     LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
     defaultValue,
     { subscribe, set, update },
@@ -56,8 +57,9 @@ const createFeatureFlagStore = (
     return initializedFeatureFlag;
   };
   const initialize = (): void => {
-    // A value persisted in localStorage (from the browser console or a
-    // `?feature_flag_*` URL param) always wins — leave it untouched.
+    // A value set from the browser console (localStorage) or a
+    // `?feature_flag_*` URL param (sessionStorage) always wins — leave it
+    // untouched.
     if (initializedFeatureFlag.isSet()) {
       return;
     }
