@@ -11,6 +11,7 @@ import {
   reportPageError,
   TEST_APP_URL,
 } from "../utils";
+import { DEFAULT_HOST } from "./identity";
 
 /**
  * The test app, addressed by what it does rather than by which element does it.
@@ -477,7 +478,7 @@ export class TestApp {
    */
   async declareAlternativeOrigins(origins: string[]): Promise<void> {
     const alternativeOrigins = JSON.stringify({ alternativeOrigins: origins });
-    await this.page.locator("#hostUrl").fill("https://localhost:5173");
+    await this.page.locator("#hostUrl").fill(DEFAULT_HOST);
     await this.page.locator("#newAlternativeOrigins").fill(alternativeOrigins);
     await this.page.locator("#certified").click();
     await this.page.locator("#updateNewAlternativeOrigins").click();

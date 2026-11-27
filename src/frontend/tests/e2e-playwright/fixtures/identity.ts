@@ -11,8 +11,10 @@ import {
   type WebAuthnCredential,
 } from "../utils";
 import { Principal } from "@icp-sdk/core/principal";
+import { DEV_SERVER_PORT } from "../workerStack";
 
-export const DEFAULT_HOST = "https://localhost:5173"; // Vite dev server
+/** The current worker's dev server. */
+export const DEFAULT_HOST = `https://localhost:${DEV_SERVER_PORT}`;
 export const DEFAULT_NAME = "Test User";
 
 export type IdentityConfig = {

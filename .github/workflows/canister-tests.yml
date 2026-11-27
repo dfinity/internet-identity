@@ -432,35 +432,9 @@ jobs:
     env:
       # Suffix used for tagging artifacts
       artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
-      # All test OpenID provider ports we spin up (see
-      # /src/test_openid_provider). 11105 / 11106 back the direct OpenID
-      # fixtures; 11107 backs the SSO discovery (two-hop) fixture; 11108 is an
-      # Entra-style provider (pairwise `sub` + stable `oid`) for the non-`sub`
-      # gating tests; 11109 only serves a well-known pointing at the 11107 IdP,
-      # a second SSO discovery domain for the same accounts (domain-mismatch
-      # tests); 11110 issues the tokens of the "Apple" provider.
-      openid_providers: "11105 11106 11107 11108 11109 11110"
-      # The Entra-style provider port — started with pairwise env below.
-      pairwise_openid_provider: "11108"
-      # The alias discovery-domain port and the IdP it points at.
-      alias_openid_provider: "11109"
-      alias_openid_target: "11107"
-      # The "Apple" provider: configured with Apple's real authorize URL so the
-      # frontend takes its Sign in with Apple paths, while its tokens come from
-      # this port. The tests route https://appleid.apple.com to it and back (see
-      # fixtures/apple.ts), the only redirect URI it accepts.
-      apple_openid_provider: "11110"
-      apple_redirect_uri: "https://appleid.apple.com/e2e/callback"
-      # Direct OpenID provider ports — only these get an `openid_configs`
-      # entry on the canister. 11107 is intentionally excluded: it's
-      # registered exclusively as an SSO `DiscoverableOidcConfig`, so the
-      # JWT verification path uses the discoverable provider (and the
-      # resulting credential is `sso:<domain>`-keyed). If 11107 were
-      # also in `openid_configs`, both providers would match
-      # `iss=http://localhost:11107` and the direct one would win first
-      # (registered earlier), producing an `openid:`-keyed credential
-      # the SSO attribute scope can't reach.
-      direct_openid_providers: "11105 11106"
+      # Playwright workers per shard, each against its own stack that
+      # scripts/dev-e2e-setup sets up.
+      E2E_WORKERS: 4
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
@@ -474,25 +448,6 @@ jobs:
       - name: Install icp-cli
         run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
-      # Pin the network launcher (which bundles pocket-ic) because
-      # `icp network start` otherwise fetches `releases/latest`, and
-      # hold it at v16.1.0 or newer: that is the first launcher whose
-      # pocket-ic holds a threshold key over secp256r1, which is what
-      # Internet Identity signs its VAPID JWTs with. Without one, no
-      # browser can subscribe and every notification test fails.
-      # Keep in step with scripts/dev-e2e-setup.
-      - name: Pin icp-cli-network-launcher
-        run: |
-          launcher_tag=v16.1.0-2026-10-22-03-29
-          launcher_dir="$RUNNER_TEMP/icp-cli-network-launcher-x86_64-linux-$launcher_tag"
-          curl --proto '=https' --tlsv1.2 -fsSL \
-            -o "$RUNNER_TEMP/launcher.tar.gz" \
-            "https://github.com/dfinity/icp-cli-network-launcher/releases/download/$launcher_tag/icp-cli-network-launcher-x86_64-linux-$launcher_tag.tar.gz"
-          tar xzf "$RUNNER_TEMP/launcher.tar.gz" -C "$RUNNER_TEMP"
-          test -x "$launcher_dir/icp-cli-network-launcher"
-          test -x "$launcher_dir/pocket-ic"
-          echo "ICP_CLI_NETWORK_LAUNCHER_PATH=$launcher_dir/icp-cli-network-launcher" >> "$GITHUB_ENV"
-
       # Helps with debugging
       - name: Show versions
         run: |
@@ -500,44 +455,6 @@ jobs:
           icp --version
           echo node --version
           node --version
-
-      # Needs to run before the canisters so they can fetch the JWK keys
-      # from these test OpenID provider instances immediately after starting.
-      - name: "Run test OpenID providers"
-        run: |
-          npm ci --prefix ./src/test_openid_provider
-          for port in ${{ env.openid_providers }}; do
-            if [ "$port" = "${{ env.pairwise_openid_provider }}" ]; then
-              # Entra-style: pairwise `sub` + a stable `oid`, named for the
-              # dialog copy. Pairwise needs single-host redirect_uris; the e2e II
-              # origin is https://id.ai, so restrict to that one callback.
-              OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" OIDC_REDIRECT_URIS="https://id.ai/callback" \
-                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
-            elif [ "$port" = "${{ env.apple_openid_provider }}" ]; then
-              OIDC_REDIRECT_URIS="${{ env.apple_redirect_uri }}" \
-                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
-            elif [ "$port" = "${{ env.alias_openid_provider }}" ]; then
-              # Alias discovery domain: its well-known hands II the target
-              # provider's OIDC configuration, so sign-ins through it hit the
-              # same IdP and accounts (see fixtures/sso.ts).
-              OIDC_ISSUER="http://localhost:${{ env.alias_openid_target }}" OIDC_SSO_NAME="Test SSO alias" \
-                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
-            else
-              npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
-            fi
-          done
-
-      # Render the frontend canister's init_args file from the template
-      # so `icp.yaml`'s `init_args.path` resolves when icp-cli loads the
-      # project. Locally this happens via the `postinstall` npm hook; in
-      # CI we invoke it explicitly because not every job runs `npm
-      # install` before `icp`. CI overrides init args via `--args` at
-      # install time, so the rendered placeholder content is never parsed.
-      - name: "Render frontend init_args stub"
-        run: scripts/render-local-init-args
-
-      - name: "Run icp-cli"
-        run: icp network start -d
 
       - name: "Download II backend wasm"
         uses: actions/download-artifact@v4
@@ -551,92 +468,36 @@ jobs:
           name: internet_identity_frontend.wasm.gz
           path: .
 
+      # scripts/dev-e2e-setup installs the wasm under the name scripts/build gives it.
+      - run: mv internet_identity_backend.wasm.gz internet_identity.wasm.gz
+
       # Puts the wasm at .test-app/test_app.wasm and the frontend (which the
       # chrome-extension project loads as an unpacked extension) at
       # .test-app/dist.
       - name: "Fetch test app"
         uses: ./.github/actions/fetch-test-app
 
-      - name: Create Canisters
-        run: |
-          icp canister create internet_identity
-          icp canister create internet_identity_frontend
-          icp canister create test_app
-
-      - name: Generate OpenID configs
-        id: openid-configs
-        run: |
-          svg='<svg viewBox=\\\"0 0 24 24\\\"><path d=\\\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\\\" style=\\\"fill: currentColor;\\\"></path></svg>'
-          configs=()
-          for port in ${{ env.direct_openid_providers }}; do
-            configs+=("record { name = \\\"Test OpenID $port\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$port/jwks\\\"; auth_uri = \\\"http://localhost:$port/auth\\\"; auth_scope = vec { \\\"openid\\\"; \\\"profile\\\"; \\\"email\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Google }; }")
-          done
-          apple_port=${{ env.apple_openid_provider }}
-          configs+=("record { name = \\\"Apple\\\"; logo = \\\"$svg\\\"; issuer = \\\"http://localhost:$apple_port\\\"; client_id = \\\"internet_identity\\\"; jwks_uri = \\\"http://localhost:$apple_port/jwks\\\"; auth_uri = \\\"https://appleid.apple.com/auth/authorize\\\"; auth_scope = vec { \\\"openid\\\"; \\\"email\\\"; \\\"name\\\" }; fedcm_uri = opt \\\"\\\"; email_verification = opt variant { Apple }; }")
-          openid_configs="$(IFS='; '; echo "${configs[*]}")"
-          echo "OPENID_CONFIGS=$openid_configs" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy canisters
-        run: |
-          # NOTE: icp canister install will run the sync steps from icp.yaml
-          # Trust anchor for the DNSSEC chain assembled by the e2e
-          # signer (`src/frontend/tests/e2e-playwright/utils/dnssecTestSigner.ts`).
-          # Derived fresh from the signer's seed so there's no hardcoded
-          # digest to drift out of sync.
-          dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
-          # The test app as the local gateway serves it, which is the one origin both
-          # a browser and the replica itself can reach: the notification delivery test
-          # has the canister read the app's sender list over an outcall, and
-          # `nice-name.com` resolves in the browser alone. A loopback origin means a
-          # loopback push endpoint and a plain-HTTP sender list, so both escapes are
-          # opened too (matches dev-e2e-setup).
-          TEST_APP_CANISTER_ID=$(icp canister status test_app --id-only)
-          TEST_APP_LOCAL_ORIGIN="http://$TEST_APP_CANISTER_ID.localhost:8000"
-          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { mcp_official_url = opt opt \"https://official-mcp.id.ai/mcp\"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; notifications_enabled = opt true; notifications_allow_insecure_endpoint = opt true; notifications_allow_insecure_sender_list = opt true; dnssec_config = $dnssec_config })"
-          II_CANISTER_ID=$(icp canister status internet_identity --id-only)
-          icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
-          # The e2e serves the test app from the nice-name.com alt-origin, so its
-          # ICRC-167 callback (https://nice-name.com/callback) isn't one of the
-          # canister-id gateway origins the app derives on its own — declare it
-          # explicitly so II's allow-list check passes (matches dev-e2e-setup).
-          icp canister install test_app --wasm .test-app/test_app.wasm --args "(opt record { auth_callbacks = vec { \"https://nice-name.com/callback\" } })"
-          # The test app's notification library reads where it is served and which
-          # Internet Identity to send through from the canister's environment. Without
-          # them it refuses to send at all.
-          icp canister settings update test_app \
-            --add-environment-variable "notification_origin=$TEST_APP_LOCAL_ORIGIN" \
-            --add-environment-variable "notification_sender=$II_CANISTER_ID"
-
-      - name: Run dev server
-        id: dev-server-start
-        run: |
-          SEPARATE_FRONTEND_CANISTER=1 TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
-          dev_server_pid=$!
-          echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
+      # Starts the test OpenID providers, the icp network, the canisters and
+      # the dev server of every worker, with the wasm downloaded above.
+      - name: Set up e2e stacks
+        run: scripts/dev-e2e-setup --skip-build
 
       - name: Run Playwright tests
         run: |
-          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /) --reporter=line,html
+          npx playwright test --project ${{ matrix.device }} --shard=$(tr <<<'${{ matrix.shard }}' -s _ /) --reporter=line,html
 
-      - name: Stop icp-cli
+      - name: Tear down e2e stacks
         if: ${{ always() }}
-        run: icp network stop
+        run: scripts/dev-e2e-setup --teardown
 
-      - name: Stop dev server
-        if: ${{ always() }}
-        # `2>/dev/null || true` so cleanup never fails an otherwise-green job:
-        # under `bash -e` a bare `kill` of an already-exited dev server (the
-        # backgrounded `npm run dev | tee` pipeline PID is often reaped before
-        # this step) exits non-zero and would fail the run. Anything still
-        # alive is reaped by the runner's orphan-process cleanup.
-        run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }} 2>/dev/null || true
-
-      - name: Archive dev server logs
+      - name: Archive e2e stack logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: dev-server-logs-${{ env.artifact_suffix }}
-          path: dev-server-logs.txt
+          name: e2e-stack-logs-${{ env.artifact_suffix }}
+          path: .icp/cache/dev-e2e/worker-*/logs/
+          # The logs live under .icp/, which upload-artifact skips by default.
+          include-hidden-files: true
           if-no-files-found: ignore
 
       - name: Archive playwright reports

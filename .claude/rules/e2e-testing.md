@@ -11,16 +11,16 @@ paths:
 
 `e2e/use-dev-scripts` Three scripts in `scripts/` wrap the full e2e stack. Use them instead of running icp-cli and canister installs by hand:
 
-- `scripts/dev-e2e-setup`: idempotent setup. Builds canisters, starts the icp network, OpenID providers and the dev server, and exits 0 when the stack is ready. Re-running rebuilds only what changed (about 1s as a no-op, about 25s after a backend change).
-- `scripts/dev-e2e-setup --teardown`: tears the stack down.
+- `scripts/dev-e2e-setup`: idempotent setup. Builds canisters, then starts one stack per Playwright worker (an icp network, OpenID providers and a dev server, with the canisters installed), and exits 0 when the stacks are ready. Re-running rebuilds only what changed (about 1s as a no-op, about 25s after a backend change).
+- `scripts/dev-e2e-setup --teardown`: tears every stack down.
 - `e2e/offer-interactive-runs` `scripts/dev-e2e`: interactive. Runs setup plus a file watcher, opens Playwright in `--ui` mode, and tears down on Ctrl+C. Use it when the user asks to run the e2e tests themselves. When it fits, offer it to them too: it helps for visually reviewing a flow as a user, or when a run gets stuck or unclear and needs a human's eyes and judgement.
 
 The `e2e-playwright` job in `.github/workflows/canister-tests.yml` is the CI reference if the scripts drift from it.
 
 ## Running tests
 
-- `e2e/run-narrowed` Start the stack with `./scripts/dev-e2e-setup`, then run `npx playwright test --project=desktop --workers=1`, narrowed to a spec file (`npx playwright test <path to .spec.ts> ...`) or to tests by name (`-g "<name pattern>"`). The projects in `playwright.config.ts` are `desktop`, `mobile` and `chrome-extension`; specs under `e2e-playwright-chrome-extension` only run in `chrome-extension`, which has its own `testDir`.
-- `e2e/one-worker` Run with `--workers=1`, as CI does: specs share canister state, and parallel workers produce false failures.
+- `e2e/run-narrowed` Start the stack with `./scripts/dev-e2e-setup`, then run `npx playwright test --project=desktop`, narrowed to a spec file (`npx playwright test <path to .spec.ts> ...`) or to tests by name (`-g "<name pattern>"`). The projects in `playwright.config.ts` are `desktop`, `mobile` and `chrome-extension`; specs under `e2e-playwright-chrome-extension` only run in `chrome-extension`, which has its own `testDir`.
+- `e2e/worker-per-stack` (was `e2e/one-worker`) Every Playwright worker runs against a stack of its own, so specs never share canister state across workers. `E2E_WORKERS` (default 4) sets both how many stacks `dev-e2e-setup` starts and how many workers Playwright runs; set it for both, and never pass a larger `--workers`: a worker without a stack fails every test. Worker i's dev server listens on 5173 + i, its gateway on 8000 + i (the `e2e-<i>` network in `icp.yaml`), and its OpenID providers on the base ports + 100 i. Specs and fixtures get these ports from `tests/e2e-playwright/workerStack.ts`.
 - `e2e/rerun-setup` After changing code, re-run `./scripts/dev-e2e-setup` before the next test run. The tests run against the deployed canisters, so a change takes effect only once setup rebuilds them (see Stack gotchas).
 - `e2e/full-suite-for-broad-changes` For broad frontend changes (auth flows, consent, sessions), run the full suite in all three projects, as CI does, not just the new spec.
 - `e2e/trace-failures` Add `--trace on` to debug a failure.
@@ -34,7 +34,7 @@ The `e2e-playwright` job in `.github/workflows/canister-tests.yml` is the CI ref
 
 ## Local OpenID providers
 
-`e2e/read-ports-from-script` The ports are declared at the top of `scripts/dev-e2e-setup`. Read them from there rather than hardcoding a list:
+`e2e/read-ports-from-script` Worker 0's ports are declared at the top of `scripts/dev-e2e-setup`; every other worker's are offset from them (see `e2e/worker-per-stack`). Read them from there rather than hardcoding a list:
 
 - `OPENID_PORTS`: every provider the stack starts.
 - `DIRECT_OPENID_PORTS`: the subset configured as direct providers.
@@ -76,7 +76,7 @@ The `e2e-playwright` job in `.github/workflows/canister-tests.yml` is the CI ref
 
 `./scripts/dev-e2e-setup --teardown` handles the normal case. If something is stuck after an interrupted run:
 
-1. Replica: `icp network stop`, or kill `icp-cli-network-launcher`.
-2. Dev server: `lsof -iTCP:5173 -sTCP:LISTEN -nP` and kill it.
-3. OpenID providers: resolve `OPENID_PORTS` from `scripts/dev-e2e-setup`, then `lsof -iTCP:<port> -sTCP:LISTEN -nP` for each and kill.
+1. Replicas: `icp network stop` and `ICP_ENVIRONMENT=e2e-<i> icp network stop` per worker, or kill `icp-cli-network-launcher`.
+2. Dev servers: `lsof -iTCP:5173 -sTCP:LISTEN -nP` (and 5174 onwards, one per worker) and kill them.
+3. OpenID providers: resolve `OPENID_PORTS` from `scripts/dev-e2e-setup`, offset per worker, then `lsof -iTCP:<port> -sTCP:LISTEN -nP` for each and kill.
 4. Playwright workers: `ps aux | grep -iE 'playwright|chromedriver'`.
