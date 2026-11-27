@@ -179,8 +179,8 @@ test("push notifications are not persisted by following the backend", () => {
 
 test("a value set by hand wins over the backend", () => {
   mockNotificationsEnabled.mockReturnValue(true);
-  // The persisting setter — what the browser console and a `?feature_flag_*`
-  // param reach. The store's own `set` is in-memory only.
+  // The persisting setter — what the browser console reaches. The store's
+  // own `set` is in-memory only.
   PUSH_NOTIFICATIONS.getFeatureFlag()?.set(false);
 
   PUSH_NOTIFICATIONS.initialize();

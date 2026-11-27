@@ -1764,6 +1764,12 @@ export interface ListAvailableAttributesRequest {
    * Identity for which available attributes should be listed.
    */
   'identity_number' : IdentityNumber,
+  /**
+   * Whether Apple private relay addresses are listed, as `email` and
+   * `verified_email` rows. They only take mail from senders registered with
+   * II's Apple developer team. Absent or `false` leaves them out.
+   */
+  'include_private_relay_emails' : [] | [boolean],
 }
 export type ListAvailableAttributesResponse = Array<
   [string, Uint8Array | number[]]
@@ -2096,7 +2102,7 @@ export type OpenIdEmailVerification = { 'Google' : null } |
     /**
      * Trusts email_verified like Google. Apple's private relay addresses,
      * which only senders registered with II's Apple developer team can deliver
-     * mail to, are not kept on the credential at all.
+     * mail to, are listed by `list_available_attributes` only on request.
      */
     'Apple' : null
   } |
@@ -2260,7 +2266,10 @@ export interface PrepareIcrc3AttributeRequest {
    */
   'account_number' : [] | [AccountNumber],
   /**
-   * The attributes to be certified.
+   * The attributes to be certified. An `email` or `verified_email` value
+   * that is an Apple private relay address is certified together with the
+   * same key suffixed `_private_relay`, set to "true" (e.g. `email` and
+   * `email_private_relay`). Other values get no such key.
    */
   'attributes' : Array<AttributeSpec>,
   /**
@@ -2929,7 +2938,14 @@ export type VerificationPath = { 'Doh' : null } |
  * credential. The `verified_at` timestamp is when DKIM/DMARC
  * verification completed successfully.
  */
-export interface VerifiedEmail { 'address' : string, 'verified_at' : Timestamp }
+export interface VerifiedEmail {
+  /**
+   * `opt true` for an Apple private relay address; absent counts as not one.
+   */
+  'is_private_relay' : [] | [boolean],
+  'address' : string,
+  'verified_at' : Timestamp,
+}
 export type VerifyTentativeDeviceResponse = {
     /**
      * Device registration mode is off, either due to timeout or because it was never enabled.

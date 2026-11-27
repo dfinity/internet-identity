@@ -3045,6 +3045,7 @@ mod sso_gating {
         let request = || ListAvailableAttributesRequest {
             identity_number,
             attributes: None,
+            include_private_relay_emails: None,
         };
         let sso_email_key = format!("sso:{GATE_DOMAIN}:email");
 

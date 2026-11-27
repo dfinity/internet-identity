@@ -878,6 +878,7 @@ export const idlFactory = ({ IDL }) => {
     'recovery_authn_methods' : IDL.Vec(AuthnMethod),
   });
   const VerifiedEmail = IDL.Record({
+    'is_private_relay' : IDL.Opt(IDL.Bool),
     'address' : IDL.Text,
     'verified_at' : Timestamp,
   });
@@ -1014,6 +1015,7 @@ export const idlFactory = ({ IDL }) => {
   const ListAvailableAttributesRequest = IDL.Record({
     'attributes' : IDL.Opt(IDL.Vec(IDL.Text)),
     'identity_number' : IdentityNumber,
+    'include_private_relay_emails' : IDL.Opt(IDL.Bool),
   });
   const ListAvailableAttributesResponse = IDL.Vec(
     IDL.Tuple(IDL.Text, IDL.Vec(IDL.Nat8))

@@ -11,6 +11,7 @@
     resolveAttributeGroups,
   } from "$lib/stores/channelHandlers/attributes";
   import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { SHARE_PRIVATE_RELAY_EMAILS } from "$lib/state/featureFlags";
   import { lastSharedEmailsStore } from "$lib/stores/last-shared-emails.store";
   import { anonymousActor, backendCanisterConfig } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
@@ -256,6 +257,7 @@
         .list_available_attributes({
           identity_number: $authenticatedStore.identityNumber,
           attributes: [],
+          include_private_relay_emails: [$SHARE_PRIVATE_RELAY_EMAILS],
         })
         .then(throwCanisterError);
       const groups = sortGroupsUnscopedFirst(

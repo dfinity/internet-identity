@@ -5,6 +5,8 @@ import {
   INVALID_PARAMS_ERROR_CODE,
 } from "$lib/utils/transport/utils";
 import { frontendCanisterConfig } from "$lib/globals";
+import { get } from "svelte/store";
+import { SHARE_PRIVATE_RELAY_EMAILS } from "$lib/state/featureFlags";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
@@ -372,6 +374,7 @@ const resolveConsentPipeline = async (params: {
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
               attributes: [],
+              include_private_relay_emails: [get(SHARE_PRIVATE_RELAY_EMAILS)],
             })
             .then(throwCanisterError)
         : Promise.resolve([]);
@@ -546,6 +549,7 @@ export const handleIcrc3OneClickOpenIdAttributes =
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
           attributes: [],
+          include_private_relay_emails: [get(SHARE_PRIVATE_RELAY_EMAILS)],
         })
         .then(throwCanisterError);
       const availableKeys = new Set(available.map(([key]) => key));
@@ -635,6 +639,7 @@ export const handleIcrc3OneClickSsoAttributes =
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
           attributes: [],
+          include_private_relay_emails: [get(SHARE_PRIVATE_RELAY_EMAILS)],
         })
         .then(throwCanisterError);
       const availableKeys = new Set(available.map(([key]) => key));

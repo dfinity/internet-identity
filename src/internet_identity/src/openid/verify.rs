@@ -12,7 +12,7 @@
 use super::domain::Domain;
 use super::{
     get_all_claims, get_issuer_placeholders, replace_issuer_placeholders, AudClaim,
-    OpenIDJWTVerificationError, OpenIdCredential,
+    OpenIDJWTVerificationError, OpenIdCredential, PRIVATE_RELAY_EMAIL_METADATA_KEY,
 };
 use crate::secs_to_nanos;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -108,26 +108,34 @@ fn flags_private_email(claim: &serde_json::Value) -> bool {
     }
 }
 
-/// The `email` claim, if it is an address apps can reach. An empty email
-/// (Apple sends one for some Work & School accounts) is no address at all.
-/// Apple's private relay addresses only take mail from senders registered with
-/// II's Apple developer team, so they are left out too, as if the token had no
-/// email: flagged by `is_private_email`, or by their domain when the flag is
-/// missing.
-fn reachable_email(
+/// An `email` claim value, with whether it is one of Apple's private relay
+/// addresses. A relay address only takes mail from senders registered with
+/// II's Apple developer team.
+#[derive(Debug, PartialEq, Eq)]
+struct ClaimedEmail {
+    address: String,
+    is_private_relay: bool,
+}
+
+/// The `email` claim as a [`ClaimedEmail`], or `None` for a missing or empty
+/// email (Apple sends an empty one for some Work & School accounts). The
+/// address is a private relay address when `is_private_email` flags it or its
+/// domain is one of [`APPLE_RELAY_DOMAINS`].
+fn claimed_email(
     email: Option<String>,
     is_private_email: Option<&serde_json::Value>,
-) -> Option<String> {
-    let email = email.filter(|email| !email.is_empty())?;
-    if is_private_email.is_some_and(flags_private_email) {
-        return None;
-    }
-    let relay_domain = email.rsplit_once('@').is_some_and(|(_, domain)| {
+) -> Option<ClaimedEmail> {
+    let address = email.filter(|email| !email.is_empty())?;
+    let is_relay_domain = address.rsplit_once('@').is_some_and(|(_, domain)| {
         APPLE_RELAY_DOMAINS
             .iter()
             .any(|relay| domain.eq_ignore_ascii_case(relay))
     });
-    (!relay_domain).then_some(email)
+    let is_private_relay = is_relay_domain || is_private_email.is_some_and(flags_private_email);
+    Some(ClaimedEmail {
+        address,
+        is_private_relay,
+    })
 }
 
 #[derive(Deserialize)]
@@ -264,8 +272,18 @@ pub(super) fn verify_and_build(
 
     // Assemble metadata
     let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
-    if let Some(email) = reachable_email(email, is_private_email.as_ref()) {
-        metadata.insert("email".into(), MetadataEntryV2::String(email));
+    if let Some(ClaimedEmail {
+        address,
+        is_private_relay,
+    }) = claimed_email(email, is_private_email.as_ref())
+    {
+        metadata.insert("email".into(), MetadataEntryV2::String(address));
+        if is_private_relay {
+            metadata.insert(
+                PRIVATE_RELAY_EMAIL_METADATA_KEY.into(),
+                MetadataEntryV2::String("true".into()),
+            );
+        }
     }
     if let Some(email_verified) = email_verified {
         metadata.insert(
@@ -848,30 +866,43 @@ mod tests {
     }
 
     #[test]
-    fn should_keep_only_reachable_emails() {
+    fn should_mark_private_relay_emails() {
         let not_private = serde_json::Value::Bool(false);
         let private = serde_json::Value::Bool(true);
-        for (email, is_private_email, kept) in [
-            ("user@example.com", None, true),
-            ("user@icloud.com", Some(&not_private), true),
+        for (email, is_private_email, is_private_relay) in [
+            ("user@example.com", None, false),
+            ("user@icloud.com", Some(&not_private), false),
             // A relay address is flagged on any domain, `@icloud.com` included.
-            ("relay-alias@icloud.com", Some(&private), false),
+            ("relay-alias@icloud.com", Some(&private), true),
             // Without the flag, the relay domains still give it away.
-            ("ep9ks2tnph@privaterelay.appleid.com", None, false),
-            ("ep9ks2tnph@PrivateRelay.AppleID.com", None, false),
-            ("ep9ks2tnph@private.icloud.com", None, false),
-            // An empty email is no address at all.
-            ("", None, false),
-            // Anything else is kept as before, for every provider.
-            ("not-an-address", None, true),
+            ("ep9ks2tnph@privaterelay.appleid.com", None, true),
+            ("ep9ks2tnph@PrivateRelay.AppleID.com", None, true),
+            ("ep9ks2tnph@private.icloud.com", None, true),
+            // A relay domain is a relay address even when the flag says otherwise.
+            (
+                "ep9ks2tnph@privaterelay.appleid.com",
+                Some(&not_private),
+                true,
+            ),
+            // A look-alike domain is not a relay domain.
+            ("user@evil-privaterelay.appleid.com", None, false),
+            ("not-an-address", None, false),
         ] {
             assert_eq!(
-                reachable_email(Some(email.to_string()), is_private_email),
-                kept.then(|| email.to_string()),
+                claimed_email(Some(email.to_string()), is_private_email),
+                Some(ClaimedEmail {
+                    address: email.to_string(),
+                    is_private_relay,
+                }),
                 "{email} with is_private_email {is_private_email:?}"
             );
         }
-        assert_eq!(reachable_email(None, None), None);
+    }
+
+    #[test]
+    fn should_drop_missing_and_empty_emails() {
+        assert_eq!(claimed_email(None, None), None);
+        assert_eq!(claimed_email(Some(String::new()), None), None);
     }
 
     #[test]

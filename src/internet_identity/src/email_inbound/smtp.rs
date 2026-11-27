@@ -845,6 +845,7 @@ pub(super) fn append_or_refresh_verified_email(
         anchor.verified_emails.push(VerifiedEmail {
             address: claimed_address.to_string(),
             verified_at: now_ns,
+            is_private_relay: None,
         });
     }
     state::storage_borrow_mut(|storage| storage.write(anchor))

@@ -35,7 +35,7 @@ const overrideFeatureFlags = () => {
         );
         continue;
       }
-      featureFlags[flag]?.set(value === "true");
+      featureFlags[flag]?.getFeatureFlag()?.setForSession(value === "true");
       url.searchParams.delete(key);
     }
   }

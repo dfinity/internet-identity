@@ -3789,6 +3789,7 @@ mod attribute_sharing {
         let ValidatedListAvailableAttributesRequest {
             identity_number,
             attributes,
+            include_private_relay_emails,
         } = request.try_into()?;
 
         // Gate `sso:<domain>` rows by the certified bundle; the bundle is the trusted source of the SSO domain.
@@ -3799,7 +3800,11 @@ mod attribute_sharing {
                 ListAvailableAttributesError::AuthorizationError(principal)
             })?;
 
-        Ok(anchor.list_available_attributes(attributes, sso_session_domain))
+        Ok(anchor.list_available_attributes(
+            attributes,
+            sso_session_domain,
+            include_private_relay_emails,
+        ))
     }
 }
 
