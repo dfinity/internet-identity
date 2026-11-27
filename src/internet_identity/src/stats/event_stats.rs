@@ -307,8 +307,7 @@ fn events_to_remove_from_24h_aggregations<M: Memory>(
     // Always aim to collect events up to 24h ago, even if past update calls did not manage due to
     // the MAX_EVENTS_TO_PROCESS limit.
     let window_end_timestamp = now - DAY_NS;
-    let events = db
-        .range(start_key..=EventKey::max_key(window_end_timestamp))
+    let events = events_from_key_through_time(db, start_key, window_end_timestamp)
         .take(MAX_EVENTS_TO_PROCESS)
         .collect::<Vec<_>>();
 
@@ -322,6 +321,27 @@ fn events_to_remove_from_24h_aggregations<M: Memory>(
     events
 }
 
+/// The events of `db` in key order, from the one at `start_key` to the last one recorded at
+/// `end_timestamp`: every key from `start_key` to `EventKey::max_key(end_timestamp)`, both
+/// bounds included.
+fn events_from_key_through_time<'a, M: Memory + 'a>(
+    db: &'a StableBTreeMap<EventKey, EventData, M>,
+    start_key: EventKey,
+    end_timestamp: Timestamp,
+) -> impl Iterator<Item = (EventKey, EventData)> + 'a {
+    db.range(start_key..=EventKey::max_key(end_timestamp))
+}
+
+/// The events of `db` in key order, from the first one to the last one recorded at
+/// `end_timestamp`: every key up to `EventKey::max_key(end_timestamp)`, that bound
+/// included.
+fn events_through_time<'a, M: Memory + 'a>(
+    db: &'a StableBTreeMap<EventKey, EventData, M>,
+    end_timestamp: Timestamp,
+) -> impl Iterator<Item = (EventKey, EventData)> + 'a {
+    db.range(..=EventKey::max_key(end_timestamp))
+}
+
 /// Removes events older than the retention period (30d).
 /// Returns a vec of tuples of the pruned events and their timestamps.
 /// Prunes at most [MAX_EVENTS_TO_PROCESS].
@@ -331,8 +351,7 @@ fn prune_events<M: Memory>(
 ) -> Vec<(EventKey, EventData)> {
     const RETENTION_PERIOD: u64 = 30 * DAY_NS;
 
-    let pruned_events: Vec<_> = db
-        .range(..=EventKey::max_key(now - RETENTION_PERIOD))
+    let pruned_events: Vec<_> = events_through_time(db, now - RETENTION_PERIOD)
         .take(MAX_EVENTS_TO_PROCESS)
         .collect();
     for entry in &pruned_events {
