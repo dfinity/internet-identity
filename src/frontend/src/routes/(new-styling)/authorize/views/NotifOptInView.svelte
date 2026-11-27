@@ -2,13 +2,17 @@
   import { onMount } from "svelte";
   import { BellOffIcon } from "@lucide/svelte";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
-  import type { _SERVICE } from "$lib/generated/internet_identity_types";
+  import type {
+    _SERVICE,
+    RemoveUnansweredPwaWebPushSubscriptionsRequest,
+  } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import { startAppInstall } from "./notifInstall";
   import { stopRepairChecks } from "./stopRepairChecks";
+  import { removeDisabledInstalledApps } from "./removeDisabledInstalledApps";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import {
     turnOnNotifications,
@@ -55,8 +59,13 @@
     /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
     installFirst: boolean;
     /** Opened because this device stopped receiving the app's notifications: skipping
-     *  then stops the checks on this device, and leaves the app's consent as it is. */
+     *  then stops the checks on this device, unless `disabledInstalledApps` is what
+     *  mutes it, and leaves the app's consent as it is. */
     isRepair: boolean;
+    /** The installed web apps the app disabled that mute this device: allowing removes
+     *  them first, and skipping leaves them, so the next sign-in asks again. */
+    disabledInstalledApps:
+      RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
@@ -71,6 +80,7 @@
     consented,
     installFirst,
     isRepair,
+    disabledInstalledApps,
     onDone,
   }: Props = $props();
 
@@ -105,7 +115,7 @@
 
   const skip = async () => {
     funnel?.trigger(BrowserNotificationsEvents.Skipped);
-    if (isRepair) {
+    if (isRepair && disabledInstalledApps === undefined) {
       busy = true;
       await stopRepairChecks({
         identityNumber,
@@ -156,7 +166,10 @@
       consented,
       source,
     });
-    granting = started.granted;
+    granting = Promise.all([
+      started.granted,
+      removeDisabledInstalledApps(disabledInstalledApps),
+    ]).then(() => undefined);
     // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
     void started.url.then(
       (url) => {
@@ -255,6 +268,7 @@
   const runEnable = async (current: DeviceNotificationState): Promise<void> => {
     busy = true;
     try {
+      await removeDisabledInstalledApps(disabledInstalledApps);
       const result = await turnOnNotifications({
         identityNumber,
         origin,

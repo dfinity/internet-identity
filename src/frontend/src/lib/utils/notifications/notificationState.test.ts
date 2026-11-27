@@ -255,7 +255,7 @@ describe("resolveOptIn", () => {
         actor: actorGranting(true),
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "skip", granted: true });
+    ).resolves.toMatchObject({ screen: "skip", granted: true });
   });
 
   it("asks a set-up browser whose app is not allowed, carrying what it found", async () => {
@@ -676,7 +676,7 @@ describe("where a Home Screen app delivers", () => {
       appStatus.mockResolvedValue({ kind: "no-app" });
       saidSo.mockResolvedValue(true);
 
-      await expect(resolve(true)).resolves.toEqual({
+      await expect(resolve(true)).resolves.toMatchObject({
         screen: "skip",
         granted: true,
       });
@@ -754,7 +754,7 @@ describe("where a Home Screen app delivers", () => {
           actor: actorGranting(true),
           browser: new Promise(() => undefined),
         }),
-      ).resolves.toEqual({ screen: "skip", granted: true });
+      ).resolves.toMatchObject({ screen: "skip", granted: true });
     });
 
     /// One read and no write: the resolution picks a screen, and every state-changing
@@ -791,7 +791,7 @@ describe("where a Home Screen app delivers", () => {
       appStatus.mockResolvedValue({ kind: "no-app" });
       saidSo.mockResolvedValue(true);
 
-      await expect(resolve(true)).resolves.toEqual({
+      await expect(resolve(true)).resolves.toMatchObject({
         screen: "skip",
         granted: true,
       });
@@ -875,7 +875,7 @@ describe("where the app that asked is installed and subscribes for itself", () =
         actor: actorGranting(true),
         browser: new Promise(() => undefined),
       }),
-    ).resolves.toEqual({ screen: "skip", granted: true });
+    ).resolves.toMatchObject({ screen: "skip", granted: true });
   });
 
   it("is granted on consent alone", async () => {

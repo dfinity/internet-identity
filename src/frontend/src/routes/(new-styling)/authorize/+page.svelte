@@ -731,6 +731,7 @@
         consented={$notificationConsentStore.consented}
         installFirst={$notificationConsentStore.installFirst}
         isRepair={$notificationConsentStore.isRepair}
+        disabledInstalledApps={$notificationConsentStore.disabledInstalledApps}
         onDone={() => notificationConsentStore.settle(context)}
       />
     {/key}
