@@ -184,11 +184,13 @@
         icpAlertsFunnel.trigger(IcpAlertsEvents.InstallOpened, {
           tab: started.tabOpened ? "opened" : "refused",
         });
-        // The install is under way, so the mute goes; one left in place asks again at
-        // the next sign-in.
-        await removeDisabledInstalledApps(disabledInstalledApps).catch(
-          reportFailure,
-        );
+        // The install steps are open, so the mute goes; one left in place, such as
+        // where the tab was refused, asks again at the next sign-in.
+        if (started.tabOpened) {
+          await removeDisabledInstalledApps(disabledInstalledApps).catch(
+            reportFailure,
+          );
+        }
         return settleSignIn();
       },
       () => {
@@ -290,6 +292,9 @@
         }
       }
       await removeDisabledInstalledApps(disabledInstalledApps);
+      if (isTurnedOn) {
+        funnel?.trigger(BrowserNotificationsEvents.Enabled);
+      }
       clearFailure();
       done();
     } catch (error) {
