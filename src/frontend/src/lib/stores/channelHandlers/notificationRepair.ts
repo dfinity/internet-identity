@@ -57,6 +57,7 @@ export const repairNotificationPath = async ({
   origin,
   frontendOrigin,
   accountPrincipal,
+  isInstalledApp,
   actor,
   browserActor = browserKeyActor,
 }: {
@@ -66,6 +67,9 @@ export const repairNotificationPath = async ({
    *  origins. */
   frontendOrigin: string;
   accountPrincipal: Principal;
+  /** The sign-in came from the app's installed web app on this device, which
+   *  subscribes for itself. */
+  isInstalledApp: boolean;
   actor: ActorSubclass<_SERVICE>;
   browserActor?: (identityNumber: bigint) => Promise<BrowserCalls>;
 }): Promise<RepairOutcome> => {
@@ -126,6 +130,7 @@ export const repairNotificationPath = async ({
           actor,
           installFirst: outcome.installFirst,
           disabledInstalledApps: outcome.disabledInstalledApps,
+          isInstalledApp,
         }),
       );
       clearTimeout(deadline);
@@ -244,19 +249,23 @@ class CheckTimedOutError extends Error {
 
 /** What the allow screen the check opens shows, or `undefined` where there is nothing
  *  left to ask. A device muted by `disabledInstalledApps` is asked even where it is set
- *  up, as long as it delivers here once they are removed. */
+ *  up, as long as it delivers here once they are removed: allowing then only removes
+ *  them. */
 const repairContext = async ({
   identityNumber,
   origin,
   actor,
   installFirst,
   disabledInstalledApps,
+  isInstalledApp,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
   /** The Home Screen app this device routes through stopped answering. */
   installFirst: boolean;
+  /** The sign-in came from the app's installed web app, which subscribes for itself. */
+  isInstalledApp: boolean;
   /** The installed web apps the app disabled that mute this device. */
   disabledInstalledApps:
     RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
@@ -271,6 +280,7 @@ const repairContext = async ({
       installFirst: true,
       isRepair: true,
       disabledInstalledApps,
+      isTurnedOn: false,
     };
   }
   const resolution = await resolveOptIn({
@@ -278,7 +288,7 @@ const repairContext = async ({
     origin,
     actor,
     browser: readBrowserPushState(),
-    isInstalledApp: false,
+    isInstalledApp,
   });
   if (resolution.screen === "skip") {
     if (disabledInstalledApps === undefined || !resolution.granted) {
@@ -293,6 +303,7 @@ const repairContext = async ({
       installFirst: false,
       isRepair: true,
       disabledInstalledApps,
+      isTurnedOn: true,
     };
   }
   return {
@@ -304,6 +315,7 @@ const repairContext = async ({
     installFirst: resolution.installFirst,
     isRepair: true,
     disabledInstalledApps,
+    isTurnedOn: false,
   };
 };
 

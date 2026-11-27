@@ -304,6 +304,7 @@ const askUntilSettled = async (
       installFirst: resolution.installFirst,
       isRepair: false,
       disabledInstalledApps: undefined,
+      isTurnedOn: false,
     });
 
     // The header keeps the identity switcher up for this screen, and switching

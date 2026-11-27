@@ -77,6 +77,8 @@ const SessionParamsCodec = z.object({
   // session's own granted length, and applies its own default where absent.
   maxTimeToIdle: z.optional(Nat64StringCodec),
   icrc95DerivationOrigin: z.optional(OriginSchema),
+  /** The app signs in from its installed web app, which subscribes for itself. */
+  installedApp: z.optional(z.boolean()),
 });
 
 /**
@@ -309,6 +311,7 @@ export const handleSessionDelegationRequest =
             origin: effectiveOrigin,
             frontendOrigin: channel.origin,
             accountPrincipal: createdSession.accountPrincipal,
+            isInstalledApp: params.installedApp === true,
             actor: createdSession.actor,
           });
           // What was minted is for an identity the user has moved away from: the app

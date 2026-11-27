@@ -63,9 +63,13 @@
      *  mutes it, and leaves the app's consent as it is. */
     isRepair: boolean;
     /** The installed web apps the app disabled that mute this device: allowing removes
-     *  them first, and skipping leaves them, so the next sign-in asks again. */
+     *  them once notifications are on here, and skipping leaves them, so the next
+     *  sign-in asks again. */
     disabledInstalledApps:
       RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
+    /** The app holds consent and this device delivers already, so allowing only removes
+     *  `disabledInstalledApps`. */
+    isTurnedOn: boolean;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
@@ -81,6 +85,7 @@
     installFirst,
     isRepair,
     disabledInstalledApps,
+    isTurnedOn,
     onDone,
   }: Props = $props();
 
@@ -166,22 +171,24 @@
       consented,
       source,
     });
-    granting = Promise.all([
-      started.granted,
-      removeDisabledInstalledApps(disabledInstalledApps),
-    ]).then(() => undefined);
+    granting = started.granted;
     // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
     void started.url.then(
-      (url) => {
+      async (url) => {
         if (url === undefined) {
           icpAlertsFunnel.trigger(IcpAlertsEvents.Failed, {
             reason: "no-install-url",
           });
-        } else {
-          icpAlertsFunnel.trigger(IcpAlertsEvents.InstallOpened, {
-            tab: started.tabOpened ? "opened" : "refused",
-          });
+          return settleSignIn();
         }
+        icpAlertsFunnel.trigger(IcpAlertsEvents.InstallOpened, {
+          tab: started.tabOpened ? "opened" : "refused",
+        });
+        // The install is under way, so the mute goes; one left in place asks again at
+        // the next sign-in.
+        await removeDisabledInstalledApps(disabledInstalledApps).catch(
+          reportFailure,
+        );
         return settleSignIn();
       },
       () => {
@@ -268,17 +275,21 @@
   const runEnable = async (current: DeviceNotificationState): Promise<void> => {
     busy = true;
     try {
-      await removeDisabledInstalledApps(disabledInstalledApps);
-      const result = await turnOnNotifications({
-        identityNumber,
-        origin,
-        actor,
-        device: current,
-        consented,
-      });
-      if (!enabledBy(result)) {
-        return;
+      // Raised first, in the press's activation, which Safari and Firefox need for the
+      // prompt; the mute goes only once notifications are on.
+      if (!isTurnedOn) {
+        const result = await turnOnNotifications({
+          identityNumber,
+          origin,
+          actor,
+          device: current,
+          consented,
+        });
+        if (!enabledBy(result)) {
+          return;
+        }
       }
+      await removeDisabledInstalledApps(disabledInstalledApps);
       clearFailure();
       done();
     } catch (error) {

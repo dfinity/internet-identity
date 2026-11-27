@@ -25,10 +25,13 @@ export interface NotificationConsentContext {
    *  `disabledInstalledApps` is what mutes it. */
   isRepair: boolean;
   /** The installed web apps the app disabled that mute this device, which allowing
-   *  removes before it turns notifications on here, and declining leaves as they are.
+   *  removes once notifications are on here, and declining leaves as they are.
    *  `undefined` where none does. */
   disabledInstalledApps:
     RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
+  /** Whether the app holds this identity's consent and this device delivers already,
+   *  so allowing turns nothing on and only removes `disabledInstalledApps`. */
+  isTurnedOn: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();
