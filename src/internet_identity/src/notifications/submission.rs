@@ -37,9 +37,11 @@ pub fn authorize_and_submit(
     sender: Principal,
     now_ns: Timestamp,
 ) -> Result<SendNotificationResponse, BatchRefusal> {
+    use Senders::*;
+
     match senders::authorize(application_origin, sender, now_ns) {
-        Senders::Listed => {}
-        Senders::NotListed => {
+        Listed => {}
+        NotListed => {
             for notification in &notifications {
                 let labels =
                     Labels::app(application_origin.as_str(), notification.urgency.as_ref());
@@ -53,7 +55,7 @@ pub fn authorize_and_submit(
             }
             return Err(BatchRefusal::NoSuchSender);
         }
-        Senders::Pending { retry_after } => {
+        Pending { retry_after } => {
             let deferred = defer_batch(
                 notifications,
                 DeferCause::SenderList,
@@ -63,7 +65,30 @@ pub fn authorize_and_submit(
             return Ok(deferred);
         }
     }
-    // The sender is listed from here on, so the application counts in the ranking.
+
+    authorize_frontend_and_submit(
+        application_origin,
+        frontend_origin,
+        notifications,
+        sender,
+        now_ns,
+    )
+}
+
+/// Queues `notifications` from `sender`, a listed sender of the application at
+/// `application_origin`, sent on behalf of its frontend at `frontend_origin`. Refused
+/// where the application does not list `frontend_origin` as an alternative origin, and
+/// deferred as a whole while that list is not read yet. `now_ns` is the call's time.
+fn authorize_frontend_and_submit(
+    application_origin: &ApplicationOrigin,
+    frontend_origin: &ApplicationOrigin,
+    notifications: Vec<Notification>,
+    sender: Principal,
+    now_ns: Timestamp,
+) -> Result<SendNotificationResponse, BatchRefusal> {
+    use AlternativeOrigin::*;
+
+    // The sender is listed, so the application counts in the ranking.
     let listed_app_labels = |urgency: Option<&Urgency>| {
         Labels::listed_app(application_origin.as_str(), urgency, now_ns)
     };
@@ -72,14 +97,14 @@ pub fn authorize_and_submit(
         frontend_origin,
         now_ns,
     ) {
-        AlternativeOrigin::Listed => Ok(submit(
+        Listed => Ok(submit(
             application_origin,
             frontend_origin,
             notifications,
             sender,
             now_ns,
         )),
-        AlternativeOrigin::NotListed => {
+        NotListed => {
             for notification in &notifications {
                 let labels = listed_app_labels(notification.urgency.as_ref());
                 delivery_metrics::count_received(&labels);
@@ -87,7 +112,7 @@ pub fn authorize_and_submit(
             }
             Err(BatchRefusal::NoSuchFrontend)
         }
-        AlternativeOrigin::Pending { retry_after } => Ok(defer_batch(
+        Pending { retry_after } => Ok(defer_batch(
             notifications,
             DeferCause::AlternativeOrigins,
             retry_after,

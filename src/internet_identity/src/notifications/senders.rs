@@ -91,15 +91,17 @@ pub enum Senders {
 /// the list is not cached. Only an update may call this: a fill spawns an
 /// outcall.
 pub fn authorize(origin: &ApplicationOrigin, caller: Principal, now_ns: Timestamp) -> Senders {
+    use Cached::*;
+
     match single_flight_cache::get(&SENDERS_CACHE, origin.clone()) {
-        Cached::Ready(senders) => {
+        Ready(senders) => {
             if senders.contains(&caller) {
                 Senders::Listed
             } else {
                 Senders::NotListed
             }
         }
-        Cached::Pending => Senders::Pending {
+        Pending => Senders::Pending {
             retry_after: retry_after(origin, now_ns),
         },
     }

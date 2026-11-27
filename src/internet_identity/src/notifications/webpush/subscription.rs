@@ -186,8 +186,10 @@ pub(crate) fn clear_gone_subscription(
     endpoint: &str,
     now_ns: Timestamp,
 ) -> Result<(), String> {
+    use DeliveryTarget::*;
+
     match target {
-        DeliveryTarget::Browser => {
+        Browser => {
             let anchor = storage_borrow(|storage| storage.read(anchor_number))
                 .map_err(|err| format!("{err}"))?;
             let Some(registered) = anchor
@@ -201,7 +203,7 @@ pub(crate) fn clear_gone_subscription(
             }
             write_subscription(anchor, browser_id, None)
         }
-        DeliveryTarget::Pwa {
+        Pwa {
             application_number,
             frontend_origin_hash,
         } => pwa_subscription::clear_gone_pwa_subscription(
@@ -214,7 +216,7 @@ pub(crate) fn clear_gone_subscription(
             endpoint,
             now_ns,
         ),
-        DeliveryTarget::App(app_id) => {
+        App(app_id) => {
             let gone = storage_borrow(|storage| {
                 storage.notification_app(app_id).is_some_and(|app| {
                     app.webpush_subscription

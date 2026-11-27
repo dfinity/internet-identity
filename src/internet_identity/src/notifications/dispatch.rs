@@ -237,8 +237,10 @@ impl DeliveryTarget {
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> Option<PwaSubscriptionHolder> {
+        use DeliveryTarget::*;
+
         match self {
-            DeliveryTarget::Pwa {
+            Pwa {
                 application_number,
                 frontend_origin_hash,
             } => Some(PwaSubscriptionHolder {
@@ -247,7 +249,7 @@ impl DeliveryTarget {
                 browser_id,
                 frontend_origin_hash,
             }),
-            DeliveryTarget::Browser | DeliveryTarget::App(_) => None,
+            Browser | App(_) => None,
         }
     }
 }
@@ -466,14 +468,16 @@ fn resolve_identity_wake_up<M: Memory + Clone>(
     storage: &Storage<M>,
     pending: &PendingIdentityNotification,
 ) -> (InboxNotificationKind, Option<PwaRoute<'static>>) {
+    use IdentityWakeUpPath::*;
+
     match pending.path {
-        IdentityWakeUpPath::Routed => (
+        Routed => (
             InboxNotificationKind::Identity {
                 event: pending.event.clone(),
             },
             None,
         ),
-        IdentityWakeUpPath::InstalledApp {
+        InstalledApp {
             application_number,
             frontend_origin_hash,
             account_principal,
@@ -1004,6 +1008,8 @@ pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
     browser: &Browser,
     now_ns: Timestamp,
 ) -> Vec<InstalledAppSubscription> {
+    use InstalledAppDelivery::*;
+
     let Some(config) = storage.anchor_application_config(anchor_number, application_number) else {
         return Vec::new();
     };
@@ -1032,8 +1038,8 @@ pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
         );
         let (subscription, is_disabled) = match find_installed_app_delivery(browser, &route, now_ns)
         {
-            Some(InstalledAppDelivery::Wakes { subscription, .. }) => (subscription, false),
-            Some(InstalledAppDelivery::Disabled { subscription }) => (subscription, true),
+            Some(Wakes { subscription, .. }) => (subscription, false),
+            Some(Disabled { subscription }) => (subscription, true),
             None => continue,
         };
         installed_app_subscriptions.push(InstalledAppSubscription {
@@ -1245,6 +1251,8 @@ fn app_wake_up_address(
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    use InstalledAppDelivery::*;
+
     let is_handled_on_same_device = browsers.iter().any(|other_browser| {
         other_browser.id != browser.id
             && other_browser.same_device_browser_id == Some(browser.id)
@@ -1254,12 +1262,12 @@ fn app_wake_up_address(
         return None;
     }
     match find_installed_app_delivery(browser, route, now_ns) {
-        Some(InstalledAppDelivery::Wakes {
+        Some(Wakes {
             subscription,
             relay_origin,
             target,
         }) => return Some((subscription, relay_origin, target)),
-        Some(InstalledAppDelivery::Disabled { .. }) => return None,
+        Some(Disabled { .. }) => return None,
         None => {}
     }
     let (subscription, relay_origin, target) = wake_up_address(browser, app, now_ns)?;
@@ -1328,13 +1336,15 @@ fn find_pwa_wake_up_address(
     route: &PwaRoute,
     now_ns: Timestamp,
 ) -> Option<(ReadySubscription, String, DeliveryTarget)> {
+    use InstalledAppDelivery::*;
+
     match find_installed_app_delivery(browser, route, now_ns)? {
-        InstalledAppDelivery::Wakes {
+        Wakes {
             subscription,
             relay_origin,
             target,
         } => Some((subscription, relay_origin, target)),
-        InstalledAppDelivery::Disabled { .. } => None,
+        Disabled { .. } => None,
     }
 }
 
@@ -1395,6 +1405,8 @@ fn is_probe(notification: &InboxNotification) -> bool {
 /// way: a failed post removes the entry it announced, since no wake-up is coming for it,
 /// and a relay that lost the subscription also takes the registration with it.
 pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestamp) {
+    use PostOutcome::*;
+
     record_post_outcome(outcome);
     if let (Some(notification), Some(loss)) = (delivery.notification.as_ref(), outcome.loss()) {
         delivery_metrics::count_push_outcome(
@@ -1406,16 +1418,13 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
         );
     }
     match outcome {
-        PostOutcome::Sent => count_accepted_push(delivery, now_ns),
+        Sent => count_accepted_push(delivery, now_ns),
         // Nothing was posted, and the entry stays for whatever wakes this browser next.
-        PostOutcome::Superseded => {}
-        PostOutcome::Gone => drop_gone_subscription(delivery, now_ns),
-        PostOutcome::RateLimited
-        | PostOutcome::RelayError
-        | PostOutcome::RelayServerError
-        | PostOutcome::Rejected
-        | PostOutcome::NoCapacity
-        | PostOutcome::Unsealed => drop_failed_wake_up(delivery),
+        Superseded => {}
+        Gone => drop_gone_subscription(delivery, now_ns),
+        RateLimited | RelayError | RelayServerError | Rejected | NoCapacity | Unsealed => {
+            drop_failed_wake_up(delivery)
+        }
     }
 }
 

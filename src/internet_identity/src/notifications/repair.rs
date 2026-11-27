@@ -53,9 +53,11 @@ pub(crate) enum DevicePath {
 impl DevicePath {
     /// Resolves `path`'s app to the number it is stored under.
     pub(crate) fn resolve(path: NotificationPath) -> Result<Self, String> {
+        use NotificationPath::*;
+
         match path {
-            NotificationPath::ThisBrowser => Ok(DevicePath::ThisBrowser),
-            NotificationPath::InstalledApps(InstalledAppsPath {
+            ThisBrowser => Ok(DevicePath::ThisBrowser),
+            InstalledApps(InstalledAppsPath {
                 origin,
                 account_principal,
                 frontend_origin,
@@ -126,9 +128,11 @@ impl PathSubscription {
         frontend_origin_hash: OriginSha256,
         account_principal: Principal,
     ) -> bool {
+        use IdentityWakeUpPath::*;
+
         match self.wake_up_path {
-            IdentityWakeUpPath::Routed => false,
-            IdentityWakeUpPath::InstalledApp {
+            Routed => false,
+            InstalledApp {
                 application_number: path_application_number,
                 frontend_origin_hash: path_frontend_origin_hash,
                 account_principal: path_account_principal,
@@ -313,18 +317,20 @@ fn path_subscriptions(
     path: DevicePath,
     now_ns: Timestamp,
 ) -> Vec<PathSubscription> {
+    use DevicePath::*;
+
     let Some(browser) = anchor.browser(browser_id) else {
         return Vec::new();
     };
     match path {
-        DevicePath::ThisBrowser => routed_on_path(browser, anchor.anchor_number(), now_ns)
+        ThisBrowser => routed_on_path(browser, anchor.anchor_number(), now_ns)
             .into_iter()
             .collect(),
-        DevicePath::InstalledApps {
+        InstalledApps {
             application_number: None,
             ..
         } => Vec::new(),
-        DevicePath::InstalledApps {
+        InstalledApps {
             application_number: Some(application_number),
             frontend_origin_hash,
             account_principal,

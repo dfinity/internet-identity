@@ -1296,6 +1296,7 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
 fn app_prepare_pwa_webpush_subscription(
     request: AppPreparePwaWebPushSubscriptionRequest,
 ) -> AppPreparePwaWebPushSubscriptionResult {
+    use pwa_subscription::PreparedPwaSubscription::*;
     use AppPreparePwaWebPushSubscriptionError::*;
 
     let now = time();
@@ -1325,20 +1326,19 @@ fn app_prepare_pwa_webpush_subscription(
         vapid_public_key,
         now,
     ) {
-        Ok(pwa_subscription::PreparedPwaSubscription::Keys(keys)) => {
-            AppPreparePwaWebPushSubscriptionResult::Ok(keys)
-        }
-        Ok(pwa_subscription::PreparedPwaSubscription::Pending) => {
-            AppPreparePwaWebPushSubscriptionResult::Pending
-        }
-        Err(pwa_subscription::PreparePwaSubscriptionError::NotificationsNotAllowed) => {
-            AppPreparePwaWebPushSubscriptionResult::Err(NotificationsNotAllowed)
-        }
-        Err(pwa_subscription::PreparePwaSubscriptionError::NoSuchFrontend) => {
-            AppPreparePwaWebPushSubscriptionResult::Err(NoSuchFrontend)
-        }
-        Err(pwa_subscription::PreparePwaSubscriptionError::Internal(reason)) => {
-            AppPreparePwaWebPushSubscriptionResult::Err(InternalCanisterError(reason))
+        Ok(Keys(keys)) => AppPreparePwaWebPushSubscriptionResult::Ok(keys),
+        Ok(Pending) => AppPreparePwaWebPushSubscriptionResult::Pending,
+        Err(err) => {
+            use pwa_subscription::PreparePwaSubscriptionError::*;
+
+            let err = match err {
+                NotificationsNotAllowed => {
+                    AppPreparePwaWebPushSubscriptionError::NotificationsNotAllowed
+                }
+                NoSuchFrontend => AppPreparePwaWebPushSubscriptionError::NoSuchFrontend,
+                Internal(reason) => InternalCanisterError(reason),
+            };
+            AppPreparePwaWebPushSubscriptionResult::Err(err)
         }
     }
 }
@@ -1369,15 +1369,17 @@ fn app_set_pwa_webpush_subscription(
         .map_err(InternalCanisterError)?;
 
     pwa_subscription::set_pwa_subscription(holder, session.account_principal, subscription, now)
-        .map_err(|err| match err {
-            pwa_subscription::SetPwaSubscriptionError::NotificationsNotAllowed => {
-                NotificationsNotAllowed
-            }
-            pwa_subscription::SetPwaSubscriptionError::TransportKeyExpired => TransportKeyExpired,
-            pwa_subscription::SetPwaSubscriptionError::EndpointInUse => EndpointInUse,
-            pwa_subscription::SetPwaSubscriptionError::FrontendNotListed => TransportKeyExpired,
-            pwa_subscription::SetPwaSubscriptionError::Internal(reason) => {
-                InternalCanisterError(reason)
+        .map_err(|err| {
+            use pwa_subscription::SetPwaSubscriptionError::*;
+
+            match err {
+                NotificationsNotAllowed => {
+                    AppSetPwaWebPushSubscriptionError::NotificationsNotAllowed
+                }
+                TransportKeyExpired => AppSetPwaWebPushSubscriptionError::TransportKeyExpired,
+                EndpointInUse => AppSetPwaWebPushSubscriptionError::EndpointInUse,
+                FrontendNotListed => AppSetPwaWebPushSubscriptionError::TransportKeyExpired,
+                Internal(reason) => InternalCanisterError(reason),
             }
         })
 }
@@ -1388,6 +1390,7 @@ fn app_set_pwa_webpush_subscription(
 fn app_disable_pwa_webpush_subscription(
     request: AppDisablePwaWebPushSubscriptionRequest,
 ) -> Result<(), AppDisablePwaWebPushSubscriptionError> {
+    use pwa_subscription::DisablePwaSubscriptionError::*;
     use AppDisablePwaWebPushSubscriptionError::*;
 
     let now = time();
@@ -1401,10 +1404,8 @@ fn app_disable_pwa_webpush_subscription(
 
     pwa_subscription::disable_pwa_subscription(holder, session.account_principal, now).map_err(
         |err| match err {
-            pwa_subscription::DisablePwaSubscriptionError::FrontendNotListed => NoSuchFrontend,
-            pwa_subscription::DisablePwaSubscriptionError::Internal(reason) => {
-                InternalCanisterError(reason)
-            }
+            FrontendNotListed => NoSuchFrontend,
+            Internal(reason) => InternalCanisterError(reason),
         },
     )
 }
@@ -1589,6 +1590,8 @@ fn app_prepare_same_device_link(
 fn app_send_notification(
     request: SendNotificationArg,
 ) -> Result<SendNotificationResponse, SendNotificationError> {
+    use BatchRefusal::*;
+
     let SendNotificationArg {
         origin,
         notifications,
@@ -1618,8 +1621,8 @@ fn app_send_notification(
         ic_cdk::api::time(),
     )
     .map_err(|refusal| match refusal {
-        BatchRefusal::NoSuchSender => SendNotificationError::NoSuchSender,
-        BatchRefusal::NoSuchFrontend => SendNotificationError::NoSuchFrontend,
+        NoSuchSender => SendNotificationError::NoSuchSender,
+        NoSuchFrontend => SendNotificationError::NoSuchFrontend,
     })
 }
 

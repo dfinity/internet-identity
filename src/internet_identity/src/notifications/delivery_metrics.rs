@@ -269,68 +269,53 @@ pub(crate) enum Reason {
 
 impl Reason {
     fn as_str(self) -> &'static str {
+        use Reason::*;
+
         match self {
-            Reason::UnknownPrincipal => "unknown_principal",
-            Reason::DormantIdentity => "dormant_identity",
-            Reason::NoChannel => "no_channel",
-            Reason::SenderNotAllowed => "sender_not_allowed",
-            Reason::FrontendNotListed => "frontend_not_listed",
-            Reason::CapacityPastExpiry => "capacity_past_expiry",
-            Reason::AppLimitPastExpiry => "app_limit_past_expiry",
-            Reason::BacklogFull => "backlog_full",
-            Reason::ExpiredOnArrival => "expired_on_arrival",
-            Reason::ExpiredAppDeadline => "expired_app_deadline",
-            Reason::ExpiredInBacklog => "expired_in_backlog",
-            Reason::NoDevice => "no_device",
-            Reason::StorageError => "storage_error",
-            Reason::RelayUnreachable => "relay_unreachable",
-            Reason::RelayGone => "relay_gone",
-            Reason::RelayRateLimited => "relay_rate_limited",
-            Reason::RelayRejected => "relay_rejected",
-            Reason::RelayServerError => "relay_server_error",
-            Reason::RelayNoAnswer => "relay_no_answer",
-            Reason::NoOutcallCapacity => "no_outcall_capacity",
-            Reason::SealFailed => "seal_failed",
-            Reason::NeverFetched => "never_fetched",
-            Reason::FetchedTooLate => "fetched_too_late",
-            Reason::PayloadUnreachable => "payload_unreachable",
-            Reason::PayloadRejected => "payload_rejected",
-            Reason::InboxFull => "inbox_full",
-            Reason::ConsentRevoked => "consent_revoked",
-            Reason::BrowserEvicted => "browser_evicted",
+            UnknownPrincipal => "unknown_principal",
+            DormantIdentity => "dormant_identity",
+            NoChannel => "no_channel",
+            SenderNotAllowed => "sender_not_allowed",
+            FrontendNotListed => "frontend_not_listed",
+            CapacityPastExpiry => "capacity_past_expiry",
+            AppLimitPastExpiry => "app_limit_past_expiry",
+            BacklogFull => "backlog_full",
+            ExpiredOnArrival => "expired_on_arrival",
+            ExpiredAppDeadline => "expired_app_deadline",
+            ExpiredInBacklog => "expired_in_backlog",
+            NoDevice => "no_device",
+            StorageError => "storage_error",
+            RelayUnreachable => "relay_unreachable",
+            RelayGone => "relay_gone",
+            RelayRateLimited => "relay_rate_limited",
+            RelayRejected => "relay_rejected",
+            RelayServerError => "relay_server_error",
+            RelayNoAnswer => "relay_no_answer",
+            NoOutcallCapacity => "no_outcall_capacity",
+            SealFailed => "seal_failed",
+            NeverFetched => "never_fetched",
+            FetchedTooLate => "fetched_too_late",
+            PayloadUnreachable => "payload_unreachable",
+            PayloadRejected => "payload_rejected",
+            InboxFull => "inbox_full",
+            ConsentRevoked => "consent_revoked",
+            BrowserEvicted => "browser_evicted",
         }
     }
 
     fn drop(self) -> DropPoint {
+        use Reason::*;
+
         match self {
-            Reason::UnknownPrincipal
-            | Reason::DormantIdentity
-            | Reason::NoChannel
-            | Reason::SenderNotAllowed
-            | Reason::FrontendNotListed
-            | Reason::CapacityPastExpiry
-            | Reason::AppLimitPastExpiry
-            | Reason::BacklogFull => DropPoint::Accept,
-            Reason::ExpiredOnArrival
-            | Reason::ExpiredAppDeadline
-            | Reason::ExpiredInBacklog
-            | Reason::NoDevice
-            | Reason::StorageError
-            | Reason::RelayUnreachable
-            | Reason::RelayGone
-            | Reason::RelayRateLimited
-            | Reason::RelayRejected
-            | Reason::RelayServerError
-            | Reason::RelayNoAnswer
-            | Reason::NoOutcallCapacity
-            | Reason::SealFailed => DropPoint::Push,
-            Reason::NeverFetched
-            | Reason::FetchedTooLate
-            | Reason::PayloadUnreachable
-            | Reason::PayloadRejected
-            | Reason::InboxFull
-            | Reason::ConsentRevoked
-            | Reason::BrowserEvicted => DropPoint::Deliver,
+            UnknownPrincipal | DormantIdentity | NoChannel | SenderNotAllowed
+            | FrontendNotListed | CapacityPastExpiry | AppLimitPastExpiry | BacklogFull => {
+                DropPoint::Accept
+            }
+            ExpiredOnArrival | ExpiredAppDeadline | ExpiredInBacklog | NoDevice | StorageError
+            | RelayUnreachable | RelayGone | RelayRateLimited | RelayRejected
+            | RelayServerError | RelayNoAnswer | NoOutcallCapacity | SealFailed => DropPoint::Push,
+            NeverFetched | FetchedTooLate | PayloadUnreachable | PayloadRejected | InboxFull
+            | ConsentRevoked | BrowserEvicted => DropPoint::Deliver,
         }
     }
 }
@@ -350,11 +335,13 @@ pub(crate) enum DeferCause {
 
 impl DeferCause {
     fn as_str(self) -> &'static str {
+        use DeferCause::*;
+
         match self {
-            DeferCause::Capacity => "capacity",
-            DeferCause::AppLimit => "app_limit",
-            DeferCause::SenderList => "sender_list",
-            DeferCause::AlternativeOrigins => "alternative_origins",
+            Capacity => "capacity",
+            AppLimit => "app_limit",
+            SenderList => "sender_list",
+            AlternativeOrigins => "alternative_origins",
         }
     }
 }

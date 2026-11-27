@@ -177,6 +177,8 @@ fn start_pwa_subscription(
     sender_seed: [u8; 32],
     now_ns: Timestamp,
 ) -> Result<(), PreparePwaSubscriptionError> {
+    use SetPwaSubscriptionError::*;
+
     if !is_notifications_allowed(holder) {
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
@@ -191,17 +193,13 @@ fn start_pwa_subscription(
         disabled_at_ns: None,
     };
     write_pwa_subscription(holder, Some(subscription), None, now_ns).map_err(|err| match err {
-        SetPwaSubscriptionError::NotificationsNotAllowed => {
-            PreparePwaSubscriptionError::NotificationsNotAllowed
-        }
-        SetPwaSubscriptionError::FrontendNotListed => PreparePwaSubscriptionError::NoSuchFrontend,
-        SetPwaSubscriptionError::TransportKeyExpired => {
+        NotificationsNotAllowed => PreparePwaSubscriptionError::NotificationsNotAllowed,
+        FrontendNotListed => PreparePwaSubscriptionError::NoSuchFrontend,
+        TransportKeyExpired => {
             PreparePwaSubscriptionError::Internal("a transport key expired".to_string())
         }
-        SetPwaSubscriptionError::EndpointInUse => {
-            PreparePwaSubscriptionError::Internal("an endpoint is in use".to_string())
-        }
-        SetPwaSubscriptionError::Internal(reason) => PreparePwaSubscriptionError::Internal(reason),
+        EndpointInUse => PreparePwaSubscriptionError::Internal("an endpoint is in use".to_string()),
+        Internal(reason) => PreparePwaSubscriptionError::Internal(reason),
     })
 }
 
@@ -293,6 +291,8 @@ pub fn disable_pwa_subscription(
     account_principal: Principal,
     now_ns: Timestamp,
 ) -> Result<(), DisablePwaSubscriptionError> {
+    use SetPwaSubscriptionError::*;
+
     let Some(held_subscription) = read_pwa_subscription(holder) else {
         return Ok(());
     };
@@ -311,19 +311,15 @@ pub fn disable_pwa_subscription(
         disabled_at_ns,
     };
     write_pwa_subscription(holder, Some(subscription), None, now_ns).map_err(|err| match err {
-        SetPwaSubscriptionError::FrontendNotListed => {
-            DisablePwaSubscriptionError::FrontendNotListed
-        }
-        SetPwaSubscriptionError::Internal(reason) => DisablePwaSubscriptionError::Internal(reason),
-        SetPwaSubscriptionError::NotificationsNotAllowed => {
+        FrontendNotListed => DisablePwaSubscriptionError::FrontendNotListed,
+        Internal(reason) => DisablePwaSubscriptionError::Internal(reason),
+        NotificationsNotAllowed => {
             DisablePwaSubscriptionError::Internal("notifications are not allowed".to_string())
         }
-        SetPwaSubscriptionError::TransportKeyExpired => {
+        TransportKeyExpired => {
             DisablePwaSubscriptionError::Internal("a transport key expired".to_string())
         }
-        SetPwaSubscriptionError::EndpointInUse => {
-            DisablePwaSubscriptionError::Internal("an endpoint is in use".to_string())
-        }
+        EndpointInUse => DisablePwaSubscriptionError::Internal("an endpoint is in use".to_string()),
     })
 }
 
@@ -584,6 +580,8 @@ fn authorize_frontend(
     frontend_origin: Option<&ApplicationOrigin>,
     now_ns: Timestamp,
 ) -> Result<FrontendAuthorization, PreparePwaSubscriptionError> {
+    use AlternativeOrigin::*;
+
     let Some(frontend_origin) = frontend_origin else {
         return Ok(FrontendAuthorization::Accepted);
     };
@@ -599,9 +597,9 @@ fn authorize_frontend(
         frontend_origin,
         now_ns,
     ) {
-        AlternativeOrigin::Listed => Ok(FrontendAuthorization::Accepted),
-        AlternativeOrigin::NotListed => Err(PreparePwaSubscriptionError::NoSuchFrontend),
-        AlternativeOrigin::Pending { .. } => Ok(FrontendAuthorization::Pending),
+        Listed => Ok(FrontendAuthorization::Accepted),
+        NotListed => Err(PreparePwaSubscriptionError::NoSuchFrontend),
+        Pending { .. } => Ok(FrontendAuthorization::Pending),
     }
 }
 
@@ -615,6 +613,8 @@ pub fn prepare_pwa_subscription(
     vapid_public_key: Vec<u8>,
     now_ns: Timestamp,
 ) -> Result<PreparedPwaSubscription, PreparePwaSubscriptionError> {
+    use FrontendAuthorization::*;
+
     let holder = resolve_pwa_holder(session, frontend_origin)
         .map_err(PreparePwaSubscriptionError::Internal)?;
     // Before the pool is asked, so an app without consent is told so rather than to come
@@ -623,8 +623,8 @@ pub fn prepare_pwa_subscription(
         return Err(PreparePwaSubscriptionError::NotificationsNotAllowed);
     }
     match authorize_frontend(session, frontend_origin, now_ns)? {
-        FrontendAuthorization::Accepted => {}
-        FrontendAuthorization::Pending => return Ok(PreparedPwaSubscription::Pending),
+        Accepted => {}
+        Pending => return Ok(PreparedPwaSubscription::Pending),
     }
     let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {
         return Ok(PreparedPwaSubscription::Pending);

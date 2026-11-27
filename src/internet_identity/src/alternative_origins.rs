@@ -125,18 +125,20 @@ pub fn authorize_alternative_origin(
     frontend_origin: &ApplicationOrigin,
     now_ns: Timestamp,
 ) -> AlternativeOrigin {
+    use Cached::*;
+
     if derivation_origin == frontend_origin {
         return AlternativeOrigin::Listed;
     }
     match single_flight_cache::get(&ALTERNATIVE_ORIGINS_CACHE, derivation_origin.clone()) {
-        Cached::Ready(alternative_origins) => {
+        Ready(alternative_origins) => {
             if alternative_origins.contains(&OriginSha256::from_origin(frontend_origin.as_str())) {
                 AlternativeOrigin::Listed
             } else {
                 AlternativeOrigin::NotListed
             }
         }
-        Cached::Pending => AlternativeOrigin::Pending {
+        Pending => AlternativeOrigin::Pending {
             retry_after: retry_after(derivation_origin, now_ns),
         },
     }
@@ -147,9 +149,11 @@ pub fn authorize_alternative_origin(
 pub fn peek_alternative_origins(
     derivation_origin: &ApplicationOrigin,
 ) -> Option<BTreeSet<OriginSha256>> {
+    use Cached::*;
+
     match single_flight_cache::peek(&ALTERNATIVE_ORIGINS_CACHE, derivation_origin) {
-        Cached::Ready(alternative_origins) => Some(alternative_origins),
-        Cached::Pending => None,
+        Ready(alternative_origins) => Some(alternative_origins),
+        Pending => None,
     }
 }
 
