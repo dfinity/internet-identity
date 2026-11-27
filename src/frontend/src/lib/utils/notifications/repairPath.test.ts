@@ -7,6 +7,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import {
   checkNotificationPath,
+  hasDisabledInstalledApp,
   type BrowserCalls,
   type IdentityCalls,
 } from "./repairPath";
@@ -49,6 +50,12 @@ const probeWaiting: SubscriptionDeliveryStatus = {
   probe_sent_at_ns: [BigInt(1)],
   has_probe_had_its_answer_time: true,
   is_disabled: [false],
+};
+/** An installed web app the app disabled: nothing is sent to it, and it mutes this
+ *  device. */
+const disabledInstalledApp: SubscriptionDeliveryStatus = {
+  ...underLimit,
+  is_disabled: [true],
 };
 
 const consenting: IdentityCalls = {
@@ -266,6 +273,84 @@ describe("checkNotificationPath", () => {
         },
       },
     ]);
+  });
+});
+
+describe("hasDisabledInstalledApp", () => {
+  it("finds a disabled installed app among enabled ones", () => {
+    expect(
+      hasDisabledInstalledApp({
+        subscriptions: [underLimit, disabledInstalledApp],
+      }),
+    ).toBe(true);
+  });
+
+  it("finds none on a path whose installed apps are all enabled", () => {
+    expect(
+      hasDisabledInstalledApp({ subscriptions: [underLimit, pastLimit] }),
+    ).toBe(false);
+  });
+
+  it("finds none where the canister did not say", () => {
+    expect(
+      hasDisabledInstalledApp({
+        subscriptions: [{ ...underLimit, is_disabled: [] }],
+      }),
+    ).toBe(false);
+  });
+
+  it("finds none on an empty path", () => {
+    expect(hasDisabledInstalledApp({ subscriptions: [] })).toBe(false);
+  });
+});
+
+describe("checkNotificationPath with a disabled installed app", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("asks, naming the installed apps allowing removes, and probes and removes nothing itself", async () => {
+    const { browser, calls } = browserAnswering({
+      installedApps: [{ subscriptions: [disabledInstalledApp, pastLimit] }],
+      thisBrowser: [{ subscriptions: [underLimit] }],
+    });
+
+    await expect(check(browser)).resolves.toEqual({
+      kind: "ask",
+      installFirst: false,
+      disabledInstalledApps: {
+        anchor_number: IDENTITY_NUMBER,
+        origin: ORIGIN,
+        account_principal: ACCOUNT,
+        frontend_origin: [FRONTEND_ORIGIN],
+      },
+    });
+    expect(calls.probed).toEqual([]);
+    expect(calls.removed).toEqual([]);
+    expect(calls.disabled).toEqual([]);
+  });
+
+  it("asks nothing where the app is not allowed", async () => {
+    const { browser } = browserAnswering({
+      installedApps: [{ subscriptions: [disabledInstalledApp] }],
+      thisBrowser: [{ subscriptions: [underLimit] }],
+    });
+
+    await expect(
+      checkNotificationPath({
+        identityNumber: IDENTITY_NUMBER,
+        origin: ORIGIN,
+        frontendOrigin: FRONTEND_ORIGIN,
+        accountPrincipal: ACCOUNT,
+        actor: { notification_consent_granted: () => Promise.resolve(false) },
+        browser,
+        onPastLimit: () => {},
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toEqual({ kind: "working" });
   });
 });
 

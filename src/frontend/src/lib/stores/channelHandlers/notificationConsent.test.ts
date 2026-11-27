@@ -337,6 +337,7 @@ describe("handleNotificationConsentRequest", () => {
     vi.mocked(resolveOptIn).mockResolvedValue({
       screen: "skip",
       granted: true,
+      state: { source: "installed-app" },
     });
     const opened = vi.fn();
     const unsubscribe = notificationConsentStore.subscribe((context) => {
@@ -451,6 +452,7 @@ describe("handleNotificationConsentRequest", () => {
     vi.mocked(resolveOptIn).mockResolvedValueOnce({
       screen: "skip",
       granted: true,
+      state: { source: "installed-app" },
     });
     const { sent } = await run({ settle: false });
     expect(sent[0].result).toEqual({ granted: true });

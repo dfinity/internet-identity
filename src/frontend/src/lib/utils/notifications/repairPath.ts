@@ -7,6 +7,10 @@
  * past the limit is probed: the probe is Internet Identity's own notification, and
  * removing it through the subscription answers it. An installed web app that does not answer is removed, so the
  * app's notifications come back here; this browser's own path is then probed in turn.
+ *
+ * An installed web app the app disabled keeps this device muted, whether or not it is
+ * still installed, so the user is asked: allowing turns notifications on here first,
+ * and removes it once they are on.
  */
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
@@ -15,6 +19,7 @@ import type {
   NotificationPath,
   NotificationPathStatus,
   ProbeNotificationPathError,
+  RemoveUnansweredPwaWebPushSubscriptionsRequest,
 } from "$lib/generated/internet_identity_types";
 import { POLL_INTERVAL_MS } from "$lib/constants/polling.constants";
 import type { Principal } from "@icp-sdk/core/principal";
@@ -29,8 +34,15 @@ export type PathCheckOutcome =
   /** Nothing to do, or repaired without the user. */
   | { kind: "working" }
   /** Ask the user on the allow screen. `installFirst` opens it on the install steps,
-   *  for a Home Screen app that stopped answering. */
-  | { kind: "ask"; installFirst: boolean };
+   *  for a Home Screen app that stopped answering. `disabledInstalledApps` is the
+   *  removal that allowing sends first, where an installed web app the app disabled
+   *  mutes this device. */
+  | {
+      kind: "ask";
+      installFirst: boolean;
+      disabledInstalledApps:
+        RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
+    };
 
 /** Whether a probe was answered, or the path had nothing on it to probe. */
 type ProbeAnswer = "answered" | "unanswered" | "nothing-on-path";
@@ -66,7 +78,9 @@ const workingOutcome: PathCheckOutcome = { kind: "working" };
  *
  *  An installed web app of that frontend that delivers for the account is the path, and
  *  this browser's own only takes over where none is left: one that is not past its limit
- *  is working, and whatever this browser's own path holds is beside the point. Another
+ *  is working, and whatever this browser's own path holds is beside the point. One the
+ *  app disabled, on this browser's entry or one linked to it, mutes this device, so the
+ *  user is asked whether to remove it and turn notifications on here. Another
  *  frontend's installed web app is no part of it: the frontend's notifications never
  *  wake it. */
 export const checkNotificationPath = async ({
@@ -117,6 +131,18 @@ export const checkNotificationPath = async ({
     identityNumber,
     installedApps,
   );
+  if (hasDisabledInstalledApp(installedAppsStatus)) {
+    return {
+      kind: "ask",
+      installFirst: false,
+      disabledInstalledApps: {
+        anchor_number: identityNumber,
+        origin,
+        account_principal: accountPrincipal,
+        frontend_origin: [frontendOrigin],
+      },
+    };
+  }
   if (installedAppsStatus.subscriptions.length > 0) {
     if (!isPastLimit(installedAppsStatus)) {
       return workingOutcome;
@@ -197,13 +223,21 @@ const afterOwnPath = async (
     // canister refuses to replace an app that is on until the probe's whole window has
     // passed, which is longer than the check waits.
     await switchOffApp(browser, identityNumber);
-    return { kind: "ask", installFirst: true };
+    return {
+      kind: "ask",
+      installFirst: true,
+      disabledInstalledApps: undefined,
+    };
   }
   if (
     typeof Notification === "undefined" ||
     Notification.permission !== "granted"
   ) {
-    return { kind: "ask", installFirst: false };
+    return {
+      kind: "ask",
+      installFirst: false,
+      disabledInstalledApps: undefined,
+    };
   }
   await renewSubscription(identityNumber, signal);
   return workingOutcome;
@@ -254,6 +288,15 @@ const pathStatus = (
   browser
     .get_notification_path_status({ anchor_number: identityNumber, path })
     .then(throwCanisterError);
+
+/** Whether the app disabled an installed web app on `status`'s path, which mutes this
+ *  device until it is removed. */
+export const hasDisabledInstalledApp = (
+  status: NotificationPathStatus,
+): boolean =>
+  status.subscriptions.some(
+    ({ is_disabled: [isDisabled] }) => isDisabled === true,
+  );
 
 const isPastLimit = (status: NotificationPathStatus): boolean =>
   status.subscriptions.some(

@@ -1,5 +1,8 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type {
+  _SERVICE,
+  RemoveUnansweredPwaWebPushSubscriptionsRequest,
+} from "$lib/generated/internet_identity_types";
 import { get } from "svelte/store";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
 import { authenticationStore } from "$lib/stores/authentication.store";
@@ -54,6 +57,7 @@ export const repairNotificationPath = async ({
   origin,
   frontendOrigin,
   accountPrincipal,
+  isInstalledApp,
   actor,
   browserActor = browserKeyActor,
 }: {
@@ -63,6 +67,9 @@ export const repairNotificationPath = async ({
    *  origins. */
   frontendOrigin: string;
   accountPrincipal: Principal;
+  /** The sign-in came from the app's installed web app on this device, which
+   *  subscribes for itself. */
+  isInstalledApp: boolean;
   actor: ActorSubclass<_SERVICE>;
   browserActor?: (identityNumber: bigint) => Promise<BrowserCalls>;
 }): Promise<RepairOutcome> => {
@@ -122,6 +129,8 @@ export const repairNotificationPath = async ({
           origin,
           actor,
           installFirst: outcome.installFirst,
+          disabledInstalledApps: outcome.disabledInstalledApps,
+          isInstalledApp,
         }),
       );
       clearTimeout(deadline);
@@ -239,18 +248,27 @@ class CheckTimedOutError extends Error {
 }
 
 /** What the allow screen the check opens shows, or `undefined` where there is nothing
- *  left to ask. */
+ *  left to ask. A device muted by `disabledInstalledApps` is asked even where it is set
+ *  up, as long as it delivers here once they are removed: allowing then only removes
+ *  them. */
 const repairContext = async ({
   identityNumber,
   origin,
   actor,
   installFirst,
+  disabledInstalledApps,
+  isInstalledApp,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
   /** The Home Screen app this device routes through stopped answering. */
   installFirst: boolean;
+  /** The sign-in came from the app's installed web app, which subscribes for itself. */
+  isInstalledApp: boolean;
+  /** The installed web apps the app disabled that mute this device. */
+  disabledInstalledApps:
+    RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
 }): Promise<NotificationConsentContext | undefined> => {
   if (installFirst) {
     return {
@@ -261,6 +279,8 @@ const repairContext = async ({
       consented: true,
       installFirst: true,
       isRepair: true,
+      disabledInstalledApps,
+      isTurnedOn: false,
     };
   }
   const resolution = await resolveOptIn({
@@ -268,10 +288,23 @@ const repairContext = async ({
     origin,
     actor,
     browser: readBrowserPushState(),
-    isInstalledApp: false,
+    isInstalledApp,
   });
   if (resolution.screen === "skip") {
-    return undefined;
+    if (disabledInstalledApps === undefined || !resolution.granted) {
+      return undefined;
+    }
+    return {
+      effectiveOrigin: origin,
+      identityNumber,
+      actor,
+      device: resolution.state,
+      consented: true,
+      installFirst: false,
+      isRepair: true,
+      disabledInstalledApps,
+      isTurnedOn: true,
+    };
   }
   return {
     effectiveOrigin: origin,
@@ -281,6 +314,8 @@ const repairContext = async ({
     consented: resolution.consented,
     installFirst: resolution.installFirst,
     isRepair: true,
+    disabledInstalledApps,
+    isTurnedOn: false,
   };
 };
 

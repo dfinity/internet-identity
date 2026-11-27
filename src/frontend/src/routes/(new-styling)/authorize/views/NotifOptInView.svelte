@@ -2,13 +2,17 @@
   import { onMount } from "svelte";
   import { BellOffIcon } from "@lucide/svelte";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
-  import type { _SERVICE } from "$lib/generated/internet_identity_types";
+  import type {
+    _SERVICE,
+    RemoveUnansweredPwaWebPushSubscriptionsRequest,
+  } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import { startAppInstall } from "./notifInstall";
   import { stopRepairChecks } from "./stopRepairChecks";
+  import { removeDisabledInstalledApps } from "./removeDisabledInstalledApps";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import {
     turnOnNotifications,
@@ -55,8 +59,17 @@
     /** Answering sends the user to install the app that carries notifications, because this browser has no prompt to raise. */
     installFirst: boolean;
     /** Opened because this device stopped receiving the app's notifications: skipping
-     *  then stops the checks on this device, and leaves the app's consent as it is. */
+     *  then stops the checks on this device, unless `disabledInstalledApps` is what
+     *  mutes it, and leaves the app's consent as it is. */
     isRepair: boolean;
+    /** The installed web apps the app disabled that mute this device: allowing removes
+     *  them once notifications are on here, and skipping leaves them, so the next
+     *  sign-in asks again. */
+    disabledInstalledApps:
+      RemoveUnansweredPwaWebPushSubscriptionsRequest | undefined;
+    /** The app holds consent and this device delivers already, so allowing only removes
+     *  `disabledInstalledApps`. */
+    isTurnedOn: boolean;
     /** Continues sign-in: after enabling, allowing, skipping, or handing the user to the install. */
     onDone: () => void;
   }
@@ -71,6 +84,8 @@
     consented,
     installFirst,
     isRepair,
+    disabledInstalledApps,
+    isTurnedOn,
     onDone,
   }: Props = $props();
 
@@ -105,7 +120,7 @@
 
   const skip = async () => {
     funnel?.trigger(BrowserNotificationsEvents.Skipped);
-    if (isRepair) {
+    if (isRepair && disabledInstalledApps === undefined) {
       busy = true;
       await stopRepairChecks({
         identityNumber,
@@ -159,15 +174,22 @@
     granting = started.granted;
     // Either way: a mint that failed closes the tab it opened, and sign-in still settles.
     void started.url.then(
-      (url) => {
+      async (url) => {
         if (url === undefined) {
           icpAlertsFunnel.trigger(IcpAlertsEvents.Failed, {
             reason: "no-install-url",
           });
-        } else {
-          icpAlertsFunnel.trigger(IcpAlertsEvents.InstallOpened, {
-            tab: started.tabOpened ? "opened" : "refused",
-          });
+          return settleSignIn();
+        }
+        icpAlertsFunnel.trigger(IcpAlertsEvents.InstallOpened, {
+          tab: started.tabOpened ? "opened" : "refused",
+        });
+        // The install steps are open, so the mute goes; one left in place, such as
+        // where the tab was refused, asks again at the next sign-in.
+        if (started.tabOpened) {
+          await removeDisabledInstalledApps(disabledInstalledApps).catch(
+            reportFailure,
+          );
         }
         return settleSignIn();
       },
@@ -255,15 +277,23 @@
   const runEnable = async (current: DeviceNotificationState): Promise<void> => {
     busy = true;
     try {
-      const result = await turnOnNotifications({
-        identityNumber,
-        origin,
-        actor,
-        device: current,
-        consented,
-      });
-      if (!enabledBy(result)) {
-        return;
+      // Raised first, in the press's activation, which Safari and Firefox need for the
+      // prompt; the mute goes only once notifications are on.
+      if (!isTurnedOn) {
+        const result = await turnOnNotifications({
+          identityNumber,
+          origin,
+          actor,
+          device: current,
+          consented,
+        });
+        if (!enabledBy(result)) {
+          return;
+        }
+      }
+      await removeDisabledInstalledApps(disabledInstalledApps);
+      if (isTurnedOn) {
+        funnel?.trigger(BrowserNotificationsEvents.Enabled);
       }
       clearFailure();
       done();

@@ -76,6 +76,7 @@ const repair = () =>
     origin: "https://app.example",
     frontendOrigin: "https://app.example",
     accountPrincipal: Principal.fromText("2vxsx-fae"),
+    isInstalledApp: false,
     actor,
     browserActor: () => Promise.resolve(silentInstalledApp),
   });
@@ -118,6 +119,7 @@ describe("repairNotificationPath", () => {
         origin: "chrome-extension://abcdefghijklmnop",
         frontendOrigin: "chrome-extension://abcdefghijklmnop",
         accountPrincipal: Principal.fromText("2vxsx-fae"),
+        isInstalledApp: false,
         actor,
         browserActor,
       }),
@@ -134,6 +136,7 @@ describe("repairNotificationPath", () => {
         origin: "https://app.example",
         frontendOrigin: "chrome-extension://abcdefghijklmnop",
         accountPrincipal: Principal.fromText("2vxsx-fae"),
+        isInstalledApp: false,
         actor,
         browserActor,
       }),
@@ -147,6 +150,7 @@ describe("repairNotificationPath", () => {
       origin: "https://app.example",
       frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
+      isInstalledApp: false,
       actor,
       browserActor: () => new Promise<BrowserCalls>(() => {}),
     });
@@ -174,6 +178,7 @@ describe("repairNotificationPath", () => {
       origin: "https://app.example",
       frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
+      isInstalledApp: false,
       actor,
       browserActor: () =>
         new Promise<BrowserCalls>((resolve) => {
@@ -202,6 +207,7 @@ describe("repairNotificationPath", () => {
         origin: "https://app.example",
         frontendOrigin: "https://app.example",
         accountPrincipal: Principal.fromText("2vxsx-fae"),
+        isInstalledApp: false,
         actor,
         browserActor: () => Promise.reject(new Error("the lookup failed")),
       });
@@ -221,6 +227,7 @@ describe("repairNotificationPath", () => {
       origin: "https://app.example",
       frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
+      isInstalledApp: false,
       actor,
       browserActor: () => {
         signedIn.set({ identityNumber: OTHER_IDENTITY_NUMBER });
@@ -279,6 +286,7 @@ describe("repairNotificationPath while the allow screen is prepared", () => {
       origin: "https://app.example",
       frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
+      isInstalledApp: false,
       actor: stallingActor(),
       browserActor: () => Promise.resolve(silentBrowser),
     });
@@ -367,6 +375,7 @@ describe("repairNotificationPath on an iPhone", () => {
       origin: "https://app.example",
       frontendOrigin: "https://app.example",
       accountPrincipal: Principal.fromText("2vxsx-fae"),
+      isInstalledApp: false,
       actor,
       browserActor: () => Promise.resolve(silentAlerts),
     });
@@ -375,6 +384,63 @@ describe("repairNotificationPath on an iPhone", () => {
 
     signedIn.set({ identityNumber: OTHER_IDENTITY_NUMBER });
 
+    await expect(repaired).resolves.toBe("identity-changed");
+  });
+});
+
+describe("repairNotificationPath from an installed web app its app disabled", () => {
+  /** The installed web app this sign-in comes from shares this browser's entry, and the
+   *  app disabled it. */
+  const disabledHere: BrowserCalls = {
+    ...silentInstalledApp,
+    get_notification_path_status: ({ path }) =>
+      Promise.resolve({
+        Ok: {
+          subscriptions:
+            "ThisBrowser" in path
+              ? []
+              : [
+                  {
+                    unanswered_pushes: [],
+                    probe_sent_at_ns: [],
+                    has_probe_had_its_answer_time: false,
+                    is_disabled: [true],
+                  },
+                ],
+        },
+      }),
+  };
+  const repairDisabled = (isInstalledApp: boolean) =>
+    repairNotificationPath({
+      identityNumber: IDENTITY_NUMBER,
+      origin: "https://app.example",
+      frontendOrigin: "https://app.example",
+      accountPrincipal: Principal.fromText("2vxsx-fae"),
+      isInstalledApp,
+      actor,
+      browserActor: () => Promise.resolve(disabledHere),
+    });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    signedIn.set({ identityNumber: IDENTITY_NUMBER });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    notificationConsentStore.clear();
+  });
+
+  it("asks only to remove the mute where the app already holds consent", async () => {
+    const repaired = repairDisabled(true);
+    await vi.advanceTimersByTimeAsync(WHILE_THE_PROBE_WAITS_MS);
+
+    expect(get(notificationConsentStore)).toMatchObject({
+      device: { source: "installed-app" },
+      isTurnedOn: true,
+      disabledInstalledApps: { anchor_number: IDENTITY_NUMBER },
+    });
+
+    signedIn.set({ identityNumber: OTHER_IDENTITY_NUMBER });
     await expect(repaired).resolves.toBe("identity-changed");
   });
 });
