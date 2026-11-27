@@ -8,4 +8,8 @@ pub struct VerifiedEmail {
     pub address: String,
     /// Nanoseconds since the Unix epoch.
     pub verified_at: Timestamp,
+    /// `Some(true)` when the address is one of Apple's private relay
+    /// addresses, which only take mail from senders registered with II's
+    /// Apple developer team. Absent counts as not a relay address.
+    pub is_private_relay: Option<bool>,
 }

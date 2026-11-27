@@ -191,8 +191,17 @@ export const PUSH_NOTIFICATIONS = createFeatureFlagStore(
   },
 );
 
+/// Lists Apple private relay ("Hide My Email") addresses when an app asks for
+/// an email. They only take mail from senders registered with II's Apple
+/// developer team, so off by default.
+export const SHARE_PRIVATE_RELAY_EMAILS = createFeatureFlagStore(
+  "SHARE_PRIVATE_RELAY_EMAILS",
+  false,
+);
+
 export default {
   PUSH_NOTIFICATIONS,
+  SHARE_PRIVATE_RELAY_EMAILS,
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,

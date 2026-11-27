@@ -2054,12 +2054,15 @@ impl Anchor {
         Ok(())
     }
 
-    /// Returns `true` when appended, `false` if already present or cap
-    /// reached. Never errors — the surrounding OIDC link must not fail
-    /// just because the verified-emails bucket is full.
+    /// Appends `address`, verified at `verified_at_ns` and marked as an Apple
+    /// private relay address when `is_private_relay` is set. Returns `true`
+    /// when appended, `false` if already present or cap reached. Never errors
+    /// — the surrounding OIDC link must not fail just because the
+    /// verified-emails bucket is full.
     pub fn mirror_verified_email_from_oidc(
         &mut self,
         address: &str,
+        is_private_relay: bool,
         verified_at_ns: Timestamp,
     ) -> bool {
         if self
@@ -2075,6 +2078,7 @@ impl Anchor {
         self.verified_emails.push(VerifiedEmail {
             address: address.to_ascii_lowercase(),
             verified_at: verified_at_ns,
+            is_private_relay: Some(is_private_relay),
         });
         true
     }

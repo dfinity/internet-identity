@@ -231,11 +231,12 @@ pub fn add_openid_credential_skip_checks(
     now_ns: u64,
 ) -> Result<Operation, AnchorError> {
     let mirrored_address = openid_credential.get_verified_email();
+    let is_private_relay = openid_credential.has_private_relay_email();
     anchor.add_openid_credential(openid_credential.clone())?;
 
     // Mirror so the address survives an OIDC unlink.
     if let Some(address) = mirrored_address {
-        anchor.mirror_verified_email_from_oidc(&address, now_ns);
+        anchor.mirror_verified_email_from_oidc(&address, is_private_relay, now_ns);
     }
 
     Ok(Operation::AddOpenIdCredential {
@@ -469,6 +470,7 @@ fn oidc_link_at_verified_emails_cap_skips_mirror_but_succeeds() {
         anchor.verified_emails.push(VerifiedEmail {
             address: format!("user{i}@example.com"),
             verified_at: 100,
+            is_private_relay: None,
         });
     }
 

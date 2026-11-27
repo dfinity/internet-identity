@@ -11,22 +11,37 @@ pub struct StorableVerifiedEmail {
     /// Nanoseconds since the Unix epoch.
     #[n(1)]
     pub verified_at: Timestamp,
+    /// `Some(true)` for an Apple private relay address; absent counts as not one.
+    #[n(2)]
+    pub is_private_relay: Option<bool>,
 }
 
 impl From<VerifiedEmail> for StorableVerifiedEmail {
     fn from(value: VerifiedEmail) -> Self {
+        let VerifiedEmail {
+            address,
+            verified_at,
+            is_private_relay,
+        } = value;
         Self {
-            address: value.address,
-            verified_at: value.verified_at,
+            address,
+            verified_at,
+            is_private_relay,
         }
     }
 }
 
 impl From<StorableVerifiedEmail> for VerifiedEmail {
     fn from(value: StorableVerifiedEmail) -> Self {
+        let StorableVerifiedEmail {
+            address,
+            verified_at,
+            is_private_relay,
+        } = value;
         Self {
-            address: value.address,
-            verified_at: value.verified_at,
+            address,
+            verified_at,
+            is_private_relay,
         }
     }
 }
