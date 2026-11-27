@@ -166,7 +166,9 @@ fn find_superseded_links(
     storage_borrow(|storage| {
         let linking_frontends =
             storage.pwa_webpush_frontends_of_browser(anchor.anchor_number(), linking_browser_id);
+
         let mut superseded_browser_ids = BTreeSet::new();
+
         for browser in anchor.browsers() {
             if browser.id == linking_browser_id
                 || browser.same_device_browser_id != Some(same_device_browser_id)
@@ -179,6 +181,7 @@ fn find_superseded_links(
                 superseded_browser_ids.insert(browser.id);
             }
         }
+
         superseded_browser_ids
     })
 }

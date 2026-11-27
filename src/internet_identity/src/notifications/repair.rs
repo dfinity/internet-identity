@@ -365,6 +365,7 @@ fn installed_apps_path_subscriptions(
             account_principal,
         )
     };
+
     let mut path_subscriptions: Vec<PathSubscription> =
         installed_apps_on_path(browser, anchor.anchor_number(), application_number, now_ns)
             .into_iter()
@@ -372,6 +373,7 @@ fn installed_apps_path_subscriptions(
                 path_subscription.is_disabled && is_on_path(path_subscription)
             })
             .collect();
+
     for entry in same_device_entries(anchor, browser) {
         path_subscriptions.extend(
             installed_apps_on_path(entry, anchor.anchor_number(), application_number, now_ns)
@@ -379,6 +381,7 @@ fn installed_apps_path_subscriptions(
                 .filter(is_on_path),
         );
     }
+
     path_subscriptions
 }
 
@@ -422,7 +425,9 @@ fn installed_apps_on_path(
             now_ns,
         )
     });
+
     let mut path_subscriptions = Vec::new();
+
     for InstalledAppSubscription {
         frontend_origin_hash,
         subscription,
@@ -447,6 +452,7 @@ fn installed_apps_on_path(
             is_disabled,
         });
     }
+
     path_subscriptions
 }
 

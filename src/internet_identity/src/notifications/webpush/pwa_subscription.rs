@@ -227,6 +227,7 @@ pub fn set_pwa_subscription(
     else {
         return Err(SetPwaSubscriptionError::TransportKeyExpired);
     };
+
     let ValidatedPwaWebPushSubscription {
         endpoint,
         subscriber_key,
@@ -247,6 +248,7 @@ pub fn set_pwa_subscription(
         }
     })
     .map_err(map_set_error)?;
+
     let displaced_holder = find_endpoint_holder(holder, &ready_subscription.endpoint);
     if let Some(endpoint_holder) = displaced_holder {
         let accepted_frontend_origin_hashes =
@@ -304,6 +306,7 @@ pub fn disable_pwa_subscription(
     if held_account_principal != account_principal || disabled_at_ns.is_some() {
         return Ok(());
     }
+
     let disabled_at_ns = Some(now_ns);
     let subscription = PwaSubscription {
         subscription,
@@ -453,6 +456,7 @@ pub(crate) fn write_pwa_subscription(
     }
     let stale_holders =
         find_stale_pwa_slots(holder, accepted_frontend_origin_hashes.as_ref(), now_ns);
+
     storage_borrow_mut(|storage| {
         storage.write_pwa_webpush_subscription(
             holder,
@@ -498,8 +502,10 @@ fn find_stale_pwa_slots(
         else {
             return BTreeSet::new();
         };
+
         let mut stale_holders = BTreeSet::new();
         let mut sessions_by_account: BTreeMap<Principal, Vec<Session>> = BTreeMap::new();
+
         for (browser_id, frontend_origin_hash, held_subscription) in
             config.pwa_webpush_subscription_slots()
         {
@@ -535,6 +541,7 @@ fn find_stale_pwa_slots(
                 stale_holders.insert(slot_holder);
             }
         }
+
         stale_holders
     })
 }
@@ -626,6 +633,7 @@ pub fn prepare_pwa_subscription(
         Accepted => {}
         Pending => return Ok(PreparedPwaSubscription::Pending),
     }
+
     let Some(seeds) = seed_pool::derive_seeds_for_pwa(holder, now_ns) else {
         return Ok(PreparedPwaSubscription::Pending);
     };
@@ -637,6 +645,7 @@ pub fn prepare_pwa_subscription(
         seeds.sender_seed,
         now_ns,
     )?;
+
     let vapid_public_key = ByteBuf::from(vapid_public_key);
     let transport_public_key = ByteBuf::from(transport_public_key);
     Ok(PreparedPwaSubscription::Keys(

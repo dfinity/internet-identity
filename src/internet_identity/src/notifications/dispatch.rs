@@ -1013,8 +1013,10 @@ pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
     let Some(config) = storage.anchor_application_config(anchor_number, application_number) else {
         return Vec::new();
     };
+
     let mut sessions_by_account: BTreeMap<Principal, Vec<Session>> = BTreeMap::new();
     let mut installed_app_subscriptions = Vec::new();
+
     for (frontend_origin_hash, held_subscription) in
         config.pwa_webpush_subscriptions_of_browser(browser.id)
     {
@@ -1049,6 +1051,7 @@ pub(crate) fn installed_app_subscriptions<M: Memory + Clone>(
             is_disabled,
         });
     }
+
     installed_app_subscriptions
 }
 
@@ -1310,6 +1313,7 @@ fn find_installed_app_delivery(
     if browser.session_count == 0 {
         return None;
     }
+
     let live_until_ns = now_ns.checked_add(PWA_SESSION_MARGIN_NS)?;
     let has_live_session = route.sessions.iter().any(|session| {
         session.browser_id == browser.id && !session.is_expired_or_idle(live_until_ns)
@@ -1317,6 +1321,7 @@ fn find_installed_app_delivery(
     if !has_live_session {
         return None;
     }
+
     let relay_origin = vapid_key::relay_origin_of(subscription.endpoint.as_str())?;
     let target = DeliveryTarget::Pwa {
         application_number: route.application_number,

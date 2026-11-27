@@ -251,6 +251,7 @@ async fn fetch_alternative_origins(
             },
         ],
     };
+
     let (response,) = http_request_with_closure(
         request,
         ALTERNATIVE_ORIGINS_CALL_CYCLES,
@@ -276,6 +277,7 @@ fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
             body: b"invalid ii-alternative-origins response status".to_vec(),
         };
     }
+
     let invalid_response = HttpResponse {
         status: status.clone(),
         headers: vec![],
@@ -284,6 +286,7 @@ fn transform_alternative_origins(response: HttpResponse) -> HttpResponse {
     let Some(alternative_origins) = parse_alternative_origins(&body) else {
         return invalid_response;
     };
+
     let list = AlternativeOriginList {
         alternative_origins: alternative_origins
             .iter()

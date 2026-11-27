@@ -92,6 +92,7 @@ fn authorize_frontend_and_submit(
     let listed_app_labels = |urgency: Option<&Urgency>| {
         Labels::listed_app(application_origin.as_str(), urgency, now_ns)
     };
+
     match alternative_origins::authorize_alternative_origin(
         application_origin,
         frontend_origin,
