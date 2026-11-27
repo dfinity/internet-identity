@@ -1,7 +1,8 @@
 import { test as base, expect, type Page } from "@playwright/test";
+import { workerOpenIdPort } from "../workerStack";
 
-export const DEFAULT_OPENID_PORT = 11105;
-export const ALTERNATE_OPENID_PORT = 11106;
+export const DEFAULT_OPENID_PORT = workerOpenIdPort(11105);
+export const ALTERNATE_OPENID_PORT = workerOpenIdPort(11106);
 
 export type OpenIdConfig = {
   defaultPort?: number;

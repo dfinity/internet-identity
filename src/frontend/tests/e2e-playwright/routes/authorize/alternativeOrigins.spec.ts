@@ -8,6 +8,7 @@ import {
   useLegacyProtocol,
 } from "../../utils";
 import { test } from "../../fixtures";
+import { DEFAULT_HOST } from "../../fixtures/identity";
 
 test("Should not issue delegation when alternative origins are empty", async ({
   page,
@@ -17,7 +18,7 @@ test("Should not issue delegation when alternative origins are empty", async ({
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://localhost:5173");
+  await page.locator("#hostUrl").fill(DEFAULT_HOST);
   await page
     .locator("#newAlternativeOrigins")
     .fill('{"alternativeOrigins":[]}');
@@ -50,7 +51,7 @@ test("Should not issue delegation when origin is missing from /.well-known/ii-al
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://localhost:5173");
+  await page.locator("#hostUrl").fill(DEFAULT_HOST);
   const alternativeOrigins = JSON.stringify({
     alternativeOrigins: [NOT_TEST_APP_URL],
   });
@@ -88,7 +89,7 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   const alternativeOrigins = JSON.stringify({
     alternativeOrigins: [TEST_APP_URL],
   });
-  await page.locator("#hostUrl").fill("https://localhost:5173");
+  await page.locator("#hostUrl").fill(DEFAULT_HOST);
   await page.locator("#newAlternativeOrigins").fill(alternativeOrigins);
   await page.locator("#certified").click();
   await page.locator("#updateNewAlternativeOrigins").click();
@@ -134,7 +135,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://localhost:5173");
+  await page.locator("#hostUrl").fill(DEFAULT_HOST);
 
   // Set up alternative origins with 101 entries (exceeding the 100 limit).
   // The requesting origin is one of them, so the only thing that can make
@@ -175,7 +176,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://localhost:5173");
+  await page.locator("#hostUrl").fill(DEFAULT_HOST);
 
   // Set up alternative origins that will return a redirect
   const redirectOrigins = JSON.stringify({
@@ -216,7 +217,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await page.goto(TEST_APP_URL);
   await useLegacyProtocol(page);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://localhost:5173");
+  await page.locator("#hostUrl").fill(DEFAULT_HOST);
 
   // Configure alternative origins to include the nice URL
   const alternativeOrigins = JSON.stringify({
@@ -260,7 +261,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await page.goto(TEST_APP_CANONICAL_URL);
   await useLegacyProtocol(page);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://localhost:5173");
+  await page.locator("#hostUrl").fill(DEFAULT_HOST);
 
   // Authenticate with the existing identity
   const pagePromise2 = page.context().waitForEvent("page");

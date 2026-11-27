@@ -4,6 +4,7 @@ import {
   type Page,
   type Route,
 } from "@playwright/test";
+import { workerOpenIdPort } from "../workerStack";
 
 /**
  * The test OpenID provider behind the "Apple" provider: the canister's config
@@ -11,7 +12,7 @@ import {
  * Apple paths, and this provider's issuer and keys, so the canister accepts the
  * tokens it issues. See `scripts/dev-e2e-setup`.
  */
-export const APPLE_OPENID_PORT = 11110;
+export const APPLE_OPENID_PORT = workerOpenIdPort(11110);
 export const APPLE_ISSUER = `http://localhost:${APPLE_OPENID_PORT}`;
 export const APPLE_PROVIDER_NAME = "Apple";
 

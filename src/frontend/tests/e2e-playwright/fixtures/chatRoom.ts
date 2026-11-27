@@ -4,6 +4,7 @@ import { IDL } from "@icp-sdk/core/candid";
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
+import { GATEWAY_PORT } from "../workerStack";
 
 /**
  * The test app's chatroom, as something other than a browser.
@@ -18,11 +19,11 @@ export const TEST_APP_CANISTER = readCanisterId({ canisterName: "test_app" });
 /// The app as the local gateway serves it, which is the one origin both this browser and
 /// the canister can reach: Internet Identity reads the app's sender list over an outcall,
 /// and `nice-name.com` resolves in the browser alone.
-export const APP_URL = `http://${TEST_APP_CANISTER}.localhost:8000`;
+export const APP_URL = `http://${TEST_APP_CANISTER}.localhost:${GATEWAY_PORT}`;
 
 /// The replica as this process reaches it. The browser resolves every host to the dev
 /// server through a launch flag, which is no help out here.
-const REPLICA_URL = process.env.REPLICA_URL ?? "http://localhost:8000";
+const REPLICA_URL = `http://localhost:${GATEWAY_PORT}`;
 
 const Counts = IDL.Record({
   queued: IDL.Nat64,

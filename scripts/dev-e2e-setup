@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# Idempotent set-up of the local e2e test stack: builds canisters (only when
-# source is newer than the wasm), starts the test OpenID providers, icp
-# network, dev server, and (re)installs the canisters with the same init args
-# the e2e CI job uses. Designed to be re-run on every code change — re-runs
-# detect what's already healthy and only do incremental work.
+# Idempotent set-up of the e2e test stacks: builds canisters (only when
+# source is newer than the wasm), then gives every Playwright worker a stack of
+# its own: test OpenID providers, an icp network, the canisters installed with
+# the e2e init args, and a dev server. Designed to be re-run on every code
+# change: re-runs detect what's already healthy and only do incremental work.
+# The e2e CI job runs it too, with --skip-build.
 #
 # Usage:
-#   scripts/dev-e2e-setup              set up; exit 0 when everything is ready
-#   scripts/dev-e2e-setup --teardown   stop everything this script started
+#   scripts/dev-e2e-setup                set up; exit 0 when everything is ready
+#   scripts/dev-e2e-setup --skip-build   set up with the wasm files already in
+#                                        the repo root instead of building them
+#   scripts/dev-e2e-setup --teardown     stop everything this script started
+#
+# E2E_WORKERS sets the number of stacks (DEFAULT_E2E_WORKERS when unset); Playwright
+# reads the same variable for its worker count (see playwright.config.ts).
 
 set -euo pipefail
 
@@ -15,9 +21,25 @@ SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPTS_DIR/.."
 REPO_ROOT="$PWD"
 
-# Match the e2e job in .github/workflows/canister-tests.yml
 LAUNCHER_TAG="v16.1.0-2026-10-22-03-29"
+
+# Stacks set up when E2E_WORKERS is unset. Every stack after the first needs an
+# `e2e-<i>` network and environment in icp.yaml.
+DEFAULT_E2E_WORKERS=4
+E2E_WORKERS="${E2E_WORKERS:-$DEFAULT_E2E_WORKERS}"
+
+# The ports below are worker 0's. Worker i's dev server listens on
+# BASE_DEV_SERVER_PORT + i, its gateway on the port icp.yaml gives `e2e-<i>`,
+# and its OpenID providers on these ports + i * OPENID_PORT_STRIDE. The tests
+# derive the same ports (src/frontend/tests/e2e-playwright/workerStack.ts).
+BASE_DEV_SERVER_PORT=5173
+OPENID_PORT_STRIDE=100
 OPENID_PORTS=(11105 11106 11107 11108 11109 11110)
+# Only these get an `openid_configs` entry on the canister. 11107 is registered
+# exclusively as an SSO `DiscoverableOidcConfig`, so its tokens verify through
+# the discoverable provider into an `sso:<domain>`-keyed credential; as a direct
+# provider too, it would match `iss=http://localhost:11107` first and yield an
+# `openid:`-keyed credential the SSO attribute scope can't reach.
 DIRECT_OPENID_PORTS=(11105 11106)
 # 11108 is an Entra-style provider: pairwise `sub` (per client) + a stable `oid`,
 # for the non-`sub` gating tests (see fixtures/sso.ts SSO_ENTRA_DISCOVERY_DOMAIN).
@@ -38,22 +60,56 @@ APPLE_REDIRECT_URI="https://appleid.apple.com/e2e/callback"
 
 STATE_DIR=".icp/cache/dev-e2e"
 LAUNCHER_DIR="$STATE_DIR/launcher-$LAUNCHER_TAG"
-LOG_DIR="$STATE_DIR/logs"
-STATE_FILE="$STATE_DIR/state"
-II_ARGS_FILE="$STATE_DIR/ii-init-args.did"
-FE_ARGS_FILE="$STATE_DIR/fe-init-args.did"
-TEST_APP_ARGS_FILE="$STATE_DIR/test-app-init-args.did"
 TEST_APP_CANISTER_ID=""
 TEST_APP_LOCAL_ORIGIN=""
-mkdir -p "$STATE_DIR" "$LOG_DIR"
+mkdir -p "$STATE_DIR"
 
 log() { printf '\033[1;36m>>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
 
-# State is shell-sourceable: NETWORK_STARTED_BY_US, DEV_SERVER_PID, OPENID_PIDS, II_CANISTER_ID.
+# Points every per-stack variable at the stack of Playwright worker $1, and
+# exports ICP_ENVIRONMENT so every `icp` call, and the dev server, targets that
+# worker's network.
+select_worker() {
+  WORKER_INDEX=$1
+  if [[ "$WORKER_INDEX" == 0 ]]; then
+    ICP_ENVIRONMENT=local
+  else
+    ICP_ENVIRONMENT="e2e-$WORKER_INDEX"
+  fi
+  export ICP_ENVIRONMENT
+  NETWORK_NAME="$ICP_ENVIRONMENT"
+  DEV_SERVER_PORT=$((BASE_DEV_SERVER_PORT + WORKER_INDEX))
+
+  local openid_port_offset=$((WORKER_INDEX * OPENID_PORT_STRIDE))
+  local port
+  WORKER_OPENID_PORTS=()
+  for port in "${OPENID_PORTS[@]}"; do
+    WORKER_OPENID_PORTS+=("$((port + openid_port_offset))")
+  done
+  WORKER_DIRECT_OPENID_PORTS=()
+  for port in "${DIRECT_OPENID_PORTS[@]}"; do
+    WORKER_DIRECT_OPENID_PORTS+=("$((port + openid_port_offset))")
+  done
+  WORKER_PAIRWISE_OPENID_PORT=$((PAIRWISE_OPENID_PORT + openid_port_offset))
+  WORKER_ALIAS_OPENID_PORT=$((ALIAS_OPENID_PORT + openid_port_offset))
+  WORKER_ALIAS_OPENID_TARGET_PORT=$((ALIAS_OPENID_TARGET_PORT + openid_port_offset))
+  WORKER_APPLE_OPENID_PORT=$((APPLE_OPENID_PORT + openid_port_offset))
+
+  WORKER_DIR="$STATE_DIR/worker-$WORKER_INDEX"
+  LOG_DIR="$WORKER_DIR/logs"
+  STATE_FILE="$WORKER_DIR/state"
+  II_ARGS_FILE="$WORKER_DIR/ii-init-args.did"
+  FE_ARGS_FILE="$WORKER_DIR/fe-init-args.did"
+  TEST_APP_ARGS_FILE="$WORKER_DIR/test-app-init-args.did"
+  mkdir -p "$LOG_DIR"
+}
+
+# State is shell-sourceable: ICP_ENVIRONMENT, NETWORK_STARTED_BY_US, GATEWAY_PORT, DEV_SERVER_PID, OPENID_PIDS, II_CANISTER_ID.
 load_state() {
   NETWORK_STARTED_BY_US=0
+  GATEWAY_PORT=""
   DEV_SERVER_PID=""
   OPENID_PIDS=""
   II_CANISTER_ID=""
@@ -67,7 +123,9 @@ load_state() {
 
 save_state() {
   cat > "$STATE_FILE" <<EOF
+ICP_ENVIRONMENT="$ICP_ENVIRONMENT"
 NETWORK_STARTED_BY_US=$NETWORK_STARTED_BY_US
+GATEWAY_PORT="$GATEWAY_PORT"
 DEV_SERVER_PID="$DEV_SERVER_PID"
 OPENID_PIDS="$OPENID_PIDS"
 II_CANISTER_ID="$II_CANISTER_ID"
@@ -118,7 +176,7 @@ ensure_prereqs() {
   # pgrep (procps-ng) backs collect_descendants — without it teardown can't
   # walk the process tree and stray vite/esbuild grandchildren leak.
   # gh backs scripts/fetch-test-app, which downloads the test app release.
-  for cmd in node npm cargo curl tar pgrep gh; do
+  for cmd in node npm curl tar pgrep gh; do
     command -v "$cmd" >/dev/null || die "Missing required tool: $cmd"
   done
 
@@ -127,8 +185,11 @@ ensure_prereqs() {
     warn "Node version mismatch: have $(node --version), repo pins $want_node"
   fi
 
-  if ! command -v ic-wasm >/dev/null; then
-    die "Missing ic-wasm. Install with: cargo install ic-wasm --version 0.8.5 --locked"
+  if [[ "$SKIP_BUILD" == 0 ]]; then
+    command -v cargo >/dev/null || die "Missing required tool: cargo"
+    if ! command -v ic-wasm >/dev/null; then
+      die "Missing ic-wasm. Install with: cargo install ic-wasm --version 0.8.5 --locked"
+    fi
   fi
 
   if ! command -v icp >/dev/null; then
@@ -141,7 +202,7 @@ ensure_prereqs() {
 
 # Pinned rather than following releases/latest, and no older than v16.1.0: that is
 # the first launcher whose pocket-ic holds a threshold key over secp256r1, which is
-# what Internet Identity signs its VAPID JWTs with. Keep in step with the workflow.
+# what Internet Identity signs its VAPID JWTs with.
 ensure_launcher() {
   local bin="$LAUNCHER_DIR/icp-cli-network-launcher"
   if [[ -x "$bin" ]]; then
@@ -210,9 +271,6 @@ needs_rebuild() {
 }
 
 build_canisters() {
-  REBUILT_II=0
-  REBUILT_FE=0
-  REBUILT_TEST_APP=0
   if needs_rebuild src/internet_identity internet_identity.wasm.gz; then
     log "Building internet_identity (cargo)"
     II_FETCH_ROOT_KEY=1 ./scripts/build --internet-identity
@@ -231,6 +289,9 @@ build_canisters() {
   else
     log "internet_identity_frontend.wasm.gz up to date, skipping build"
   fi
+}
+
+fetch_test_app() {
   # The test app is not built from source; fetch the pinned release. This also
   # unpacks .test-app/dist, which the chrome-extension e2e project loads as an
   # unpacked extension. Compare the unpacked tag before and after so a moved pin
@@ -246,11 +307,11 @@ build_canisters() {
 
 start_openid_providers() {
   local need_start=0
-  for port in "${OPENID_PORTS[@]}"; do
+  for port in "${WORKER_OPENID_PORTS[@]}"; do
     curl -fsS "http://localhost:$port/jwks" >/dev/null 2>&1 || { need_start=1; break; }
   done
   if [[ "$need_start" == 0 ]]; then
-    log "OpenID providers already responding on ${OPENID_PORTS[*]}"
+    log "OpenID providers already responding on ${WORKER_OPENID_PORTS[*]}"
     return
   fi
 
@@ -260,10 +321,10 @@ start_openid_providers() {
     for pid in $OPENID_PIDS; do kill_tree "$pid"; done
   fi
 
-  log "Starting test OpenID providers on: ${OPENID_PORTS[*]}"
+  log "Starting test OpenID providers on: ${WORKER_OPENID_PORTS[*]}"
   local new_pids=()
-  for port in "${OPENID_PORTS[@]}"; do
-    if [[ "$port" == "$PAIRWISE_OPENID_PORT" ]]; then
+  for port in "${WORKER_OPENID_PORTS[@]}"; do
+    if [[ "$port" == "$WORKER_PAIRWISE_OPENID_PORT" ]]; then
       # Entra-style: pairwise `sub` + a stable `oid`, named for the consent/dialog
       # copy. Pairwise needs single-host redirect_uris (or a sector_identifier_uri);
       # the e2e II origin is https://id.ai, so restrict to that one callback.
@@ -271,14 +332,14 @@ start_openid_providers() {
         OIDC_REDIRECT_URIS="https://id.ai/callback" \
         npm start --silent --prefix ./src/test_openid_provider -- "$port" \
         > "$LOG_DIR/openid-$port.log" 2>&1 &
-    elif [[ "$port" == "$APPLE_OPENID_PORT" ]]; then
+    elif [[ "$port" == "$WORKER_APPLE_OPENID_PORT" ]]; then
       OIDC_REDIRECT_URIS="$APPLE_REDIRECT_URI" \
         npm start --silent --prefix ./src/test_openid_provider -- "$port" \
         > "$LOG_DIR/openid-$port.log" 2>&1 &
-    elif [[ "$port" == "$ALIAS_OPENID_PORT" ]]; then
-      # Alias discovery domain: its well-known hands II the 11107 provider's
+    elif [[ "$port" == "$WORKER_ALIAS_OPENID_PORT" ]]; then
+      # Alias discovery domain: its well-known hands II the target provider's
       # OIDC configuration, so sign-ins through it hit the same IdP and accounts.
-      OIDC_ISSUER="http://localhost:$ALIAS_OPENID_TARGET_PORT" OIDC_SSO_NAME="Test SSO alias" \
+      OIDC_ISSUER="http://localhost:$WORKER_ALIAS_OPENID_TARGET_PORT" OIDC_SSO_NAME="Test SSO alias" \
         npm start --silent --prefix ./src/test_openid_provider -- "$port" \
         > "$LOG_DIR/openid-$port.log" 2>&1 &
     else
@@ -289,7 +350,7 @@ start_openid_providers() {
   done
   OPENID_PIDS="${new_pids[*]}"
 
-  for port in "${OPENID_PORTS[@]}"; do
+  for port in "${WORKER_OPENID_PORTS[@]}"; do
     local tries=0
     until curl -fsS "http://localhost:$port/jwks" >/dev/null 2>&1; do
       tries=$((tries+1))
@@ -300,8 +361,8 @@ start_openid_providers() {
 }
 
 # icp tracks running networks in two places that both need to be clean:
-#   ~/.cache/icp-cli/port-descriptors/<port>.{json,lock}  — global per-port
-#   .icp/cache/networks/local/{descriptor.json,lock}      — project-local
+#   ~/.cache/icp-cli/port-descriptors/<port>.{json,lock}  (global, per port)
+#   .icp/cache/networks/<network>/{descriptor.json,lock}  (project-local)
 # If the launcher dies without `icp network stop` (kill -9, crash, container
 # exit) these survive pointing at a dead PID and `icp network start` errors
 # with "already running" or "port in use" until they're removed.
@@ -319,12 +380,12 @@ purge_stale_port_descriptors() {
   done
   shopt -u nullglob
 
-  local local_desc=".icp/cache/networks/local/descriptor.json"
+  local local_desc=".icp/cache/networks/$NETWORK_NAME/descriptor.json"
   if [[ -f "$local_desc" ]]; then
     pid=$(grep -o '"pid": *[0-9]*' "$local_desc" 2>/dev/null | head -1 | awk '{print $2}')
     if ! pid_alive "$pid"; then
       log "Removing stale project network descriptor"
-      rm -f "$local_desc" ".icp/cache/networks/local/lock"
+      rm -f "$local_desc" ".icp/cache/networks/$NETWORK_NAME/lock"
     fi
   fi
 }
@@ -332,21 +393,23 @@ purge_stale_port_descriptors() {
 start_network() {
   purge_stale_port_descriptors
   if icp network status >/dev/null 2>&1; then
-    log "icp network already running, reusing"
+    log "icp network $NETWORK_NAME already running, reusing"
   else
-    log "Starting icp network (daemon)"
+    log "Starting icp network $NETWORK_NAME (daemon)"
     icp network start -d
     NETWORK_STARTED_BY_US=1
   fi
+  GATEWAY_PORT=$(icp network status --json \
+    | node -e 'process.stdout.write(new URL(JSON.parse(require("fs").readFileSync(0, "utf8")).gateway_url).port)')
 }
 
 write_install_args() {
   local svg='<svg viewBox=\"0 0 24 24\"><path d=\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\" style=\"fill: currentColor;\"></path></svg>'
   local configs=()
-  for port in "${DIRECT_OPENID_PORTS[@]}"; do
+  for port in "${WORKER_DIRECT_OPENID_PORTS[@]}"; do
     configs+=("record { name = \"Test OpenID $port\"; logo = \"$svg\"; issuer = \"http://localhost:$port\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$port/jwks\"; auth_uri = \"http://localhost:$port/auth\"; auth_scope = vec { \"openid\"; \"profile\"; \"email\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Google }; }")
   done
-  configs+=("record { name = \"Apple\"; logo = \"$svg\"; issuer = \"http://localhost:$APPLE_OPENID_PORT\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$APPLE_OPENID_PORT/jwks\"; auth_uri = \"https://appleid.apple.com/auth/authorize\"; auth_scope = vec { \"openid\"; \"email\"; \"name\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Apple }; }")
+  configs+=("record { name = \"Apple\"; logo = \"$svg\"; issuer = \"http://localhost:$WORKER_APPLE_OPENID_PORT\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$WORKER_APPLE_OPENID_PORT/jwks\"; auth_uri = \"https://appleid.apple.com/auth/authorize\"; auth_scope = vec { \"openid\"; \"email\"; \"name\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Apple }; }")
   local openid_configs dnssec_config
   openid_configs="$(IFS='; '; echo "${configs[*]}")"
   dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
@@ -387,7 +450,7 @@ create_canisters() {
   # browser and the replica itself can reach: the notification e2e needs the
   # canister to read the app's sender list, and `nice-name.com` resolves in the
   # browser alone.
-  TEST_APP_LOCAL_ORIGIN="http://$TEST_APP_CANISTER_ID.localhost:8000"
+  TEST_APP_LOCAL_ORIGIN="http://$TEST_APP_CANISTER_ID.localhost:$GATEWAY_PORT"
 }
 
 # Per-canister install: skip if the wasm wasn't rebuilt this run AND a module
@@ -441,15 +504,16 @@ port_listening() {
 }
 
 start_dev_server() {
-  if [[ -n "$DEV_SERVER_PID" ]] && pid_alive "$DEV_SERVER_PID" && port_listening 5173; then
-    log "Dev server already running on https://localhost:5173 (pid $DEV_SERVER_PID)"
+  local dev_server_url="https://localhost:$DEV_SERVER_PORT"
+  if [[ -n "$DEV_SERVER_PID" ]] && pid_alive "$DEV_SERVER_PID" && port_listening "$DEV_SERVER_PORT"; then
+    log "Dev server already running on $dev_server_url (pid $DEV_SERVER_PID)"
     return
   fi
 
-  if port_listening 5173; then
-    warn "Port 5173 is in use by an untracked process; refusing to start a duplicate"
+  if port_listening "$DEV_SERVER_PORT"; then
+    warn "Port $DEV_SERVER_PORT is in use by an untracked process; refusing to start a duplicate"
     warn "Run: scripts/dev-e2e-setup --teardown   then re-run setup"
-    die "5173 unavailable"
+    die "$DEV_SERVER_PORT unavailable"
   fi
 
   log "Starting dev server"
@@ -457,7 +521,7 @@ start_dev_server() {
   # otherwise a stale "ready in" from a previous run produces a false positive.
   : > "$LOG_DIR/dev-server.log"
   SEPARATE_FRONTEND_CANISTER=1 TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 \
-    npm run dev > "$LOG_DIR/dev-server.log" 2>&1 &
+    npm run dev -- --port "$DEV_SERVER_PORT" --strictPort > "$LOG_DIR/dev-server.log" 2>&1 &
   DEV_SERVER_PID=$!
   local tries=0
   until grep -q "ready in" "$LOG_DIR/dev-server.log" 2>/dev/null; do
@@ -465,15 +529,13 @@ start_dev_server() {
     [[ $tries -gt 60 ]] && die "Dev server did not become ready (see $LOG_DIR/dev-server.log)"
     sleep 0.5
   done
-  log "Dev server ready on https://localhost:5173"
+  log "Dev server ready on $dev_server_url"
 }
 
-do_setup() {
+setup_worker() {
+  select_worker "$1"
+  log "Setting up the stack of worker $WORKER_INDEX (environment $ICP_ENVIRONMENT)"
   load_state
-  ensure_prereqs
-  ensure_launcher
-  ensure_node_deps
-  build_canisters
   start_openid_providers
   start_network
   # After creation: the install args name the canisters, including the origin
@@ -484,36 +546,73 @@ do_setup() {
   install_canisters
   start_dev_server
   save_state
-  log "Setup complete. Dev server: https://localhost:5173"
+}
+
+do_setup() {
+  [[ "$E2E_WORKERS" =~ ^[1-9][0-9]*$ ]] || die "E2E_WORKERS must be a positive integer, got '$E2E_WORKERS'"
+  ensure_prereqs
+  ensure_launcher
+  ensure_node_deps
+  REBUILT_II=0
+  REBUILT_FE=0
+  REBUILT_TEST_APP=0
+  if [[ "$SKIP_BUILD" == 1 ]]; then
+    log "Skipping the canister builds, installing the wasm files in the repo root"
+  else
+    build_canisters
+  fi
+  fetch_test_app
+
+  local worker_index
+  for ((worker_index = 0; worker_index < E2E_WORKERS; worker_index++)); do
+    setup_worker "$worker_index"
+  done
+
+  log "Setup complete: $E2E_WORKERS stacks, dev servers from https://localhost:$BASE_DEV_SERVER_PORT"
   log "II canister id: $II_CANISTER_ID"
   log "Run tests: npx playwright test --project=desktop [--grep <name>]"
 }
 
+# Tears down every stack a setup left state for, whatever E2E_WORKERS is now.
 do_teardown() {
-  load_state
   log "Tearing down dev-e2e state"
-  if [[ -n "$DEV_SERVER_PID" ]]; then kill_tree "$DEV_SERVER_PID"; fi
-  if [[ -n "$OPENID_PIDS" ]]; then
-    for pid in $OPENID_PIDS; do kill_tree "$pid"; done
-  fi
-  if [[ "$NETWORK_STARTED_BY_US" == 1 ]]; then
-    icp network stop 2>/dev/null || true
-    # `icp network stop` leaves the global port descriptor behind, which
-    # makes `icp network status` report stale info until the next setup
-    # purges it. Clean it up for symmetry.
-    rm -f "$HOME"/.cache/icp-cli/port-descriptors/8000.{json,lock}
-  fi
-  rm -f "$STATE_FILE" "$II_ARGS_FILE" "$FE_ARGS_FILE" "$TEST_APP_ARGS_FILE"
+  local worker_dir
+  for worker_dir in "$STATE_DIR"/worker-*; do
+    [[ -d "$worker_dir" ]] || continue
+    select_worker "${worker_dir##*/worker-}"
+    load_state
+    log "Tearing down the stack of worker $WORKER_INDEX"
+    if [[ -n "$DEV_SERVER_PID" ]]; then kill_tree "$DEV_SERVER_PID"; fi
+    if [[ -n "$OPENID_PIDS" ]]; then
+      for pid in $OPENID_PIDS; do kill_tree "$pid"; done
+    fi
+    if [[ "$NETWORK_STARTED_BY_US" == 1 ]]; then
+      icp network stop 2>/dev/null || true
+      # `icp network stop` leaves the global port descriptor behind, which
+      # makes `icp network status` report stale info until the next setup
+      # purges it. Clean it up for symmetry.
+      if [[ -n "$GATEWAY_PORT" ]]; then
+        rm -f "$HOME/.cache/icp-cli/port-descriptors/$GATEWAY_PORT".{json,lock}
+      fi
+    fi
+    rm -f "$STATE_FILE" "$II_ARGS_FILE" "$FE_ARGS_FILE" "$TEST_APP_ARGS_FILE"
+  done
   log "Teardown complete"
 }
 
+SKIP_BUILD=0
 case "${1:-}" in
   --teardown) do_teardown ;;
   -h|--help)
     cat <<EOF
 Usage:
-  scripts/dev-e2e-setup              set up the e2e stack; exits when ready
-  scripts/dev-e2e-setup --teardown   stop everything this script started
+  scripts/dev-e2e-setup                set up the e2e stacks; exits when ready
+  scripts/dev-e2e-setup --skip-build   set up with the wasm files already in
+                                       the repo root instead of building them
+  scripts/dev-e2e-setup --teardown     stop everything this script started
+
+Sets up one stack per Playwright worker: E2E_WORKERS of them (default
+$DEFAULT_E2E_WORKERS). Worker i's dev server listens on port $BASE_DEV_SERVER_PORT + i.
 
 Re-runnable: subsequent invocations detect what's already healthy (network,
 OpenID providers, dev server) and only redo the work that's needed.
@@ -525,6 +624,7 @@ OpenID providers, dev server) and only redo the work that's needed.
 State is kept under .icp/cache/dev-e2e/ (gitignored via .icp/).
 EOF
     ;;
+  --skip-build) SKIP_BUILD=1; do_setup ;;
   "") do_setup ;;
   *) die "Unknown argument: $1 (see --help)" ;;
 esac

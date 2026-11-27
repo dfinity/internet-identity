@@ -1,5 +1,6 @@
 import { chromium, type BrowserContext } from "@playwright/test";
 import path from "path";
+import { DEV_SERVER_PORT } from "../workerStack";
 import { test } from "./";
 
 // Unpacked by scripts/fetch-test-app from the pinned test app release.
@@ -19,7 +20,7 @@ export const chromeExtensionTest = test.extend<{
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
         "--ignore-certificate-errors",
-        "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
+        `--host-resolver-rules=MAP * localhost:${DEV_SERVER_PORT}, EXCLUDE localhost`,
       ],
     });
     // Close the default about:blank page so that page indices align

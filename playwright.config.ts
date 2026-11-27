@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import {
+  DEV_SERVER_PORT,
+  E2E_WORKERS,
+} from "./src/frontend/tests/e2e-playwright/workerStack";
 
 /**
  * Read environment variables from file.
@@ -19,8 +23,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* One worker per stack that scripts/dev-e2e-setup sets up. */
+  workers: E2E_WORKERS,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -42,11 +46,12 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--ignore-certificate-errors",
-            // Exclude loopback so tests can reach a real local server (e.g. the
-            // CLI flow's loopback callback, or a canister as the local gateway
+            // Every host goes to the current worker's dev server. Exclude
+            // loopback so tests can reach a real local server (e.g. the CLI
+            // flow's loopback callback, or a canister as the local gateway
             // serves it at <id>.localhost); MAP otherwise remaps every host,
             // including 127.0.0.1, to the dev server.
-            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE 127.0.0.1, EXCLUDE [::1]",
+            `--host-resolver-rules=MAP * localhost:${DEV_SERVER_PORT}, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE 127.0.0.1, EXCLUDE [::1]`,
           ],
         },
       },
@@ -58,11 +63,12 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--ignore-certificate-errors",
-            // Exclude loopback so tests can reach a real local server (e.g. the
-            // CLI flow's loopback callback, or a canister as the local gateway
+            // Every host goes to the current worker's dev server. Exclude
+            // loopback so tests can reach a real local server (e.g. the CLI
+            // flow's loopback callback, or a canister as the local gateway
             // serves it at <id>.localhost); MAP otherwise remaps every host,
             // including 127.0.0.1, to the dev server.
-            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE 127.0.0.1, EXCLUDE [::1]",
+            `--host-resolver-rules=MAP * localhost:${DEV_SERVER_PORT}, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE 127.0.0.1, EXCLUDE [::1]`,
           ],
         },
       },

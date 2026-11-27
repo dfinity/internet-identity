@@ -79,7 +79,6 @@ COPY . .
 ARG II_VERSION=
 
 RUN touch src/*/src/lib.rs
-RUN npm ci
 
 RUN ./scripts/build
 RUN sha256sum /internet_identity.wasm.gz

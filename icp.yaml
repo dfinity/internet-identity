@@ -46,3 +46,28 @@ canisters:
       steps:
         - type: script
           command: "scripts/provision-issuer"
+
+# The e2e stacks of scripts/dev-e2e-setup: Playwright worker i runs against
+# its own network, in environment `e2e-<i>`, with its gateway on 8000 + i.
+# Worker 0 uses the default `local` network and environment.
+networks:
+  - name: e2e-1
+    mode: managed
+    gateway:
+      port: 8001
+  - name: e2e-2
+    mode: managed
+    gateway:
+      port: 8002
+  - name: e2e-3
+    mode: managed
+    gateway:
+      port: 8003
+
+environments:
+  - name: e2e-1
+    network: e2e-1
+  - name: e2e-2
+    network: e2e-2
+  - name: e2e-3
+    network: e2e-3

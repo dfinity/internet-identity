@@ -1,6 +1,7 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
+import { DEFAULT_HOST } from "../../fixtures/identity";
 import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 import {
   SSO_DISCOVERY_DOMAIN,
@@ -663,7 +664,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const alternativeOrigins = JSON.stringify({
         alternativeOrigins: [HOST_ORIGIN],
       });
-      await page.locator("#hostUrl").fill("https://localhost:5173");
+      await page.locator("#hostUrl").fill(DEFAULT_HOST);
       await page.locator("#newAlternativeOrigins").fill(alternativeOrigins);
       await page.locator("#certified").click();
       await page.locator("#updateNewAlternativeOrigins").click();

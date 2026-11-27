@@ -1,19 +1,28 @@
 #!/usr/bin/env node
 // File watcher spawned by scripts/dev-e2e. Watches the canister source dirs
-// and the frontend assets dir; on change, rebuilds and upgrades the affected
-// canister using the same init-args files that scripts/dev-e2e-setup wrote.
+// and the frontend assets dir; on change, rebuilds the affected canister and
+// upgrades it in every e2e stack, using the init-args files that
+// scripts/dev-e2e-setup wrote for that stack.
 
 import { watch, appendFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 
-const II_ARGS_FILE = process.env.DEV_E2E_II_ARGS_FILE;
-const FE_ARGS_FILE = process.env.DEV_E2E_FE_ARGS_FILE;
 const LOG_FILE = process.env.DEV_E2E_LOG_FILE;
 
-if (!II_ARGS_FILE || !FE_ARGS_FILE) {
-  console.error(
-    "[watcher] DEV_E2E_II_ARGS_FILE and DEV_E2E_FE_ARGS_FILE must be set",
-  );
+// One `<icp environment>=<stack state dir>` line per e2e stack.
+const stacks = (process.env.DEV_E2E_STACKS ?? "")
+  .split("\n")
+  .filter((line) => line !== "")
+  .map((line) => {
+    const separatorIndex = line.indexOf("=");
+    return {
+      environment: line.slice(0, separatorIndex),
+      stateDir: line.slice(separatorIndex + 1),
+    };
+  });
+
+if (stacks.length === 0) {
+  console.error("[watcher] DEV_E2E_STACKS must name at least one stack");
   process.exit(1);
 }
 
@@ -23,7 +32,7 @@ const targets = [
     dirs: ["src/internet_identity"],
     buildFlag: "--internet-identity",
     wasm: "internet_identity.wasm.gz",
-    argsFile: II_ARGS_FILE,
+    argsFileName: "ii-init-args.did",
   },
   {
     name: "internet_identity_frontend",
@@ -32,7 +41,7 @@ const targets = [
     dirs: ["src/internet_identity_frontend", "src/frontend"],
     buildFlag: "--frontend",
     wasm: "internet_identity_frontend.wasm.gz",
-    argsFile: FE_ARGS_FILE,
+    argsFileName: "fe-init-args.did",
   },
 ];
 
@@ -66,19 +75,25 @@ async function rebuild(target) {
     await run("./scripts/build", [target.buildFlag], {
       env: { II_FETCH_ROOT_KEY: "1" },
     });
-    log(`upgrading ${target.name}`);
-    await run("icp", [
-      "canister",
-      "install",
-      target.name,
-      "-y",
-      "--mode",
-      "upgrade",
-      "--wasm",
-      target.wasm,
-      "--args-file",
-      target.argsFile,
-    ]);
+    for (const stack of stacks) {
+      log(`upgrading ${target.name} in ${stack.environment}`);
+      await run(
+        "icp",
+        [
+          "canister",
+          "install",
+          target.name,
+          "-y",
+          "--mode",
+          "upgrade",
+          "--wasm",
+          target.wasm,
+          "--args-file",
+          `${stack.stateDir}/${target.argsFileName}`,
+        ],
+        { env: { ICP_ENVIRONMENT: stack.environment } },
+      );
+    }
     log(`${target.name} upgraded`);
   } catch (err) {
     log(`rebuild failed: ${err.message}`);
