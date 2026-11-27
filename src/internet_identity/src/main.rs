@@ -51,7 +51,7 @@ use notifications::webpush::pwa_subscription;
 use notifications::webpush::rotation;
 use notifications::webpush::vapid_key::VapidPublicKey;
 use notifications::webpush::{deliverable_endpoint, PushEndpoint, SealedAuth, SubscriberKey};
-use notifications::{admit_batch, enabled_or, TooManyNotifications};
+use notifications::{admit_batch, check_notifications_enabled, TooManyNotifications};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -356,7 +356,9 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 /// finds it.
 #[update]
 fn prepare_webpush_subscription(anchor_number: AnchorNumber) -> PrepareWebPushSubscriptionResult {
-    if let Err(err) = enabled_or(PrepareWebPushSubscriptionError::InternalCanisterError) {
+    if let Err(err) =
+        check_notifications_enabled(PrepareWebPushSubscriptionError::InternalCanisterError)
+    {
         return PrepareWebPushSubscriptionResult::Err(err);
     }
     let Ok(key) = check_browser_or_notification_app_authorization(anchor_number) else {
@@ -416,7 +418,7 @@ fn set_webpush_subscription(
         transport_key,
         sealed_auth,
     } = request;
-    enabled_or(SetWebPushSubscriptionError::InternalCanisterError)?;
+    check_notifications_enabled(SetWebPushSubscriptionError::InternalCanisterError)?;
 
     // Every field at once rather than the first to fail, so a browser doesn't go round
     // four times to learn what one answer can say.
@@ -487,7 +489,7 @@ fn remove_webpush_subscription(
         anchor_number,
         browser_id,
     } = request;
-    enabled_or(RemoveWebPushSubscriptionError::InternalCanisterError)?;
+    check_notifications_enabled(RemoveWebPushSubscriptionError::InternalCanisterError)?;
     check_authz_and_record_activity(anchor_number)
         .map_err(|_| RemoveWebPushSubscriptionError::Unauthorized(caller()))?;
 
@@ -839,7 +841,7 @@ fn claim_same_device_link(
         link_public_key,
         signature,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
 
@@ -881,7 +883,7 @@ fn get_notification_path_status(
         anchor_number,
         path,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
@@ -906,7 +908,7 @@ fn probe_notification_path(
         anchor_number,
         path,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let path = notifications::repair::DevicePath::resolve(path).map_err(InternalCanisterError)?;
@@ -940,7 +942,7 @@ fn remove_unanswered_pwa_webpush_subscriptions(
         account_principal,
         frontend_origin,
     } = request;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let (anchor, browser_id) =
         check_browser_authorization(anchor_number).map_err(|_| InvalidBrowserKey)?;
     let application_number =
@@ -1072,7 +1074,7 @@ fn prepare_notification_delegation(
     } = request;
     let origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(NotificationDelegationError::InternalCanisterError)?;
-    enabled_or(NotificationDelegationError::InternalCanisterError)?;
+    check_notifications_enabled(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
@@ -1103,7 +1105,7 @@ fn get_notification_delegation(
     } = request;
     let origin = ApplicationOrigin::try_from(origin.as_str())
         .map_err(NotificationDelegationError::InternalCanisterError)?;
-    enabled_or(NotificationDelegationError::InternalCanisterError)?;
+    check_notifications_enabled(NotificationDelegationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
     let (anchor, browser_id) = delivering_browser(request.anchor_number, key)
@@ -1131,7 +1133,7 @@ fn browser_get_notification(
         browser_id,
         inbox_notification_id,
     } = request;
-    enabled_or(GetNotificationError::InternalCanisterError)?;
+    check_notifications_enabled(GetNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| GetNotificationError::InvalidBrowserKey)?;
     let anchor = anchor_delivering_to(anchor_number, key, browser_id)
@@ -1158,7 +1160,7 @@ fn browser_remove_notification(
         inbox_notification_id,
         not_shown,
     } = request;
-    enabled_or(RemoveNotificationError::InternalCanisterError)?;
+    check_notifications_enabled(RemoveNotificationError::InternalCanisterError)?;
     let key = check_browser_or_notification_app_authorization(anchor_number)
         .map_err(|_| RemoveNotificationError::InvalidBrowserKey)?;
     let anchor = anchor_delivering_to(anchor_number, key, browser_id)
@@ -1199,7 +1201,7 @@ fn notification_grant_consent(
     } = request;
 
     let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
 
     check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
@@ -1216,7 +1218,7 @@ fn notification_revoke_consent(
     use NotificationRevokeConsentError::*;
 
     let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
 
     check_authz_and_record_activity(anchor_number).map_err(|_| Unauthorized(caller()))?;
 
@@ -1252,7 +1254,7 @@ fn app_notification_consent_status(
 ) -> Result<AppNotificationConsentStatusResponse, AppNotificationConsentStatusError> {
     use AppNotificationConsentStatusError::*;
 
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
 
     let AuthorizedSession {
         anchor_number,
@@ -1277,7 +1279,7 @@ fn app_revoke_notification_consent() -> Result<(), AppRevokeNotificationConsentE
         ..
     } = check_app_authorization(now).map_err(|_| NoSuchSession)?;
 
-    notifications::enabled_or(InternalCanisterError)?;
+    notifications::check_notifications_enabled(InternalCanisterError)?;
     let origin = ApplicationOrigin::try_from(origin.as_str()).map_err(InternalCanisterError)?;
 
     notifications::revoke_consent(anchor_number, &origin, now)
@@ -1300,7 +1302,7 @@ fn app_prepare_pwa_webpush_subscription(
     let Ok(session) = check_app_authorization(now) else {
         return AppPreparePwaWebPushSubscriptionResult::Err(NoSuchSession);
     };
-    if let Err(err) = enabled_or(InternalCanisterError) {
+    if let Err(err) = check_notifications_enabled(InternalCanisterError) {
         return AppPreparePwaWebPushSubscriptionResult::Err(err);
     }
     let AppPreparePwaWebPushSubscriptionRequest { frontend_origin } = request;
@@ -1352,7 +1354,7 @@ fn app_set_pwa_webpush_subscription(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppSetPwaWebPushSubscriptionRequest {
         subscription,
         frontend_origin,
@@ -1390,7 +1392,7 @@ fn app_disable_pwa_webpush_subscription(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppDisablePwaWebPushSubscriptionRequest { frontend_origin } = request;
     let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
         .map_err(InternalCanisterError)?;
@@ -1417,7 +1419,7 @@ fn app_get_pwa_webpush_subscription_status(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppGetPwaWebPushSubscriptionStatusRequest { frontend_origin } = request;
     let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
         .map_err(InternalCanisterError)?;
@@ -1441,7 +1443,7 @@ fn app_get_pwa_notification(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppGetPwaNotificationRequest {
         inbox_notification_id,
     } = request;
@@ -1467,7 +1469,7 @@ fn app_remove_pwa_notification(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppRemovePwaNotificationRequest {
         inbox_notification_id,
         not_shown,
@@ -1507,7 +1509,7 @@ fn app_probe_pwa_webpush_subscription(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppProbePwaWebPushSubscriptionRequest { frontend_origin } = request;
     let frontend_origin = pwa_subscription::validate_frontend_origin(frontend_origin)
         .map_err(InternalCanisterError)?;
@@ -1540,7 +1542,7 @@ fn app_get_same_device_link_status() -> Result<SameDeviceLinkStatus, AppGetSameD
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     // The link and the app are the browser entry's, whichever frontend asks.
     let holder =
         pwa_subscription::resolve_pwa_holder(&session, None).map_err(InternalCanisterError)?;
@@ -1565,7 +1567,7 @@ fn app_prepare_same_device_link(
 
     let now = time();
     let session = check_app_authorization(now).map_err(|_| NoSuchSession)?;
-    enabled_or(InternalCanisterError)?;
+    check_notifications_enabled(InternalCanisterError)?;
     let AppPrepareSameDeviceLinkRequest { link_public_key } = request;
 
     notifications::same_device_link::prepare(
@@ -1599,7 +1601,7 @@ fn app_send_notification(
             .map_err(SendNotificationError::InternalCanisterError)?,
         None => frontend_origin.clone(),
     };
-    enabled_or(SendNotificationError::InternalCanisterError)?;
+    check_notifications_enabled(SendNotificationError::InternalCanisterError)?;
     FetchableApplicationOrigin::try_from(&application_origin)
         .map_err(SendNotificationError::InternalCanisterError)?;
     let notifications = admit_batch(notifications).map_err(|TooManyNotifications { limit }| {

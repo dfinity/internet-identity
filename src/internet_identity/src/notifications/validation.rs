@@ -58,8 +58,9 @@ pub fn notifications_enabled() -> bool {
     crate::state::persistent_state(|s| s.notifications_enabled).unwrap_or(false)
 }
 
-/// The refusal an endpoint answers while this deployment does not notify.
-pub fn enabled_or<E>(refusal: impl FnOnce(String) -> E) -> Result<(), E> {
+/// Checks that this deployment notifies. While it does not, returns the error
+/// `refusal` builds from the not-enabled message, for an endpoint to answer with.
+pub fn check_notifications_enabled<E>(refusal: impl FnOnce(String) -> E) -> Result<(), E> {
     if notifications_enabled() {
         return Ok(());
     }
@@ -203,7 +204,7 @@ mod tests {
     #[test]
     fn an_origin_is_admitted_while_enabled() {
         set_enabled(Some(true));
-        assert!(enabled_or(|message| message).is_ok());
+        assert!(check_notifications_enabled(|message| message).is_ok());
         assert!(ApplicationOrigin::try_from("https://any.example").is_ok());
     }
 
@@ -211,7 +212,7 @@ mod tests {
     fn every_endpoint_is_refused_while_disabled() {
         set_enabled(Some(false));
         assert_eq!(
-            enabled_or(|message| message),
+            check_notifications_enabled(|message| message),
             Err(NOT_ENABLED_MESSAGE.to_string())
         );
         assert!(ApplicationOrigin::try_from("https://any.example").is_ok());
@@ -221,7 +222,7 @@ mod tests {
     fn every_endpoint_is_refused_when_nothing_is_configured() {
         set_enabled(None);
         assert_eq!(
-            enabled_or(|message| message),
+            check_notifications_enabled(|message| message),
             Err(NOT_ENABLED_MESSAGE.to_string())
         );
     }
