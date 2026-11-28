@@ -35,14 +35,25 @@ jobs:
         run: npm run generate
       - name: Check for dapp logos
         run: |
+          set -euo pipefail
+          dapps_json=src/frontend/src/lib/legacy/flows/dappsExplorer/dapps.json
+          icons_dir=src/frontend/src/lib/icons
+          # jq runs in a command substitution so that its failure fails the
+          # step; inside a process substitution its exit status is discarded.
+          logos=$(jq -r '.[] | .logo' "$dapps_json")
+          if [ -z "$logos" ]
+          then
+            echo "No dapps found in $dapps_json"
+            exit 1
+          fi
           while read -r logo
           do
-            if [ ! -f src/frontend/src/assets/icons/"$logo" ]
+            if [ ! -f "$icons_dir/$logo" ]
             then
               echo "Logo not found: $logo"
               exit 1
             fi
-          done < <(jq <src/frontend/src/flows/dappsExplorer/dapps.json -cMr '.[] | .logo' )
+          done <<<"$logos"
       - name: Commit type interfaces
         uses: EndBug/add-and-commit@v9
         # Push only fires on `main` now, so this is inert. Preserved for
