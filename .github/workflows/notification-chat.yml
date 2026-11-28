@@ -1,0 +1,55 @@
+# The notification chat demo in demos/notification-chat is a project of its
+# own (its own Cargo workspace, package.json and icp.yaml), so the repository's
+# other workflows do not reach it. This one runs what a contributor runs there.
+name: Notification chat demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "demos/notification-chat/**"
+      - ".github/workflows/notification-chat.yml"
+  pull_request:
+    paths:
+      - "demos/notification-chat/**"
+      - ".github/workflows/notification-chat.yml"
+
+# Checks only: nothing here writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: demos/notification-chat
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: demos/notification-chat/.node-version
+
+      # The channel and the wasm target come from the demo's rust-toolchain.toml,
+      # which rustup picks up from the working directory.
+      - name: Install Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup component add clippy rustfmt
+          cargo --version
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm run format-check
+      # The canister embeds dist/ at compile time, so the frontend builds first.
+      - run: npm run build
+
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D clippy::all -D warnings
+      - run: cargo test
+      - run: cargo build --release --target wasm32-unknown-unknown
