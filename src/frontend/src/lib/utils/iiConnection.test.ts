@@ -73,9 +73,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
 };
 
 vi.mock("$lib/globals", () => ({
-  canisterConfig: {
-    new_flow_origins: [["https://id.ai"]],
-  },
+  getPrimaryOrigin: () => "https://id.ai",
 }));
 
 const mockActor = {
@@ -569,7 +567,7 @@ describe("Connection.login", () => {
   });
 
   describe("only pin device is available", () => {
-    it("returns a custom error", async () => {
+    it("connection does not use this device to authenticate", async () => {
       const pinDevice: DeviceData = {
         alias: "mockDevice",
         metadata: [],
@@ -587,9 +585,14 @@ describe("Connection.login", () => {
 
       const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
 
-      const loginResult = await connection.login(BigInt(12345));
+      await connection.login(BigInt(12345));
 
-      expect(loginResult.kind).toBe("pinUserOtherDomain");
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+      expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+        [],
+        undefined,
+        false,
+      );
     });
   });
 
