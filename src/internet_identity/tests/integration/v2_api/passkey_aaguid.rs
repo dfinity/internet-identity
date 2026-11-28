@@ -674,3 +674,80 @@ fn should_enforce_unique_passkey_pubkeys_in_registration_mode_flows() -> Result<
 
     Ok(())
 }
+
+#[test]
+fn should_enforce_unique_passkey_credential_ids_in_registration_mode_flows(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let with_credential_id_of = |authn_method: &AuthnMethodData| {
+        let AuthnMethod::WebAuthn(webauthn) = authn_method.authn_method.clone() else {
+            panic!("expected a WebAuthn authn method");
+        };
+        AuthnMethodData {
+            authn_method: AuthnMethod::WebAuthn(WebAuthn {
+                pubkey: test_pubkey(42),
+                ..webauthn
+            }),
+            ..authn_method.clone()
+        }
+    };
+
+    let a0 = crate::v2_api::authn_method_test_helpers::sample_webauthn_authn_method(1);
+    create_identity_with_authn_method(&env, canister_id, &a0);
+    let b0 = crate::v2_api::authn_method_test_helpers::sample_webauthn_authn_method(5);
+    let identity_b0 = create_identity_with_authn_method(&env, canister_id, &b0);
+    let intermediate_sender = Principal::self_authenticating([42; 32]);
+
+    authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        b0.principal(),
+        identity_b0,
+        Some("0eZr5".to_string()),
+    )?
+    .unwrap();
+
+    let result_register_conflict =
+        canister_tests::api::internet_identity::api_v2::authn_method_register(
+            &env,
+            canister_id,
+            identity_b0,
+            &with_credential_id_of(&a0),
+        )?;
+    assert_eq!(
+        result_register_conflict,
+        Err(AuthnMethodRegisterError::InvalidMetadata(
+            "passkey with this credential id is already used".to_string()
+        ))
+    );
+
+    let AuthnMethodConfirmationCode {
+        confirmation_code, ..
+    } = authn_method_session_register(&env, canister_id, intermediate_sender, identity_b0)?
+        .unwrap();
+    authn_method_confirm(
+        &env,
+        canister_id,
+        b0.principal(),
+        identity_b0,
+        &confirmation_code,
+    )?
+    .unwrap();
+
+    let result_exit_conflict = authn_method_registration_mode_exit(
+        &env,
+        canister_id,
+        intermediate_sender,
+        identity_b0,
+        Some(with_credential_id_of(&a0)),
+    )?;
+    assert_eq!(
+        result_exit_conflict,
+        Err(AuthnMethodRegistrationModeExitError::InternalCanisterError(
+            "passkey with this credential id is already used".to_string()
+        ))
+    );
+
+    Ok(())
+}

@@ -338,6 +338,245 @@ fn should_enforce_unique_passkey_pubkeys_in_legacy_flows() -> Result<(), RejectR
     Ok(())
 }
 
+fn device_with_credential_id_of_device_data_1() -> DeviceData {
+    DeviceData {
+        pubkey: ByteBuf::from([42u8; 32]),
+        credential_id: device_data_1().credential_id,
+        ..device_data_2()
+    }
+}
+
+#[test]
+fn should_not_add_device_with_credential_id_of_another_anchor() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+    let user_number_2 =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+
+    let result = api::add(
+        &env,
+        canister_id,
+        principal_2(),
+        user_number_2,
+        &device_with_credential_id_of_device_data_1(),
+    );
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("passkey with this credential id is already used").unwrap(),
+    );
+}
+
+#[test]
+fn should_not_add_tentative_device_with_credential_id_of_another_anchor(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+    let user_number_2 =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+    api::enter_device_registration_mode(&env, canister_id, principal_2(), user_number_2)?;
+
+    let result = api::add_tentative_device(
+        &env,
+        canister_id,
+        user_number_2,
+        &device_with_credential_id_of_device_data_1(),
+    );
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("passkey with this credential id is already used").unwrap(),
+    );
+    Ok(())
+}
+
+/// Stages a tentative device on a second anchor, then attaches a device with the same credential
+/// id to the first anchor before the tentative device is confirmed.
+fn stage_tentative_device_and_claim_its_credential_id_elsewhere(
+    env: &pocket_ic::PocketIc,
+    canister_id: candid::Principal,
+) -> Result<(AnchorNumber, DeviceConfirmationCode), RejectResponse> {
+    let user_number_1 =
+        flows::register_anchor_with(env, canister_id, principal_1(), &device_data_1());
+    let user_number_2 =
+        flows::register_anchor_with(env, canister_id, principal_2(), &device_data_2());
+    let credential_id = Some(ByteBuf::from("credential id 3"));
+
+    api::enter_device_registration_mode(env, canister_id, principal_2(), user_number_2)?;
+    let tentative_device = DeviceData {
+        pubkey: ByteBuf::from([42u8; 32]),
+        credential_id: credential_id.clone(),
+        ..device_data_2()
+    };
+    let AddTentativeDeviceResponse::AddedTentatively {
+        verification_code, ..
+    } = api::add_tentative_device(env, canister_id, user_number_2, &tentative_device)?
+    else {
+        panic!("expected the device to be added tentatively");
+    };
+
+    let claiming_device = DeviceData {
+        pubkey: ByteBuf::from([43u8; 32]),
+        credential_id,
+        ..device_data_1()
+    };
+    api::add(
+        env,
+        canister_id,
+        principal_1(),
+        user_number_1,
+        &claiming_device,
+    )?;
+
+    Ok((user_number_2, verification_code))
+}
+
+#[test]
+fn should_not_verify_tentative_device_with_credential_id_claimed_by_another_anchor(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let (user_number, verification_code) =
+        stage_tentative_device_and_claim_its_credential_id_elsewhere(&env, canister_id)?;
+
+    let result = api::verify_tentative_device(
+        &env,
+        canister_id,
+        principal_2(),
+        user_number,
+        &verification_code,
+    );
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("passkey with this credential id is already used").unwrap(),
+    );
+    let anchor_info = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
+    assert_eq!(anchor_info.into_device_data(), vec![device_data_2()]);
+    Ok(())
+}
+
+#[test]
+fn should_not_confirm_authn_method_with_credential_id_claimed_by_another_anchor(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let (user_number, verification_code) =
+        stage_tentative_device_and_claim_its_credential_id_elsewhere(&env, canister_id)?;
+
+    let result = api::api_v2::authn_method_confirm(
+        &env,
+        canister_id,
+        principal_2(),
+        user_number,
+        &verification_code,
+    )?;
+
+    assert_eq!(
+        result,
+        Err(AuthnMethodConfirmationError::InternalCanisterError(
+            "passkey with this credential id is already used".to_string()
+        ))
+    );
+    let anchor_info = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
+    assert_eq!(anchor_info.into_device_data(), vec![device_data_2()]);
+    Ok(())
+}
+
+#[test]
+fn should_not_update_device_to_credential_id_of_another_anchor() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+    let user_number_2 =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+
+    let device = DeviceData {
+        credential_id: device_data_1().credential_id,
+        ..device_data_2()
+    };
+    let result = api::update(
+        &env,
+        canister_id,
+        principal_2(),
+        user_number_2,
+        &device.pubkey,
+        &device,
+    );
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("passkey with this credential id is already used").unwrap(),
+    );
+}
+
+#[test]
+fn should_not_replace_device_with_credential_id_of_another_anchor() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+    let user_number_2 =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+
+    let result = api::replace(
+        &env,
+        canister_id,
+        principal_2(),
+        user_number_2,
+        &device_data_2().pubkey,
+        &device_with_credential_id_of_device_data_1(),
+    );
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("passkey with this credential id is already used").unwrap(),
+    );
+}
+
+#[test]
+fn should_keep_credential_id_when_updating_and_replacing_own_device() -> Result<(), RejectResponse>
+{
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number =
+        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+
+    let mut device = device_data_1();
+    device.alias.push_str(" renamed");
+    api::update(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        &device.pubkey,
+        &device,
+    )?;
+
+    let replacement = DeviceData {
+        pubkey: device_data_2().pubkey,
+        ..device.clone()
+    };
+    api::replace(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        &device.pubkey,
+        &replacement,
+    )?;
+
+    let anchor_info = api::get_anchor_info(&env, canister_id, principal_2(), user_number)?;
+    assert_eq!(anchor_info.into_device_data(), vec![replacement]);
+    Ok(())
+}
+
 /// Verifies that unprotected devices can only be updated from themselves
 #[test]
 fn should_not_update_protected_with_different_device() {

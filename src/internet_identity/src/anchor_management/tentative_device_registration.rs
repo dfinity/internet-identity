@@ -103,6 +103,13 @@ pub async fn add_tentative_device(
                 } => {
                     anchor_management::check_passkey_pubkey_is_not_used(&tentative_device.pubkey)
                         .map_err(|_| AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed)?;
+                    if let Some(credential_id) = &tentative_device.credential_id {
+                        anchor_management::check_passkey_credential_id_is_not_used(
+                            credential_id,
+                            Some(anchor_number),
+                        )
+                        .map_err(AuthnMethodRegisterError::InvalidMetadata)?;
+                    }
 
                     registration.state = DeviceTentativelyAdded {
                         tentative_device,
@@ -196,7 +203,17 @@ pub fn confirm_tentative_device_or_session(
                 } => {
                     if user_confirmation_code == *confirmation_code {
                         // Verification successful - return device to be added and remove the registration
-                        (true, Ok(Some(tentative_device.clone())))
+                        let result = match &tentative_device.credential_id {
+                            Some(credential_id) => {
+                                anchor_management::check_passkey_credential_id_is_not_used(
+                                    credential_id,
+                                    Some(anchor_number),
+                                )
+                                .map_err(AuthnMethodConfirmationError::InternalCanisterError)
+                            }
+                            None => Ok(()),
+                        };
+                        (true, result.map(|()| Some(tentative_device.clone())))
                     } else {
                         // Increment failed attempts counter
                         *failed_attempts += 1;
